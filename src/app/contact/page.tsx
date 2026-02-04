@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
+import ScrollReveal from "@/components/ScrollReveal";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -84,8 +85,9 @@ export default function ContactPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12">
             {/* Contact Form */}
-            <div className="bg-white rounded-xl p-8 shadow-sm border-t-4 border-[#6A8FE3]">
-              <h2 className="text-2xl font-bold text-[#0A1F44] mb-6">Send Us a Message</h2>
+            <ScrollReveal direction="left">
+              <div className="bg-white rounded-xl p-8 shadow-sm border-t-4 border-[#6A8FE3] h-full">
+                <h2 className="text-2xl font-bold text-[#0A1F44] mb-6">Send Us a Message</h2>
 
               {submitted ? (
                 <div className="bg-gray-50 border border-[#8dc63f] rounded-lg p-8 text-center">
@@ -193,10 +195,11 @@ export default function ContactPage() {
                   </button>
                 </form>
               )}
-            </div>
+              </div>
+            </ScrollReveal>
 
             {/* Contact Info */}
-            <div>
+            <ScrollReveal direction="right" delay={200}>
               <h2 className="text-2xl font-bold text-[#0A1F44] mb-6">Get in Touch</h2>
 
               <div className="space-y-6 mb-8">
@@ -290,7 +293,7 @@ export default function ContactPage() {
                   </a>
                 </div>
               </div>
-            </div>
+            </ScrollReveal>
           </div>
         </div>
       </section>
@@ -298,18 +301,20 @@ export default function ContactPage() {
       {/* CTA - Green accent */}
       <section className="py-12 bg-[#8dc63f]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-            Ready to Join Our Team?
-          </h2>
+          <ScrollReveal>
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+              Ready to Join Our Team?
+            </h2>
           <p className="text-lg text-white/90 mb-6">
             Skip the contact form and apply directly for career opportunities.
           </p>
-          <Link
-            href="/apply"
-            className="inline-block bg-white text-[#7ab82e] px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors"
-          >
-            Apply Now
-          </Link>
+            <Link
+              href="/apply"
+              className="inline-block bg-white text-[#7ab82e] px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors"
+            >
+              Apply Now
+            </Link>
+          </ScrollReveal>
         </div>
       </section>
     </PageWrapper>

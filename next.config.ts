@@ -1,15 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export',
-  trailingSlash: true,
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '3cworldgroup.com',
         pathname: '/wp-content/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.pexels.com',
+        pathname: '/**',
       },
     ],
   },

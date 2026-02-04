@@ -1,72 +1,83 @@
 import Link from "next/link";
 import Image from "next/image";
 import PageWrapper from "@/components/PageWrapper";
+import AnimatedCounter from "@/components/AnimatedCounter";
+import ScrollReveal from "@/components/ScrollReveal";
 
 export default function Home() {
   return (
     <PageWrapper>
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#0A1F44] via-[#1a3a6e] to-[#5578c9] text-white py-20 md:py-28">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+      {/* Hero Section - Chipr-inspired bold layout */}
+      <section className="bg-[#0A1F44] text-white min-h-[85vh] flex items-center relative overflow-hidden">
+        {/* Background accent */}
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#6A8FE3]/20 to-transparent"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10 w-full">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <span className="inline-block bg-[#8dc63f] text-white px-4 py-2 rounded-full text-sm font-semibold mb-6">
-                NOW HIRING NATIONWIDE
-              </span>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-                High-Earning Sales Contractor Opportunities
+              <div className="inline-block bg-[#8dc63f] text-white px-5 py-2 font-bold text-sm uppercase tracking-wider mb-8">
+                Now Hiring Nationwide
+              </div>
+
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-black mb-8 leading-[1.1]">
+                Drive Customer Acquisition.
+                <span className="block text-[#8dc63f]">Build Your Future.</span>
               </h1>
-              <p className="text-xl text-white/90 mb-8 leading-relaxed">
-                Unlock your potential with 3C World Group. Join our nationwide team selling fiber internet,
-                TV services, and security solutions. Earn <strong>$1k–$5k+ per week</strong> with flexible schedules and
-                full training provided.
+
+              <p className="text-xl md:text-2xl text-white/80 mb-10 leading-relaxed max-w-xl">
+                We specialize in face-to-face sales solutions for leading telecommunications providers.
+                Join our network of independent contractors earning <strong className="text-white">$1,000–$5,000+ weekly</strong>.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/apply" className="inline-block bg-[#8dc63f] text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-[#7ab82e] transition-colors text-center shadow-lg">
+
+              <div className="flex flex-col sm:flex-row gap-4 mb-12">
+                <Link
+                  href="/apply"
+                  className="bg-[#8dc63f] text-white px-10 py-5 font-bold text-lg uppercase tracking-wide hover:bg-[#7ab82e] transition-all shadow-sharp inline-flex items-center justify-center gap-3"
+                >
                   Apply Now
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
                 </Link>
-                <Link href="/opportunities" className="inline-block border-2 border-white/80 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-white/10 transition-colors text-center">
-                  Learn More
+                <Link
+                  href="/services"
+                  className="border-2 border-white text-white px-10 py-5 font-bold text-lg uppercase tracking-wide hover:bg-white hover:text-[#0A1F44] transition-all inline-flex items-center justify-center"
+                >
+                  Our Solutions
                 </Link>
               </div>
+
+              {/* Stats row */}
+              <div className="flex flex-wrap gap-10">
+                <div>
+                  <div className="text-4xl font-black text-[#8dc63f]">1,000+</div>
+                  <div className="text-white/60 text-sm uppercase tracking-wide">Active Contractors</div>
+                </div>
+                <div>
+                  <div className="text-4xl font-black text-[#8dc63f]">50+</div>
+                  <div className="text-white/60 text-sm uppercase tracking-wide">States Covered</div>
+                </div>
+                <div>
+                  <div className="text-4xl font-black text-[#8dc63f]">$5k+</div>
+                  <div className="text-white/60 text-sm uppercase tracking-wide">Weekly Potential</div>
+                </div>
+              </div>
             </div>
-            <div className="hidden md:block">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                <h3 className="text-2xl font-bold mb-6">Why Join Us?</h3>
-                <div className="space-y-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#8dc63f] rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-bold text-lg">Uncapped Earnings</div>
-                      <div className="text-white/80">Top performers earn $5k+ weekly</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#8dc63f] rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-bold text-lg">Flexible Schedule</div>
-                      <div className="text-white/80">Work when and where you want</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#8dc63f] rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="font-bold text-lg">Full Training</div>
-                      <div className="text-white/80">No experience required</div>
-                    </div>
-                  </div>
+
+            {/* Hero image with sharp shadow */}
+            <div className="hidden lg:block relative">
+              <div className="relative">
+                <Image
+                  src="https://images.pexels.com/photos/7641866/pexels-photo-7641866.jpeg?auto=compress&cs=tinysrgb&w=800"
+                  alt="Professional salesman talking to customers"
+                  width={600}
+                  height={700}
+                  className="object-cover shadow-sharp-lg"
+                />
+                {/* Floating stat card */}
+                <div className="absolute -bottom-8 -left-8 bg-white text-[#0A1F44] p-6 shadow-sharp">
+                  <div className="text-3xl font-black text-[#8dc63f]">98%</div>
+                  <div className="text-sm font-bold uppercase">Contractor Satisfaction</div>
                 </div>
               </div>
             </div>
@@ -74,312 +85,494 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section className="bg-gray-50 py-16 md:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#0A1F44] mb-4">
-              Our Services
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              We partner with industry-leading providers to deliver premium telecommunications and security solutions.
-            </p>
+      {/* What We Do - Professional verbiage from Credico */}
+      <section className="bg-white py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <ScrollReveal direction="left">
+              <div>
+                <div className="inline-block bg-[#6A8FE3]/10 text-[#6A8FE3] px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
+                  What We Do
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-[#0A1F44] mb-6 leading-tight">
+                  Simplifying Outsourced Sales for America's Leading Providers
+                </h2>
+                <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                  3C World Group coordinates face-to-face customer acquisition for telecommunications
+                  and security providers nationwide. From strategy to execution, we deliver outstanding
+                  results through direct sales interactions that build lasting customer relationships.
+                </p>
+
+                <div className="space-y-4 mb-8">
+                  <div className="flex items-start gap-4">
+                    <div className="w-6 h-6 bg-[#8dc63f] flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-bold text-[#0A1F44]">Direct Customer Engagement</div>
+                      <div className="text-gray-600">Face-to-face interactions that convert prospects into loyal customers</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-6 h-6 bg-[#8dc63f] flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-bold text-[#0A1F44]">Nationwide Coverage</div>
+                      <div className="text-gray-600">Operations spanning 50+ states with protected territories</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-6 h-6 bg-[#8dc63f] flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-bold text-[#0A1F44]">Proven Methodology</div>
+                      <div className="text-gray-600">Comprehensive training and ongoing support for consistent results</div>
+                    </div>
+                  </div>
+                </div>
+
+                <Link href="/about" className="inline-flex items-center gap-2 text-[#6A8FE3] font-bold uppercase tracking-wide hover:gap-4 transition-all">
+                  Learn About Us
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </Link>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal direction="right" delay={200}>
+              <div className="relative">
+                <Image
+                  src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80"
+                  alt="Team meeting"
+                  width={600}
+                  height={500}
+                  className="object-cover shadow-sharp"
+                />
+              </div>
+            </ScrollReveal>
           </div>
+        </div>
+      </section>
+
+      {/* Services - with sharp shadow cards */}
+      <section className="bg-gray-50 py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="text-center mb-16">
+              <div className="inline-block bg-[#0A1F44] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
+                Our Solutions
+              </div>
+              <h2 className="text-4xl md:text-5xl font-black text-[#0A1F44] mb-6">
+                Premium Telecommunications Services
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                We partner with industry-leading providers to deliver solutions that customers actually want.
+              </p>
+            </div>
+          </ScrollReveal>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Fiber Internet Card */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all border border-gray-100">
-              <div className="h-48 relative">
-                <Image
-                  src="https://3cworldgroup.com/wp-content/uploads/2026/01/2224687301-1.jpg"
-                  alt="Fiber optic internet installation"
-                  fill
-                  className="object-cover"
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-[#6A8FE3] text-white px-3 py-1 rounded-full text-xs font-semibold">Internet</span>
+            {/* Fiber Internet */}
+            <ScrollReveal delay={0}>
+              <div className="bg-white border-2 border-[#0A1F44] shadow-sharp-sm hover:shadow-sharp transition-all group h-full">
+                <div className="h-56 relative overflow-hidden">
+                  <Image
+                    src="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=800&q=80"
+                    alt="Fiber Internet"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-8">
+                  <h3 className="text-2xl font-black text-[#0A1F44] mb-3">Fiber Internet</h3>
+                  <p className="text-gray-600 mb-6">
+                    Lightning-fast fiber optic connectivity delivering speeds up to 1 Gbps for residential and commercial customers.
+                  </p>
+                  <Link href="/services#fiber" className="inline-flex items-center gap-2 text-[#6A8FE3] font-bold uppercase text-sm tracking-wide hover:gap-3 transition-all">
+                    Learn More
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                 </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Fiber Internet</h3>
-                <p className="text-gray-600 mb-4">
-                  Lightning-fast fiber optic connections delivering speeds up to 1 Gbps for homes and businesses.
-                </p>
-                <Link href="/services#fiber" className="text-[#6A8FE3] font-semibold hover:text-[#5578c9] inline-flex items-center gap-1 transition-colors">
-                  Learn More
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-            </div>
+            </ScrollReveal>
 
-            {/* TV Services Card */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all border border-gray-100">
-              <div className="h-48 relative">
-                <Image
-                  src="https://3cworldgroup.com/wp-content/uploads/2026/01/1448455557.jpg"
-                  alt="Family watching TV at home"
-                  fill
-                  className="object-cover"
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-[#8dc63f] text-white px-3 py-1 rounded-full text-xs font-semibold">Entertainment</span>
+            {/* TV Services */}
+            <ScrollReveal delay={150}>
+              <div className="bg-white border-2 border-[#8dc63f] shadow-sharp-green hover:translate-x-[-4px] hover:translate-y-[-4px] transition-all group h-full">
+                <div className="h-56 relative overflow-hidden">
+                  <Image
+                    src="https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=800&q=80"
+                    alt="TV Services"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-8">
+                  <h3 className="text-2xl font-black text-[#0A1F44] mb-3">TV Services</h3>
+                  <p className="text-gray-600 mb-6">
+                    Premium entertainment packages with hundreds of HD channels, cloud DVR, and on-demand content.
+                  </p>
+                  <Link href="/services#tv" className="inline-flex items-center gap-2 text-[#8dc63f] font-bold uppercase text-sm tracking-wide hover:gap-3 transition-all">
+                    Learn More
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                 </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Reliable TV Services</h3>
-                <p className="text-gray-600 mb-4">
-                  Premium entertainment packages with hundreds of channels, HD quality, and on-demand content.
-                </p>
-                <Link href="/services#tv" className="text-[#8dc63f] font-semibold hover:text-[#7ab82e] inline-flex items-center gap-1 transition-colors">
-                  Learn More
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-            </div>
+            </ScrollReveal>
 
-            {/* Security Card */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all border border-gray-100">
-              <div className="h-48 relative">
-                <Image
-                  src="https://3cworldgroup.com/wp-content/uploads/2026/01/2224116080.jpg"
-                  alt="Modern home security technology"
-                  fill
-                  className="object-cover"
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-[#0A1F44] text-white px-3 py-1 rounded-full text-xs font-semibold">Security</span>
+            {/* Security */}
+            <ScrollReveal delay={300}>
+              <div className="bg-white border-2 border-[#6A8FE3] shadow-sharp-blue hover:translate-x-[-4px] hover:translate-y-[-4px] transition-all group h-full">
+                <div className="h-56 relative overflow-hidden">
+                  <Image
+                    src="https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=800&q=80"
+                    alt="Security Systems"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-8">
+                  <h3 className="text-2xl font-black text-[#0A1F44] mb-3">Security Systems</h3>
+                  <p className="text-gray-600 mb-6">
+                    Complete home and business security with 24/7 professional monitoring and smart home integration.
+                  </p>
+                  <Link href="/services#security" className="inline-flex items-center gap-2 text-[#6A8FE3] font-bold uppercase text-sm tracking-wide hover:gap-3 transition-all">
+                    Learn More
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                 </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Advanced Security</h3>
-                <p className="text-gray-600 mb-4">
-                  Complete home and business security with 24/7 monitoring, smart home integration, and HD cameras.
-                </p>
-                <Link href="/services#security" className="text-[#6A8FE3] font-semibold hover:text-[#5578c9] inline-flex items-center gap-1 transition-colors">
-                  Learn More
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section with animated counters */}
+      <section className="bg-[#0A1F44] py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8 text-center">
+            <div className="p-8">
+              <AnimatedCounter end={1000} suffix="+" className="text-5xl font-black text-[#8dc63f]" />
+              <p className="text-white/70 mt-3 uppercase tracking-wide text-sm font-bold">Contractors Nationwide</p>
+            </div>
+            <div className="p-8">
+              <AnimatedCounter end={50} suffix="+" className="text-5xl font-black text-[#8dc63f]" />
+              <p className="text-white/70 mt-3 uppercase tracking-wide text-sm font-bold">States Covered</p>
+            </div>
+            <div className="p-8">
+              <AnimatedCounter end={5} prefix="$" suffix="k+" className="text-5xl font-black text-[#8dc63f]" />
+              <p className="text-white/70 mt-3 uppercase tracking-wide text-sm font-bold">Weekly Earning Potential</p>
+            </div>
+            <div className="p-8">
+              <AnimatedCounter end={98} suffix="%" className="text-5xl font-black text-[#8dc63f]" />
+              <p className="text-white/70 mt-3 uppercase tracking-wide text-sm font-bold">Contractor Satisfaction</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why Join Section */}
-      <section className="bg-gradient-to-b from-[#f0f5fa] to-[#e8f0f8] py-16 md:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <span className="inline-block bg-[#6A8FE3] text-white px-4 py-2 rounded-full text-sm font-semibold mb-4">
-              JOIN OUR TEAM
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-[#0A1F44] mb-4">
-              Why Join 3C World Group?
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Build a rewarding career with unlimited potential
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-            <div className="rounded-2xl overflow-hidden shadow-xl ring-1 ring-[#6A8FE3]/20">
-              <div className="relative h-72">
-                <Image
-                  src="https://3cworldgroup.com/wp-content/uploads/2026/01/2198220817.jpg"
-                  alt="Independent contractor working"
-                  fill
-                  className="object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0A1F44]/90 via-[#0A1F44]/40 to-transparent flex items-end justify-center pb-6">
-                  <div className="text-center text-white">
-                    <div className="text-4xl font-bold">$1k–$5k</div>
-                    <div className="text-lg opacity-90">Per Week Earnings</div>
-                  </div>
-                </div>
+      {/* Expanding Markets Section */}
+      <section className="bg-white py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="text-center mb-16">
+              <div className="inline-block bg-[#8dc63f] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
+                Now Hiring
               </div>
-            </div>
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#6A8FE3]/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-[#8dc63f] rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-[#0A1F44]">Uncapped Earning Potential</h3>
-              </div>
-              <p className="text-gray-600 text-lg leading-relaxed">
-                Our top contractors consistently earn $5,000+ per week. With competitive commission rates
-                and performance bonuses, your income is only limited by your effort. No salary caps,
-                no limits on success.
+              <h2 className="text-4xl md:text-5xl font-black text-[#0A1F44] mb-6">
+                Expanding Across America
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                We're actively recruiting independent contractors in these markets. Secure your protected territory today.
               </p>
             </div>
+          </ScrollReveal>
+
+          <div className="grid md:grid-cols-4 gap-6">
+            {/* Midwest */}
+            <ScrollReveal delay={0}>
+              <div className="bg-gray-50 p-6 border-l-4 border-[#6A8FE3] h-full">
+                <h3 className="font-black text-[#0A1F44] uppercase tracking-wide text-sm mb-4">Midwest</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                  Chicago, IL
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                  Dayton, OH
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                  Grand Rapids, MI
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                  Lansing, MI
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                  Indianapolis, IN
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                  Lexington, KY
+                </li>
+              </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Southwest */}
+            <ScrollReveal delay={100}>
+              <div className="bg-gray-50 p-6 border-l-4 border-[#8dc63f] h-full">
+                <h3 className="font-black text-[#0A1F44] uppercase tracking-wide text-sm mb-4">Southwest</h3>
+                <ul className="space-y-2 text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Denver, CO
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Phoenix, AZ
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Albuquerque, NM
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Lubbock, TX
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Dallas, TX
+                  </li>
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Southeast */}
+            <ScrollReveal delay={200}>
+              <div className="bg-gray-50 p-6 border-l-4 border-[#6A8FE3] h-full">
+                <h3 className="font-black text-[#0A1F44] uppercase tracking-wide text-sm mb-4">Southeast</h3>
+                <ul className="space-y-2 text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                    Birmingham, AL
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                    Atlanta, GA
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                    Savannah, GA
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                    Jacksonville, FL
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#8dc63f] rounded-full"></span>
+                    Tallahassee, FL
+                  </li>
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* East Coast */}
+            <ScrollReveal delay={300}>
+              <div className="bg-gray-50 p-6 border-l-4 border-[#8dc63f] h-full">
+                <h3 className="font-black text-[#0A1F44] uppercase tracking-wide text-sm mb-4">East Coast</h3>
+                <ul className="space-y-2 text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Charleston, WV
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Baltimore, MD
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Philadelphia, PA
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-[#6A8FE3] rounded-full"></span>
+                    Pittsburgh, PA
+                  </li>
+                </ul>
+              </div>
+            </ScrollReveal>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-            <div className="order-2 md:order-1 bg-white rounded-2xl p-8 shadow-lg border border-[#6A8FE3]/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-[#6A8FE3] rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-[#0A1F44]">Career Growth Opportunities</h3>
-              </div>
-              <p className="text-gray-600 text-lg leading-relaxed">
-                We don't just offer commission – we build sales professionals. Full training program,
-                weekly coaching, and clear advancement paths to team lead and management positions.
-                Skills you'll use for life.
-              </p>
-            </div>
-            <div className="order-1 md:order-2 rounded-2xl overflow-hidden shadow-xl ring-1 ring-[#6A8FE3]/20">
-              <div className="relative h-72">
-                <Image
-                  src="https://3cworldgroup.com/wp-content/uploads/2026/01/484896838.jpg"
-                  alt="Career growth and training"
-                  fill
-                  className="object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0A1F44]/90 via-[#0A1F44]/40 to-transparent flex items-end justify-center pb-6">
-                  <div className="text-center text-white">
-                    <div className="text-4xl font-bold">Leadership</div>
-                    <div className="text-lg opacity-90">Path to Management</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="bg-gradient-to-br from-[#6A8FE3] to-[#5578c9] rounded-2xl p-10 flex items-center justify-center shadow-xl">
-              <div className="text-center text-white">
-                <div className="text-4xl font-bold mb-2">Be Your</div>
-                <div className="text-5xl font-bold text-[#8dc63f]">Own Boss</div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl p-8 shadow-lg border border-[#6A8FE3]/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-[#8dc63f] rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-[#0A1F44]">Flexible Independence</h3>
-              </div>
-              <p className="text-gray-600 text-lg leading-relaxed">
-                As an independent contractor, you control your schedule and work-life balance.
-                Set your own hours, build your own business, and enjoy the freedom of being your own boss
-                while having the support of an established company.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="bg-[#0A1F44] py-14">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div className="p-6">
-              <div className="text-5xl font-bold text-[#8dc63f] mb-2">50+</div>
-              <div className="text-white/80 text-lg">States Covered</div>
-            </div>
-            <div className="p-6 md:border-x border-white/10">
-              <div className="text-5xl font-bold text-[#8dc63f] mb-2">1,000+</div>
-              <div className="text-white/80 text-lg">Contractors Nationwide</div>
-            </div>
-            <div className="p-6">
-              <div className="text-5xl font-bold text-[#8dc63f] mb-2">$5k/wk+</div>
-              <div className="text-white/80 text-lg">Top Contractor Earnings</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="bg-gradient-to-b from-[#f5f9f2] to-[#eef5e8] py-16 md:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <span className="inline-block bg-[#8dc63f] text-white px-4 py-2 rounded-full text-sm font-semibold mb-4">
-              GET STARTED
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-[#0A1F44] mb-4">
-              How It Works
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              From application to your first paycheck in four simple steps.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all border-t-4 border-[#6A8FE3] hover:-translate-y-1">
-              <div className="w-16 h-16 bg-[#6A8FE3] rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                1
-              </div>
-              <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Apply Online</h3>
-              <p className="text-gray-600">
-                Quick application – just name, phone, email, and city.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all border-t-4 border-[#8dc63f] hover:-translate-y-1">
-              <div className="w-16 h-16 bg-[#8dc63f] rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                2
-              </div>
-              <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Interview</h3>
-              <p className="text-gray-600">
-                Quick phone screen to make sure we're a good fit.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all border-t-4 border-[#6A8FE3] hover:-translate-y-1">
-              <div className="w-16 h-16 bg-[#6A8FE3] rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                3
-              </div>
-              <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Training</h3>
-              <p className="text-gray-600">
-                Full sales training and territory assignment.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all border-t-4 border-[#8dc63f] hover:-translate-y-1">
-              <div className="w-16 h-16 bg-[#8dc63f] rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                4
-              </div>
-              <h3 className="text-xl font-bold text-[#0A1F44] mb-3">Start Earning</h3>
-              <p className="text-gray-600">
-                Hit the ground running with support from day one.
-              </p>
-            </div>
-          </div>
-
-          <div className="text-center mt-10">
-            <Link href="/opportunities" className="inline-block bg-[#8dc63f] text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-[#7ab82e] transition-colors shadow-lg">
-              View Career Paths
+          <div className="text-center mt-12">
+            <p className="text-gray-500 mb-6">Don't see your city? We're always expanding – apply and let us know where you're located.</p>
+            <Link
+              href="/apply"
+              className="bg-[#8dc63f] text-white px-10 py-5 font-bold text-lg uppercase tracking-wide hover:bg-[#7ab82e] transition-all shadow-sharp inline-flex items-center gap-3"
+            >
+              Check Availability
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-[#7ab82e] to-[#8dc63f] py-16">
+      {/* Career Opportunities - Credico-style professional content */}
+      <section className="bg-gray-50 py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <ScrollReveal direction="left" className="order-2 lg:order-1">
+              <Image
+                src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=800&q=80"
+                alt="Career opportunities"
+                width={600}
+                height={500}
+                className="object-cover shadow-sharp"
+              />
+            </ScrollReveal>
+
+            <ScrollReveal direction="right" delay={200} className="order-1 lg:order-2">
+              <div className="inline-block bg-[#8dc63f] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
+                Career Opportunities
+              </div>
+              <h2 className="text-4xl md:text-5xl font-black text-[#0A1F44] mb-6 leading-tight">
+                Join a Team That Invests in Your Success
+              </h2>
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                We don't just offer commission – we build sales professionals. Our comprehensive training
+                program, ongoing coaching, and clear advancement paths set you up for long-term success
+                in the direct sales industry.
+              </p>
+
+              <div className="grid sm:grid-cols-2 gap-6 mb-10">
+                <div className="bg-gray-50 p-6 border-l-4 border-[#8dc63f]">
+                  <div className="text-2xl font-black text-[#8dc63f]">$1k–$5k+</div>
+                  <div className="text-gray-600 text-sm">Weekly earning potential</div>
+                </div>
+                <div className="bg-gray-50 p-6 border-l-4 border-[#6A8FE3]">
+                  <div className="text-2xl font-black text-[#6A8FE3]">Flexible</div>
+                  <div className="text-gray-600 text-sm">Set your own schedule</div>
+                </div>
+                <div className="bg-gray-50 p-6 border-l-4 border-[#8dc63f]">
+                  <div className="text-2xl font-black text-[#8dc63f]">Full Training</div>
+                  <div className="text-gray-600 text-sm">No experience required</div>
+                </div>
+                <div className="bg-gray-50 p-6 border-l-4 border-[#6A8FE3]">
+                  <div className="text-2xl font-black text-[#6A8FE3]">Growth Path</div>
+                  <div className="text-gray-600 text-sm">Leadership opportunities</div>
+                </div>
+              </div>
+
+              <Link
+                href="/opportunities"
+                className="bg-[#8dc63f] text-white px-10 py-5 font-bold text-lg uppercase tracking-wide hover:bg-[#7ab82e] transition-all shadow-sharp inline-flex items-center gap-3"
+              >
+                Explore Careers
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </Link>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="bg-gray-50 py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="text-center mb-16">
+              <div className="inline-block bg-[#6A8FE3] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
+                Get Started
+              </div>
+              <h2 className="text-4xl md:text-5xl font-black text-[#0A1F44] mb-6">
+                Your Path to Success
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                From application to your first paycheck – we make the process simple and straightforward.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid md:grid-cols-4 gap-8">
+            {[
+              { num: "01", title: "Apply Online", desc: "Quick 30-second application with basic information" },
+              { num: "02", title: "Interview", desc: "Brief phone call to ensure we're the right fit" },
+              { num: "03", title: "Training", desc: "Comprehensive onboarding and territory assignment" },
+              { num: "04", title: "Start Earning", desc: "Hit the ground running with full support" },
+            ].map((step, index) => (
+              <ScrollReveal key={index} delay={index * 100}>
+                <div className="bg-white p-8 shadow-sharp-sm border-t-4 border-[#8dc63f] h-full">
+                  <div className="text-4xl font-black text-[#8dc63f] mb-3">{step.num}</div>
+                  <h3 className="text-xl font-black text-[#0A1F44] mb-2">{step.title}</h3>
+                  <p className="text-gray-700">{step.desc}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Link
+              href="/apply"
+              className="bg-[#0A1F44] text-white px-12 py-5 font-bold text-lg uppercase tracking-wide hover:bg-[#1a3a6e] transition-all shadow-sharp inline-flex items-center gap-3"
+            >
+              Start Your Application
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="bg-[#8dc63f] py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Ready to Start Your Career?
-          </h2>
-          <p className="text-xl text-white/90 mb-8">
-            Join our team of successful contractors and take control of your income today.
-          </p>
-          <Link
-            href="/apply"
-            className="inline-block bg-white text-[#7ab82e] px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
-          >
-            Apply Now
-          </Link>
+          <ScrollReveal>
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
+              Ready to Take Control of Your Income?
+            </h2>
+            <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
+              Join our nationwide network of successful sales professionals.
+              No experience required – we'll teach you everything you need to succeed.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/apply"
+                className="bg-white text-[#8dc63f] px-12 py-5 font-bold text-lg uppercase tracking-wide hover:bg-gray-100 transition-all shadow-sharp inline-flex items-center justify-center gap-3"
+              >
+                Apply Now
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </Link>
+              <Link
+                href="/contact"
+                className="border-2 border-white text-white px-12 py-5 font-bold text-lg uppercase tracking-wide hover:bg-white hover:text-[#8dc63f] transition-all inline-flex items-center justify-center"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </ScrollReveal>
         </div>
       </section>
     </PageWrapper>
