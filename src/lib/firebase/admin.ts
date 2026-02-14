@@ -6,7 +6,17 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 function formatPrivateKey(key: string | undefined): string | undefined {
   if (!key) return undefined;
 
-  let formattedKey = key;
+  let formattedKey = key.trim();
+
+  // Check if it's base64 encoded (doesn't start with -----)
+  if (!formattedKey.startsWith('-----') && !formattedKey.includes('BEGIN PRIVATE KEY')) {
+    try {
+      // Try to decode as base64
+      formattedKey = Buffer.from(formattedKey, 'base64').toString('utf-8');
+    } catch {
+      // Not base64, continue with original
+    }
+  }
 
   // Try to parse as JSON string first (in case it was JSON.stringify'd)
   if (formattedKey.startsWith('"') && formattedKey.endsWith('"')) {
@@ -23,10 +33,12 @@ function formatPrivateKey(key: string | undefined): string | undefined {
   }
 
   // Replace escaped newlines with actual newlines
-  // This handles both \\n (double escaped) and \n (single escaped)
+  // Handle various escape formats
   formattedKey = formattedKey
     .replace(/\\\\n/g, '\n')
-    .replace(/\\n/g, '\n');
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
 
   return formattedKey;
 }
