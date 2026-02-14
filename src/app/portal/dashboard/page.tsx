@@ -200,14 +200,14 @@ export default function DashboardPage() {
         <div className={`relative overflow-hidden bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-2xl p-5 flex items-center justify-between transition-all duration-700 delay-400 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-orange-500/5 animate-pulse"></div>
           <div className="relative flex items-center gap-4">
-            <div className="p-3 bg-amber-500/20 rounded-xl">
-              <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-3 bg-amber-600 rounded-xl">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
             </div>
             <div>
-              <p className="font-bold text-amber-200 text-lg">Sales Need Your Review</p>
-              <p className="text-amber-200/70 text-sm">Team members are waiting for approval</p>
+              <p className="font-bold text-gray-900 text-lg">Sales Need Your Review</p>
+              <p className="text-gray-700 text-sm">Team members are waiting for approval</p>
             </div>
           </div>
           <Link
