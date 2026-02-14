@@ -54,6 +54,7 @@ export interface Sale {
   products: SaleProduct[];
   totalValue: number;
   totalPoints: number;
+  commission?: number;
 
   // Status & workflow
   status: SaleStatus;

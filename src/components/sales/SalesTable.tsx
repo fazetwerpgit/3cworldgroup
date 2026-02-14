@@ -131,7 +131,7 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
               </div>
               <div>
                 <p className="text-gray-500 text-xs">Commission</p>
-                <p className="text-[#8dc63f] font-medium">+{formatCurrency(sale.commission)}</p>
+                <p className="text-[#8dc63f] font-medium">+{formatCurrency(sale.commission || 0)}</p>
               </div>
             </div>
 
@@ -233,7 +233,7 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
                       {formatCurrency(sale.totalValue)}
                     </div>
                     <div className="text-xs text-[#8dc63f]">
-                      +{formatCurrency(sale.commission)} commission
+                      +{formatCurrency(sale.commission || 0)} commission
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
