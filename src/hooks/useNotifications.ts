@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Notification } from '@/types/notifications';
 
@@ -9,14 +9,23 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchNotifications = useCallback(async (limit = 20) => {
     if (!user) return;
 
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/portal/notifications?userId=${user.uid}&limit=${limit}`
+        `/api/portal/notifications?userId=${user.uid}&limit=${limit}`,
+        { signal: abortControllerRef.current.signal }
       );
       if (response.ok) {
         const data = await response.json();
@@ -24,6 +33,8 @@ export function useNotifications() {
         setUnreadCount(data.unreadCount);
       }
     } catch (error) {
+      // Ignore abort errors
+      if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
@@ -33,25 +44,43 @@ export function useNotifications() {
   const markAsRead = useCallback(async (notificationIds: string[]) => {
     if (!user) return;
 
+    // Filter out IDs that are already being processed (prevent double-clicks)
+    const idsToMark = notificationIds.filter(id => !markingRead.has(id));
+    if (idsToMark.length === 0) return;
+
+    // Track which IDs are being processed
+    setMarkingRead(prev => {
+      const next = new Set(prev);
+      idsToMark.forEach(id => next.add(id));
+      return next;
+    });
+
     try {
       const response = await fetch('/api/portal/notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notificationIds }),
+        body: JSON.stringify({ notificationIds: idsToMark }),
       });
 
       if (response.ok) {
         setNotifications((prev) =>
           prev.map((n) =>
-            notificationIds.includes(n.id) ? { ...n, read: true } : n
+            idsToMark.includes(n.id) ? { ...n, read: true } : n
           )
         );
-        setUnreadCount((prev) => Math.max(0, prev - notificationIds.length));
+        setUnreadCount((prev) => Math.max(0, prev - idsToMark.length));
       }
     } catch (error) {
       console.error('Error marking notifications as read:', error);
+    } finally {
+      // Remove from tracking set
+      setMarkingRead(prev => {
+        const next = new Set(prev);
+        idsToMark.forEach(id => next.delete(id));
+        return next;
+      });
     }
-  }, [user]);
+  }, [user, markingRead]);
 
   const markAllAsRead = useCallback(async () => {
     if (!user) return;
@@ -82,7 +111,13 @@ export function useNotifications() {
         fetchNotifications();
       }, 30000);
 
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        // Cancel any in-flight request on unmount
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     }
   }, [user, fetchNotifications]);
 

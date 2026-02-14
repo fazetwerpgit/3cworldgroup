@@ -299,9 +299,9 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
 
       {/* Rejection Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="reject-modal-title">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-[#0A1F44] mb-4">Reject Sale</h3>
+            <h3 id="reject-modal-title" className="text-lg font-semibold text-[#0A1F44] mb-4">Reject Sale</h3>
             <p className="text-gray-600 mb-4">
               Please provide a reason for rejecting this sale:
             </p>
@@ -336,7 +336,7 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-3 bg-red-100 rounded-full">
@@ -344,7 +344,7 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-[#0A1F44]">Delete Sale</h3>
+              <h3 id="delete-modal-title" className="text-lg font-semibold text-[#0A1F44]">Delete Sale</h3>
             </div>
             <p className="text-gray-600 mb-6">
               Are you sure you want to delete this sale? This action cannot be undone and will permanently remove the sale record.
