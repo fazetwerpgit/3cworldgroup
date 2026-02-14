@@ -6,17 +6,33 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 function formatPrivateKey(key: string | undefined): string | undefined {
   if (!key) return undefined;
 
+  let formattedKey = key;
+
+  // Try to parse as JSON string first (in case it was JSON.stringify'd)
+  if (formattedKey.startsWith('"') && formattedKey.endsWith('"')) {
+    try {
+      formattedKey = JSON.parse(formattedKey);
+    } catch {
+      // Not valid JSON, continue with original
+    }
+  }
+
   // If the key already has actual newlines, return as-is
-  if (key.includes('-----BEGIN PRIVATE KEY-----\n')) {
-    return key;
+  if (formattedKey.includes('-----BEGIN PRIVATE KEY-----\n')) {
+    return formattedKey;
   }
 
   // Replace escaped newlines with actual newlines
   // This handles both \\n (double escaped) and \n (single escaped)
-  return key
+  formattedKey = formattedKey
     .replace(/\\\\n/g, '\n')
     .replace(/\\n/g, '\n');
+
+  return formattedKey;
 }
+
+// Track initialization error for debugging
+let initError: string | null = null;
 
 // Check if we have valid admin credentials
 const hasValidAdminConfig = Boolean(
@@ -35,28 +51,37 @@ if (hasValidAdminConfig) {
   try {
     const formattedPrivateKey = formatPrivateKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
 
-    const adminConfig = {
-      credential: cert({
-        projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-        privateKey: formattedPrivateKey,
-      }),
-    };
-
-    if (getApps().length === 0) {
-      app = initializeApp(adminConfig);
+    if (!formattedPrivateKey || !formattedPrivateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      initError = 'Private key format is invalid';
+      console.error('Firebase Admin: Private key format is invalid');
     } else {
-      app = getApps()[0];
-    }
+      const adminConfig = {
+        credential: cert({
+          projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+          privateKey: formattedPrivateKey,
+        }),
+      };
 
-    adminAuth = getAuth(app);
-    adminDb = getFirestore(app);
+      if (getApps().length === 0) {
+        app = initializeApp(adminConfig);
+      } else {
+        app = getApps()[0];
+      }
+
+      adminAuth = getAuth(app);
+      adminDb = getFirestore(app);
+    }
   } catch (error) {
+    initError = error instanceof Error ? error.message : 'Unknown initialization error';
     console.error('Failed to initialize Firebase Admin:', error);
   }
+} else {
+  initError = 'Missing environment variables';
+  console.error('Firebase Admin: Missing required environment variables');
 }
 
-export { app, adminAuth, adminDb };
+export { app, adminAuth, adminDb, initError };
 
 // Helper to check if Firebase Admin is properly configured
 export function isFirebaseAdminConfigured(): boolean {

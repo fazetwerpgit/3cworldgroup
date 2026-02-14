@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, initError } from '@/lib/firebase/admin';
 import { Sale, SaleStatus } from '@/types';
 
 // Helper function to create a notification
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
       return NextResponse.json(
-        { error: 'Database not configured' },
+        { error: 'Database not configured', details: initError || 'adminDb is null' },
         { status: 500 }
       );
     }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
       return NextResponse.json(
-        { error: 'Database not configured' },
+        { error: 'Database not configured', details: initError || 'adminDb is null' },
         { status: 500 }
       );
     }
