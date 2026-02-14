@@ -6,6 +6,7 @@ import { User, UserRoles } from '@/types';
 interface UserTableProps {
   users: User[];
   onStatusChange?: (userId: string, status: 'active' | 'inactive') => void;
+  onDelete?: (userId: string, userName: string) => void;
   loading?: boolean;
 }
 
@@ -21,7 +22,7 @@ const roleLabels: Record<string, string> = {
   sales_rep: 'Sales Rep',
 };
 
-export function UserTable({ users, onStatusChange, loading }: UserTableProps) {
+export function UserTable({ users, onStatusChange, onDelete, loading }: UserTableProps) {
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
@@ -119,10 +120,10 @@ export function UserTable({ users, onStatusChange, loading }: UserTableProps) {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-3">
                     <Link
                       href={`/portal/admin/users/${user.uid}`}
-                      className="text-[#0A1F44] hover:text-[#1a3a6e]"
+                      className="text-[#0A1F44] hover:text-[#1a3a6e] font-medium"
                     >
                       Edit
                     </Link>
@@ -130,7 +131,7 @@ export function UserTable({ users, onStatusChange, loading }: UserTableProps) {
                       <button
                         onClick={() => onStatusChange(user.uid, 'inactive')}
                         disabled={loading}
-                        className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                        className="text-orange-600 hover:text-orange-800 disabled:opacity-50"
                       >
                         Deactivate
                       </button>
@@ -142,6 +143,16 @@ export function UserTable({ users, onStatusChange, loading }: UserTableProps) {
                         className="text-green-600 hover:text-green-800 disabled:opacity-50"
                       >
                         Activate
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(user.uid, user.displayName || user.email || 'this user')}
+                        disabled={loading}
+                        className="text-red-600 hover:text-red-800 disabled:opacity-50 font-medium"
+                        title="Delete user"
+                      >
+                        Delete
                       </button>
                     )}
                   </div>

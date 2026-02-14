@@ -6,6 +6,9 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -16,6 +19,7 @@ interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasPermission: (permission: string) => boolean;
   isRole: (...roles: UserRole[]) => boolean;
   refreshUser: () => Promise<void>;
@@ -137,6 +141,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    if (!auth || !auth.currentUser) {
+      throw new Error('You must be signed in to change your password');
+    }
+
+    const user = auth.currentUser;
+    if (!user.email) {
+      throw new Error('No email associated with this account');
+    }
+
+    // Re-authenticate the user with their current password
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // Update to new password
+    await updatePassword(user, newPassword);
+  };
+
   const refreshUser = async () => {
     if (!auth) return;
     const currentUser = auth.currentUser;
@@ -166,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signOut,
         resetPassword,
+        changePassword,
         hasPermission,
         isRole,
         refreshUser,

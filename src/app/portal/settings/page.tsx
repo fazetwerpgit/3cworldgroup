@@ -7,11 +7,18 @@ import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 
 export default function SettingsPage() {
-  const { user, resetPassword, refreshUser } = useAuth();
+  const { user, resetPassword, changePassword, refreshUser } = useAuth();
   const [resetSent, setResetSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Password change state
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Profile editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -40,6 +47,49 @@ export default function SettingsPage() {
       setError('Failed to send password reset email. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    // Validate passwords
+    if (newPassword.length < 6) {
+      setError('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      await changePassword(currentPassword, newPassword);
+      setSuccess('Password changed successfully!');
+      setShowPasswordForm(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message.includes('wrong-password') || err.message.includes('invalid-credential')) {
+          setError('Current password is incorrect.');
+        } else if (err.message.includes('weak-password')) {
+          setError('New password is too weak. Please choose a stronger password.');
+        } else {
+          setError('Failed to change password. Please try again.');
+        }
+      } else {
+        setError('Failed to change password. Please try again.');
+      }
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -262,17 +312,113 @@ export default function SettingsPage() {
                   Security
                 </h2>
                 <div className="space-y-4">
+                  {/* Change Password */}
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-[#0A1F44] rounded-lg">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">Change Password</h3>
+                          <p className="text-sm text-gray-500">
+                            Update your password directly
+                          </p>
+                        </div>
+                      </div>
+                      {!showPasswordForm && (
+                        <button
+                          onClick={() => setShowPasswordForm(true)}
+                          className="px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] transition-colors"
+                        >
+                          Change Password
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Password Change Form */}
+                    {showPasswordForm && (
+                      <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Current Password
+                          </label>
+                          <input
+                            type="password"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            required
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            placeholder="Enter current password"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            New Password
+                          </label>
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            required
+                            minLength={6}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            placeholder="Enter new password (min 6 characters)"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Confirm New Password
+                          </label>
+                          <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            required
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            placeholder="Confirm new password"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 pt-2">
+                          <button
+                            type="submit"
+                            disabled={changingPassword}
+                            className="px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] transition-colors disabled:opacity-50"
+                          >
+                            {changingPassword ? 'Changing...' : 'Update Password'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowPasswordForm(false);
+                              setCurrentPassword('');
+                              setNewPassword('');
+                              setConfirmPassword('');
+                              setError('');
+                            }}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* Reset Password via Email */}
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-[#0A1F44] rounded-lg">
+                      <div className="p-2 bg-gray-400 rounded-lg">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-medium text-gray-900">Password</h3>
+                        <h3 className="font-medium text-gray-900">Reset via Email</h3>
                         <p className="text-sm text-gray-500">
-                          Reset your password via email
+                          Forgot your password? Get a reset link
                         </p>
                       </div>
                     </div>
@@ -287,9 +433,9 @@ export default function SettingsPage() {
                       <button
                         onClick={handlePasswordReset}
                         disabled={loading}
-                        className="px-4 py-2 bg-[#0A1F44] text-white rounded-lg text-sm font-medium hover:bg-[#1a3a6e] transition-colors disabled:opacity-50"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
                       >
-                        {loading ? 'Sending...' : 'Reset Password'}
+                        {loading ? 'Sending...' : 'Send Reset Link'}
                       </button>
                     )}
                   </div>

@@ -14,6 +14,8 @@ export default function UsersPage() {
   const [error, setError] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | ''>('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ userId: string; userName: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -60,6 +62,36 @@ export default function UsersPage() {
       fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user');
+    }
+  };
+
+  const handleDeleteClick = (userId: string, userName: string) => {
+    setDeleteConfirm({ userId, userName });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+
+    setDeleting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/portal/auth/users/${deleteConfirm.userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete user');
+      }
+
+      // Refresh the list
+      fetchUsers();
+      setDeleteConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -153,8 +185,45 @@ export default function UsersPage() {
                 <UserTable
                   users={users}
                   onStatusChange={handleStatusChange}
-                  loading={loading}
+                  onDelete={handleDeleteClick}
+                  loading={loading || deleting}
                 />
+              )}
+
+              {/* Delete Confirmation Modal */}
+              {deleteConfirm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-red-100 rounded-full">
+                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Delete User</h3>
+                    </div>
+                    <p className="text-gray-600 mb-6">
+                      Are you sure you want to delete <strong>{deleteConfirm.userName}</strong>?
+                      This will disable their account and they will no longer be able to sign in.
+                    </p>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setDeleteConfirm(null)}
+                        disabled={deleting}
+                        className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDeleteConfirm}
+                        disabled={deleting}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {deleting ? 'Deleting...' : 'Delete User'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </main>
