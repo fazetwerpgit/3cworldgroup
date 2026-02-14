@@ -1,8 +1,20 @@
+import { NextResponse } from 'next/server';
+
+// POST /api/portal/auth/signup - DISABLED for security
+// Employee accounts must be created by admins through User Management
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Public signup is disabled. Please contact your manager to create an account.' },
+    { status: 403 }
+  );
+}
+
+/* ORIGINAL CODE - DISABLED FOR SECURITY
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 // POST /api/portal/auth/signup - Register new employee as sales_rep
-export async function POST(request: NextRequest) {
+export async function POST_DISABLED(request: NextRequest) {
   try {
     if (!adminDb || !adminAuth) {
       return NextResponse.json(
@@ -101,3 +113,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+*/
