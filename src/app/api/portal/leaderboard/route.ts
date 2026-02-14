@@ -40,9 +40,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get approved sales - filter by date in code to avoid compound index requirement
+    // Limit to prevent memory issues with large datasets
     const salesSnapshot = await adminDb
       .collection('sales')
       .where('status', '==', 'approved')
+      .limit(5000)
       .get();
 
     // Convert startDate to timestamp for comparison

@@ -47,9 +47,11 @@ export async function GET(request: NextRequest) {
     const salesRef = adminDb.collection('sales');
 
     // Use only one filter in the query, filter rest in memory
+    // Add limit to prevent memory issues with large datasets
+    const maxFetch = Math.min(limit * 2, 500); // Cap at 500 to prevent memory issues
     const snapshot = salesRepId
-      ? await salesRef.where('salesRepId', '==', salesRepId).get()
-      : await salesRef.get();
+      ? await salesRef.where('salesRepId', '==', salesRepId).limit(maxFetch).get()
+      : await salesRef.limit(maxFetch).get();
     let sales: Sale[] = [];
 
     snapshot.forEach((doc) => {
@@ -124,6 +126,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate points server-side based on products to prevent cheating
+    let calculatedPoints = 0;
+    if (Array.isArray(products)) {
+      for (const product of products) {
+        calculatedPoints += product.points || 0;
+      }
+    }
+
     const newSale = {
       salesRepId,
       salesRepName: salesRepName || '',
@@ -135,35 +145,33 @@ export async function POST(request: NextRequest) {
       saleType: saleType || 'new_service',
       products,
       totalValue: totalValue || 0,
-      totalPoints: totalPoints || 0,
-      status: 'approved' as SaleStatus, // Auto-approved - no approval needed
+      totalPoints: calculatedPoints, // Server-calculated, not from client
+      status: 'pending' as SaleStatus, // Requires approval
       saleDate: new Date(),
       notes: notes || '',
       createdAt: new Date(),
       updatedAt: new Date(),
-      approvedAt: new Date(), // Auto-approved timestamp
     };
 
     const docRef = await adminDb.collection('sales').add(newSale);
 
-    // Send confirmation notification with points earned
-    const pointsEarned = totalPoints || 0;
+    // Send confirmation notification - sale is pending approval
     await createNotification(
       salesRepId,
-      'sale_approved',
-      'Sale Recorded! 🎉',
-      `Your sale has been logged.${pointsEarned > 0 ? ` You earned ${pointsEarned} points!` : ''}`,
+      'sale_submitted',
+      'Sale Submitted! 📋',
+      'Your sale has been submitted and is pending approval from your manager.',
       `/portal/sales/${docRef.id}`
     );
 
-    // Also send points notification if they earned points
-    if (pointsEarned > 0) {
+    // Notify manager if one is assigned
+    if (managerId) {
       await createNotification(
-        salesRepId,
-        'points_earned',
-        `+${pointsEarned} Points Earned`,
-        'Great job! Check the leaderboard to see your ranking.',
-        '/portal/leaderboard'
+        managerId,
+        'sale_pending',
+        'New Sale Needs Approval',
+        `${salesRepName || 'A team member'} submitted a new sale for review.`,
+        '/portal/approvals'
       );
     }
 
