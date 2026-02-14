@@ -23,25 +23,56 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Simple query without ordering to avoid index requirements
+    // We'll sort in memory instead
     let query = adminDb
       .collection('notifications')
-      .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc');
+      .where('userId', '==', userId);
 
-    if (unreadOnly) {
-      query = query.where('read', '==', false);
+    const snapshot = await query.limit(limit * 2).get();
+
+    // Sort and filter in memory to avoid compound index requirements
+    interface NotificationData {
+      id: string;
+      userId: string;
+      type: string;
+      title: string;
+      message: string;
+      read: boolean;
+      createdAt: Date | null;
+      link?: string;
+      metadata?: Record<string, unknown>;
     }
 
-    const snapshot = await query.limit(limit).get();
-
-    const notifications = snapshot.docs.map((doc) => {
+    let notifications: NotificationData[] = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate(),
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        read: data.read ?? false,
+        createdAt: data.createdAt?.toDate() || null,
+        link: data.link,
+        metadata: data.metadata,
       };
     });
+
+    // Filter unread if needed
+    if (unreadOnly) {
+      notifications = notifications.filter((n) => !n.read);
+    }
+
+    // Sort by createdAt descending
+    notifications.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    // Apply limit
+    notifications = notifications.slice(0, limit);
 
     // Get unread count
     const unreadSnapshot = await adminDb

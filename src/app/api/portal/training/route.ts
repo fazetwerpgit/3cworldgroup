@@ -17,23 +17,25 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const isRequired = searchParams.get('required');
 
-    let query = adminDb
-      .collection('training')
-      .where('isPublished', '==', true)
-      .orderBy('order', 'asc');
-
-    const snapshot = await query.get();
+    // Simple query - filter and sort in memory to avoid index requirements
+    const snapshot = await adminDb.collection('training').get();
     let resources: TrainingResource[] = [];
 
     snapshot.forEach((doc) => {
       const data = doc.data();
-      resources.push({
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
-      } as TrainingResource);
+      // Only include published resources
+      if (data.isPublished) {
+        resources.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+        } as TrainingResource);
+      }
     });
+
+    // Sort by order
+    resources.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     // Filter in memory (Firestore has limitations on compound queries)
     if (category) {

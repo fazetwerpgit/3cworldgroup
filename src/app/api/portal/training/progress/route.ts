@@ -67,13 +67,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if progress record exists
+    // Check if progress record exists - use single where to avoid compound index
     const existingSnapshot = await adminDb
       .collection('userProgress')
       .where('userId', '==', userId)
-      .where('resourceId', '==', resourceId)
-      .limit(1)
       .get();
+
+    // Filter for the specific resource in memory
+    const existingDoc = existingSnapshot.docs.find(
+      (doc) => doc.data().resourceId === resourceId
+    );
 
     const updateData = {
       userId,
@@ -83,13 +86,12 @@ export async function POST(request: NextRequest) {
       lastAccessedAt: new Date(),
     };
 
-    if (existingSnapshot.empty) {
+    if (!existingDoc) {
       // Create new progress record
       await adminDb.collection('userProgress').add(updateData);
     } else {
       // Update existing record
-      const docRef = existingSnapshot.docs[0].ref;
-      await docRef.update(updateData);
+      await existingDoc.ref.update(updateData);
     }
 
     return NextResponse.json({ success: true });

@@ -38,16 +38,13 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Base query
-    let query = adminDb
-      .collection('sales')
-      .where('saleDate', '>=', startDate);
+    // Get all sales and filter in memory to avoid index requirements
+    const salesRef = adminDb.collection('sales');
 
-    if (salesRepId) {
-      query = query.where('salesRepId', '==', salesRepId);
-    }
-
-    const snapshot = await query.get();
+    const snapshot = salesRepId
+      ? await salesRef.where('salesRepId', '==', salesRepId).get()
+      : await salesRef.get();
+    const startTimestamp = startDate.getTime();
 
     let totalSales = 0;
     let totalValue = 0;
@@ -59,6 +56,13 @@ export async function GET(request: NextRequest) {
 
     snapshot.forEach((doc) => {
       const data = doc.data();
+
+      // Filter by date in memory
+      const saleDate = data.saleDate?.toDate ? data.saleDate.toDate() : new Date(data.saleDate);
+      if (saleDate.getTime() < startTimestamp) {
+        return; // Skip sales before the period
+      }
+
       totalSales++;
       totalValue += data.totalValue || 0;
       totalPoints += data.totalPoints || 0;
@@ -101,24 +105,23 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    let previousQuery = adminDb
-      .collection('sales')
-      .where('saleDate', '>=', previousStartDate)
-      .where('saleDate', '<', previousEndDate);
-
-    if (salesRepId) {
-      previousQuery = previousQuery.where('salesRepId', '==', salesRepId);
-    }
-
-    const previousSnapshot = await previousQuery.get();
+    // Use the same snapshot and filter for previous period in memory
+    const previousStartTimestamp = previousStartDate.getTime();
+    const previousEndTimestamp = previousEndDate.getTime();
     let previousTotalPoints = 0;
     let previousTotalSales = 0;
 
-    previousSnapshot.forEach((doc) => {
+    snapshot.forEach((doc) => {
       const data = doc.data();
-      previousTotalSales++;
-      if (data.status === 'approved') {
-        previousTotalPoints += data.totalPoints || 0;
+      const saleDate = data.saleDate?.toDate ? data.saleDate.toDate() : new Date(data.saleDate);
+      const saleDateTimestamp = saleDate.getTime();
+
+      // Check if sale is in previous period
+      if (saleDateTimestamp >= previousStartTimestamp && saleDateTimestamp < previousEndTimestamp) {
+        previousTotalSales++;
+        if (data.status === 'approved') {
+          previousTotalPoints += data.totalPoints || 0;
+        }
       }
     });
 

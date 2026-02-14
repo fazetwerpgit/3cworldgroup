@@ -43,21 +43,23 @@ export async function GET(request: NextRequest) {
     const salesRepId = searchParams.get('salesRepId');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = adminDb.collection('sales').orderBy('createdAt', 'desc');
+    // Build query - avoid compound indexes by filtering in memory
+    const salesRef = adminDb.collection('sales');
 
-    if (status) {
-      query = query.where('status', '==', status);
-    }
-
-    if (salesRepId) {
-      query = query.where('salesRepId', '==', salesRepId);
-    }
-
-    const snapshot = await query.limit(limit).get();
-    const sales: Sale[] = [];
+    // Use only one filter in the query, filter rest in memory
+    const snapshot = salesRepId
+      ? await salesRef.where('salesRepId', '==', salesRepId).get()
+      : await salesRef.get();
+    let sales: Sale[] = [];
 
     snapshot.forEach((doc) => {
       const data = doc.data();
+
+      // Filter by status in memory if needed
+      if (status && data.status !== status) {
+        return;
+      }
+
       sales.push({
         id: doc.id,
         ...data,
@@ -67,6 +69,16 @@ export async function GET(request: NextRequest) {
         approvedAt: data.approvedAt?.toDate(),
       } as Sale);
     });
+
+    // Sort by createdAt descending
+    sales.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    // Apply limit
+    sales = sales.slice(0, limit);
 
     return NextResponse.json({ sales });
   } catch (error) {
