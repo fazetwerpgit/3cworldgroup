@@ -212,7 +212,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/portal/approvals"
-            className="relative px-5 py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-400 transition-all hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] shine-effect"
+            className="relative px-5 py-3 bg-amber-500 text-gray-900 rounded-xl font-bold hover:bg-amber-400 transition-all hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] shadow-lg"
           >
             Review Now →
           </Link>
