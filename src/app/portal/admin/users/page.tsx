@@ -203,8 +203,8 @@ export default function UsersPage() {
                       <h3 className="text-lg font-semibold text-gray-900">Delete User</h3>
                     </div>
                     <p className="text-gray-600 mb-6">
-                      Are you sure you want to delete <strong>{deleteConfirm.userName}</strong>?
-                      This will disable their account and they will no longer be able to sign in.
+                      Are you sure you want to permanently delete <strong>{deleteConfirm.userName}</strong>?
+                      This action cannot be undone. The user will be removed from the system completely.
                     </p>
                     <div className="flex items-center justify-end gap-3">
                       <button

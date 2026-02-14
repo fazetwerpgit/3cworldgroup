@@ -113,7 +113,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/portal/auth/users/[id] - Disable a user (soft delete)
+// DELETE /api/portal/auth/users/[id] - Permanently delete a user
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -135,20 +135,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Disable user in Firebase Auth
-    await adminAuth.updateUser(id, { disabled: true });
+    // Delete user from Firebase Auth
+    await adminAuth.deleteUser(id);
 
-    // Set status to inactive in Firestore
-    await docRef.update({
-      status: 'inactive',
-      updatedAt: new Date(),
-    });
+    // Delete user document from Firestore
+    await docRef.delete();
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting user:', error);
     return NextResponse.json(
-      { error: 'Failed to delete user' },
+      { error: 'Failed to delete user', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
