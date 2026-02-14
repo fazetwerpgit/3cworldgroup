@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to create user' },
+      { error: 'Failed to create user', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

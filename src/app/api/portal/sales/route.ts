@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching sales:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch sales' },
+      { error: 'Failed to fetch sales', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating sale:', error);
     return NextResponse.json(
-      { error: 'Failed to create sale' },
+      { error: 'Failed to create sale', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
