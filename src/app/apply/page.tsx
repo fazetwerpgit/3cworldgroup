@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -33,12 +34,29 @@ const faqs = [
 ];
 
 export default function ApplyPage() {
+  return (
+    <Suspense>
+      <ApplyPageContent />
+    </Suspense>
+  );
+}
+
+function ApplyPageContent() {
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
     city: "",
+    referredBy: "",
   });
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      setFormData((prev) => ({ ...prev, referredBy: ref }));
+    }
+  }, [searchParams]);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -63,6 +81,7 @@ export default function ApplyPage() {
         phone: formData.phone,
         email: formData.email,
         city: formData.city,
+        referredBy: formData.referredBy,
       });
 
       await fetch(`${scriptUrl}?${params.toString()}`, {
@@ -299,6 +318,21 @@ export default function ApplyPage() {
                         placeholder="Dallas, TX"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="referredBy" className="block text-sm font-bold text-[#0A1F44] mb-2">
+                      Referred by
+                    </label>
+                    <input
+                      type="text"
+                      id="referredBy"
+                      name="referredBy"
+                      value={formData.referredBy}
+                      onChange={handleChange}
+                      className="w-full px-4 py-4 border-2 border-gray-200 focus:border-[#0A1F44] outline-none transition-colors"
+                      placeholder="Name of person who referred you (optional)"
+                    />
                   </div>
 
                   <button
