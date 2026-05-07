@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageWrapper from "@/components/PageWrapper";
@@ -43,12 +43,14 @@ export default function ApplyPage() {
 
 function ApplyPageContent() {
   const searchParams = useSearchParams();
+  const formStartedAtRef = useRef(Date.now());
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
     city: "",
     referredBy: "",
+    website: "",
   });
 
   useEffect(() => {
@@ -72,6 +74,13 @@ function ApplyPageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (formData.website || Date.now() - formStartedAtRef.current < 3000) {
+      setSubmitted(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       // Build URL with query parameters (more reliable for Google Apps Script)
@@ -254,6 +263,30 @@ function ApplyPageContent() {
                 <p className="text-gray-600 mb-8">No resume needed. Just tell us about yourself.</p>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Honeypot — hidden from real users, bots fill it. Do not remove. */}
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: "-10000px",
+                      top: "auto",
+                      width: 1,
+                      height: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <label htmlFor="website">Website (leave blank)</label>
+                    <input
+                      type="text"
+                      id="website"
+                      name="website"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={formData.website}
+                      onChange={handleChange}
+                    />
+                  </div>
+
                   <div className="grid md:grid-cols-2 gap-5">
                     <div>
                       <label htmlFor="name" className="block text-sm font-bold text-[#0A1F44] mb-2">
