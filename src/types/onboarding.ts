@@ -37,11 +37,27 @@ export interface UserOnboardingItem {
   // no card numbers or SSNs are ever persisted.
   reference?: string;
   reviewedBy?: string;
+  reviewerName?: string;
   reviewedAt?: Date;
   rejectionReason?: string;
   submittedAt?: Date;
   updatedAt: Date;
 }
+
+// UI display config per onboarding status
+export const OnboardingStatusConfig: Record<OnboardingStatus, { name: string; color: string }> = {
+  not_started: { name: 'Not Started', color: 'gray' },
+  submitted: { name: 'Under Review', color: 'yellow' },
+  approved: { name: 'Approved', color: 'green' },
+  rejected: { name: 'Needs Attention', color: 'red' },
+};
+
+export const OnboardingCategoryLabels: Record<OnboardingCategory, string> = {
+  paperwork: 'Paperwork',
+  financial: 'Financial',
+  business: 'Business (IBO)',
+  credential: 'Credentialing',
+};
 
 export type ChannelOnboardingStatus = 'not_started' | 'submitted' | 'cleared';
 

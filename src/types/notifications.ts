@@ -4,6 +4,9 @@ export type NotificationType =
   | 'sale_pending'
   | 'points_earned'
   | 'leaderboard_rank'
+  | 'onboarding_submitted'
+  | 'onboarding_approved'
+  | 'onboarding_rejected'
   | 'announcement'
   | 'system';
 
@@ -32,6 +35,9 @@ export const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   sale_pending: '⏳',
   points_earned: '⭐',
   leaderboard_rank: '🏆',
+  onboarding_submitted: '📋',
+  onboarding_approved: '🎉',
+  onboarding_rejected: '📝',
   announcement: '📢',
   system: '🔔',
 };
@@ -42,6 +48,9 @@ export const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   sale_pending: 'bg-yellow-50 text-yellow-700',
   points_earned: 'bg-purple-50 text-purple-700',
   leaderboard_rank: 'bg-blue-50 text-blue-700',
+  onboarding_submitted: 'bg-blue-50 text-blue-700',
+  onboarding_approved: 'bg-green-50 text-green-700',
+  onboarding_rejected: 'bg-red-50 text-red-700',
   announcement: 'bg-orange-50 text-orange-700',
   system: 'bg-gray-50 text-gray-700',
 };
