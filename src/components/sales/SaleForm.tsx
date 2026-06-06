@@ -7,7 +7,6 @@ import { useSales } from '@/hooks/useSales';
 import {
   SaleType,
   SaleProduct,
-  FiberCompany,
   SALE_TYPES,
   FIBER_COMPANIES,
   FIBER_PLANS,
@@ -32,7 +31,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     saleType: 'new_service' as SaleType,
     notes: '',
   });
-  const [selectedCompany, setSelectedCompany] = useState<FiberCompany | ''>('');
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [formError, setFormError] = useState('');
 
@@ -43,7 +42,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCompanyChange = (company: FiberCompany) => {
+  const handleCompanyChange = (company: string) => {
     setSelectedCompany(company);
   };
 
@@ -107,7 +106,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       ...formData,
       salesRepId: user.uid,
       salesRepName: user.displayName || user.email || '',
-      managerId: user.managerId,
+      managerId: user.reportsToId,
       products,
       totalValue: calculateTotalValue(),
       totalPoints: calculateTotalPoints(),

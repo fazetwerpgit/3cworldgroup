@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { NOTIFICATION_ICONS, NOTIFICATION_COLORS } from '@/types/notifications';
+import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export function PortalHeader() {
   const { user, signOut } = useAuth();
@@ -38,15 +39,10 @@ export function PortalHeader() {
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      admin: 'Administrator',
-      operations: 'Operations',
-      sales_manager: 'Sales Manager',
-      sales_rep: 'Sales Representative',
-    };
-    return labels[role] || role;
-  };
+  // Shared display names cover all platform + field roles; effective role
+  // handles legacy docs that resolve to fieldRole-only.
+  const effectiveRole = getEffectiveRole(user);
+  const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
 
   const formatTimeAgo = (date: Date | string) => {
     const now = new Date();
@@ -214,7 +210,7 @@ export function PortalHeader() {
               <p className="text-sm font-medium text-gray-900">
                 {user?.displayName || user?.email?.split('@')[0] || 'User'}
               </p>
-              <p className="text-xs text-gray-500">{getRoleLabel(user?.role || '')}</p>
+              <p className="text-xs text-gray-500">{roleLabel}</p>
             </div>
             {/* Dropdown arrow */}
             <svg

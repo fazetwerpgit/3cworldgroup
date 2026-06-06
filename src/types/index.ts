@@ -1,4 +1,7 @@
 export * from './auth';
+export * from './channels';
+export * from './commission';
+export * from './onboarding';
 export * from './sales';
 export * from './training';
 export * from './leaderboard';

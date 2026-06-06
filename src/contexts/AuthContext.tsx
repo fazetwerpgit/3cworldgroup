@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
-import { User, AuthState, RolePermissions, UserRole } from '@/types';
+import { User, AuthState, RolePermissions, UserRole, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
@@ -44,8 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           uid: firebaseUser.uid,
           email: userData.email,
           displayName: userData.displayName,
-          role: userData.role,
-          managerId: userData.managerId,
+          ...resolveRoles(userData.role, userData.fieldRole),
+          isIBO: userData.isIBO ?? false,
+          // TODO: migrate Firestore managerId -> reportsToId
+          reportsToId: userData.reportsToId ?? userData.managerId,
           territoryId: userData.territoryId,
           phone: userData.phone,
           avatarUrl: userData.avatarUrl,
@@ -172,13 +174,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = (permission: string): boolean => {
     if (!state.user) return false;
-    const permissions = RolePermissions[state.user.role] || [];
+    const roleKey = state.user.role ?? state.user.fieldRole;
+    const permissions = roleKey ? RolePermissions[roleKey] : [];
     return permissions.includes(permission);
   };
 
   const isRole = (...roles: UserRole[]): boolean => {
     if (!state.user) return false;
-    return roles.includes(state.user.role);
+    const { role, fieldRole } = state.user;
+    return roles.some((r) => r === role || r === fieldRole);
   };
 
   return (

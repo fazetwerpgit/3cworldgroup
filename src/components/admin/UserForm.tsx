@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, UserRole } from '@/types';
+import { User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
 
 interface UserFormProps {
   user?: User;
   isEdit?: boolean;
 }
 
+// TODO: split platform role / field role selection in form UX
 const roleOptions: { value: UserRole; label: string }[] = [
-  { value: 'sales_rep', label: 'Sales Representative' },
-  { value: 'sales_manager', label: 'Sales Manager' },
+  { value: 'entry_rep', label: 'Entry Representative' },
+  { value: 'l1_manager', label: 'L1 Manager' },
+  { value: 'l2_manager', label: 'L2 Manager' },
   { value: 'operations', label: 'Operations' },
   { value: 'admin', label: 'Administrator' },
 ];
@@ -25,9 +27,11 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     email: user?.email || '',
     password: '',
     displayName: user?.displayName || '',
-    role: user?.role || 'sales_rep' as UserRole,
+    // Effective role: platform role wins, else field role (legacy docs shim
+    // to fieldRole-only, so reading user.role alone would show entry_rep).
+    role: getEffectiveRole(user) || ('entry_rep' as UserRole),
     phone: user?.phone || '',
-    managerId: user?.managerId || '',
+    managerId: user?.reportsToId || '',
     status: user?.status || 'active',
   });
 
@@ -44,6 +48,12 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     setLoading(true);
 
     try {
+      // The select mixes platform and field roles; send each to its own field
+      // so the API never writes a field role into the platform `role` column.
+      const rolePayload = isPlatformRole(formData.role)
+        ? { role: formData.role }
+        : { fieldRole: formData.role };
+
       if (isEdit && user) {
         // Update existing user
         const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
@@ -51,7 +61,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             displayName: formData.displayName,
-            role: formData.role,
+            ...rolePayload,
             phone: formData.phone,
             managerId: formData.managerId || null,
             status: formData.status,
@@ -75,7 +85,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             email: formData.email,
             password: formData.password,
             displayName: formData.displayName,
-            role: formData.role,
+            ...rolePayload,
             phone: formData.phone,
             managerId: formData.managerId || null,
           }),

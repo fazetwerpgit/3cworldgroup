@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { UserRole } from '@/types';
+import { PlatformRole, FieldRole } from '@/types';
 
 // POST /api/portal/auth/create-user - Create a new user
 export async function POST(request: NextRequest) {
@@ -18,24 +18,39 @@ export async function POST(request: NextRequest) {
       password,
       displayName,
       role,
+      fieldRole,
       managerId,
       territoryId,
       phone,
     } = body;
 
-    // Validate required fields
-    if (!email || !password || !displayName || !role) {
+    // Validate required fields - exactly one of role (platform) or
+    // fieldRole (field sales) must be provided
+    if (!email || !password || !displayName || (!role && !fieldRole)) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, password, displayName, role' },
+        { error: 'Missing required fields: email, password, displayName, role or fieldRole' },
+        { status: 400 }
+      );
+    }
+    if (role && fieldRole) {
+      return NextResponse.json(
+        { error: 'Provide either role (platform) or fieldRole (field sales), not both' },
         { status: 400 }
       );
     }
 
-    // Validate role
-    const validRoles: UserRole[] = ['admin', 'operations', 'sales_manager', 'sales_rep'];
-    if (!validRoles.includes(role)) {
+    // Validate roles: `role` is platform-only, `fieldRole` is field-only
+    const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
+    const validFieldRoles: FieldRole[] = ['entry_rep', 'l1_manager', 'l2_manager'];
+    if (role && !validPlatformRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
+        { status: 400 }
+      );
+    }
+    if (fieldRole && !validFieldRoles.includes(fieldRole)) {
+      return NextResponse.json(
+        { error: 'Invalid fieldRole' },
         { status: 400 }
       );
     }
@@ -47,11 +62,11 @@ export async function POST(request: NextRequest) {
       displayName,
     });
 
-    // Create user profile in Firestore
+    // Create user profile in Firestore - role kind determines which field is set
     const userProfile = {
       email,
       displayName,
-      role,
+      ...(role ? { role } : { fieldRole }),
       managerId: managerId || null,
       territoryId: territoryId || null,
       phone: phone || '',

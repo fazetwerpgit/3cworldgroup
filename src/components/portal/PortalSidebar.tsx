@@ -174,7 +174,7 @@ export function PortalSidebar() {
     return item.permissions.some((p) => hasPermission(p));
   };
 
-  const showOperationsSection = isRole('admin', 'operations', 'sales_manager');
+  const showOperationsSection = isRole('admin', 'operations', 'l1_manager', 'l2_manager');
   const showAdminSection = isRole('admin');
 
   // Filter operations items based on permissions

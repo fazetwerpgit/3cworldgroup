@@ -1,10 +1,9 @@
 export type SaleStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type SaleType = 'new_service' | 'upgrade' | 'add_on' | 'renewal';
-export type FiberCompany = 'tfiber' | 'att' | 'frontier';
 
 export interface FiberPlan {
   id: string;
-  company: FiberCompany;
+  company: string; // Channel id - see types/channels.ts
   name: string;
   speed: string;
   price: number;
@@ -14,7 +13,7 @@ export interface FiberPlan {
 export interface SaleProduct {
   productId: string;
   productName: string;
-  company: FiberCompany;
+  company: string; // Channel id - see types/channels.ts
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -92,7 +91,7 @@ export const SALE_TYPES: { value: SaleType; label: string }[] = [
 ];
 
 // Fiber companies
-export const FIBER_COMPANIES: { value: FiberCompany; label: string; logo?: string }[] = [
+export const FIBER_COMPANIES: { value: string; label: string; logo?: string }[] = [
   { value: 'tfiber', label: 'TFiber (T-Mobile)' },
   { value: 'att', label: 'AT&T Fiber' },
   { value: 'frontier', label: 'Frontier Fiber' },
@@ -100,6 +99,7 @@ export const FIBER_COMPANIES: { value: FiberCompany; label: string; logo?: strin
 
 // Fiber plans with pricing (based on 2025 research)
 // Points are awarded based on plan tier - scaled 1-15 points
+// TODO: rework as per-channel products
 export const FIBER_PLANS: FiberPlan[] = [
   // TFiber (T-Mobile Fiber) Plans
   { id: 'tfiber-500', company: 'tfiber', name: 'TFiber 500', speed: '500 Mbps', price: 60.00, points: 5 },
@@ -121,7 +121,7 @@ export const FIBER_PLANS: FiberPlan[] = [
 ];
 
 // Helper to get plans by company
-export function getPlansByCompany(company: FiberCompany): FiberPlan[] {
+export function getPlansByCompany(company: string): FiberPlan[] {
   return FIBER_PLANS.filter(plan => plan.company === company);
 }
 

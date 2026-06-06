@@ -1,12 +1,23 @@
-// User roles - expandable enumeration
-export const UserRoles = {
+// Platform (back-office) roles
+export type PlatformRole = 'admin' | 'operations';
+
+// Field sales roles
+export type FieldRole = 'entry_rep' | 'l1_manager' | 'l2_manager';
+
+/** @deprecated Use PlatformRole | FieldRole instead */
+export type UserRole = PlatformRole | FieldRole;
+
+// Role constants - expandable enumeration
+export const PlatformRoles = {
   ADMIN: 'admin',
   OPERATIONS: 'operations',
-  SALES_MANAGER: 'sales_manager',
-  SALES_REP: 'sales_rep',
 } as const;
 
-export type UserRole = (typeof UserRoles)[keyof typeof UserRoles];
+export const FieldRoles = {
+  ENTRY_REP: 'entry_rep',
+  L1_MANAGER: 'l1_manager',
+  L2_MANAGER: 'l2_manager',
+} as const;
 
 // Base permissions everyone gets
 const BASE_PERMISSIONS = [
@@ -16,8 +27,21 @@ const BASE_PERMISSIONS = [
   'links:read',            // Everyone can access links/resources
 ];
 
+// Field rep permissions: base + sales read/write
+const FIELD_REP_PERMISSIONS = [
+  ...BASE_PERMISSIONS,
+  'sales:read', 'sales:write',
+];
+
+// Field manager permissions: rep + approvals and user visibility
+const FIELD_MANAGER_PERMISSIONS = [
+  ...FIELD_REP_PERMISSIONS,
+  'sales:approve',
+  'users:read',
+];
+
 // Permission sets for each role - central authorization logic
-export const RolePermissions: Record<UserRole, string[]> = {
+export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
   admin: [
     ...BASE_PERMISSIONS,
     'users:read', 'users:write', 'users:delete',
@@ -41,33 +65,78 @@ export const RolePermissions: Record<UserRole, string[]> = {
     'shorts:write',
     'links:write',
   ],
-  sales_manager: [
-    ...BASE_PERMISSIONS,
-    'users:read',
-    'sales:read', 'sales:write', 'sales:approve',
-    'reports:read',
-  ],
-  sales_rep: [
-    ...BASE_PERMISSIONS,
-    'sales:read', 'sales:write',
-  ],
+  entry_rep: [...FIELD_REP_PERMISSIONS],
+  l1_manager: [...FIELD_MANAGER_PERMISSIONS],
+  l2_manager: [...FIELD_MANAGER_PERMISSIONS],
 };
 
 // Role display names for UI
-export const RoleDisplayNames: Record<UserRole, string> = {
+export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   admin: 'Administrator',
   operations: 'Operations',
-  sales_manager: 'Sales Manager',
-  sales_rep: 'Sales Representative',
+  entry_rep: 'Entry Representative',
+  l1_manager: 'L1 Manager',
+  l2_manager: 'L2 Manager',
 };
+
+// Legacy role values still present in Firestore docs.
+// Read-time shim only - does NOT rewrite Firestore.
+// TODO: backfill legacy role docs, then remove this shim.
+const LEGACY_ROLE_MAP: Record<string, FieldRole> = {
+  sales_rep: 'entry_rep',
+  sales_manager: 'l1_manager',
+};
+
+const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
+const FIELD_ROLE_VALUES: readonly string[] = Object.values(FieldRoles);
+
+// Defensive mapping for raw role data read from Firestore.
+// Handles legacy values ('sales_rep'/'sales_manager') and field roles
+// stored in the old single `role` field.
+export function resolveRoles(
+  rawRole?: string,
+  rawFieldRole?: string
+): { role?: PlatformRole; fieldRole?: FieldRole } {
+  const fieldRole =
+    rawFieldRole && FIELD_ROLE_VALUES.includes(rawFieldRole)
+      ? (rawFieldRole as FieldRole)
+      : undefined;
+
+  if (rawRole && PLATFORM_ROLE_VALUES.includes(rawRole)) {
+    return { role: rawRole as PlatformRole, fieldRole };
+  }
+  if (rawRole && FIELD_ROLE_VALUES.includes(rawRole)) {
+    return { role: undefined, fieldRole: fieldRole ?? (rawRole as FieldRole) };
+  }
+  if (rawRole && LEGACY_ROLE_MAP[rawRole]) {
+    return { role: undefined, fieldRole: fieldRole ?? LEGACY_ROLE_MAP[rawRole] };
+  }
+  return { role: undefined, fieldRole };
+}
+
+// Type guard: is this value a platform (back-office) role?
+export function isPlatformRole(value: string | undefined): value is PlatformRole {
+  return !!value && PLATFORM_ROLE_VALUES.includes(value);
+}
+
+// The single role used for display/selection in UI.
+// Platform role wins when both are set, matching permission resolution
+// (AuthContext.hasPermission uses role ?? fieldRole).
+export function getEffectiveRole(
+  user?: { role?: PlatformRole; fieldRole?: FieldRole } | null
+): PlatformRole | FieldRole | undefined {
+  return user?.role ?? user?.fieldRole;
+}
 
 // User document type
 export interface User {
   uid: string;
   email: string;
   displayName: string;
-  role: UserRole;
-  managerId?: string;
+  role?: PlatformRole;       // Back-office users only
+  fieldRole?: FieldRole;     // Field sales users only
+  isIBO: boolean;
+  reportsToId?: string;
   territoryId?: string;
   phone?: string;
   avatarUrl?: string;

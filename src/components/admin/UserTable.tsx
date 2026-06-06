@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { User, UserRoles } from '@/types';
+import { User } from '@/types';
 
 interface UserTableProps {
   users: User[];
@@ -18,8 +18,9 @@ const statusColors = {
 const roleLabels: Record<string, string> = {
   admin: 'Administrator',
   operations: 'Operations',
-  sales_manager: 'Sales Manager',
-  sales_rep: 'Sales Rep',
+  entry_rep: 'Entry Representative',
+  l1_manager: 'L1 Manager',
+  l2_manager: 'L2 Manager',
 };
 
 export function UserTable({ users, onStatusChange, onDelete, loading }: UserTableProps) {
@@ -102,7 +103,7 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="text-sm text-gray-900">
-                    {roleLabels[user.role] || user.role}
+                    {roleLabels[user.role ?? user.fieldRole ?? ''] || user.role || user.fieldRole}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

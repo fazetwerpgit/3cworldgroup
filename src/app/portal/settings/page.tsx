@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function SettingsPage() {
   const { user, resetPassword, changePassword, refreshUser } = useAuth();
@@ -132,22 +133,18 @@ export default function SettingsPage() {
     setPhone(user?.phone || '');
   };
 
-  const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      admin: 'Administrator',
-      operations: 'Operations',
-      sales_manager: 'Sales Manager',
-      sales_rep: 'Sales Representative',
-    };
-    return labels[role] || role;
-  };
+  // Effective role handles legacy docs that resolve to fieldRole-only;
+  // labels come from the shared RoleDisplayNames map.
+  const effectiveRole = getEffectiveRole(user);
+  const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
 
   const getRoleBadgeColor = (role: string) => {
     const colors: Record<string, string> = {
       admin: 'bg-purple-100 text-purple-800',
       operations: 'bg-blue-100 text-blue-800',
-      sales_manager: 'bg-green-100 text-green-800',
-      sales_rep: 'bg-gray-100 text-gray-800',
+      l1_manager: 'bg-green-100 text-green-800',
+      l2_manager: 'bg-green-100 text-green-800',
+      entry_rep: 'bg-gray-100 text-gray-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
@@ -260,8 +257,8 @@ export default function SettingsPage() {
                       <label className="block text-sm font-medium text-gray-500 mb-1">
                         Role
                       </label>
-                      <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getRoleBadgeColor(user?.role || '')}`}>
-                        {getRoleLabel(user?.role || '')}
+                      <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getRoleBadgeColor(effectiveRole || '')}`}>
+                        {roleLabel}
                       </span>
                     </div>
                     <div>

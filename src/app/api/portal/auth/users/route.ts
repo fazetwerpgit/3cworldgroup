@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { User } from '@/types';
+import { User, resolveRoles, getEffectiveRole } from '@/types';
 
 // GET /api/portal/auth/users - Get all users
 export async function GET(request: NextRequest) {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get('role');
     const status = searchParams.get('status');
 
-    let query = adminDb.collection('users').orderBy('createdAt', 'desc');
+    const query = adminDb.collection('users').orderBy('createdAt', 'desc');
 
     const snapshot = await query.get();
     let users: User[] = [];
@@ -27,8 +27,10 @@ export async function GET(request: NextRequest) {
         uid: doc.id,
         email: data.email,
         displayName: data.displayName,
-        role: data.role,
-        managerId: data.managerId,
+        ...resolveRoles(data.role, data.fieldRole),
+        isIBO: data.isIBO ?? false,
+        // TODO: migrate Firestore managerId -> reportsToId
+        reportsToId: data.reportsToId ?? data.managerId,
         territoryId: data.territoryId,
         phone: data.phone,
         avatarUrl: data.avatarUrl,
@@ -39,9 +41,11 @@ export async function GET(request: NextRequest) {
       } as User);
     });
 
-    // Filter in memory (Firestore has limitations on compound queries)
+    // Filter in memory (Firestore has limitations on compound queries).
+    // Match on the effective role so field users (role undefined after
+    // resolveRoles) are filterable by their fieldRole.
     if (role) {
-      users = users.filter((u) => u.role === role);
+      users = users.filter((u) => getEffectiveRole(u) === role);
     }
     if (status) {
       users = users.filter((u) => u.status === status);

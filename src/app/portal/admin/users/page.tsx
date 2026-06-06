@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { UserTable } from '@/components/admin/UserTable';
-import { User, UserRole } from '@/types';
+import { User, UserRole, RoleDisplayNames } from '@/types';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -133,10 +133,13 @@ export default function UsersPage() {
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
                     >
                       <option value="">All Roles</option>
-                      <option value="admin">Administrator</option>
-                      <option value="operations">Operations</option>
-                      <option value="sales_manager">Sales Manager</option>
-                      <option value="sales_rep">Sales Rep</option>
+                      {(Object.entries(RoleDisplayNames) as [UserRole, string][]).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
                   <div className="flex items-center gap-2">

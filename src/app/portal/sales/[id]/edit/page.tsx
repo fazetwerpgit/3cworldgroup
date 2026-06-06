@@ -11,7 +11,6 @@ import {
   SaleType,
   SaleStatus,
   SaleProduct,
-  FiberCompany,
   SALE_TYPES,
   FIBER_COMPANIES,
   getPlansByCompany,
@@ -35,7 +34,7 @@ export default function EditSalePage() {
     notes: '',
   });
   const [products, setProducts] = useState<SaleProduct[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<FiberCompany | ''>('');
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -58,7 +57,7 @@ export default function EditSalePage() {
         });
         setProducts(saleData.products || []);
         if (saleData.products?.length > 0) {
-          setSelectedCompany(saleData.products[0].company as FiberCompany);
+          setSelectedCompany(saleData.products[0].company);
         }
       }
     }
@@ -74,7 +73,7 @@ export default function EditSalePage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCompanyChange = (company: FiberCompany) => {
+  const handleCompanyChange = (company: string) => {
     setSelectedCompany(company);
   };
 

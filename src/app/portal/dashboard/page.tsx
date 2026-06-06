@@ -5,6 +5,7 @@ import { DashboardStats } from '@/components/portal/DashboardStats';
 import { QuickActions } from '@/components/portal/QuickActions';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
@@ -81,7 +82,7 @@ export default function DashboardPage() {
                   <span className="text-lg sm:text-xl">👤</span>
                   <div>
                     <span className="text-white/60 text-xs block">Role</span>
-                    <span className="font-semibold text-white capitalize text-sm sm:text-base">{user?.role?.replace('_', ' ') || 'Sales Rep'}</span>
+                    <span className="font-semibold text-white text-sm sm:text-base">{(getEffectiveRole(user) && RoleDisplayNames[getEffectiveRole(user)!]) || 'Team Member'}</span>
                   </div>
                 </div>
                 {user?.territoryId && (

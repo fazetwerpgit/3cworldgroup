@@ -39,7 +39,8 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
 
     // Check role requirements
     if (requiredRoles && requiredRoles.length > 0) {
-      if (!requiredRoles.includes(user.role)) {
+      const roleKey = user.role ?? user.fieldRole;
+      if (!roleKey || !requiredRoles.includes(roleKey)) {
         router.push('/portal/dashboard');
         return;
       }
@@ -68,7 +69,8 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
     if (!user) return false;
 
     if (requiredRoles && requiredRoles.length > 0) {
-      if (!requiredRoles.includes(user.role)) return false;
+      const roleKey = user.role ?? user.fieldRole;
+      if (!roleKey || !requiredRoles.includes(roleKey)) return false;
     }
 
     if (requiredPermissions && requiredPermissions.length > 0) {
