@@ -79,20 +79,13 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   l2_manager: 'L2 Manager',
 };
 
-// Legacy role values still present in Firestore docs.
-// Read-time shim only - does NOT rewrite Firestore.
-// TODO: backfill legacy role docs, then remove this shim.
-const LEGACY_ROLE_MAP: Record<string, FieldRole> = {
-  sales_rep: 'entry_rep',
-  sales_manager: 'l1_manager',
-};
-
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
 const FIELD_ROLE_VALUES: readonly string[] = Object.values(FieldRoles);
 
 // Defensive mapping for raw role data read from Firestore.
-// Handles legacy values ('sales_rep'/'sales_manager') and field roles
-// stored in the old single `role` field.
+// Validates values against the role unions and tolerates field roles
+// stored in the `role` column (legacy sales_rep/sales_manager values were
+// backfilled via scripts/backfill-roles.mjs; unknown values resolve to no role).
 export function resolveRoles(
   rawRole?: string,
   rawFieldRole?: string
@@ -107,9 +100,6 @@ export function resolveRoles(
   }
   if (rawRole && FIELD_ROLE_VALUES.includes(rawRole)) {
     return { role: undefined, fieldRole: fieldRole ?? (rawRole as FieldRole) };
-  }
-  if (rawRole && LEGACY_ROLE_MAP[rawRole]) {
-    return { role: undefined, fieldRole: fieldRole ?? LEGACY_ROLE_MAP[rawRole] };
   }
   return { role: undefined, fieldRole };
 }

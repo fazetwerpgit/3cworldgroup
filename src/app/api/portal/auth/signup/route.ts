@@ -13,7 +13,7 @@ export async function POST() {
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
-// POST /api/portal/auth/signup - Register new employee as sales_rep
+// POST /api/portal/auth/signup - Register new employee as entry_rep
 export async function POST_DISABLED(request: NextRequest) {
   try {
     if (!adminDb || !adminAuth) {
@@ -48,11 +48,11 @@ export async function POST_DISABLED(request: NextRequest) {
       displayName: displayName || email.split('@')[0],
     });
 
-    // Create Firestore user profile with sales_rep role
+    // Create Firestore user profile with entry_rep field role
     const userProfile = {
       email,
       displayName: displayName || email.split('@')[0],
-      role: 'sales_rep', // Default role - admin can change later
+      fieldRole: 'entry_rep', // Default field role - admin can change later
       status: 'active',
       hireDate: new Date(),
       createdAt: new Date(),

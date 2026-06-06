@@ -22,7 +22,7 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>({
     pointsPerSale: { min: 1, max: 15, default: 5 },
     autoApprove: true,
-    defaultRole: 'sales_rep',
+    defaultRole: 'entry_rep',
     leaderboardPeriods: ['week', 'month', 'quarter', 'year'],
     companyName: '3C World Group',
     supportEmail: 'support@3cworldgroup.com',
@@ -163,8 +163,9 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setSettings({ ...settings, defaultRole: e.target.value })}
                   className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none transition-all"
                 >
-                  <option value="sales_rep" className="bg-gray-800">Sales Representative</option>
-                  <option value="sales_manager" className="bg-gray-800">Sales Manager</option>
+                  <option value="entry_rep" className="bg-gray-800">Entry Representative</option>
+                  <option value="l1_manager" className="bg-gray-800">L1 Manager</option>
+                  <option value="l2_manager" className="bg-gray-800">L2 Manager</option>
                   <option value="operations" className="bg-gray-800">Operations</option>
                 </select>
                 <p className="text-xs text-white/40 mt-2">
