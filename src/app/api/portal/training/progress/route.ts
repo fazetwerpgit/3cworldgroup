@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { requireSelfOrManagement } from '@/lib/auth/requireManagement';
 
 // GET /api/portal/training/progress - Get user's training progress
 export async function GET(request: NextRequest) {
@@ -19,6 +20,15 @@ export async function GET(request: NextRequest) {
         { error: 'Missing userId parameter' },
         { status: 400 }
       );
+    }
+
+    // A user may read their own progress; management may read anyone's.
+    const gate = await requireSelfOrManagement(
+      searchParams.get('requestedBy'),
+      userId
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const snapshot = await adminDb
@@ -65,6 +75,12 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: userId, resourceId' },
         { status: 400 }
       );
+    }
+
+    // A user may write their own progress; management may write anyone's.
+    const gate = await requireSelfOrManagement(body.requestedBy, userId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     // Check if progress record exists - use single where to avoid compound index

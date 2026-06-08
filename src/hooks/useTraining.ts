@@ -75,7 +75,9 @@ export function useTraining() {
 
   const fetchProgress = useCallback(async (userId: string) => {
     try {
-      const response = await fetch(`/api/portal/training/progress?userId=${userId}`);
+      const response = await fetch(
+        `/api/portal/training/progress?userId=${userId}&requestedBy=${userId}`
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -99,6 +101,7 @@ export function useTraining() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          requestedBy: userId,
           userId,
           resourceId,
           completed,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { getRequester } from '@/lib/auth/requireManagement';
 
 // GET /api/portal/sales/stats - Get sales statistics
 export async function GET(request: NextRequest) {
@@ -14,6 +15,20 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const salesRepId = searchParams.get('salesRepId');
     const period = searchParams.get('period') || 'month'; // day, week, month, year
+
+    // Scope: a rep may only request their own stats; management may request
+    // any rep's or org-wide (no salesRepId). A non-management caller must pass
+    // their own uid as salesRepId.
+    const requester = await getRequester(searchParams.get('requestedBy'));
+    if (!requester) {
+      return NextResponse.json({ error: 'Caller not found' }, { status: 403 });
+    }
+    if (!requester.isManagement && salesRepId !== requester.uid) {
+      return NextResponse.json(
+        { error: 'Forbidden: you can only view your own stats' },
+        { status: 403 }
+      );
+    }
 
     // Calculate date range
     const now = new Date();
@@ -83,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     // Get previous period stats for comparison
     let previousStartDate: Date;
-    let previousEndDate = startDate;
+    const previousEndDate = startDate;
 
     switch (period) {
       case 'day':

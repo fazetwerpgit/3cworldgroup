@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { hashInviteToken } from '@/lib/recruiting/tokens';
-import { getOnboardingItemsForUser } from '@/types';
+import { getOnboardingItemsForUser, looksLikeRawSensitiveData } from '@/types';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -137,6 +137,21 @@ export async function POST(
     if (missing.length > 0) {
       return NextResponse.json(
         { error: `Please complete every item before submitting: ${missing.map((i) => i.label).join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Sensitive items must carry a reference/vendor token, never raw PII.
+    const rawSensitive = items.filter(
+      (item) => item.sensitive && looksLikeRawSensitiveData(clean(references[item.id], 500))
+    );
+    if (rawSensitive.length > 0) {
+      return NextResponse.json(
+        {
+          error: `These items look like raw card/SSN/account numbers - enter a reference or vendor token only: ${rawSensitive
+            .map((i) => i.label)
+            .join(', ')}`,
+        },
         { status: 400 }
       );
     }

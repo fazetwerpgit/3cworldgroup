@@ -24,7 +24,7 @@ export function useNotifications() {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/portal/notifications?userId=${user.uid}&limit=${limit}`,
+        `/api/portal/notifications?userId=${user.uid}&limit=${limit}&requestedBy=${user.uid}`,
         { signal: abortControllerRef.current.signal }
       );
       if (response.ok) {
@@ -59,7 +59,7 @@ export function useNotifications() {
       const response = await fetch('/api/portal/notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notificationIds: idsToMark }),
+        body: JSON.stringify({ notificationIds: idsToMark, requestedBy: user.uid }),
       });
 
       if (response.ok) {
@@ -89,7 +89,7 @@ export function useNotifications() {
       const response = await fetch('/api/portal/notifications', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, markAllRead: true }),
+        body: JSON.stringify({ userId: user.uid, markAllRead: true, requestedBy: user.uid }),
       });
 
       if (response.ok) {

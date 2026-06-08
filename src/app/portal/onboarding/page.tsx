@@ -74,7 +74,9 @@ export default function OnboardingPage() {
   const fetchChecklist = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(`/api/portal/onboarding?userId=${user.uid}`);
+      const response = await fetch(
+        `/api/portal/onboarding?userId=${user.uid}&requestedBy=${user.uid}`
+      );
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load checklist');
       setData(json);
@@ -98,7 +100,7 @@ export default function OnboardingPage() {
       const response = await fetch('/api/portal/onboarding/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, itemId: submitModal.id, reference }),
+        body: JSON.stringify({ userId: user.uid, itemId: submitModal.id, reference, requestedBy: user.uid }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to submit');

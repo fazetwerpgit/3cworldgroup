@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Sale } from '@/types';
+import { getRequester, requireAdmin } from '@/lib/auth/requireManagement';
 
-// GET /api/portal/sales/[id] - Get a single sale
+// GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,6 +25,21 @@ export async function GET(
     }
 
     const data = doc.data();
+
+    // A sale row carries customer PII; only its owning rep or management may read it.
+    const requester = await getRequester(
+      request.nextUrl.searchParams.get('requestedBy')
+    );
+    if (!requester) {
+      return NextResponse.json({ error: 'Caller not found' }, { status: 403 });
+    }
+    if (!requester.isManagement && data?.salesRepId !== requester.uid) {
+      return NextResponse.json(
+        { error: 'Forbidden: you can only view your own sales' },
+        { status: 403 }
+      );
+    }
+
     const sale: Sale = {
       id: doc.id,
       ...data,
@@ -66,13 +82,41 @@ export async function PUT(
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
     }
 
-    // Don't allow updating certain fields
-    const { id: _, createdAt, ...updateData } = body;
+    // Only the owning rep or management may edit a sale.
+    const requester = await getRequester(body.requestedBy);
+    if (!requester) {
+      return NextResponse.json({ error: 'Caller not found' }, { status: 403 });
+    }
+    const existing = doc.data();
+    if (!requester.isManagement && existing?.salesRepId !== requester.uid) {
+      return NextResponse.json(
+        { error: 'Forbidden: you can only edit your own sales' },
+        { status: 403 }
+      );
+    }
 
-    await docRef.update({
-      ...updateData,
-      updatedAt: new Date(),
-    });
+    // Allowlist of fields a sale edit may set. Approval status and its audit
+    // trail are controlled only by /sales/approve; ownership, points, and
+    // server-managed timestamps are immutable here. This closes the
+    // edit-to-self-approve bypass.
+    const EDITABLE_FIELDS = [
+      'customerName',
+      'customerPhone',
+      'customerEmail',
+      'customerAddress',
+      'saleType',
+      'products',
+      'totalValue',
+      'managerId',
+      'notes',
+    ] as const;
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    for (const field of EDITABLE_FIELDS) {
+      if (body[field] !== undefined) updateData[field] = body[field];
+    }
+
+    await docRef.update(updateData);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -99,7 +143,14 @@ export async function DELETE(
       );
     }
 
-    // In production, verify that the user is an admin
+    // Deleting a sale is destructive and admin-only.
+    const gate = await requireAdmin(
+      request.nextUrl.searchParams.get('requestedBy')
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const docRef = adminDb.collection('sales').doc(id);
     const doc = await docRef.get();
 

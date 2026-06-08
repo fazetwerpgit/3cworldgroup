@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
 
 interface SalesFilters {
@@ -24,6 +25,7 @@ interface SalesStats {
 }
 
 export function useSales() {
+  const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [stats, setStats] = useState<SalesStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,7 +64,9 @@ export function useSales() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/portal/sales/${id}`);
+      const response = await fetch(
+        `/api/portal/sales/${id}?requestedBy=${user?.uid ?? ''}`
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -77,7 +81,7 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const createSale = useCallback(async (saleData: CreateSaleData): Promise<Sale | null> => {
     setLoading(true);
@@ -113,7 +117,7 @@ export function useSales() {
       const response = await fetch(`/api/portal/sales/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({ ...updates, requestedBy: user?.uid }),
       });
       const data = await response.json();
 
@@ -129,16 +133,17 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const deleteSale = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/portal/sales/${id}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/portal/sales/${id}?requestedBy=${user?.uid ?? ''}`,
+        { method: 'DELETE' }
+      );
       const data = await response.json();
 
       if (!response.ok) {
@@ -154,7 +159,7 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const approveSale = useCallback(async (
     saleId: string,
@@ -210,6 +215,7 @@ export function useSales() {
       const params = new URLSearchParams();
       if (period) params.append('period', period);
       if (salesRepId) params.append('salesRepId', salesRepId);
+      if (user?.uid) params.append('requestedBy', user.uid);
 
       const response = await fetch(`/api/portal/sales/stats?${params.toString()}`);
       const data = await response.json();
@@ -225,7 +231,7 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   return {
     sales,

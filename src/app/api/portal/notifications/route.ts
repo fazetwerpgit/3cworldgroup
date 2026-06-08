@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { requireManagement, requireSelfOrManagement } from '@/lib/auth/requireManagement';
 
 // GET /api/portal/notifications - Get user notifications
 export async function GET(request: NextRequest) {
@@ -23,9 +24,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // A user may read their own notifications; management may read anyone's.
+    const gate = await requireSelfOrManagement(
+      searchParams.get('requestedBy'),
+      userId
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     // Simple query without ordering to avoid index requirements
     // We'll sort in memory instead
-    let query = adminDb
+    const query = adminDb
       .collection('notifications')
       .where('userId', '==', userId);
 
@@ -115,6 +125,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Routes create notifications internally via their own helpers; this public
+    // endpoint is an admin/announcement tool. Gate it so a caller can't spoof
+    // notifications (e.g. fake "Sale Approved") to arbitrary users.
+    const gate = await requireManagement(body.requestedBy);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const notification = {
       userId,
       type,
@@ -155,21 +173,36 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { notificationIds, userId, markAllRead } = body;
+    const { notificationIds, userId, markAllRead, requestedBy } = body;
+
+    // Resolve the caller once; both branches scope writes to the caller's own
+    // notifications (management may act on anyone's).
+    const caller = requestedBy ?? userId;
+
+    // Commit doc refs in chunks to respect Firestore's 500-op batch limit.
+    const commitInChunks = async (refs: FirebaseFirestore.DocumentReference[]) => {
+      for (let i = 0; i < refs.length; i += 450) {
+        const batch = adminDb!.batch();
+        for (const ref of refs.slice(i, i + 450)) {
+          batch.update(ref, { read: true });
+        }
+        await batch.commit();
+      }
+    };
 
     if (markAllRead && userId) {
-      // Mark all notifications as read for user
+      const gate = await requireSelfOrManagement(caller, userId);
+      if (!gate.ok) {
+        return NextResponse.json({ error: gate.error }, { status: gate.status });
+      }
+
       const snapshot = await adminDb
         .collection('notifications')
         .where('userId', '==', userId)
         .where('read', '==', false)
         .get();
 
-      const batch = adminDb.batch();
-      snapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, { read: true });
-      });
-      await batch.commit();
+      await commitInChunks(snapshot.docs.map((doc) => doc.ref));
 
       return NextResponse.json({
         success: true,
@@ -178,16 +211,32 @@ export async function PUT(request: NextRequest) {
     }
 
     if (notificationIds && Array.isArray(notificationIds)) {
-      const batch = adminDb.batch();
-      for (const id of notificationIds) {
-        const ref = adminDb.collection('notifications').doc(id);
-        batch.update(ref, { read: true });
+      const requester = await requireSelfOrManagement(caller, caller);
+      if (!requester.ok) {
+        return NextResponse.json({ error: requester.error }, { status: requester.status });
       }
-      await batch.commit();
+
+      // Only mark notifications the caller actually owns (management may mark
+      // any). A spoofed id for someone else's notification is silently skipped.
+      const docs = await adminDb.getAll(
+        ...notificationIds.map((id: string) =>
+          adminDb!.collection('notifications').doc(id)
+        )
+      );
+      const ownedRefs = docs
+        .filter(
+          (doc) =>
+            doc.exists &&
+            (requester.requester.isManagement ||
+              doc.data()?.userId === requester.requester.uid)
+        )
+        .map((doc) => doc.ref);
+
+      await commitInChunks(ownedRefs);
 
       return NextResponse.json({
         success: true,
-        message: `Marked ${notificationIds.length} notifications as read`,
+        message: `Marked ${ownedRefs.length} notifications as read`,
       });
     }
 

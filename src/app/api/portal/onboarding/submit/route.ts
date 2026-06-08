@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { ONBOARDING_ITEMS, resolveRoles, getOnboardingItemsForUser } from '@/types';
+import {
+  ONBOARDING_ITEMS,
+  resolveRoles,
+  getOnboardingItemsForUser,
+  looksLikeRawSensitiveData,
+} from '@/types';
+import { requireSelfOrManagement } from '@/lib/auth/requireManagement';
 
 // POST /api/portal/onboarding/submit - Rep submits an onboarding item for review.
 // Sensitive items (W-9, direct deposit, chargeback card) accept a reference
@@ -25,10 +31,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A user may submit their own onboarding; management may submit on behalf.
+    const gate = await requireSelfOrManagement(body.requestedBy, userId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const item = ONBOARDING_ITEMS.find((i) => i.id === itemId);
     if (!item) {
       return NextResponse.json(
         { error: 'Unknown onboarding item' },
+        { status: 400 }
+      );
+    }
+
+    // Sensitive items must carry a reference/vendor token, never raw PII.
+    if (
+      item.sensitive &&
+      typeof reference === 'string' &&
+      looksLikeRawSensitiveData(reference)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'This looks like a raw card/SSN/account number. Enter a reference or vendor token only - never raw sensitive data.',
+        },
         { status: 400 }
       );
     }

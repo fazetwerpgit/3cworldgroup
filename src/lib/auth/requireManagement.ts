@@ -101,3 +101,26 @@ export async function requireAdmin(
   }
   return { ok: true, requester };
 }
+
+/**
+ * Require the caller to be either the owner of the target resource (their own
+ * userId) or a management user. Used for self-owned reads/writes (a user's own
+ * onboarding, training progress, sales, notifications) that managers may also
+ * view for oversight.
+ */
+export async function requireSelfOrManagement(
+  callerId: string | null | undefined,
+  targetUserId: string | null | undefined
+): Promise<GateResult> {
+  if (!callerId) {
+    return { ok: false, error: 'Caller id is required', status: 400 };
+  }
+  const requester = await getRequester(callerId);
+  if (!requester) {
+    return { ok: false, error: 'Caller not found', status: 403 };
+  }
+  if (requester.isManagement || requester.uid === targetUserId) {
+    return { ok: true, requester };
+  }
+  return { ok: false, error: 'Forbidden: you can only access your own data', status: 403 };
+}

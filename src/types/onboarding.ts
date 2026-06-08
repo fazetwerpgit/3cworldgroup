@@ -73,6 +73,18 @@ export interface UserChannelOnboarding {
   updatedAt: Date;
 }
 
+// Guardrail for sensitive items: the app stores a reference/vendor token only,
+// never raw SSNs, bank-account, or card numbers. This rejects the obvious
+// raw-PII shapes (a bare 9-digit SSN, or a 13-19 digit card/account run, with
+// or without separators) so a user can't paste raw data into a reference field.
+// It is a guardrail, not full DLP.
+export function looksLikeRawSensitiveData(value: string): boolean {
+  const digits = value.replace(/[\s-]/g, '');
+  if (!/^\d+$/.test(digits)) return false;
+  // SSN = 9 digits; card/bank = 13-19 digits
+  return digits.length === 9 || (digits.length >= 13 && digits.length <= 19);
+}
+
 // Helper to get the onboarding checklist for a user
 export function getOnboardingItemsForUser(fieldRole: FieldRole, isIBO: boolean): OnboardingItem[] {
   return ONBOARDING_ITEMS

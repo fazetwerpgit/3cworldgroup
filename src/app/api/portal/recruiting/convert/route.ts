@@ -63,6 +63,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Only act on invites that are still awaiting a decision. Acting on an
+    // already converted/rejected invite would, e.g., flip an active user back
+    // to inactive on a duplicate reject.
+    if (invite.status === 'converted' || invite.status === 'rejected') {
+      return NextResponse.json(
+        { error: `This recruit was already ${invite.status}` },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
     if (action === 'rejected') {
       await Promise.all([

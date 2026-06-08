@@ -5,6 +5,7 @@ import {
   resolveRoles,
   OnboardingStatus,
 } from '@/types';
+import { requireSelfOrManagement } from '@/lib/auth/requireManagement';
 
 // GET /api/portal/onboarding?userId=xxx - Merged onboarding checklist for a user.
 // Returns the items that apply to the user's fieldRole/isIBO, each merged with
@@ -24,6 +25,15 @@ export async function GET(request: NextRequest) {
         { error: 'userId is required' },
         { status: 400 }
       );
+    }
+
+    // A user may read their own checklist; management may read anyone's.
+    const gate = await requireSelfOrManagement(
+      request.nextUrl.searchParams.get('requestedBy'),
+      userId
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const userDoc = await adminDb.collection('users').doc(userId).get();

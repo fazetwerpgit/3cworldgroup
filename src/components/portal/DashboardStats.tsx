@@ -45,7 +45,9 @@ export function DashboardStats() {
       if (!user) return;
 
       try {
-        const statsRes = await fetch(`/api/portal/sales/stats?salesRepId=${user.uid}&period=month`);
+        const statsRes = await fetch(
+          `/api/portal/sales/stats?salesRepId=${user.uid}&period=month&requestedBy=${user.uid}`
+        );
         if (statsRes.ok) {
           const data = await statsRes.json();
           setStats(data.stats);
