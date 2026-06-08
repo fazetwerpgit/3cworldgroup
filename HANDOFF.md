@@ -1,243 +1,275 @@
-# 3C World Group Portal — Agent Handoff
+# 3C World Group Portal - Claude Max Handoff
 
-> For the next coding agent (Codex) picking up this repo. Read this top-to-bottom
-> before touching code. It encodes the rules that aren't obvious from the source.
+For the next coding agent, especially Claude running a Max workflow. Read this
+before touching code. This repo is in the middle of an employee-portal redesign,
+not a public marketing-site redesign.
 
-Last updated: 2026-06-07 · Branch: `master` · Latest commit: `1701fe5`
+Last updated: 2026-06-08
+Branch: `master`
+Current checkpoint: portal UX redesign and admin polish pass
 
----
+## Product Intent
 
-## 1. What this project is
+This app is becoming an internal sales-team operating portal for 3C World Group.
+The public site and apply flow remain secondary. The main product is the
+authenticated employee portal under `/portal`.
 
-A full **rep-lifecycle platform** for 3C World Group that replaces Connecteam.
-It carries a field sales rep through every stage:
+The boss-provided document appears to point toward replacing scattered email and
+Connecteam-style workflows with a single internal portal:
 
-```
-recruit → onboard → train → sell → (decommission)
-```
+- reps can see training, scripts, links, calls, shorts, leaderboard, pay info,
+  sales, and onboarding status;
+- managers/admins can manage recruiting, pipeline, onboarding review, user
+  accounts, settings, and email-template copy;
+- onboarding should happen in the website instead of email so recruits do not
+  drop off from missed messages.
 
-It is an internal back-office + field portal, not a marketing site. The public
-apply form feeds recruiting; everything behind `/portal` is the authenticated app.
+Design direction is now v3: polished but operational. Avoid decorative AI-looking
+sections, giant marketing cards, or single-color gradient sludge. This should
+feel like a sales ops command center that reps and managers can use every day.
 
----
+## Stack
 
-## 2. Run it
+- Next.js 16.1.1 App Router, Turbopack
+- React 19
+- TypeScript strict
+- Tailwind v4
+- Firebase Auth client plus Firebase Admin SDK routes
+- Cloud Firestore
+- shadcn-style UI primitives live under `src/components/ui`
+- Brand colors:
+  - navy `#0A1F44`
+  - green `#8dc63f`
+
+## Run Commands
 
 ```bash
-npm install          # if node_modules is cold
-npm run dev          # Next.js dev server on http://localhost:3000
-npm run build        # production build — must stay green before any commit
-npm run lint         # eslint
+npm install
+npm run dev
+npm run build
+npm run lint
+npx tsc --noEmit
 ```
 
-- **Login page is `/portal`** (`src/app/portal/page.tsx`). There is **no**
-  `/portal/login` — that path 404s. Don't link to it.
-- Requires `.env.local` (present locally, gitignored). It holds the Firebase
-  **client** config (`NEXT_PUBLIC_FIREBASE_*`) and the Firebase **admin** SDK
-  service-account creds (`FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`,
-  `FIREBASE_ADMIN_PRIVATE_KEY`). The private key may be raw PEM or base64 — the
-  loader in `scripts/backfill-roles.mjs` shows the decode pattern.
-- Git remote: `origin → https://github.com/fazetwerpgit/3cworldgroup.git`.
+Dev server has been used at:
 
-### Stack
-| Concern | Choice |
-|---|---|
-| Framework | Next.js **16.1.1** (App Router, Turbopack), React 19 |
-| Language | TypeScript (strict) |
-| Styling | Tailwind **v4** (`@tailwindcss/postcss`) |
-| Auth | Firebase Auth (client) + Firebase Admin SDK (server routes) |
-| Data | Cloud Firestore |
-| Brand colors | green `#8dc63f`, navy `#0A1F44` |
+```text
+http://127.0.0.1:3000
+```
 
----
+Static mockups are in:
 
-## 3. The role model (most important invariant)
+```text
+design-mockups/portal-redesign-v3/index.html
+```
 
-A user has **either** a platform role **or** a field role — never both meaningfully.
-They are two separate Firestore columns and two separate TypeScript unions.
-Defined in `src/types/auth.ts`:
+## Current Design System Direction
+
+Use these portal patterns unless there is a strong reason not to:
+
+- page wrapper: `mx-auto max-w-[1500px] space-y-5`
+- narrower form wrapper: `mx-auto max-w-[1100px] space-y-5`
+- hero/workbench header:
+  `portal-panel portal-rail rounded-lg p-5 sm:p-6`
+- main heading:
+  `text-2xl font-semibold tracking-tight text-slate-950`
+- intro copy:
+  `mt-2 max-w-2xl text-sm text-slate-600`
+- cards:
+  `rounded-lg border-slate-200 bg-white py-0 shadow-sm`
+- card header:
+  `border-b border-slate-100 p-5`
+- card content:
+  `p-5`
+- primary green buttons:
+  `bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]`
+
+Avoid:
+
+- duplicate portal chrome inside pages already wrapped by a portal/admin layout;
+- white text on the lime green primary button in portal screens;
+- `rounded-xl` for portal cards unless the base UI primitive injects it and the
+  local component overrides it;
+- mojibake or decorative text symbols in UI copy;
+- public-site hero/marketing patterns inside the portal.
+
+## Role Model
+
+Roles are split between platform and field roles. Keep this invariant:
 
 ```ts
-type PlatformRole = 'admin' | 'operations';          // back-office
-type FieldRole    = 'entry_rep' | 'l1_manager' | 'l2_manager';  // field sales
+type PlatformRole = 'admin' | 'operations';
+type FieldRole = 'entry_rep' | 'l1_manager' | 'l2_manager';
 ```
 
-Rules you must preserve:
+Important rules:
 
-- **Never read `data.role` / `data.fieldRole` raw.** Always pass them through
-  `resolveRoles(rawRole, rawFieldRole)`. It validates against the unions and
-  tolerates legacy field values that landed in the `role` column. Unknown values
-  resolve to *no role* (deny by default).
-- `getEffectiveRole(user)` = `user.role ?? user.fieldRole`. Platform role wins
-  when both exist, matching `AuthContext.hasPermission`.
-- In components, gate with the `AuthContext` helpers: `isRole(...roles)` and
-  `hasPermission(permission)`. For whole pages use
-  `<ProtectedRoute roles={[...]}>`.
-- Permission → role mapping is centralized in `RolePermissions` in `auth.ts`.
-  Add new capabilities there, not ad-hoc in components.
-- `RoleDisplayNames` is the single source for human-readable role labels.
+- Prefer `getEffectiveRole(user)` and `resolveRoles(rawRole, rawFieldRole)`.
+- Do not add ad-hoc role checks in components when `ProtectedRoute`,
+  `isRole(...)`, or `hasPermission(...)` already covers it.
+- Platform users handle admin/ops workflows.
+- Field reps and managers use rep-facing portal workflows.
+- IBO is an opt-in flag, not a role.
 
-Hierarchy for commission/override purposes: **L2 manager > L1 manager > entry rep.**
-A manager's report relationship is `reportsToId` (legacy docs used `managerId`,
-backfilled — prefer `reportsToId ?? managerId` when reading old data).
+## Major Features Now Present
 
----
+Employee portal:
 
-## 4. Security & data-handling stance (non-negotiable)
+- dashboard
+- sales list, detail, edit, and create
+- approvals
+- leaderboard
+- pay structure
+- calls schedule
+- training/university module list and detail
+- quick links
+- shorts
+- chat
+- personal settings
+- rep onboarding checklist
 
-These came directly from the project owner. Treat them as hard constraints:
+Admin/ops portal:
 
-1. **Sensitive data is vendor-first.** The app stores *status + a reference*,
-   never raw card numbers or SSNs. If a feature needs PII, store a vendor token /
-   status flag and let the vendor hold the secret.
-2. **No video hosting in-app.** Calls use Google Meet links only (validated
-   against `meet.google.com`). The app organizes/links, it does not stream.
-3. **Email is copy-paste, not send.** The email-template feature is a management
-   library; the app does **not** send mail. Templates are copied to the clipboard
-   for the user's own email client.
-4. When referencing Connecteam for parity, use screenshots as reference — never
-   share or hardcode login credentials.
+- recruiting
+- pipeline command center
+- onboarding review
+- user management
+- system settings
+- email templates
 
----
+Public/recruit flow:
 
-## 5. Architecture map
+- public apply page
+- public onboarding token route under `/onboard/[token]`
+- recruiting APIs and public application APIs
 
-### API routes — `src/app/api/portal/**/route.ts`
-Server routes use the **Firebase Admin SDK** (`src/lib/firebase/admin.ts`,
-exported as `adminDb`). Every route guards on `adminDb` being configured and
-returns JSON `{ error }` with proper status codes. Auth/role checks are done
-server-side by loading the caller's user doc and running `resolveRoles`.
+## Latest Completed Pass
 
-| Route | Purpose |
-|---|---|
-| `auth/*` | signup, create-user, user CRUD |
-| `onboarding/*` | submit + ops review loop |
-| `sales/*` | sales CRUD, approve, stats |
-| `training/*` | modules + progress |
-| `leaderboard` | rankings |
-| `notifications` | in-app notifications |
-| `pipeline` | recruiting command-center aggregate (derived stages) |
-| `pipeline/channels` | per-channel clearance status |
-| `pipeline/field-train` | "message manager to field train" |
-| `pipeline/decommission` | decommission + reinstate |
-| `commission` | role-scoped pay-structure visibility |
-| `calls` | recurring call schedule (Meet links) |
-| `email-templates` | management template library |
+The most recent pass did five things:
 
-### Pages — `src/app/portal/**/page.tsx`
-- **Rep-facing pages** use a **light theme** (`bg-gray-50`, white cards) and wrap
-  their own `<PortalHeader />` + `<PortalSidebar />`. Examples:
-  `pay-structure`, `calls`, `onboarding`, `sales`.
-- **Admin/ops pages** render inside the admin layout (which already supplies the
-  chrome) and use a **dark theme** (gradient `from-gray-800 to-gray-900` cards).
-  Examples: `admin/pipeline`, `admin/email-templates`, `admin/onboarding`.
-- Match the theme of the directory you're editing — don't mix.
+1. Polished admin users:
+   - `src/app/portal/admin/users/page.tsx`
+   - `src/app/portal/admin/users/new/page.tsx`
+   - `src/app/portal/admin/users/[id]/page.tsx`
+   - `src/components/admin/UserTable.tsx`
+   - `src/components/admin/UserForm.tsx`
 
-### Navigation — `src/components/portal/PortalSidebar.tsx`
-Three arrays: `navigationItems` (everyone, permission/role-gated),
-`operationsItems` (Operations section), `adminItems` (Admin section).
-Each `NavItem` can carry `permissions?` and/or `roles?`. `canAccessItem`
-enforces both. Add new pages to the right array with the right gate.
+2. Polished admin settings:
+   - `src/app/portal/admin/settings/page.tsx`
 
-### Types — `src/types/*.ts`, re-exported through `src/types/index.ts`
-Always import from `@/types`. When you add a type file, add its
-`export * from './x'` line to `index.ts`.
+3. Polished email templates:
+   - `src/app/portal/admin/email-templates/page.tsx`
 
----
+4. Portal consistency sweep:
+   - `src/app/portal/onboarding/page.tsx`
+   - `src/app/portal/error.tsx`
+   - `src/components/auth/LoginForm.tsx`
+   - `src/components/sales/SalesTable.tsx`
+   - `src/components/leaderboard/LeaderboardTable.tsx`
+   - `src/components/leaderboard/RankCard.tsx`
 
-## 6. Build status — what's DONE
+5. Verification:
+   - TypeScript passed.
+   - Targeted ESLint on touched files passed.
+   - Route smoke checks passed.
+   - Production build passed.
+   - `git diff --check` passed.
 
-All five planned pieces are implemented, verified on the dev server, and committed.
+## Verification Evidence From Current Checkpoint
 
-| Piece | Scope | Commit |
-|---|---|---|
-| 1 / 1b | Split platform/field roles, signup defaults, legacy backfill | `31cef5b`, `a138b3e` |
-| 2–3 | Channels + onboarding type layer, onboarding checklist UI + ops review | `8f56f61` |
-| 4 | Recruiting pipeline command center + decommission flow | `1cd6a21` |
-| 5 | Pay-structure visibility, calls schedule, email templates | `1701fe5` |
+Passed:
 
-### Piece 4 behavior (pipeline) — `src/app/portal/admin/pipeline/page.tsx`
-Pipeline **stage is derived, never stored**. Resolution order (first match wins):
+```bash
+npx tsc --noEmit
+npx eslint src/app/portal/admin/users/page.tsx src/app/portal/admin/users/new/page.tsx 'src/app/portal/admin/users/[id]/page.tsx' src/components/admin/UserTable.tsx src/components/admin/UserForm.tsx src/app/portal/admin/settings/page.tsx src/app/portal/admin/email-templates/page.tsx src/app/portal/onboarding/page.tsx src/app/portal/error.tsx src/components/sales/SalesTable.tsx src/components/leaderboard/RankCard.tsx src/components/leaderboard/LeaderboardTable.tsx src/components/auth/LoginForm.tsx
+npm run build
+git diff --check
 ```
-decommissioned  (status 'inactive' OR a decommission audit record)
-→ processing     (onboarding incomplete)
-→ need_logins    (0 channels cleared)
-→ cleared_to_sell(0 approved sales)
-→ active
+
+Route smoke checks returned `200`:
+
+```text
+/portal/admin/users
+/portal/admin/users/new
+/portal/admin/users/sample
+/portal/admin/settings
+/portal/admin/email-templates
+/portal/onboarding
 ```
-Decommission reasons: `non_activity | wrongdoing | manager_fire`
-(`src/types/pipeline.ts`). Decommission sets `status: 'inactive'` + an audit
-record; reinstate deletes the audit field via `FieldValue.delete()`.
-DSI note: Xfinity is credentialed **direct**; the other 8 channels go **via DSI**,
-and the "cleared" notification text reflects that.
 
-### Piece 5 behavior
-- **Commission** (`api/portal/commission`): `GET ?userId=` returns **only the
-  caller's own tier** for field users and **all tiers** for platform users.
-  `PUT` is **admin-only** (operations gets 403). Rates live in Firestore
-  `config/commission`; when that doc is absent the API falls back to
-  `DEFAULT_COMMISSION` **zero placeholders** — that's intentional so "not set yet"
-  stays distinct from "set to 0". The page shows a yellow "rates pending" banner
-  while placeholders are active (`ratesArePending` in `src/types/commission.ts`).
-- **Calls** (`api/portal/calls`): `scheduledCalls` collection. Meet-link regex
-  `^https:\/\/meet\.google\.com\/[a-z0-9-]+$/i`, time `HH:mm` 24h. Audience
-  `all` (everyone) vs `managers` (L1/L2 + platform only). Create/delete restricted
-  to admin/operations (`canManage`).
-- **Email templates** (`api/portal/email-templates`): **all** operations
-  (including GET) are management-only (`admin`/`operations`). Body capped 10k chars.
+Full `npm run lint` is not green yet. Current failures are pre-existing or
+outside the polished portal slice:
 
----
+- public marketing page `react/no-unescaped-entities` issues;
+- a few API `prefer-const` issues;
+- `src/contexts/AuthContext.tsx` React hook lint around synchronous setState in
+  an effect.
 
-## 7. What's OPEN (for the project owner / boss — do NOT block on these)
+Do not claim full lint is clean until those are fixed.
 
-The app works today with placeholders; these need real inputs from leadership:
+## Known Local State Notes
 
-- **Real commission rates + override percentages** (currently 0 placeholders).
-- **Ripple** product category — undefined, needs classification.
-- **Background-check** vendor + flow.
-- **Payment / SSN vendor** choices (drives the vendor-first storage above).
+The working tree has a lot of portal redesign work compared with the previous
+commits. Some directories are new:
 
-Locked product decisions already baked in:
-- **IBO** is a separate opt-in flag (`User.isIBO`), not a role.
-- **DSI is the distributor** for 8 of 9 channels; Xfinity is direct.
-- Commission config is **editable in-app** (admin), rates TBD.
+- `design-mockups/`
+- `src/components/ui/`
+- `src/app/portal/chat/`
+- `src/app/api/portal/chat/`
+- `src/app/portal/admin/recruiting/`
+- `src/app/api/portal/recruiting/`
+- `src/app/api/public/`
+- `src/app/onboard/`
+- `src/lib/recruiting/`
+- `src/types/chat.ts`
+- `src/types/recruiting.ts`
+- `components.json`
 
----
+These are intentional for this checkpoint. Do not delete them as "untracked
+noise" without checking the feature first.
 
-## 8. Conventions & gotchas (save yourself an hour)
+## Claude Max Workflow Recommendation
 
-- **There is no project `CLAUDE.md`.** Only the user's global one. If you add
-  project conventions, a root `CLAUDE.md` is the place.
-- **Verify on the dev server before committing.** This is the owner's explicit
-  workflow. Round-trip APIs with `Invoke-RestMethod`, drive the UI with the
-  Playwright MCP, *then* commit. Don't commit unverified code.
-- **Clean up test data before committing.** Disposable users/docs created during
-  verification must be deleted. Pattern: a temp `scripts/*.mjs` using
-  `firebase-admin`, loading `.env.local` exactly like `scripts/backfill-roles.mjs`
-  (regex-parse the file, base64-or-PEM the private key). Delete the temp script
-  after. Reset `config/commission` by deleting the doc (back to placeholders).
-- **Shell is PowerShell 5.1 on Windows.** Quirks that bit us:
-  - `git commit -m "..."` with embedded double quotes mangles args → write the
-    message to a temp file and use `git commit -F file`, then remove the file in a
-    *separate* command (compound `Remove-Item` can misparse).
-  - API error bodies: `$_.ErrorDetails.Message` is null. Read them via
-    `$_.Exception.Response.GetResponseStream()` + a `StreamReader`.
-  - Use `$null`, `$env:VAR`, backtick line-continuation — not bash syntax.
-- **LF→CRLF warnings on commit are expected** and harmless on this repo.
-- **Behavior preferences:** new commits over amending; no emojis in code/commits
-  unless asked; keep edits idiomatic to surrounding code.
+Use Claude for focused design/code review loops, not broad rewrites.
 
----
+Suggested sequence:
 
-## 9. Suggested first moves for Codex
+1. Start dev server and inspect the portal pages live.
+2. Compare live portal screens against `design-mockups/portal-redesign-v3`.
+3. Run a visual QA pass on mobile and desktop widths.
+4. Fix only visible inconsistencies or bugs.
+5. Run targeted ESLint on changed files, then `npx tsc --noEmit`, then
+   `npm run build`.
+6. Only after the portal is stable, clean the unrelated global lint debt.
 
-1. `npm run dev`, log in at `/portal`, click through the three Piece-5 pages
-   (Pay Structure, Calls Schedule, Email Templates) as a field rep and as an
-   ops/admin user to see the role-scoping live.
-2. Read `src/types/auth.ts` and `src/components/portal/PortalSidebar.tsx` — they
-   define how access control flows end to end.
-3. When the boss returns real commission rates, an admin sets them at
-   `/portal/pay-structure` → "Edit Rates" (writes `config/commission`). No code
-   change needed.
-4. Likely next features if asked: territory assignment UI, background-check
-   integration, vendor-token storage for payment/SSN (status + reference only).
+Prompt Claude with explicit constraints:
+
+```text
+You are working on the employee portal only. Do not redesign the public marketing
+site. Preserve current data behavior. Use the existing v3 portal visual system:
+portal-panel, portal-rail, rounded-lg cards, navy text, lime primary buttons with
+navy text. Do not introduce new routes unless required. Do not remove role gates.
+Run targeted lint, TypeScript, route smoke, and build before final.
+```
+
+## Next Good Tasks
+
+If the boss wants more polish:
+
+- run browser visual QA on each portal page at desktop and mobile;
+- tighten public apply to match the recruiting/onboarding flow;
+- add actual onboarding document requirements when leadership provides them;
+- clean global lint debt;
+- review Firebase route authorization server-side before production launch;
+- add a small QA checklist page or doc for managers testing recruiting and
+  onboarding.
+
+## Hard Constraints To Preserve
+
+- The app should not store raw SSNs, card numbers, or bank-account numbers.
+  Store status/reference/vendor token only.
+- Email templates are copy-paste only. The app does not send email.
+- Google Meet links only for calls; no in-app video hosting.
+- Pipeline stage is derived from user/onboarding/channel/sales state, not a
+  manually stored stage.
+- Do not link to `/portal/login`; `/portal` is the login entry.

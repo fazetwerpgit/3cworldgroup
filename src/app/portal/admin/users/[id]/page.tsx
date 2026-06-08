@@ -1,17 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { UserForm } from '@/components/admin/UserForm';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { User } from '@/types';
 
 export default function EditUserPage() {
   const params = useParams();
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,53 +43,50 @@ export default function EditUserPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="min-h-screen bg-gray-50">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-3xl mx-auto">
-              {/* Back link */}
-              <Link
-                href="/portal/admin/users"
-                className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to Users
-              </Link>
+      <div className="mx-auto max-w-[1100px] space-y-5">
+        <Button asChild variant="ghost" className="text-slate-600 hover:text-slate-950">
+          <Link href="/portal/admin/users">
+            <ArrowLeft className="h-4 w-4" />
+            Back to users
+          </Link>
+        </Button>
 
-              {/* Loading */}
-              {loading && (
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-gray-500">Loading user...</p>
+        {loading && (
+          <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+            <CardContent className="py-8">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
+              <p className="mt-4 text-sm text-slate-500">Loading user...</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {user && (
+          <>
+            <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#8dc63f]/15 text-[#4f7f1e]">
+                  <Pencil className="h-5 w-5" />
                 </div>
-              )}
-
-              {/* Error */}
-              {error && (
-                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
-                  {error}
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    Edit User
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                    Update {user.displayName}&apos;s account information,
+                    permissions, and reporting assignment.
+                  </p>
                 </div>
-              )}
-
-              {/* Form */}
-              {user && (
-                <>
-                  <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-[#0A1F44]">Edit User</h1>
-                    <p className="text-gray-500 mt-1">
-                      Update {user.displayName}&apos;s account information and permissions.
-                    </p>
-                  </div>
-                  <UserForm user={user} isEdit />
-                </>
-              )}
-            </div>
-          </main>
-        </div>
+              </div>
+            </section>
+            <UserForm user={user} isEdit />
+          </>
+        )}
       </div>
     </ProtectedRoute>
   );

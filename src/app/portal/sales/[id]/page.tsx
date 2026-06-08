@@ -3,10 +3,45 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft, Check, Pencil, Trash2, TriangleAlert, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sale } from '@/types';
+
+function PortalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen portal-canvas">
+      <PortalHeader />
+      <div className="flex">
+        <PortalSidebar />
+        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 font-medium text-slate-950">{value}</p>
+    </div>
+  );
+}
 
 export default function SaleDetailPage() {
   const params = useParams();
@@ -60,27 +95,27 @@ export default function SaleDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'border-amber-200 bg-amber-50 text-amber-700';
       case 'rejected':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'border-red-200 bg-red-50 text-red-700';
       case 'cancelled':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'border-gray-200 bg-gray-100 text-gray-700';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'border-gray-200 bg-gray-100 text-gray-700';
     }
   };
 
   if (loading && !sale) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8dc63f] mx-auto"></div>
-            <p className="mt-4 text-gray-500">Loading sale details...</p>
-          </div>
-        </div>
+        <PortalShell>
+          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 p-8 text-center shadow-sm">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
+            <p className="mt-4 text-slate-500">Loading sale details...</p>
+          </Card>
+        </PortalShell>
       </ProtectedRoute>
     );
   }
@@ -88,231 +123,181 @@ export default function SaleDetailPage() {
   if (error || !sale) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <p className="text-gray-900 font-semibold">Sale not found</p>
-            <p className="text-gray-500 mt-1">{error || 'The sale you are looking for does not exist.'}</p>
-            <Link
-              href="/portal/sales"
-              className="inline-block mt-4 px-4 py-2 bg-[#8dc63f] text-white rounded-lg font-medium hover:bg-[#7ab82e]"
-            >
-              Back to Sales
-            </Link>
-          </div>
-        </div>
+        <PortalShell>
+          <Card className="mx-auto max-w-md rounded-lg border-slate-200 p-8 text-center shadow-sm">
+            <TriangleAlert className="mx-auto mb-4 size-12 text-red-500" />
+            <p className="font-semibold text-slate-950">Sale not found</p>
+            <p className="mt-1 text-slate-500">{error || 'The sale you are looking for does not exist.'}</p>
+            <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+              <Link href="/portal/sales">Back to Sales</Link>
+            </Button>
+          </Card>
+        </PortalShell>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute permissions={['sales:read']}>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto p-6 space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
+      <PortalShell>
+        <div className="mx-auto max-w-[1100px] space-y-5">
+          <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href="/portal/sales"
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
+              <Button asChild variant="ghost" size="icon">
+                <Link href="/portal/sales" aria-label="Back to sales">
+                  <ArrowLeft className="size-5 text-slate-600" />
+                </Link>
+              </Button>
               <div>
-                <h1 className="text-2xl font-bold text-[#0A1F44]">Sale Details</h1>
-                <p className="text-gray-500 text-sm">ID: {sale.id}</p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Sale Details</h1>
+                  <p className="text-sm text-slate-500">ID: {sale.id}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(sale.status)}`}>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="outline" className={getStatusColor(sale.status)}>
                 {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-              </span>
+              </Badge>
               {isAdmin && (
                 <>
-                  <Link
-                    href={`/portal/sales/${sale.id}/edit`}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                  <Button asChild variant="outline">
+                    <Link href={`/portal/sales/${sale.id}/edit`}>
+                      <Pencil className="size-4" />
+                      Edit
+                    </Link>
+                  </Button>
+                  <Button type="button" variant="destructive" onClick={() => setShowDeleteModal(true)}>
+                    <Trash2 className="size-4" />
                     Delete
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
-          </div>
-
-          {/* Customer Information */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-lg font-semibold text-[#0A1F44] mb-4 flex items-center gap-2">
-              <span className="text-xl">👤</span> Customer Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-gray-500">Address</label>
-                <p className="font-medium text-gray-900">{sale.customerAddress || 'Not provided'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-gray-500">Name</label>
-                <p className="font-medium text-gray-900">{sale.customerName || 'Not provided'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-gray-500">Phone</label>
-                <p className="font-medium text-gray-900">{sale.customerPhone || 'Not provided'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-gray-500">Email</label>
-                <p className="font-medium text-gray-900">{sale.customerEmail || 'Not provided'}</p>
-              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Sale Information */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-lg font-semibold text-[#0A1F44] mb-4 flex items-center gap-2">
-              <span className="text-xl">📊</span> Sale Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-gray-500">Sales Rep</label>
-                <p className="font-medium text-gray-900">{sale.salesRepName}</p>
+          <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 p-5">
+              <CardTitle className="text-[#0A1F44]">Customer Information</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <DetailField label="Address" value={sale.customerAddress || 'Not provided'} />
+                <DetailField label="Name" value={sale.customerName || 'Not provided'} />
+                <DetailField label="Phone" value={sale.customerPhone || 'Not provided'} />
+                <DetailField label="Email" value={sale.customerEmail || 'Not provided'} />
               </div>
-              <div>
-                <label className="text-sm text-gray-500">Sale Date</label>
-                <p className="font-medium text-gray-900">{formatDate(sale.saleDate)}</p>
-              </div>
-              <div>
-                <label className="text-sm text-gray-500">Sale Type</label>
-                <p className="font-medium text-gray-900 capitalize">{sale.saleType?.replace('_', ' ') || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-sm text-gray-500">Created</label>
-                <p className="font-medium text-gray-900">{formatDate(sale.createdAt)}</p>
-              </div>
-            </div>
-            {sale.notes && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <label className="text-sm text-gray-500">Notes</label>
-                <p className="font-medium text-gray-900">{sale.notes}</p>
-              </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Products/Plans */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-lg font-semibold text-[#0A1F44] mb-4 flex items-center gap-2">
-              <span className="text-xl">📦</span> Plans Sold
-            </h2>
-            <div className="space-y-3">
-              {sale.products?.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">{product.productName}</p>
-                    <p className="text-sm text-gray-500">{product.company}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatCurrency(product.unitPrice)}/mo</p>
-                    <p className="text-sm text-[#8dc63f] font-medium">+{product.points} pts</p>
-                  </div>
+          <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 p-5">
+              <CardTitle className="text-[#0A1F44]">Sale Information</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <DetailField label="Sales Rep" value={sale.salesRepName} />
+                <DetailField label="Sale Date" value={formatDate(sale.saleDate)} />
+                <DetailField label="Sale Type" value={<span className="capitalize">{sale.saleType?.replace('_', ' ') || 'N/A'}</span>} />
+                <DetailField label="Created" value={formatDate(sale.createdAt)} />
+              </div>
+              {sale.notes && (
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
+                  <p className="mt-1 font-medium text-slate-950">{sale.notes}</p>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="bg-gradient-to-br from-[#0A1F44] to-[#1a3a6e] rounded-xl p-6 text-white">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span className="text-xl">💰</span> Summary
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <label className="text-white/60 text-sm">Total Value</label>
-                <p className="text-2xl font-bold">{formatCurrency(sale.totalValue || 0)}</p>
-                <p className="text-white/60 text-xs">/month</p>
-              </div>
-              <div>
-                <label className="text-white/60 text-sm">Commission</label>
-                <p className="text-2xl font-bold">{formatCurrency(sale.commission || 0)}</p>
-              </div>
-              <div>
-                <label className="text-white/60 text-sm">Points Earned</label>
-                <p className="text-2xl font-bold text-[#8dc63f]">+{sale.totalPoints || 0}</p>
-              </div>
-              <div>
-                <label className="text-white/60 text-sm">Plans</label>
-                <p className="text-2xl font-bold">{sale.products?.length || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Approval Information */}
-          {(sale.status === 'approved' || sale.status === 'rejected') && sale.approvedBy && (
-            <div className={`rounded-xl p-6 ${sale.status === 'approved' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-              <h2 className={`text-lg font-semibold mb-2 ${sale.status === 'approved' ? 'text-green-800' : 'text-red-800'}`}>
-                {sale.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
-              </h2>
-              <p className={sale.status === 'approved' ? 'text-green-700' : 'text-red-700'}>
-                By: {sale.approverName || sale.approvedBy} on {formatDate(sale.approvedAt)}
-              </p>
-              {sale.rejectionReason && (
-                <p className="mt-2 text-red-700">
-                  <span className="font-medium">Reason:</span> {sale.rejectionReason}
-                </p>
               )}
-            </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 p-5">
+              <CardTitle className="text-[#0A1F44]">Plans Sold</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="space-y-3">
+                {sale.products?.map((product, index) => (
+                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <p className="font-medium text-slate-950">{product.productName}</p>
+                      <p className="text-sm text-slate-500">{product.company}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-slate-950">{formatCurrency(product.unitPrice)}/mo</p>
+                      <p className="text-sm font-medium text-[#5a8f1f]">+{product.points} pts</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border-[#0A1F44]/10 bg-[#0A1F44] py-0 text-white shadow-sm">
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div>
+                  <p className="text-xs uppercase text-white/60">Total Value</p>
+                  <p className="text-2xl font-bold">{formatCurrency(sale.totalValue || 0)}</p>
+                  <p className="text-xs text-white/60">/month</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-white/60">Commission</p>
+                  <p className="text-2xl font-bold">{formatCurrency(sale.commission || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-white/60">Points</p>
+                  <p className="text-2xl font-bold text-[#8dc63f]">+{sale.totalPoints || 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-white/60">Plans</p>
+                  <p className="text-2xl font-bold">{sale.products?.length || 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {(sale.status === 'approved' || sale.status === 'rejected') && sale.approvedBy && (
+            <Card className={`rounded-lg shadow-sm ${sale.status === 'approved' ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+              <CardContent className="pt-6">
+                <h2 className={`mb-2 flex items-center gap-2 text-lg font-semibold ${sale.status === 'approved' ? 'text-emerald-800' : 'text-red-800'}`}>
+                  {sale.status === 'approved' ? <Check className="size-5" /> : <X className="size-5" />}
+                  {sale.status === 'approved' ? 'Approved' : 'Rejected'}
+                </h2>
+                <p className={sale.status === 'approved' ? 'text-emerald-700' : 'text-red-700'}>
+                  By: {sale.approverName || sale.approvedBy} on {formatDate(sale.approvedAt)}
+                </p>
+                {sale.rejectionReason && (
+                  <p className="mt-2 text-red-700">
+                    <span className="font-medium">Reason:</span> {sale.rejectionReason}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
-      </div>
+      </PortalShell>
 
-      {/* Delete Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-red-100 rounded-full">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-[#0A1F44]">Delete Sale</h3>
-            </div>
-            <p className="text-gray-600 mb-6">
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Sale</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete this sale? This action cannot be undone and will permanently remove the sale record.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Delete Sale'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleDelete} disabled={deleting} variant="destructive">
+              {deleting ? 'Deleting...' : 'Delete Sale'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 }

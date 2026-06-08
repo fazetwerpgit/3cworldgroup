@@ -1,0 +1,55 @@
+﻿<question_for_gemini>
+
+Design Intent
+- Polish the 3C World Group employee portal into a mature internal operations console. Replace AI-slop elements: emoji-as-icons, random motivational hype copy, neon/glow/particle effects, over-rounded generic cards, and inconsistent admin/field shells. Keep the portal practical for field reps, managers, operations, and admins.
+
+Structure Requirements (Desktop + Mobile)
+- Provide full-width desktop layout architecture, section hierarchy, and breakpoint behavior.
+- Specify responsive behavior for tablet and mobile.
+
+Motion Requirements (Micro-interactions + Transitions)
+- Define interaction triggers, states, duration, and easing.
+- Keep motion purposeful and subtle; avoid generic effects.
+
+Implementation Constraints
+- Target stack: Next.js 16 App Router, React 19, Tailwind CSS v4, shadcn/ui minimal components, Firebase-backed client pages
+- Additional constraints:
+- Employee portal only
+- do not redesign public marketing pages
+- Use 3C navy #0A1F44 and green #8dc63f as restrained accents
+- Dense professional dashboard style
+- not landing-page style
+- Use Lucide icons instead of emoji
+- Motion must be purposeful
+- 150-300ms
+- and respect prefers-reduced-motion
+- Mockups should cover dashboard
+- leaderboard
+- admin pipeline
+- sales
+- onboarding
+- calls
+- email templates
+- and shared portal shell
+- Baseline design quality constraints:
+- Avoid generic AI-template aesthetics; define a distinct visual direction.
+- Use expressive typography with explicit pairings and usage rules (hero, heading, body, UI).
+- Define a tokenized spacing and sizing system (8pt rhythm recommended).
+- Define semantic color tokens with accessible contrast guidance.
+- Define motion with concrete durations, easing, and trigger/state mapping.
+- Make implementation direct for Next.js 16 App Router, React 19, Tailwind CSS v4, shadcn/ui minimal components, Firebase-backed client pages with clear component and styling guidance.
+
+References (Local Files)
+- None provided
+
+References (URL)
+- None provided
+
+Required Response Schema
+Return exactly these top-level sections:
+1) Layout Blueprint
+2) Visual System
+3) Motion Plan
+4) Implementation Notes
+
+</question_for_gemini>

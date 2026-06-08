@@ -1,107 +1,121 @@
 'use client';
 
+import { ExternalLink, Info, RadioTower, Route, ShieldCheck } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// Sample links - these would come from Firestore in production
 const quickLinks = [
   {
     title: 'TFiber Service Check',
-    description: 'Check if TFiber service is available at an address',
+    description: 'Check whether TFiber service is available at a customer address.',
     url: 'https://www.t-mobile.com/isp',
-    icon: '🏠',
     category: 'Service Tools',
   },
   {
     title: 'AT&T Fiber Availability',
-    description: 'Check AT&T Fiber availability by address',
+    description: 'Check AT&T Fiber availability by address.',
     url: 'https://www.att.com/internet/fiber/',
-    icon: '📡',
     category: 'Service Tools',
   },
   {
     title: 'Frontier Availability',
-    description: 'Check Frontier Fiber service availability',
+    description: 'Check Frontier Fiber service availability.',
     url: 'https://frontier.com/',
-    icon: '🌐',
     category: 'Service Tools',
-  },
-  {
-    title: 'Company Handbook',
-    description: 'Employee policies and procedures',
-    url: '#',
-    icon: '📚',
-    category: 'Resources',
-  },
-  {
-    title: 'Benefits Portal',
-    description: 'Access your employee benefits',
-    url: '#',
-    icon: '💼',
-    category: 'Resources',
   },
 ];
 
 export default function LinksPage() {
-  const categories = [...new Set(quickLinks.map(link => link.category))];
+  const categories = [...new Set(quickLinks.map((link) => link.category))];
 
   return (
     <ProtectedRoute permissions={['links:read']}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header */}
-              <div>
-                <h1 className="text-2xl font-bold text-[#0A1F44]">Quick Links</h1>
-                <p className="text-gray-500 mt-1">
-                  Useful tools and resources at your fingertips
-                </p>
-              </div>
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1500px] space-y-5">
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                        Quick Links
+                      </h1>
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                        Field reference
+                      </Badge>
+                    </div>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                      Approved service checks and field reference links for repeated sales workflows.
+                    </p>
+                  </div>
+                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                    <Route className="size-5" />
+                  </div>
+                </div>
+              </section>
 
-              {/* Links by Category */}
-              {categories.map(category => (
-                <div key={category}>
-                  <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">{category}</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {categories.map((category) => (
+                <section key={category} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      {category}
+                    </h2>
+                    <Badge variant="outline" className="border-slate-200 text-slate-500">
+                      {quickLinks.filter((link) => link.category === category).length} links
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {quickLinks
-                      .filter(link => link.category === category)
-                      .map((link, idx) => (
+                      .filter((link) => link.category === category)
+                      .map((link) => (
                         <a
-                          key={idx}
+                          key={link.title}
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md hover:border-[#8dc63f] transition-all group"
+                          className="group block rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/70 hover:shadow-md motion-reduce:transform-none"
                         >
                           <div className="flex items-start gap-4">
-                            <span className="text-3xl">{link.icon}</span>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-gray-900 group-hover:text-[#8dc63f] transition-colors flex items-center gap-2">
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44] transition-colors duration-200 group-hover:border-[#8dc63f]/50 group-hover:bg-[#8dc63f]/10">
+                              <RadioTower className="size-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 transition-colors duration-200 group-hover:text-[#4f7f1d]">
                                 {link.title}
-                                <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
+                                <ExternalLink className="size-4 opacity-60 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none" />
                               </h3>
-                              <p className="text-sm text-gray-500 mt-1">{link.description}</p>
+                              <p className="mt-1 text-sm text-slate-600">{link.description}</p>
                             </div>
                           </div>
                         </a>
                       ))}
                   </div>
-                </div>
+                </section>
               ))}
 
-              {/* Info */}
-              <div className="bg-[#0A1F44]/5 rounded-xl p-4 flex items-center gap-3">
-                <span className="text-2xl">💡</span>
-                <p className="text-sm text-gray-600">
-                  Need a link added? Contact your operations team to request new resources.
-                </p>
-              </div>
+              <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base text-[#0A1F44]">
+                    <ShieldCheck className="size-4 text-[#4f7f1d]" />
+                    Resource Requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-slate-600">
+                    Send missing or outdated resource links to operations so this list stays current.
+                  </p>
+                  <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                    <Info className="size-3.5" />
+                    Use approved links only when checking address availability with customers.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </main>
         </div>

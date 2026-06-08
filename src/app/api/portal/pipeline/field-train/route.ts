@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { resolveRoles } from '@/types';
+
+async function isManagement(userId: string): Promise<boolean> {
+  const doc = await adminDb!.collection('users').doc(userId).get();
+  if (!doc.exists) return false;
+  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
+  return role === 'admin' || role === 'operations';
+}
 
 // POST /api/portal/pipeline/field-train - "Message manager to field train".
 // Sends an in-app notification to the rep's manager (reportsToId, legacy
@@ -20,6 +28,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields: userId, requestedBy' },
         { status: 400 }
+      );
+    }
+    if (!(await isManagement(requestedBy))) {
+      return NextResponse.json(
+        { error: 'Only operations or admin can request field training' },
+        { status: 403 }
       );
     }
 

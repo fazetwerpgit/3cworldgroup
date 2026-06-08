@@ -1,0 +1,494 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import {
+  CheckCircle2,
+  Clipboard,
+  ExternalLink,
+  Link2,
+  Loader2,
+  Send,
+  UserPlus,
+  XCircle,
+} from 'lucide-react';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  ApplicationRecord,
+  FieldRole,
+  OnboardingInviteStatus,
+  RecruitingStatusLabels,
+  RoleDisplayNames,
+} from '@/types';
+
+interface InviteView {
+  id: string;
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone: string;
+  candidateCity: string;
+  intendedFieldRole: FieldRole;
+  isIBO: boolean;
+  status: OnboardingInviteStatus;
+  ownerName: string;
+  applicationId?: string | null;
+  convertedUserId?: string | null;
+  expiresAt: string | null;
+  submittedAt: string | null;
+  createdAt: string | null;
+}
+
+const emptyForm = {
+  candidateName: '',
+  candidateEmail: '',
+  candidatePhone: '',
+  candidateCity: '',
+  intendedFieldRole: 'entry_rep' as FieldRole,
+  isIBO: false,
+  applicationId: '',
+};
+
+const statusTone: Record<string, string> = {
+  invited: 'border-blue-200 bg-blue-50 text-blue-700',
+  in_progress: 'border-amber-200 bg-amber-50 text-amber-700',
+  submitted: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  converted: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  rejected: 'border-red-200 bg-red-50 text-red-700',
+  expired: 'border-slate-200 bg-slate-100 text-slate-600',
+};
+
+export default function RecruitingCommandCenterPage() {
+  const { user, hasPermission, isRole } = useAuth();
+  const [invites, setInvites] = useState<InviteView[]>([]);
+  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [latestInviteUrl, setLatestInviteUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+
+  const canAccess =
+    hasPermission('recruiting:read') ||
+    isRole('admin', 'operations', 'l1_manager', 'l2_manager');
+
+  const fetchRecruiting = useCallback(async () => {
+    if (!user || !canAccess) return;
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/portal/recruiting/invites?userId=${user.uid}`);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Failed to load recruiting data');
+      setInvites(json.invites);
+      setApplications(json.applications);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load recruiting data');
+    } finally {
+      setLoading(false);
+    }
+  }, [canAccess, user]);
+
+  useEffect(() => {
+    fetchRecruiting();
+  }, [fetchRecruiting]);
+
+  const fillFromApplication = (applicationId: string) => {
+    const application = applications.find((item) => item.id === applicationId);
+    if (!application) {
+      setForm((prev) => ({ ...prev, applicationId }));
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      applicationId,
+      candidateName: application.name,
+      candidateEmail: application.email,
+      candidatePhone: application.phone,
+      candidateCity: application.city,
+    }));
+  };
+
+  const createInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    setLatestInviteUrl('');
+    try {
+      const response = await fetch('/api/portal/recruiting/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          requestedBy: user.uid,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Failed to create invite');
+      setInvites((prev) => [json.invite, ...prev]);
+      setLatestInviteUrl(json.inviteUrl);
+      setForm(emptyForm);
+      setSuccess('Invite link created. Copy it and send it by text, call follow-up, or manager chat.');
+      await fetchRecruiting();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create invite');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyLatestInvite = async () => {
+    if (!latestInviteUrl) return;
+    await navigator.clipboard.writeText(latestInviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const convertInvite = async (inviteId: string, action: 'approved' | 'rejected') => {
+    if (!user) return;
+    setProcessingId(inviteId);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch('/api/portal/recruiting/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestedBy: user.uid,
+          inviteId,
+          action,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Failed to update recruit');
+      setSuccess(action === 'approved' ? 'Recruit activated.' : 'Recruit rejected.');
+      await fetchRecruiting();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update recruit');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const formatDate = (value: string | null) => {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const submittedCount = invites.filter((invite) => invite.status === 'submitted').length;
+  const activeCount = invites.filter((invite) => invite.status === 'converted').length;
+  const inProgressCount = invites.filter((invite) =>
+    ['invited', 'in_progress'].includes(invite.status)
+  ).length;
+  const waitingApplications = applications.length;
+
+  return (
+    <ProtectedRoute roles={['admin', 'operations', 'l1_manager', 'l2_manager']}>
+      <div className="mx-auto max-w-[1500px] space-y-5">
+        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  Recruiting Command Center
+                </h1>
+                <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e]">
+                  Website onboarding
+                </Badge>
+              </div>
+              <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                Create invite links, keep recruits inside the website, and activate submitted profiles from one manager queue.
+              </p>
+            </div>
+          <Button type="button" variant="outline" onClick={fetchRecruiting} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <Clipboard className="size-4" />}
+            Refresh
+          </Button>
+        </div>
+        </section>
+
+        {error && (
+          <Alert className="border-red-200 bg-red-50 text-red-800">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <Alert className="border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]">
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <Card className="portal-panel rounded-lg py-0">
+            <CardContent className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                In motion
+              </p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{inProgressCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="portal-panel rounded-lg py-0">
+            <CardContent className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Submitted
+              </p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{submittedCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="portal-panel rounded-lg py-0">
+            <CardContent className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Activated
+              </p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{activeCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="portal-panel rounded-lg py-0">
+            <CardContent className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Applications
+              </p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950">{waitingApplications}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[420px_1fr]">
+          <Card className="border-slate-200 py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 p-5">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UserPlus className="size-5 text-[#0A1F44]" />
+                Start Recruit Onboarding
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={createInvite} className="space-y-4">
+                {applications.length > 0 && (
+                  <div>
+                    <Label>Use website application</Label>
+                    <NativeSelect
+                      value={form.applicationId}
+                      onChange={(event) => fillFromApplication(event.target.value)}
+                    >
+                      <option value="">Manual entry</option>
+                      {applications.map((application) => (
+                        <option key={application.id} value={application.id}>
+                          {application.name} - {application.city}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                )}
+
+                <div>
+                  <Label>Name</Label>
+                  <Input
+                    value={form.candidateName}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, candidateName: event.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={form.candidateEmail}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, candidateEmail: event.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Phone</Label>
+                    <Input
+                      value={form.candidatePhone}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, candidatePhone: event.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <Input
+                      value={form.candidateCity}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, candidateCity: event.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Role Path</Label>
+                  <NativeSelect
+                    value={form.intendedFieldRole}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        intendedFieldRole: event.target.value as FieldRole,
+                      }))
+                    }
+                  >
+                    <option value="entry_rep">Entry Representative</option>
+                    <option value="l1_manager">L1 Manager</option>
+                    <option value="l2_manager">L2 Manager</option>
+                  </NativeSelect>
+                </div>
+                <label className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 p-3 text-sm">
+                  <Checkbox
+                    checked={form.isIBO}
+                    onCheckedChange={(checked) =>
+                      setForm((prev) => ({ ...prev, isIBO: checked === true }))
+                    }
+                  />
+                  Include IBO business items
+                </label>
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                >
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                  Create Invite Link
+                </Button>
+              </form>
+
+              {latestInviteUrl && (
+                <div className="mt-5 rounded-lg border border-[#8dc63f]/30 bg-[#8dc63f]/10 p-3">
+                  <p className="text-sm font-semibold text-[#335d14]">Invite link ready</p>
+                  <p className="mt-1 break-all text-xs text-[#4f7f1e]">{latestInviteUrl}</p>
+                  <div className="mt-3 flex gap-2">
+                    <Button type="button" size="sm" onClick={copyLatestInvite}>
+                      <Link2 className="size-4" />
+                      {copied ? 'Copied' : 'Copy Link'}
+                    </Button>
+                    <Button asChild type="button" size="sm" variant="outline">
+                      <a href={latestInviteUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink className="size-4" />
+                        Open
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 p-5">
+              <CardTitle className="text-base">Recruit Onboarding Queue</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              {loading ? (
+                <div className="p-8 text-center text-sm text-slate-500">Loading recruits...</div>
+              ) : invites.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                  No invite links have been created yet.
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3">Recruit</th>
+                          <th className="px-4 py-3">Path</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Owner</th>
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-4 py-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white">
+                        {invites.map((invite) => (
+                          <tr key={invite.id} className="hover:bg-slate-50/80">
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-slate-950">{invite.candidateName}</div>
+                              <div className="text-xs text-slate-500">{invite.candidateEmail}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div>{RoleDisplayNames[invite.intendedFieldRole]}</div>
+                              {invite.isIBO && (
+                                <Badge variant="secondary" className="mt-1 text-[11px]">
+                                  IBO
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge
+                                variant="outline"
+                                className={statusTone[invite.status] ?? statusTone.invited}
+                              >
+                                {RecruitingStatusLabels[invite.status] ?? invite.status}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">{invite.ownerName}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {invite.submittedAt
+                                ? `Submitted ${formatDate(invite.submittedAt)}`
+                                : `Created ${formatDate(invite.createdAt)}`}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {invite.status === 'submitted' ? (
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => convertInvite(invite.id, 'approved')}
+                                    disabled={processingId === invite.id}
+                                    className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                                  >
+                                    <CheckCircle2 className="size-4" />
+                                    Activate
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => convertInvite(invite.id, 'rejected')}
+                                    disabled={processingId === invite.id}
+                                    className="border-red-200 text-red-700 hover:bg-red-50"
+                                  >
+                                    <XCircle className="size-4" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-400">No action</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </ProtectedRoute>
+  );
+}

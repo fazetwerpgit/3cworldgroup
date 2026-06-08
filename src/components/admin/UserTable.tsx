@@ -1,7 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { Pencil, Trash2, UserPlus } from 'lucide-react';
 import { User } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface UserTableProps {
   users: User[];
@@ -11,8 +23,8 @@ interface UserTableProps {
 }
 
 const statusColors = {
-  active: 'bg-green-100 text-green-800',
-  inactive: 'bg-red-100 text-red-800',
+  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  inactive: 'border-red-200 bg-red-50 text-red-700',
 };
 
 const roleLabels: Record<string, string> = {
@@ -35,134 +47,138 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
 
   if (users.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-        <svg
-          className="w-12 h-12 mx-auto mb-3 text-gray-300"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-          />
-        </svg>
-        <p className="text-gray-500">No users found</p>
-        <Link
-          href="/portal/admin/users/new"
-          className="inline-block mt-4 px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] transition-colors"
-        >
-          Add First User
-        </Link>
-      </div>
+      <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+        <CardContent className="py-10">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+            <UserPlus className="h-6 w-6" />
+          </div>
+          <p className="font-medium text-slate-950">No users found</p>
+          <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+            <Link href="/portal/admin/users/new">Add First User</Link>
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                User
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Hire Date
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {users.map((user) => (
-              <tr key={user.uid} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#0A1F44] rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-white">
-                        {user.displayName?.charAt(0).toUpperCase() || 'U'}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {user.displayName}
-                      </div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
-                    </div>
+    <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+      <Table>
+        <TableHeader className="bg-slate-50">
+          <TableRow className="hover:bg-slate-50">
+            <TableHead className="px-6 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              User
+            </TableHead>
+            <TableHead className="px-6 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Role
+            </TableHead>
+            <TableHead className="px-6 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Status
+            </TableHead>
+            <TableHead className="px-6 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Hire Date
+            </TableHead>
+            <TableHead className="px-6 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Actions
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.map((user) => (
+            <TableRow
+              key={user.uid}
+              className="border-slate-100 transition-colors hover:bg-slate-50"
+            >
+              <TableCell className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0A1F44] text-sm font-medium text-white">
+                    {user.displayName?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-sm text-gray-900">
-                    {roleLabels[user.role ?? user.fieldRole ?? ''] || user.role || user.fieldRole}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      statusColors[user.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {user.status?.charAt(0).toUpperCase() + user.status?.slice(1) || 'Unknown'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-sm text-gray-500">
-                    {formatDate(user.hireDate)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                  <div className="flex items-center justify-end gap-3">
-                    <Link
-                      href={`/portal/admin/users/${user.uid}`}
-                      className="text-[#0A1F44] hover:text-[#1a3a6e] font-medium"
-                    >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-slate-950">
+                      {user.displayName}
+                    </div>
+                    <div className="truncate text-sm text-slate-500">{user.email}</div>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="px-6 py-4 text-sm text-slate-700">
+                {roleLabels[user.role ?? user.fieldRole ?? ''] ||
+                  user.role ||
+                  user.fieldRole}
+              </TableCell>
+              <TableCell className="px-6 py-4">
+                <Badge
+                  variant="outline"
+                  className={
+                    statusColors[user.status as keyof typeof statusColors] ||
+                    'border-slate-200 bg-slate-100 text-slate-600'
+                  }
+                >
+                  {user.status?.charAt(0).toUpperCase() + user.status?.slice(1) ||
+                    'Unknown'}
+                </Badge>
+              </TableCell>
+              <TableCell className="px-6 py-4 text-sm text-slate-500">
+                {formatDate(user.hireDate)}
+              </TableCell>
+              <TableCell className="px-6 py-4 text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/portal/admin/users/${user.uid}`}>
+                      <Pencil className="h-4 w-4" />
                       Edit
                     </Link>
-                    {onStatusChange && user.status === 'active' && (
-                      <button
-                        onClick={() => onStatusChange(user.uid, 'inactive')}
-                        disabled={loading}
-                        className="text-orange-600 hover:text-orange-800 disabled:opacity-50"
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                    {onStatusChange && user.status === 'inactive' && (
-                      <button
-                        onClick={() => onStatusChange(user.uid, 'active')}
-                        disabled={loading}
-                        className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                      >
-                        Activate
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button
-                        onClick={() => onDelete(user.uid, user.displayName || user.email || 'this user')}
-                        disabled={loading}
-                        className="text-red-600 hover:text-red-800 disabled:opacity-50 font-medium"
-                        title="Delete user"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                  </Button>
+                  {onStatusChange && user.status === 'active' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onStatusChange(user.uid, 'inactive')}
+                      disabled={loading}
+                      className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                    >
+                      Deactivate
+                    </Button>
+                  )}
+                  {onStatusChange && user.status === 'inactive' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onStatusChange(user.uid, 'active')}
+                      disabled={loading}
+                      className="border-[#8dc63f]/40 text-[#4f7f1e] hover:bg-[#8dc63f]/10"
+                    >
+                      Activate
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        onDelete(
+                          user.uid,
+                          user.displayName || user.email || 'this user'
+                        )
+                      }
+                      disabled={loading}
+                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                      title="Delete user"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }

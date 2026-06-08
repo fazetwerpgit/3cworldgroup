@@ -25,6 +25,8 @@ const BASE_PERMISSIONS = [
   'training:read',         // Everyone can access training/university
   'shorts:read',           // Everyone can watch shorts
   'links:read',            // Everyone can access links/resources
+  'chat:read',
+  'chat:write',
 ];
 
 // Field rep permissions: base + sales read/write
@@ -38,6 +40,8 @@ const FIELD_MANAGER_PERMISSIONS = [
   ...FIELD_REP_PERMISSIONS,
   'sales:approve',
   'users:read',
+  'recruiting:read',
+  'recruiting:write',
 ];
 
 // Permission sets for each role - central authorization logic
@@ -53,6 +57,10 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
     'territories:read', 'territories:write',
     'shorts:write',
     'links:write',
+    'chat:moderate',
+    'recruiting:read',
+    'recruiting:write',
+    'recruiting:convert',
   ],
   operations: [
     ...BASE_PERMISSIONS,
@@ -64,6 +72,10 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
     'territories:read', 'territories:write',
     'shorts:write',
     'links:write',
+    'chat:moderate',
+    'recruiting:read',
+    'recruiting:write',
+    'recruiting:convert',
   ],
   entry_rep: [...FIELD_REP_PERMISSIONS],
   l1_manager: [...FIELD_MANAGER_PERMISSIONS],

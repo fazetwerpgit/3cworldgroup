@@ -2,14 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Check, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import {
   SaleType,
   SaleProduct,
   SALE_TYPES,
   FIBER_COMPANIES,
-  FIBER_PLANS,
   getPlansByCompany,
   getPlanById
 } from '@/types';
@@ -127,97 +133,101 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {(formError || error) && (
-        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {formError || error}
         </div>
       )}
 
-      {/* Customer Address - Required */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">Customer Address</h2>
+      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 p-5">
+          <CardTitle className="text-[#0A1F44]">Customer Address</CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <Label className="mb-1">
             Installation Address *
-          </label>
-          <input
+          </Label>
+          <Input
             type="text"
             name="customerAddress"
             value={formData.customerAddress}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+            className="h-11"
             placeholder="123 Main St, City, State 12345"
           />
-          <p className="text-xs text-gray-500 mt-1">Enter the full address where service will be installed</p>
+          <p className="mt-1 text-xs text-slate-500">Enter the full address where service will be installed</p>
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Optional Customer Info */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">Customer Information <span className="text-sm font-normal text-gray-400">(Optional)</span></h2>
+      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 p-5">
+          <CardTitle className="text-[#0A1F44]">Customer Information <span className="text-sm font-normal text-slate-400">(Optional)</span></CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <Label className="mb-1">
               Customer Name
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               name="customerName"
               value={formData.customerName}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
               placeholder="John Smith"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <Label className="mb-1">
               Phone Number
-            </label>
-            <input
+            </Label>
+            <Input
               type="tel"
               name="customerPhone"
               value={formData.customerPhone}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
               placeholder="(555) 123-4567"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <Label className="mb-1">
               Email
-            </label>
-            <input
+            </Label>
+            <Input
               type="email"
               name="customerEmail"
               value={formData.customerEmail}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
               placeholder="customer@email.com"
             />
           </div>
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Company & Plan Selection */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">Select Plan</h2>
+      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 p-5">
+          <CardTitle className="text-[#0A1F44]">Select Plan</CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
 
-        {/* Company Selection */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">Choose Provider</label>
+          <Label className="mb-3">Choose Provider</Label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {FIBER_COMPANIES.map((company) => (
               <button
                 key={company.value}
                 type="button"
                 onClick={() => handleCompanyChange(company.value)}
-                className={`p-4 rounded-xl border-2 text-left transition-all ${
+                className={`rounded-lg border p-4 text-left transition-colors ${
                   selectedCompany === company.value
-                    ? 'border-[#8dc63f] bg-[#8dc63f]/5'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-[#8dc63f] bg-[#8dc63f]/5 shadow-[inset_0_0_0_1px_#8dc63f]'
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#8dc63f]' : 'text-gray-900'}`}>
+                <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950'}`}>
                   {company.label}
                 </span>
               </button>
@@ -225,10 +235,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
           </div>
         </div>
 
-        {/* Plan Selection */}
         {selectedCompany && (
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">Choose Plan</label>
+            <Label className="mb-3">Choose Plan</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {availablePlans.map((plan) => (
                 <button
@@ -236,16 +245,16 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                   type="button"
                   onClick={() => addPlan(plan.id)}
                   disabled={products.some(p => p.productId === plan.id)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                  className={`rounded-lg border p-4 text-left transition-colors ${
                     products.some(p => p.productId === plan.id)
-                      ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                      ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
                       : 'border-gray-200 hover:border-[#8dc63f] hover:bg-[#8dc63f]/5'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-semibold text-gray-900 block">{plan.name}</span>
-                      <span className="text-sm text-gray-500">{plan.speed}</span>
+                      <span className="font-semibold text-slate-950 block">{plan.name}</span>
+                      <span className="text-sm text-slate-500">{plan.speed}</span>
                     </div>
                     <div className="text-right">
                       <span className="font-bold text-[#0A1F44]">${plan.price.toFixed(2)}</span>
@@ -253,9 +262,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1">
-                    <span className="text-xs bg-[#8dc63f]/10 text-[#8dc63f] px-2 py-0.5 rounded-full font-medium">
+                    <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
                       +{plan.points} pts
-                    </span>
+                    </Badge>
                   </div>
                 </button>
               ))}
@@ -263,105 +272,110 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
           </div>
         )}
 
-        {/* Selected Plans */}
         {products.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Selected Plans</label>
+            <Label className="mb-3">Selected Plans</Label>
             <div className="space-y-2">
               {products.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div>
-                    <span className="font-medium text-gray-900">{product.productName}</span>
+                    <span className="font-medium text-slate-950">{product.productName}</span>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-sm text-gray-500">${product.unitPrice.toFixed(2)}/mo</span>
-                      <span className="text-xs bg-[#8dc63f]/10 text-[#8dc63f] px-2 py-0.5 rounded-full font-medium">
+                      <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
                         +{product.points} pts
-                      </span>
+                      </Badge>
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => removeProduct(index)}
-                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-800"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                    <Trash2 className="size-4" />
+                    <span className="sr-only">Remove plan</span>
+                  </Button>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Sale Type & Notes */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">Sale Details</h2>
+      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 p-5">
+          <CardTitle className="text-[#0A1F44]">Sale Details</CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sale Type</label>
-            <select
+            <Label className="mb-1">Sale Type</Label>
+            <NativeSelect
               name="saleType"
               value={formData.saleType}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+              className="w-full"
             >
               {SALE_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <input
+            <Label className="mb-1">Notes</Label>
+            <Input
               type="text"
               name="notes"
               value={formData.notes}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-              placeholder="Any additional notes..."
+              placeholder="Additional context for review"
             />
           </div>
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Summary */}
       {products.length > 0 && (
-        <div className="bg-gradient-to-br from-[#0A1F44] to-[#1a3a6e] rounded-xl p-6 text-white">
-          <h2 className="text-lg font-semibold mb-4">Sale Summary</h2>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-white/70">Monthly Value</span>
-              <span className="font-semibold">${calculateTotalValue().toFixed(2)}/mo</span>
+        <Card className="rounded-lg border-[#0A1F44]/10 bg-[#0A1F44] py-0 text-white shadow-sm">
+          <CardHeader>
+            <CardTitle>Sale Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase text-white/60">Monthly Value</p>
+              <p className="text-xl font-semibold">${calculateTotalValue().toFixed(2)}/mo</p>
             </div>
-            <div className="flex justify-between">
-              <span className="text-white/70">Plans Selected</span>
-              <span className="font-semibold">{products.length}</span>
+            <div>
+              <p className="text-xs uppercase text-white/60">Plans Selected</p>
+              <p className="text-xl font-semibold">{products.length}</p>
             </div>
-            <div className="border-t border-white/20 pt-3 flex justify-between items-center">
-              <span className="text-white/70">Points You&apos;ll Earn</span>
-              <span className="text-2xl font-bold text-[#8dc63f]">+{calculateTotalPoints()} pts</span>
+            <div>
+              <p className="text-xs uppercase text-white/60">Points</p>
+              <p className="text-xl font-semibold text-[#8dc63f]">+{calculateTotalPoints()} pts</p>
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Submit */}
       <div className="flex justify-end gap-4">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => router.back()}
-          className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={loading || products.length === 0 || !formData.customerAddress.trim()}
-          className="px-8 py-3 bg-[#8dc63f] text-white rounded-lg font-semibold hover:bg-[#7ab82e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
         >
           {loading ? (
             <>
@@ -370,13 +384,11 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             </>
           ) : (
             <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="size-4" />
               Submit Sale
             </>
           )}
-        </button>
+        </Button>
       </div>
     </form>
   );

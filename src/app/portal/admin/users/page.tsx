@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { AlertTriangle, Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { UserTable } from '@/components/admin/UserTable';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { User, UserRole, RoleDisplayNames } from '@/types';
 
 export default function UsersPage() {
@@ -14,7 +16,10 @@ export default function UsersPage() {
   const [error, setError] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | ''>('');
-  const [deleteConfirm, setDeleteConfirm] = useState<{ userId: string; userName: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -45,7 +50,10 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleStatusChange = async (userId: string, status: 'active' | 'inactive') => {
+  const handleStatusChange = async (
+    userId: string,
+    status: 'active' | 'inactive'
+  ) => {
     try {
       const response = await fetch(`/api/portal/auth/users/${userId}`, {
         method: 'PUT',
@@ -58,7 +66,6 @@ export default function UsersPage() {
         throw new Error(data.error || 'Failed to update user');
       }
 
-      // Refresh the list
       fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user');
@@ -85,7 +92,6 @@ export default function UsersPage() {
         throw new Error(data.error || 'Failed to delete user');
       }
 
-      // Refresh the list
       fetchUsers();
       setDeleteConfirm(null);
     } catch (err) {
@@ -97,140 +103,138 @@ export default function UsersPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="min-h-screen bg-gray-50">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto space-y-6">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#0A1F44]">User Management</h1>
-                  <p className="text-gray-500 mt-1">
-                    Manage employee accounts and permissions
-                  </p>
-                </div>
-                <Link
-                  href="/portal/admin/users/new"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#8dc63f] text-white rounded-lg font-medium hover:bg-[#7ab82e] transition-colors"
+      <div className="mx-auto max-w-[1500px] space-y-5">
+        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              User Management
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              Manage employee accounts, roles, and access status.
+            </p>
+          </div>
+          <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+            <Link href="/portal/admin/users/new">
+              <Plus className="h-4 w-4" />
+              Add User
+            </Link>
+          </Button>
+          </div>
+        </section>
+
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-slate-700">Role</label>
+                <NativeSelect
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
+                  className="w-48"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add User
-                </Link>
-              </div>
-
-              {/* Filters */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Role:</label>
-                    <select
-                      value={roleFilter}
-                      onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-                    >
-                      <option value="">All Roles</option>
-                      {(Object.entries(RoleDisplayNames) as [UserRole, string][]).map(
-                        ([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Status:</label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive' | '')}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-                    >
-                      <option value="">All</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                  {(roleFilter || statusFilter) && (
-                    <button
-                      onClick={() => {
-                        setRoleFilter('');
-                        setStatusFilter('');
-                      }}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Clear filters
-                    </button>
+                  <NativeSelectOption value="">All Roles</NativeSelectOption>
+                  {(Object.entries(RoleDisplayNames) as [UserRole, string][]).map(
+                    ([value, label]) => (
+                      <NativeSelectOption key={value} value={value}>
+                        {label}
+                      </NativeSelectOption>
+                    )
                   )}
-                  <span className="text-sm text-gray-500 ml-auto">
-                    {users.length} user{users.length !== 1 ? 's' : ''} found
-                  </span>
-                </div>
+                </NativeSelect>
               </div>
-
-              {/* Error */}
-              {error && (
-                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
-                  {error}
-                </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-slate-700">Status</label>
+                <NativeSelect
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as 'active' | 'inactive' | '')
+                  }
+                  className="w-36"
+                >
+                  <NativeSelectOption value="">All</NativeSelectOption>
+                  <NativeSelectOption value="active">Active</NativeSelectOption>
+                  <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
+                </NativeSelect>
+              </div>
+              {(roleFilter || statusFilter) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-slate-600 hover:text-slate-950"
+                  onClick={() => {
+                    setRoleFilter('');
+                    setStatusFilter('');
+                  }}
+                >
+                  Clear filters
+                </Button>
               )}
-
-              {/* Loading */}
-              {loading ? (
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-gray-500">Loading users...</p>
-                </div>
-              ) : (
-                <UserTable
-                  users={users}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDeleteClick}
-                  loading={loading || deleting}
-                />
-              )}
-
-              {/* Delete Confirmation Modal */}
-              {deleteConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-red-100 rounded-full">
-                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Delete User</h3>
-                    </div>
-                    <p className="text-gray-600 mb-6">
-                      Are you sure you want to permanently delete <strong>{deleteConfirm.userName}</strong>?
-                      This action cannot be undone. The user will be removed from the system completely.
-                    </p>
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        onClick={() => setDeleteConfirm(null)}
-                        disabled={deleting}
-                        className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleDeleteConfirm}
-                        disabled={deleting}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
-                      >
-                        {deleting ? 'Deleting...' : 'Delete User'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <span className="ml-auto text-sm text-slate-500">
+                {users.length} user{users.length !== 1 ? 's' : ''} found
+              </span>
             </div>
-          </main>
-        </div>
+          </CardContent>
+        </Card>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+            <CardContent className="py-8">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
+              <p className="mt-4 text-sm text-slate-500">Loading users...</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <UserTable
+            users={users}
+            onStatusChange={handleStatusChange}
+            onDelete={handleDeleteClick}
+            loading={loading || deleting}
+          />
+        )}
+
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white py-0 shadow-xl">
+              <CardContent className="p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-full bg-red-50 p-2 text-red-600">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-950">Delete User</h3>
+                </div>
+                <p className="mb-6 text-sm text-slate-600">
+                  Permanently delete <strong>{deleteConfirm.userName}</strong> from
+                  the system. This action cannot be undone.
+                </p>
+                <div className="flex items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDeleteConfirm(null)}
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleDeleteConfirm}
+                    disabled={deleting}
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete User'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );

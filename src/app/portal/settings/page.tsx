@@ -160,19 +160,24 @@ export default function SettingsPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-[#0A1F44]">Account Settings</h1>
-              </div>
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1100px] space-y-5">
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  Account Settings
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  Manage your profile, password, and account details used inside the employee portal.
+                </p>
+              </section>
 
               {/* Success/Error Messages */}
               {success && (
-                <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -180,13 +185,13 @@ export default function SettingsPage() {
                 </div>
               )}
               {error && (
-                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
 
               {/* Profile Information */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-[#0A1F44]">
                     Profile Information
@@ -194,7 +199,7 @@ export default function SettingsPage() {
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="text-sm text-[#8dc63f] hover:text-[#7ab82e] font-medium flex items-center gap-1"
+                      className="flex items-center gap-1 text-sm font-medium text-[#5a8f1f] hover:text-[#4a7c19]"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -205,14 +210,14 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleCancelEdit}
-                        className="text-sm text-gray-500 hover:text-gray-700 font-medium"
+                        className="text-sm font-medium text-slate-500 hover:text-slate-700"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSaveProfile}
                         disabled={saving}
-                        className="text-sm bg-[#8dc63f] text-white px-3 py-1 rounded-lg font-medium hover:bg-[#7ab82e] disabled:opacity-50"
+                        className="rounded-md bg-[#8dc63f] px-3 py-1 text-sm font-medium text-[#0A1F44] hover:bg-[#7ab82e] disabled:opacity-50"
                       >
                         {saving ? 'Saving...' : 'Save'}
                       </button>
@@ -222,8 +227,8 @@ export default function SettingsPage() {
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 bg-gradient-to-br from-[#8dc63f] to-[#6ba32e] rounded-full flex items-center justify-center shadow-lg">
-                      <span className="text-3xl font-bold text-white">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-[#8dc63f] shadow-sm">
+                      <span className="text-3xl font-bold text-[#0A1F44]">
                         {user?.displayName?.charAt(0).toUpperCase() ||
                           user?.email?.charAt(0).toUpperCase() ||
                           'U'}
@@ -252,7 +257,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                  <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium text-gray-500 mb-1">
                         Role
@@ -272,7 +277,7 @@ export default function SettingsPage() {
                             : 'bg-red-100 text-red-800'
                         }`}
                       >
-                        {user?.status === 'active' ? '● Active' : '○ Inactive'}
+                        {user?.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
                     </div>
                     <div>
@@ -304,13 +309,13 @@ export default function SettingsPage() {
               </div>
 
               {/* Security */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">
                   Security
                 </h2>
                 <div className="space-y-4">
                   {/* Change Password */}
-                  <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-[#0A1F44] rounded-lg">
@@ -319,8 +324,8 @@ export default function SettingsPage() {
                           </svg>
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900">Change Password</h3>
-                          <p className="text-sm text-gray-500">
+                          <h3 className="font-medium text-slate-950">Change Password</h3>
+                          <p className="text-sm text-slate-500">
                             Update your password directly
                           </p>
                         </div>
@@ -328,7 +333,7 @@ export default function SettingsPage() {
                       {!showPasswordForm && (
                         <button
                           onClick={() => setShowPasswordForm(true)}
-                          className="px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] transition-colors"
+                          className="rounded-md bg-[#8dc63f] px-4 py-2 text-sm font-medium text-[#0A1F44] transition-colors hover:bg-[#7ab82e]"
                         >
                           Change Password
                         </button>
@@ -382,7 +387,7 @@ export default function SettingsPage() {
                           <button
                             type="submit"
                             disabled={changingPassword}
-                            className="px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] transition-colors disabled:opacity-50"
+                            className="rounded-md bg-[#8dc63f] px-4 py-2 text-sm font-medium text-[#0A1F44] transition-colors hover:bg-[#7ab82e] disabled:opacity-50"
                           >
                             {changingPassword ? 'Changing...' : 'Update Password'}
                           </button>
@@ -395,7 +400,7 @@ export default function SettingsPage() {
                               setConfirmPassword('');
                               setError('');
                             }}
-                            className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium"
+                            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
                           >
                             Cancel
                           </button>
@@ -405,7 +410,7 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Reset Password via Email */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-gray-400 rounded-lg">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -413,14 +418,14 @@ export default function SettingsPage() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-medium text-gray-900">Reset via Email</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="font-medium text-slate-950">Reset via Email</h3>
+                        <p className="text-sm text-slate-500">
                           Forgot your password? Get a reset link
                         </p>
                       </div>
                     </div>
                     {resetSent ? (
-                      <span className="text-green-600 text-sm flex items-center gap-1">
+                      <span className="flex items-center gap-1 text-sm text-emerald-700">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
@@ -430,7 +435,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handlePasswordReset}
                         disabled={loading}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
+                        className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
                       >
                         {loading ? 'Sending...' : 'Send Reset Link'}
                       </button>
@@ -440,7 +445,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Account Info */}
-              <div className="bg-gradient-to-br from-[#0A1F44] to-[#1a3a6e] rounded-xl p-6 text-white">
+              <div className="rounded-lg border border-[#0A1F44]/15 bg-[#0A1F44] p-6 text-white">
                 <div className="flex items-start gap-4">
                   <div className="p-2 bg-white/10 rounded-lg">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -458,26 +463,26 @@ export default function SettingsPage() {
               </div>
 
               {/* Account Stats */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">
                   Account Details
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <div className="rounded-lg bg-slate-50 p-4 text-center">
                     <p className="text-2xl font-bold text-[#0A1F44]">{formatDate(user?.createdAt).split(',')[0]}</p>
                     <p className="text-xs text-gray-500 mt-1">Member Since</p>
                   </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="rounded-lg bg-slate-50 p-4 text-center">
                     <p className="text-2xl font-bold text-[#0A1F44]">{user?.territoryId || '--'}</p>
                     <p className="text-xs text-gray-500 mt-1">Territory</p>
                   </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="rounded-lg bg-slate-50 p-4 text-center">
                     <p className="text-2xl font-bold text-[#8dc63f]">{user?.uid?.slice(-6).toUpperCase()}</p>
                     <p className="text-xs text-gray-500 mt-1">Employee ID</p>
                   </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="rounded-lg bg-slate-50 p-4 text-center">
                     <p className="text-2xl font-bold text-[#0A1F44]">
-                      {user?.status === 'active' ? '✓' : '✗'}
+                      {user?.status === 'active' ? 'Yes' : 'No'}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">Account Active</p>
                   </div>

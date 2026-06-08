@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import {
   resolveRoles,
@@ -8,16 +8,34 @@ import {
   PIPELINE_STAGE_ORDER,
 } from '@/types';
 
+async function isManagement(userId: string): Promise<boolean> {
+  const doc = await adminDb!.collection('users').doc(userId).get();
+  if (!doc.exists) return false;
+  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
+  return role === 'admin' || role === 'operations';
+}
+
 // GET /api/portal/pipeline - Recruiting pipeline overview.
 // Aggregates every field rep's onboarding progress, channel clearances and
 // approved sales into a derived stage. Stage is computed, never stored, so
 // it can't drift out of sync with the underlying data.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
       return NextResponse.json(
         { error: 'Database not configured' },
         { status: 500 }
+      );
+    }
+
+    const userId = request.nextUrl.searchParams.get('userId');
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+    if (!(await isManagement(userId))) {
+      return NextResponse.json(
+        { error: 'Only operations or admin can access the recruiting pipeline' },
+        { status: 403 }
       );
     }
 

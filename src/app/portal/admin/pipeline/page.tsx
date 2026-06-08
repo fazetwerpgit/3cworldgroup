@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   PipelineRep,
@@ -21,25 +26,25 @@ interface ChannelRow extends Channel {
 }
 
 const STAGE_BADGE: Record<PipelineStage, string> = {
-  processing: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  need_logins: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  cleared_to_sell: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  active: 'bg-[#8dc63f]/20 text-[#8dc63f] border-[#8dc63f]/30',
-  decommissioned: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  processing: 'border-amber-200 bg-amber-50 text-amber-700',
+  need_logins: 'border-blue-200 bg-blue-50 text-blue-700',
+  cleared_to_sell: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  decommissioned: 'border-slate-200 bg-slate-100 text-slate-600',
 };
 
 const STAGE_CARD_ACCENT: Record<PipelineStage, string> = {
-  processing: 'text-yellow-400',
-  need_logins: 'text-blue-400',
-  cleared_to_sell: 'text-purple-400',
-  active: 'text-[#8dc63f]',
-  decommissioned: 'text-gray-400',
+  processing: 'text-amber-700',
+  need_logins: 'text-blue-700',
+  cleared_to_sell: 'text-indigo-700',
+  active: 'text-[#4f7f1e]',
+  decommissioned: 'text-slate-600',
 };
 
 const CHANNEL_STATUS_BADGE: Record<ChannelOnboardingStatus, string> = {
-  not_started: 'bg-gray-500/20 text-gray-400',
-  submitted: 'bg-yellow-500/20 text-yellow-400',
-  cleared: 'bg-[#8dc63f]/20 text-[#8dc63f]',
+  not_started: 'border-slate-200 bg-slate-100 text-slate-600',
+  submitted: 'border-amber-200 bg-amber-50 text-amber-700',
+  cleared: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
 };
 
 export default function PipelinePage() {
@@ -51,13 +56,12 @@ export default function PipelinePage() {
   const [success, setSuccess] = useState('');
   const [stageFilter, setStageFilter] = useState<PipelineStage | ''>('');
   const [busy, setBusy] = useState(false);
-
-  // Modals
   const [channelsModal, setChannelsModal] = useState<PipelineRep | null>(null);
   const [channelRows, setChannelRows] = useState<ChannelRow[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [decommissionModal, setDecommissionModal] = useState<PipelineRep | null>(null);
-  const [decommissionReason, setDecommissionReason] = useState<DecommissionReason>('non_activity');
+  const [decommissionReason, setDecommissionReason] =
+    useState<DecommissionReason>('non_activity');
   const [decommissionNotes, setDecommissionNotes] = useState('');
 
   const flash = (msg: string) => {
@@ -66,8 +70,9 @@ export default function PipelinePage() {
   };
 
   const fetchPipeline = useCallback(async () => {
+    if (!user) return;
     try {
-      const response = await fetch('/api/portal/pipeline');
+      const response = await fetch(`/api/portal/pipeline?userId=${user.uid}`);
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pipeline');
       setReps(json.reps);
@@ -77,7 +82,7 @@ export default function PipelinePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchPipeline();
@@ -87,7 +92,10 @@ export default function PipelinePage() {
     setChannelsModal(rep);
     setChannelsLoading(true);
     try {
-      const response = await fetch(`/api/portal/pipeline/channels?userId=${rep.uid}`);
+      if (!user) return;
+      const response = await fetch(
+        `/api/portal/pipeline/channels?userId=${rep.uid}&requestedBy=${user.uid}`
+      );
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load channels');
       setChannelRows(json.channels);
@@ -99,15 +107,23 @@ export default function PipelinePage() {
     }
   };
 
-  const setChannelStatus = async (channelId: string, status: ChannelOnboardingStatus) => {
-    if (!channelsModal) return;
+  const setChannelStatus = async (
+    channelId: string,
+    status: ChannelOnboardingStatus
+  ) => {
+    if (!channelsModal || !user) return;
     setBusy(true);
     setError('');
     try {
       const response = await fetch('/api/portal/pipeline/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: channelsModal.uid, channelId, status }),
+        body: JSON.stringify({
+          userId: channelsModal.uid,
+          channelId,
+          status,
+          requestedBy: user.uid,
+        }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to update channel');
@@ -177,13 +193,14 @@ export default function PipelinePage() {
   };
 
   const reinstate = async (rep: PipelineRep) => {
+    if (!user) return;
     setBusy(true);
     setError('');
     try {
       const response = await fetch('/api/portal/pipeline/decommission', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: rep.uid }),
+        body: JSON.stringify({ userId: rep.uid, requestedBy: user.uid }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to reinstate');
@@ -196,32 +213,36 @@ export default function PipelinePage() {
     }
   };
 
-  const visibleReps = stageFilter ? reps.filter((r) => r.stage === stageFilter) : reps;
+  const visibleReps = stageFilter
+    ? reps.filter((r) => r.stage === stageFilter)
+    : reps;
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Recruiting Pipeline</h1>
-          <p className="text-white/60 text-sm mt-1">
-            Track every rep from onboarding to active selling
-          </p>
-        </div>
+      <div className="mx-auto max-w-[1500px] space-y-5">
+        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              Recruiting Pipeline
+            </h1>
+            <p className="max-w-2xl text-sm text-slate-600">
+              Track each field rep from onboarding paperwork to channel credentials, active sales, and decommissioning.
+            </p>
+          </div>
+        </section>
 
         {error && (
-          <div className="bg-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm border border-red-500/30">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
         {success && (
-          <div className="bg-[#8dc63f]/20 text-[#8dc63f] px-4 py-3 rounded-xl text-sm border border-[#8dc63f]/30">
+          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e]">
             {success}
           </div>
         )}
 
-        {/* Stage summary cards (click to filter) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {PIPELINE_STAGE_ORDER.map((stage) => {
             const cfg = PipelineStageConfig[stage];
             const selected = stageFilter === stage;
@@ -229,128 +250,174 @@ export default function PipelinePage() {
               <button
                 key={stage}
                 onClick={() => setStageFilter(selected ? '' : stage)}
-                className={`text-left bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-4 border transition-all ${
-                  selected ? 'border-[#8dc63f]/60 ring-1 ring-[#8dc63f]/40' : 'border-white/10 hover:border-white/25'
+                className={`cursor-pointer rounded-lg border bg-white p-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 ${
+                  selected
+                    ? 'border-[#8dc63f] ring-2 ring-[#8dc63f]/20'
+                    : 'border-slate-200'
                 }`}
               >
-                <p className={`text-2xl font-bold ${STAGE_CARD_ACCENT[stage]}`}>
+                <p className={`text-2xl font-semibold ${STAGE_CARD_ACCENT[stage]}`}>
                   {counts[stage] ?? 0}
                 </p>
-                <p className="text-sm font-medium text-white mt-1">{cfg.name}</p>
-                <p className="text-xs text-white/40 mt-0.5">{cfg.description}</p>
+                <p className="mt-1 text-sm font-medium text-slate-950">{cfg.name}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{cfg.description}</p>
               </button>
             );
           })}
         </div>
 
-        {/* Rep table */}
         {loading ? (
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border border-white/10 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-            <p className="mt-4 text-white/60">Loading pipeline...</p>
-          </div>
+          <Card className="border-slate-200 bg-white text-center">
+            <CardContent className="py-8">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
+              <p className="mt-4 text-sm text-slate-500">Loading pipeline...</p>
+            </CardContent>
+          </Card>
         ) : visibleReps.length === 0 ? (
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-12 border border-white/10 text-center">
-            <p className="text-white font-medium">
-              {stageFilter ? `No reps in "${PipelineStageConfig[stageFilter].name}"` : 'No field reps yet'}
-            </p>
-            <p className="text-white/50 text-sm mt-1">
-              {stageFilter ? 'Click the card again to clear the filter.' : 'Create field users in User Management to start the pipeline.'}
-            </p>
-          </div>
+          <Card className="border-slate-200 bg-white text-center">
+            <CardContent className="py-12">
+              <p className="font-medium text-slate-950">
+                {stageFilter
+                  ? `No reps in "${PipelineStageConfig[stageFilter].name}"`
+                  : 'No field reps yet'}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {stageFilter
+                  ? 'Click the card again to clear the filter.'
+                  : 'Create field users in User Management to start the pipeline.'}
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-white/10 overflow-hidden">
+          <Card className="overflow-hidden border-slate-200 bg-white py-0 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider">Rep</th>
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider">Stage</th>
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider">Onboarding</th>
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider">Channels</th>
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider">Sales</th>
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider">Manager</th>
-                    <th className="px-4 py-3 text-xs font-bold text-white/40 uppercase tracking-wider text-right">Actions</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                    {[
+                      'Rep',
+                      'Stage',
+                      'Onboarding',
+                      'Channels',
+                      'Sales',
+                      'Manager',
+                      'Actions',
+                    ].map((heading) => (
+                      <th
+                        key={heading}
+                        className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 ${
+                          heading === 'Actions' ? 'text-right' : ''
+                        }`}
+                      >
+                        {heading}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {visibleReps.map((rep) => (
-                    <tr key={rep.uid} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <tr
+                      key={rep.uid}
+                      className="border-b border-slate-100 transition-colors hover:bg-slate-50"
+                    >
                       <td className="px-4 py-3">
-                        <p className="font-medium text-white">{rep.displayName}</p>
-                        <p className="text-xs text-white/50">
+                        <p className="font-medium text-slate-950">{rep.displayName}</p>
+                        <p className="text-xs text-slate-500">
                           {RoleDisplayNames[rep.fieldRole]}
-                          {rep.isIBO && <span className="ml-1.5 text-[#8dc63f]">IBO</span>}
+                          {rep.isIBO && (
+                            <span className="ml-1.5 font-medium text-[#4f7f1e]">
+                              IBO
+                            </span>
+                          )}
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full border ${STAGE_BADGE[rep.stage]}`}>
+                        <Badge variant="outline" className={STAGE_BADGE[rep.stage]}>
                           {PipelineStageConfig[rep.stage].name}
-                        </span>
+                        </Badge>
                         {rep.decommission && (
-                          <p className="text-xs text-white/40 mt-1">
+                          <p className="mt-1 text-xs text-slate-500">
                             {DecommissionReasonLabels[rep.decommission.reason]}
                           </p>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 bg-white/10 rounded-full h-1.5">
+                          <div className="h-1.5 w-16 rounded-full bg-slate-200">
                             <div
-                              className="bg-[#8dc63f] h-1.5 rounded-full"
+                              className="h-1.5 rounded-full bg-[#8dc63f]"
                               style={{
-                                width: `${rep.onboarding.total > 0 ? (rep.onboarding.approved / rep.onboarding.total) * 100 : 0}%`,
+                                width: `${
+                                  rep.onboarding.total > 0
+                                    ? (rep.onboarding.approved / rep.onboarding.total) *
+                                      100
+                                    : 0
+                                }%`,
                               }}
                             />
                           </div>
-                          <span className="text-white/70 text-xs">
+                          <span className="text-xs text-slate-600">
                             {rep.onboarding.approved}/{rep.onboarding.total}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-white/70">
+                      <td className="px-4 py-3 text-slate-600">
                         {rep.channelsCleared} cleared
                         {rep.channelsSubmitted > 0 && (
-                          <span className="text-yellow-400/80"> · {rep.channelsSubmitted} pending</span>
+                          <span className="text-amber-700">
+                            {' '}
+                            - {rep.channelsSubmitted} pending
+                          </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-white/70">{rep.approvedSales}</td>
-                      <td className="px-4 py-3 text-white/70">{rep.managerName ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{rep.approvedSales}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {rep.managerName ?? '-'}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           {rep.stage !== 'decommissioned' ? (
                             <>
-                              <button
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => requestFieldTraining(rep)}
                                 disabled={busy}
                                 title="Message manager to field train"
-                                className="px-3 py-1.5 text-xs font-medium bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors disabled:opacity-50"
                               >
                                 Field Train
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => openChannels(rep)}
                                 disabled={busy}
-                                className="px-3 py-1.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50"
                               >
                                 Channels
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setDecommissionModal(rep)}
                                 disabled={busy}
-                                className="px-3 py-1.5 text-xs font-medium bg-red-500/15 text-red-400 rounded-lg hover:bg-red-500/25 transition-colors disabled:opacity-50"
+                                className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                               >
                                 Decommission
-                              </button>
+                              </Button>
                             </>
                           ) : (
-                            <button
+                            <Button
+                              type="button"
+                              size="sm"
                               onClick={() => reinstate(rep)}
                               disabled={busy}
-                              className="px-3 py-1.5 text-xs font-medium bg-[#8dc63f]/20 text-[#8dc63f] rounded-lg hover:bg-[#8dc63f]/30 transition-colors disabled:opacity-50"
+                              className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                             >
                               Reinstate
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -359,124 +426,153 @@ export default function PipelinePage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* Channels modal */}
         {channelsModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                Channel Credentials — {channelsModal.displayName}
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Xfinity is credentialed directly; all other channels go through DSI.
-                Credentials live with the vendor — only status is tracked here.
-              </p>
-              {channelsLoading ? (
-                <div className="py-8 text-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#8dc63f] mx-auto"></div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {channelRows.map((channel) => (
-                    <div
-                      key={channel.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">{channel.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {channel.credentialingPath === 'direct' ? 'Direct' : 'via DSI'} ·{' '}
-                          <span className={`px-1.5 py-0.5 rounded ${CHANNEL_STATUS_BADGE[channel.status]}`}>
-                            {channel.status.replace('_', ' ')}
-                          </span>
-                        </p>
-                      </div>
-                      <select
-                        value={channel.status}
-                        onChange={(e) =>
-                          setChannelStatus(channel.id, e.target.value as ChannelOnboardingStatus)
-                        }
-                        disabled={busy}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] outline-none disabled:opacity-50"
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="max-h-[80vh] w-full max-w-lg overflow-y-auto border-slate-200 bg-white">
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-slate-950">
+                  Channel Credentials - {channelsModal.displayName}
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Xfinity is credentialed directly; all other channels go through DSI.
+                  Credentials live with the vendor; only status is tracked here.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {channelsLoading ? (
+                  <div className="py-8 text-center">
+                    <div className="mx-auto h-6 w-6 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {channelRows.map((channel) => (
+                      <div
+                        key={channel.id}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 p-3"
                       >
-                        <option value="not_started">Not Started</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="cleared">Cleared</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => {
-                  setChannelsModal(null);
-                  setChannelRows([]);
-                }}
-                className="w-full mt-4 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+                        <div>
+                          <p className="font-medium text-slate-950">{channel.name}</p>
+                          <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                            {channel.credentialingPath === 'direct' ? 'Direct' : 'via DSI'}
+                            <Badge
+                              variant="outline"
+                              className={CHANNEL_STATUS_BADGE[channel.status]}
+                            >
+                              {channel.status.replace('_', ' ')}
+                            </Badge>
+                          </p>
+                        </div>
+                        <NativeSelect
+                          value={channel.status}
+                          onChange={(e) =>
+                            setChannelStatus(
+                              channel.id,
+                              e.target.value as ChannelOnboardingStatus
+                            )
+                          }
+                          disabled={busy}
+                          className="w-36"
+                        >
+                          <NativeSelectOption value="not_started">
+                            Not Started
+                          </NativeSelectOption>
+                          <NativeSelectOption value="submitted">
+                            Submitted
+                          </NativeSelectOption>
+                          <NativeSelectOption value="cleared">
+                            Cleared
+                          </NativeSelectOption>
+                        </NativeSelect>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setChannelsModal(null);
+                    setChannelRows([]);
+                  }}
+                  className="mt-4 w-full"
+                >
+                  Close
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 
-        {/* Decommission modal */}
         {decommissionModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Decommission {decommissionModal.displayName}
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                This deactivates the account (sign-in blocked) and records the reason.
-                The account and sales history are preserved and can be reinstated.
-              </p>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-              <select
-                value={decommissionReason}
-                onChange={(e) => setDecommissionReason(e.target.value as DecommissionReason)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] outline-none mb-3"
-              >
-                {(Object.entries(DecommissionReasonLabels) as [DecommissionReason, string][]).map(
-                  ([value, label]) => (
-                    <option key={value} value={value}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="w-full max-w-md border-slate-200 bg-white">
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-slate-950">
+                  Decommission {decommissionModal.displayName}
+                </h3>
+                <p className="text-sm text-slate-600">
+                  This deactivates the account and records the reason. The account
+                  and sales history are preserved and can be reinstated.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Reason
+                </label>
+                <NativeSelect
+                  value={decommissionReason}
+                  onChange={(e) =>
+                    setDecommissionReason(e.target.value as DecommissionReason)
+                  }
+                  className="mb-3 w-full"
+                >
+                  {(
+                    Object.entries(DecommissionReasonLabels) as [
+                      DecommissionReason,
+                      string,
+                    ][]
+                  ).map(([value, label]) => (
+                    <NativeSelectOption key={value} value={value}>
                       {label}
-                    </option>
-                  )
-                )}
-              </select>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes (optional)
-              </label>
-              <textarea
-                value={decommissionNotes}
-                onChange={(e) => setDecommissionNotes(e.target.value)}
-                placeholder="Context for the audit record..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none resize-none"
-                rows={3}
-              />
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => {
-                    setDecommissionModal(null);
-                    setDecommissionNotes('');
-                    setDecommissionReason('non_activity');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={decommission}
-                  disabled={busy}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
-                >
-                  {busy ? 'Working...' : 'Confirm'}
-                </button>
-              </div>
-            </div>
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Notes (optional)
+                </label>
+                <Textarea
+                  value={decommissionNotes}
+                  onChange={(e) => setDecommissionNotes(e.target.value)}
+                  placeholder="Context for the audit record..."
+                  rows={3}
+                />
+                <div className="mt-4 flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDecommissionModal(null);
+                      setDecommissionNotes('');
+                      setDecommissionReason('non_activity');
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={decommission}
+                    disabled={busy}
+                    className="flex-1 bg-red-600 text-white hover:bg-red-700"
+                  >
+                    {busy ? 'Working...' : 'Confirm'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

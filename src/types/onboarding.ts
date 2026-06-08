@@ -24,7 +24,7 @@ export const ONBOARDING_ITEMS: OnboardingItem[] = [
   // IBO-only items
   { id: 'llc_sos', label: 'LLC / Secretary of State', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, order: 6 },
   { id: 'insurance', label: 'Insurance', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, order: 7 },
-  { id: 'chargeback_card', label: 'Chargeback Card', category: 'financial', appliesToRoles: [], iboOnly: true, sensitive: true, order: 8 },
+  { id: 'chargeback_card', label: 'Credit Card / Background Check / Drug Screen', category: 'financial', appliesToRoles: [], iboOnly: true, sensitive: true, order: 8 },
 ];
 
 // Per-user progress on an onboarding item

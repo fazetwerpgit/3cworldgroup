@@ -2,8 +2,29 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Check, ClipboardList, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Sale, SaleStatus } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 
 interface SalesTableProps {
   sales: Sale[];
@@ -13,10 +34,10 @@ interface SalesTableProps {
 }
 
 const statusColors: Record<SaleStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-800',
+  pending: 'border-amber-200 bg-amber-50 text-amber-700',
+  approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  rejected: 'border-red-200 bg-red-50 text-red-700',
+  cancelled: 'border-gray-200 bg-gray-100 text-gray-700',
 };
 
 export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTableProps) {
@@ -67,28 +88,13 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
 
   if (sales.length === 0) {
     return (
-      <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-        <svg
-          className="w-12 h-12 mx-auto mb-3 text-gray-300"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-          />
-        </svg>
+      <Card className="rounded-lg border-gray-200 p-8 text-center shadow-sm">
+        <ClipboardList className="mx-auto mb-3 size-12 text-gray-300" />
         <p className="text-gray-500">No sales found</p>
-        <Link
-          href="/portal/sales/new"
-          className="inline-block mt-4 px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] transition-colors"
-        >
-          Log New Sale
-        </Link>
-      </div>
+        <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+          <Link href="/portal/sales/new">Log New Sale</Link>
+        </Button>
+      </Card>
     );
   }
 
@@ -97,25 +103,20 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
       {/* Mobile Card Layout */}
       <div className="lg:hidden space-y-4">
         {sales.map((sale) => (
-          <div key={sale.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            {/* Header with customer name and status */}
+          <Card key={sale.id} className="rounded-lg border-gray-200 py-4 shadow-sm">
+            <CardContent className="px-4">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <h3 className="font-semibold text-gray-900">{sale.customerName}</h3>
+                <h3 className="font-semibold text-gray-900">{sale.customerName || sale.customerAddress || 'Customer pending'}</h3>
                 {sale.customerPhone && (
                   <p className="text-sm text-gray-500">{sale.customerPhone}</p>
                 )}
               </div>
-              <span
-                className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                  statusColors[sale.status]
-                }`}
-              >
+              <Badge variant="outline" className={statusColors[sale.status]}>
                 {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-              </span>
+              </Badge>
             </div>
 
-            {/* Details grid */}
             <div className="grid grid-cols-2 gap-3 text-sm mb-4">
               <div>
                 <p className="text-gray-500 text-xs">Sales Rep</p>
@@ -135,238 +136,242 @@ export function SalesTable({ sales, onApprove, onDelete, loading }: SalesTablePr
               </div>
             </div>
 
-            {/* Action buttons */}
             <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
-              <Link
-                href={`/portal/sales/${sale.id}`}
-                className="flex-1 px-3 py-2 text-center text-sm font-medium text-[#0A1F44] bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                View
-              </Link>
+              <Button asChild variant="outline" size="sm" className="flex-1">
+                <Link href={`/portal/sales/${sale.id}`}>
+                  <Eye className="size-4" />
+                  View
+                </Link>
+              </Button>
               {isAdmin && (
                 <>
-                  <Link
-                    href={`/portal/sales/${sale.id}/edit`}
-                    className="flex-1 px-3 py-2 text-center text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                  >
-                    Edit
-                  </Link>
-                  <button
+                  <Button asChild variant="outline" size="sm" className="flex-1">
+                    <Link href={`/portal/sales/${sale.id}/edit`}>
+                      <Pencil className="size-4" />
+                      Edit
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setShowDeleteModal(sale.id!)}
                     disabled={loading}
-                    className="flex-1 px-3 py-2 text-center text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                    className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                   >
+                    <Trash2 className="size-4" />
                     Delete
-                  </button>
+                  </Button>
                 </>
               )}
               {canApprove && sale.status === 'pending' && (
                 <>
-                  <button
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleApprove(sale.id!)}
                     disabled={loading}
-                    className="flex-1 px-3 py-2 text-center text-sm font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors"
+                    className="flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                   >
+                    <Check className="size-4" />
                     Approve
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setShowRejectModal(sale.id!)}
                     disabled={loading}
-                    className="flex-1 px-3 py-2 text-center text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                    className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                   >
+                    <X className="size-4" />
                     Reject
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Desktop Table Layout */}
-      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="hidden lg:block overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sales Rep
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Value
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Sales Rep</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Value</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sales.map((sale) => (
-                <tr key={sale.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                <TableRow key={sale.id} className="hover:bg-gray-50/80">
+                  <TableCell className="whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {sale.customerName}
+                        {sale.customerName || sale.customerAddress || 'Customer pending'}
                       </div>
                       {sale.customerPhone && (
                         <div className="text-sm text-gray-500">{sale.customerPhone}</div>
                       )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <div className="text-sm text-gray-900">{sale.salesRepName}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <div className="text-sm text-gray-900">{formatDate(sale.saleDate)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {formatCurrency(sale.totalValue)}
                     </div>
                     <div className="text-xs text-[#8dc63f]">
                       +{formatCurrency(sale.commission || 0)} commission
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        statusColors[sale.status]
-                      }`}
-                    >
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Badge variant="outline" className={statusColors[sale.status]}>
                       {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/portal/sales/${sale.id}`}
-                        className="text-[#0A1F44] hover:text-[#1a3a6e]"
-                      >
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/portal/sales/${sale.id}`}>
+                          <Eye className="size-4" />
                         View
-                      </Link>
+                        </Link>
+                      </Button>
                       {isAdmin && (
                         <>
-                          <Link
-                            href={`/portal/sales/${sale.id}/edit`}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
+                          <Button asChild variant="ghost" size="sm">
+                            <Link href={`/portal/sales/${sale.id}/edit`}>
+                              <Pencil className="size-4" />
                             Edit
-                          </Link>
-                          <button
+                            </Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowDeleteModal(sale.id!)}
                             disabled={loading}
-                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            className="text-red-700 hover:bg-red-50 hover:text-red-800"
                           >
+                            <Trash2 className="size-4" />
                             Delete
-                          </button>
+                          </Button>
                         </>
                       )}
                       {canApprove && sale.status === 'pending' && (
                         <>
-                          <button
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleApprove(sale.id!)}
                             disabled={loading}
-                            className="text-green-600 hover:text-green-800 disabled:opacity-50"
+                            className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                           >
+                            <Check className="size-4" />
                             Approve
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowRejectModal(sale.id!)}
                             disabled={loading}
-                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            className="text-red-700 hover:bg-red-50 hover:text-red-800"
                           >
+                            <X className="size-4" />
                             Reject
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
 
-      {/* Rejection Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="reject-modal-title">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 id="reject-modal-title" className="text-lg font-semibold text-[#0A1F44] mb-4">Reject Sale</h3>
-            <p className="text-gray-600 mb-4">
+      <Dialog open={!!showRejectModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowRejectModal(null);
+          setRejectionReason('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Sale</DialogTitle>
+            <DialogDescription>
               Please provide a reason for rejecting this sale:
-            </p>
-            <textarea
+            </DialogDescription>
+          </DialogHeader>
+            <Textarea
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none resize-none"
               rows={3}
               placeholder="Enter rejection reason..."
             />
-            <div className="flex justify-end gap-3 mt-4">
-              <button
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => {
                   setShowRejectModal(null);
                   setRejectionReason('');
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
-              </button>
-              <button
-                onClick={() => handleReject(showRejectModal)}
-                disabled={!rejectionReason || loading}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              </Button>
+              <Button
+                type="button"
+                onClick={() => showRejectModal && handleReject(showRejectModal)}
+                disabled={!rejectionReason || loading || !showRejectModal}
+                variant="destructive"
               >
                 Reject Sale
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-red-100 rounded-full">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <h3 id="delete-modal-title" className="text-lg font-semibold text-[#0A1F44]">Delete Sale</h3>
-            </div>
-            <p className="text-gray-600 mb-6">
+      <Dialog open={!!showDeleteModal} onOpenChange={(open) => {
+        if (!open) setShowDeleteModal(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Sale</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete this sale? This action cannot be undone and will permanently remove the sale record.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteModal(null)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
+            </DialogDescription>
+          </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowDeleteModal(null)}>
                 Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(showDeleteModal)}
-                disabled={loading}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              </Button>
+              <Button
+                type="button"
+                onClick={() => showDeleteModal && handleDelete(showDeleteModal)}
+                disabled={loading || !showDeleteModal}
+                variant="destructive"
               >
                 Delete Sale
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

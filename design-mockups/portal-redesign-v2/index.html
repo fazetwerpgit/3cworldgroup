@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3C Portal Redesign V2 Mockups</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        background:
+          linear-gradient(rgba(10,31,68,.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(10,31,68,.035) 1px, transparent 1px),
+          #f8fafc;
+        background-size: 24px 24px;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen text-slate-950">
+    <div class="flex min-h-screen">
+      <aside class="w-64 bg-[#0A1F44] text-white">
+        <div class="px-5 py-5">
+          <div class="flex items-center gap-3">
+            <div class="grid h-9 w-9 place-items-center rounded-md bg-[#8dc63f] text-sm font-black">3C</div>
+            <div>
+              <p class="text-sm font-semibold">Employee Portal</p>
+              <p class="text-xs text-white/55">Ops Console V2</p>
+            </div>
+          </div>
+        </div>
+        <nav class="space-y-1 px-3 text-sm">
+          <div class="rounded-md border border-white/10 bg-white/10 px-3 py-2">Dashboard</div>
+          <div class="px-3 py-2 text-white/65">Onboarding</div>
+          <div class="px-3 py-2 text-white/65">Sales</div>
+          <div class="px-3 py-2 text-white/65">Team Chat</div>
+          <div class="px-3 py-2 text-white/65">Recruiting Pipeline</div>
+        </nav>
+      </aside>
+      <main class="flex-1">
+        <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
+          <div class="text-sm font-medium text-slate-600">Live activity: 4 reps need logins, 2 cleared to sell</div>
+          <button class="rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-white">Command</button>
+        </header>
+        <section class="space-y-6 p-6">
+          <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Field Operations Dashboard</h1>
+            <p class="mt-1 text-sm text-slate-600">Pipeline, onboarding, selling, and team communication in one workspace.</p>
+          </div>
+          <div class="grid grid-cols-4 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Processing</p>
+              <p class="mt-3 text-3xl font-semibold">18</p>
+              <div class="mt-4 h-1.5 rounded-full bg-amber-100"><div class="h-full w-2/3 rounded-full bg-amber-500"></div></div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Need Logins</p>
+              <p class="mt-3 text-3xl font-semibold">7</p>
+              <div class="mt-4 h-1.5 rounded-full bg-blue-100"><div class="h-full w-1/2 rounded-full bg-blue-600"></div></div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Cleared To Sell</p>
+              <p class="mt-3 text-3xl font-semibold">11</p>
+              <div class="mt-4 h-1.5 rounded-full bg-[#8dc63f]/20"><div class="h-full w-3/4 rounded-full bg-[#8dc63f]"></div></div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Unread Chat</p>
+              <p class="mt-3 text-3xl font-semibold">24</p>
+              <div class="mt-4 text-xs text-slate-500">Text-only Firebase pilot</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-[1.4fr_.8fr] gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div class="border-b border-slate-200 p-4">
+                <h2 class="font-semibold">Recruiting Pipeline</h2>
+              </div>
+              <div class="grid grid-cols-5 gap-3 p-4 text-sm">
+                <div class="rounded-md border border-amber-200 bg-amber-50 p-3">Processing</div>
+                <div class="rounded-md border border-blue-200 bg-blue-50 p-3">Need Logins</div>
+                <div class="rounded-md border border-indigo-200 bg-indigo-50 p-3">Cleared</div>
+                <div class="rounded-md border border-green-200 bg-green-50 p-3">Active</div>
+                <div class="rounded-md border border-red-200 bg-red-50 p-3">Decommission</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div class="border-b border-slate-200 p-4">
+                <h2 class="font-semibold">Team Chat</h2>
+              </div>
+              <div class="space-y-3 p-4 text-sm">
+                <div class="rounded-md bg-slate-50 p-3"><b>Operations</b> posted channel clearance notes.</div>
+                <div class="rounded-md bg-slate-50 p-3"><b>Manager Call</b> moved to Thursday.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

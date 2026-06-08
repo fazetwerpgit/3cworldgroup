@@ -1,10 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { ElementType } from 'react';
+import { AlertCircle, BadgeDollarSign, Clock3, Edit3, Layers3, Save, Users } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CommissionConfig, FieldRole, RoleDisplayNames } from '@/types';
 
 interface PayStructureResponse {
@@ -14,11 +22,16 @@ interface PayStructureResponse {
   updatedByName: string | null;
 }
 
-// Per-tier blurb shown under the role name
 const TIER_NOTES: Record<FieldRole, string> = {
   entry_rep: 'Commission on your own approved sales.',
   l1_manager: 'Commission on your own sales plus an override on your team.',
   l2_manager: 'Commission on your own sales plus an override on your organization.',
+};
+
+const TIER_ICON: Record<FieldRole, ElementType> = {
+  entry_rep: BadgeDollarSign,
+  l1_manager: Users,
+  l2_manager: Layers3,
 };
 
 export default function PayStructurePage() {
@@ -26,7 +39,6 @@ export default function PayStructurePage() {
   const [data, setData] = useState<PayStructureResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // Admin edit state
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<CommissionConfig[]>([]);
   const [saving, setSaving] = useState(false);
@@ -39,9 +51,7 @@ export default function PayStructurePage() {
     try {
       const response = await fetch(`/api/portal/commission?userId=${user.uid}`);
       const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error || 'Failed to load pay structure');
-      }
+      if (!response.ok) throw new Error(json.error || 'Failed to load pay structure');
       setData(json);
       setDraft(json.tiers);
     } catch (err) {
@@ -56,7 +66,7 @@ export default function PayStructurePage() {
   }, [fetchStructure]);
 
   const ratesPending = (data?.tiers ?? []).every(
-    (t) => t.baseRate === 0 && (t.overrideRate ?? 0) === 0
+    (tier) => tier.baseRate === 0 && (tier.overrideRate ?? 0) === 0
   );
 
   const updateDraft = (
@@ -65,8 +75,8 @@ export default function PayStructurePage() {
     value: string
   ) => {
     setDraft((prev) =>
-      prev.map((t) =>
-        t.fieldRole === fieldRole ? { ...t, [key]: Number(value) || 0 } : t
+      prev.map((tier) =>
+        tier.fieldRole === fieldRole ? { ...tier, [key]: Number(value) || 0 } : tier
       )
     );
   };
@@ -86,9 +96,7 @@ export default function PayStructurePage() {
         }),
       });
       const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error || 'Failed to save');
-      }
+      if (!response.ok) throw new Error(json.error || 'Failed to save');
       setEditing(false);
       setSuccess('Pay structure updated');
       setTimeout(() => setSuccess(''), 3000);
@@ -100,157 +108,193 @@ export default function PayStructurePage() {
     }
   };
 
+  const tiers = editing ? draft : data?.tiers ?? [];
+
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#0A1F44]">Pay Structure</h1>
-                  <p className="text-gray-500 mt-1">
-                    {data?.scope === 'all'
-                      ? 'Commission tiers for every field role'
-                      : 'Your commission tier'}
-                  </p>
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1500px] space-y-5">
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                        Pay Structure
+                      </h1>
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                        Compensation
+                      </Badge>
+                    </div>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                      {data?.scope === 'all'
+                        ? 'Commission tiers for every field role.'
+                        : 'Your current commission tier and override rules.'}
+                    </p>
+                  </div>
+                  {isAdmin && data && !editing && (
+                    <Button
+                      onClick={() => {
+                        setDraft(data.tiers);
+                        setEditing(true);
+                      }}
+                      className="bg-[#0A1F44] text-white hover:bg-[#13294f]"
+                    >
+                      <Edit3 className="size-4" />
+                      Edit Rates
+                    </Button>
+                  )}
                 </div>
-                {isAdmin && data && !editing && (
-                  <button
-                    onClick={() => {
-                      setDraft(data.tiers);
-                      setEditing(true);
-                    }}
-                    className="px-4 py-2 bg-[#0A1F44] text-white rounded-lg text-sm font-medium hover:bg-[#13294f] transition-colors"
-                  >
-                    Edit Rates
-                  </button>
-                )}
-              </div>
+              </section>
 
               {error && (
-                <div className="bg-red-50 text-red-700 px-4 py-3 rounded-xl text-sm border border-red-200">
-                  {error}
-                </div>
+                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                  <AlertCircle className="size-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
               {success && (
-                <div className="bg-green-50 text-green-700 px-4 py-3 rounded-xl text-sm border border-green-200">
-                  {success}
-                </div>
+                <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800">
+                  <Save className="size-4" />
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
               )}
-
               {ratesPending && !loading && (
-                <div className="bg-yellow-50 text-yellow-800 px-4 py-3 rounded-xl text-sm border border-yellow-200">
-                  Final commission rates are being confirmed by leadership. The
-                  numbers below are placeholders and will be updated.
-                </div>
+                <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+                  <Clock3 className="size-4" />
+                  <AlertDescription>
+                    Final commission rates are being confirmed by leadership. Current numbers are placeholders.
+                  </AlertDescription>
+                </Alert>
               )}
 
               {loading ? (
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-gray-500">Loading pay structure...</p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {[1, 2, 3].map((item) => (
+                    <Card key={item} className="rounded-lg border-slate-200 shadow-sm">
+                      <CardContent className="space-y-4 p-5">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               ) : (
-                (editing ? draft : data?.tiers ?? []).map((tier) => (
-                  <div
-                    key={tier.fieldRole}
-                    className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <h2 className="font-semibold text-gray-900">
-                        {RoleDisplayNames[tier.fieldRole]}
-                      </h2>
-                      {data?.scope === 'own' && (
-                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#8dc63f]/10 text-[#5a8f1f]">
-                          Your tier
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mb-4">
-                      {TIER_NOTES[tier.fieldRole]}
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                          Base Commission
-                        </p>
-                        {editing ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={tier.baseRate}
-                            onChange={(e) =>
-                              updateDraft(tier.fieldRole, 'baseRate', e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8dc63f]"
-                            aria-label={`Base rate for ${RoleDisplayNames[tier.fieldRole]}`}
-                          />
-                        ) : (
-                          <p className="text-2xl font-bold text-[#0A1F44]">
-                            {tier.baseRate}%
-                          </p>
-                        )}
-                      </div>
-                      {tier.overrideRate !== undefined && (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                            Team Override
-                          </p>
-                          {editing ? (
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={tier.overrideRate}
-                              onChange={(e) =>
-                                updateDraft(tier.fieldRole, 'overrideRate', e.target.value)
-                              }
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8dc63f]"
-                              aria-label={`Override rate for ${RoleDisplayNames[tier.fieldRole]}`}
-                            />
-                          ) : (
-                            <p className="text-2xl font-bold text-[#0A1F44]">
-                              {tier.overrideRate}%
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {tiers.map((tier) => {
+                    const TierIcon = TIER_ICON[tier.fieldRole];
+                    return (
+                      <Card
+                        key={tier.fieldRole}
+                        className="rounded-lg border-slate-200 py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex gap-3">
+                              <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                                <TierIcon className="size-5" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-base text-slate-950">
+                                  {RoleDisplayNames[tier.fieldRole]}
+                                </CardTitle>
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {TIER_NOTES[tier.fieldRole]}
+                                </p>
+                              </div>
+                            </div>
+                            {data?.scope === 'own' && (
+                              <Badge className="bg-[#8dc63f]/15 text-[#4f7f1d] hover:bg-[#8dc63f]/15">
+                                Your tier
+                              </Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Base Commission
                             </p>
+                            {editing ? (
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={tier.baseRate}
+                                onChange={(event) =>
+                                  updateDraft(tier.fieldRole, 'baseRate', event.target.value)
+                                }
+                                className="mt-2 bg-white"
+                                aria-label={`Base rate for ${RoleDisplayNames[tier.fieldRole]}`}
+                              />
+                            ) : (
+                              <p className="mt-2 text-3xl font-semibold text-[#0A1F44]">
+                                {tier.baseRate}%
+                              </p>
+                            )}
+                          </div>
+                          {tier.overrideRate !== undefined && (
+                            <div className="rounded-lg border border-slate-200 bg-white p-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                Team Override
+                              </p>
+                              {editing ? (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={tier.overrideRate}
+                                  onChange={(event) =>
+                                    updateDraft(tier.fieldRole, 'overrideRate', event.target.value)
+                                  }
+                                  className="mt-2"
+                                  aria-label={`Override rate for ${RoleDisplayNames[tier.fieldRole]}`}
+                                />
+                              ) : (
+                                <p className="mt-2 text-2xl font-semibold text-[#0A1F44]">
+                                  {tier.overrideRate}%
+                                </p>
+                              )}
+                            </div>
                           )}
-                        </div>
-                      )}
-                    </div>
-                    {tier.notes && !editing && (
-                      <p className="text-sm text-gray-500 mt-3">{tier.notes}</p>
-                    )}
-                  </div>
-                ))
+                          {tier.notes && !editing && (
+                            <p className="text-sm text-slate-500">{tier.notes}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
 
               {editing && (
-                <div className="flex gap-3 justify-end">
-                  <button
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       setEditing(false);
                       setDraft(data?.tiers ?? []);
                     }}
                     disabled={saving}
-                    className="px-4 py-2 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={handleSave}
                     disabled={saving}
-                    className="px-4 py-2 bg-[#8dc63f] text-white rounded-lg text-sm font-medium hover:bg-[#7ab82e] disabled:opacity-50 transition-colors"
+                    className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                   >
                     {saving ? 'Saving...' : 'Save Rates'}
-                  </button>
+                  </Button>
                 </div>
               )}
 
               {data?.updatedAt && (
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-slate-500">
                   Last updated{' '}
                   {new Date(data.updatedAt).toLocaleDateString('en-US', {
                     month: 'short',

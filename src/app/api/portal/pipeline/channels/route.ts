@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { CHANNELS, ChannelOnboardingStatus } from '@/types';
+import { CHANNELS, ChannelOnboardingStatus, resolveRoles } from '@/types';
+
+async function isManagement(userId: string): Promise<boolean> {
+  const doc = await adminDb!.collection('users').doc(userId).get();
+  if (!doc.exists) return false;
+  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
+  return role === 'admin' || role === 'operations';
+}
 
 // GET /api/portal/pipeline/channels?userId=xxx - Per-channel credentialing
 // status for one rep. Merges the CHANNELS catalog with userChannelOnboarding
@@ -15,8 +22,18 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = request.nextUrl.searchParams.get('userId');
+    const requestedBy = request.nextUrl.searchParams.get('requestedBy');
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+    if (!requestedBy) {
+      return NextResponse.json({ error: 'requestedBy is required' }, { status: 400 });
+    }
+    if (!(await isManagement(requestedBy))) {
+      return NextResponse.json(
+        { error: 'Only operations or admin can view channel credentialing' },
+        { status: 403 }
+      );
     }
 
     const active = CHANNELS.filter((c) => c.active);
@@ -60,12 +77,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, channelId, status, reference } = body;
+    const { userId, channelId, status, reference, requestedBy } = body;
 
-    if (!userId || !channelId || !status) {
+    if (!userId || !channelId || !status || !requestedBy) {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, channelId, status' },
+        { error: 'Missing required fields: userId, channelId, status, requestedBy' },
         { status: 400 }
+      );
+    }
+    if (!(await isManagement(requestedBy))) {
+      return NextResponse.json(
+        { error: 'Only operations or admin can update channel credentialing' },
+        { status: 403 }
       );
     }
 

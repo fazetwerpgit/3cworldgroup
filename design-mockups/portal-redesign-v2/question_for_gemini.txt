@@ -1,0 +1,39 @@
+﻿You are the design director for a full employee portal redesign for 3C World Group.
+
+HARD MODEL REQUIREMENT: This prompt is being sent to gemini-3.1-pro-preview. Do not answer unless operating as Gemini 3.1 Pro Preview.
+
+Context:
+- Repo: Next.js 16 App Router, React 19, Tailwind v4, shadcn/ui, Firebase.
+- Scope: authenticated employee portal under /portal only, not the public marketing site.
+- Product: internal rep lifecycle platform replacing Connecteam: recruit -> onboard -> train -> sell -> decommission.
+- Brand colors: navy #0A1F44, green #8dc63f.
+- Existing design was too obviously AI/Claude/Sonnet: needs more intentional flare without becoming gimmicky.
+
+Boss doc requirements that must be represented:
+- IBO onboarding: W9, contract, onboarding submission, direct deposit, pay structure, LLC Secretary of State, insurance upload, credit card for chargebacks/background checks/drug screen.
+- Rep/L1/L2 onboarding: W9, contract, onboarding submission, direct deposit, pay structure, Xfinity submission, DSI submission, rep onboarding, onboarding submission, Xfinity, DSI broken into channel onboarding.
+- Backend recruiting platform counts: reps processing, need logins, cleared to sell, field-train manager message, online training, active, decommissioning.
+- Decommission reasons: non activity, wrongdoing in field, manager fire.
+- Channels: Frontier, AT&T, Ripple, Brightspeed, Kinetic, T-Fiber, Vivint, DirecTV, Xfinity direct, others via DSI.
+- Calls: onboarding call, Day 1 training intro to online training, Day 2 pitch practice, Day 3 rebuttals/closing practice, Monday team call, Thursday team call, manager call, IBO call.
+- Team Chat pilot should be free/no paid SaaS: Firebase text-only pilot, no media hosting.
+
+Research-inspired design inputs:
+- Connecteam: operational employee app patterns, onboarding/task flows, team chat/channel use cases.
+- Salesforce/HubSpot/monday/Pipedrive: sales workspace, pipeline visibility, clear stage/status affordances.
+- SPOTIO/SalesRabbit: field sales KPI/leaderboard motivation, but avoid juvenile gamification.
+
+Design direction:
+- Ops Console with tasteful flare.
+- Use precise density, glass only if readable, subtle grid/texture, status rails, command bars, progress timelines, live activity strips, refined microinteractions.
+- No emoji-as-icons, no neon, no generic purple gradients, no decorative infinite motion, no random motivational copy.
+- Use Lucide icons and shadcn primitives.
+- Motion: 150-300ms, purposeful, reduced-motion compatible.
+
+Return exactly these sections:
+1) Layout Blueprint
+2) Visual System
+3) Motion Plan
+4) Page-by-Page Redesign Map
+5) Boss Doc Compliance Matrix
+6) Implementation Notes

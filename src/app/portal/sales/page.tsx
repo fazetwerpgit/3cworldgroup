@@ -3,10 +3,16 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { Filter, Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { SalesTable } from '@/components/sales/SalesTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { NativeSelect } from '@/components/ui/native-select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
 import { SaleStatus } from '@/types';
@@ -15,17 +21,12 @@ function SalesContent() {
   const searchParams = useSearchParams();
   const { user, hasPermission } = useAuth();
   const { sales, loading, error, fetchSales, approveSale, deleteSale } = useSales();
-  const [statusFilter, setStatusFilter] = useState<SaleStatus | ''>('');
+  const [statusFilter, setStatusFilter] = useState<SaleStatus | ''>(
+    (searchParams.get('status') as SaleStatus | null) ?? ''
+  );
 
   const canApprove = hasPermission('sales:approve');
   const canViewAll = hasPermission('sales:read');
-
-  useEffect(() => {
-    const status = searchParams.get('status') as SaleStatus | null;
-    if (status) {
-      setStatusFilter(status);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     const filters: { status?: SaleStatus; salesRepId?: string } = {};
@@ -60,69 +61,70 @@ function SalesContent() {
 
   return (
     <ProtectedRoute permissions={['sales:read']}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto space-y-6">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#0A1F44]">Sales</h1>
-                  <p className="text-gray-500 mt-1">
-                    {canViewAll ? 'View and manage all sales' : 'View and manage your sales'}
-                  </p>
-                </div>
-                <Link
-                  href="/portal/sales/new"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#8dc63f] text-white rounded-lg font-medium hover:bg-[#7ab82e] transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Log New Sale
-                </Link>
-              </div>
-
-              {/* Filters */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Status:</label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as SaleStatus | '')}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-                    >
-                      <option value="">All</option>
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1500px] space-y-5">
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Sales Workspace</h1>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                      {canViewAll ? 'Review field sales activity and approval status' : 'Track your submitted sales and approval status'}
+                    </p>
                   </div>
-                  {canApprove && statusFilter === 'pending' && (
-                    <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
-                      {sales.filter((s) => s.status === 'pending').length} pending approval
-                    </span>
-                  )}
+                  <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+                    <Link href="/portal/sales/new">
+                      <Plus className="size-4" />
+                      Log sale
+                    </Link>
+                  </Button>
                 </div>
-              </div>
+              </section>
 
-              {/* Error */}
+              <Card className="rounded-lg border-slate-200 py-4 shadow-sm">
+                <CardContent className="px-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                      <Filter className="size-4 text-[#5a8f1f]" />
+                      Filters
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-slate-700">Status:</label>
+                      <NativeSelect
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as SaleStatus | '')}
+                        className="min-w-40"
+                      >
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="cancelled">Cancelled</option>
+                      </NativeSelect>
+                    </div>
+                    {canApprove && statusFilter === 'pending' && (
+                      <Badge variant="outline" className="rounded-md border-amber-200 bg-amber-50 text-amber-700">
+                        {sales.filter((s) => s.status === 'pending').length} pending approval
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {error && (
-                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
 
-              {/* Loading */}
               {loading && sales.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
+                <Card className="rounded-lg border-slate-200 p-8 text-center shadow-sm">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-gray-500">Loading sales...</p>
-                </div>
+                  <p className="mt-4 text-slate-500">Loading sales workspace...</p>
+                </Card>
               ) : (
                 <SalesTable
                   sales={sales}
@@ -141,17 +143,17 @@ function SalesContent() {
 
 function SalesLoadingFallback() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="h-16 bg-white border-b border-gray-200"></div>
+    <div className="min-h-screen portal-canvas">
+      <div className="h-16 border-b border-slate-200 bg-white"></div>
       <div className="flex">
-        <div className="w-64 bg-[#0A1F44] min-h-[calc(100vh-4rem)]"></div>
-        <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/3 mb-8"></div>
-              <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
-                <div className="h-64 bg-gray-100 rounded"></div>
+        <div className="min-h-[calc(100vh-4rem)] w-[258px] bg-[#0A1F44]"></div>
+        <main className="flex-1 p-4 sm:p-6">
+          <div className="mx-auto max-w-[1500px]">
+            <div>
+              <Skeleton className="h-8 w-1/4 mb-4" />
+              <Skeleton className="h-4 w-1/3 mb-8" />
+              <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+                <Skeleton className="h-64 w-full" />
               </div>
             </div>
           </div>

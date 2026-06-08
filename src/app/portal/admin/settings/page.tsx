@@ -2,6 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Bell, Check, Lock, Settings, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SystemSettings {
@@ -17,6 +22,18 @@ interface SystemSettings {
   supportEmail: string;
 }
 
+type SettingsTab = 'general' | 'sales' | 'notifications';
+
+const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'general', label: 'General', icon: <Settings className="h-4 w-4" /> },
+  {
+    id: 'sales',
+    label: 'Sales & Points',
+    icon: <SlidersHorizontal className="h-4 w-4" />,
+  },
+  { id: 'notifications', label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
+];
+
 export default function AdminSettingsPage() {
   const { isRole } = useAuth();
   const [settings, setSettings] = useState<SystemSettings>({
@@ -29,325 +46,387 @@ export default function AdminSettingsPage() {
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
-  const [activeTab, setActiveTab] = useState<'general' | 'sales' | 'notifications'>('general');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
   const isAdmin = isRole('admin');
 
   const handleSave = async () => {
     setSaving(true);
-    // Simulate save - in production this would call an API
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setSaving(false);
-    setSuccess('Settings saved successfully!');
+    setSuccess('Settings saved');
     setTimeout(() => setSuccess(''), 3000);
   };
 
   if (!isAdmin) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-white/10 p-8 text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <p className="text-white font-semibold text-lg">Access Denied</p>
-          <p className="text-white/60 mt-1">Only admins can access system settings.</p>
-          <Link
-            href="/portal/dashboard"
-            className="inline-block mt-4 px-4 py-2 bg-[#8dc63f] text-white rounded-lg font-medium hover:bg-[#7ab82e]"
-          >
-            Back to Dashboard
-          </Link>
-        </div>
+      <div className="mx-auto max-w-[900px]">
+        <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+          <CardContent className="py-10">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Lock className="h-6 w-6" />
+            </div>
+            <p className="text-lg font-semibold text-slate-950">Access Denied</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Only admins can access system settings.
+            </p>
+            <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+              <Link href="/portal/dashboard">Back to Dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white">System Settings</h1>
-          <p className="text-white/60 text-sm">Configure system-wide settings</p>
+    <div className="mx-auto max-w-[1200px] space-y-5">
+      <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              System Settings
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              Configure portal defaults used by operations and field teams.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+          >
+            {saving ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-[#0A1F44]" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                Save Changes
+              </>
+            )}
+          </Button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full sm:w-auto px-6 py-2.5 bg-[#8dc63f] text-white rounded-xl font-medium hover:bg-[#7ab82e] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg hover:shadow-[0_0_20px_rgba(141,198,63,0.4)] transition-all"
-        >
-          {saving ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              Saving...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Save Changes
-            </>
-          )}
-        </button>
-      </div>
+      </section>
 
-      {/* Success Message */}
       {success && (
-        <div className="bg-[#8dc63f]/20 text-[#8dc63f] px-4 py-3 rounded-xl text-sm flex items-center gap-2 border border-[#8dc63f]/30">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+        <div className="flex items-center gap-2 rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e]">
+          <Check className="h-4 w-4" />
           {success}
         </div>
       )}
 
-      {/* Tabs - Dark Theme */}
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-white/10 overflow-hidden">
-        <div className="flex border-b border-white/10 overflow-x-auto">
-          {[
-            { id: 'general', label: 'General', icon: '⚙️' },
-            { id: 'sales', label: 'Sales & Points', icon: '💰' },
-            { id: 'notifications', label: 'Notifications', icon: '🔔' },
-          ].map((tab) => (
+      <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+        <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50">
+          {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex-1 min-w-[100px] px-4 sm:px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex min-w-[130px] flex-1 cursor-pointer items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? 'text-[#8dc63f] border-b-2 border-[#8dc63f] bg-[#8dc63f]/10'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                  ? 'border-b-2 border-[#8dc63f] bg-white text-[#0A1F44]'
+                  : 'text-slate-600 hover:bg-white hover:text-slate-950'
               }`}
             >
-              <span>{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
+              {tab.icon}
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
 
-        <div className="p-4 sm:p-6">
-          {/* General Settings */}
+        <CardContent className="p-6">
           {activeTab === 'general' && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Company Name
                 </label>
-                <input
+                <Input
                   type="text"
                   value={settings.companyName}
-                  onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none transition-all"
+                  onChange={(e) =>
+                    setSettings({ ...settings, companyName: e.target.value })
+                  }
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Support Email
                 </label>
-                <input
+                <Input
                   type="email"
                   value={settings.supportEmail}
-                  onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none transition-all"
+                  onChange={(e) =>
+                    setSettings({ ...settings, supportEmail: e.target.value })
+                  }
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Default Role for New Users
                 </label>
-                <select
+                <NativeSelect
                   value={settings.defaultRole}
-                  onChange={(e) => setSettings({ ...settings, defaultRole: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none transition-all"
+                  onChange={(e) =>
+                    setSettings({ ...settings, defaultRole: e.target.value })
+                  }
+                  className="w-full"
                 >
-                  <option value="entry_rep" className="bg-gray-800">Entry Representative</option>
-                  <option value="l1_manager" className="bg-gray-800">L1 Manager</option>
-                  <option value="l2_manager" className="bg-gray-800">L2 Manager</option>
-                  <option value="operations" className="bg-gray-800">Operations</option>
-                </select>
-                <p className="text-xs text-white/40 mt-2">
-                  New users who sign up will be assigned this role by default
+                  <NativeSelectOption value="entry_rep">
+                    Entry Representative
+                  </NativeSelectOption>
+                  <NativeSelectOption value="l1_manager">L1 Manager</NativeSelectOption>
+                  <NativeSelectOption value="l2_manager">L2 Manager</NativeSelectOption>
+                  <NativeSelectOption value="operations">Operations</NativeSelectOption>
+                </NativeSelect>
+                <p className="mt-2 text-xs text-slate-500">
+                  New users who sign up will be assigned this role by default.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Sales & Points Settings */}
           {activeTab === 'sales' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div>
-                  <h3 className="font-medium text-white">Auto-Approve Sales</h3>
-                  <p className="text-sm text-white/50">
-                    Automatically approve sales when submitted
+                  <h3 className="font-medium text-slate-950">Auto-Approve Sales</h3>
+                  <p className="text-sm text-slate-500">
+                    Automatically approve sales when submitted.
                   </p>
                 </div>
                 <button
-                  onClick={() => setSettings({ ...settings, autoApprove: !settings.autoApprove })}
-                  className={`relative w-14 h-7 rounded-full transition-colors ${
-                    settings.autoApprove ? 'bg-[#8dc63f]' : 'bg-white/20'
+                  type="button"
+                  onClick={() =>
+                    setSettings({ ...settings, autoApprove: !settings.autoApprove })
+                  }
+                  className={`relative h-7 w-14 cursor-pointer rounded-full transition-colors ${
+                    settings.autoApprove ? 'bg-[#8dc63f]' : 'bg-slate-300'
                   }`}
                 >
                   <span
-                    className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${
-                      settings.autoApprove ? 'left-8' : 'left-1'
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                      settings.autoApprove ? 'translate-x-8' : 'translate-x-1'
                     }`}
                   />
                 </button>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-4">
+                <label className="mb-4 block text-sm font-medium text-slate-700">
                   Points Per Sale Range
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                    <label className="block text-xs text-white/50 mb-2 font-medium">Minimum</label>
-                    <input
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Minimum
+                    </label>
+                    <Input
                       type="number"
                       value={settings.pointsPerSale.min}
                       onChange={(e) =>
                         setSettings({
                           ...settings,
-                          pointsPerSale: { ...settings.pointsPerSale, min: parseInt(e.target.value) },
+                          pointsPerSale: {
+                            ...settings.pointsPerSale,
+                            min: parseInt(e.target.value),
+                          },
                         })
                       }
-                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
                     />
                   </div>
-                  <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                    <label className="block text-xs text-white/50 mb-2 font-medium">Maximum</label>
-                    <input
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Maximum
+                    </label>
+                    <Input
                       type="number"
                       value={settings.pointsPerSale.max}
                       onChange={(e) =>
                         setSettings({
                           ...settings,
-                          pointsPerSale: { ...settings.pointsPerSale, max: parseInt(e.target.value) },
+                          pointsPerSale: {
+                            ...settings.pointsPerSale,
+                            max: parseInt(e.target.value),
+                          },
                         })
                       }
-                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
                     />
                   </div>
-                  <div className="bg-[#8dc63f]/10 rounded-xl p-4 border border-[#8dc63f]/30">
-                    <label className="block text-xs text-[#8dc63f] mb-2 font-medium">Default</label>
-                    <input
+                  <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 p-4">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#4f7f1e]">
+                      Default
+                    </label>
+                    <Input
                       type="number"
                       value={settings.pointsPerSale.default}
                       onChange={(e) =>
                         setSettings({
                           ...settings,
-                          pointsPerSale: { ...settings.pointsPerSale, default: parseInt(e.target.value) },
+                          pointsPerSale: {
+                            ...settings.pointsPerSale,
+                            default: parseInt(e.target.value),
+                          },
                         })
                       }
-                      className="w-full px-4 py-2.5 bg-[#8dc63f]/10 border border-[#8dc63f]/30 rounded-lg text-white focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
                     />
                   </div>
                 </div>
-                <p className="text-xs text-white/40 mt-3">
-                  Points are assigned based on the fiber plan selected (1-15 pts)
+                <p className="mt-3 text-xs text-slate-500">
+                  Points are assigned based on the fiber plan selected.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-3">
+                <label className="mb-3 block text-sm font-medium text-slate-700">
                   Leaderboard Time Periods
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {['day', 'week', 'month', 'quarter', 'year', 'all_time'].map((period) => {
-                    const isSelected = settings.leaderboardPeriods.includes(period);
-                    return (
-                      <button
-                        key={period}
-                        type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            setSettings({
-                              ...settings,
-                              leaderboardPeriods: settings.leaderboardPeriods.filter((p) => p !== period),
-                            });
-                          } else {
-                            setSettings({
-                              ...settings,
-                              leaderboardPeriods: [...settings.leaderboardPeriods, period],
-                            });
+                  {['day', 'week', 'month', 'quarter', 'year', 'all_time'].map(
+                    (period) => {
+                      const isSelected = settings.leaderboardPeriods.includes(period);
+                      return (
+                        <Button
+                          key={period}
+                          type="button"
+                          variant={isSelected ? 'default' : 'outline'}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSettings({
+                                ...settings,
+                                leaderboardPeriods:
+                                  settings.leaderboardPeriods.filter((p) => p !== period),
+                              });
+                            } else {
+                              setSettings({
+                                ...settings,
+                                leaderboardPeriods: [
+                                  ...settings.leaderboardPeriods,
+                                  period,
+                                ],
+                              });
+                            }
+                          }}
+                          className={
+                            isSelected
+                              ? 'bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]'
+                              : ''
                           }
-                        }}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                          isSelected
-                            ? 'bg-[#8dc63f] text-white shadow-lg shadow-[#8dc63f]/20'
-                            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/10'
-                        }`}
-                      >
-                        {period.replace('_', ' ').charAt(0).toUpperCase() + period.slice(1).replace('_', ' ')}
-                      </button>
-                    );
-                  })}
+                        >
+                          {period
+                            .replace('_', ' ')
+                            .replace(/\b\w/g, (char) => char.toUpperCase())}
+                        </Button>
+                      );
+                    }
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Notifications Settings */}
           {activeTab === 'notifications' && (
             <div className="space-y-3">
               {[
-                { id: 'newSale', label: 'New Sale Submitted', description: 'Notify when a new sale is logged', enabled: true },
-                { id: 'saleApproved', label: 'Sale Approved', description: 'Notify reps when their sale is approved', enabled: true },
-                { id: 'saleRejected', label: 'Sale Rejected', description: 'Notify reps when their sale is rejected', enabled: true },
-                { id: 'leaderboardUpdate', label: 'Leaderboard Changes', description: 'Notify when ranking changes', enabled: false },
-                { id: 'newAchievement', label: 'Achievement Unlocked', description: 'Notify when badges are earned', enabled: true },
+                {
+                  id: 'newSale',
+                  label: 'New Sale Submitted',
+                  description: 'Notify managers when a new sale is logged.',
+                  enabled: true,
+                },
+                {
+                  id: 'saleApproved',
+                  label: 'Sale Approved',
+                  description: 'Notify reps when their sale is approved.',
+                  enabled: true,
+                },
+                {
+                  id: 'saleRejected',
+                  label: 'Sale Rejected',
+                  description: 'Notify reps when their sale is rejected.',
+                  enabled: true,
+                },
+                {
+                  id: 'leaderboardUpdate',
+                  label: 'Leaderboard Changes',
+                  description: 'Notify reps when ranking changes.',
+                  enabled: false,
+                },
               ].map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:border-white/20 transition-all">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-slate-300"
+                >
                   <div>
-                    <h3 className="font-medium text-white">{item.label}</h3>
-                    <p className="text-sm text-white/50">{item.description}</p>
+                    <h3 className="font-medium text-slate-950">{item.label}</h3>
+                    <p className="text-sm text-slate-500">{item.description}</p>
                   </div>
-                  <button className={`relative w-14 h-7 rounded-full transition-colors ${item.enabled ? 'bg-[#8dc63f]' : 'bg-white/20'}`}>
-                    <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all ${item.enabled ? 'left-8' : 'left-1'}`} />
+                  <button
+                    type="button"
+                    className={`relative h-7 w-14 cursor-pointer rounded-full transition-colors ${
+                      item.enabled ? 'bg-[#8dc63f]' : 'bg-slate-300'
+                    }`}
+                    aria-pressed={item.enabled}
+                  >
+                    <span
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                        item.enabled ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
                   </button>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Danger Zone - Dark Theme */}
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-red-500/30 overflow-hidden">
-        <div className="px-4 sm:px-6 py-4 bg-red-500/10 border-b border-red-500/30">
-          <h2 className="text-lg font-semibold text-red-400 flex items-center gap-2">
-            <span>⚠️</span> Danger Zone
+      <Card className="rounded-lg border-red-200 bg-white py-0 shadow-sm">
+        <CardHeader className="border-b border-red-100 bg-red-50/70 p-5">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-red-700">
+            <ShieldAlert className="h-5 w-5" />
+            Restricted Actions
           </h2>
-        </div>
-        <div className="p-4 sm:p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border border-red-500/20 rounded-xl bg-red-500/5">
+        </CardHeader>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex flex-col justify-between gap-4 rounded-lg border border-red-100 bg-white p-4 sm:flex-row sm:items-center">
             <div>
-              <h3 className="font-medium text-white">Reset All Sales Data</h3>
-              <p className="text-sm text-white/50">
+              <h3 className="font-medium text-slate-950">Reset All Sales Data</h3>
+              <p className="text-sm text-slate-500">
                 Permanently delete all sales records. This cannot be undone.
               </p>
             </div>
-            <button className="w-full sm:w-auto px-5 py-2.5 border-2 border-red-500 text-red-400 rounded-xl hover:bg-red-500 hover:text-white font-medium transition-all">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
               Reset Sales
-            </button>
+            </Button>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border border-red-500/20 rounded-xl bg-red-500/5">
+          <div className="flex flex-col justify-between gap-4 rounded-lg border border-red-100 bg-white p-4 sm:flex-row sm:items-center">
             <div>
-              <h3 className="font-medium text-white">Reset Leaderboard</h3>
-              <p className="text-sm text-white/50">
-                Clear all leaderboard rankings and start fresh.
+              <h3 className="font-medium text-slate-950">Reset Leaderboard</h3>
+              <p className="text-sm text-slate-500">
+                Clear leaderboard rankings and restart the reporting period.
               </p>
             </div>
-            <button className="w-full sm:w-auto px-5 py-2.5 border-2 border-red-500 text-red-400 rounded-xl hover:bg-red-500 hover:text-white font-medium transition-all">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
               Reset Leaderboard
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

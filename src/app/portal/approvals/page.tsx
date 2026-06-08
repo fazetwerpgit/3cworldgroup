@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check, ClipboardCheck, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sale, SaleStatusConfig, FIBER_COMPANIES } from '@/types';
+import { Sale, FIBER_COMPANIES } from '@/types';
 
 export default function ApprovalsPage() {
   const { user } = useAuth();
@@ -106,74 +107,75 @@ export default function ApprovalsPage() {
 
   return (
     <ProtectedRoute permissions={['sales:approve']}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-6xl mx-auto space-y-6">
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1500px] space-y-5">
               {/* Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#0A1F44]">Pending Approvals</h1>
-                  <p className="text-gray-500 mt-1">
-                    Review and approve sales submissions from your team
-                  </p>
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Pending Approvals</h1>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                      Review sales submissions with the customer, plan, value, and points in one pass.
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                    <ClipboardCheck className="h-4 w-4" />
+                    {sales.length} pending
+                  </div>
                 </div>
-                <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full text-sm font-medium">
-                  {sales.length} pending
-                </div>
-              </div>
+              </section>
 
               {/* Sales List */}
               {loading ? (
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
+                <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-gray-500">Loading pending sales...</p>
+                  <p className="mt-4 text-slate-500">Loading pending sales...</p>
                 </div>
               ) : sales.length === 0 ? (
-                <div className="bg-white rounded-xl p-12 shadow-sm border border-gray-100 text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                <div className="rounded-lg border border-slate-200 bg-white p-12 text-center shadow-sm">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+                    <Check className="h-7 w-7" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900">All caught up!</h3>
-                  <p className="text-gray-500 mt-1">No pending sales to review right now.</p>
+                  <h3 className="text-lg font-semibold text-slate-950">All caught up</h3>
+                  <p className="mt-1 text-slate-500">No pending sales to review right now.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {sales.map((sale) => (
                     <div
                       key={sale.id}
-                      className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+                      className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 bg-[#0A1F44] rounded-full flex items-center justify-center">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#0A1F44]">
                               <span className="text-sm font-bold text-white">
                                 {sale.salesRepName?.charAt(0).toUpperCase() || 'U'}
                               </span>
                             </div>
                             <div>
-                              <h3 className="font-semibold text-gray-900">{sale.salesRepName}</h3>
-                              <p className="text-xs text-gray-500">{formatDate(sale.saleDate)}</p>
+                              <h3 className="font-semibold text-slate-950">{sale.salesRepName}</h3>
+                              <p className="text-xs text-slate-500">{formatDate(sale.saleDate)}</p>
                             </div>
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wider">Address</p>
-                              <p className="font-medium text-gray-900 truncate">{sale.customerAddress}</p>
+                              <p className="text-xs uppercase tracking-wider text-slate-500">Address</p>
+                              <p className="truncate font-medium text-slate-950">{sale.customerAddress}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wider">Plans</p>
+                              <p className="text-xs uppercase tracking-wider text-slate-500">Plans</p>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {sale.products.map((product, idx) => (
                                   <span
                                     key={idx}
-                                    className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded"
+                                    className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700"
                                   >
                                     {getCompanyLabel(product.company)}
                                   </span>
@@ -181,17 +183,17 @@ export default function ApprovalsPage() {
                               </div>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wider">Monthly Value</p>
-                              <p className="font-medium text-gray-900">${sale.totalValue.toFixed(2)}</p>
+                              <p className="text-xs uppercase tracking-wider text-slate-500">Monthly Value</p>
+                              <p className="font-medium text-slate-950">${sale.totalValue.toFixed(2)}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wider">Points</p>
+                              <p className="text-xs uppercase tracking-wider text-slate-500">Points</p>
                               <p className="font-bold text-[#8dc63f]">+{sale.totalPoints} pts</p>
                             </div>
                           </div>
 
                           {sale.notes && (
-                            <div className="mt-3 p-2 bg-gray-50 rounded text-sm text-gray-600">
+                            <div className="mt-3 rounded-md bg-slate-50 p-2 text-sm text-slate-600">
                               <span className="font-medium">Notes:</span> {sale.notes}
                             </div>
                           )}
@@ -201,15 +203,13 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleApprove(sale.id!)}
                             disabled={processingId === sale.id}
-                            className="flex-1 lg:w-full px-4 py-2 bg-[#8dc63f] text-white rounded-lg font-medium hover:bg-[#7ab82e] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-[#8dc63f] px-4 py-2 font-semibold text-[#0A1F44] transition-colors hover:bg-[#7ab82e] disabled:opacity-50 lg:w-full"
                           >
                             {processingId === sale.id ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                             ) : (
                               <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
+                                <Check className="h-4 w-4" />
                                 Approve
                               </>
                             )}
@@ -217,11 +217,9 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => setShowRejectModal(sale.id!)}
                             disabled={processingId === sale.id}
-                            className="flex-1 lg:w-full px-4 py-2 border border-red-300 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-red-200 px-4 py-2 font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 lg:w-full"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <X className="h-4 w-4" />
                             Reject
                           </button>
                         </div>
@@ -237,16 +235,16 @@ export default function ApprovalsPage() {
         {/* Rejection Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Sale</h3>
-              <p className="text-sm text-gray-600 mb-4">
+            <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+              <h3 className="mb-4 text-lg font-semibold text-slate-950">Reject Sale</h3>
+              <p className="mb-4 text-sm text-slate-600">
                 Please provide a reason for rejection. This will be shared with the sales rep.
               </p>
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Enter rejection reason..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none resize-none"
+                className="w-full resize-none rounded-md border border-slate-300 px-4 py-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#8dc63f]"
                 rows={3}
               />
               <div className="flex gap-3 mt-4">
@@ -255,14 +253,14 @@ export default function ApprovalsPage() {
                     setShowRejectModal(null);
                     setRejectionReason('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  className="flex-1 rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleReject}
                   disabled={processingId === showRejectModal || !rejectionReason.trim()}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="flex-1 rounded-md bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                 >
                   {processingId === showRejectModal ? 'Rejecting...' : 'Confirm Reject'}
                 </button>

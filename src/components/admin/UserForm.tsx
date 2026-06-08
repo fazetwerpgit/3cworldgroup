@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
 
 interface UserFormProps {
@@ -9,7 +13,6 @@ interface UserFormProps {
   isEdit?: boolean;
 }
 
-// TODO: split platform role / field role selection in form UX
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'entry_rep', label: 'Entry Representative' },
   { value: 'l1_manager', label: 'L1 Manager' },
@@ -27,8 +30,6 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     email: user?.email || '',
     password: '',
     displayName: user?.displayName || '',
-    // Effective role: platform role wins, else field role (legacy docs shim
-    // to fieldRole-only, so reading user.role alone would show entry_rep).
     role: getEffectiveRole(user) || ('entry_rep' as UserRole),
     phone: user?.phone || '',
     managerId: user?.reportsToId || '',
@@ -48,14 +49,11 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     setLoading(true);
 
     try {
-      // The select mixes platform and field roles; send each to its own field
-      // so the API never writes a field role into the platform `role` column.
       const rolePayload = isPlatformRole(formData.role)
         ? { role: formData.role }
         : { fieldRole: formData.role };
 
       if (isEdit && user) {
-        // Update existing user
         const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -73,7 +71,6 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           throw new Error(data.error || 'Failed to update user');
         }
       } else {
-        // Create new user
         if (!formData.password) {
           throw new Error('Password is required for new users');
         }
@@ -108,158 +105,162 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Account Information */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">Account Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address *
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              disabled={isEdit}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-              placeholder="employee@3cworldgroup.com"
-            />
-            {isEdit && (
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed after creation.</p>
-            )}
-          </div>
-
-          {!isEdit && (
+      <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 p-5">
+          <h2 className="text-lg font-semibold text-slate-950">Account Information</h2>
+          <p className="text-sm text-slate-500">
+            Basic account details used for sign-in and employee records.
+          </p>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password *
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Email Address *
               </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
+              <Input
+                type="email"
+                name="email"
+                value={formData.email}
                 onChange={handleChange}
-                required={!isEdit}
-                minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-                placeholder="Minimum 6 characters"
+                disabled={isEdit}
+                required
+                placeholder="employee@3cworldgroup.com"
+              />
+              {isEdit && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Email cannot be changed after creation.
+                </p>
+              )}
+            </div>
+
+            {!isEdit && (
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Password *
+                </label>
+                <Input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required={!isEdit}
+                  minLength={6}
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Display Name *
+              </label>
+              <Input
+                type="text"
+                name="displayName"
+                value={formData.displayName}
+                onChange={handleChange}
+                required
+                placeholder="John Smith"
               />
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Display Name *
-            </label>
-            <input
-              type="text"
-              name="displayName"
-              value={formData.displayName}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-              placeholder="John Smith"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-              placeholder="(555) 123-4567"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Role & Permissions */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">Role & Permissions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role *
-            </label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-            >
-              {roleOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {isEdit && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Phone Number
               </label>
-              <select
-                name="status"
-                value={formData.status}
+              <Input
+                type="tel"
+                name="phone"
+                value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                placeholder="(555) 123-4567"
+              />
             </div>
-          )}
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Manager ID
-            </label>
-            <input
-              type="text"
-              name="managerId"
-              value={formData.managerId}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-              placeholder="Optional - Enter manager's user ID"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Assign a manager for this user (used for sales approval workflow)
-            </p>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Submit */}
-      <div className="flex justify-end gap-4">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-        >
+      <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 p-5">
+          <h2 className="text-lg font-semibold text-slate-950">Role & Permissions</h2>
+          <p className="text-sm text-slate-500">
+            Choose the portal role and reporting assignment.
+          </p>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Role *
+              </label>
+              <NativeSelect
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                required
+                className="w-full"
+              >
+                {roleOptions.map((opt) => (
+                  <NativeSelectOption key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+
+            {isEdit && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Status
+                </label>
+                <NativeSelect
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="w-full"
+                >
+                  <NativeSelectOption value="active">Active</NativeSelectOption>
+                  <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
+                </NativeSelect>
+              </div>
+            )}
+
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Manager ID
+              </label>
+              <Input
+                type="text"
+                name="managerId"
+                value={formData.managerId}
+                onChange={handleChange}
+                placeholder="Optional - Enter manager user ID"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Assign a manager for this user. This supports sales approval workflow.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={loading}
-          className="px-6 py-2 bg-[#8dc63f] text-white rounded-lg font-medium hover:bg-[#7ab82e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
         >
           {loading ? 'Saving...' : isEdit ? 'Update User' : 'Create User'}
-        </button>
+        </Button>
       </div>
     </form>
   );

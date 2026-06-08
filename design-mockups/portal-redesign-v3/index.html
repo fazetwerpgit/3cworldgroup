@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3C Portal Redesign V3 Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --navy: #0A1F44;
+      --green: #8dc63f;
+      --ink: #172033;
+      --line: #dbe3ef;
+      --canvas: #f5f7fb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(10, 31, 68, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(10, 31, 68, 0.035) 1px, transparent 1px),
+        var(--canvas);
+      background-size: 28px 28px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, a, .motion {
+      transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease, opacity 160ms ease;
+    }
+
+    .screen {
+      display: none;
+      animation: enter 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .rail::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 12px;
+      bottom: 12px;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--green);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .progress-fill {
+      animation: fill 700ms cubic-bezier(0.16, 1, 0.3, 1);
+      transform-origin: left;
+    }
+
+    @keyframes fill {
+      from { transform: scaleX(0.12); }
+      to { transform: scaleX(1); }
+    }
+
+    .tab-active {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tab-active .tab-rail {
+      background: var(--green);
+    }
+
+    .micro-press:active {
+      transform: translateY(1px) scale(0.99);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 1ms !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen md:flex">
+    <aside class="hidden md:flex md:w-[258px] shrink-0 flex-col bg-[#0A1F44] text-white">
+      <div class="border-b border-white/10 px-5 py-5">
+        <div class="flex items-center gap-3">
+          <div class="grid h-9 w-9 place-items-center rounded-md bg-[#8dc63f] text-sm font-black text-[#0A1F44]">3C</div>
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Employee Portal</div>
+            <div class="text-lg font-semibold leading-tight">3C Console</div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-3 py-4 text-sm">
+        <div class="mb-5">
+          <div class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/42">Main</div>
+          <button data-screen="today" class="nav-btn tab-active micro-press mb-1 flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-white/78 hover:bg-white/10">
+            <span class="tab-rail h-5 w-1 rounded-full bg-transparent"></span>
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-[11px] font-bold">TD</span>
+            <span class="flex-1">Dashboard</span>
+            <span class="rounded bg-[#8dc63f]/18 px-1.5 py-0.5 text-[11px] font-semibold text-[#b8ef68]">12</span>
+          </button>
+          <button data-screen="path" class="nav-btn micro-press mb-1 flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-white/70 hover:bg-white/10 hover:text-white">
+            <span class="tab-rail h-5 w-1 rounded-full bg-transparent"></span>
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-[11px] font-bold">OB</span>
+            <span class="flex-1">My Onboarding</span>
+          </button>
+          <button data-screen="sales" class="nav-btn micro-press mb-1 flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-white/70 hover:bg-white/10 hover:text-white">
+            <span class="tab-rail h-5 w-1 rounded-full bg-transparent"></span>
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-[11px] font-bold">SL</span>
+            <span class="flex-1">Sales</span>
+          </button>
+          <div class="mt-2 space-y-0.5 border-l border-white/10 ml-6 pl-4 text-white/58">
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Pay Structure</div>
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Calls Schedule</div>
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Team Chat</div>
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Leaderboard</div>
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Shorts</div>
+            <button data-screen="path" class="nav-btn micro-press flex w-full rounded-md px-2 py-1.5 text-left hover:bg-white/10">University</button>
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Links</div>
+          </div>
+        </div>
+
+        <div class="mb-5">
+          <div class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/42">Ops</div>
+          <button data-screen="recruiting" class="nav-btn micro-press mb-1 flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-white/70 hover:bg-white/10 hover:text-white">
+            <span class="tab-rail h-5 w-1 rounded-full bg-transparent"></span>
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-[11px] font-bold">RV</span>
+            <span class="flex-1">Onboarding Review</span>
+            <span class="rounded bg-amber-300/18 px-1.5 py-0.5 text-[11px] font-semibold text-amber-200">5</span>
+          </button>
+          <button data-screen="recruiting" class="nav-btn micro-press mb-1 flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-white/70 hover:bg-white/10 hover:text-white">
+            <span class="tab-rail h-5 w-1 rounded-full bg-transparent"></span>
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-[11px] font-bold">RP</span>
+            <span class="flex-1">Recruiting Pipeline</span>
+          </button>
+          <button data-screen="invite" class="nav-btn micro-press mb-1 flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-white/70 hover:bg-white/10 hover:text-white">
+            <span class="tab-rail h-5 w-1 rounded-full bg-transparent"></span>
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-[11px] font-bold">IN</span>
+            <span class="flex-1">Recruit Onboarding</span>
+          </button>
+          <div class="mt-2 space-y-0.5 border-l border-white/10 ml-6 pl-4 text-white/58">
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Email Templates</div>
+            <div class="rounded-md px-2 py-1.5 hover:bg-white/10">Pending Approvals</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/42">Admin</div>
+          <div class="space-y-0.5 text-white/58">
+            <div class="rounded-md px-3 py-2 hover:bg-white/10">User Management</div>
+            <div class="rounded-md px-3 py-2 hover:bg-white/10">System Settings</div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="border-t border-white/10 px-5 py-4 text-xs text-white/48">
+        Feature-faithful v3 mockup
+      </div>
+    </aside>
+
+    <main class="flex-1 pb-20 md:pb-0">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/92 backdrop-blur">
+        <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 md:px-6">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Portal Redesign V3</div>
+            <h1 id="screen-title" class="text-xl font-semibold text-[#0A1F44] md:text-2xl">Today Dashboard</h1>
+          </div>
+          <div class="hidden min-w-[360px] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 lg:flex">
+            <span class="h-4 w-4 rounded border border-slate-400"></span>
+            Search reps, sales, recruits, trainings
+            <span class="ml-auto rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] text-slate-500">Ctrl K</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="micro-press hidden rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:inline-flex">View Queue</button>
+            <button class="micro-press rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-[#0A1F44] hover:bg-[#7fb437]">Log Sale</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="mx-auto max-w-[1600px] px-4 py-5 md:px-6">
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+          <button data-screen="today" class="top-tab micro-press rounded-md border border-[#0A1F44] bg-[#0A1F44] px-3 py-2 text-sm font-semibold text-white">Today</button>
+          <button data-screen="sales" class="top-tab micro-press rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Sales Workspace</button>
+          <button data-screen="recruiting" class="top-tab micro-press rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Recruiting</button>
+          <button data-screen="invite" class="top-tab micro-press rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Invite Flow</button>
+          <button data-screen="path" class="top-tab micro-press rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">University Path</button>
+        </div>
+
+        <div id="today" class="screen active">
+          <div class="mb-4 grid gap-3 md:grid-cols-4">
+            <article class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="text-xs font-medium text-slate-500">Sales MTD</div>
+                  <div class="mt-1 text-2xl font-bold text-[#0A1F44]">$28.4k</div>
+                </div>
+                <span class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">+12%</span>
+              </div>
+              <div class="mt-4 h-2 rounded-full bg-slate-100"><div class="progress-fill h-2 w-[68%] rounded-full bg-[#8dc63f]"></div></div>
+            </article>
+            <article class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs font-medium text-slate-500">My Onboarding</div>
+              <div class="mt-1 text-2xl font-bold text-[#0A1F44]">6 / 8</div>
+              <p class="mt-3 text-sm text-slate-600">Direct deposit and channel selection still need attention.</p>
+            </article>
+            <article class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs font-medium text-slate-500">Calls Today</div>
+              <div class="mt-1 text-2xl font-bold text-[#0A1F44]">3</div>
+              <p class="mt-3 text-sm text-slate-600">Day 1 onboarding, team call, manager sync.</p>
+            </article>
+            <article class="rounded-lg border border-slate-200 bg-white p-4">
+              <div class="text-xs font-medium text-slate-500">Open Approvals</div>
+              <div class="mt-1 text-2xl font-bold text-[#0A1F44]">9</div>
+              <p class="mt-3 text-sm text-slate-600">Sales and recruit reviews awaiting manager action.</p>
+            </article>
+          </div>
+
+          <div class="grid gap-4 xl:grid-cols-12">
+            <section class="xl:col-span-7 rounded-lg border border-slate-200 bg-white">
+              <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <div>
+                  <h2 class="font-semibold text-[#0A1F44]">Action Queue</h2>
+                  <p class="text-sm text-slate-500">Existing portal work, ordered by what blocks the day.</p>
+                </div>
+                <span class="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">12 open</span>
+              </div>
+              <div class="divide-y divide-slate-100">
+                <div class="rail relative flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50">
+                  <div class="pl-3">
+                    <div class="font-medium">Approve pending Xfinity sale</div>
+                    <div class="text-sm text-slate-500">Sales / Pending Approvals</div>
+                  </div>
+                  <button class="micro-press rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Review</button>
+                </div>
+                <div class="relative flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50">
+                  <div class="pl-3">
+                    <div class="font-medium">Send recruit invite link</div>
+                    <div class="text-sm text-slate-500">Recruit Onboarding / Manager action</div>
+                  </div>
+                  <button class="micro-press rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-[#0A1F44] hover:bg-[#7fb437]">Create Link</button>
+                </div>
+                <div class="relative flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50">
+                  <div class="pl-3">
+                    <div class="font-medium">Join Day 1 call</div>
+                    <div class="text-sm text-slate-500">Calls Schedule / starts 3:00 PM</div>
+                  </div>
+                  <button class="micro-press rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Open</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="xl:col-span-5 rounded-lg border border-slate-200 bg-white">
+              <div class="border-b border-slate-200 px-4 py-3">
+                <h2 class="font-semibold text-[#0A1F44]">Team Signal</h2>
+                <p class="text-sm text-slate-500">Chat, shorts, leaderboard, and training without mixing them into policy storage.</p>
+              </div>
+              <div class="grid gap-3 p-4 sm:grid-cols-2">
+                <div class="rounded-md border border-slate-200 p-3">
+                  <div class="text-xs font-semibold uppercase text-slate-500">Team Chat</div>
+                  <div class="mt-2 text-sm font-medium">5 unread manager notes</div>
+                </div>
+                <div class="rounded-md border border-slate-200 p-3">
+                  <div class="text-xs font-semibold uppercase text-slate-500">Leaderboard</div>
+                  <div class="mt-2 text-sm font-medium">Rank 4 this week</div>
+                </div>
+                <div class="rounded-md border border-slate-200 p-3">
+                  <div class="text-xs font-semibold uppercase text-slate-500">Shorts</div>
+                  <div class="mt-2 text-sm font-medium">2 new clips</div>
+                </div>
+                <div class="rounded-md border border-slate-200 p-3">
+                  <div class="text-xs font-semibold uppercase text-slate-500">University</div>
+                  <div class="mt-2 text-sm font-medium">1 module due</div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div id="sales" class="screen">
+          <div class="grid gap-4 xl:grid-cols-12">
+            <section class="rounded-lg border border-slate-200 bg-white xl:col-span-4">
+              <div class="border-b border-slate-200 px-4 py-3">
+                <h2 class="font-semibold text-[#0A1F44]">Sales Queue</h2>
+                <p class="text-sm text-slate-500">List/detail CRM flow applied to current sales data.</p>
+              </div>
+              <div class="divide-y divide-slate-100">
+                <button class="w-full bg-slate-50 px-4 py-4 text-left">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold">Maria Chen</span>
+                    <span class="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">Pending</span>
+                  </div>
+                  <div class="mt-1 text-sm text-slate-500">Xfinity internet / submitted today</div>
+                </button>
+                <button class="w-full px-4 py-4 text-left hover:bg-slate-50">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold">J. Wallace</span>
+                    <span class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">Needs info</span>
+                  </div>
+                  <div class="mt-1 text-sm text-slate-500">DSI bundle / missing account note</div>
+                </button>
+                <button class="w-full px-4 py-4 text-left hover:bg-slate-50">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold">R. Patel</span>
+                    <span class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">Approved</span>
+                  </div>
+                  <div class="mt-1 text-sm text-slate-500">DirecTV / approved by L1</div>
+                </button>
+              </div>
+            </section>
+
+            <section class="rounded-lg border border-slate-200 bg-white xl:col-span-8">
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <div>
+                  <h2 class="font-semibold text-[#0A1F44]">Maria Chen</h2>
+                  <p class="text-sm text-slate-500">Sales / submission review</p>
+                </div>
+                <div class="flex gap-2">
+                  <button class="micro-press rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Request Fix</button>
+                  <button class="micro-press rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-[#0A1F44] hover:bg-[#7fb437]">Approve</button>
+                </div>
+              </div>
+              <div class="grid gap-4 p-4 lg:grid-cols-3">
+                <div class="lg:col-span-2">
+                  <table class="w-full border-collapse text-left text-sm">
+                    <tbody class="divide-y divide-slate-100">
+                      <tr><th class="w-40 py-3 pr-4 text-slate-500">Channel</th><td class="py-3 font-medium">Xfinity</td></tr>
+                      <tr><th class="py-3 pr-4 text-slate-500">Package</th><td class="py-3 font-medium">Internet + Mobile</td></tr>
+                      <tr><th class="py-3 pr-4 text-slate-500">Rep</th><td class="py-3 font-medium">Entry Rep / Dallas Team</td></tr>
+                      <tr><th class="py-3 pr-4 text-slate-500">Manager</th><td class="py-3 font-medium">L1 Manager Review</td></tr>
+                      <tr><th class="py-3 pr-4 text-slate-500">Next Action</th><td class="py-3 font-medium text-amber-700">Confirm install date before approval</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <aside class="rounded-md border border-slate-200 bg-slate-50 p-4">
+                  <div class="text-xs font-semibold uppercase text-slate-500">Status Rail</div>
+                  <div class="mt-4 space-y-3 text-sm">
+                    <div class="flex items-center gap-2"><span class="status-dot bg-[#8dc63f]"></span>Submitted</div>
+                    <div class="flex items-center gap-2"><span class="status-dot bg-[#8dc63f]"></span>Manager Review</div>
+                    <div class="flex items-center gap-2"><span class="status-dot bg-amber-500"></span>Install Confirm</div>
+                    <div class="flex items-center gap-2 text-slate-400"><span class="status-dot bg-slate-300"></span>Approved</div>
+                  </div>
+                </aside>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div id="recruiting" class="screen">
+          <section class="rounded-lg border border-slate-200 bg-white">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div>
+                <h2 class="font-semibold text-[#0A1F44]">Recruit Onboarding Command Center</h2>
+                <p class="text-sm text-slate-500">Combines existing recruiting pipeline, onboarding review, invite links, and approvals.</p>
+              </div>
+              <button class="micro-press rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-[#0A1F44] hover:bg-[#7fb437]">Create Invite Link</button>
+            </div>
+            <div class="grid gap-3 border-b border-slate-200 p-4 md:grid-cols-4">
+              <div class="rounded-md border border-slate-200 p-3"><div class="text-xs text-slate-500">Processing</div><div class="mt-1 text-2xl font-bold">18</div></div>
+              <div class="rounded-md border border-slate-200 p-3"><div class="text-xs text-slate-500">Submitted</div><div class="mt-1 text-2xl font-bold">7</div></div>
+              <div class="rounded-md border border-slate-200 p-3"><div class="text-xs text-slate-500">Needs Review</div><div class="mt-1 text-2xl font-bold">5</div></div>
+              <div class="rounded-md border border-slate-200 p-3"><div class="text-xs text-slate-500">Activated</div><div class="mt-1 text-2xl font-bold">11</div></div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[760px] border-collapse text-left text-sm">
+                <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th class="px-4 py-3">Recruit</th>
+                    <th class="px-4 py-3">Role Path</th>
+                    <th class="px-4 py-3">Manager</th>
+                    <th class="px-4 py-3">Website Step</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-semibold">Avery Morgan</td>
+                    <td class="px-4 py-3">Entry Rep</td>
+                    <td class="px-4 py-3">T. Johnson</td>
+                    <td class="px-4 py-3">Documents submitted</td>
+                    <td class="px-4 py-3"><span class="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">Needs review</span></td>
+                    <td class="px-4 py-3 text-right"><button class="font-semibold text-[#0A1F44]">Open</button></td>
+                  </tr>
+                  <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-semibold">Brielle Adams</td>
+                    <td class="px-4 py-3">L1 Manager</td>
+                    <td class="px-4 py-3">Ops</td>
+                    <td class="px-4 py-3">Invite created</td>
+                    <td class="px-4 py-3"><span class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">Waiting on recruit</span></td>
+                    <td class="px-4 py-3 text-right"><button class="font-semibold text-[#0A1F44]">Copy link</button></td>
+                  </tr>
+                  <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-semibold">Cole Diaz</td>
+                    <td class="px-4 py-3">IBO Flag</td>
+                    <td class="px-4 py-3">M. Rivera</td>
+                    <td class="px-4 py-3">Portal account pending</td>
+                    <td class="px-4 py-3"><span class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">Ready activate</span></td>
+                    <td class="px-4 py-3 text-right"><button class="font-semibold text-[#0A1F44]">Activate</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div id="invite" class="screen">
+          <div class="mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white">
+            <div class="border-b border-slate-200 px-5 py-4">
+              <div class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Public Token Flow</div>
+              <h2 class="mt-1 text-xl font-semibold text-[#0A1F44]">Welcome to 3C onboarding</h2>
+              <p class="mt-1 text-sm text-slate-600">The recruit stays inside the website from invite to submitted profile, reducing email confusion.</p>
+            </div>
+            <div class="grid gap-5 p-5 lg:grid-cols-12">
+              <aside class="lg:col-span-4">
+                <div class="space-y-3">
+                  <div class="rounded-md border border-[#8dc63f] bg-lime-50 p-3"><div class="text-sm font-semibold">1. Confirm invite</div><div class="text-xs text-slate-600">Token link verified</div></div>
+                  <div class="rounded-md border border-[#8dc63f] bg-lime-50 p-3"><div class="text-sm font-semibold">2. Personal profile</div><div class="text-xs text-slate-600">Contact and identity info</div></div>
+                  <div class="rounded-md border border-amber-200 bg-amber-50 p-3"><div class="text-sm font-semibold">3. Documents</div><div class="text-xs text-slate-600">Role-specific uploads</div></div>
+                  <div class="rounded-md border border-slate-200 p-3"><div class="text-sm font-semibold">4. Portal access</div><div class="text-xs text-slate-600">Create password, submit</div></div>
+                </div>
+              </aside>
+              <section class="lg:col-span-8">
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <label class="block"><span class="text-sm font-medium">Legal first name</span><div class="mt-1 h-11 rounded-md border border-slate-300 bg-slate-50"></div></label>
+                  <label class="block"><span class="text-sm font-medium">Legal last name</span><div class="mt-1 h-11 rounded-md border border-slate-300 bg-slate-50"></div></label>
+                  <label class="block"><span class="text-sm font-medium">Role path</span><div class="mt-1 flex h-11 items-center rounded-md border border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">Entry Rep</div></label>
+                  <label class="block"><span class="text-sm font-medium">Manager</span><div class="mt-1 flex h-11 items-center rounded-md border border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">Assigned by invite</div></label>
+                </div>
+                <div class="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+                  <div class="font-semibold">Document checklist</div>
+                  <div class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    <div class="flex items-center gap-2"><span class="status-dot bg-[#8dc63f]"></span>W9</div>
+                    <div class="flex items-center gap-2"><span class="status-dot bg-[#8dc63f]"></span>Contract</div>
+                    <div class="flex items-center gap-2"><span class="status-dot bg-amber-500"></span>Direct deposit</div>
+                    <div class="flex items-center gap-2"><span class="status-dot bg-slate-300"></span>Channel documents</div>
+                  </div>
+                </div>
+                <div class="mt-5 flex justify-end gap-2">
+                  <button class="micro-press rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Save Progress</button>
+                  <button class="micro-press rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-[#0A1F44] hover:bg-[#7fb437]">Continue</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <div id="path" class="screen">
+          <div class="grid gap-4 lg:grid-cols-12">
+            <section class="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-8">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="font-semibold text-[#0A1F44]">University / My Path</h2>
+                  <p class="text-sm text-slate-500">Enablement path using current training, onboarding, calls, shorts, and links.</p>
+                </div>
+                <span class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">62% complete</span>
+              </div>
+              <div class="mt-5 space-y-4">
+                <div class="relative rounded-md border border-slate-200 p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div><div class="font-semibold">Day 1 Foundation</div><div class="text-sm text-slate-500">Call schedule, pay structure, intro shorts</div></div>
+                    <button class="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Open</button>
+                  </div>
+                  <div class="mt-3 h-2 rounded-full bg-slate-100"><div class="progress-fill h-2 w-full rounded-full bg-[#8dc63f]"></div></div>
+                </div>
+                <div class="relative rounded-md border border-slate-200 p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div><div class="font-semibold">Channel Readiness</div><div class="text-sm text-slate-500">Xfinity, DSI, DirecTV, and field notes</div></div>
+                    <button class="rounded-md bg-[#8dc63f] px-3 py-2 text-sm font-semibold text-[#0A1F44] hover:bg-[#7fb437]">Resume</button>
+                  </div>
+                  <div class="mt-3 h-2 rounded-full bg-slate-100"><div class="progress-fill h-2 w-[54%] rounded-full bg-[#8dc63f]"></div></div>
+                </div>
+                <div class="relative rounded-md border border-slate-200 p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div><div class="font-semibold">Manager Review</div><div class="text-sm text-slate-500">Approvals, recruiting handoff, team expectations</div></div>
+                    <button class="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Preview</button>
+                  </div>
+                  <div class="mt-3 h-2 rounded-full bg-slate-100"><div class="progress-fill h-2 w-[18%] rounded-full bg-amber-500"></div></div>
+                </div>
+              </div>
+            </section>
+            <aside class="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-4">
+              <h2 class="font-semibold text-[#0A1F44]">Resource Shelf</h2>
+              <div class="mt-4 divide-y divide-slate-100 text-sm">
+                <div class="flex items-center justify-between py-3"><span>Calls Schedule</span><span class="text-slate-500">Today</span></div>
+                <div class="flex items-center justify-between py-3"><span>Pay Structure</span><span class="text-slate-500">Required</span></div>
+                <div class="flex items-center justify-between py-3"><span>Shorts</span><span class="text-slate-500">2 new</span></div>
+                <div class="flex items-center justify-between py-3"><span>Links</span><span class="text-slate-500">Pinned</span></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white md:hidden">
+    <button data-screen="today" class="nav-btn flex h-14 flex-1 flex-col items-center justify-center text-xs font-semibold text-[#0A1F44]">Today</button>
+    <button data-screen="sales" class="nav-btn flex h-14 flex-1 flex-col items-center justify-center text-xs font-semibold text-slate-500">Log Sale</button>
+    <button data-screen="today" class="nav-btn flex h-14 flex-1 flex-col items-center justify-center text-xs font-semibold text-slate-500">Calls</button>
+    <button data-screen="today" class="nav-btn flex h-14 flex-1 flex-col items-center justify-center text-xs font-semibold text-slate-500">Chat</button>
+    <button data-screen="path" class="nav-btn flex h-14 flex-1 flex-col items-center justify-center text-xs font-semibold text-slate-500">My Path</button>
+  </nav>
+
+  <script>
+    const titles = {
+      today: "Today Dashboard",
+      sales: "Sales Workspace",
+      recruiting: "Recruiting Command Center",
+      invite: "Recruit Invite Flow",
+      path: "University / My Path"
+    };
+
+    function activate(screenId) {
+      document.querySelectorAll(".screen").forEach((screen) => {
+        screen.classList.toggle("active", screen.id === screenId);
+      });
+
+      document.querySelectorAll(".nav-btn").forEach((button) => {
+        const active = button.dataset.screen === screenId;
+        button.classList.toggle("tab-active", active);
+        if (button.classList.contains("flex-1")) {
+          button.classList.toggle("text-[#0A1F44]", active);
+          button.classList.toggle("text-slate-500", !active);
+        }
+      });
+
+      document.querySelectorAll(".top-tab").forEach((button) => {
+        const active = button.dataset.screen === screenId;
+        button.className = active
+          ? "top-tab micro-press rounded-md border border-[#0A1F44] bg-[#0A1F44] px-3 py-2 text-sm font-semibold text-white"
+          : "top-tab micro-press rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50";
+      });
+
+      document.getElementById("screen-title").textContent = titles[screenId] || "Portal Redesign V3";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.querySelectorAll("[data-screen]").forEach((button) => {
+      button.addEventListener("click", () => activate(button.dataset.screen));
+    });
+  </script>
+</body>
+</html>

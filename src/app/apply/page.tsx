@@ -83,20 +83,22 @@ function ApplyPageContent() {
     }
 
     try {
-      // Build URL with query parameters (more reliable for Google Apps Script)
-      const scriptUrl = "https://script.google.com/macros/s/AKfycbxTKksrsLnqFAju_KAs8DstGE5V5CnuljsD456aVT5hlxGXMZGm50M1IXEPTi8lUR9K7A/exec";
-      const params = new URLSearchParams({
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email,
-        city: formData.city,
-        referredBy: formData.referredBy,
+      const response = await fetch("/api/public/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          city: formData.city,
+          referredBy: formData.referredBy,
+        }),
       });
 
-      await fetch(`${scriptUrl}?${params.toString()}`, {
-        method: "GET",
-        mode: "no-cors",
-      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to submit application");
+      }
 
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -126,18 +128,18 @@ function ApplyPageContent() {
               </svg>
             </div>
             <div className="inline-block bg-[#8dc63f] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
-              You're In!
+              You&apos;re In!
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6">
               Application received.
             </h1>
             <p className="text-xl text-white/70 mb-10 max-w-md mx-auto leading-relaxed">
-              We'll call you within <span className="text-[#8dc63f] font-bold">2-3 business days</span> to schedule your quick intro call.
+              We&apos;ll call you within <span className="text-[#8dc63f] font-bold">2-3 business days</span> to schedule your quick intro call.
             </p>
 
             <div className="bg-white/10 backdrop-blur-sm p-6 mb-10 max-w-md mx-auto border-l-4 border-[#8dc63f]">
               <h3 className="font-bold mb-2">While you wait:</h3>
-              <p className="text-white/70 text-sm">Check your phone — our team calls from local numbers. Save our number so you don't miss it!</p>
+              <p className="text-white/70 text-sm">Check your phone - our team calls from local numbers. Save our number so you don&apos;t miss it!</p>
             </div>
 
             <Link
@@ -391,7 +393,7 @@ function ApplyPageContent() {
                   <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
                 </svg>
                 <p className="text-lg mb-6 leading-relaxed">
-                  "I went from working retail making $15/hour to averaging <span className="text-[#8dc63f] font-bold">$3,200/week</span>. Best decision I ever made."
+                  &ldquo;I went from working retail making $15/hour to averaging <span className="text-[#8dc63f] font-bold">$3,200/week</span>. Best decision I ever made.&rdquo;
                 </p>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-[#8dc63f] rounded-full flex items-center justify-center font-bold text-white">
@@ -469,7 +471,7 @@ function ApplyPageContent() {
                 Common Questions
               </div>
               <h2 className="text-3xl md:text-4xl font-black text-[#0A1F44]">
-                Got Questions? We've Got Answers.
+                Got Questions? We&apos;ve Got Answers.
               </h2>
             </div>
           </ScrollReveal>

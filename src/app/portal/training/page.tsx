@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { AlertTriangle, BookOpenCheck, Filter, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
@@ -8,6 +9,13 @@ import { ResourceGrid } from '@/components/training/ResourceGrid';
 import { ProgressTracker } from '@/components/training/ProgressTracker';
 import { useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TrainingCategory, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 
 export default function TrainingPage() {
@@ -34,115 +42,137 @@ export default function TrainingPage() {
   }, [categoryFilter, typeFilter, fetchResources]);
 
   useEffect(() => {
-    if (user) {
-      fetchProgress(user.uid);
-    }
+    if (user) fetchProgress(user.uid);
   }, [user, fetchProgress]);
 
   const overallProgress = getOverallProgress();
   const incompleteRequired = getIncompleteRequired();
+  const hasFilters = Boolean(categoryFilter || typeFilter);
 
   return (
     <ProtectedRoute permissions={['training:read']}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-7xl mx-auto space-y-6">
-              {/* Header */}
-              <div>
-                <h1 className="text-2xl font-bold text-[#0A1F44]">Training & Resources</h1>
-                <p className="text-gray-500 mt-1">
-                  Access training materials and track your learning progress
-                </p>
-              </div>
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1500px] space-y-5">
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                        University / My Path
+                      </h1>
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                        Training desk
+                      </Badge>
+                    </div>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                      Required modules, reference materials, and field refreshers organized as a clear enablement path.
+                    </p>
+                  </div>
+                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                    <BookOpenCheck className="size-5" />
+                  </div>
+                </div>
+              </section>
 
-              {/* Progress Tracker */}
               {resources.length > 0 && <ProgressTracker {...overallProgress} />}
 
-              {/* Required Training Alert */}
               {incompleteRequired.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                  <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <div>
-                    <p className="font-medium text-red-800">
-                      You have {incompleteRequired.length} required training module{incompleteRequired.length > 1 ? 's' : ''} to complete
-                    </p>
-                    <p className="text-sm text-red-600 mt-1">
-                      Please complete all required training to maintain compliance.
-                    </p>
-                  </div>
-                </div>
+                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                  <AlertTriangle className="size-4" />
+                  <AlertDescription>
+                    You have {incompleteRequired.length} required training module{incompleteRequired.length > 1 ? 's' : ''} to complete.
+                  </AlertDescription>
+                </Alert>
               )}
 
-              {/* Filters */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Category:</label>
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value as TrainingCategory | '')}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-                    >
-                      <option value="">All Categories</option>
-                      {TRAINING_CATEGORIES.map((cat) => (
-                        <option key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </select>
+              <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <div className="grid gap-2">
+                        <Label htmlFor="training-category" className="text-sm text-slate-700">
+                          Category
+                        </Label>
+                        <NativeSelect
+                          id="training-category"
+                          value={categoryFilter}
+                          onChange={(event) => setCategoryFilter(event.target.value as TrainingCategory | '')}
+                          className="w-full min-w-48 bg-white"
+                        >
+                          <option value="">All Categories</option>
+                          {TRAINING_CATEGORIES.map((category) => (
+                            <option key={category.value} value={category.value}>
+                              {category.label}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="training-type" className="text-sm text-slate-700">
+                          Type
+                        </Label>
+                        <NativeSelect
+                          id="training-type"
+                          value={typeFilter}
+                          onChange={(event) => setTypeFilter(event.target.value as ResourceType | '')}
+                          className="w-full min-w-40 bg-white"
+                        >
+                          <option value="">All Types</option>
+                          {RESOURCE_TYPES.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="border-slate-200 text-slate-500">
+                        <Filter className="mr-1 size-3" />
+                        {resources.length} visible
+                      </Badge>
+                      {hasFilters && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCategoryFilter('');
+                            setTypeFilter('');
+                          }}
+                        >
+                          <X className="size-4" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Type:</label>
-                    <select
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value as ResourceType | '')}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
-                    >
-                      <option value="">All Types</option>
-                      {RESOURCE_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {(categoryFilter || typeFilter) && (
-                    <button
-                      onClick={() => {
-                        setCategoryFilter('');
-                        setTypeFilter('');
-                      }}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Clear filters
-                    </button>
-                  )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Error */}
               {error && (
-                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
-                  {error}
-                </div>
+                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                  <AlertTriangle className="size-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
 
-              {/* Loading */}
               {loading && resources.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-gray-500">Loading training resources...</p>
-                </div>
+                <Card className="rounded-lg border-slate-200 shadow-sm">
+                  <CardContent className="space-y-4 p-6">
+                    <Skeleton className="h-6 w-52" />
+                    <Skeleton className="h-28 w-full" />
+                    <Skeleton className="h-28 w-full" />
+                  </CardContent>
+                </Card>
               ) : (
                 <ResourceGrid
                   resources={resources}
                   progress={progress}
-                  emptyMessage="No training resources available yet. Check back soon!"
+                  emptyMessage="No training resources are available yet."
                 />
               )}
             </div>

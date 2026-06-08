@@ -1,0 +1,68 @@
+<question_for_gemini>
+Design Intent
+Create a third employee-portal mockup direction for the 3C World Group portal. This is NOT a new feature brainstorm. It must stay in the direction of the current portal and preserve the current feature/page inventory. Use prior research into sales-team apps, CRM workspaces, field sales portals, frontline employee apps, and sales enablement platforms only for design flow inspiration.
+
+The user wants the mockup to avoid generic AI polish. It should feel like a practical sales-team operating console: dense, professional, fast to scan, and useful for reps, managers, operations, and admins.
+
+Current product/page inventory to preserve:
+- Main: Dashboard, My Onboarding, Sales, Pay Structure, Calls Schedule, Team Chat, Leaderboard, Shorts, University, Links.
+- Ops: Onboarding Review, Recruiting Pipeline, Recruit Onboarding, Email Templates, Pending Approvals.
+- Admin: User Management, System Settings.
+- Public/recruit flows already implemented conceptually: Apply page and token-based recruit onboarding.
+
+Current roles:
+- admin, operations, entry_rep, l1_manager, l2_manager.
+- IBO is a flag, not a role.
+
+Structure Requirements (Desktop + Mobile)
+Desktop:
+- Keep the existing left sidebar navigation grouped into Main, Ops, Admin.
+- Keep the v2 visual direction: navy structural shell (#0A1F44), green action color (#8dc63f), white/slate surfaces, crisp borders, practical density.
+- Produce a v3 layout direction with these five mockup screens:
+  1. Today dashboard: a daily work hub that surfaces existing things: sales status, onboarding progress, calls, chat, training/university, approvals, recruiting tasks.
+  2. Sales workspace: current Sales and Pending Approvals concepts arranged like an action-first CRM view, with submission status and next action cues. Do not invent map, territory routing, GPS, or field-visit features.
+  3. Recruit onboarding command center: based on existing Recruit Onboarding, Recruiting Pipeline, Onboarding Review, and invite link flows.
+  4. Recruit invite/onboard flow: public token-based onboarding page that keeps recruits in the website rather than email confusion.
+  5. University / My Path: based on existing training, onboarding, calls, shorts, and links, arranged as a clear enablement path.
+- Research-derived flow patterns allowed: action queues, status rails, compressed list/detail layouts, daily work summary, guided next steps, role-aware task grouping, mobile-first bottom actions.
+- Research-derived product features NOT allowed: maps, route optimization, GPS tracking, territory assignment, call recording, AI coaching, external dialer, new SaaS integrations.
+
+Mobile:
+- Show how the same portal can feel usable on a phone for reps.
+- Prioritize Today, Log Sale, Calls, Chat, and My Path without adding new pages.
+- Use stable fixed-size controls and avoid text overflow.
+
+Motion Requirements (Micro-interactions + Transitions)
+- Motion should be understated and functional, not decorative.
+- 150-250ms hover/focus/press transitions.
+- 250-320ms sheet/section transitions.
+- Subtle active rail, status progress fill, row hover, tab underline, command button press.
+- No looping bounce, no glowy orbs, no generic gradients, no confetti.
+- Honor prefers-reduced-motion.
+
+Implementation Constraints
+- Target stack for artifact: static HTML + Tailwind CDN mockup.
+- The mockup should be easy to open locally or serve with python http.server.
+- No app code changes required for this mockup.
+- No external image dependency required.
+- Avoid emojis. Use text labels, CSS shapes, or simple line-icon style glyphs.
+- Cards at 8px border radius or less.
+- Avoid cards inside cards.
+- Avoid one-note navy-only palette: navy shell is fine, but surfaces should use slate, white, green, amber, blue, red status accents with restraint.
+- Make it feel like a sales operations tool, not a marketing landing page.
+
+References (Local Files)
+- design-mockups/portal-redesign-v2/answer_from_gemini.md
+- src/components/portal/PortalSidebar.tsx
+- HANDOFF.md
+
+References (URL)
+- Research set was previously summarized from SalesRabbit, SPOTIO, Badger Maps, Map My Customers, Outfield, Salesforce, HubSpot, Pipedrive, Close, Connecteam, Staffbase, Workvivo, Blink, Mindtickle, Highspot, Seismic, Trainual, Allego. Use only design and flow principles from these categories, not feature additions.
+
+Required Response Schema
+Return exactly these top-level sections:
+1) Layout Blueprint
+2) Visual System
+3) Motion Plan
+4) Implementation Notes
+</question_for_gemini>

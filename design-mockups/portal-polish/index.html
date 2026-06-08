@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3C Portal Polish Mockup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --navy: #0a1f44;
+        --green: #8dc63f;
+        --bg: #f8fafc;
+        --text: #0f172a;
+        --border: #e2e8f0;
+      }
+      * { letter-spacing: 0; }
+      body { background: var(--bg); color: var(--text); }
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
+    </style>
+  </head>
+  <body class="font-sans">
+    <div class="min-h-screen grid grid-cols-[248px_1fr]">
+      <aside class="bg-[var(--navy)] text-white border-r border-white/10">
+        <div class="h-14 flex items-center px-5 border-b border-white/10">
+          <div class="h-8 w-8 rounded-md bg-[var(--green)] grid place-items-center text-sm font-semibold">3C</div>
+          <span class="ml-3 text-sm font-semibold">Employee Portal</span>
+        </div>
+        <nav class="p-3 text-sm">
+          <p class="px-3 py-2 text-[11px] uppercase text-white/40 font-semibold">Workspace</p>
+          <a class="flex items-center gap-3 rounded-md bg-white/10 px-3 py-2.5 text-white" href="#">Dashboard</a>
+          <a class="flex items-center gap-3 rounded-md px-3 py-2.5 text-white/70 hover:bg-white/10" href="#">Sales</a>
+          <a class="flex items-center gap-3 rounded-md px-3 py-2.5 text-white/70 hover:bg-white/10" href="#">Onboarding</a>
+          <a class="flex items-center gap-3 rounded-md px-3 py-2.5 text-white/70 hover:bg-white/10" href="#">Calls</a>
+          <p class="mt-6 px-3 py-2 text-[11px] uppercase text-white/40 font-semibold">Operations</p>
+          <a class="flex items-center gap-3 rounded-md px-3 py-2.5 text-white/70 hover:bg-white/10" href="#">Recruiting Pipeline</a>
+          <a class="flex items-center gap-3 rounded-md px-3 py-2.5 text-white/70 hover:bg-white/10" href="#">Email Templates</a>
+        </nav>
+      </aside>
+      <main>
+        <header class="h-14 bg-white border-b border-[var(--border)] flex items-center justify-between px-6">
+          <div>
+            <p class="text-sm font-medium">Monday, June 8</p>
+            <p class="text-xs text-slate-500">Operations console</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button class="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm">Notifications</button>
+            <div class="h-8 w-8 rounded-md bg-slate-100 border border-[var(--border)]"></div>
+          </div>
+        </header>
+        <div class="p-6 space-y-6">
+          <section class="grid grid-cols-4 gap-4">
+            <div class="rounded-lg border border-[var(--border)] bg-white p-4">
+              <p class="text-xs text-slate-500">Approved points</p>
+              <p class="mt-2 text-2xl font-semibold">1,240</p>
+              <p class="mt-1 text-xs text-[var(--green)]">+8% from last month</p>
+            </div>
+            <div class="rounded-lg border border-[var(--border)] bg-white p-4">
+              <p class="text-xs text-slate-500">Sales this month</p>
+              <p class="mt-2 text-2xl font-semibold">18</p>
+              <p class="mt-1 text-xs text-slate-500">3 pending approval</p>
+            </div>
+            <div class="rounded-lg border border-[var(--border)] bg-white p-4">
+              <p class="text-xs text-slate-500">Pipeline active</p>
+              <p class="mt-2 text-2xl font-semibold">42</p>
+              <p class="mt-1 text-xs text-slate-500">9 need logins</p>
+            </div>
+            <div class="rounded-lg border border-[var(--border)] bg-white p-4">
+              <p class="text-xs text-slate-500">Leaderboard rank</p>
+              <p class="mt-2 text-2xl font-semibold">#7</p>
+              <p class="mt-1 text-xs text-slate-500">Monthly points</p>
+            </div>
+          </section>
+          <section class="grid grid-cols-[2fr_1fr] gap-6">
+            <div class="rounded-lg border border-[var(--border)] bg-white">
+              <div class="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+                <h1 class="font-semibold">Recruiting Pipeline</h1>
+                <button class="rounded-md bg-[var(--green)] px-3 py-1.5 text-sm font-medium text-white">Field training request</button>
+              </div>
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-xs text-slate-500">
+                  <tr><th class="text-left px-4 py-2">Rep</th><th class="text-left px-4 py-2">Stage</th><th class="text-left px-4 py-2">Channels</th><th class="text-right px-4 py-2">Actions</th></tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border)]">
+                  <tr><td class="px-4 py-3 font-medium">Jordan Myers</td><td class="px-4 py-3"><span class="rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700">Need logins</span></td><td class="px-4 py-3">0 cleared</td><td class="px-4 py-3 text-right text-[var(--navy)]">Review</td></tr>
+                  <tr><td class="px-4 py-3 font-medium">Avery Stone</td><td class="px-4 py-3"><span class="rounded-md bg-green-50 px-2 py-1 text-xs text-green-700">Active</span></td><td class="px-4 py-3">3 cleared</td><td class="px-4 py-3 text-right text-[var(--navy)]">Review</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="rounded-lg border border-[var(--border)] bg-white p-4">
+              <h2 class="font-semibold">Template Queue</h2>
+              <p class="mt-1 text-sm text-slate-500">Starter templates remain editable before publishing.</p>
+              <div class="mt-4 space-y-2">
+                <button class="w-full rounded-md border border-[var(--border)] px-3 py-2 text-left text-sm hover:border-[var(--green)]">New Rep Onboarding</button>
+                <button class="w-full rounded-md border border-[var(--border)] px-3 py-2 text-left text-sm hover:border-[var(--green)]">Field Training Request</button>
+                <button class="w-full rounded-md border border-[var(--border)] px-3 py-2 text-left text-sm hover:border-[var(--green)]">Channel Clearance Notice</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

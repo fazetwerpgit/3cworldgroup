@@ -29,19 +29,6 @@ export interface NotificationPreferences {
   announcements: boolean;
 }
 
-export const NOTIFICATION_ICONS: Record<NotificationType, string> = {
-  sale_approved: '✅',
-  sale_rejected: '❌',
-  sale_pending: '⏳',
-  points_earned: '⭐',
-  leaderboard_rank: '🏆',
-  onboarding_submitted: '📋',
-  onboarding_approved: '🎉',
-  onboarding_rejected: '📝',
-  announcement: '📢',
-  system: '🔔',
-};
-
 export const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   sale_approved: 'bg-green-50 text-green-700',
   sale_rejected: 'bg-red-50 text-red-700',

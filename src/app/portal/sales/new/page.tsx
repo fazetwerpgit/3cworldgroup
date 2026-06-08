@@ -8,21 +8,20 @@ import { SaleForm } from '@/components/sales/SaleForm';
 export default function NewSalePage() {
   return (
     <ProtectedRoute permissions={['sales:write']}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="max-w-3xl mx-auto">
-              {/* Header */}
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold text-[#0A1F44]">Log New Sale</h1>
-                <p className="text-gray-500 mt-1">
-                  Enter the details of your sale. It will be submitted for approval.
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-[1100px] space-y-5">
+              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  Log New Sale
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  Enter customer, provider, and plan details. The submission goes into manager review.
                 </p>
-              </div>
-
-              {/* Form */}
+              </section>
               <SaleForm />
             </div>
           </main>

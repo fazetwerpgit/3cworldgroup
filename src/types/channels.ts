@@ -15,7 +15,6 @@ export const CHANNELS: Channel[] = [
   { id: 'tfiber', name: 'TFiber (T-Mobile)', type: 'fiber', active: true, credentialingPath: 'dsi' },
   { id: 'brightspeed', name: 'Brightspeed', type: 'fiber', active: true, credentialingPath: 'dsi' },
   { id: 'kinetic', name: 'Kinetic', type: 'fiber', active: true, credentialingPath: 'dsi' },
-  // TODO: verify Ripple category
   { id: 'ripple', name: 'Ripple', type: 'fiber', active: true, credentialingPath: 'dsi' },
   { id: 'xfinity', name: 'Xfinity', type: 'fiber', active: true, credentialingPath: 'direct' },
   { id: 'directv', name: 'DIRECTV', type: 'satellite', active: true, credentialingPath: 'dsi' },

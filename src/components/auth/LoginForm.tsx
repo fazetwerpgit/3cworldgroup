@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type FormMode = 'login' | 'forgot';
@@ -65,12 +66,12 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0A1F44] to-[#1a3a6e] flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen portal-canvas flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="portal-panel rounded-lg p-8">
           {/* Logo & Header */}
           <div className="text-center mb-8">
-            <div className="w-20 h-20 mx-auto mb-4 bg-[#0A1F44] rounded-full flex items-center justify-center">
+            <div className="w-20 h-20 mx-auto mb-4 bg-[#0A1F44] rounded-lg flex items-center justify-center shadow-sm">
               <span className="text-2xl font-black text-white">3C</span>
             </div>
             <h1 className="text-2xl font-bold text-[#0A1F44]">Employee Portal</h1>
@@ -110,7 +111,7 @@ export function LoginForm() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#8dc63f] text-white py-3 rounded-lg font-semibold hover:bg-[#7ab82e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-lg bg-[#8dc63f] py-3 font-semibold text-[#0A1F44] transition-colors hover:bg-[#7ab82e] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading ? 'Sending...' : 'Send Reset Link'}
                   </button>
@@ -177,7 +178,7 @@ export function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#8dc63f] text-white py-3 rounded-lg font-semibold hover:bg-[#7ab82e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-lg bg-[#8dc63f] py-3 font-semibold text-[#0A1F44] transition-colors hover:bg-[#7ab82e] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -203,9 +204,10 @@ export function LoginForm() {
         <div className="mt-6 text-center">
           <Link
             href="/"
-            className="text-sm text-white/70 hover:text-white transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-white/70 transition-colors hover:text-white"
           >
-            ← Back to main site
+            <ArrowLeft className="h-4 w-4" />
+            Back to main site
           </Link>
         </div>
       </div>

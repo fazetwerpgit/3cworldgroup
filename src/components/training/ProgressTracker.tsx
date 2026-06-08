@@ -8,37 +8,38 @@ interface ProgressTrackerProps {
 
 export function ProgressTracker({ completed, total, percentage }: ProgressTrackerProps) {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-[#0A1F44]">Your Progress</h2>
-        <span className="text-2xl font-bold text-[#8dc63f]">{percentage}%</span>
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-[#0A1F44]">My Path Progress</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Training modules completed across your assigned resources.
+          </p>
+        </div>
+        <span className="text-2xl font-semibold text-[#5a8f1f]">{percentage}%</span>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-3 bg-gray-100 rounded-full overflow-hidden mb-4">
+      <div className="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
         <div
-          className="h-full bg-gradient-to-r from-[#8dc63f] to-[#7ab82e] rounded-full transition-all duration-500"
+          className="h-full rounded-full bg-[#8dc63f] transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
 
-      {/* Stats */}
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-500">
+        <span className="text-slate-500">
           <span className="font-semibold text-[#0A1F44]">{completed}</span> of{' '}
           <span className="font-semibold text-[#0A1F44]">{total}</span> modules completed
         </span>
         {percentage === 100 ? (
-          <span className="text-[#8dc63f] font-medium flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span className="flex items-center gap-1 font-medium text-[#5a8f1f]">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            All complete!
+            All complete
           </span>
         ) : (
-          <span className="text-gray-500">
-            {total - completed} remaining
-          </span>
+          <span className="text-slate-500">{total - completed} remaining</span>
         )}
       </div>
     </div>

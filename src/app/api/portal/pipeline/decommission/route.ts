@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
-import { DecommissionReason, DecommissionReasonLabels } from '@/types';
+import { DecommissionReason, DecommissionReasonLabels, resolveRoles } from '@/types';
 
 const VALID_REASONS: DecommissionReason[] = ['non_activity', 'wrongdoing', 'manager_fire'];
+
+async function isManagement(userId: string): Promise<boolean> {
+  const doc = await adminDb!.collection('users').doc(userId).get();
+  if (!doc.exists) return false;
+  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
+  return role === 'admin' || role === 'operations';
+}
 
 // POST /api/portal/pipeline/decommission - Deactivate a rep with an audit
 // trail. Sets status 'inactive' (AuthContext blocks non-active sign-ins) and
@@ -25,6 +32,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields: userId, reason, decommissionedBy' },
         { status: 400 }
+      );
+    }
+    if (!(await isManagement(decommissionedBy))) {
+      return NextResponse.json(
+        { error: 'Only operations or admin can decommission reps' },
+        { status: 403 }
       );
     }
 
@@ -95,9 +108,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId } = body;
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const { userId, requestedBy } = body;
+    if (!userId || !requestedBy) {
+      return NextResponse.json(
+        { error: 'Missing required fields: userId, requestedBy' },
+        { status: 400 }
+      );
+    }
+    if (!(await isManagement(requestedBy))) {
+      return NextResponse.json(
+        { error: 'Only operations or admin can reinstate reps' },
+        { status: 403 }
+      );
     }
 
     const docRef = adminDb.collection('users').doc(userId);
