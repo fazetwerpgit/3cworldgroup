@@ -156,7 +156,7 @@ export default function DashboardPage() {
       <DashboardStats />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Card className="border-slate-200 py-0 shadow-sm xl:col-span-7">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm xl:col-span-7">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-slate-950">
               <ClipboardCheck className="h-4 w-4 text-[#5a8f1f]" />
@@ -191,7 +191,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 py-0 shadow-sm xl:col-span-5">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm xl:col-span-5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-slate-950">
               <Sparkles className="h-4 w-4 text-[#5a8f1f]" />
@@ -217,7 +217,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="border-slate-200 py-0 shadow-sm">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-slate-950">
               <ShieldCheck className="h-4 w-4 text-[#5a8f1f]" />
@@ -230,7 +230,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 py-0 shadow-sm">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-slate-950">
               <FileText className="h-4 w-4 text-[#5a8f1f]" />

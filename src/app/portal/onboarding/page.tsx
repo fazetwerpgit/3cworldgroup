@@ -139,14 +139,14 @@ export default function OnboardingPage() {
         <div className="flex">
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1200px] space-y-5">
+            <div className="mx-auto max-w-[1500px] space-y-5">
               <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <Badge variant="outline" className="mb-3 border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
                       Field readiness
                     </Badge>
-                    <h1 className="text-2xl font-semibold tracking-tight text-[#0A1F44]">
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
                       My Onboarding
                     </h1>
                     <p className="mt-2 max-w-2xl text-sm text-slate-600">
@@ -177,8 +177,8 @@ export default function OnboardingPage() {
               )}
 
               {loading ? (
-                <Card className="rounded-lg border-slate-200 shadow-sm">
-                  <CardContent className="space-y-4 p-6">
+                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                  <CardContent className="space-y-4 p-5">
                     <Skeleton className="h-6 w-48" />
                     <Skeleton className="h-16 w-full" />
                     <Skeleton className="h-16 w-full" />
@@ -201,7 +201,7 @@ export default function OnboardingPage() {
                         return (
                           <Card
                             key={item.id}
-                            className="rounded-lg border-slate-200 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+                            className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
                           >
                             <CardContent className="p-5">
                               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

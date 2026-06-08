@@ -60,8 +60,8 @@ export default function AdminSettingsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-[900px]">
-        <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+      <div className="mx-auto max-w-[1200px] space-y-5">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
           <CardContent className="py-10">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
               <Lock className="h-6 w-6" />

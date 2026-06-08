@@ -84,8 +84,8 @@ function SalesContent() {
                 </div>
               </section>
 
-              <Card className="rounded-lg border-slate-200 py-4 shadow-sm">
-                <CardContent className="px-4">
+              <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                <CardContent className="p-5">
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
                       <Filter className="size-4 text-[#5a8f1f]" />
@@ -121,9 +121,11 @@ function SalesContent() {
               )}
 
               {loading && sales.length === 0 ? (
-                <Card className="rounded-lg border-slate-200 p-8 text-center shadow-sm">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
-                  <p className="mt-4 text-slate-500">Loading sales workspace...</p>
+                <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+                  <CardContent className="p-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
+                    <p className="mt-4 text-slate-500">Loading sales workspace...</p>
+                  </CardContent>
                 </Card>
               ) : (
                 <SalesTable
@@ -144,11 +146,11 @@ function SalesContent() {
 function SalesLoadingFallback() {
   return (
     <div className="min-h-screen portal-canvas">
-      <div className="h-16 border-b border-slate-200 bg-white"></div>
+      <PortalHeader />
       <div className="flex">
-        <div className="min-h-[calc(100vh-4rem)] w-[258px] bg-[#0A1F44]"></div>
-        <main className="flex-1 p-4 sm:p-6">
-          <div className="mx-auto max-w-[1500px]">
+        <PortalSidebar />
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
+          <div className="mx-auto max-w-[1500px] space-y-5">
             <div>
               <Skeleton className="h-8 w-1/4 mb-4" />
               <Skeleton className="h-4 w-1/3 mb-8" />

@@ -33,8 +33,11 @@ export default function OnboardingReviewPage() {
   const [rejectionReason, setRejectionReason] = useState('');
 
   const fetchQueue = useCallback(async () => {
+    if (!user) return;
     try {
-      const response = await fetch('/api/portal/onboarding/review');
+      const response = await fetch(
+        `/api/portal/onboarding/review?requestedBy=${user.uid}`
+      );
       const json = await response.json();
       if (!response.ok) {
         throw new Error(json.error || 'Failed to load review queue');
@@ -45,7 +48,7 @@ export default function OnboardingReviewPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchQueue();
@@ -129,14 +132,14 @@ export default function OnboardingReviewPage() {
         )}
 
         {loading ? (
-          <Card className="border-slate-200 bg-white text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
               <p className="mt-4 text-sm text-slate-500">Loading submissions...</p>
             </CardContent>
           </Card>
         ) : submissions.length === 0 ? (
-          <Card className="border-slate-200 bg-white text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
             <CardContent className="py-12">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#8dc63f]/10 text-[#4f7f1e]">
                 <Check className="h-6 w-6" />
@@ -152,9 +155,9 @@ export default function OnboardingReviewPage() {
             {submissions.map((submission) => (
               <Card
                 key={submission.id}
-                className="border-slate-200 bg-white py-0 shadow-sm transition-colors hover:border-slate-300"
+                className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-colors hover:border-slate-300"
               >
-                <CardContent className="p-6">
+                <CardContent className="p-5">
                   <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
@@ -246,8 +249,8 @@ export default function OnboardingReviewPage() {
 
         {rejectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md border-slate-200 bg-white shadow-lg">
-              <CardHeader>
+            <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white py-0 shadow-lg">
+              <CardHeader className="border-b border-slate-100 p-5">
                 <h3 className="text-lg font-semibold text-slate-950">
                   Reject {rejectModal.itemLabel}
                 </h3>
@@ -256,7 +259,7 @@ export default function OnboardingReviewPage() {
                   {rejectModal.userName}.
                 </p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 <Textarea
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}

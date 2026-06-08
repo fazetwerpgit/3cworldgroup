@@ -174,7 +174,7 @@ export default function PayStructurePage() {
               {loading ? (
                 <div className="grid gap-4 md:grid-cols-3">
                   {[1, 2, 3].map((item) => (
-                    <Card key={item} className="rounded-lg border-slate-200 shadow-sm">
+                    <Card key={item} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
                       <CardContent className="space-y-4 p-5">
                         <Skeleton className="h-5 w-32" />
                         <Skeleton className="h-16 w-full" />
@@ -190,7 +190,7 @@ export default function PayStructurePage() {
                     return (
                       <Card
                         key={tier.fieldRole}
-                        className="rounded-lg border-slate-200 py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+                        className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
                       >
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between gap-3">

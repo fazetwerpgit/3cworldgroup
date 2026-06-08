@@ -80,7 +80,7 @@ export default function LeaderboardPage() {
 
               <RankCard rank={userRank?.rank || null} totalSales={userRank?.totalSales || 0} totalPoints={userRank?.totalPoints || 0} />
 
-              <Card className="border-slate-200 bg-white shadow-sm">
+              <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
                 <CardContent className="space-y-5 p-5">
                   <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
                     <div>
@@ -129,8 +129,8 @@ export default function LeaderboardPage() {
               </Card>
 
               {error && (
-                <Card className="border-red-200 bg-red-50 shadow-sm">
-                  <CardContent className="flex items-start gap-3 p-4 text-sm text-red-700">
+                <Card className="rounded-lg border-red-200 bg-red-50 py-0 shadow-sm">
+                  <CardContent className="flex items-start gap-3 p-5 text-sm text-red-700">
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     <span>{error}</span>
                   </CardContent>
@@ -138,7 +138,7 @@ export default function LeaderboardPage() {
               )}
 
               {loading ? (
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
                   <CardContent className="space-y-3 p-5">
                     {[...Array(6)].map((_, index) => (
                       <Skeleton key={index} className="h-12 w-full rounded-lg" />
@@ -149,7 +149,7 @@ export default function LeaderboardPage() {
                 <LeaderboardTable entries={leaderboard} currentUserId={user?.uid} metric={metric} />
               )}
 
-              <Card className="border-slate-200 bg-white shadow-sm">
+              <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
                 <CardContent className="flex items-start gap-3 p-5">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#8dc63f]/10 text-[#5f8f20]">
                     <Info className="size-5" />

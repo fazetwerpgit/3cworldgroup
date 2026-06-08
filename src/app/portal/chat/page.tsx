@@ -258,17 +258,17 @@ export default function TeamChatPage() {
 
                   <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
                     {loadingMessages ? (
-                      <Card className="border-slate-200 bg-white/90">
-                        <CardContent className="p-6 text-sm text-slate-500">
+                      <Card className="rounded-lg border-slate-200 bg-white/90 py-0 shadow-sm">
+                        <CardContent className="p-5 text-sm text-slate-500">
                           Loading messages...
                         </CardContent>
                       </Card>
                     ) : messages.length === 0 ? (
-                      <Card className="border-slate-200 bg-white/90 text-center">
-                        <CardHeader>
+                      <Card className="rounded-lg border-slate-200 bg-white/90 py-0 text-center shadow-sm">
+                        <CardHeader className="border-b border-slate-100 p-5">
                           <CardTitle className="text-base">No messages yet</CardTitle>
                         </CardHeader>
-                        <CardContent className="text-sm text-slate-500">
+                        <CardContent className="p-5 text-sm text-slate-500">
                           Start with a short update, question, or field note.
                         </CardContent>
                       </Card>

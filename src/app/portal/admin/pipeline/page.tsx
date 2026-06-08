@@ -267,14 +267,14 @@ export default function PipelinePage() {
         </div>
 
         {loading ? (
-          <Card className="border-slate-200 bg-white text-center">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
               <p className="mt-4 text-sm text-slate-500">Loading pipeline...</p>
             </CardContent>
           </Card>
         ) : visibleReps.length === 0 ? (
-          <Card className="border-slate-200 bg-white text-center">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
             <CardContent className="py-12">
               <p className="font-medium text-slate-950">
                 {stageFilter
@@ -289,7 +289,7 @@ export default function PipelinePage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="overflow-hidden border-slate-200 bg-white py-0 shadow-sm">
+          <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -431,8 +431,8 @@ export default function PipelinePage() {
 
         {channelsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="max-h-[80vh] w-full max-w-lg overflow-y-auto border-slate-200 bg-white">
-              <CardHeader>
+            <Card className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 p-5">
                 <h3 className="text-lg font-semibold text-slate-950">
                   Channel Credentials - {channelsModal.displayName}
                 </h3>
@@ -441,7 +441,7 @@ export default function PipelinePage() {
                   Credentials live with the vendor; only status is tracked here.
                 </p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 {channelsLoading ? (
                   <div className="py-8 text-center">
                     <div className="mx-auto h-6 w-6 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
@@ -508,8 +508,8 @@ export default function PipelinePage() {
 
         {decommissionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md border-slate-200 bg-white">
-              <CardHeader>
+            <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 p-5">
                 <h3 className="text-lg font-semibold text-slate-950">
                   Decommission {decommissionModal.displayName}
                 </h3>
@@ -518,7 +518,7 @@ export default function PipelinePage() {
                   and sales history are preserved and can be reinstated.
                 </p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-5">
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   Reason
                 </label>

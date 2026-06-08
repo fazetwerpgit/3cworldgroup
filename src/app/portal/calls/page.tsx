@@ -249,16 +249,16 @@ export default function CallsSchedulePage() {
               )}
 
               {loading ? (
-                <Card className="rounded-lg border-slate-200 shadow-sm">
-                  <CardContent className="space-y-4 p-6">
+                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                  <CardContent className="space-y-4 p-5">
                     <Skeleton className="h-6 w-36" />
                     <Skeleton className="h-20 w-full" />
                     <Skeleton className="h-20 w-full" />
                   </CardContent>
                 </Card>
               ) : byDay.length === 0 ? (
-                <Card className="rounded-lg border-slate-200 shadow-sm">
-                  <CardContent className="p-6">
+                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                  <CardContent className="p-5">
                     <div className="flex gap-4">
                       <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
                         <CalendarClock className="size-5" />
@@ -307,7 +307,7 @@ export default function CallsSchedulePage() {
                       {calls.map((call) => (
                         <Card
                           key={call.id}
-                          className="rounded-lg border-slate-200 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+                          className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
                         >
                           <CardContent className="p-5">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

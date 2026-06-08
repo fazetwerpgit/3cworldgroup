@@ -271,7 +271,7 @@ export default function RecruitingCommandCenterPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[420px_1fr]">
-          <Card className="border-slate-200 py-0 shadow-sm">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
             <CardHeader className="border-b border-slate-100 p-5">
               <CardTitle className="flex items-center gap-2 text-base">
                 <UserPlus className="size-5 text-[#0A1F44]" />
@@ -379,7 +379,12 @@ export default function RecruitingCommandCenterPage() {
                   <p className="text-sm font-semibold text-[#335d14]">Invite link ready</p>
                   <p className="mt-1 break-all text-xs text-[#4f7f1e]">{latestInviteUrl}</p>
                   <div className="mt-3 flex gap-2">
-                    <Button type="button" size="sm" onClick={copyLatestInvite}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={copyLatestInvite}
+                      className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                    >
                       <Link2 className="size-4" />
                       {copied ? 'Copied' : 'Copy Link'}
                     </Button>
@@ -395,7 +400,7 @@ export default function RecruitingCommandCenterPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200 py-0 shadow-sm">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
             <CardHeader className="border-b border-slate-100 p-5">
               <CardTitle className="text-base">Recruit Onboarding Queue</CardTitle>
             </CardHeader>
