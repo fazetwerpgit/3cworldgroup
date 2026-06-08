@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { User, PlatformRole, FieldRole, resolveRoles } from '@/types';
+import { requireManagement } from '@/lib/auth/requireManagement';
 
-// GET /api/portal/auth/users/[id] - Get a single user
+const VALID_STATUSES = ['active', 'inactive', 'pending'];
+
+// GET /api/portal/auth/users/[id] - Get a single user (management only)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,6 +19,14 @@ export async function GET(
         { error: 'Database not configured' },
         { status: 500 }
       );
+    }
+
+    // A user's directory record (incl. PII) is management-only.
+    const gate = await requireManagement(
+      request.nextUrl.searchParams.get('requestedBy')
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const doc = await adminDb.collection('users').doc(id).get();
@@ -68,7 +79,13 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { displayName, role, fieldRole, managerId, territoryId, phone, status } = body;
+    const { requestedBy, displayName, role, fieldRole, managerId, territoryId, phone, status } = body;
+
+    // Only admin/operations may edit users (incl. changing roles/status).
+    const gate = await requireManagement(requestedBy);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
 
     const docRef = adminDb.collection('users').doc(id);
     const doc = await docRef.get();
@@ -80,6 +97,12 @@ export async function PUT(
     // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
     const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
     const validFieldRoles: FieldRole[] = ['entry_rep', 'l1_manager', 'l2_manager'];
+    if (role && fieldRole) {
+      return NextResponse.json(
+        { error: 'Provide either role (platform) or fieldRole (field sales), not both' },
+        { status: 400 }
+      );
+    }
     if (role && !validPlatformRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
@@ -89,6 +112,12 @@ export async function PUT(
     if (fieldRole && !validFieldRoles.includes(fieldRole)) {
       return NextResponse.json(
         { error: 'Invalid fieldRole' },
+        { status: 400 }
+      );
+    }
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { error: 'Invalid status' },
         { status: 400 }
       );
     }
@@ -144,6 +173,21 @@ export async function DELETE(
       );
     }
 
+    // Only admin/operations may delete users.
+    const gate = await requireManagement(
+      request.nextUrl.searchParams.get('requestedBy')
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    // Don't let a caller delete their own account out from under themselves.
+    if (gate.requester.uid === id) {
+      return NextResponse.json(
+        { error: 'You cannot delete your own account' },
+        { status: 400 }
+      );
+    }
+
     const docRef = adminDb.collection('users').doc(id);
     const doc = await docRef.get();
 
@@ -161,7 +205,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting user:', error);
     return NextResponse.json(
-      { error: 'Failed to delete user', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to delete user' },
       { status: 500 }
     );
   }

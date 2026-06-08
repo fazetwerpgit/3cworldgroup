@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { PlatformRole, FieldRole } from '@/types';
+import { requireManagement } from '@/lib/auth/requireManagement';
 
-// POST /api/portal/auth/create-user - Create a new user
+// POST /api/portal/auth/create-user - Create a new user (management only)
 export async function POST(request: NextRequest) {
   try {
     if (!adminAuth || !adminDb) {
@@ -14,6 +15,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      requestedBy,
       email,
       password,
       displayName,
@@ -23,6 +25,12 @@ export async function POST(request: NextRequest) {
       territoryId,
       phone,
     } = body;
+
+    // Only admin/operations may create users (and assign roles).
+    const gate = await requireManagement(requestedBy);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
 
     // Validate required fields - exactly one of role (platform) or
     // fieldRole (field sales) must be provided
@@ -76,7 +84,16 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    await adminDb.collection('users').doc(userRecord.uid).set(userProfile);
+    // If the Firestore profile write fails, roll back the Auth user so we
+    // don't leave an orphaned login with no profile.
+    try {
+      await adminDb.collection('users').doc(userRecord.uid).set(userProfile);
+    } catch (profileError) {
+      await adminAuth.deleteUser(userRecord.uid).catch((rollbackError) => {
+        console.error('Failed to roll back orphaned Auth user:', rollbackError);
+      });
+      throw profileError;
+    }
 
     return NextResponse.json({
       success: true,
@@ -106,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to create user', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to create user' },
       { status: 500 }
     );
   }

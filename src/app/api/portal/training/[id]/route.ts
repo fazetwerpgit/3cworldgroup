@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
+import { requireManagement } from '@/lib/auth/requireManagement';
 
 // GET /api/portal/training/[id] - Get a single training resource
 export async function GET(
@@ -57,6 +58,13 @@ export async function PUT(
     }
 
     const body = await request.json();
+
+    // Only admin/operations may edit training content.
+    const gate = await requireManagement(body.requestedBy);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const docRef = adminDb.collection('training').doc(id);
     const doc = await docRef.get();
 
@@ -64,8 +72,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
     }
 
-    // Don't allow updating certain fields
-    const { id: _, createdAt, ...updateData } = body;
+    // Don't allow updating certain fields (including the caller id field)
+    const { id: _, createdAt, requestedBy: _requestedBy, ...updateData } = body;
 
     await docRef.update({
       ...updateData,
@@ -95,6 +103,14 @@ export async function DELETE(
         { error: 'Database not configured' },
         { status: 500 }
       );
+    }
+
+    // Only admin/operations may delete training content.
+    const gate = await requireManagement(
+      request.nextUrl.searchParams.get('requestedBy')
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const docRef = adminDb.collection('training').doc(id);

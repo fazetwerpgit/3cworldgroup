@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
+import { requireManagement } from '@/lib/auth/requireManagement';
 
 // Helper function to create a notification (mirrors sales/approve)
 async function createNotification(
@@ -31,13 +32,21 @@ async function createNotification(
 
 // GET /api/portal/onboarding/review - List submitted items awaiting review.
 // Used by the ops review queue. Joins item metadata + user display info.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
       return NextResponse.json(
         { error: 'Database not configured' },
         { status: 500 }
       );
+    }
+
+    // The review queue exposes other users' submissions; management only.
+    const gate = await requireManagement(
+      request.nextUrl.searchParams.get('requestedBy')
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const snapshot = await adminDb
@@ -112,6 +121,12 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: userId, itemId, status, reviewerId' },
         { status: 400 }
       );
+    }
+
+    // Only admin/operations may approve/reject onboarding submissions.
+    const gate = await requireManagement(reviewerId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     if (!['approved', 'rejected'].includes(status)) {

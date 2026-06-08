@@ -8,9 +8,11 @@ import { UserTable } from '@/components/admin/UserTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { useAuth } from '@/contexts/AuthContext';
 import { User, UserRole, RoleDisplayNames } from '@/types';
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,10 +28,12 @@ export default function UsersPage() {
     setLoading(true);
     setError('');
 
+    if (!currentUser) return;
     try {
       const params = new URLSearchParams();
       if (roleFilter) params.append('role', roleFilter);
       if (statusFilter) params.append('status', statusFilter);
+      params.append('requestedBy', currentUser.uid);
 
       const response = await fetch(`/api/portal/auth/users?${params.toString()}`);
       const data = await response.json();
@@ -44,7 +48,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [roleFilter, statusFilter]);
+  }, [roleFilter, statusFilter, currentUser]);
 
   useEffect(() => {
     fetchUsers();
@@ -58,7 +62,7 @@ export default function UsersPage() {
       const response = await fetch(`/api/portal/auth/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, requestedBy: currentUser?.uid }),
       });
 
       if (!response.ok) {
@@ -83,9 +87,10 @@ export default function UsersPage() {
     setError('');
 
     try {
-      const response = await fetch(`/api/portal/auth/users/${deleteConfirm.userId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/portal/auth/users/${deleteConfirm.userId}?requestedBy=${currentUser?.uid ?? ''}`,
+        { method: 'DELETE' }
+      );
 
       if (!response.ok) {
         const data = await response.json();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
+import { requireManagement } from '@/lib/auth/requireManagement';
 
 // GET /api/portal/training - Get training resources
 export async function GET(request: NextRequest) {
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      requestedBy,
       title,
       description,
       type,
@@ -82,6 +84,12 @@ export async function POST(request: NextRequest) {
       isPublished,
       order,
     } = body;
+
+    // Only admin/operations may create training content.
+    const gate = await requireManagement(requestedBy);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
 
     // Validate required fields
     if (!title || !type || !category) {

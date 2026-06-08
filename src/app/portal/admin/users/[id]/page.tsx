@@ -8,10 +8,12 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserForm } from '@/components/admin/UserForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 import { User } from '@/types';
 
 export default function EditUserPage() {
   const params = useParams();
+  const { user: currentUser } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,8 +22,11 @@ export default function EditUserPage() {
 
   useEffect(() => {
     async function fetchUser() {
+      if (!currentUser) return;
       try {
-        const response = await fetch(`/api/portal/auth/users/${userId}`);
+        const response = await fetch(
+          `/api/portal/auth/users/${userId}?requestedBy=${currentUser.uid}`
+        );
         const data = await response.json();
 
         if (!response.ok) {
@@ -39,7 +44,7 @@ export default function EditUserPage() {
     if (userId) {
       fetchUser();
     }
-  }, [userId]);
+  }, [userId, currentUser]);
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
@@ -52,7 +57,7 @@ export default function EditUserPage() {
         </Button>
 
         {loading && (
-          <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
               <p className="mt-4 text-sm text-slate-500">Loading user...</p>

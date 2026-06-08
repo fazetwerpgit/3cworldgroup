@@ -230,7 +230,21 @@ export async function POST(
       );
     }
 
-    await batch.commit();
+    // The Auth user is created before the batch. If the batch fails, roll the
+    // Auth user back so the recruit can resubmit; otherwise the next attempt
+    // would hit auth/email-already-exists and the invite would be permanently
+    // bricked with no Firestore record to recover from.
+    try {
+      await batch.commit();
+    } catch (commitError) {
+      await adminAuth.deleteUser(userRecord.uid).catch((rollbackError) => {
+        console.error(
+          'Failed to roll back orphaned Auth user after batch commit failure:',
+          rollbackError
+        );
+      });
+      throw commitError;
+    }
 
     await adminDb.collection('notifications').add({
       userId: data.ownerId,

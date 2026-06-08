@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { useAuth } from '@/contexts/AuthContext';
 import { User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
 
 interface UserFormProps {
@@ -23,6 +24,7 @@ const roleOptions: { value: UserRole; label: string }[] = [
 
 export function UserForm({ user, isEdit = false }: UserFormProps) {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -58,6 +60,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            requestedBy: currentUser?.uid,
             displayName: formData.displayName,
             ...rolePayload,
             phone: formData.phone,
@@ -79,6 +82,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            requestedBy: currentUser?.uid,
             email: formData.email,
             password: formData.password,
             displayName: formData.displayName,

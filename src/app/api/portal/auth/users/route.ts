@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { User, resolveRoles, getEffectiveRole } from '@/types';
+import { requireManagement } from '@/lib/auth/requireManagement';
 
-// GET /api/portal/auth/users - Get all users
+// GET /api/portal/auth/users - Get all users (management only)
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -13,6 +14,13 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
+
+    // The full user directory (incl. PII) is management-only.
+    const gate = await requireManagement(searchParams.get('requestedBy'));
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const role = searchParams.get('role');
     const status = searchParams.get('status');
 
