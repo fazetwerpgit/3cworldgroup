@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -113,7 +114,15 @@ export function PortalHeader() {
         </button>
 
         <Link href="/portal/dashboard" className="flex items-center gap-3">
-          <span className="hidden h-8 w-px bg-slate-200 lg:block" />
+          <Image
+            src="/logo.png"
+            alt="3C World Group"
+            width={36}
+            height={36}
+            priority
+            className="h-9 w-9 shrink-0 object-contain"
+          />
+          <span className="hidden h-8 w-px bg-slate-200 sm:block" />
           <span className="hidden sm:block">
             <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Employee Portal
