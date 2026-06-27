@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { OnboardingItem, RoleDisplayNames, FieldRole } from '@/types';
+import FileUpload from '@/components/onboarding/FileUpload';
+import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 
 interface InviteView {
   id: string;
@@ -53,6 +55,13 @@ export default function PublicOnboardingPage() {
     password: '',
   });
   const [references, setReferences] = useState<Record<string, string>>({});
+  // dl_photos requires both slots before the reference (shared folder path) is
+  // set. We only read the slots inside the setter's updater, so the value
+  // binding itself is intentionally unused.
+  const [, setDlSlots] = useState<{ front: string; back: string }>({
+    front: '',
+    back: '',
+  });
 
   useEffect(() => {
     async function loadInvite() {
@@ -79,6 +88,16 @@ export default function PublicOnboardingPage() {
 
   const updateReference = (itemId: string, value: string) => {
     setReferences((prev) => ({ ...prev, [itemId]: value }));
+  };
+
+  const markDlSlot = (slot: 'front' | 'back', folderPath: string) => {
+    setDlSlots((prev) => {
+      const next = { ...prev, [slot]: folderPath };
+      // Reference is the shared folder path once both slots are present; empty
+      // (incomplete) otherwise, so the completion + submit checks stay accurate.
+      updateReference('dl_photos', next.front && next.back ? folderPath : '');
+      return next;
+    });
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -330,16 +349,49 @@ export default function PublicOnboardingPage() {
                       </Badge>
                     )}
                   </div>
-                  <Textarea
-                    value={references[item.id] || ''}
-                    onChange={(event) => updateReference(item.id, event.target.value)}
-                    placeholder={
-                      item.sensitive
-                        ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
-                        : 'Example: Completed, acknowledged, or upload/reference note'
-                    }
-                    required
-                  />
+                  {isStorageItem(item.id) ? (
+                    item.id === 'dl_photos' ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <FileUpload
+                          itemId="dl_photos"
+                          slot="front"
+                          label="Front of license"
+                          accept="image/*"
+                          allowedTypes={IMAGE_TYPES}
+                          uploadUrl={`/api/public/onboarding/${token}/upload`}
+                          onUploaded={(path) => markDlSlot('front', path)}
+                        />
+                        <FileUpload
+                          itemId="dl_photos"
+                          slot="back"
+                          label="Back of license"
+                          accept="image/*"
+                          allowedTypes={IMAGE_TYPES}
+                          uploadUrl={`/api/public/onboarding/${token}/upload`}
+                          onUploaded={(path) => markDlSlot('back', path)}
+                        />
+                      </div>
+                    ) : (
+                      <FileUpload
+                        itemId={item.id}
+                        accept="image/*,application/pdf"
+                        allowedTypes={DOC_TYPES}
+                        uploadUrl={`/api/public/onboarding/${token}/upload`}
+                        onUploaded={(path) => updateReference(item.id, path)}
+                      />
+                    )
+                  ) : (
+                    <Textarea
+                      value={references[item.id] || ''}
+                      onChange={(event) => updateReference(item.id, event.target.value)}
+                      placeholder={
+                        item.sensitive
+                          ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
+                          : 'Example: Completed, acknowledged, or upload/reference note'
+                      }
+                      required
+                    />
+                  )}
                 </div>
               ))}
             </CardContent>
