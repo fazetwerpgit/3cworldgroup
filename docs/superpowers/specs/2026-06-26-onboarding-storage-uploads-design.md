@@ -32,7 +32,7 @@ Today every item — including these four — is captured as a single free-text 
 2. **`storage.rules`: deny all client access.** Every read and write goes through the server. No client rule can be misconfigured into a leak.
 3. **Folder-per-item; `reference` = the folder path string.** One item can hold 1..n files. No type-model change.
 4. **Public uploads are authorized by the invite token** — the same hashed-token gate the candidate already uses. No anonymous Firebase auth, no open endpoint.
-5. **File limits:** type allowlist + **10 MB per file**. Enforced server-side.
+5. **File limits:** type allowlist + **4 MB per file**, enforced server-side. (Deployment target is **Vercel**, whose route handlers cap request bodies at ~4.5 MB; 4 MB leaves multipart headroom.) `FileUpload` downscales canvas-decodable images client-side so phone photos fit under the cap.
 6. **Signed-URL expiry for review: 15 minutes.** Minted per request on management's authenticated review call only.
 7. **Virus scanning deferred** to a fast-follow (no blocker in P1).
 
@@ -167,7 +167,7 @@ Both onboarding pages render a `FileUpload` instead of the text input **only** f
 - The public upload endpoint is gated by the invite token (hashed lookup, expiry + status checks) — same security model as the existing public submit.
 - Extension/content-type is derived from validated MIME, never from the client filename — prevents path traversal or executable masquerading.
 - Raw PII never enters Firestore: the file is the sensitive artifact, locked in Storage; the only thing persisted is the opaque folder path. `looksLikeRawSensitiveData()` stays as-is on text references.
-- 10 MB cap + type allowlist bound abuse; rate limiting on the public upload route is a recommended fast-follow (note, not P1 blocker).
+- 4 MB cap + type allowlist bound abuse; rate limiting on the public upload route is a recommended fast-follow (note, not P1 blocker).
 
 ---
 
