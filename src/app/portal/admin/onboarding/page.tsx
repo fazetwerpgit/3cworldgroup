@@ -212,7 +212,7 @@ export default function OnboardingReviewPage() {
                           <div className="mt-4 flex flex-wrap gap-3">
                             {submission.files.map((file) => (
                               <a
-                                key={file.name}
+                                key={`${submission.id}-${file.name}`}
                                 href={file.url}
                                 target="_blank"
                                 rel="noopener noreferrer"

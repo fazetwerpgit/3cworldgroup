@@ -7,6 +7,8 @@ import {
   looksLikeRawSensitiveData,
 } from '@/types';
 import { requireSelfOrManagement } from '@/lib/auth/requireManagement';
+import { isStorageItem } from '@/lib/onboarding/uploads';
+import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 
 // POST /api/portal/onboarding/submit - Rep submits an onboarding item for review.
 // Sensitive items (W-9, direct deposit, chargeback card) accept a reference
@@ -81,6 +83,20 @@ export async function POST(request: NextRequest) {
         { error: 'This item does not apply to your onboarding checklist' },
         { status: 400 }
       );
+    }
+
+    // Storage items: the reference must be this user's own folder and the
+    // required file(s) must actually exist. Prevents pointing a submission at
+    // another user's folder, and blocks empty/partial submissions.
+    if (isStorageItem(itemId)) {
+      const verified = await verifyStorageReference(
+        { kind: 'user', userId },
+        itemId,
+        typeof reference === 'string' ? reference : ''
+      );
+      if (!verified.ok) {
+        return NextResponse.json({ error: verified.error }, { status: 400 });
+      }
     }
 
     const docRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);

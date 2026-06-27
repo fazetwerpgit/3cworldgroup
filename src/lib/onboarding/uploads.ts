@@ -35,6 +35,12 @@ export function isStorageItem(itemId: string): boolean {
   return STORAGE_ITEM_IDS.includes(itemId);
 }
 
+// Filename bases that must exist in a storage item's folder for it to be
+// complete. dl_photos needs both front+back; every other storage item needs one.
+export function expectedFileBases(itemId: string): string[] {
+  return itemId === 'dl_photos' ? ['front', 'back'] : ['file'];
+}
+
 export function extForMime(mime: string): string | null {
   return IMAGE_MIMES[mime] ?? PDF_MIME[mime] ?? null;
 }

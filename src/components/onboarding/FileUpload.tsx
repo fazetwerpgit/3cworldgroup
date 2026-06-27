@@ -36,6 +36,7 @@ async function maybeDownscale(file: File, maxBytes: number): Promise<File> {
     const ctx = canvas.getContext('2d');
     if (!ctx) return file;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85)
     );
@@ -113,6 +114,8 @@ export default function FileUpload({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
+          // Clear the input so re-selecting the same file fires onChange again.
+          e.target.value = '';
           if (file) handleFile(file);
         }}
       />

@@ -123,6 +123,7 @@ export default function OnboardingPage() {
 
       setSubmitModal(null);
       setReference('');
+      setDlSlots({ front: '', back: '' });
       await fetchChecklist();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
@@ -266,6 +267,7 @@ export default function OnboardingPage() {
                                     onClick={() => {
                                       setSubmitModal(item);
                                       setReference(item.reference ?? '');
+                                      setDlSlots({ front: '', back: '' });
                                     }}
                                     className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                                   >
@@ -363,7 +365,12 @@ export default function OnboardingPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={
+                  submitting ||
+                  (!!submitModal &&
+                    isStorageItem(submitModal.id) &&
+                    !reference.trim())
+                }
                 className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
               >
                 {submitting ? 'Submitting...' : 'Submit for Review'}

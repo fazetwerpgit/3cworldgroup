@@ -5,6 +5,8 @@ import {
   extForMime,
   validateUpload,
   buildFolderPath,
+  expectedFileBases,
+  MAX_FILE_BYTES,
 } from './uploads';
 
 describe('storage item identification', () => {
@@ -73,9 +75,30 @@ describe('validateUpload', () => {
     expect(r.ok).toBe(false);
   });
 
+  it('accepts a file exactly at the 4 MB boundary', () => {
+    const r = validateUpload({ itemId: 'w9', mime: 'application/pdf', size: MAX_FILE_BYTES });
+    expect(r).toEqual({ ok: true, ext: 'pdf', fileBase: 'file' });
+  });
+
+  it('rejects a zero-byte file', () => {
+    const r = validateUpload({ itemId: 'w9', mime: 'application/pdf', size: 0 });
+    expect(r.ok).toBe(false);
+  });
+
   it('rejects an unknown mime', () => {
     const r = validateUpload({ itemId: 'insurance', mime: 'application/zip', size: 10 });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('expectedFileBases', () => {
+  it('requires front and back for dl_photos', () => {
+    expect(expectedFileBases('dl_photos')).toEqual(['front', 'back']);
+  });
+
+  it('requires a single file for other storage items', () => {
+    expect(expectedFileBases('w9')).toEqual(['file']);
+    expect(expectedFileBases('insurance')).toEqual(['file']);
   });
 });
 
