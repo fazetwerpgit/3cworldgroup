@@ -31,6 +31,8 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OnboardingItem, OnboardingStatus, OnboardingStatusConfig, OnboardingCategoryLabels, OnboardingCategory } from '@/types';
+import FileUpload from '@/components/onboarding/FileUpload';
+import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 
 interface ChecklistItem extends OnboardingItem {
   status: OnboardingStatus;
@@ -70,6 +72,20 @@ export default function OnboardingPage() {
   const [submitModal, setSubmitModal] = useState<ChecklistItem | null>(null);
   const [reference, setReference] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // dl_photos requires both slots before the reference (shared folder path) is
+  // set. Only read inside the setter's updater, so the value binding is unused.
+  const [, setDlSlots] = useState<{ front: string; back: string }>({
+    front: '',
+    back: '',
+  });
+
+  const markDlSlot = (slot: 'front' | 'back', folderPath: string) => {
+    setDlSlots((prev) => {
+      const next = { ...prev, [slot]: folderPath };
+      setReference(next.front && next.back ? folderPath : '');
+      return next;
+    });
+  };
 
   const fetchChecklist = useCallback(async () => {
     if (!user) return;
@@ -278,6 +294,7 @@ export default function OnboardingPage() {
           if (!open) {
             setSubmitModal(null);
             setReference('');
+            setDlSlots({ front: '', back: '' });
           }
         }}>
           <DialogContent className="rounded-lg">
@@ -291,18 +308,55 @@ export default function OnboardingPage() {
                   : 'Add an optional note, document name, or confirmation number for the reviewer.'}
               </DialogDescription>
             </DialogHeader>
-            <Input
-              value={reference}
-              onChange={(event) => setReference(event.target.value)}
-              placeholder="Reference or note (optional)"
-              maxLength={500}
-            />
+            {submitModal && isStorageItem(submitModal.id) ? (
+              submitModal.id === 'dl_photos' ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FileUpload
+                    itemId="dl_photos"
+                    slot="front"
+                    label="Front of license"
+                    accept="image/*"
+                    allowedTypes={IMAGE_TYPES}
+                    uploadUrl="/api/portal/onboarding/upload"
+                    extraFields={{ userId: user?.uid ?? '', requestedBy: user?.uid ?? '' }}
+                    onUploaded={(path) => markDlSlot('front', path)}
+                  />
+                  <FileUpload
+                    itemId="dl_photos"
+                    slot="back"
+                    label="Back of license"
+                    accept="image/*"
+                    allowedTypes={IMAGE_TYPES}
+                    uploadUrl="/api/portal/onboarding/upload"
+                    extraFields={{ userId: user?.uid ?? '', requestedBy: user?.uid ?? '' }}
+                    onUploaded={(path) => markDlSlot('back', path)}
+                  />
+                </div>
+              ) : (
+                <FileUpload
+                  itemId={submitModal.id}
+                  accept="image/*,application/pdf"
+                  allowedTypes={DOC_TYPES}
+                  uploadUrl="/api/portal/onboarding/upload"
+                  extraFields={{ userId: user?.uid ?? '', requestedBy: user?.uid ?? '' }}
+                  onUploaded={(path) => setReference(path)}
+                />
+              )
+            ) : (
+              <Input
+                value={reference}
+                onChange={(event) => setReference(event.target.value)}
+                placeholder="Reference or note (optional)"
+                maxLength={500}
+              />
+            )}
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => {
                   setSubmitModal(null);
                   setReference('');
+                  setDlSlots({ front: '', back: '' });
                 }}
               >
                 Cancel
