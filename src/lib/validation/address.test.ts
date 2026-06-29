@@ -49,14 +49,22 @@ describe('validateAddress', () => {
     expect(r).toEqual({ ok: true, clean: { zip: '78701-1234' } });
   });
 
-  it('rejects a non-empty invalid zip', () => {
+  it('rejects a non-empty invalid zip with a zip message', () => {
     const r = validateAddress({ zip: '7870' });
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/zip/i);
   });
 
-  it('rejects an unknown state code', () => {
+  it('rejects an unknown state code with a state message', () => {
     const r = validateAddress({ state: 'ZZ' });
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/state/i);
+  });
+
+  it('coerces non-string inputs to empty instead of throwing', () => {
+    // Raw JSON bodies can carry non-strings; these must not throw a 500.
+    const r = validateAddress({ address: 123, city: { x: 1 }, state: null, zip: undefined });
+    expect(r).toEqual({ ok: true, clean: {} });
   });
 
   it('caps overly long street and city', () => {

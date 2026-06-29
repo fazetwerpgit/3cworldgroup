@@ -309,7 +309,7 @@ export default function SettingsPage() {
                           </p>
                         </div>
                       ) : (
-                        <p className="text-gray-900">Not on file</p>
+                        <p className="text-gray-400 italic">Not on file</p>
                       )}
                     </div>
                     <div>

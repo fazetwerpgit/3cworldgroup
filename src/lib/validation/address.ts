@@ -1,5 +1,6 @@
-// Shared address validation for onboarding intake. Client and server both call
-// validateAddress so the rules never diverge. All four fields are optional.
+// Shared address validation used by onboarding intake and the admin user
+// routes. Client and server both call validateAddress so the rules never
+// diverge. All four fields are optional.
 
 export type AddressFields = {
   address?: string;
@@ -7,6 +8,25 @@ export type AddressFields = {
   state?: string;
   zip?: string;
 };
+
+// Input accepted from raw request bodies, where each value may be any JSON type
+// (or missing). cleanText coerces non-strings to '' so callers can pass body
+// fields directly without pre-casting.
+export type AddressInput = {
+  address?: unknown;
+  city?: unknown;
+  state?: unknown;
+  zip?: unknown;
+};
+
+// Max length for free-text street/city fields.
+export const MAX_TEXT_LEN = 200;
+
+// Coerce an unknown JSON value to a trimmed, length-capped string. Non-strings
+// (numbers, objects) become '' rather than throwing on .trim().
+function cleanText(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
 
 export const US_STATES: { code: string; name: string }[] = [
   { code: 'AL', name: 'Alabama' },
@@ -72,12 +92,12 @@ export function isValidZip(zip: string): boolean {
 // and state, and returns only the keys that are non-empty (so empty strings are
 // never written to Firestore). Empty input is valid (all fields optional).
 export function validateAddress(
-  input: AddressFields
+  input: AddressInput
 ): { ok: true; clean: AddressFields } | { ok: false; error: string } {
-  const address = (input.address ?? '').trim().slice(0, 200);
-  const city = (input.city ?? '').trim().slice(0, 200);
-  const state = (input.state ?? '').trim().slice(0, 20);
-  const zip = (input.zip ?? '').trim().slice(0, 20);
+  const address = cleanText(input.address, MAX_TEXT_LEN);
+  const city = cleanText(input.city, MAX_TEXT_LEN);
+  const state = cleanText(input.state, 20);
+  const zip = cleanText(input.zip, 20);
 
   if (zip && !isValidZip(zip)) {
     return { ok: false, error: 'Enter a valid ZIP code (12345 or 12345-6789)' };

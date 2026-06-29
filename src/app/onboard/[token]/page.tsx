@@ -336,9 +336,12 @@ export default function PublicOnboardingPage() {
                 <Label>ZIP</Label>
                 <Input
                   value={profile.zip}
-                  onChange={(event) =>
-                    setProfile((prev) => ({ ...prev, zip: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    const zip = event.target.value;
+                    setProfile((prev) => ({ ...prev, zip }));
+                    // Clear a showing error as soon as the value becomes valid/empty.
+                    if (zipError && (zip === '' || isValidZip(zip))) setZipError(false);
+                  }}
                   onBlur={() => setZipError(profile.zip !== '' && !isValidZip(profile.zip))}
                   placeholder="12345"
                 />
