@@ -20,6 +20,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { OnboardingItem, RoleDisplayNames, FieldRole } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { US_STATES, isValidZip } from '@/lib/validation/address';
 
 interface InviteView {
   id: string;
@@ -51,9 +53,13 @@ export default function PublicOnboardingPage() {
   const [profile, setProfile] = useState({
     displayName: '',
     phone: '',
+    address: '',
     city: '',
+    state: '',
+    zip: '',
     password: '',
   });
+  const [zipError, setZipError] = useState(false);
   const [references, setReferences] = useState<Record<string, string>>({});
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. We only read the slots inside the setter's updater, so the value
@@ -73,7 +79,10 @@ export default function PublicOnboardingPage() {
         setProfile({
           displayName: json.invite.candidateName || '',
           phone: json.invite.candidatePhone || '',
+          address: '',
           city: json.invite.candidateCity || '',
+          state: '',
+          zip: '',
           password: '',
         });
       } catch (err) {
@@ -288,6 +297,15 @@ export default function PublicOnboardingPage() {
                   required
                 />
               </div>
+              <div className="sm:col-span-2">
+                <Label>Street Address</Label>
+                <Input
+                  value={profile.address}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, address: event.target.value }))
+                  }
+                />
+              </div>
               <div>
                 <Label>City</Label>
                 <Input
@@ -296,6 +314,39 @@ export default function PublicOnboardingPage() {
                     setProfile((prev) => ({ ...prev, city: event.target.value }))
                   }
                 />
+              </div>
+              <div>
+                <Label>State</Label>
+                <NativeSelect
+                  value={profile.state}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, state: event.target.value }))
+                  }
+                  className="w-full"
+                >
+                  <NativeSelectOption value="">Select state</NativeSelectOption>
+                  {US_STATES.map((s) => (
+                    <NativeSelectOption key={s.code} value={s.code}>
+                      {s.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div>
+                <Label>ZIP</Label>
+                <Input
+                  value={profile.zip}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, zip: event.target.value }))
+                  }
+                  onBlur={() => setZipError(profile.zip !== '' && !isValidZip(profile.zip))}
+                  placeholder="12345"
+                />
+                {zipError && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Enter a valid ZIP (12345 or 12345-6789)
+                  </p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Label>Create Portal Password</Label>

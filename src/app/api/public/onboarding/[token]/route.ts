@@ -4,6 +4,7 @@ import { hashInviteToken } from '@/lib/recruiting/tokens';
 import { getOnboardingItemsForUser, looksLikeRawSensitiveData } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
+import { validateAddress } from '@/lib/validation/address';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -122,6 +123,16 @@ export async function POST(
     const displayName = clean(body.displayName, 180) || data.candidateName;
     const phone = clean(body.phone, 80) || data.candidatePhone;
     const city = clean(body.city, 120) || data.candidateCity || '';
+    const addressCheck = validateAddress({
+      address: body.address,
+      city,
+      state: body.state,
+      zip: body.zip,
+    });
+    if (!addressCheck.ok) {
+      return NextResponse.json({ error: addressCheck.error }, { status: 400 });
+    }
+    const addressFields = addressCheck.clean;
     const password = clean(body.password, 200);
     const references = body.references && typeof body.references === 'object'
       ? (body.references as Record<string, unknown>)
@@ -191,7 +202,7 @@ export async function POST(
       reportsToId: data.ownerId,
       managerId: data.ownerId,
       phone,
-      city,
+      ...addressFields,
       status: 'pending',
       onboardingInviteId: invite.id,
       hireDate: now,
