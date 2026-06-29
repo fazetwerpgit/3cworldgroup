@@ -102,7 +102,7 @@ The client `User` builder (lines 43-58) omits the address fields. Add `address: 
 ### 4.8 Read-only display (CHANGED)
 
 - **`src/app/portal/settings/page.tsx`:** render the rep's address (from the AuthContext `user`) as read-only text — a labeled "Address" block showing `address`, `city, state zip` on a second line; show a muted "Not on file" when all four are empty.
-- **Admin user view (`src/app/portal/admin/users/[id]/page.tsx`):** display the address read-only in the user detail surface (consumes the `users/[id]` GET). The create/edit form surfaces are `src/app/portal/admin/users/new/page.tsx` and the shared `UserForm.tsx` (§4.4).
+- **Admin user view:** the admin user detail page (`src/app/portal/admin/users/[id]/page.tsx`) renders the editable `UserForm` (`<UserForm user={user} isEdit />`) — there is no separate read-only user view in the app. The address is therefore surfaced admin-side as the editable inputs in `UserForm` (§4.4), prefilled from the `users/[id]` GET serialization (§4.6). (Decided in brainstorm: no redundant read-only block above an editable form. Read-only display applies to the rep's Settings page only, where reps cannot edit.) The create surface is `src/app/portal/admin/users/new/page.tsx` (also renders `UserForm`).
 
 ---
 
