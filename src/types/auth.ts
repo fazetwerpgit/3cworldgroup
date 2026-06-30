@@ -86,7 +86,7 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
 export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   admin: 'Administrator',
   operations: 'Operations',
-  entry_rep: 'Entry Representative',
+  entry_rep: 'Account Executive',
   l1_manager: 'L1 Manager',
   l2_manager: 'L2 Manager',
 };
@@ -139,8 +139,18 @@ export interface User {
   fieldRole?: FieldRole;     // Field sales users only
   isIBO: boolean;
   reportsToId?: string;
+  // IBO Rep linkage: a rep working under an IBO owner. The owner (a User with
+  // isIBO: true) holds the business docs (LLC/SOS, insurance); the rep does not.
+  iboOwnerId?: string;
+  iboName?: string;
   territoryId?: string;
   phone?: string;
+  // Non-sensitive contact address. DL# / SSN are NEVER stored here - they flow
+  // through the background-check vendor as a reference (see types/onboarding.ts).
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
   avatarUrl?: string;
   status: 'active' | 'inactive' | 'pending';
   hireDate: Date;

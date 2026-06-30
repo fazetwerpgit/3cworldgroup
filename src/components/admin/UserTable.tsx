@@ -30,7 +30,7 @@ const statusColors = {
 const roleLabels: Record<string, string> = {
   admin: 'Administrator',
   operations: 'Operations',
-  entry_rep: 'Entry Representative',
+  entry_rep: 'Account Executive',
   l1_manager: 'L1 Manager',
   l2_manager: 'L2 Manager',
 };

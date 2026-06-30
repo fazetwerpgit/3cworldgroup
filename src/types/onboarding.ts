@@ -3,6 +3,14 @@ import { FieldRole } from './auth';
 export type OnboardingCategory = 'paperwork' | 'financial' | 'business' | 'credential';
 export type OnboardingStatus = 'not_started' | 'submitted' | 'approved' | 'rejected';
 
+// How the reference value for an item is obtained. The app NEVER stores the
+// raw document/number - only this kind of pointer:
+//   vendor  - a token/ref from an external vendor (e.g. background-check provider)
+//   storage - a Firebase Storage path to an uploaded file (e.g. DL photos)
+//   esign   - a reference to a signed agreement (e.g. Adobe Sign agreement id)
+//   manual  - free-text confirmation reference entered by staff
+export type ReferenceKind = 'vendor' | 'storage' | 'esign' | 'manual';
+
 export interface OnboardingItem {
   id: string;
   label: string;
@@ -10,21 +18,27 @@ export interface OnboardingItem {
   appliesToRoles: FieldRole[]; // Empty = applies to all field roles
   iboOnly: boolean;
   sensitive: boolean;
+  referenceKind: ReferenceKind;
+  signatureProvider?: 'adobe_sign'; // Set when the item is completed via e-signature
   order: number;
 }
 
 // Onboarding checklist definitions
 export const ONBOARDING_ITEMS: OnboardingItem[] = [
   // Base items - all field roles
-  { id: 'w9', label: 'W-9', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, order: 1 },
-  { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, order: 2 },
-  { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, order: 3 },
-  { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, order: 4 },
-  { id: 'pay_structure', label: 'Pay Structure', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, order: 5 },
-  // IBO-only items
-  { id: 'llc_sos', label: 'LLC / Secretary of State', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, order: 6 },
-  { id: 'insurance', label: 'Insurance', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, order: 7 },
-  { id: 'chargeback_card', label: 'Credit Card / Background Check / Drug Screen', category: 'financial', appliesToRoles: [], iboOnly: true, sensitive: true, order: 8 },
+  { id: 'w9', label: 'W-9', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 1 },
+  // Background / drug screen carries DL# + SSN through the vendor - stored as a
+  // vendor reference only, never the raw numbers.
+  { id: 'background_check', label: 'Background / Drug Screen Authorization', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'vendor', order: 2 },
+  { id: 'dl_photos', label: "Driver's License Photos (Front & Back)", category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 3 },
+  { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 4 },
+  { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 5 },
+  { id: 'pay_structure', label: 'Compensation', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 6 },
+  { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'manual', order: 7 },
+  // IBO-only items (the IBO owner holds these; IBO Reps under an owner skip them)
+  { id: 'llc_sos', label: 'LLC / Secretary of State', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 8 },
+  { id: 'insurance', label: 'Proof of Insurance', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 9 },
+  { id: 'chargeback_card', label: 'Chargeback Credit Card', category: 'financial', appliesToRoles: [], iboOnly: true, sensitive: true, referenceKind: 'vendor', order: 10 },
 ];
 
 // Per-user progress on an onboarding item

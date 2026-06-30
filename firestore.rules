@@ -1,6 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Is the signed-in caller a back-office or field-management user?
+    function isManagement() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return u.role in ['admin', 'operations'] ||
+             u.fieldRole in ['l1_manager', 'l2_manager'];
+    }
+
     // Authenticated users can read their own user profile
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
@@ -42,6 +49,33 @@ service cloud.firestore {
     match /leaderboard/{docId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
+    }
+
+    // Onboarding item progress - a user reads their own; management reads all.
+    // All writes go through the server (Admin SDK), which bypasses these rules,
+    // so client writes are denied.
+    match /userOnboarding/{docId} {
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isManagement());
+      allow write: if false;
+    }
+
+    // Channel credentialing progress - same access model as userOnboarding.
+    match /userChannelOnboarding/{docId} {
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isManagement());
+      allow write: if false;
+    }
+
+    // Onboarding invites carry token hashes; only the server (Admin SDK) and the
+    // public token route may touch them. No direct client access.
+    match /onboardingInvites/{docId} {
+      allow read, write: if false;
+    }
+
+    // Candidate onboarding submissions - server-only (Admin SDK).
+    match /candidateOnboarding/{docId} {
+      allow read, write: if false;
     }
   }
 }
