@@ -5,6 +5,7 @@ import { getOnboardingItemsForUser, looksLikeRawSensitiveData } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 import { validateAddress } from '@/lib/validation/address';
+import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -187,6 +188,19 @@ export async function POST(
       }
     }
 
+    // Sensitive fields (SSN, DL#, background-check auth) travel as their own body
+    // keys, NEVER inside the references map, so the looksLikeRawSensitiveData
+    // guardrail on references is not triggered. They are encrypted before storage.
+    const sensitive = buildSensitiveDoc({
+      ssn: typeof body.ssn === 'string' ? body.ssn : undefined,
+      dlNumber: typeof body.dlNumber === 'string' ? body.dlNumber : undefined,
+      backgroundCheckAuth:
+        typeof body.backgroundCheckAuth === 'boolean' ? body.backgroundCheckAuth : undefined,
+    });
+    if (!sensitive.ok) {
+      return NextResponse.json({ error: sensitive.error }, { status: 400 });
+    }
+
     const now = new Date();
     const userRecord = await adminAuth.createUser({
       email: data.candidateEmail,
@@ -212,6 +226,15 @@ export async function POST(
 
     const batch = adminDb.batch();
     batch.set(adminDb.collection('users').doc(userRecord.uid), userProfile);
+
+    // Write the encrypted sensitive doc only when there is something to store.
+    if (Object.keys(sensitive.doc).length > 0) {
+      batch.set(adminDb.collection('userSensitive').doc(userRecord.uid), {
+        ...sensitive.doc,
+        updatedAt: now,
+        updatedBy: userRecord.uid,
+      });
+    }
 
     const candidateItems = items.map((item) => ({
       itemId: item.id,
