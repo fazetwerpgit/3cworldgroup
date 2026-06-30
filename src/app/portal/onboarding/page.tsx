@@ -33,6 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { OnboardingItem, OnboardingStatus, OnboardingStatusConfig, OnboardingCategoryLabels, OnboardingCategory } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
+import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
 
 interface ChecklistItem extends OnboardingItem {
   status: OnboardingStatus;
@@ -344,6 +345,19 @@ export default function OnboardingPage() {
                   onUploaded={(path) => setReference(path)}
                 />
               )
+            ) : submitModal && isEsignItem(submitModal.id) ? (
+              <div className="space-y-2">
+                <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 text-[#0A1F44]">
+                  Adobe Sign
+                </Badge>
+                <p className="text-xs text-slate-500">{ESIGN_HELPER_TEXT}</p>
+                <Input
+                  value={reference}
+                  onChange={(event) => setReference(event.target.value)}
+                  placeholder="Adobe Sign confirmation"
+                  maxLength={500}
+                />
+              </div>
             ) : (
               <Input
                 value={reference}
