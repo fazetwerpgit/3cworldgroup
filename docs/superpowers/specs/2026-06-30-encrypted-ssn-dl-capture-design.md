@@ -23,7 +23,7 @@ The live Formstack onboarding form (`forms/3c_onboarding_form`) collects **Socia
 
 1. **New hire enters SSN + DL# during onboarding** (the public token flow), matching Formstack.
 2. **Encrypted at rest with AES-256-GCM** (authenticated encryption — detects tampering). Plain text is not stored anywhere.
-3. **Only the `admin` role** can reveal the full decrypted value. Operations/managers/reps cannot.
+3. **Only a VERIFIED `admin`** can reveal the full decrypted value. Because the SSN is high-value PII, the reveal endpoint verifies a real Firebase ID token server-side (not the app's usual trust-the-UID `requestedBy` pattern, which a security review flagged as spoofable). Operations/managers/reps cannot reveal. (App-wide auth hardening of the other admin endpoints is noted as a separate future effort.)
 4. **Masked display** for the admin list view: `•••••6789` (last 4 of SSN). A "Reveal" action fetches the full value on demand.
 5. **Isolated storage:** SSN/DL# live in their own server-only Firestore location, NOT on the `User` doc and NOT in the normal `userOnboarding` `reference` field. The `looksLikeRawSensitiveData` guardrail stays on the normal fields.
 6. **One new secret:** an encryption key in an env var. If lost, stored values are unrecoverable — documented prominently.
