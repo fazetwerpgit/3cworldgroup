@@ -90,9 +90,15 @@ For admins only: show an "Sensitive on file" row with the masked value (`SSN •
 
 Add a `userSensitive` rule: **deny all client access** (read + write `if false`) — only the Admin SDK touches it, exactly like the deny-all pattern P1 used for Storage. Same for `sensitiveAccessLog`.
 
-### 4.8 Config (`.env.local` + Vercel + `.env.example`/docs)
+### 4.8 Config (`.env.local` + Vercel)
 
-New env var `ONBOARDING_FIELD_ENCRYPTION_KEY` (32-byte key, base64). Generated once (`openssl rand -base64 32`), added to `.env.local` and Vercel. **Documented prominently:** losing this key makes stored SSN/DL# permanently unreadable; it must be backed up securely and never committed.
+New env var `ONBOARDING_FIELD_ENCRYPTION_KEY` (32-byte key, base64). Generated once (`openssl rand -base64 32`), added to `.env.local` and Vercel. **Documented prominently:** losing this key makes stored SSN/DL# permanently unreadable; it must be backed up securely and never committed. (Note: `.env.example` is gitignored in this repo via the `.env*` rule, so this requirement lives here in the committed spec rather than in `.env.example`.)
+
+> **SETUP CHECKLIST (operator):**
+> 1. Generate the key: `openssl rand -base64 32`
+> 2. Add `ONBOARDING_FIELD_ENCRYPTION_KEY=<that value>` to `.env.local` (local) AND to Vercel → Project Settings → Environment Variables (production).
+> 3. **Back up the key in a secure password manager.** If it is ever lost, every stored SSN/DL# is permanently unrecoverable.
+> 4. Never commit the real key.
 
 ---
 
