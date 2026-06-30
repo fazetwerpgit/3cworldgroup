@@ -9,6 +9,7 @@ import { UserForm } from '@/components/admin/UserForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { User } from '@/types';
 
 export default function EditUserPage() {
@@ -17,6 +18,8 @@ export default function EditUserPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sensitive, setSensitive] = useState<{ ssnLast4: string | null; dlLast4: string | null } | null>(null);
+  const [revealed, setRevealed] = useState<{ ssn: string | null; dlNumber: string | null } | null>(null);
 
   const userId = params.id as string;
 
@@ -45,6 +48,37 @@ export default function EditUserPage() {
       fetchUser();
     }
   }, [userId, currentUser]);
+
+  // Fetch the masked last-4 (admin only). Sends a REAL Firebase ID token, not a
+  // UID — the server verifies it before returning anything.
+  useEffect(() => {
+    if (currentUser?.role !== 'admin' || !userId) return;
+    let active = true;
+    (async () => {
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) return;
+      const r = await fetch(`/api/portal/admin/sensitive/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json();
+      if (active) setSensitive({ ssnLast4: d.ssnLast4, dlLast4: d.dlLast4 });
+    })().catch(() => {
+      if (active) setSensitive(null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [currentUser, userId]);
+
+  const doReveal = async () => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token) return;
+    const r = await fetch(`/api/portal/admin/sensitive/${userId}?reveal=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await r.json();
+    setRevealed({ ssn: d.ssn, dlNumber: d.dlNumber });
+  };
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
@@ -90,6 +124,25 @@ export default function EditUserPage() {
               </div>
             </section>
             <UserForm user={user} isEdit />
+            {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
+              <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+                <h2 className="text-sm font-semibold text-amber-900">Sensitive (admin only)</h2>
+                <p className="mt-2 text-sm text-slate-700">
+                  SSN: {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
+                </p>
+                <p className="text-sm text-slate-700">
+                  DL #: {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
+                </p>
+                {!revealed && (
+                  <button
+                    onClick={doReveal}
+                    className="mt-3 rounded-md border border-amber-300 px-3 py-1 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                  >
+                    Reveal
+                  </button>
+                )}
+              </section>
+            )}
           </>
         )}
       </div>
