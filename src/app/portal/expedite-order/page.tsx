@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { EXPEDITE_REASONS } from '@/lib/forms/formOptions';
 import { US_STATES } from '@/lib/validation/address';
 
@@ -32,10 +33,12 @@ export default function ExpediteOrderPage() {
     setSaving(true);
     setError('');
     try {
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) throw new Error('Not signed in');
       const res = await fetch('/api/portal/forms/expedite-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, requestedBy: user.uid }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');

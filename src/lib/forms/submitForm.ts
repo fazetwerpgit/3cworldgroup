@@ -1,24 +1,21 @@
 import { adminDb } from '@/lib/firebase/admin';
 
-// Writes a rep-form submission. Stamps the canonical rep identity from the user
-// doc (never trusts client-supplied name/email) and a 'new' status.
+// Writes a rep-form submission, stamped with the VERIFIED rep identity (uid/name/
+// email come from a verified Firebase token via the route, never from client input)
+// and a 'new' status.
 export async function submitFormRecord(
   collection: string,
-  repUid: string,
+  rep: { uid: string; name: string; email: string },
   fields: Record<string, unknown>
 ): Promise<{ id: string }> {
   if (!adminDb) throw new Error('Database not configured');
 
-  const userSnap = await adminDb.collection('users').doc(repUid).get();
-  if (!userSnap.exists) throw new Error('Submitting user not found');
-  const u = userSnap.data();
-
   const now = new Date();
   const ref = await adminDb.collection(collection).add({
     ...fields,
-    repUid,
-    repName: u?.displayName ?? u?.email ?? repUid,
-    repEmail: u?.email ?? '',
+    repUid: rep.uid,
+    repName: rep.name,
+    repEmail: rep.email,
     status: 'new',
     createdAt: now,
     updatedAt: now,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSelfOrManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { FIBER_COMPANIES, isValidOption } from '@/lib/forms/formOptions';
 
@@ -8,17 +8,21 @@ function s(v: unknown, max = 200) {
 }
 
 // POST /api/portal/forms/fiber-report - a logged-in rep submits a fiber report.
+// Auth: real Firebase ID token (Authorization: Bearer); stamped under the verified
+// caller, never a client-supplied UID.
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const requestedBy = s(body.requestedBy, 128);
-
-    const gate = await requireSelfOrManagement(requestedBy, requestedBy);
+    const gate = await requireVerifiedUser(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
+    const body = await request.json();
     const companySold = s(body.companySold, 40);
+    if (companySold && !isValidOption(FIBER_COMPANIES, companySold)) {
+      return NextResponse.json({ error: 'Select a valid company' }, { status: 400 });
+    }
+
     const fields = {
-      companySold: isValidOption(FIBER_COMPANIES, companySold) ? companySold : '',
+      companySold,
       dateKnocked: s(body.dateKnocked, 40),
       packNumber: s(body.packNumber, 40),
       numberOfReps: s(body.numberOfReps, 20),
@@ -28,7 +32,11 @@ export async function POST(request: NextRequest) {
       orderNumber: s(body.orderNumber, 120),
     };
 
-    const { id } = await submitFormRecord('fiberReports', gate.requester.uid, fields);
+    const { id } = await submitFormRecord(
+      'fiberReports',
+      { uid: gate.uid, name: gate.name, email: gate.email },
+      fields
+    );
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting fiber report:', error);

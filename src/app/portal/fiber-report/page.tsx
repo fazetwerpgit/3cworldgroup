@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { FIBER_COMPANIES } from '@/lib/forms/formOptions';
 
 const EMPTY = {
@@ -29,10 +30,12 @@ export default function FiberReportPage() {
     setSaving(true);
     setError('');
     try {
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) throw new Error('Not signed in');
       const res = await fetch('/api/portal/forms/fiber-report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, requestedBy: user.uid }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
