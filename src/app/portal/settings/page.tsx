@@ -296,6 +296,22 @@ export default function SettingsPage() {
                         <p className="text-gray-900">{user?.phone || 'Not set'}</p>
                       )}
                     </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Address
+                      </label>
+                      {user?.address || user?.city || user?.state || user?.zip ? (
+                        <div className="text-gray-900">
+                          {user?.address && <p>{user.address}</p>}
+                          <p>
+                            {[user?.city, user?.state].filter(Boolean).join(', ')}
+                            {user?.zip ? ` ${user.zip}` : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 italic">Not on file</p>
+                      )}
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-500 mb-1">
                         Hire Date

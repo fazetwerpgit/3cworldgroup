@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
 import { User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
+import { US_STATES } from '@/lib/validation/address';
 
 interface UserFormProps {
   user?: User;
@@ -15,7 +16,7 @@ interface UserFormProps {
 }
 
 const roleOptions: { value: UserRole; label: string }[] = [
-  { value: 'entry_rep', label: 'Entry Representative' },
+  { value: 'entry_rep', label: 'Account Executive' },
   { value: 'l1_manager', label: 'L1 Manager' },
   { value: 'l2_manager', label: 'L2 Manager' },
   { value: 'operations', label: 'Operations' },
@@ -34,6 +35,10 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     displayName: user?.displayName || '',
     role: getEffectiveRole(user) || ('entry_rep' as UserRole),
     phone: user?.phone || '',
+    address: user?.address || '',
+    city: user?.city || '',
+    state: user?.state || '',
+    zip: user?.zip || '',
     managerId: user?.reportsToId || '',
     status: user?.status || 'active',
   });
@@ -64,6 +69,10 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             displayName: formData.displayName,
             ...rolePayload,
             phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zip: formData.zip,
             managerId: formData.managerId || null,
             status: formData.status,
           }),
@@ -88,6 +97,10 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             displayName: formData.displayName,
             ...rolePayload,
             phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zip: formData.zip,
             managerId: formData.managerId || null,
           }),
         });
@@ -184,6 +197,64 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="(555) 123-4567"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Street Address
+              </label>
+              <Input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                placeholder="123 Main St"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                City
+              </label>
+              <Input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                placeholder="Austin"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                State
+              </label>
+              <NativeSelect
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                className="w-full"
+              >
+                <NativeSelectOption value="">Select state</NativeSelectOption>
+                {US_STATES.map((s) => (
+                  <NativeSelectOption key={s.code} value={s.code}>
+                    {s.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                ZIP Code
+              </label>
+              <Input
+                type="text"
+                name="zip"
+                value={formData.zip}
+                onChange={handleChange}
+                placeholder="78701"
               />
             </div>
           </div>

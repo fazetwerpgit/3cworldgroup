@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { PlatformRole, FieldRole } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
+import { validateAddress } from '@/lib/validation/address';
 
 // POST /api/portal/auth/create-user - Create a new user (management only)
 export async function POST(request: NextRequest) {
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
       managerId,
       territoryId,
       phone,
+      address,
+      city,
+      state,
+      zip,
     } = body;
 
     // Only admin/operations may create users (and assign roles).
@@ -63,6 +68,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const addressCheck = validateAddress({ address, city, state, zip });
+    if (!addressCheck.ok) {
+      return NextResponse.json({ error: addressCheck.error }, { status: 400 });
+    }
+
     // Create user in Firebase Auth
     const userRecord = await adminAuth.createUser({
       email,
@@ -78,6 +88,7 @@ export async function POST(request: NextRequest) {
       managerId: managerId || null,
       territoryId: territoryId || null,
       phone: phone || '',
+      ...addressCheck.clean,
       status: 'active',
       hireDate: new Date(),
       createdAt: new Date(),

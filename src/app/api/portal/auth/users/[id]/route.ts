@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { User, PlatformRole, FieldRole, resolveRoles } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
+import { validateAddress } from '@/lib/validation/address';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -46,6 +47,10 @@ export async function GET(
       reportsToId: data?.reportsToId ?? data?.managerId,
       territoryId: data?.territoryId,
       phone: data?.phone,
+      address: data?.address,
+      city: data?.city,
+      state: data?.state,
+      zip: data?.zip,
       avatarUrl: data?.avatarUrl,
       status: data?.status,
       hireDate: data?.hireDate?.toDate(),
@@ -79,7 +84,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { requestedBy, displayName, role, fieldRole, managerId, territoryId, phone, status } = body;
+    const { requestedBy, displayName, role, fieldRole, managerId, territoryId, phone, status, address, city, state, zip } = body;
 
     // Only admin/operations may edit users (incl. changing roles/status).
     const gate = await requireManagement(requestedBy);
@@ -122,6 +127,11 @@ export async function PUT(
       );
     }
 
+    const addressCheck = validateAddress({ address, city, state, zip });
+    if (!addressCheck.ok) {
+      return NextResponse.json({ error: addressCheck.error }, { status: 400 });
+    }
+
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
@@ -139,6 +149,14 @@ export async function PUT(
     if (managerId !== undefined) updateData.managerId = managerId;
     if (territoryId !== undefined) updateData.territoryId = territoryId;
     if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined)
+      updateData.address = addressCheck.clean.address ?? FieldValue.delete();
+    if (city !== undefined)
+      updateData.city = addressCheck.clean.city ?? FieldValue.delete();
+    if (state !== undefined)
+      updateData.state = addressCheck.clean.state ?? FieldValue.delete();
+    if (zip !== undefined)
+      updateData.zip = addressCheck.clean.zip ?? FieldValue.delete();
     if (status !== undefined) updateData.status = status;
 
     // Update displayName in Firebase Auth if changed

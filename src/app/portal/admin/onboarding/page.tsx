@@ -17,7 +17,9 @@ interface Submission {
   itemLabel: string;
   category: OnboardingCategory;
   sensitive: boolean;
+  referenceKind: 'vendor' | 'storage' | 'esign' | 'manual';
   reference: string | null;
+  files: { name: string; url: string; contentType: string }[];
   userName: string;
   userEmail: string;
   submittedAt: string | null;
@@ -205,11 +207,45 @@ export default function OnboardingReviewPage() {
                         </div>
                       </div>
 
-                      {submission.reference && (
-                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                          <span className="font-medium text-slate-950">Reference:</span>{' '}
-                          {submission.reference}
-                        </div>
+                      {submission.referenceKind === 'storage' ? (
+                        submission.files.length > 0 ? (
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            {submission.files.map((file) => (
+                              <a
+                                key={`${submission.id}-${file.name}`}
+                                href={file.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                              >
+                                {file.contentType.startsWith('image/') ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={file.url}
+                                    alt={file.name}
+                                    className="h-24 w-36 rounded-md border border-slate-200 object-cover"
+                                  />
+                                ) : (
+                                  <span className="flex h-24 w-36 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+                                    {file.name}
+                                  </span>
+                                )}
+                              </a>
+                            ))}
+                            <p className="w-full text-xs text-slate-400">Links expire in 15 minutes.</p>
+                          </div>
+                        ) : (
+                          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                            No files found at {submission.reference ?? 'this reference'}.
+                          </div>
+                        )
+                      ) : (
+                        submission.reference && (
+                          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                            <span className="font-medium text-slate-950">Reference:</span>{' '}
+                            {submission.reference}
+                          </div>
+                        )
                       )}
                     </div>
 

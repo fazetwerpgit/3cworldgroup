@@ -1,7 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
+import { isStorageItem } from '@/lib/onboarding/uploads';
 import { requireManagement } from '@/lib/auth/requireManagement';
+
+const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
+
+// For a storage-item reference (a folder path), list its files and mint a
+// 15-minute signed read URL for each. Degrades to [] on any error so one bad
+// reference never 500s the whole review queue.
+async function signFolderFiles(
+  reference: string | null
+): Promise<{ name: string; url: string; contentType: string }[]> {
+  if (!reference) return [];
+  try {
+    const bucket = getOnboardingBucket();
+    // Always list within the exact folder. A trailing slash prevents a legacy
+    // reference like ".../dl_photos" from over-matching ".../dl_photos_x/...".
+    const prefix = reference.endsWith('/') ? reference : `${reference}/`;
+    const [files] = await bucket.getFiles({ prefix });
+    const expires = Date.now() + SIGNED_URL_TTL_MS;
+    return Promise.all(
+      files.map(async (f) => {
+        const [url] = await f.getSignedUrl({ action: 'read', expires });
+        return {
+          name: f.name.split('/').pop() ?? f.name,
+          url,
+          contentType: String(f.metadata.contentType ?? ''),
+        };
+      })
+    );
+  } catch (error) {
+    console.error('Failed to sign storage files for review:', error);
+    return [];
+  }
+}
 
 // Helper function to create a notification (mirrors sales/approve)
 async function createNotification(
@@ -69,11 +102,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const submissions = snapshot.docs
-      .map((doc) => {
+    const submissions = await Promise.all(
+      snapshot.docs.map(async (doc) => {
         const data = doc.data();
         const item = ONBOARDING_ITEMS.find((i) => i.id === data.itemId);
         const user = userMap.get(data.userId);
+        const storage = isStorageItem(data.itemId);
         return {
           id: doc.id,
           userId: data.userId,
@@ -81,17 +115,21 @@ export async function GET(request: NextRequest) {
           itemLabel: item?.label ?? data.itemId,
           category: item?.category ?? 'paperwork',
           sensitive: item?.sensitive ?? false,
+          referenceKind: item?.referenceKind ?? 'manual',
           reference: data.reference ?? null,
+          files: storage ? await signFolderFiles(data.reference ?? null) : [],
           userName: user?.displayName ?? user?.email ?? data.userId,
           userEmail: user?.email ?? '',
           submittedAt: data.submittedAt?.toDate() ?? null,
         };
       })
-      .sort((a, b) => {
-        const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-        const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-        return ta - tb; // oldest first - FIFO review queue
-      });
+    );
+
+    submissions.sort((a, b) => {
+      const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+      return ta - tb; // oldest first - FIFO review queue
+    });
 
     return NextResponse.json({ submissions });
   } catch (error) {

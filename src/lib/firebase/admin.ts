@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, App, ServiceAccount } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getStorage, Storage } from 'firebase-admin/storage';
 
 // Track initialization error for debugging
 let initError: string | null = null;
@@ -8,6 +9,7 @@ let initError: string | null = null;
 let app: App | null = null;
 let adminAuth: Auth | null = null;
 let adminDb: Firestore | null = null;
+let adminStorage: Storage | null = null;
 
 // Try to get service account from FIREBASE_SERVICE_ACCOUNT (base64 encoded JSON)
 // or fall back to individual environment variables
@@ -71,6 +73,7 @@ if (serviceAccount) {
 
     adminAuth = getAuth(app);
     adminDb = getFirestore(app);
+    adminStorage = getStorage(app);
   } catch (error) {
     initError = error instanceof Error ? error.message : 'Unknown initialization error';
     console.error('Failed to initialize Firebase Admin:', error);
@@ -80,9 +83,19 @@ if (serviceAccount) {
   console.error('Firebase Admin: No valid credentials found');
 }
 
-export { app, adminAuth, adminDb, initError };
+export { app, adminAuth, adminDb, adminStorage, initError };
 
 // Helper to check if Firebase Admin is properly configured
 export function isFirebaseAdminConfigured(): boolean {
   return app !== null && adminDb !== null;
+}
+
+// Returns the configured onboarding Storage bucket. Throws if Storage or the
+// bucket env is unavailable, so callers fail loudly instead of writing nowhere.
+export function getOnboardingBucket() {
+  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!adminStorage || !bucketName) {
+    throw new Error('Storage bucket is not configured');
+  }
+  return adminStorage.bucket(bucketName);
 }

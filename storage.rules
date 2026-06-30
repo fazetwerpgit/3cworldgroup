@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // All onboarding file access goes through the Firebase Admin SDK on the
+      // server. No client read or write path exists; signed URLs (minted
+      // server-side on management review) are the only way bytes leave the bucket.
+      allow read, write: if false;
+    }
+  }
+}

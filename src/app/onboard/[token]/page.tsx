@@ -18,6 +18,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { OnboardingItem, RoleDisplayNames, FieldRole } from '@/types';
+import FileUpload from '@/components/onboarding/FileUpload';
+import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { US_STATES, isValidZip } from '@/lib/validation/address';
 
 interface InviteView {
   id: string;
@@ -49,10 +53,21 @@ export default function PublicOnboardingPage() {
   const [profile, setProfile] = useState({
     displayName: '',
     phone: '',
+    address: '',
     city: '',
+    state: '',
+    zip: '',
     password: '',
   });
+  const [zipError, setZipError] = useState(false);
   const [references, setReferences] = useState<Record<string, string>>({});
+  // dl_photos requires both slots before the reference (shared folder path) is
+  // set. We only read the slots inside the setter's updater, so the value
+  // binding itself is intentionally unused.
+  const [, setDlSlots] = useState<{ front: string; back: string }>({
+    front: '',
+    back: '',
+  });
 
   useEffect(() => {
     async function loadInvite() {
@@ -64,7 +79,10 @@ export default function PublicOnboardingPage() {
         setProfile({
           displayName: json.invite.candidateName || '',
           phone: json.invite.candidatePhone || '',
+          address: '',
           city: json.invite.candidateCity || '',
+          state: '',
+          zip: '',
           password: '',
         });
       } catch (err) {
@@ -79,6 +97,16 @@ export default function PublicOnboardingPage() {
 
   const updateReference = (itemId: string, value: string) => {
     setReferences((prev) => ({ ...prev, [itemId]: value }));
+  };
+
+  const markDlSlot = (slot: 'front' | 'back', folderPath: string) => {
+    setDlSlots((prev) => {
+      const next = { ...prev, [slot]: folderPath };
+      // Reference is the shared folder path once both slots are present; empty
+      // (incomplete) otherwise, so the completion + submit checks stay accurate.
+      updateReference('dl_photos', next.front && next.back ? folderPath : '');
+      return next;
+    });
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -269,6 +297,15 @@ export default function PublicOnboardingPage() {
                   required
                 />
               </div>
+              <div className="sm:col-span-2">
+                <Label>Street Address</Label>
+                <Input
+                  value={profile.address}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, address: event.target.value }))
+                  }
+                />
+              </div>
               <div>
                 <Label>City</Label>
                 <Input
@@ -277,6 +314,42 @@ export default function PublicOnboardingPage() {
                     setProfile((prev) => ({ ...prev, city: event.target.value }))
                   }
                 />
+              </div>
+              <div>
+                <Label>State</Label>
+                <NativeSelect
+                  value={profile.state}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, state: event.target.value }))
+                  }
+                  className="w-full"
+                >
+                  <NativeSelectOption value="">Select state</NativeSelectOption>
+                  {US_STATES.map((s) => (
+                    <NativeSelectOption key={s.code} value={s.code}>
+                      {s.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div>
+                <Label>ZIP</Label>
+                <Input
+                  value={profile.zip}
+                  onChange={(event) => {
+                    const zip = event.target.value;
+                    setProfile((prev) => ({ ...prev, zip }));
+                    // Clear a showing error as soon as the value becomes valid/empty.
+                    if (zipError && (zip === '' || isValidZip(zip))) setZipError(false);
+                  }}
+                  onBlur={() => setZipError(profile.zip !== '' && !isValidZip(profile.zip))}
+                  placeholder="12345"
+                />
+                {zipError && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Enter a valid ZIP (12345 or 12345-6789)
+                  </p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Label>Create Portal Password</Label>
@@ -330,16 +403,49 @@ export default function PublicOnboardingPage() {
                       </Badge>
                     )}
                   </div>
-                  <Textarea
-                    value={references[item.id] || ''}
-                    onChange={(event) => updateReference(item.id, event.target.value)}
-                    placeholder={
-                      item.sensitive
-                        ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
-                        : 'Example: Completed, acknowledged, or upload/reference note'
-                    }
-                    required
-                  />
+                  {isStorageItem(item.id) ? (
+                    item.id === 'dl_photos' ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <FileUpload
+                          itemId="dl_photos"
+                          slot="front"
+                          label="Front of license"
+                          accept="image/*"
+                          allowedTypes={IMAGE_TYPES}
+                          uploadUrl={`/api/public/onboarding/${token}/upload`}
+                          onUploaded={(path) => markDlSlot('front', path)}
+                        />
+                        <FileUpload
+                          itemId="dl_photos"
+                          slot="back"
+                          label="Back of license"
+                          accept="image/*"
+                          allowedTypes={IMAGE_TYPES}
+                          uploadUrl={`/api/public/onboarding/${token}/upload`}
+                          onUploaded={(path) => markDlSlot('back', path)}
+                        />
+                      </div>
+                    ) : (
+                      <FileUpload
+                        itemId={item.id}
+                        accept="image/*,application/pdf"
+                        allowedTypes={DOC_TYPES}
+                        uploadUrl={`/api/public/onboarding/${token}/upload`}
+                        onUploaded={(path) => updateReference(item.id, path)}
+                      />
+                    )
+                  ) : (
+                    <Textarea
+                      value={references[item.id] || ''}
+                      onChange={(event) => updateReference(item.id, event.target.value)}
+                      placeholder={
+                        item.sensitive
+                          ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
+                          : 'Example: Completed, acknowledged, or upload/reference note'
+                      }
+                      required
+                    />
+                  )}
                 </div>
               ))}
             </CardContent>
