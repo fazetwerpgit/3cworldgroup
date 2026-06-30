@@ -179,7 +179,7 @@ export default function AdminSettingsPage() {
                   className="w-full"
                 >
                   <NativeSelectOption value="entry_rep">
-                    Entry Representative
+                    Account Executive
                   </NativeSelectOption>
                   <NativeSelectOption value="l1_manager">L1 Manager</NativeSelectOption>
                   <NativeSelectOption value="l2_manager">L2 Manager</NativeSelectOption>
