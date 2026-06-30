@@ -7,6 +7,16 @@ export const EXPEDITE_REASONS: string[] = [
   'Customer no showed need it rescheduled asap',
 ];
 
+export const PAYROLL_CAMPAIGNS: string[] = [
+  'T-Fiber',
+  'Frontier',
+  'AT&T',
+  'Verizon',
+  'Brightspeed',
+  'Centurylink/Quantum',
+  'Ripple',
+];
+
 export function isValidOption(list: string[], value: string): boolean {
   return list.includes(value);
 }

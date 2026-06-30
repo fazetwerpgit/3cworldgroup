@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FIBER_COMPANIES, EXPEDITE_REASONS, isValidOption } from './formOptions';
+import { FIBER_COMPANIES, EXPEDITE_REASONS, PAYROLL_CAMPAIGNS, isValidOption } from './formOptions';
 
 describe('form options', () => {
   it('has the exact Fiber companies', () => {
@@ -10,6 +10,11 @@ describe('form options', () => {
       'Install too far out',
       'Tech missed install need install asap',
       'Customer no showed need it rescheduled asap',
+    ]);
+  });
+  it('has the exact Payroll campaigns', () => {
+    expect(PAYROLL_CAMPAIGNS).toEqual([
+      'T-Fiber', 'Frontier', 'AT&T', 'Verizon', 'Brightspeed', 'Centurylink/Quantum', 'Ripple',
     ]);
   });
   it('isValidOption accepts members and rejects non-members', () => {
