@@ -350,7 +350,7 @@ export default function RecruitingCommandCenterPage() {
                       }))
                     }
                   >
-                    <option value="entry_rep">Entry Representative</option>
+                    <option value="entry_rep">Account Executive</option>
                     <option value="l1_manager">L1 Manager</option>
                     <option value="l2_manager">L2 Manager</option>
                   </NativeSelect>
