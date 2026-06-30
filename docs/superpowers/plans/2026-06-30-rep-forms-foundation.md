@@ -11,7 +11,8 @@
 ## Global Constraints
 
 - **Server-only-write collections:** `fiberReports`, `expediteOrders` get `allow read, write: if false` in firestore.rules. All reads/writes go through Admin SDK routes.
-- **Every API route is server-gated.** Submit routes: `requireSelfOrManagement(requestedBy, requestedBy)` (rep submits as self). Review GET + mark-handled POST: `requireManagement(requestedBy)` (admin/operations only). UI `ProtectedRoute`/sidebar gating is NOT a substitute.
+- **Every API route is server-gated.** Submit routes: `requireSelfOrManagement(requestedBy, requestedBy)` (rep submits as self). Review GET + mark-handled POST: `requireManagement(requestedBy)` (admin/operations only). UI `ProtectedRoute`/sidebar gating is NOT a substitute. NOTE: this uses the repo's established client-supplied-`requestedBy` + Firestore-role pattern (NOT Firebase ID-token verification) — consistent with every other portal route. That pattern is acceptable here because these forms hold no sensitive PII; do not claim token-level identity verification. (The verified-token pattern was reserved for SSN reveal only.)
+- **`requireManagement`/`requireSelfOrManagement` success returns `{ ok: true; requester }`** where `requester` includes `uid`, `name`, `role?`, `fieldRole?`, `isManagement`, `isAdmin`, `isManagerOrAbove`. The plan only uses `requester.uid`.
 - **Canonical rep stamping:** submit routes IGNORE any client-supplied repName/email and load them from `users/{uid}`. The client cannot spoof identity.
 - **Timestamps:** convert Firestore `Timestamp` with `.toDate()` before `NextResponse.json`.
 - **Status state-guard:** mark-handled only transitions `new -> handled` (re-read doc, verify current status).
@@ -1007,7 +1008,7 @@ git commit -m "feat: add Expedite Order rep page + admin review page"
 
 - [ ] **Step 1: Add rep-facing form links**
 
-In `src/components/portal/PortalSidebar.tsx`, in the `navigationItems` array (the rep-facing list), add two entries (after an existing item like 'Calls Schedule'). Use simple inline SVG icons consistent with the file:
+In `src/components/portal/PortalSidebar.tsx`, in the **`navigationItems`** array (the rep-facing list at line ~25), add two entries (after an existing item like 'Calls Schedule'). Use simple inline SVG icons consistent with the file:
 
 ```tsx
   {
@@ -1032,7 +1033,7 @@ In `src/components/portal/PortalSidebar.tsx`, in the `navigationItems` array (th
 
 - [ ] **Step 2: Add admin review links**
 
-In the management/operations nav list (the array containing the existing `{ name: 'Onboarding Review', href: '/portal/admin/onboarding', ... roles: ['admin','operations'] }` entry), add two entries with the same `roles: ['admin', 'operations']`:
+In the **`operationsItems`** array (the management/operations nav list at line ~127, containing the existing `{ name: 'Onboarding Review', href: '/portal/admin/onboarding', ... roles: ['admin','operations'] }` entry), add two entries with the same `roles: ['admin', 'operations']`:
 
 ```tsx
   {
@@ -1057,7 +1058,7 @@ In the management/operations nav list (the array containing the existing `{ name
   },
 ```
 
-> Note: find the exact array names by reading the file — the rep list is `navigationItems`; the management list is the one whose items carry `roles: ['admin','operations']` (the 'Onboarding Review' entry lives there). Add to those two arrays respectively. Do not introduce overlapping href prefixes.
+> Verified array names: rep list = `navigationItems`; management list = `operationsItems` (the 'Onboarding Review' entry lives there); there is also `adminItems` (admin-only) — do NOT use that one. Add to `navigationItems` (Step 1) and `operationsItems` (Step 2). Do not introduce overlapping href prefixes.
 
 - [ ] **Step 3: Verify typecheck + lint + build**
 
