@@ -99,5 +99,8 @@ service cloud.firestore {
     match /expediteOrders/{id} {
       allow read, write: if false;
     }
+    match /payrollDisputes/{id} {
+      allow read, write: if false;
+    }
   }
 }
