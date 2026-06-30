@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { OnboardingItem, RoleDisplayNames, FieldRole } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
+import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { US_STATES, isValidZip } from '@/lib/validation/address';
 
@@ -434,6 +435,19 @@ export default function PublicOnboardingPage() {
                         onUploaded={(path) => updateReference(item.id, path)}
                       />
                     )
+                  ) : isEsignItem(item.id) ? (
+                    <div className="space-y-2">
+                      <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 text-[#0A1F44]">
+                        Adobe Sign
+                      </Badge>
+                      <p className="text-xs text-slate-500">{ESIGN_HELPER_TEXT}</p>
+                      <Textarea
+                        value={references[item.id] || ''}
+                        onChange={(event) => updateReference(item.id, event.target.value)}
+                        placeholder="Adobe Sign confirmation"
+                        required
+                      />
+                    </div>
                   ) : (
                     <Textarea
                       value={references[item.id] || ''}

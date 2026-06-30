@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
+import { ADOBE_SIGN_DASHBOARD_URL } from '@/lib/onboarding/esign';
 
 interface Submission {
   id: string;
@@ -239,6 +240,30 @@ export default function OnboardingReviewPage() {
                             No files found at {submission.reference ?? 'this reference'}.
                           </div>
                         )
+                      ) : submission.referenceKind === 'esign' ? (
+                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                          <div className="mb-2 flex items-center gap-2">
+                            <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 text-[#0A1F44]">
+                              Adobe Sign
+                            </Badge>
+                            <a
+                              href={ADOBE_SIGN_DASHBOARD_URL}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-[#4f7f1e] hover:underline"
+                            >
+                              Open Adobe Sign ↗
+                            </a>
+                          </div>
+                          {submission.reference ? (
+                            <>
+                              <span className="font-medium text-slate-950">Reference:</span>{' '}
+                              {submission.reference}
+                            </>
+                          ) : (
+                            <span className="text-slate-400">No confirmation entered.</span>
+                          )}
+                        </div>
                       ) : (
                         submission.reference && (
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
