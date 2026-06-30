@@ -58,6 +58,9 @@ export default function PublicOnboardingPage() {
     city: '',
     state: '',
     zip: '',
+    ssn: '',
+    dlNumber: '',
+    backgroundCheckAuth: false,
     password: '',
   });
   const [zipError, setZipError] = useState(false);
@@ -84,6 +87,9 @@ export default function PublicOnboardingPage() {
           city: json.invite.candidateCity || '',
           state: '',
           zip: '',
+          ssn: '',
+          dlNumber: '',
+          backgroundCheckAuth: false,
           password: '',
         });
       } catch (err) {
@@ -352,6 +358,41 @@ export default function PublicOnboardingPage() {
                   </p>
                 )}
               </div>
+              <div>
+                <Label>Social Security Number</Label>
+                <Input
+                  value={profile.ssn}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, ssn: event.target.value }))
+                  }
+                  placeholder="123-45-6789"
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <Label>Driver&apos;s License Number</Label>
+                <Input
+                  value={profile.dlNumber}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, dlNumber: event.target.value }))
+                  }
+                  autoComplete="off"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={profile.backgroundCheckAuth}
+                  onChange={(event) =>
+                    setProfile((prev) => ({ ...prev, backgroundCheckAuth: event.target.checked }))
+                  }
+                />
+                I authorize a background / drug screen.
+              </label>
+              <p className="text-xs text-slate-400 sm:col-span-2">
+                Your SSN and license number are encrypted and only visible to authorized administrators.
+              </p>
               <div className="sm:col-span-2">
                 <Label>Create Portal Password</Label>
                 <Input
