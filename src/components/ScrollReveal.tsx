@@ -19,6 +19,35 @@ export default function ScrollReveal({
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    // Respect users who prefer reduced motion, and guard against environments
+    // without IntersectionObserver — reveal immediately in both cases.
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Reveal on the next frame to avoid a synchronous state update inside the
+    // effect; still effectively immediate to the user.
+    const revealNow = () => {
+      const raf = window.requestAnimationFrame(() => setIsVisible(true));
+      return () => window.cancelAnimationFrame(raf);
+    };
+
+    if (prefersReduced || typeof IntersectionObserver === "undefined") {
+      return revealNow();
+    }
+
+    // If the element is already within the viewport at mount (e.g. above-the-fold
+    // content, a short page, or a refresh mid-scroll), reveal it right away so it
+    // can never get stuck at opacity-0.
+    const rect = node.getBoundingClientRect();
+    const viewportH = window.innerHeight || document.documentElement.clientHeight;
+    if (rect.top < viewportH && rect.bottom > 0) {
+      return revealNow();
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -32,11 +61,16 @@ export default function ScrollReveal({
       }
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
+    observer.observe(node);
 
-    return () => observer.disconnect();
+    // Safety net: if the observer never fires (fast scroll, layout/hydration
+    // timing, browser quirks), reveal anyway so content is never lost.
+    const fallback = window.setTimeout(() => setIsVisible(true), 1200);
+
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(fallback);
+    };
   }, []);
 
   const getTransform = () => {
