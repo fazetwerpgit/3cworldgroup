@@ -26,7 +26,7 @@ import { adminDb } from '@/lib/firebase/admin';
 
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const mockSubmit = submitFormRecord as unknown as ReturnType<typeof vi.fn>;
-const mockAdminCollection = adminDb.collection as unknown as ReturnType<typeof vi.fn>;
+const mockAdminCollection = adminDb!.collection as unknown as ReturnType<typeof vi.fn>;
 
 function req(body: unknown) {
   return new NextRequest('http://localhost/api/portal/forms/bug-report', {
