@@ -32,26 +32,30 @@ export async function submitAndExpectSuccess(
   expect(body.success, `${apiPath} should return success`).toBe(true);
 }
 
-// Fill a text/Input field whose <Label>text</Label> sits just before it. The forms
-// wrap each field as <div><Label>X</Label><Input .../></div>, so we find the label
-// then the input within the same wrapper.
-export async function fillByLabel(page: Page, labelText: string, value: string) {
-  const wrapper = page.locator('div', { has: page.getByText(labelText, { exact: true }) }).last();
-  await wrapper.locator('input, textarea').first().fill(value);
+// The wrapper <div> that holds a given field's <Label> + control. Forms render
+// each field as <div><Label>X</Label><Input|select .../></div>.
+function fieldWrapper(page: Page, labelText: string) {
+  return page
+    .locator('div', { has: page.locator('label', { hasText: new RegExp(`^${escapeRegex(labelText)}$`) }) })
+    .last();
 }
 
-// Select an option in whichever <select> currently offers it (matches by option text).
-export async function selectByLabelText(page: Page, optionText: string) {
-  const selects = page.locator('select');
-  const count = await selects.count();
-  for (let i = 0; i < count; i++) {
-    const opt = selects.nth(i).locator(`option`, { hasText: optionText });
-    if (await opt.count()) {
-      await selects.nth(i).selectOption({ label: optionText });
-      return;
-    }
-  }
-  throw new Error(`No <select> found offering option "${optionText}"`);
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Fill a text/Input field by its field label.
+export async function fillByLabel(page: Page, labelText: string, value: string) {
+  await fieldWrapper(page, labelText).locator('input, textarea').first().fill(value);
+}
+
+// Select an option in the dropdown belonging to a specific field label. Waits for
+// the option to exist first (form option lists load async), then selects it —
+// unambiguous even when several selects share option text (e.g. Yes/No).
+export async function selectField(page: Page, labelText: string, optionText: string) {
+  const select = fieldWrapper(page, labelText).locator('select').first();
+  await select.locator('option', { hasText: new RegExp(`^\\s*${escapeRegex(optionText)}\\s*$`) }).waitFor({ state: 'attached', timeout: 15_000 });
+  await select.selectOption({ label: optionText });
 }
 
 // Draw on the signature canvas (manager-interview) so the required signature exists.

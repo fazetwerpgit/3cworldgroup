@@ -6,24 +6,26 @@
 // only contains the naming pattern — never a real credential.
 export const BOT_COUNT = Number(process.env.E2E_BOT_COUNT || 3);
 
-const BOT_SECRET = process.env.E2E_BOT_SECRET;
-
 export interface Bot {
   index: number;
   email: string;
-  password: string;
   displayName: string;
+  // password is a getter so the tests can be DEFINED without the secret (e.g.
+  // `playwright test --list`); the secret is only required when a test actually
+  // reads the password to log in.
+  readonly password: string;
 }
 
 export function bot(index: number): Bot {
-  if (!BOT_SECRET) {
-    throw new Error('E2E_BOT_SECRET is not set — required to derive QA bot passwords.');
-  }
   return {
     index,
     email: `qa-e2e-${index}@3cworldgroup.test`,
-    password: `${BOT_SECRET}#${index}`,
     displayName: `QA E2E Bot ${index}`,
+    get password() {
+      const secret = process.env.E2E_BOT_SECRET;
+      if (!secret) throw new Error('E2E_BOT_SECRET is not set — required to derive QA bot passwords.');
+      return `${secret}#${index}`;
+    },
   };
 }
 

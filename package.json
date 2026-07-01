@@ -10,7 +10,8 @@
     "test": "vitest run",
     "e2e:setup": "node scripts/e2e-create-test-user.mjs",
     "e2e": "playwright test",
-    "e2e:cleanup": "node scripts/e2e-cleanup.mjs"
+    "e2e:cleanup": "node scripts/e2e-cleanup.mjs",
+    "e2e:all": "node scripts/e2e-run.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
