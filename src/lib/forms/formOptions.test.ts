@@ -38,7 +38,7 @@ describe('form options', () => {
     });
 
     it('has the exact Leads managers', () => {
-      expect(LEADS_MANAGERS).toEqual(['Jordan Zuber', 'Will Teasdale', 'Jeremy McFarland']);
+      expect(LEADS_MANAGERS).toEqual(['Jacob Myers']);
     });
 
     it('has the exact Leads locations', () => {

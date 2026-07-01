@@ -23,7 +23,7 @@ export function isValidOption(list: string[], value: string): boolean {
 
 export const LEADS_CAMPAIGNS: string[] = ['T-Fiber', 'Verizon', 'AT&T'];
 
-export const LEADS_MANAGERS: string[] = ['Jordan Zuber', 'Will Teasdale', 'Jeremy McFarland'];
+export const LEADS_MANAGERS: string[] = ['Jacob Myers'];
 
 export const LEADS_LOCATIONS: string[] = [
   'Des Moines IA', 'St Joeseph MO', 'Iowa City IA', 'Davenport/Moline IA',
