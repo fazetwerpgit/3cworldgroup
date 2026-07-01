@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { validateFormUpload, buildFormAttachmentFolder } from '@/lib/forms/formUploads';
-
-// Allowlisted form types that may receive attachments.
-const ALLOWED_FORM_TYPES = ['payroll-dispute'];
+import {
+  validateFormUpload,
+  buildFormAttachmentFolder,
+  isAllowedFormUpload,
+} from '@/lib/forms/formUploads';
 
 // POST /api/portal/forms/upload - verified user uploads a form attachment.
 // Writes ONLY under the verified caller's own folder. Returns the folder path.
@@ -15,23 +16,22 @@ export async function POST(request: NextRequest) {
 
     const form = await request.formData();
     const formType = String(form.get('formType') ?? '');
+    const slot = String(form.get('slot') ?? '');
     const file = form.get('file');
 
-    if (!ALLOWED_FORM_TYPES.includes(formType) || !(file instanceof File)) {
-      return NextResponse.json({ error: 'Missing or invalid formType/file' }, { status: 400 });
+    if (!isAllowedFormUpload(formType, slot) || !(file instanceof File)) {
+      return NextResponse.json({ error: 'Missing or invalid formType/slot/file' }, { status: 400 });
     }
 
     const check = validateFormUpload({ mime: file.type, size: file.size });
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
-    const folder = buildFormAttachmentFolder(gate.uid, formType);
+    const folder = buildFormAttachmentFolder(gate.uid, formType, slot || undefined);
     const objectPath = `${folder}file.${check.ext}`;
 
     const bucket = getOnboardingBucket();
-    // Clear any prior attachment in this folder first. A replacement may have a
-    // different extension (pdf -> jpg), so overwriting a fixed name is not enough:
-    // the stale object would linger and the viewer could sign it instead. Deleting
-    // the whole folder guarantees exactly one attachment ever exists here.
+    // Clear any prior attachment in this slot folder first, so a replacement with a
+    // different extension can't leave a stale object the viewer might sign instead.
     await bucket.deleteFiles({ prefix: folder, force: true });
 
     const buffer = Buffer.from(await file.arrayBuffer());

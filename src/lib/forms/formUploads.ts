@@ -24,6 +24,20 @@ export function validateFormUpload(input: {
   return { ok: true, ext };
 }
 
-export function buildFormAttachmentFolder(uid: string, formType: string): string {
-  return `form-attachments/${uid}/${formType}/`;
+export function buildFormAttachmentFolder(uid: string, formType: string, slot?: string): string {
+  const base = `form-attachments/${uid}/${formType}/`;
+  return slot ? `${base}${slot}/` : base;
+}
+
+// Which slots each form's uploads may use. Empty string = the single-file forms
+// (Payroll Dispute) that write straight into the formType folder. Leads Request
+// uses three named slots so its attachments never collide.
+export const FORM_UPLOAD_SLOTS: Record<string, string[]> = {
+  'payroll-dispute': [''],
+  'leads-request': ['hostile', 'blind-knock', 'lasso'],
+};
+
+export function isAllowedFormUpload(formType: string, slot: string): boolean {
+  const slots = FORM_UPLOAD_SLOTS[formType];
+  return Array.isArray(slots) && slots.includes(slot);
 }
