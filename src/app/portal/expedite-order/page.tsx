@@ -60,15 +60,15 @@ export default function ExpediteOrderPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-2xl space-y-5">
-              <h1 className="text-2xl font-semibold text-slate-950">Expedite Internet Order</h1>
-              <p className="text-sm text-slate-600">Submitting as {user?.displayName || user?.email}.</p>
+              <h1 className="text-2xl font-semibold text-slate-950 dark:text-foreground">Expedite Internet Order</h1>
+              <p className="text-sm text-slate-600 dark:text-muted-foreground">Submitting as {user?.displayName || user?.email}.</p>
               {done && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
                   Expedite request submitted.
                 </div>
               )}
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
               )}
               <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div><Label>Customer Name</Label><Input value={form.customerName} onChange={(e) => setForm((p) => ({ ...p, customerName: e.target.value }))} required /></div>
