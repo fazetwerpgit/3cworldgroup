@@ -52,10 +52,10 @@ interface ChecklistResponse {
 }
 
 const statusStyle: Record<OnboardingStatus, string> = {
-  not_started: 'border-slate-200 bg-slate-50 text-slate-600',
-  submitted: 'border-amber-200 bg-amber-50 text-amber-700',
-  approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  rejected: 'border-rose-200 bg-rose-50 text-rose-700',
+  not_started: 'border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-slate-600 dark:text-muted-foreground',
+  submitted: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  approved: 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  rejected: 'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300',
 };
 
 const statusIcon: Record<OnboardingStatus, ElementType> = {
@@ -166,23 +166,23 @@ export default function OnboardingPage() {
                     <Badge variant="outline" className="mb-3 border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
                       Field readiness
                     </Badge>
-                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                       My Onboarding
                     </h1>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                       Complete each clearance item before moving into active selling.
                       {data?.isIBO ? ' IBO business items are included.' : ''}
                     </p>
                   </div>
-                  <div className="grid min-w-[220px] gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="grid min-w-[220px] gap-2 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-700">Approved</span>
-                      <span className="font-semibold text-[#0A1F44]">
+                      <span className="font-medium text-slate-700 dark:text-muted-foreground">Approved</span>
+                      <span className="font-semibold text-[#0A1F44] dark:text-foreground">
                         {data ? `${data.progress.approved}/${data.progress.total}` : '--'}
                       </span>
                     </div>
                     <Progress value={progressPct} className="h-2" />
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 dark:text-muted-foreground">
                       {data?.progress.complete ? 'Clearance complete' : `${progressPct}% ready`}
                     </p>
                   </div>
@@ -190,14 +190,14 @@ export default function OnboardingPage() {
               </section>
 
               {error && (
-                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                <Alert className="border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300">
                   <AlertCircle className="size-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
               {loading ? (
-                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                   <CardContent className="space-y-4 p-5">
                     <Skeleton className="h-6 w-48" />
                     <Skeleton className="h-16 w-full" />
@@ -208,10 +208,10 @@ export default function OnboardingPage() {
                 Object.entries(grouped).map(([category, items]) => (
                   <section key={category} className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-muted-foreground">
                         {OnboardingCategoryLabels[category as OnboardingCategory] ?? category}
                       </h2>
-                      <Badge variant="outline" className="border-slate-200 text-slate-500">
+                      <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-500 dark:text-muted-foreground">
                         {items.filter((item) => item.status === 'approved').length}/{items.length}
                       </Badge>
                     </div>
@@ -221,23 +221,23 @@ export default function OnboardingPage() {
                         return (
                           <Card
                             key={item.id}
-                            className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+                            className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
                           >
                             <CardContent className="p-5">
                               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex gap-4">
-                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
                                     {item.sensitive ? <LockKeyhole className="size-5" /> : <ClipboardCheck className="size-5" />}
                                   </div>
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <h3 className="font-semibold text-slate-950">{item.label}</h3>
+                                      <h3 className="font-semibold text-slate-950 dark:text-foreground">{item.label}</h3>
                                       <Badge variant="outline" className={statusStyle[item.status]}>
                                         <StatusIcon className="mr-1 size-3" />
                                         {OnboardingStatusConfig[item.status].name}
                                       </Badge>
                                       {item.sensitive && (
-                                        <Badge variant="outline" className="border-slate-200 text-slate-500">
+                                        <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-500 dark:text-muted-foreground">
                                           <ShieldCheck className="mr-1 size-3" />
                                           Secure reference only
                                         </Badge>
@@ -245,18 +245,18 @@ export default function OnboardingPage() {
                                     </div>
 
                                     {item.status === 'submitted' && item.submittedAt && (
-                                      <p className="mt-2 text-xs text-slate-500">
+                                      <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground">
                                         Submitted {formatDate(item.submittedAt)} - awaiting review
                                       </p>
                                     )}
                                     {item.status === 'approved' && item.reviewedAt && (
-                                      <p className="mt-2 text-xs text-emerald-700">
+                                      <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
                                         Approved {formatDate(item.reviewedAt)}
                                         {item.reviewerName ? ` by ${item.reviewerName}` : ''}
                                       </p>
                                     )}
                                     {item.status === 'rejected' && item.rejectionReason && (
-                                      <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                                      <div className="mt-3 rounded-md border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
                                         <span className="font-medium">Reason:</span> {item.rejectionReason}
                                       </div>
                                     )}
@@ -276,7 +276,7 @@ export default function OnboardingPage() {
                                   </Button>
                                 )}
                                 {item.status === 'approved' && (
-                                  <div className="flex size-9 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+                                  <div className="flex size-9 items-center justify-center rounded-md bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
                                     <CheckCircle2 className="size-5" />
                                   </div>
                                 )}
@@ -302,7 +302,7 @@ export default function OnboardingPage() {
         }}>
           <DialogContent className="rounded-lg">
             <DialogHeader>
-              <DialogTitle className="text-[#0A1F44]">
+              <DialogTitle className="text-[#0A1F44] dark:text-foreground">
                 Submit {submitModal?.label}
               </DialogTitle>
               <DialogDescription>
@@ -347,10 +347,10 @@ export default function OnboardingPage() {
               )
             ) : submitModal && isEsignItem(submitModal.id) ? (
               <div className="space-y-2">
-                <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 text-[#0A1F44]">
+                <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 dark:bg-slate-800 text-[#0A1F44] dark:text-foreground">
                   Adobe Sign
                 </Badge>
-                <p className="text-xs text-slate-500">{ESIGN_HELPER_TEXT}</p>
+                <p className="text-xs text-slate-500 dark:text-muted-foreground">{ESIGN_HELPER_TEXT}</p>
                 <Input
                   value={reference}
                   onChange={(event) => setReference(event.target.value)}

@@ -67,13 +67,13 @@ const APPLICATION_COLUMNS = [
 ];
 
 const statusTone: Record<string, string> = {
-  invited: 'border-blue-200 bg-blue-50 text-blue-700',
-  in_progress: 'border-amber-200 bg-amber-50 text-amber-700',
+  invited: 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300',
+  in_progress: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
   submitted: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
-  approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  converted: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  rejected: 'border-red-200 bg-red-50 text-red-700',
-  expired: 'border-slate-200 bg-slate-100 text-slate-600',
+  approved: 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  converted: 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  rejected: 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-300',
+  expired: 'border-slate-200 dark:border-border bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground',
 };
 
 export default function RecruitingCommandCenterPage() {
@@ -216,14 +216,14 @@ export default function RecruitingCommandCenterPage() {
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                   Recruiting Command Center
                 </h1>
                 <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e]">
                   Website onboarding
                 </Badge>
               </div>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                 Create invite links, keep recruits inside the website, and activate submitted profiles from one manager queue.
               </p>
             </div>
@@ -235,7 +235,7 @@ export default function RecruitingCommandCenterPage() {
         </section>
 
         {error && (
-          <Alert className="border-red-200 bg-red-50 text-red-800">
+          <Alert className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-800 dark:text-red-300">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -248,43 +248,43 @@ export default function RecruitingCommandCenterPage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <Card className="portal-panel rounded-lg py-0">
             <CardContent className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
                 In motion
               </p>
-              <p className="mt-2 text-3xl font-semibold text-slate-950">{inProgressCount}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-foreground">{inProgressCount}</p>
             </CardContent>
           </Card>
           <Card className="portal-panel rounded-lg py-0">
             <CardContent className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
                 Submitted
               </p>
-              <p className="mt-2 text-3xl font-semibold text-slate-950">{submittedCount}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-foreground">{submittedCount}</p>
             </CardContent>
           </Card>
           <Card className="portal-panel rounded-lg py-0">
             <CardContent className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
                 Activated
               </p>
-              <p className="mt-2 text-3xl font-semibold text-slate-950">{activeCount}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-foreground">{activeCount}</p>
             </CardContent>
           </Card>
           <Card className="portal-panel rounded-lg py-0">
             <CardContent className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
                 Applications
               </p>
-              <p className="mt-2 text-3xl font-semibold text-slate-950">{waitingApplications}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-foreground">{waitingApplications}</p>
             </CardContent>
           </Card>
         </div>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[420px_1fr]">
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 p-5">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
               <CardTitle className="flex items-center gap-2 text-base">
-                <UserPlus className="size-5 text-[#0A1F44]" />
+                <UserPlus className="size-5 text-[#0A1F44] dark:text-foreground" />
                 Start Recruit Onboarding
               </CardTitle>
             </CardHeader>
@@ -365,7 +365,7 @@ export default function RecruitingCommandCenterPage() {
                     <option value="l2_manager">L2 Manager</option>
                   </NativeSelect>
                 </div>
-                <label className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 p-3 text-sm">
+                <label className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 dark:border-border p-3 text-sm">
                   <Checkbox
                     checked={form.isIBO}
                     onCheckedChange={(checked) =>
@@ -410,8 +410,8 @@ export default function RecruitingCommandCenterPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm xl:col-span-2">
-            <CardHeader className="border-b border-slate-100 p-5">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm xl:col-span-2">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <CardTitle className="text-base">Website Applications</CardTitle>
                 <Button
@@ -431,7 +431,7 @@ export default function RecruitingCommandCenterPage() {
             </CardHeader>
             <CardContent className="p-5">
               {applications.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-8 text-center text-sm text-slate-500 dark:text-muted-foreground">
                   No website applications yet.
                 </div>
               ) : (
@@ -439,18 +439,18 @@ export default function RecruitingCommandCenterPage() {
                   {applications.map((application) => (
                     <div
                       key={application.id}
-                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                      className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-4 shadow-sm"
                     >
                       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                         <div>
-                          <p className="font-medium text-slate-950">{application.name}</p>
-                          <p className="mt-1 text-sm text-slate-600">{application.city}</p>
+                          <p className="font-medium text-slate-950 dark:text-foreground">{application.name}</p>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">{application.city}</p>
                         </div>
                         <Badge variant="outline" className={statusTone[application.status] ?? statusTone.invited}>
                           {application.status}
                         </Badge>
                       </div>
-                      <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-3">
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 dark:text-muted-foreground sm:grid-cols-3">
                         <div>{application.phone}</div>
                         <div>{application.email}</div>
                         <div>Submitted {formatDate(application.createdAt ? application.createdAt.toString() : null)}</div>
@@ -462,22 +462,22 @@ export default function RecruitingCommandCenterPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 p-5">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
               <CardTitle className="text-base">Recruit Onboarding Queue</CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               {loading ? (
-                <div className="p-8 text-center text-sm text-slate-500">Loading recruits...</div>
+                <div className="p-8 text-center text-sm text-slate-500 dark:text-muted-foreground">Loading recruits...</div>
               ) : invites.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-8 text-center text-sm text-slate-500 dark:text-muted-foreground">
                   No invite links have been created yet.
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-lg border border-slate-200">
+                <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-border">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <thead className="bg-slate-50 dark:bg-muted text-left text-xs uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
                         <tr>
                           <th className="px-4 py-3">Recruit</th>
                           <th className="px-4 py-3">Path</th>
@@ -487,12 +487,12 @@ export default function RecruitingCommandCenterPage() {
                           <th className="px-4 py-3 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white">
+                      <tbody className="divide-y divide-slate-200 dark:divide-border bg-white dark:bg-card">
                         {invites.map((invite) => (
-                          <tr key={invite.id} className="hover:bg-slate-50/80">
+                          <tr key={invite.id} className="hover:bg-slate-50 dark:hover:bg-muted/80">
                             <td className="px-4 py-3">
-                              <div className="font-medium text-slate-950">{invite.candidateName}</div>
-                              <div className="text-xs text-slate-500">{invite.candidateEmail}</div>
+                              <div className="font-medium text-slate-950 dark:text-foreground">{invite.candidateName}</div>
+                              <div className="text-xs text-slate-500 dark:text-muted-foreground">{invite.candidateEmail}</div>
                             </td>
                             <td className="px-4 py-3">
                               <div>{RoleDisplayNames[invite.intendedFieldRole]}</div>
@@ -510,8 +510,8 @@ export default function RecruitingCommandCenterPage() {
                                 {RecruitingStatusLabels[invite.status] ?? invite.status}
                               </Badge>
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{invite.ownerName}</td>
-                            <td className="px-4 py-3 text-slate-600">
+                            <td className="px-4 py-3 text-slate-600 dark:text-muted-foreground">{invite.ownerName}</td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-muted-foreground">
                               {invite.submittedAt
                                 ? `Submitted ${formatDate(invite.submittedAt)}`
                                 : `Created ${formatDate(invite.createdAt)}`}
@@ -535,14 +535,14 @@ export default function RecruitingCommandCenterPage() {
                                     variant="outline"
                                     onClick={() => convertInvite(invite.id, 'rejected')}
                                     disabled={processingId === invite.id}
-                                    className="border-red-200 text-red-700 hover:bg-red-50"
+                                    className="border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15"
                                   >
                                     <XCircle className="size-4" />
                                     Reject
                                   </Button>
                                 </div>
                               ) : (
-                                <span className="text-xs text-slate-400">No action</span>
+                                <span className="text-xs text-slate-400 dark:text-muted-foreground">No action</span>
                               )}
                             </td>
                           </tr>

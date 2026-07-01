@@ -112,16 +112,16 @@ export default function OnboardingReviewPage() {
         <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                 Onboarding Review
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                 Review submitted onboarding items before reps move forward in the website-driven onboarding flow.
               </p>
             </div>
             <Badge
               variant="outline"
-              className="w-fit rounded-md border-amber-200 bg-amber-50 px-3 py-1 text-amber-700"
+              className="w-fit rounded-md border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-1 text-amber-700 dark:text-amber-300"
             >
               {submissions.length} pending
             </Badge>
@@ -129,26 +129,26 @@ export default function OnboardingReviewPage() {
         </section>
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500">Loading submissions...</p>
+              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading submissions...</p>
             </CardContent>
           </Card>
         ) : submissions.length === 0 ? (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-12">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#8dc63f]/10 text-[#4f7f1e]">
                 <Check className="h-6 w-6" />
               </div>
-              <h3 className="font-semibold text-slate-950">Review queue is clear</h3>
-              <p className="mt-1 text-sm text-slate-500">
+              <h3 className="font-semibold text-slate-950 dark:text-foreground">Review queue is clear</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">
                 No onboarding submissions need review right now.
               </p>
             </CardContent>
@@ -158,7 +158,7 @@ export default function OnboardingReviewPage() {
             {submissions.map((submission) => (
               <Card
                 key={submission.id}
-                className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-colors hover:border-slate-300"
+                className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-colors hover:border-slate-300"
               >
                 <CardContent className="p-5">
                   <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
@@ -168,10 +168,10 @@ export default function OnboardingReviewPage() {
                           {submission.userName?.charAt(0).toUpperCase() || 'U'}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="truncate font-semibold text-slate-950">
+                          <h3 className="truncate font-semibold text-slate-950 dark:text-foreground">
                             {submission.userName}
                           </h3>
-                          <p className="truncate text-xs text-slate-500">
+                          <p className="truncate text-xs text-slate-500 dark:text-muted-foreground">
                             {submission.userEmail}
                           </p>
                         </div>
@@ -179,30 +179,30 @@ export default function OnboardingReviewPage() {
 
                       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
                             Item
                           </p>
-                          <p className="mt-1 flex items-center gap-2 font-medium text-slate-950">
+                          <p className="mt-1 flex items-center gap-2 font-medium text-slate-950 dark:text-foreground">
                             {submission.itemLabel}
                             {submission.sensitive && (
-                              <Lock className="h-3.5 w-3.5 text-slate-400" />
+                              <Lock className="h-3.5 w-3.5 text-slate-400 dark:text-muted-foreground" />
                             )}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
                             Category
                           </p>
-                          <p className="mt-1 font-medium text-slate-950">
+                          <p className="mt-1 font-medium text-slate-950 dark:text-foreground">
                             {OnboardingCategoryLabels[submission.category] ??
                               submission.category}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
                             Submitted
                           </p>
-                          <p className="mt-1 font-medium text-slate-950">
+                          <p className="mt-1 font-medium text-slate-950 dark:text-foreground">
                             {formatDate(submission.submittedAt)}
                           </p>
                         </div>
@@ -224,26 +224,26 @@ export default function OnboardingReviewPage() {
                                   <img
                                     src={file.url}
                                     alt={file.name}
-                                    className="h-24 w-36 rounded-md border border-slate-200 object-cover"
+                                    className="h-24 w-36 rounded-md border border-slate-200 dark:border-border object-cover"
                                   />
                                 ) : (
-                                  <span className="flex h-24 w-36 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+                                  <span className="flex h-24 w-36 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-xs font-medium text-slate-600 dark:text-muted-foreground">
                                     {file.name}
                                   </span>
                                 )}
                               </a>
                             ))}
-                            <p className="w-full text-xs text-slate-400">Links expire in 15 minutes.</p>
+                            <p className="w-full text-xs text-slate-400 dark:text-muted-foreground">Links expire in 15 minutes.</p>
                           </div>
                         ) : (
-                          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                          <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-xs text-slate-500 dark:text-muted-foreground">
                             No files found at {submission.reference ?? 'this reference'}.
                           </div>
                         )
                       ) : submission.referenceKind === 'esign' ? (
-                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-sm text-slate-700 dark:text-muted-foreground">
                           <div className="mb-2 flex items-center gap-2">
-                            <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 text-[#0A1F44]">
+                            <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 dark:bg-slate-800 text-[#0A1F44] dark:text-foreground">
                               Adobe Sign
                             </Badge>
                             <a
@@ -257,17 +257,17 @@ export default function OnboardingReviewPage() {
                           </div>
                           {submission.reference ? (
                             <>
-                              <span className="font-medium text-slate-950">Reference:</span>{' '}
+                              <span className="font-medium text-slate-950 dark:text-foreground">Reference:</span>{' '}
                               {submission.reference}
                             </>
                           ) : (
-                            <span className="text-slate-400">No confirmation entered.</span>
+                            <span className="text-slate-400 dark:text-muted-foreground">No confirmation entered.</span>
                           )}
                         </div>
                       ) : (
                         submission.reference && (
-                          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                            <span className="font-medium text-slate-950">Reference:</span>{' '}
+                          <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-sm text-slate-700 dark:text-muted-foreground">
+                            <span className="font-medium text-slate-950 dark:text-foreground">Reference:</span>{' '}
                             {submission.reference}
                           </div>
                         )
@@ -295,7 +295,7 @@ export default function OnboardingReviewPage() {
                         variant="outline"
                         onClick={() => setRejectModal(submission)}
                         disabled={processingId === submission.id}
-                        className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 lg:w-full"
+                        className="flex-1 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-300 lg:w-full"
                       >
                         <X className="h-4 w-4" />
                         Reject
@@ -310,12 +310,12 @@ export default function OnboardingReviewPage() {
 
         {rejectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white py-0 shadow-lg">
-              <CardHeader className="border-b border-slate-100 p-5">
-                <h3 className="text-lg font-semibold text-slate-950">
+            <Card className="w-full max-w-md rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-lg">
+              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">
                   Reject {rejectModal.itemLabel}
                 </h3>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 dark:text-muted-foreground">
                   Provide a reason for rejection. This will be shared with{' '}
                   {rejectModal.userName}.
                 </p>
