@@ -117,7 +117,7 @@ export default function TrainingDetailPage() {
                       </div>
                       <div className="p-5 sm:p-6">
                         <div className="mb-4 flex flex-wrap items-center gap-2">
-                        <Badge className="bg-[#8dc63f]/15 text-[#4f7f1d] hover:bg-[#8dc63f]/15">
+                        <Badge className="bg-[#8dc63f]/15 text-[#4f7f1d] dark:text-green-300 hover:bg-[#8dc63f]/15">
                           {typeConfig?.label || currentResource.type}
                         </Badge>
                         <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground">

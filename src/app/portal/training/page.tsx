@@ -65,7 +65,7 @@ export default function TrainingPage() {
                       <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         University / My Path
                       </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
                         Training desk
                       </Badge>
                     </div>

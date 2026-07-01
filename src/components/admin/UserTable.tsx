@@ -23,7 +23,7 @@ interface UserTableProps {
 }
 
 const statusColors = {
-  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
   inactive: 'border-red-200 bg-red-50 text-red-700',
 };
 
@@ -149,7 +149,7 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                       size="sm"
                       onClick={() => onStatusChange(user.uid, 'active')}
                       disabled={loading}
-                      className="border-[#8dc63f]/40 text-[#4f7f1e] hover:bg-[#8dc63f]/10"
+                      className="border-[#8dc63f]/40 text-[#4f7f1e] dark:text-green-300 hover:bg-[#8dc63f]/10"
                     >
                       Activate
                     </Button>

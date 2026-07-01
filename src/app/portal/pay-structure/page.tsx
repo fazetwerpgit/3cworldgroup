@@ -125,7 +125,7 @@ export default function PayStructurePage() {
                       <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Pay Structure
                       </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
                         Compensation
                       </Badge>
                     </div>
@@ -208,7 +208,7 @@ export default function PayStructurePage() {
                               </div>
                             </div>
                             {data?.scope === 'own' && (
-                              <Badge className="bg-[#8dc63f]/15 text-[#4f7f1d] hover:bg-[#8dc63f]/15">
+                              <Badge className="bg-[#8dc63f]/15 text-[#4f7f1d] dark:text-green-300 hover:bg-[#8dc63f]/15">
                                 Your tier
                               </Badge>
                             )}

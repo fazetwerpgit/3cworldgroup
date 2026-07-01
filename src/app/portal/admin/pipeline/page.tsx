@@ -29,7 +29,7 @@ const STAGE_BADGE: Record<PipelineStage, string> = {
   processing: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
   need_logins: 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300',
   cleared_to_sell: 'border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
-  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
   decommissioned: 'border-slate-200 dark:border-border bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground',
 };
 
@@ -37,14 +37,14 @@ const STAGE_CARD_ACCENT: Record<PipelineStage, string> = {
   processing: 'text-amber-700 dark:text-amber-300',
   need_logins: 'text-blue-700 dark:text-blue-300',
   cleared_to_sell: 'text-indigo-700 dark:text-indigo-300',
-  active: 'text-[#4f7f1e]',
+  active: 'text-[#4f7f1e] dark:text-green-300',
   decommissioned: 'text-slate-600 dark:text-muted-foreground',
 };
 
 const CHANNEL_STATUS_BADGE: Record<ChannelOnboardingStatus, string> = {
   not_started: 'border-slate-200 dark:border-border bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground',
   submitted: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  cleared: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  cleared: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
 };
 
 export default function PipelinePage() {
@@ -237,7 +237,7 @@ export default function PipelinePage() {
           </div>
         )}
         {success && (
-          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e]">
+          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e] dark:text-green-300">
             {success}
           </div>
         )}
@@ -325,7 +325,7 @@ export default function PipelinePage() {
                         <p className="text-xs text-slate-500 dark:text-muted-foreground">
                           {RoleDisplayNames[rep.fieldRole]}
                           {rep.isIBO && (
-                            <span className="ml-1.5 font-medium text-[#4f7f1e]">
+                            <span className="ml-1.5 font-medium text-[#4f7f1e] dark:text-green-300">
                               IBO
                             </span>
                           )}

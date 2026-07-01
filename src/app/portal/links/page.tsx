@@ -46,7 +46,7 @@ export default function LinksPage() {
                       <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Quick Links
                       </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
                         Field reference
                       </Badge>
                     </div>
@@ -86,7 +86,7 @@ export default function LinksPage() {
                               <RadioTower className="size-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground transition-colors duration-200 group-hover:text-[#4f7f1d]">
+                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground transition-colors duration-200 group-hover:text-[#4f7f1d] dark:text-green-300">
                                 {link.title}
                                 <ExternalLink className="size-4 opacity-60 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none" />
                               </h3>
@@ -102,7 +102,7 @@ export default function LinksPage() {
               <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base text-[#0A1F44] dark:text-foreground">
-                    <ShieldCheck className="size-4 text-[#4f7f1d]" />
+                    <ShieldCheck className="size-4 text-[#4f7f1d] dark:text-green-300" />
                     Resource Requests
                   </CardTitle>
                 </CardHeader>

@@ -69,7 +69,7 @@ const APPLICATION_COLUMNS = [
 const statusTone: Record<string, string> = {
   invited: 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300',
   in_progress: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  submitted: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]',
+  submitted: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
   approved: 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   converted: 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   rejected: 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-300',
@@ -219,7 +219,7 @@ export default function RecruitingCommandCenterPage() {
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                   Recruiting Command Center
                 </h1>
-                <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e]">
+                <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
                   Website onboarding
                 </Badge>
               </div>
@@ -240,7 +240,7 @@ export default function RecruitingCommandCenterPage() {
           </Alert>
         )}
         {success && (
-          <Alert className="border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e]">
+          <Alert className="border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
@@ -387,7 +387,7 @@ export default function RecruitingCommandCenterPage() {
               {latestInviteUrl && (
                 <div className="mt-5 rounded-lg border border-[#8dc63f]/30 bg-[#8dc63f]/10 p-3">
                   <p className="text-sm font-semibold text-[#335d14]">Invite link ready</p>
-                  <p className="mt-1 break-all text-xs text-[#4f7f1e]">{latestInviteUrl}</p>
+                  <p className="mt-1 break-all text-xs text-[#4f7f1e] dark:text-green-300">{latestInviteUrl}</p>
                   <div className="mt-3 flex gap-2">
                     <Button
                       type="button"

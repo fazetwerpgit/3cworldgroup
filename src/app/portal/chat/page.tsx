@@ -165,7 +165,7 @@ export default function TeamChatPage() {
                       <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Team Chat
                       </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e]">
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
                         Free Firebase pilot
                       </Badge>
                     </div>

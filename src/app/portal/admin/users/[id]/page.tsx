@@ -109,7 +109,7 @@ export default function EditUserPage() {
           <>
             <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
               <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#8dc63f]/15 text-[#4f7f1e]">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#8dc63f]/15 text-[#4f7f1e] dark:text-green-300">
                   <Pencil className="h-5 w-5" />
                 </div>
                 <div>

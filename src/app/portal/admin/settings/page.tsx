@@ -113,7 +113,7 @@ export default function AdminSettingsPage() {
       </section>
 
       {success && (
-        <div className="flex items-center gap-2 rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e]">
+        <div className="flex items-center gap-2 rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e] dark:text-green-300">
           <Check className="h-4 w-4" />
           {success}
         </div>
@@ -260,7 +260,7 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                   <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 p-4">
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#4f7f1e]">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#4f7f1e] dark:text-green-300">
                       Default
                     </label>
                     <Input

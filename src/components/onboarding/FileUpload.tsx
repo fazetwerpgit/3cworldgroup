@@ -137,7 +137,7 @@ export default function FileUpload({
           {state === 'uploaded' ? 'Replace file' : 'Choose file'}
         </Button>
         {state === 'uploaded' && (
-          <span className="flex items-center gap-1 text-sm text-[#4f7f1e]">
+          <span className="flex items-center gap-1 text-sm text-[#4f7f1e] dark:text-green-300">
             <CheckCircle2 className="size-4" />
             {fileName || 'Uploaded'}
           </span>

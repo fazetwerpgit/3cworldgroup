@@ -144,7 +144,7 @@ export default function OnboardingReviewPage() {
         ) : submissions.length === 0 ? (
           <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-12">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#8dc63f]/10 text-[#4f7f1e]">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
                 <Check className="h-6 w-6" />
               </div>
               <h3 className="font-semibold text-slate-950 dark:text-foreground">Review queue is clear</h3>
@@ -250,7 +250,7 @@ export default function OnboardingReviewPage() {
                               href={ADOBE_SIGN_DASHBOARD_URL}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs font-medium text-[#4f7f1e] hover:underline"
+                              className="text-xs font-medium text-[#4f7f1e] dark:text-green-300 hover:underline"
                             >
                               Open Adobe Sign ↗
                             </a>

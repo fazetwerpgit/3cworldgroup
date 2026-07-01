@@ -145,7 +145,7 @@ export default function AdminFormOptionsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 p-5">
                   {successKey === key && (
-                    <div className="rounded-md border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-3 py-2 text-sm text-[#4f7f1e] dark:text-[#b9e78a]">
+                    <div className="rounded-md border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-3 py-2 text-sm text-[#4f7f1e] dark:text-green-300 dark:text-[#b9e78a]">
                       Saved updated options.
                     </div>
                   )}

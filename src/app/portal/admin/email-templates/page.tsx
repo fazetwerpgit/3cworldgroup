@@ -222,7 +222,7 @@ export default function EmailTemplatesPage() {
           </div>
         )}
         {success && (
-          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e]">
+          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e] dark:text-green-300">
             {success}
           </div>
         )}

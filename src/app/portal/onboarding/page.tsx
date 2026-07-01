@@ -163,7 +163,7 @@ export default function OnboardingPage() {
               <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <Badge variant="outline" className="mb-3 border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
+                    <Badge variant="outline" className="mb-3 border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
                       Field readiness
                     </Badge>
                     <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
