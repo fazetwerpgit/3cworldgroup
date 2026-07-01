@@ -62,18 +62,18 @@ export default function TrainingPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         University / My Path
                       </h1>
                       <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
                         Training desk
                       </Badge>
                     </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                       Required modules, reference materials, and field refreshers organized as a clear enablement path.
                     </p>
                   </div>
-                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
                     <BookOpenCheck className="size-5" />
                   </div>
                 </div>
@@ -82,7 +82,7 @@ export default function TrainingPage() {
               {resources.length > 0 && <ProgressTracker {...overallProgress} />}
 
               {incompleteRequired.length > 0 && (
-                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                <Alert className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
                   <AlertTriangle className="size-4" />
                   <AlertDescription>
                     You have {incompleteRequired.length} required training module{incompleteRequired.length > 1 ? 's' : ''} to complete.
@@ -97,19 +97,19 @@ export default function TrainingPage() {
                 </TabsList>
 
                 <TabsContent value="path" className="space-y-5">
-                  <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                  <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                     <CardContent className="p-4">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div className="flex flex-col gap-3 sm:flex-row">
                           <div className="grid gap-2">
-                            <Label htmlFor="training-category" className="text-sm text-slate-700">
+                            <Label htmlFor="training-category" className="text-sm text-slate-700 dark:text-muted-foreground">
                               Category
                             </Label>
                             <NativeSelect
                               id="training-category"
                               value={categoryFilter}
                               onChange={(event) => setCategoryFilter(event.target.value as TrainingCategory | '')}
-                              className="w-full min-w-48 bg-white"
+                              className="w-full min-w-48 bg-white dark:bg-card"
                             >
                               <option value="">All Categories</option>
                               {TRAINING_CATEGORIES.map((category) => (
@@ -120,14 +120,14 @@ export default function TrainingPage() {
                             </NativeSelect>
                           </div>
                           <div className="grid gap-2">
-                            <Label htmlFor="training-type" className="text-sm text-slate-700">
+                            <Label htmlFor="training-type" className="text-sm text-slate-700 dark:text-muted-foreground">
                               Type
                             </Label>
                             <NativeSelect
                               id="training-type"
                               value={typeFilter}
                               onChange={(event) => setTypeFilter(event.target.value as ResourceType | '')}
-                              className="w-full min-w-40 bg-white"
+                              className="w-full min-w-40 bg-white dark:bg-card"
                             >
                               <option value="">All Types</option>
                               {RESOURCE_TYPES.map((type) => (
@@ -139,7 +139,7 @@ export default function TrainingPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="border-slate-200 text-slate-500">
+                          <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-500 dark:text-muted-foreground">
                             <Filter className="mr-1 size-3" />
                             {resources.length} visible
                           </Badge>
@@ -162,14 +162,14 @@ export default function TrainingPage() {
                   </Card>
 
                   {error && (
-                    <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                    <Alert className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
                       <AlertTriangle className="size-4" />
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
 
                   {loading && resources.length === 0 ? (
-                    <Card className="rounded-lg border-slate-200 shadow-sm">
+                    <Card className="rounded-lg border-slate-200 dark:border-border shadow-sm">
                       <CardContent className="space-y-4 p-6">
                         <Skeleton className="h-6 w-52" />
                         <Skeleton className="h-28 w-full" />
@@ -186,14 +186,14 @@ export default function TrainingPage() {
                 </TabsContent>
 
                 <TabsContent value="shorts">
-                  <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                  <Card className="overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                     <div className="h-1 bg-[#8dc63f]" />
                     <CardContent className="flex flex-col items-center px-6 py-12 text-center">
-                      <div className="mb-5 flex size-14 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                      <div className="mb-5 flex size-14 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
                         <Video className="size-7" />
                       </div>
-                      <h3 className="text-lg font-semibold text-[#0A1F44]">No shorts published</h3>
-                      <p className="mt-2 max-w-md text-sm text-slate-600">
+                      <h3 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">No shorts published</h3>
+                      <p className="mt-2 max-w-md text-sm text-slate-600 dark:text-muted-foreground">
                         Short-form training clips and quick field refreshers will appear here once Operations publishes them.
                       </p>
                     </CardContent>

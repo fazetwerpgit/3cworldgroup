@@ -71,7 +71,7 @@ export default function TrainingDetailPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <Button asChild variant="ghost" className="text-slate-600 hover:text-slate-950">
+              <Button asChild variant="ghost" className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground">
                 <Link href="/portal/training">
                   <ArrowLeft className="size-4" />
                   Back to Training
@@ -79,7 +79,7 @@ export default function TrainingDetailPage() {
               </Button>
 
               {loading && !currentResource && (
-                <Card className="rounded-lg border-slate-200 shadow-sm">
+                <Card className="rounded-lg border-slate-200 dark:border-border shadow-sm">
                   <CardContent className="space-y-4 p-6">
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-6 w-64" />
@@ -89,7 +89,7 @@ export default function TrainingDetailPage() {
               )}
 
               {error && (
-                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                <Alert className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
                   <AlertTriangle className="size-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
@@ -120,34 +120,34 @@ export default function TrainingDetailPage() {
                         <Badge className="bg-[#8dc63f]/15 text-[#4f7f1d] hover:bg-[#8dc63f]/15">
                           {typeConfig?.label || currentResource.type}
                         </Badge>
-                        <Badge variant="outline" className="border-slate-200 text-slate-600">
+                        <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground">
                           {categoryConfig?.label || currentResource.category}
                         </Badge>
                         {currentResource.isRequired && (
-                          <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">
+                          <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
                             Required
                           </Badge>
                         )}
                         {resourceProgress?.completed && (
-                          <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                          <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
                             <CheckCircle2 className="mr-1 size-3" />
                             Completed
                           </Badge>
                         )}
                       </div>
 
-                        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                        <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         {currentResource.title}
                       </h1>
 
                       {currentResource.description && (
-                        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-muted-foreground">
                           {currentResource.description}
                         </p>
                       )}
 
                       {currentResource.duration && currentResource.duration > 0 && (
-                        <p className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+                        <p className="mt-4 flex items-center gap-2 text-sm text-slate-500 dark:text-muted-foreground">
                           <Clock3 className="size-4" />
                           {formatDuration(currentResource.duration)}
                         </p>
@@ -156,13 +156,13 @@ export default function TrainingDetailPage() {
                     </div>
                   </section>
 
-                  <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-                    <CardHeader className="border-b border-slate-100 p-5">
-                      <CardTitle className="text-lg text-[#0A1F44]">Content</CardTitle>
+                  <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+                    <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                      <CardTitle className="text-lg text-[#0A1F44] dark:text-foreground">Content</CardTitle>
                     </CardHeader>
                     <CardContent className="p-5">
                       {currentResource.type === 'video' && currentResource.url && (
-                        <div className="aspect-video overflow-hidden rounded-lg border border-slate-200 bg-black">
+                        <div className="aspect-video overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-black">
                           <iframe
                             src={currentResource.url}
                             className="h-full w-full"
@@ -173,9 +173,9 @@ export default function TrainingDetailPage() {
                       )}
 
                       {currentResource.type === 'document' && currentResource.url && (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
-                          <FileText className="mx-auto mb-3 size-12 text-[#0A1F44]" />
-                          <p className="mb-4 text-sm text-slate-600">View or download the document.</p>
+                        <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-8 text-center">
+                          <FileText className="mx-auto mb-3 size-12 text-[#0A1F44] dark:text-foreground" />
+                          <p className="mb-4 text-sm text-slate-600 dark:text-muted-foreground">View or download the document.</p>
                           <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
                             <a href={currentResource.url} target="_blank" rel="noopener noreferrer">
                               <Download className="size-4" />
@@ -186,9 +186,9 @@ export default function TrainingDetailPage() {
                       )}
 
                       {currentResource.type === 'link' && currentResource.url && (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
-                          <Link2 className="mx-auto mb-3 size-12 text-[#0A1F44]" />
-                          <p className="mb-4 text-sm text-slate-600">
+                        <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-8 text-center">
+                          <Link2 className="mx-auto mb-3 size-12 text-[#0A1F44] dark:text-foreground" />
+                          <p className="mb-4 text-sm text-slate-600 dark:text-muted-foreground">
                             This training links to an external resource.
                           </p>
                           <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
@@ -201,20 +201,20 @@ export default function TrainingDetailPage() {
                       )}
 
                       {!currentResource.url && (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">
+                        <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-8 text-center text-sm text-slate-600 dark:text-muted-foreground">
                           No content available for this resource.
                         </div>
                       )}
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
+                  <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
                     <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h3 className="font-semibold text-[#0A1F44]">
+                        <h3 className="font-semibold text-[#0A1F44] dark:text-foreground">
                           {resourceProgress?.completed ? 'Training Completed' : 'Mark as Complete'}
                         </h3>
-                        <p className="mt-1 text-sm text-slate-600">
+                        <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
                           {resourceProgress?.completed
                             ? 'You have completed this training module.'
                             : 'Mark this complete after you finish reviewing the material.'}

@@ -218,14 +218,14 @@ export default function CallsSchedulePage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Calls Schedule
                       </h1>
                       <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
                         Live cadence
                       </Badge>
                     </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                       Recurring onboarding, training, team, manager, and IBO calls with confirmed Meet links.
                     </p>
                   </div>
@@ -242,14 +242,14 @@ export default function CallsSchedulePage() {
               </section>
 
               {error && (
-                <Alert className="border-rose-200 bg-rose-50 text-rose-800">
+                <Alert className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
                   <AlertCircle className="size-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
               {loading ? (
-                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                   <CardContent className="space-y-4 p-5">
                     <Skeleton className="h-6 w-36" />
                     <Skeleton className="h-20 w-full" />
@@ -257,17 +257,17 @@ export default function CallsSchedulePage() {
                   </CardContent>
                 </Card>
               ) : byDay.length === 0 ? (
-                <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+                <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                   <CardContent className="p-5">
                     <div className="flex gap-4">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
                         <CalendarClock className="size-5" />
                       </div>
                       <div>
-                        <h2 className="font-semibold text-slate-950">
+                        <h2 className="font-semibold text-slate-950 dark:text-foreground">
                           Call schedule not published yet
                         </h2>
-                        <p className="mt-1 text-sm text-slate-600">
+                        <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
                           {data?.canManage
                             ? 'Leadership listed the required cadence below. Add each call once the Meet link and exact time are confirmed.'
                             : 'Management is still confirming the recurring call times and Meet links.'}
@@ -280,10 +280,10 @@ export default function CallsSchedulePage() {
                           <button
                             key={call.title}
                             onClick={() => applyRequiredCall(call)}
-                            className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 text-left transition-[border-color,background-color,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/70 hover:bg-[#8dc63f]/5 motion-reduce:transform-none"
+                            className="cursor-pointer rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-3 text-left transition-[border-color,background-color,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/70 hover:bg-[#8dc63f]/5 motion-reduce:transform-none"
                           >
-                            <p className="text-sm font-semibold text-slate-950">{call.title}</p>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="text-sm font-semibold text-slate-950 dark:text-foreground">{call.title}</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                               {CallDayLabels[call.day]} - {CallAudienceLabels[call.audience]}
                             </p>
                           </button>
@@ -296,10 +296,10 @@ export default function CallsSchedulePage() {
                 byDay.map(({ day, calls }) => (
                   <section key={day} className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-muted-foreground">
                         {CallDayLabels[day]}
                       </h2>
-                      <Badge variant="outline" className="border-slate-200 text-slate-500">
+                      <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-500 dark:text-muted-foreground">
                         {calls.length} call{calls.length === 1 ? '' : 's'}
                       </Badge>
                     </div>
@@ -307,35 +307,35 @@ export default function CallsSchedulePage() {
                       {calls.map((call) => (
                         <Card
                           key={call.id}
-                          className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+                          className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
                         >
                           <CardContent className="p-5">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                               <div className="flex gap-4">
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
                                   {call.audience === 'managers' ? <ShieldCheck className="size-5" /> : <Users className="size-5" />}
                                 </div>
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="font-semibold text-slate-950">{call.title}</h3>
+                                    <h3 className="font-semibold text-slate-950 dark:text-foreground">{call.title}</h3>
                                     <Badge
                                       variant="outline"
                                       className={
                                         call.audience === 'managers'
-                                          ? 'border-blue-200 bg-blue-50 text-blue-700'
-                                          : 'border-slate-200 bg-slate-50 text-slate-600'
+                                          ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300'
+                                          : 'border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-slate-600 dark:text-muted-foreground'
                                       }
                                     >
                                       {CallAudienceLabels[call.audience]}
                                     </Badge>
                                   </div>
-                                  <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-                                    <Clock3 className="size-4 text-slate-400" />
+                                  <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-muted-foreground">
+                                    <Clock3 className="size-4 text-slate-400 dark:text-muted-foreground" />
                                     {formatTime(call.time)}
                                     {call.timezone ? ` (${call.timezone})` : ''} / every {CallDayLabels[call.day]}
                                   </p>
                                   {call.description && (
-                                    <p className="mt-1 text-sm text-slate-500">{call.description}</p>
+                                    <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">{call.description}</p>
                                   )}
                                 </div>
                               </div>
@@ -351,7 +351,7 @@ export default function CallsSchedulePage() {
                                     variant="outline"
                                     onClick={() => handleDelete(call)}
                                     disabled={deletingId === call.id}
-                                    className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                                    className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:hover:bg-rose-500/15 dark:hover:text-rose-300"
                                   >
                                     <Trash2 className="size-4" />
                                     {deletingId === call.id ? 'Removing...' : 'Remove'}
@@ -377,14 +377,14 @@ export default function CallsSchedulePage() {
       }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-[#0A1F44]">Add Recurring Call</DialogTitle>
+            <DialogTitle className="text-[#0A1F44] dark:text-foreground">Add Recurring Call</DialogTitle>
             <DialogDescription>
               Use the required-call starters when possible, then confirm the exact time and Meet link.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-muted-foreground">
               Leadership call list
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -395,7 +395,7 @@ export default function CallsSchedulePage() {
                   variant="outline"
                   size="xs"
                   onClick={() => applyRequiredCall(call)}
-                  className="bg-white"
+                  className="bg-white dark:bg-card"
                 >
                   {call.title}
                 </Button>
@@ -420,7 +420,7 @@ export default function CallsSchedulePage() {
                   id="call-day"
                   value={form.day}
                   onChange={(event) => setForm({ ...form, day: event.target.value as CallDay })}
-                  className="w-full bg-white"
+                  className="w-full bg-white dark:bg-card"
                 >
                   {CALL_DAY_ORDER.map((day) => (
                     <option key={day} value={day}>
@@ -455,7 +455,7 @@ export default function CallsSchedulePage() {
                 id="call-audience"
                 value={form.audience}
                 onChange={(event) => setForm({ ...form, audience: event.target.value as CallAudience })}
-                className="w-full bg-white"
+                className="w-full bg-white dark:bg-card"
               >
                 {(Object.keys(CallAudienceLabels) as CallAudience[]).map((audience) => (
                   <option key={audience} value={audience}>

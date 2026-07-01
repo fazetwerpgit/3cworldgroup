@@ -43,18 +43,18 @@ export default function LinksPage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Quick Links
                       </h1>
                       <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d]">
                         Field reference
                       </Badge>
                     </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                       Approved service checks and field reference links for repeated sales workflows.
                     </p>
                   </div>
-                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
                     <Route className="size-5" />
                   </div>
                 </div>
@@ -63,10 +63,10 @@ export default function LinksPage() {
               {categories.map((category) => (
                 <section key={category} className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-muted-foreground">
                       {category}
                     </h2>
-                    <Badge variant="outline" className="border-slate-200 text-slate-500">
+                    <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-500 dark:text-muted-foreground">
                       {quickLinks.filter((link) => link.category === category).length} links
                     </Badge>
                   </div>
@@ -79,18 +79,18 @@ export default function LinksPage() {
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="group block rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/70 hover:shadow-md motion-reduce:transform-none"
+                          className="group block rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-5 shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/70 hover:shadow-md motion-reduce:transform-none"
                         >
                           <div className="flex items-start gap-4">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44] transition-colors duration-200 group-hover:border-[#8dc63f]/50 group-hover:bg-[#8dc63f]/10">
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground transition-colors duration-200 group-hover:border-[#8dc63f]/50 group-hover:bg-[#8dc63f]/10">
                               <RadioTower className="size-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 transition-colors duration-200 group-hover:text-[#4f7f1d]">
+                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground transition-colors duration-200 group-hover:text-[#4f7f1d]">
                                 {link.title}
                                 <ExternalLink className="size-4 opacity-60 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none" />
                               </h3>
-                              <p className="mt-1 text-sm text-slate-600">{link.description}</p>
+                              <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">{link.description}</p>
                             </div>
                           </div>
                         </a>
@@ -99,18 +99,18 @@ export default function LinksPage() {
                 </section>
               ))}
 
-              <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+              <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base text-[#0A1F44]">
+                  <CardTitle className="flex items-center gap-2 text-base text-[#0A1F44] dark:text-foreground">
                     <ShieldCheck className="size-4 text-[#4f7f1d]" />
                     Resource Requests
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-slate-600 dark:text-muted-foreground">
                     Send missing or outdated resource links to operations so this list stays current.
                   </p>
-                  <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                  <p className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-muted-foreground">
                     <Info className="size-3.5" />
                     Use approved links only when checking address availability with customers.
                   </p>

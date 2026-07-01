@@ -162,14 +162,14 @@ export default function TeamChatPage() {
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                 <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Team Chat
                       </h1>
                       <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e]">
                         Free Firebase pilot
                       </Badge>
                     </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                     Text-only team channels for onboarding, training, and manager coordination. No media hosting or paid chat vendor.
                   </p>
                 </div>
@@ -186,25 +186,25 @@ export default function TeamChatPage() {
               </section>
 
               {error && (
-                <Alert className="border-red-200 bg-red-50 text-red-800">
+                <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
-              <div className="grid min-h-[680px] grid-cols-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:grid-cols-[320px_1fr]">
-                <aside className="border-b border-slate-200 bg-slate-50/70 lg:border-b-0 lg:border-r">
-                  <div className="border-b border-slate-200 p-4">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                      <MessageSquareText className="size-4 text-[#0A1F44]" />
+              <div className="grid min-h-[680px] grid-cols-1 overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card shadow-sm lg:grid-cols-[320px_1fr]">
+                <aside className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted/70 lg:border-b-0 lg:border-r">
+                  <div className="border-b border-slate-200 dark:border-border p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-foreground">
+                      <MessageSquareText className="size-4 text-[#0A1F44] dark:text-foreground" />
                       Pilot Channels
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                       Latest 50 messages per channel to control read volume.
                     </p>
                   </div>
                   <div className="space-y-2 p-3">
                     {loadingChannels ? (
-                      <div className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-500">
+                      <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
                         Loading channels...
                       </div>
                     ) : (
@@ -215,16 +215,16 @@ export default function TeamChatPage() {
                           onClick={() => setActiveChannelId(channel.id)}
                           className={`w-full cursor-pointer rounded-md border p-3 text-left transition-colors duration-200 ${
                             channel.id === activeChannelId
-                              ? 'border-[#8dc63f]/50 bg-[#8dc63f]/10 text-slate-950'
-                              : 'border-transparent bg-white text-slate-700 hover:border-slate-200'
+                              ? 'border-[#8dc63f]/50 bg-[#8dc63f]/10 text-slate-950 dark:text-foreground'
+                              : 'border-transparent bg-white dark:bg-card text-slate-700 dark:text-muted-foreground hover:border-slate-200 dark:hover:border-border'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <span className="flex items-center gap-2 text-sm font-semibold">
                               {channel.audience === 'managers' ? (
-                                <Lock className="size-4 text-slate-500" />
+                                <Lock className="size-4 text-slate-500 dark:text-muted-foreground" />
                               ) : (
-                                <Hash className="size-4 text-slate-500" />
+                                <Hash className="size-4 text-slate-500 dark:text-muted-foreground" />
                               )}
                               {channel.name}
                             </span>
@@ -232,7 +232,7 @@ export default function TeamChatPage() {
                               {audienceCopy[channel.audience]}
                             </Badge>
                           </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-500">
+                          <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-muted-foreground">
                             {channel.description}
                           </p>
                         </button>
@@ -242,33 +242,33 @@ export default function TeamChatPage() {
                 </aside>
 
                 <section className="flex min-h-[680px] flex-col">
-                  <div className="flex items-center justify-between border-b border-slate-200 p-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-border p-4">
                     <div>
-                      <h2 className="font-semibold text-slate-950">
+                      <h2 className="font-semibold text-slate-950 dark:text-foreground">
                         {activeChannel?.name ?? 'Select a channel'}
                       </h2>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                         {activeChannel?.description ?? 'Choose a channel to view messages.'}
                       </p>
                     </div>
-                    <Badge variant="outline" className="border-slate-200 text-slate-600">
+                    <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground">
                       {messages.length} shown
                     </Badge>
                   </div>
 
                   <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
                     {loadingMessages ? (
-                      <Card className="rounded-lg border-slate-200 bg-white/90 py-0 shadow-sm">
-                        <CardContent className="p-5 text-sm text-slate-500">
+                      <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 shadow-sm">
+                        <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
                           Loading messages...
                         </CardContent>
                       </Card>
                     ) : messages.length === 0 ? (
-                      <Card className="rounded-lg border-slate-200 bg-white/90 py-0 text-center shadow-sm">
-                        <CardHeader className="border-b border-slate-100 p-5">
+                      <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 text-center shadow-sm">
+                        <CardHeader className="border-b border-slate-100 dark:border-border p-5">
                           <CardTitle className="text-base">No messages yet</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-5 text-sm text-slate-500">
+                        <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
                           Start with a short update, question, or field note.
                         </CardContent>
                       </Card>
@@ -278,12 +278,12 @@ export default function TeamChatPage() {
                         return (
                           <div
                             key={message.id}
-                            className="group rounded-md border border-slate-200 bg-white/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300"
+                            className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-semibold text-slate-950">
+                                  <span className="font-semibold text-slate-950 dark:text-foreground">
                                     {message.authorName}
                                   </span>
                                   {message.authorRole && (
@@ -291,11 +291,11 @@ export default function TeamChatPage() {
                                       {message.authorRole.replace('_', ' ')}
                                     </Badge>
                                   )}
-                                  <span className="text-xs text-slate-500">
+                                  <span className="text-xs text-slate-500 dark:text-muted-foreground">
                                     {formatTime(message.createdAt)}
                                   </span>
                                 </div>
-                                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-muted-foreground">
                                   {message.text}
                                 </p>
                               </div>
@@ -304,7 +304,7 @@ export default function TeamChatPage() {
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="size-8 shrink-0 text-slate-400 opacity-100 hover:bg-red-50 hover:text-red-700 sm:opacity-0 sm:group-hover:opacity-100"
+                                  className="size-8 shrink-0 text-slate-400 dark:text-muted-foreground opacity-100 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300 sm:opacity-0 sm:group-hover:opacity-100"
                                   onClick={() => deleteMessage(message.id)}
                                   disabled={deletingId === message.id}
                                   aria-label="Delete message"
@@ -319,7 +319,7 @@ export default function TeamChatPage() {
                     )}
                   </div>
 
-                  <div className="border-t border-slate-200 bg-white p-4">
+                  <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
                     <div className="flex flex-col gap-3">
                       <Textarea
                         value={draft}
@@ -334,7 +334,7 @@ export default function TeamChatPage() {
                         className="resize-none"
                       />
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
                           Text only. Do not post customer PII, card numbers, SSNs, or private credentials.
                         </p>
                         <Button
