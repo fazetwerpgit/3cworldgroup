@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedFieldManagerOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from '@/lib/forms/managerInterview';
 
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
         signatureDataUrl: body.signatureDataUrl,
       }
     );
+    await notifySubmission('manager-interview', gate.name);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting manager interview:', error);

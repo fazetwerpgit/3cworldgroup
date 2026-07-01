@@ -115,5 +115,9 @@ service cloud.firestore {
     match /bugReports/{id} {
       allow read, write: if false;
     }
+    // Per-form submission-alert toggles. Server-only; admins flip via a gated route.
+    match /formAlerts/{key} {
+      allow read, write: if false;
+    }
   }
 }

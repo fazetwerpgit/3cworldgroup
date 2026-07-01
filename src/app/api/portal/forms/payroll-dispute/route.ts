@@ -3,6 +3,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { buildFormAttachmentFolder } from '@/lib/forms/formUploads';
 
 function s(v: unknown, max = 200) {
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       { uid: gate.uid, name: gate.name, email: gate.email },
       { contractorName, contractorEmail, campaign, typeOfOrder, dateOfInstall, orderScreenshotPath }
     );
+    await notifySubmission('payroll-dispute', gate.name);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting payroll dispute:', error);

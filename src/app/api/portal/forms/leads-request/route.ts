@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { buildFormAttachmentFolder } from '@/lib/forms/formUploads';
 import { leadsConditions } from '@/lib/forms/leadsPredicates';
 import {
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
         hostileUploadPath, blindKnockUploadPath, lassoUploadPath, newRepPhone, newRepEmail,
       }
     );
+    await notifySubmission('leads-request', gate.name);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting leads request:', error);

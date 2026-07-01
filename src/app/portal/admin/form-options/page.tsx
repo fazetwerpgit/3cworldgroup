@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import FormAlertsCard from '@/components/portal/FormAlertsCard';
 import {
   EDITABLE_OPTION_KEYS,
   FORM_OPTION_DEFAULTS,
@@ -112,6 +113,8 @@ export default function AdminFormOptionsPage() {
             {error}
           </div>
         )}
+
+        <FormAlertsCard />
 
         {loading ? (
           <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">

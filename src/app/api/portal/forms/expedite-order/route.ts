@@ -3,6 +3,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { validateAddress } from '@/lib/validation/address';
 
 function s(v: unknown, max = 200) {
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
       { uid: gate.uid, name: gate.name, email: gate.email },
       fields
     );
+    await notifySubmission('expedite-order', gate.name);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting expedite order:', error);
