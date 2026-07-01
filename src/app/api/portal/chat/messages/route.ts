@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { canAccessChatChannel, getChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
+import { ensureChatChannelMember } from '@/lib/chat/channels';
 
 // GET /api/portal/chat/messages?channelId=...&limit=50 — verified caller only.
 export async function GET(request: NextRequest) {
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    await ensureChatChannelMember(channelId, user.uid);
 
     const snapshot = await adminDb!
       .collection('chatChannels')
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
     if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    await ensureChatChannelMember(channelId, user.uid);
 
     const messageRef = await adminDb!
       .collection('chatChannels')

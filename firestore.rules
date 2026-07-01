@@ -119,5 +119,25 @@ service cloud.firestore {
     match /formAlerts/{key} {
       allow read, write: if false;
     }
+
+    // Team chat channels: clients may only read channels/messages/reactions for
+    // channels where the server-maintained memberIds list contains their uid.
+    // All writes remain server-only via Admin SDK.
+    match /chatChannels/{channelId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      allow write: if false;
+    }
+
+    match /chatChannels/{channelId}/messages/{messageId} {
+      allow read: if request.auth != null &&
+        request.auth.uid in get(/databases/$(database)/documents/chatChannels/$(channelId)).data.memberIds;
+      allow write: if false;
+    }
+
+    match /chatChannels/{channelId}/messages/{messageId}/reactions/{reactionId} {
+      allow read: if request.auth != null &&
+        request.auth.uid in get(/databases/$(database)/documents/chatChannels/$(channelId)).data.memberIds;
+      allow write: if false;
+    }
   }
 }
