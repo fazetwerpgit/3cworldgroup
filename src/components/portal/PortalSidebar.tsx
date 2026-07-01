@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,7 +23,9 @@ interface NavSectionProps {
   onLinkClick: () => void;
 }
 
-const navigationItems: NavItem[] = [
+// Top of the sidebar: the everyday destinations. Team Chat and Leaderboard are
+// pulled up near the top because the team lives in them.
+const mainItems: NavItem[] = [
   {
     name: 'Dashboard',
     href: '/portal/dashboard',
@@ -33,14 +36,24 @@ const navigationItems: NavItem[] = [
     ),
   },
   {
-    name: 'My Onboarding',
-    href: '/portal/onboarding',
+    name: 'Team Chat',
+    href: '/portal/chat',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m-9 4.5V6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H8l-4 2.5z" />
       </svg>
     ),
-    roles: ['entry_rep', 'l1_manager', 'l2_manager'],
+    permissions: ['chat:read'],
+  },
+  {
+    name: 'Leaderboard',
+    href: '/portal/leaderboard',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+    permissions: ['leaderboard:read'],
   },
   {
     name: 'Sales',
@@ -71,6 +84,21 @@ const navigationItems: NavItem[] = [
     ),
   },
   {
+    name: 'My Onboarding',
+    href: '/portal/onboarding',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    roles: ['entry_rep', 'l1_manager', 'l2_manager'],
+  },
+];
+
+// The rebuilt intake forms, tucked into a collapsible "Forms" folder so they
+// don't crowd the main list.
+const formItems: NavItem[] = [
+  {
     name: 'Fiber Report',
     href: '/portal/fiber-report',
     icon: (
@@ -98,16 +126,6 @@ const navigationItems: NavItem[] = [
     ),
   },
   {
-    name: 'Manager Interview',
-    href: '/portal/manager-interview',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    ),
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager'],
-  },
-  {
     name: 'Leads Request',
     href: '/portal/leads-request',
     icon: (
@@ -117,36 +135,20 @@ const navigationItems: NavItem[] = [
     ),
   },
   {
-    name: 'Team Chat',
-    href: '/portal/chat',
+    name: 'Manager Interview',
+    href: '/portal/manager-interview',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m-9 4.5V6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H8l-4 2.5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       </svg>
     ),
-    permissions: ['chat:read'],
+    roles: ['admin', 'operations', 'l1_manager', 'l2_manager'],
   },
-  {
-    name: 'Leaderboard',
-    href: '/portal/leaderboard',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-    permissions: ['leaderboard:read'],
-  },
-  {
-    name: 'Shorts',
-    href: '/portal/shorts',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    permissions: ['shorts:read'],
-  },
+];
+
+// Learning + reference, at the bottom of the main nav. Shorts now lives inside
+// University as a tab, so it's no longer its own item.
+const resourceItems: NavItem[] = [
   {
     name: 'University',
     href: '/portal/training',
@@ -312,6 +314,60 @@ function getNavInitials(name: string) {
   return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase();
 }
 
+// One nav row. Shared by the flat sections and the collapsible Forms folder so
+// every link looks and behaves identically.
+function NavLink({
+  item,
+  active,
+  onLinkClick,
+  nested = false,
+}: {
+  item: NavItem;
+  active: boolean;
+  onLinkClick: () => void;
+  nested?: boolean;
+}) {
+  return (
+    <li>
+      <Link
+        href={item.href}
+        onClick={onLinkClick}
+        className={`group flex min-h-10 items-center gap-3 rounded-md border py-2.5 text-sm transition-colors duration-200 ${
+          nested ? 'pl-4 pr-3' : 'px-3'
+        } ${
+          active
+            ? 'border-white/15 bg-white/[0.12] text-white'
+            : 'border-transparent text-white/68 hover:bg-white/[0.08] hover:text-white'
+        }`}
+      >
+        <span
+          className={`h-5 w-1 rounded-full transition-colors ${
+            active ? 'bg-[#8dc63f]' : 'bg-transparent'
+          }`}
+        />
+        <span
+          className={`grid h-7 w-7 shrink-0 place-items-center rounded-md text-[11px] font-bold ${
+            active
+              ? 'bg-[#8dc63f] text-[#0A1F44]'
+              : 'bg-white/10 text-white/72 group-hover:text-white'
+          }`}
+          aria-hidden="true"
+        >
+          {getNavInitials(item.name)}
+        </span>
+        <span className="min-w-0 flex-1 truncate font-medium">{item.name}</span>
+        <span
+          className={`shrink-0 transition-colors ${
+            active ? 'text-[#8dc63f]' : 'text-white/35 group-hover:text-white/55'
+          }`}
+        >
+          {item.icon}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 function NavSection({ title, items, canAccessItem, isActive, onLinkClick }: NavSectionProps) {
   const visibleItems = items.filter(canAccessItem);
   if (visibleItems.length === 0) return null;
@@ -322,47 +378,59 @@ function NavSection({ title, items, canAccessItem, isActive, onLinkClick }: NavS
         {title}
       </div>
       <ul className="space-y-1">
-        {visibleItems.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <li key={item.name}>
-              <Link
-                href={item.href}
-                onClick={onLinkClick}
-                className={`group flex min-h-10 items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors duration-200 ${
-                  active
-                    ? 'border-white/15 bg-white/[0.12] text-white'
-                    : 'border-transparent text-white/68 hover:bg-white/[0.08] hover:text-white'
-                }`}
-              >
-                <span
-                  className={`h-5 w-1 rounded-full transition-colors ${
-                    active ? 'bg-[#8dc63f]' : 'bg-transparent'
-                  }`}
-                />
-                <span
-                  className={`grid h-7 w-7 shrink-0 place-items-center rounded-md text-[11px] font-bold ${
-                    active
-                      ? 'bg-[#8dc63f] text-[#0A1F44]'
-                      : 'bg-white/10 text-white/72 group-hover:text-white'
-                  }`}
-                  aria-hidden="true"
-                >
-                  {getNavInitials(item.name)}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-medium">{item.name}</span>
-                <span
-                  className={`shrink-0 transition-colors ${
-                    active ? 'text-[#8dc63f]' : 'text-white/35 group-hover:text-white/55'
-                  }`}
-                >
-                  {item.icon}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+        {visibleItems.map((item) => (
+          <NavLink key={item.name} item={item} active={isActive(item.href)} onLinkClick={onLinkClick} />
+        ))}
       </ul>
+    </section>
+  );
+}
+
+// A collapsible folder of nav items (the "Forms" group). Starts open when any
+// child route is active so you never lose your place after a refresh.
+function CollapsibleNavSection({
+  title,
+  items,
+  canAccessItem,
+  isActive,
+  onLinkClick,
+}: NavSectionProps) {
+  const visibleItems = items.filter(canAccessItem);
+  const hasActiveChild = visibleItems.some((item) => isActive(item.href));
+  const [open, setOpen] = useState(hasActiveChild);
+
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <section className="mb-5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 transition-colors hover:text-white/70"
+      >
+        <span>{title}</span>
+        <svg
+          className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-1">
+          {visibleItems.map((item) => (
+            <NavLink
+              key={item.name}
+              item={item}
+              active={isActive(item.href)}
+              onLinkClick={onLinkClick}
+              nested
+            />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -440,7 +508,23 @@ export function PortalSidebar() {
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <NavSection
             title="Main"
-            items={navigationItems}
+            items={mainItems}
+            canAccessItem={canAccessItem}
+            isActive={isActive}
+            onLinkClick={handleLinkClick}
+          />
+
+          <CollapsibleNavSection
+            title="Forms"
+            items={formItems}
+            canAccessItem={canAccessItem}
+            isActive={isActive}
+            onLinkClick={handleLinkClick}
+          />
+
+          <NavSection
+            title="Resources"
+            items={resourceItems}
             canAccessItem={canAccessItem}
             isActive={isActive}
             onLinkClick={handleLinkClick}
