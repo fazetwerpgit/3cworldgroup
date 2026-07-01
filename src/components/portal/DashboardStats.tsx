@@ -95,7 +95,7 @@ export function DashboardStats() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="border-slate-200 shadow-sm">
+          <Card key={i} className="border-slate-200 shadow-sm dark:border-border">
             <CardContent className="p-4">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="mt-4 h-8 w-16" />
@@ -152,26 +152,26 @@ export function DashboardStats() {
   });
 
   const changeClass = (type: ChangeType) => {
-    if (type === 'positive') return 'text-green-700 bg-green-50';
-    if (type === 'negative') return 'text-red-700 bg-red-50';
-    return 'text-slate-700 bg-slate-100';
+    if (type === 'positive') return 'text-green-700 bg-green-50 dark:bg-green-500/15 dark:text-green-300';
+    if (type === 'negative') return 'text-red-700 bg-red-50 dark:bg-red-500/15 dark:text-red-300';
+    return 'text-slate-700 bg-slate-100 dark:bg-muted dark:text-muted-foreground';
   };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {visibleStats.map((stat) => (
-        <Card key={stat.title} className="border-slate-200 shadow-sm">
+        <Card key={stat.title} className="border-slate-200 shadow-sm dark:border-border">
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-slate-600">{stat.title}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-muted-foreground">{stat.title}</p>
               <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#8dc63f]/10 text-[#5a8f1f]">
                 {stat.icon}
               </span>
             </div>
             <div className="mt-4 flex items-end justify-between gap-3">
               <div>
-                <p className="text-2xl font-semibold text-slate-950">{stat.value}</p>
-                <p className="mt-1 text-xs text-slate-500">{stat.helper}</p>
+                <p className="text-2xl font-semibold text-slate-950 dark:text-foreground">{stat.value}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{stat.helper}</p>
               </div>
               {stat.change && (
                 <Badge className={`rounded-md gap-1 ${changeClass(stat.change.type)}`} variant="secondary">

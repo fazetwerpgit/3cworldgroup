@@ -57,22 +57,22 @@ export function QuickActions() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-950">Quick Actions</h2>
-        <p className="text-xs text-slate-500">Common portal workflows</p>
+        <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">Quick Actions</h2>
+        <p className="text-xs text-slate-500 dark:text-muted-foreground">Common portal workflows</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {visibleActions.map((action) => (
           <Link key={action.title} href={action.href} className="group">
-            <Card className="h-full border-slate-200 shadow-sm transition-colors duration-200 group-hover:border-[#8dc63f] group-hover:bg-[#8dc63f]/5">
+            <Card className="h-full border-slate-200 shadow-sm transition-colors duration-200 group-hover:border-[#8dc63f] group-hover:bg-[#8dc63f]/5 dark:border-border">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#0A1F44]/5 text-[#0A1F44]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#0A1F44]/5 text-[#0A1F44] dark:bg-muted dark:text-foreground">
                     {action.icon}
                   </span>
-                  <ArrowRight className="h-4 w-4 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[#5a8f1f]" />
+                  <ArrowRight className="h-4 w-4 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[#5a8f1f] dark:text-muted-foreground" />
                 </div>
-                <h3 className="mt-4 text-sm font-semibold text-slate-950">{action.title}</h3>
-                <p className="mt-1 text-sm text-slate-600">{action.description}</p>
+                <h3 className="mt-4 text-sm font-semibold text-slate-950 dark:text-foreground">{action.title}</h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">{action.description}</p>
               </CardContent>
             </Card>
           </Link>

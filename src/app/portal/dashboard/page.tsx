@@ -99,20 +99,20 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                 Today
               </h1>
               <Badge variant="secondary" className="rounded-md">
                 {roleLabel}
               </Badge>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
               Start with the work that moves sales, onboarding, calls, and manager review
               forward.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" className="border-slate-200 bg-white">
+            <Button asChild variant="outline" className="border-slate-200 bg-white dark:border-border dark:bg-card">
               <Link href="/portal/calls">
                 <CalendarDays className="h-4 w-4" />
                 Calls
@@ -133,18 +133,18 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto]">
         <div className="portal-panel rounded-lg px-4 py-3">
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="flex items-center gap-2 font-semibold text-slate-950">
+            <span className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground">
               <Activity className="size-4 text-[#5a8f1f]" />
               Operating strip
             </span>
-            <span className="text-slate-500">
+            <span className="text-slate-500 dark:text-muted-foreground">
               The portal stays focused on current workflows: sales, onboarding, calls,
               chat, training, approvals, and recruiting.
             </span>
           </div>
         </div>
         {hasPermission('chat:read') && (
-          <Button asChild variant="outline" className="border-slate-200 bg-white">
+          <Button asChild variant="outline" className="border-slate-200 bg-white dark:border-border dark:bg-card">
           <Link href="/portal/chat">
             <MessageSquareText className="size-4" />
             Open Team Chat
@@ -156,44 +156,44 @@ export default function DashboardPage() {
       <DashboardStats />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm xl:col-span-7">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card xl:col-span-7">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-950">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-950 dark:text-foreground">
               <ClipboardCheck className="h-4 w-4 text-[#5a8f1f]" />
               Action Queue
             </CardTitle>
           </CardHeader>
-          <CardContent className="divide-y divide-slate-100 px-0 text-sm">
+          <CardContent className="divide-y divide-slate-100 px-0 text-sm dark:divide-border">
             {actionItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-slate-50"
+                className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-muted"
               >
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${
                     item.tone === 'primary'
                       ? 'bg-[#8dc63f]/15 text-[#5a8f1f]'
                       : item.tone === 'warning'
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-slate-100 text-slate-600'
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                        : 'bg-slate-100 text-slate-600 dark:bg-muted dark:text-muted-foreground'
                   }`}
                 >
                   {item.icon}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-slate-950">{item.title}</span>
-                  <span className="block truncate text-slate-500">{item.description}</span>
+                  <span className="block font-semibold text-slate-950 dark:text-foreground">{item.title}</span>
+                  <span className="block truncate text-slate-500 dark:text-muted-foreground">{item.description}</span>
                 </span>
-                <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-[#5a8f1f]" />
+                <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-[#5a8f1f] dark:text-muted-foreground" />
               </Link>
             ))}
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm xl:col-span-5">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card xl:col-span-5">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-950">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-950 dark:text-foreground">
               <Sparkles className="h-4 w-4 text-[#5a8f1f]" />
               Team Signal
             </CardTitle>
@@ -203,13 +203,13 @@ export default function DashboardPage() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="group rounded-md border border-slate-200 p-3 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5"
+                className="group rounded-md border border-slate-200 p-3 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border"
               >
-                <div className="flex items-center gap-2 font-semibold text-slate-950">
+                <div className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground">
                   <span className="text-[#5a8f1f]">{item.icon}</span>
                   {item.title}
                 </div>
-                <p className="mt-1 text-sm leading-5 text-slate-600">{item.description}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-muted-foreground">{item.description}</p>
               </Link>
             ))}
           </CardContent>
@@ -217,37 +217,37 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-950">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-950 dark:text-foreground">
               <ShieldCheck className="h-4 w-4 text-[#5a8f1f]" />
               Operating Notes
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm leading-6 text-slate-600">
+          <CardContent className="text-sm leading-6 text-slate-600 dark:text-muted-foreground">
             Keep customer details accurate, submit only verified sales, and use the website
             onboarding flow when a recruit is ready so the handoff is not lost in email.
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-950">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-950 dark:text-foreground">
               <FileText className="h-4 w-4 text-[#5a8f1f]" />
               Resources
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-            <Link href="/portal/pay-structure" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5">
+            <Link href="/portal/pay-structure" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border">
               Pay structure
             </Link>
-            <Link href="/portal/leaderboard" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5">
+            <Link href="/portal/leaderboard" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border">
               Leaderboard
             </Link>
-            <Link href="/portal/shorts" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5">
+            <Link href="/portal/shorts" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border">
               Shorts
             </Link>
-            <Link href="/portal/links" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5">
+            <Link href="/portal/links" className="rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border">
               Links
             </Link>
           </CardContent>
