@@ -1,28 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
-import { getChatChannelsForUser, resolveRoles } from '@/types';
+import { getChatChannelsForUser } from '@/types';
+import { getVerifiedChatUser } from '@/lib/chat/access';
 
+// GET /api/portal/chat/channels — channels the VERIFIED caller can access.
+// Identity comes from the Firebase ID token, never a client-supplied userId.
 export async function GET(request: NextRequest) {
   try {
-    if (!adminDb) {
-      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
-    }
-
-    const userId = request.nextUrl.searchParams.get('userId');
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    const userDoc = await adminDb.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const userData = userDoc.data();
-    const { role, fieldRole } = resolveRoles(userData?.role, userData?.fieldRole);
+    const result = await getVerifiedChatUser(request);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
     return NextResponse.json({
-      channels: getChatChannelsForUser(role, fieldRole),
+      channels: getChatChannelsForUser(result.user.role, result.user.fieldRole),
     });
   } catch (error) {
     console.error('Error loading chat channels:', error);

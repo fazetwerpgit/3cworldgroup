@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { ChatChannel } from '@/types';
 
 interface ChatMessageView {
@@ -48,12 +49,22 @@ export default function TeamChatPage() {
   );
   const canModerate = hasPermission('chat:moderate');
 
+  // All chat calls carry a verified Firebase ID token; the server derives identity
+  // from it (never a client-supplied userId).
+  const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
+    const token = await auth?.currentUser?.getIdToken();
+    return fetch(url, {
+      ...init,
+      headers: { ...(init?.headers || {}), Authorization: `Bearer ${token ?? ''}` },
+    });
+  }, []);
+
   const fetchChannels = useCallback(async () => {
     if (!user) return;
     setLoadingChannels(true);
     setError('');
     try {
-      const response = await fetch(`/api/portal/chat/channels?userId=${user.uid}`);
+      const response = await authedFetch('/api/portal/chat/channels');
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load channels');
       setChannels(json.channels);
@@ -63,15 +74,15 @@ export default function TeamChatPage() {
     } finally {
       setLoadingChannels(false);
     }
-  }, [user]);
+  }, [user, authedFetch]);
 
   const fetchMessages = useCallback(async () => {
     if (!user || !activeChannelId) return;
     setLoadingMessages(true);
     setError('');
     try {
-      const response = await fetch(
-        `/api/portal/chat/messages?userId=${user.uid}&channelId=${activeChannelId}&limit=50`
+      const response = await authedFetch(
+        `/api/portal/chat/messages?channelId=${activeChannelId}&limit=50`
       );
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load messages');
@@ -81,7 +92,7 @@ export default function TeamChatPage() {
     } finally {
       setLoadingMessages(false);
     }
-  }, [activeChannelId, user]);
+  }, [activeChannelId, user, authedFetch]);
 
   useEffect(() => {
     fetchChannels();
@@ -96,11 +107,10 @@ export default function TeamChatPage() {
     setSending(true);
     setError('');
     try {
-      const response = await fetch('/api/portal/chat/messages', {
+      const response = await authedFetch('/api/portal/chat/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.uid,
           channelId: activeChannelId,
           text: draft,
         }),
@@ -121,11 +131,10 @@ export default function TeamChatPage() {
     setDeletingId(messageId);
     setError('');
     try {
-      const response = await fetch('/api/portal/chat/messages', {
+      const response = await authedFetch('/api/portal/chat/messages', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.uid,
           channelId: activeChannelId,
           messageId,
         }),
