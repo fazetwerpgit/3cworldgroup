@@ -42,3 +42,8 @@ next-env.d.ts
 
 # superpowers scratch (brainstorm mockups, SDD ledger)
 .superpowers/
+
+# Playwright E2E
+/test-results/
+/playwright-report/
+/playwright/.cache/
