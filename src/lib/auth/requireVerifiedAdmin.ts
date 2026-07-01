@@ -59,6 +59,29 @@ export async function requireVerifiedManagement(
   return { ok: true, uid: c.uid, name: c.data.displayName || c.data.email || 'Manager' };
 }
 
+// Verifies a token and allows field managers OR back-office management to submit
+// (e.g. the Manager Final Interview). Broader than requireVerifiedManagement (which
+// is admin/operations only) but still excludes entry reps. Returns the verified
+// identity for stamping.
+export async function requireVerifiedFieldManagerOrManagement(
+  request: NextRequest
+): Promise<{ ok: true; uid: string; name: string; email: string } | { ok: false; error: string; status: number }> {
+  const c = await verifyCaller(request);
+  if (!c.ok) return c;
+  const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
+  const allowed =
+    role === 'admin' || role === 'operations' || fieldRole === 'l1_manager' || fieldRole === 'l2_manager';
+  if (!allowed) {
+    return { ok: false, error: 'Forbidden: manager access required', status: 403 };
+  }
+  return {
+    ok: true,
+    uid: c.uid,
+    name: c.data.displayName || c.data.email || c.uid,
+    email: c.data.email || '',
+  };
+}
+
 // Verifies a real Firebase ID token (not a client-supplied UID) and confirms the
 // caller is an admin. Use for sensitive operations (SSN/DL# reveal) where the
 // trust-the-UID pattern is not acceptable. Expects: Authorization: Bearer <idToken>.

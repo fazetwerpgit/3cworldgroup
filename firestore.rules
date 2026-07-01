@@ -108,5 +108,8 @@ service cloud.firestore {
     match /formOptions/{key} {
       allow read, write: if false;
     }
+    match /managerInterviews/{id} {
+      allow read, write: if false;
+    }
   }
 }
