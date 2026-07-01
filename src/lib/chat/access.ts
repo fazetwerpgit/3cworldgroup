@@ -28,6 +28,14 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
 
   const snap = await adminDb.collection('users').doc(gate.uid).get();
   const data = snap.data() ?? {};
+
+  // Deactivated users have no chat access — even with a still-valid token and a
+  // retained role. This is the single gate for every chat route, so it also prevents
+  // an inactive user from being re-added to a channel's memberIds.
+  if (data.status !== 'active') {
+    return { ok: false, error: 'Account is not active', status: 403 };
+  }
+
   const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);
 
   return {
