@@ -102,5 +102,8 @@ service cloud.firestore {
     match /payrollDisputes/{id} {
       allow read, write: if false;
     }
+    match /leadsRequests/{id} {
+      allow read, write: if false;
+    }
   }
 }
