@@ -62,7 +62,15 @@ export default function ExpediteOrdersReviewPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <ReviewList title="Expedite Orders" columns={COLUMNS} rows={rows} onMarkHandled={markHandled} loading={loading} error={error} />
+      <ReviewList
+        title="Expedite Orders"
+        columns={COLUMNS}
+        rows={rows}
+        onMarkHandled={markHandled}
+        loading={loading}
+        error={error}
+        downloadFilename="expedite-orders.csv"
+      />
     </ProtectedRoute>
   );
 }

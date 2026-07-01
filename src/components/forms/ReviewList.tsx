@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toCsv, downloadCsv } from '@/lib/export/csv';
 
 interface ReviewRow {
   id: string;
@@ -20,6 +21,7 @@ interface ReviewListProps {
   onMarkHandled: (id: string) => void;
   loading?: boolean;
   error?: string;
+  downloadFilename?: string;
 }
 
 function formatValue(v: unknown): string {
@@ -39,6 +41,7 @@ export default function ReviewList({
   onMarkHandled,
   loading = false,
   error = '',
+  downloadFilename,
 }: ReviewListProps) {
   const pending = rows.filter((r) => r.status === 'new').length;
 
@@ -47,9 +50,21 @@ export default function ReviewList({
       <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h1>
-          <Badge variant="outline" className="rounded-md border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">
-            {pending} new
-          </Badge>
+          <div className="flex items-center gap-2">
+            {downloadFilename && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={rows.length === 0}
+                onClick={() => downloadCsv(downloadFilename, toCsv(columns, rows))}
+              >
+                Download CSV
+              </Button>
+            )}
+            <Badge variant="outline" className="rounded-md border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">
+              {pending} new
+            </Badge>
+          </div>
         </div>
       </section>
 

@@ -60,7 +60,15 @@ export default function FiberReportsReviewPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <ReviewList title="Fiber Reports" columns={COLUMNS} rows={rows} onMarkHandled={markHandled} loading={loading} error={error} />
+      <ReviewList
+        title="Fiber Reports"
+        columns={COLUMNS}
+        rows={rows}
+        onMarkHandled={markHandled}
+        loading={loading}
+        error={error}
+        downloadFilename="fiber-reports.csv"
+      />
     </ProtectedRoute>
   );
 }

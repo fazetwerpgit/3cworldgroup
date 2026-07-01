@@ -77,6 +77,7 @@ export default function PayrollDisputesReviewPage() {
           onMarkHandled={markHandled}
           loading={loading}
           error={error}
+          downloadFilename="payroll-disputes.csv"
         />
         {rows.some((r) => r.orderScreenshotPath) && (
           <div className="mx-auto max-w-[1500px] space-y-2">

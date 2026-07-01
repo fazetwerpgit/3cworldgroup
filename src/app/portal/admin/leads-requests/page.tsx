@@ -83,6 +83,7 @@ export default function LeadsRequestsReviewPage() {
           onMarkHandled={markHandled}
           loading={loading}
           error={error}
+          downloadFilename="leads-requests.csv"
         />
         {rows.some(hasAttachment) && (
           <div className="mx-auto max-w-[1500px] space-y-2">
