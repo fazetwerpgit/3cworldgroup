@@ -87,10 +87,10 @@ export default function LeadsRequestsReviewPage() {
         />
         {rows.some(hasAttachment) && (
           <div className="mx-auto max-w-[1500px] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Attachments</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">Attachments</p>
             {rows.filter(hasAttachment).map((r) => (
               <div key={r.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-700">{String(r.repFirstName ?? r.id)}</span>
+                <span className="text-slate-700 dark:text-muted-foreground">{String(r.repFirstName ?? r.id)}</span>
                 {r.hostileUploadPath && (
                   <Button type="button" variant="outline" onClick={() => viewAttachment(r.hostileUploadPath as string)}>
                     View hostile

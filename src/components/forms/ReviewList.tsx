@@ -49,7 +49,7 @@ export default function ReviewList({
     <div className="mx-auto max-w-[1500px] space-y-5">
       <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">{title}</h1>
           <div className="flex items-center gap-2">
             {downloadFilename && (
               <Button
@@ -61,7 +61,7 @@ export default function ReviewList({
                 Download CSV
               </Button>
             )}
-            <Badge variant="outline" className="rounded-md border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">
+            <Badge variant="outline" className="rounded-md border-amber-200 bg-amber-50 px-3 py-1 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
               {pending} new
             </Badge>
           </div>
@@ -69,40 +69,40 @@ export default function ReviewList({
       </section>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
       )}
 
       {loading ? (
-        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm dark:border-border dark:bg-card">
           <CardContent className="py-8">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-            <p className="mt-4 text-sm text-slate-500">Loading…</p>
+            <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading…</p>
           </CardContent>
         </Card>
       ) : rows.length === 0 ? (
-        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm dark:border-border dark:bg-card">
           <CardContent className="py-12">
-            <h3 className="font-semibold text-slate-950">Nothing to review</h3>
-            <p className="mt-1 text-sm text-slate-500">No submissions yet.</p>
+            <h3 className="font-semibold text-slate-950 dark:text-foreground">Nothing to review</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">No submissions yet.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {rows.map((row) => (
-            <Card key={row.id} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+            <Card key={row.id} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
               <CardContent className="p-5">
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                   <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {columns.map((col) => (
                       <div key={col.key}>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{col.label}</p>
-                        <p className="mt-1 text-sm font-medium text-slate-950">{formatValue(row[col.key])}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">{col.label}</p>
+                        <p className="mt-1 text-sm font-medium text-slate-950 dark:text-foreground">{formatValue(row[col.key])}</p>
                       </div>
                     ))}
                   </div>
                   <div className="flex items-center gap-2">
                     {row.status === 'handled' ? (
-                      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
                         Handled
                       </Badge>
                     ) : (

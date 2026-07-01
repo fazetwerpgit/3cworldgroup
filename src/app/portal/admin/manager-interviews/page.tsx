@@ -71,16 +71,16 @@ export default function ManagerInterviewsReviewPage() {
         />
         {rows.some((r) => r.signatureDataUrl) && (
           <div className="mx-auto max-w-[1500px] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Signatures</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">Signatures</p>
             {rows.filter((r) => r.signatureDataUrl).map((r) => (
               <div key={r.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-700">
+                <span className="text-slate-700 dark:text-muted-foreground">
                   {String(r.candidateFirstName ?? r.id)} {String(r.candidateLastName ?? '')}
                 </span>
                 <img
                   src={r.signatureDataUrl as string}
                   alt="Signature"
-                  className="h-24 rounded border border-slate-200 bg-white"
+                  className="h-24 rounded border border-slate-200 bg-white dark:border-border dark:bg-card"
                 />
               </div>
             ))}

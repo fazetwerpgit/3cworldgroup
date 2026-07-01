@@ -81,10 +81,10 @@ export default function PayrollDisputesReviewPage() {
         />
         {rows.some((r) => r.orderScreenshotPath) && (
           <div className="mx-auto max-w-[1500px] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Screenshots</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">Screenshots</p>
             {rows.filter((r) => r.orderScreenshotPath).map((r) => (
               <div key={r.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-700">{String(r.contractorName ?? r.id)}</span>
+                <span className="text-slate-700 dark:text-muted-foreground">{String(r.contractorName ?? r.id)}</span>
                 <Button type="button" variant="outline" onClick={() => viewScreenshot(r.orderScreenshotPath as string)}>
                   View screenshot
                 </Button>

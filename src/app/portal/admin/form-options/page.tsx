@@ -98,38 +98,38 @@ export default function AdminFormOptionsPage() {
       <div className="mx-auto max-w-[1200px] space-y-5">
         <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
               Form Options
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
               Edit dropdown lists used by portal forms. Saved changes are used by reps and server-side validation.
             </p>
           </div>
         </section>
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
             {error}
           </div>
         )}
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-            <CardContent className="py-10 text-center text-sm text-slate-600">
+          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
+            <CardContent className="py-10 text-center text-sm text-slate-600 dark:text-muted-foreground">
               Loading form options...
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {EDITABLE_OPTION_KEYS.map((key) => (
-              <Card key={key} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-                <CardHeader className="border-b border-slate-200 px-5 py-4">
+              <Card key={key} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
+                <CardHeader className="border-b border-slate-200 px-5 py-4 dark:border-border">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-base font-semibold text-slate-950">
+                      <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
                         {FORM_OPTION_LABELS[key]}
                       </h2>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                         {options[key].length} option{options[key].length === 1 ? '' : 's'}
                       </p>
                     </div>
@@ -145,14 +145,14 @@ export default function AdminFormOptionsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 p-5">
                   {successKey === key && (
-                    <div className="rounded-md border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-3 py-2 text-sm text-[#4f7f1e]">
+                    <div className="rounded-md border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-3 py-2 text-sm text-[#4f7f1e] dark:text-[#b9e78a]">
                       Saved updated options.
                     </div>
                   )}
 
                   <div className="space-y-2">
                     {options[key].length === 0 ? (
-                      <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                      <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:border-border dark:bg-muted dark:text-muted-foreground">
                         No options. Add one below.
                       </p>
                     ) : (
@@ -182,8 +182,8 @@ export default function AdminFormOptionsPage() {
                     )}
                   </div>
 
-                  <div className="border-t border-slate-200 pt-4">
-                    <Label htmlFor={`add-${key}`} className="mb-2 text-slate-700">
+                  <div className="border-t border-slate-200 pt-4 dark:border-border">
+                    <Label htmlFor={`add-${key}`} className="mb-2 text-slate-700 dark:text-muted-foreground">
                       Add option
                     </Label>
                     <div className="flex gap-2">
@@ -210,8 +210,8 @@ export default function AdminFormOptionsPage() {
           </div>
         )}
 
-        <Card className="rounded-lg border-slate-200 bg-slate-50 py-0 shadow-sm">
-          <CardContent className="p-5 text-sm text-slate-600">
+        <Card className="rounded-lg border-slate-200 bg-slate-50 py-0 shadow-sm dark:border-border dark:bg-muted">
+          <CardContent className="p-5 text-sm text-slate-600 dark:text-muted-foreground">
             Leads categories and reasons cannot be edited here because they control which fields appear on the Leads Request form.
           </CardContent>
         </Card>
