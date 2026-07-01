@@ -7,10 +7,13 @@ vi.mock('@/lib/chat/access', () => ({
 }));
 
 const addMock = vi.fn(async (_doc: Record<string, unknown>) => ({ id: 'msg123' }));
+const setMock = vi.fn(async () => undefined);
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: () => ({
       doc: () => ({
+        get: vi.fn(async () => ({ exists: true, data: () => ({ memberIds: ['real-uid'] }) })),
+        set: setMock,
         collection: () => ({ add: addMock }),
       }),
     }),
@@ -45,6 +48,7 @@ const VERIFIED = {
 beforeEach(() => {
   mockGate.mockReset();
   addMock.mockClear();
+  setMock.mockClear();
 });
 
 describe('POST /api/portal/chat/messages (hardened)', () => {

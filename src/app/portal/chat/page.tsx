@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Hash, Lock, MessageSquareText, RefreshCcw, Send, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Hash, Lock, MessageSquareText, Radio, Send, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ReactionBar } from '@/components/chat/ReactionBar';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,18 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChatChannels } from '@/hooks/chat/useChatChannels';
+import { useMessages } from '@/hooks/chat/useMessages';
 import { auth } from '@/lib/firebase/config';
 import { ChatChannel } from '@/types';
-
-interface ChatMessageView {
-  id: string;
-  channelId: string;
-  text: string;
-  authorId: string;
-  authorName: string;
-  authorRole?: string;
-  createdAt: string | null;
-}
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -33,21 +26,24 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
 
 export default function TeamChatPage() {
   const { user, hasPermission } = useAuth();
-  const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [activeChannelId, setActiveChannelId] = useState('');
-  const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [draft, setDraft] = useState('');
-  const [loadingChannels, setLoadingChannels] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const { channels, loading: loadingChannels, error: channelsError } = useChatChannels();
+  const { messages, loading: loadingMessages, error: messagesError } = useMessages(
+    activeChannelId || null
+  );
 
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId),
     [activeChannelId, channels]
   );
   const canModerate = hasPermission('chat:moderate');
+  const shownError = error || channelsError || messagesError;
 
   // All chat calls carry a verified Firebase ID token; the server derives identity
   // from it (never a client-supplied userId).
@@ -59,48 +55,28 @@ export default function TeamChatPage() {
     });
   }, []);
 
-  const fetchChannels = useCallback(async () => {
+  // Cheap bootstrap call: keeps server-side membership current for this caller, then
+  // Firestore rules allow the realtime channel/message listeners to read member docs.
+  useEffect(() => {
     if (!user) return;
-    setLoadingChannels(true);
-    setError('');
-    try {
-      const response = await authedFetch('/api/portal/chat/channels');
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load channels');
-      setChannels(json.channels);
-      setActiveChannelId((current) => current || json.channels?.[0]?.id || '');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load channels');
-    } finally {
-      setLoadingChannels(false);
-    }
-  }, [user, authedFetch]);
-
-  const fetchMessages = useCallback(async () => {
-    if (!user || !activeChannelId) return;
-    setLoadingMessages(true);
-    setError('');
-    try {
-      const response = await authedFetch(
-        `/api/portal/chat/messages?channelId=${activeChannelId}&limit=50`
-      );
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load messages');
-      setMessages(json.messages);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load messages');
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, [activeChannelId, user, authedFetch]);
+    authedFetch('/api/portal/chat/channels').catch((err) => {
+      console.error('Error bootstrapping chat channels:', err);
+    });
+  }, [authedFetch, user]);
 
   useEffect(() => {
-    fetchChannels();
-  }, [fetchChannels]);
+    if (!activeChannelId && channels.length > 0) {
+      setActiveChannelId(channels[0].id);
+      return;
+    }
+    if (activeChannelId && channels.length > 0 && !channels.some((channel) => channel.id === activeChannelId)) {
+      setActiveChannelId(channels[0].id);
+    }
+  }, [activeChannelId, channels]);
 
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length, activeChannelId]);
 
   const sendMessage = async () => {
     if (!user || !activeChannelId || !draft.trim()) return;
@@ -118,7 +94,6 @@ export default function TeamChatPage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to send message');
       setDraft('');
-      await fetchMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
     } finally {
@@ -141,7 +116,6 @@ export default function TeamChatPage() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to delete message');
-      await fetchMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete message');
     } finally {
@@ -149,9 +123,9 @@ export default function TeamChatPage() {
     }
   };
 
-  const formatTime = (date: string | null) => {
+  const formatTime = (date: Date | null) => {
     if (!date) return 'Just now';
-    return new Date(date).toLocaleString('en-US', {
+    return date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -169,7 +143,7 @@ export default function TeamChatPage() {
             <div className="mx-auto max-w-[1500px] space-y-5">
               <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div>
+                  <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                         Team Chat
@@ -177,26 +151,21 @@ export default function TeamChatPage() {
                       <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
                         Free Firebase pilot
                       </Badge>
+                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 text-[#4f7f1e] dark:text-green-300">
+                        <Radio className="size-3" />
+                        Live
+                      </Badge>
                     </div>
                     <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                    Text-only team channels for onboarding, training, and manager coordination. No media hosting or paid chat vendor.
-                  </p>
+                      Text-only team channels for onboarding, training, and manager coordination. No media hosting or paid chat vendor.
+                    </p>
+                  </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={fetchMessages}
-                  disabled={loadingMessages || !activeChannelId}
-                >
-                  <RefreshCcw className="size-4" />
-                  Refresh
-                </Button>
-              </div>
               </section>
 
-              {error && (
+              {shownError && (
                 <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{shownError}</AlertDescription>
                 </Alert>
               )}
 
@@ -208,13 +177,17 @@ export default function TeamChatPage() {
                       Pilot Channels
                     </div>
                     <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                      Latest 50 messages per channel to control read volume.
+                      Latest 75 messages per channel to control read volume.
                     </p>
                   </div>
                   <div className="space-y-2 p-3">
                     {loadingChannels ? (
                       <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
                         Loading channels...
+                      </div>
+                    ) : channels.length === 0 ? (
+                      <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
+                        No live channels yet. Ask an admin to sync chat channels.
                       </div>
                     ) : (
                       channels.map((channel) => (
@@ -290,7 +263,7 @@ export default function TeamChatPage() {
                             className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300"
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <div>
+                              <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="font-semibold text-slate-950 dark:text-foreground">
                                     {message.authorName}
@@ -307,6 +280,13 @@ export default function TeamChatPage() {
                                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-muted-foreground">
                                   {message.text}
                                 </p>
+                                <ReactionBar
+                                  channelId={activeChannelId}
+                                  messageId={message.id}
+                                  reactionCounts={message.reactionCounts}
+                                  myReactions={message.myReactions}
+                                  onError={setError}
+                                />
                               </div>
                               {canDelete && (
                                 <Button
@@ -326,6 +306,7 @@ export default function TeamChatPage() {
                         );
                       })
                     )}
+                    <div ref={messagesEndRef} />
                   </div>
 
                   <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
