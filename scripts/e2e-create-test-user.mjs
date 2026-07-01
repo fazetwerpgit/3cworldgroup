@@ -4,12 +4,13 @@
 //   node scripts/e2e-create-test-user.mjs            -> 3 bots (default)
 //   E2E_BOT_COUNT=5 node scripts/e2e-create-test-user.mjs
 //
-// Each bot is role: 'admin' so it can reach every form (incl. manager-interview)
-// and its own submissions in the review pages. Delete them later with
-// scripts/e2e-cleanup.mjs --delete-user.
+// Each bot is a field manager (fieldRole: 'l1_manager') — the LEAST privilege that
+// can still reach every form, including manager-interview (which allows l1/l2
+// managers). Deliberately NOT admin: a leaked test login should not be powerful.
+// Delete them later with scripts/e2e-cleanup.mjs --delete-user.
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 for (const line of readFileSync('.env.local', 'utf-8').split(/\r?\n/)) {
@@ -65,7 +66,8 @@ for (let i = 1; i <= BOT_COUNT; i++) {
     {
       email,
       displayName,
-      role: 'admin',
+      fieldRole: 'l1_manager', // least privilege that reaches every form
+      role: FieldValue.delete(), // clear any prior admin role on re-run (platform role would otherwise win)
       managerId: null,
       territoryId: null,
       phone: '',
