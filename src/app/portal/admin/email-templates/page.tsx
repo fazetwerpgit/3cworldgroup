@@ -194,10 +194,10 @@ export default function EmailTemplatesPage() {
         <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                 Email Templates
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                 Save manager-approved copy for onboarding, performance, and
                 operations follow-up.
               </p>
@@ -217,7 +217,7 @@ export default function EmailTemplatesPage() {
         </section>
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
@@ -228,19 +228,19 @@ export default function EmailTemplatesPage() {
         )}
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500">Loading templates...</p>
+              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading templates...</p>
             </CardContent>
           </Card>
         ) : templates.length === 0 ? (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 p-5">
-              <h2 className="text-base font-semibold text-slate-950">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+              <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
                 No templates saved
               </h2>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-slate-600 dark:text-muted-foreground">
                 Start from an operating template, then edit the copy before saving.
               </p>
             </CardHeader>
@@ -250,12 +250,12 @@ export default function EmailTemplatesPage() {
                   <button
                     key={starter.name}
                     onClick={() => applyStarter(starter)}
-                    className="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:bg-[#8dc63f]/10 hover:shadow-sm"
+                    className="cursor-pointer rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:bg-[#8dc63f]/10 hover:shadow-sm"
                   >
-                    <p className="text-sm font-semibold text-slate-950">
+                    <p className="text-sm font-semibold text-slate-950 dark:text-foreground">
                       {starter.name}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                       {EmailTemplateCategoryLabels[starter.category]}
                     </p>
                   </button>
@@ -268,26 +268,26 @@ export default function EmailTemplatesPage() {
             {templates.map((template) => (
               <Card
                 key={template.id}
-                className="rounded-lg border-slate-200 bg-white py-0 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
               >
                 <CardContent className="p-5">
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="font-semibold text-slate-950">
+                        <h3 className="font-semibold text-slate-950 dark:text-foreground">
                           {template.name}
                         </h3>
                         <Badge
                           variant="outline"
-                          className="border-slate-200 bg-slate-50 text-slate-600"
+                          className="border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-slate-600 dark:text-muted-foreground"
                         >
                           {EmailTemplateCategoryLabels[template.category]}
                         </Badge>
                       </div>
-                      <p className="mt-2 text-sm font-medium text-slate-800">
+                      <p className="mt-2 text-sm font-medium text-slate-800 dark:text-foreground">
                         {template.subject}
                       </p>
-                      <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm text-slate-500">
+                      <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm text-slate-500 dark:text-muted-foreground">
                         {template.body}
                       </p>
                     </div>
@@ -325,7 +325,7 @@ export default function EmailTemplatesPage() {
                         size="sm"
                         onClick={() => handleDelete(template)}
                         disabled={deletingId === template.id}
-                        className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                        className="border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-200"
                       >
                         <Trash2 className="h-4 w-4" />
                         {deletingId === template.id ? 'Deleting' : 'Delete'}
@@ -341,18 +341,18 @@ export default function EmailTemplatesPage() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border-slate-200 bg-white py-0 shadow-xl">
-            <CardHeader className="border-b border-slate-100 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">
+          <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-xl">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+              <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">
                 {form.id ? 'Edit Template' : 'New Template'}
               </h3>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-slate-600 dark:text-muted-foreground">
                 Templates are stored for copying. They do not send email from the app.
               </p>
             </CardHeader>
             <CardContent className="space-y-4 p-5">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
                   Starter templates
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -371,7 +371,7 @@ export default function EmailTemplatesPage() {
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                     Name
                   </label>
                   <Input
@@ -382,7 +382,7 @@ export default function EmailTemplatesPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                     Category
                   </label>
                   <NativeSelect
@@ -406,7 +406,7 @@ export default function EmailTemplatesPage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Subject
                 </label>
                 <Input
@@ -417,7 +417,7 @@ export default function EmailTemplatesPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Body
                 </label>
                 <Textarea
@@ -426,7 +426,7 @@ export default function EmailTemplatesPage() {
                   rows={8}
                   placeholder="Hi {{rep_name}},&#10;&#10;..."
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                   Tokens you can use: {EMAIL_TEMPLATE_TOKENS.join(', ')}. Replace
                   them manually before sending.
                 </p>

@@ -10,7 +10,7 @@ export default function NewUserPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="mx-auto max-w-[1100px] space-y-5">
-        <Button asChild variant="ghost" className="text-slate-600 hover:text-slate-950">
+        <Button asChild variant="ghost" className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:text-foreground">
           <Link href="/portal/admin/users">
             <ArrowLeft className="h-4 w-4" />
             Back to users
@@ -23,10 +23,10 @@ export default function NewUserPage() {
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                 Add New User
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                 Create a portal account with the right employee role, reporting
                 assignment, and access status.
               </p>

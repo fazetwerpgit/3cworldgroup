@@ -83,7 +83,7 @@ export default function EditUserPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="mx-auto max-w-[1100px] space-y-5">
-        <Button asChild variant="ghost" className="text-slate-600 hover:text-slate-950">
+        <Button asChild variant="ghost" className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground">
           <Link href="/portal/admin/users">
             <ArrowLeft className="h-4 w-4" />
             Back to users
@@ -91,16 +91,16 @@ export default function EditUserPage() {
         </Button>
 
         {loading && (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500">Loading user...</p>
+              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading user...</p>
             </CardContent>
           </Card>
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 dark:border-border bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
@@ -113,10 +113,10 @@ export default function EditUserPage() {
                   <Pencil className="h-5 w-5" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                     Edit User
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                     Update {user.displayName}&apos;s account information,
                     permissions, and reporting assignment.
                   </p>
@@ -125,18 +125,18 @@ export default function EditUserPage() {
             </section>
             <UserForm user={user} isEdit />
             {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
-              <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-                <h2 className="text-sm font-semibold text-amber-900">Sensitive (admin only)</h2>
-                <p className="mt-2 text-sm text-slate-700">
+              <section className="rounded-lg border border-amber-200 dark:border-border bg-amber-50 dark:bg-amber-500/15 p-5">
+                <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-300">Sensitive (admin only)</h2>
+                <p className="mt-2 text-sm text-slate-700 dark:text-muted-foreground">
                   SSN: {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
                 </p>
-                <p className="text-sm text-slate-700">
+                <p className="text-sm text-slate-700 dark:text-muted-foreground">
                   DL #: {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
                 </p>
                 {!revealed && (
                   <button
                     onClick={doReveal}
-                    className="mt-3 rounded-md border border-amber-300 px-3 py-1 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                    className="mt-3 rounded-md border border-amber-300 dark:border-amber-500/30 px-3 py-1 text-sm font-medium text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20"
                   >
                     Reveal
                   </button>

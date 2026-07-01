@@ -112,10 +112,10 @@ export default function UsersPage() {
         <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
               User Management
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
               Manage employee accounts, roles, and access status.
             </p>
           </div>
@@ -128,11 +128,11 @@ export default function UsersPage() {
           </div>
         </section>
 
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
           <CardContent className="p-5">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Role</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-muted-foreground">Role</label>
                 <NativeSelect
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
@@ -149,7 +149,7 @@ export default function UsersPage() {
                 </NativeSelect>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Status</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-muted-foreground">Status</label>
                 <NativeSelect
                   value={statusFilter}
                   onChange={(e) =>
@@ -166,7 +166,7 @@ export default function UsersPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="text-slate-600 hover:text-slate-950"
+                  className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground"
                   onClick={() => {
                     setRoleFilter('');
                     setStatusFilter('');
@@ -175,7 +175,7 @@ export default function UsersPage() {
                   Clear filters
                 </Button>
               )}
-              <span className="ml-auto text-sm text-slate-500">
+              <span className="ml-auto text-sm text-slate-500 dark:text-muted-foreground">
                 {users.length} user{users.length !== 1 ? 's' : ''} found
               </span>
             </div>
@@ -183,16 +183,16 @@ export default function UsersPage() {
         </Card>
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 dark:border-border bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500">Loading users...</p>
+              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading users...</p>
             </CardContent>
           </Card>
         ) : (
@@ -206,15 +206,15 @@ export default function UsersPage() {
 
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md rounded-lg border-slate-200 bg-white py-0 shadow-xl">
+            <Card className="w-full max-w-md rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-xl">
               <CardContent className="p-6">
                 <div className="mb-4 flex items-center gap-3">
-                  <div className="rounded-full bg-red-50 p-2 text-red-600">
+                  <div className="rounded-full bg-red-50 dark:bg-red-500/15 p-2 text-red-600 dark:text-red-300">
                     <AlertTriangle className="h-6 w-6" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-950">Delete User</h3>
+                  <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">Delete User</h3>
                 </div>
-                <p className="mb-6 text-sm text-slate-600">
+                <p className="mb-6 text-sm text-slate-600 dark:text-muted-foreground">
                   Permanently delete <strong>{deleteConfirm.userName}</strong> from
                   the system. This action cannot be undone.
                 </p>

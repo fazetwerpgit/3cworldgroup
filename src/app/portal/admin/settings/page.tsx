@@ -61,13 +61,13 @@ export default function AdminSettingsPage() {
   if (!isAdmin) {
     return (
       <div className="mx-auto max-w-[1200px] space-y-5">
-        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm">
+        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
           <CardContent className="py-10">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-300">
               <Lock className="h-6 w-6" />
             </div>
-            <p className="text-lg font-semibold text-slate-950">Access Denied</p>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="text-lg font-semibold text-slate-950 dark:text-foreground">Access Denied</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
               Only admins can access system settings.
             </p>
             <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
@@ -84,10 +84,10 @@ export default function AdminSettingsPage() {
       <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
               System Settings
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
               Configure portal defaults used by operations and field teams.
             </p>
           </div>
@@ -119,8 +119,8 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-        <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50">
+      <Card className="overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+        <div className="flex overflow-x-auto border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -128,8 +128,8 @@ export default function AdminSettingsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex min-w-[130px] flex-1 cursor-pointer items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? 'border-b-2 border-[#8dc63f] bg-white text-[#0A1F44]'
-                  : 'text-slate-600 hover:bg-white hover:text-slate-950'
+                  ? 'border-b-2 border-[#8dc63f] bg-white dark:bg-card text-[#0A1F44] dark:text-foreground'
+                  : 'text-slate-600 dark:text-muted-foreground hover:bg-white dark:hover:bg-card hover:text-slate-950 dark:hover:text-foreground'
               }`}
             >
               {tab.icon}
@@ -142,7 +142,7 @@ export default function AdminSettingsPage() {
           {activeTab === 'general' && (
             <div className="space-y-6">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Company Name
                 </label>
                 <Input
@@ -155,7 +155,7 @@ export default function AdminSettingsPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Support Email
                 </label>
                 <Input
@@ -168,7 +168,7 @@ export default function AdminSettingsPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Default Role for New Users
                 </label>
                 <NativeSelect
@@ -185,7 +185,7 @@ export default function AdminSettingsPage() {
                   <NativeSelectOption value="l2_manager">L2 Manager</NativeSelectOption>
                   <NativeSelectOption value="operations">Operations</NativeSelectOption>
                 </NativeSelect>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground">
                   New users who sign up will be assigned this role by default.
                 </p>
               </div>
@@ -194,10 +194,10 @@ export default function AdminSettingsPage() {
 
           {activeTab === 'sales' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
                 <div>
-                  <h3 className="font-medium text-slate-950">Auto-Approve Sales</h3>
-                  <p className="text-sm text-slate-500">
+                  <h3 className="font-medium text-slate-950 dark:text-foreground">Auto-Approve Sales</h3>
+                  <p className="text-sm text-slate-500 dark:text-muted-foreground">
                     Automatically approve sales when submitted.
                   </p>
                 </div>
@@ -207,11 +207,11 @@ export default function AdminSettingsPage() {
                     setSettings({ ...settings, autoApprove: !settings.autoApprove })
                   }
                   className={`relative h-7 w-14 cursor-pointer rounded-full transition-colors ${
-                    settings.autoApprove ? 'bg-[#8dc63f]' : 'bg-slate-300'
+                    settings.autoApprove ? 'bg-[#8dc63f]' : 'bg-slate-300 dark:bg-muted'
                   }`}
                 >
                   <span
-                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white dark:bg-card shadow-sm transition-transform ${
                       settings.autoApprove ? 'translate-x-8' : 'translate-x-1'
                     }`}
                   />
@@ -219,12 +219,12 @@ export default function AdminSettingsPage() {
               </div>
 
               <div>
-                <label className="mb-4 block text-sm font-medium text-slate-700">
+                <label className="mb-4 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Points Per Sale Range
                 </label>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
                       Minimum
                     </label>
                     <Input
@@ -241,8 +241,8 @@ export default function AdminSettingsPage() {
                       }
                     />
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
                       Maximum
                     </label>
                     <Input
@@ -278,13 +278,13 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-slate-500 dark:text-muted-foreground">
                   Points are assigned based on the fiber plan selected.
                 </p>
               </div>
 
               <div>
-                <label className="mb-3 block text-sm font-medium text-slate-700">
+                <label className="mb-3 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Leaderboard Time Periods
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -361,21 +361,21 @@ export default function AdminSettingsPage() {
               ].map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-slate-300"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4 transition-colors hover:border-slate-300 dark:hover:border-border"
                 >
                   <div>
-                    <h3 className="font-medium text-slate-950">{item.label}</h3>
-                    <p className="text-sm text-slate-500">{item.description}</p>
+                    <h3 className="font-medium text-slate-950 dark:text-foreground">{item.label}</h3>
+                    <p className="text-sm text-slate-500 dark:text-muted-foreground">{item.description}</p>
                   </div>
                   <button
                     type="button"
                     className={`relative h-7 w-14 cursor-pointer rounded-full transition-colors ${
-                      item.enabled ? 'bg-[#8dc63f]' : 'bg-slate-300'
+                      item.enabled ? 'bg-[#8dc63f]' : 'bg-slate-300 dark:bg-muted'
                     }`}
                     aria-pressed={item.enabled}
                   >
                     <span
-                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white dark:bg-card shadow-sm transition-transform ${
                         item.enabled ? 'translate-x-8' : 'translate-x-1'
                       }`}
                     />
@@ -387,40 +387,40 @@ export default function AdminSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-lg border-red-200 bg-white py-0 shadow-sm">
-        <CardHeader className="border-b border-red-100 bg-red-50/70 p-5">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-red-700">
+      <Card className="rounded-lg border-red-200 dark:border-red-500/30 bg-white dark:bg-card py-0 shadow-sm">
+        <CardHeader className="border-b border-red-100 dark:border-red-500/30 bg-red-50/70 dark:bg-red-500/15 p-5">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-red-700 dark:text-red-300">
             <ShieldAlert className="h-5 w-5" />
             Restricted Actions
           </h2>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
-          <div className="flex flex-col justify-between gap-4 rounded-lg border border-red-100 bg-white p-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col justify-between gap-4 rounded-lg border border-red-100 dark:border-red-500/30 bg-white dark:bg-card p-4 sm:flex-row sm:items-center">
             <div>
-              <h3 className="font-medium text-slate-950">Reset All Sales Data</h3>
-              <p className="text-sm text-slate-500">
+              <h3 className="font-medium text-slate-950 dark:text-foreground">Reset All Sales Data</h3>
+              <p className="text-sm text-slate-500 dark:text-muted-foreground">
                 Permanently delete all sales records. This cannot be undone.
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+              className="border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-200"
             >
               Reset Sales
             </Button>
           </div>
-          <div className="flex flex-col justify-between gap-4 rounded-lg border border-red-100 bg-white p-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col justify-between gap-4 rounded-lg border border-red-100 dark:border-red-500/30 bg-white dark:bg-card p-4 sm:flex-row sm:items-center">
             <div>
-              <h3 className="font-medium text-slate-950">Reset Leaderboard</h3>
-              <p className="text-sm text-slate-500">
+              <h3 className="font-medium text-slate-950 dark:text-foreground">Reset Leaderboard</h3>
+              <p className="text-sm text-slate-500 dark:text-muted-foreground">
                 Clear leaderboard rankings and restart the reporting period.
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+              className="border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-200"
             >
               Reset Leaderboard
             </Button>

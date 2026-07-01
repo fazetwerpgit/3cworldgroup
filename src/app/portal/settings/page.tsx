@@ -142,13 +142,13 @@ export default function SettingsPage() {
 
   const getRoleBadgeColor = (role: string) => {
     const colors: Record<string, string> = {
-      admin: 'bg-purple-100 text-purple-800',
-      operations: 'bg-blue-100 text-blue-800',
-      l1_manager: 'bg-green-100 text-green-800',
-      l2_manager: 'bg-green-100 text-green-800',
-      entry_rep: 'bg-gray-100 text-gray-800',
+      admin: 'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300',
+      operations: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300',
+      l1_manager: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+      l2_manager: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+      entry_rep: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-muted-foreground',
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-muted-foreground';
   };
 
   const formatDate = (date: Date | string | undefined) => {
@@ -169,17 +169,17 @@ export default function SettingsPage() {
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1100px] space-y-5">
               <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
                   Account Settings
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
                   Manage your profile, password, and account details used inside the employee portal.
                 </p>
               </section>
 
               {/* Success/Error Messages */}
               {success && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-border bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -187,15 +187,15 @@ export default function SettingsPage() {
                 </div>
               )}
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-red-200 dark:border-border bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
                   {error}
                 </div>
               )}
 
               {/* Profile Information */}
-              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-[#0A1F44]">
+                  <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">
                     Profile Information
                   </h2>
                   {!isEditing ? (
@@ -212,7 +212,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleCancelEdit}
-                        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                        className="text-sm font-medium text-slate-500 dark:text-muted-foreground hover:text-slate-700 dark:hover:text-foreground"
                       >
                         Cancel
                       </button>
@@ -244,24 +244,24 @@ export default function SettingsPage() {
                             value={displayName}
                             onChange={(e) => setDisplayName(e.target.value)}
                             placeholder="Your name"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
                           />
-                          <p className="text-sm text-gray-500">{user?.email}</p>
+                          <p className="text-sm text-gray-500 dark:text-muted-foreground">{user?.email}</p>
                         </div>
                       ) : (
                         <>
-                          <h3 className="text-xl font-semibold text-gray-900">
+                          <h3 className="text-xl font-semibold text-gray-900 dark:text-foreground">
                             {user?.displayName || 'Set your name'}
                           </h3>
-                          <p className="text-sm text-gray-500">{user?.email}</p>
+                          <p className="text-sm text-gray-500 dark:text-muted-foreground">{user?.email}</p>
                         </>
                       )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 border-t border-slate-100 dark:border-border pt-4 md:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
                         Role
                       </label>
                       <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getRoleBadgeColor(effectiveRole || '')}`}>
@@ -269,21 +269,21 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
                         Status
                       </label>
                       <span
                         className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
                           user?.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
+                            : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
                         }`}
                       >
                         {user?.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
                         Phone
                       </label>
                       {isEditing ? (
@@ -292,18 +292,18 @@ export default function SettingsPage() {
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="(555) 123-4567"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
                         />
                       ) : (
-                        <p className="text-gray-900">{user?.phone || 'Not set'}</p>
+                        <p className="text-gray-900 dark:text-foreground">{user?.phone || 'Not set'}</p>
                       )}
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
                         Address
                       </label>
                       {user?.address || user?.city || user?.state || user?.zip ? (
-                        <div className="text-gray-900">
+                        <div className="text-gray-900 dark:text-foreground">
                           {user?.address && <p>{user.address}</p>}
                           <p>
                             {[user?.city, user?.state].filter(Boolean).join(', ')}
@@ -311,14 +311,14 @@ export default function SettingsPage() {
                           </p>
                         </div>
                       ) : (
-                        <p className="text-gray-400 italic">Not on file</p>
+                        <p className="text-gray-400 dark:text-muted-foreground italic">Not on file</p>
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
                         Hire Date
                       </label>
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-foreground">
                         {formatDate(user?.hireDate)}
                       </p>
                     </div>
@@ -327,13 +327,13 @@ export default function SettingsPage() {
               </div>
 
               {/* Security */}
-              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">
+              <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground mb-4">
                   Security
                 </h2>
                 <div className="space-y-4">
                   {/* Change Password */}
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-[#0A1F44] rounded-lg">
@@ -342,8 +342,8 @@ export default function SettingsPage() {
                           </svg>
                         </div>
                         <div>
-                          <h3 className="font-medium text-slate-950">Change Password</h3>
-                          <p className="text-sm text-slate-500">
+                          <h3 className="font-medium text-slate-950 dark:text-foreground">Change Password</h3>
+                          <p className="text-sm text-slate-500 dark:text-muted-foreground">
                             Update your password directly
                           </p>
                         </div>
@@ -362,7 +362,7 @@ export default function SettingsPage() {
                     {showPasswordForm && (
                       <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-muted-foreground mb-1">
                             Current Password
                           </label>
                           <input
@@ -370,12 +370,12 @@ export default function SettingsPage() {
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
                             required
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
                             placeholder="Enter current password"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-muted-foreground mb-1">
                             New Password
                           </label>
                           <input
@@ -384,12 +384,12 @@ export default function SettingsPage() {
                             onChange={(e) => setNewPassword(e.target.value)}
                             required
                             minLength={6}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
                             placeholder="Enter new password (min 6 characters)"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-muted-foreground mb-1">
                             Confirm New Password
                           </label>
                           <input
@@ -397,7 +397,7 @@ export default function SettingsPage() {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             required
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
                             placeholder="Confirm new password"
                           />
                         </div>
@@ -418,7 +418,7 @@ export default function SettingsPage() {
                               setConfirmPassword('');
                               setError('');
                             }}
-                            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+                            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-muted-foreground hover:text-slate-800 dark:hover:text-foreground"
                           >
                             Cancel
                           </button>
@@ -428,22 +428,22 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Reset Password via Email */}
-                  <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-400 rounded-lg">
+                      <div className="p-2 bg-gray-400 dark:bg-muted rounded-lg">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-medium text-slate-950">Reset via Email</h3>
-                        <p className="text-sm text-slate-500">
+                        <h3 className="font-medium text-slate-950 dark:text-foreground">Reset via Email</h3>
+                        <p className="text-sm text-slate-500 dark:text-muted-foreground">
                           Forgot your password? Get a reset link
                         </p>
                       </div>
                     </div>
                     {resetSent ? (
-                      <span className="flex items-center gap-1 text-sm text-emerald-700">
+                      <span className="flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-300">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
@@ -453,7 +453,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handlePasswordReset}
                         disabled={loading}
-                        className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
+                        className="rounded-md border border-slate-300 dark:border-border px-4 py-2 text-sm font-medium text-slate-700 dark:text-muted-foreground transition-colors hover:bg-slate-100 dark:hover:bg-muted disabled:opacity-50"
                       >
                         {loading ? 'Sending...' : 'Send Reset Link'}
                       </button>
@@ -465,7 +465,7 @@ export default function SettingsPage() {
               {/* Account Info */}
               <div className="rounded-lg border border-[#0A1F44]/15 bg-[#0A1F44] p-6 text-white">
                 <div className="flex items-start gap-4">
-                  <div className="p-2 bg-white/10 rounded-lg">
+                  <div className="p-2 bg-white dark:bg-card/10 rounded-lg">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -487,28 +487,28 @@ export default function SettingsPage() {
               <ReportBugCard />
 
               {/* Account Stats */}
-              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#0A1F44] mb-4">
+              <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground mb-4">
                   Account Details
                 </h2>
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  <div className="rounded-lg bg-slate-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-[#0A1F44]">{formatDate(user?.createdAt).split(',')[0]}</p>
-                    <p className="text-xs text-gray-500 mt-1">Member Since</p>
+                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
+                    <p className="text-2xl font-bold text-[#0A1F44] dark:text-foreground">{formatDate(user?.createdAt).split(',')[0]}</p>
+                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Member Since</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-[#0A1F44]">{user?.territoryId || '--'}</p>
-                    <p className="text-xs text-gray-500 mt-1">Territory</p>
+                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
+                    <p className="text-2xl font-bold text-[#0A1F44] dark:text-foreground">{user?.territoryId || '--'}</p>
+                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Territory</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-4 text-center">
+                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
                     <p className="text-2xl font-bold text-[#8dc63f]">{user?.uid?.slice(-6).toUpperCase()}</p>
-                    <p className="text-xs text-gray-500 mt-1">Employee ID</p>
+                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Employee ID</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-[#0A1F44]">
+                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
+                    <p className="text-2xl font-bold text-[#0A1F44] dark:text-foreground">
                       {user?.status === 'active' ? 'Yes' : 'No'}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">Account Active</p>
+                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Account Active</p>
                   </div>
                 </div>
               </div>
