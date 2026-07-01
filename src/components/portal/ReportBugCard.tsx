@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bug, CheckCircle2, Send } from 'lucide-react';
 import { auth } from '@/lib/firebase/config';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,13 @@ export default function ReportBugCard() {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+
+  // Auto-open the form when arriving via the header "Report a Bug" link.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#report-bug') {
+      setOpen(true);
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +55,7 @@ export default function ReportBugCard() {
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div id="report-bug" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-border dark:bg-card">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">

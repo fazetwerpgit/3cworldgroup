@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Bell,
+  Bug,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -286,6 +287,14 @@ export function PortalHeader() {
               >
                 <Settings className="h-4 w-4" />
                 Settings
+              </Link>
+              <Link
+                href="/portal/settings#report-bug"
+                onClick={() => setShowDropdown(false)}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-muted-foreground dark:hover:bg-muted"
+              >
+                <Bug className="h-4 w-4" />
+                Report a Bug
               </Link>
               <button
                 onClick={handleSignOut}

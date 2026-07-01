@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -378,36 +378,42 @@ function NavLink({
   );
 }
 
-function NavSection({ title, items, canAccessItem, isActive, onLinkClick }: NavSectionProps) {
-  const visibleItems = items.filter(canAccessItem);
-  if (visibleItems.length === 0) return null;
-
-  return (
-    <section className="mb-5">
-      <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-        {title}
-      </div>
-      <ul className="space-y-1">
-        {visibleItems.map((item) => (
-          <NavLink key={item.name} item={item} active={isActive(item.href)} onLinkClick={onLinkClick} />
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-// A collapsible folder of nav items (the "Forms" group). Starts open when any
-// child route is active so you never lose your place after a refresh.
+// A collapsible sidebar section. Every group is collapsible now (matching the
+// Forms folder). Open state persists per-section in localStorage, and a section
+// force-opens when one of its routes is active so you never lose your place.
 function CollapsibleNavSection({
   title,
   items,
   canAccessItem,
   isActive,
   onLinkClick,
-}: NavSectionProps) {
+  defaultOpen = true,
+}: NavSectionProps & { defaultOpen?: boolean }) {
   const visibleItems = items.filter(canAccessItem);
   const hasActiveChild = visibleItems.some((item) => isActive(item.href));
-  const [open, setOpen] = useState(hasActiveChild);
+  const storageKey = `3c-nav-${title.toLowerCase()}`;
+
+  const [open, setOpen] = useState(defaultOpen);
+
+  // Restore the saved open/closed state on mount (client only).
+  useEffect(() => {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;
+    if (saved === 'open') setOpen(true);
+    else if (saved === 'closed') setOpen(false);
+  }, [storageKey]);
+
+  // Always show the section that contains the current page.
+  const isOpen = open || hasActiveChild;
+
+  const toggle = () => {
+    const next = !isOpen;
+    setOpen(next);
+    try {
+      localStorage.setItem(storageKey, next ? 'open' : 'closed');
+    } catch {
+      // ignore storage failures
+    }
+  };
 
   if (visibleItems.length === 0) return null;
 
@@ -415,12 +421,12 @@ function CollapsibleNavSection({
     <section className="mb-5">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 transition-colors hover:text-white/70"
       >
         <span>{title}</span>
         <svg
-          className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+          className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -428,7 +434,7 @@ function CollapsibleNavSection({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </button>
-      {open && (
+      {isOpen && (
         <ul className="mt-1 space-y-1">
           {visibleItems.map((item) => (
             <NavLink
@@ -516,7 +522,7 @@ export function PortalSidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <NavSection
+          <CollapsibleNavSection
             title="Main"
             items={mainItems}
             canAccessItem={canAccessItem}
@@ -530,9 +536,10 @@ export function PortalSidebar() {
             canAccessItem={canAccessItem}
             isActive={isActive}
             onLinkClick={handleLinkClick}
+            defaultOpen={false}
           />
 
-          <NavSection
+          <CollapsibleNavSection
             title="Resources"
             items={resourceItems}
             canAccessItem={canAccessItem}
@@ -541,7 +548,7 @@ export function PortalSidebar() {
           />
 
           {showOperationsSection && (
-            <NavSection
+            <CollapsibleNavSection
               title="Ops"
               items={operationsItems}
               canAccessItem={canAccessItem}
@@ -551,7 +558,7 @@ export function PortalSidebar() {
           )}
 
           {showAdminSection && (
-            <NavSection
+            <CollapsibleNavSection
               title="Admin"
               items={adminItems}
               canAccessItem={canAccessItem}
