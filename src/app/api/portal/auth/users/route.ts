@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         hireDate: data.hireDate?.toDate(),
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
+        lastActiveAt: data.lastActiveAt?.toDate(),
       } as User);
     });
 

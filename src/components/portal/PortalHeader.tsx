@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { NOTIFICATION_COLORS, NotificationType } from '@/types/notifications';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
@@ -30,6 +31,7 @@ export function PortalHeader() {
   const { user, signOut } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { isOpen: isMobileMenuOpen, toggle: toggleMobileMenu } = useMobileMenu();
+  usePresenceHeartbeat();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

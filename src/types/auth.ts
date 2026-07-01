@@ -156,6 +156,9 @@ export interface User {
   hireDate: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Last time the user was active in the portal (presence heartbeat). Powers the
+  // "who's active" green dot. Distinct from updatedAt (which means the record was edited).
+  lastActiveAt?: Date;
 }
 
 // Auth context state type

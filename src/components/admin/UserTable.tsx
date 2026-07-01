@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Pencil, Trash2, UserPlus } from 'lucide-react';
 import { User } from '@/types';
+import { isOnline } from '@/lib/presence/isOnline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -91,8 +92,16 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
             >
               <TableCell className="px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0A1F44] text-sm font-medium text-white">
-                    {user.displayName?.charAt(0).toUpperCase() || 'U'}
+                  <div className="relative shrink-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0A1F44] text-sm font-medium text-white">
+                      {user.displayName?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <span
+                      title={isOnline(user.lastActiveAt) ? 'Active now' : 'Offline'}
+                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-card ${
+                        isOnline(user.lastActiveAt) ? 'bg-[#8dc63f]' : 'bg-slate-300 dark:bg-slate-600'
+                      }`}
+                    />
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-slate-950">
