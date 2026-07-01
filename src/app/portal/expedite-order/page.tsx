@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { EXPEDITE_REASONS } from '@/lib/forms/formOptions';
+import { useFormOptions } from '@/hooks/useFormOptions';
 import { US_STATES } from '@/lib/validation/address';
 
 const EMPTY = {
@@ -22,6 +22,7 @@ const EMPTY = {
 
 export default function ExpediteOrderPage() {
   const { user } = useAuth();
+  const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -91,7 +92,7 @@ export default function ExpediteOrderPage() {
                   <Label>Reason for expedite</Label>
                   <NativeSelect value={form.reason} onChange={(e) => setForm((p) => ({ ...p, reason: e.target.value }))} className="w-full" required>
                     <NativeSelectOption value="">Select reason</NativeSelectOption>
-                    {EXPEDITE_REASONS.map((r) => (
+                    {options.expediteReasons.map((r) => (
                       <NativeSelectOption key={r} value={r}>{r}</NativeSelectOption>
                     ))}
                   </NativeSelect>

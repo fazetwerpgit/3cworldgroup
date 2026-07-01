@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { FIBER_COMPANIES } from '@/lib/forms/formOptions';
+import { useFormOptions } from '@/hooks/useFormOptions';
 
 const EMPTY = {
   companySold: '', dateKnocked: '', packNumber: '', numberOfReps: '',
@@ -19,6 +19,7 @@ const EMPTY = {
 
 export default function FiberReportPage() {
   const { user } = useAuth();
+  const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -77,7 +78,7 @@ export default function FiberReportPage() {
                     className="w-full"
                   >
                     <NativeSelectOption value="">Select company</NativeSelectOption>
-                    {FIBER_COMPANIES.map((c) => (
+                    {options.providers.map((c) => (
                       <NativeSelectOption key={c} value={c}>{c}</NativeSelectOption>
                     ))}
                   </NativeSelect>

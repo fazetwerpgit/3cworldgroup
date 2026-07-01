@@ -11,7 +11,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import FileUpload from '@/components/onboarding/FileUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { PAYROLL_CAMPAIGNS } from '@/lib/forms/formOptions';
+import { useFormOptions } from '@/hooks/useFormOptions';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 
 const EMPTY = {
@@ -21,6 +21,7 @@ const EMPTY = {
 
 export default function PayrollDisputePage() {
   const { user } = useAuth();
+  const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -75,7 +76,7 @@ export default function PayrollDisputePage() {
                   <Label>Campaign</Label>
                   <NativeSelect value={form.campaign} onChange={(e) => setForm((p) => ({ ...p, campaign: e.target.value }))} className="w-full" required>
                     <NativeSelectOption value="">Select campaign</NativeSelectOption>
-                    {PAYROLL_CAMPAIGNS.map((c) => (
+                    {options.payrollCampaigns.map((c) => (
                       <NativeSelectOption key={c} value={c}>{c}</NativeSelectOption>
                     ))}
                   </NativeSelect>

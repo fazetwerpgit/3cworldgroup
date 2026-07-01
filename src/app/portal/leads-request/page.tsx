@@ -12,10 +12,8 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import FileUpload from '@/components/onboarding/FileUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { useFormOptions } from '@/hooks/useFormOptions';
 import {
-  LEADS_CAMPAIGNS,
-  LEADS_MANAGERS,
-  LEADS_LOCATIONS,
   LEADS_CATEGORIES,
   LEADS_REASONS,
 } from '@/lib/forms/formOptions';
@@ -31,6 +29,7 @@ const EMPTY = {
 
 export default function LeadsRequestPage() {
   const { user } = useAuth();
+  const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -90,7 +89,7 @@ export default function LeadsRequestPage() {
                   <Label>Campaign</Label>
                   <NativeSelect value={form.campaign} onChange={(e) => setForm((p) => ({ ...p, campaign: e.target.value }))} className="w-full" required>
                     <NativeSelectOption value="">Select campaign</NativeSelectOption>
-                    {LEADS_CAMPAIGNS.map((c) => (
+                    {options.leadsCampaigns.map((c) => (
                       <NativeSelectOption key={c} value={c}>{c}</NativeSelectOption>
                     ))}
                   </NativeSelect>
@@ -99,7 +98,7 @@ export default function LeadsRequestPage() {
                   <Label>Manager Name</Label>
                   <NativeSelect value={form.managerName} onChange={(e) => setForm((p) => ({ ...p, managerName: e.target.value }))} className="w-full" required>
                     <NativeSelectOption value="">Select manager</NativeSelectOption>
-                    {LEADS_MANAGERS.map((m) => (
+                    {options.leadsManagers.map((m) => (
                       <NativeSelectOption key={m} value={m}>{m}</NativeSelectOption>
                     ))}
                   </NativeSelect>
@@ -111,7 +110,7 @@ export default function LeadsRequestPage() {
                   <Label>Location</Label>
                   <NativeSelect value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} className="w-full" required>
                     <NativeSelectOption value="">Select location</NativeSelectOption>
-                    {LEADS_LOCATIONS.map((l) => (
+                    {options.leadsLocations.map((l) => (
                       <NativeSelectOption key={l} value={l}>{l}</NativeSelectOption>
                     ))}
                   </NativeSelect>
