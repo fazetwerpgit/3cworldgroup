@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     const objectPath = `${folder}file.${check.ext}`;
 
     const bucket = getOnboardingBucket();
+    // Clear any prior attachment in this folder first. A replacement may have a
+    // different extension (pdf -> jpg), so overwriting a fixed name is not enough:
+    // the stale object would linger and the viewer could sign it instead. Deleting
+    // the whole folder guarantees exactly one attachment ever exists here.
+    await bucket.deleteFiles({ prefix: folder, force: true });
+
     const buffer = Buffer.from(await file.arrayBuffer());
     await bucket.file(objectPath).save(buffer, { contentType: file.type, resumable: false });
 
