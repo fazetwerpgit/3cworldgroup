@@ -1,5 +1,6 @@
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 export const metadata = {
   title: "Employee Portal | 3C World Group",
@@ -11,12 +12,14 @@ export default function PortalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // This layout wraps the portal with AuthProvider and MobileMenuProvider
+  // This layout wraps the portal with Theme, Auth and MobileMenu providers.
   return (
-    <AuthProvider>
-      <MobileMenuProvider>
-        {children}
-      </MobileMenuProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MobileMenuProvider>
+          {children}
+        </MobileMenuProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
