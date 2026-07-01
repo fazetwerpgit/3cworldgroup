@@ -453,7 +453,7 @@ export default function RecruitingCommandCenterPage() {
                       <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-3">
                         <div>{application.phone}</div>
                         <div>{application.email}</div>
-                        <div>Submitted {formatDate(application.createdAt.toString())}</div>
+                        <div>Submitted {formatDate(application.createdAt ? application.createdAt.toString() : null)}</div>
                       </div>
                     </div>
                   ))}
