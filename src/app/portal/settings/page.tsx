@@ -7,6 +7,7 @@ import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
+import InstallAppCard from '@/components/portal/InstallAppCard';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function SettingsPage() {
@@ -479,6 +480,9 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Install as an app (PWA) */}
+              <InstallAppCard />
 
               {/* Appearance / dark mode */}
               <ThemeToggleCard />

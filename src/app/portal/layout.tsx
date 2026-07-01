@@ -1,6 +1,7 @@
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 
 export const metadata = {
   title: "Employee Portal | 3C World Group",
@@ -17,6 +18,7 @@ export default function PortalLayout({
     <ThemeProvider>
       <AuthProvider>
         <MobileMenuProvider>
+          <ServiceWorkerRegistrar />
           {children}
         </MobileMenuProvider>
       </AuthProvider>
