@@ -81,17 +81,10 @@ for (let i = 1; i <= BOT_COUNT; i++) {
   );
 }
 
-// The Manager Interview form requires a configured market (hireMarkets defaults
-// empty). Seed one so the E2E test can complete that form. Harmless in prod — it
-// just adds "QA Test Market" as a selectable market until an admin edits the list.
-const marketDoc = await db.collection('formOptions').doc('hireMarkets').get();
-const existingMarkets = marketDoc.exists ? marketDoc.data()?.values ?? [] : [];
-if (!existingMarkets.includes('QA Test Market')) {
-  await db.collection('formOptions').doc('hireMarkets').set(
-    { values: [...existingMarkets, 'QA Test Market'], updatedBy: 'e2e-setup', updatedAt: new Date() },
-    { merge: true }
-  );
-  console.log('Seeded "QA Test Market" into hireMarkets so the interview form can be tested.');
-}
+// Note: the Manager Interview E2E test needs at least one configured hiring market.
+// We intentionally do NOT seed a test market here (it would pollute production form
+// options). Instead the test picks the first REAL market if one exists, and skips
+// itself when none are configured. Add your real markets in Portal → Admin → Form
+// Options → Hire: Markets to enable that test with genuine data.
 
 console.log(`\n${BOT_COUNT} QA bots ready. Passwords = E2E_BOT_SECRET + "#<n>" (not stored in the repo).`);

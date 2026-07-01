@@ -83,7 +83,18 @@ forEachBot('Manager Interview submits and lands', async (page, _bot, n) => {
   await fillByLabel(page, 'Candidate First Name', `QA${n}`);
   await fillByLabel(page, 'Candidate Last Name', 'Candidate');
   await fillByLabel(page, 'Candidate Email', `qa-candidate-${n}@example.com`);
-  await selectField(page, 'Market', 'QA Test Market'); // seeded market
+
+  // Pick the first REAL configured market. This form legitimately requires markets
+  // to be configured (Portal → Admin → Form Options → Hire: Markets). If none are
+  // set up yet, skip rather than fail — the form is rendering correctly, there's
+  // just no data to select.
+  const marketSelect = page.locator('div', { has: page.locator('label', { hasText: /^Market$/ }) }).last().locator('select');
+  const marketValues = await marketSelect.locator('option').evaluateAll(
+    (opts) => opts.map((o) => (o as HTMLOptionElement).value).filter((v) => v !== '')
+  );
+  test.skip(marketValues.length === 0, 'No hiring markets configured — add them in Form Options to enable this test.');
+  await marketSelect.selectOption(marketValues[0]);
+
   await selectField(page, 'Did Candidate Show?', 'Yes');
   await selectField(page, 'Extend Offer?', 'No');
   await selectField(page, 'Rate Candidate', '4');
