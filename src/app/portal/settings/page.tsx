@@ -8,6 +8,7 @@ import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
+import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function SettingsPage() {
@@ -483,6 +484,9 @@ export default function SettingsPage() {
 
               {/* Install as an app (PWA) */}
               <InstallAppCard />
+
+              {/* Push notifications opt-in (hidden until VAPID key configured) */}
+              <PushNotificationsCard />
 
               {/* Appearance / dark mode */}
               <ThemeToggleCard />
