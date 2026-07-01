@@ -105,5 +105,8 @@ service cloud.firestore {
     match /leadsRequests/{id} {
       allow read, write: if false;
     }
+    match /formOptions/{key} {
+      allow read, write: if false;
+    }
   }
 }
