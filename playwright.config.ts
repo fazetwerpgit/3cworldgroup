@@ -1,8 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // End-to-end tests drive a real browser against the LIVE deployed site.
-// Set E2E_BASE_URL to your Vercel/production URL, and E2E_EMAIL / E2E_PASSWORD
-// to the dedicated QA test account (created by scripts/e2e-create-test-user.mjs).
+// Required env vars (never commit real values):
+//   E2E_BASE_URL    - the deployed site, e.g. https://3cworldgroup.vercel.app
+//   E2E_BOT_SECRET  - strong secret; QA bot passwords are derived as `${secret}#<n>`
+//   E2E_BOT_COUNT   - optional, number of QA bots per form (default 3)
+// Create the bot pool first with: E2E_BOT_SECRET=... npm run e2e:setup
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,

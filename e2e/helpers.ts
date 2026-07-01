@@ -1,14 +1,12 @@
 import { Page, expect } from '@playwright/test';
+import { Bot } from './bots';
 
-const EMAIL = process.env.E2E_EMAIL || 'qa-e2e@3cworldgroup.test';
-const PASSWORD = process.env.E2E_PASSWORD || 'QaE2e!TestPass2026';
-
-// Log the QA bot into the portal. The login form lives at /portal and uses
+// Log a specific QA bot into the portal. The login form lives at /portal and uses
 // #email / #password inputs with a "Sign In" submit button.
-export async function login(page: Page) {
+export async function login(page: Page, bot: Bot) {
   await page.goto('/portal');
-  await page.locator('#email').fill(EMAIL);
-  await page.locator('#password').fill(PASSWORD);
+  await page.locator('#email').fill(bot.email);
+  await page.locator('#password').fill(bot.password);
   await page.getByRole('button', { name: /sign in/i }).click();
   // Land on the dashboard (or any authed page) — the sidebar proves we're in.
   await expect(page.getByText('3C Console')).toBeVisible({ timeout: 20_000 });

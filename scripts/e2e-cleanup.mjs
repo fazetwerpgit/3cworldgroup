@@ -1,8 +1,8 @@
-// Removes everything the QA E2E bot created, so review pages stay clean.
-//   node scripts/e2e-cleanup.mjs                 -> delete the bot's form submissions + its notifications
-//   node scripts/e2e-cleanup.mjs --delete-user   -> also delete the QA auth user + profile
+// Removes everything the QA E2E bots created, so review pages stay clean.
+//   node scripts/e2e-cleanup.mjs                 -> delete every bot's form submissions + their notifications
+//   node scripts/e2e-cleanup.mjs --delete-user   -> also delete the QA auth users + profiles
 //
-// Matches submissions by repUid === the QA user's uid. Safe to re-run.
+// Matches submissions by repUid across the whole bot pool. Safe to re-run.
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -27,18 +27,22 @@ initializeApp({
   }),
 });
 
-const EMAIL = process.env.E2E_EMAIL || 'qa-e2e@3cworldgroup.test';
+const BOT_COUNT = Number(process.env.E2E_BOT_COUNT || 3);
 const auth = getAuth();
 const db = getFirestore();
 
-const user = await auth.getUserByEmail(EMAIL).catch(() => null);
-if (!user) {
-  console.log(`No test user ${EMAIL} found — nothing to clean.`);
+// Resolve every bot uid that exists.
+const uids = [];
+for (let i = 1; i <= BOT_COUNT; i++) {
+  const email = `qa-e2e-${i}@3cworldgroup.test`;
+  const user = await auth.getUserByEmail(email).catch(() => null);
+  if (user) uids.push({ email, uid: user.uid });
+}
+if (uids.length === 0) {
+  console.log('No QA bots found — nothing to clean.');
   process.exit(0);
 }
-const uid = user.uid;
 
-// Every collection a form submission can land in.
 const FORM_COLLECTIONS = [
   'fiberReports',
   'expediteOrders',
@@ -49,30 +53,29 @@ const FORM_COLLECTIONS = [
 ];
 
 let removed = 0;
-for (const col of FORM_COLLECTIONS) {
-  const snap = await db.collection(col).where('repUid', '==', uid).get();
-  for (const doc of snap.docs) {
+for (const { uid } of uids) {
+  for (const col of FORM_COLLECTIONS) {
+    const snap = await db.collection(col).where('repUid', '==', uid).get();
+    for (const doc of snap.docs) {
+      await doc.ref.delete();
+      removed++;
+    }
+    if (snap.size) console.log(`  ${col} (${uid.slice(0, 6)}…): deleted ${snap.size}`);
+  }
+  // Clear the bot's own notification bell (safe; leaves real admins' bells alone).
+  const notifSnap = await db.collection('notifications').where('userId', '==', uid).get();
+  for (const doc of notifSnap.docs) {
     await doc.ref.delete();
     removed++;
   }
-  if (snap.size) console.log(`  ${col}: deleted ${snap.size}`);
 }
 
-// Notifications the bot's submissions produced (targeted at admins). Delete any
-// notification metadata.formKey exists AND was created for the bot's own actions
-// is hard to attribute precisely, so we only clear notifications addressed TO the
-// bot user (safe, its own bell), leaving real admins' bells untouched.
-const notifSnap = await db.collection('notifications').where('userId', '==', uid).get();
-for (const doc of notifSnap.docs) {
-  await doc.ref.delete();
-  removed++;
-}
-if (notifSnap.size) console.log(`  notifications (bot's own): deleted ${notifSnap.size}`);
-
-console.log(`\nCleanup complete — removed ${removed} documents created by the QA bot.`);
+console.log(`\nCleanup complete — removed ${removed} documents created by ${uids.length} QA bots.`);
 
 if (process.argv.includes('--delete-user')) {
-  await db.collection('users').doc(uid).delete().catch(() => {});
-  await auth.deleteUser(uid).catch(() => {});
-  console.log(`Deleted QA test user ${EMAIL}.`);
+  for (const { uid, email } of uids) {
+    await db.collection('users').doc(uid).delete().catch(() => {});
+    await auth.deleteUser(uid).catch(() => {});
+    console.log(`Deleted QA bot ${email}.`);
+  }
 }

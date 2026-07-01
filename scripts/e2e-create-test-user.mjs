@@ -1,11 +1,11 @@
-// Creates (or resets) a dedicated QA test user for end-to-end tests.
+// Creates (or resets) the POOL of QA test users for end-to-end tests.
 // Uses the local Firebase Admin key from .env.local. Safe to re-run.
 //
-//   node scripts/e2e-create-test-user.mjs
+//   node scripts/e2e-create-test-user.mjs            -> 3 bots (default)
+//   E2E_BOT_COUNT=5 node scripts/e2e-create-test-user.mjs
 //
-// Prints the email + password to use as E2E_EMAIL / E2E_PASSWORD.
-// The account is role: 'admin' so it can reach every form (incl. manager-interview)
-// and its own submissions in the review pages. Delete it later with
+// Each bot is role: 'admin' so it can reach every form (incl. manager-interview)
+// and its own submissions in the review pages. Delete them later with
 // scripts/e2e-cleanup.mjs --delete-user.
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
@@ -31,41 +31,53 @@ initializeApp({
   }),
 });
 
-const EMAIL = process.env.E2E_EMAIL || 'qa-e2e@3cworldgroup.test';
-const PASSWORD = process.env.E2E_PASSWORD || 'QaE2e!TestPass2026';
-const DISPLAY = 'QA E2E Bot';
+const BOT_COUNT = Number(process.env.E2E_BOT_COUNT || 3);
+const BOT_SECRET = process.env.E2E_BOT_SECRET;
+if (!BOT_SECRET) {
+  console.error('E2E_BOT_SECRET is not set. Set a strong secret first, e.g.:');
+  console.error('  E2E_BOT_SECRET=<your-secret> npm run e2e:setup');
+  process.exit(1);
+}
+const bot = (i) => ({
+  email: `qa-e2e-${i}@3cworldgroup.test`,
+  password: `${BOT_SECRET}#${i}`,
+  displayName: `QA E2E Bot ${i}`,
+});
 
 const auth = getAuth();
 const db = getFirestore();
 
-let uid;
-try {
-  const existing = await auth.getUserByEmail(EMAIL);
-  uid = existing.uid;
-  await auth.updateUser(uid, { password: PASSWORD, displayName: DISPLAY });
-  console.log(`Reset existing test user: ${EMAIL}`);
-} catch {
-  const created = await auth.createUser({ email: EMAIL, password: PASSWORD, displayName: DISPLAY });
-  uid = created.uid;
-  console.log(`Created test user: ${EMAIL}`);
-}
+for (let i = 1; i <= BOT_COUNT; i++) {
+  const { email, password, displayName } = bot(i);
+  let uid;
+  try {
+    const existing = await auth.getUserByEmail(email);
+    uid = existing.uid;
+    await auth.updateUser(uid, { password, displayName });
+    console.log(`Reset bot ${i}: ${email}`);
+  } catch {
+    const created = await auth.createUser({ email, password, displayName });
+    uid = created.uid;
+    console.log(`Created bot ${i}: ${email}`);
+  }
 
-await db.collection('users').doc(uid).set(
-  {
-    email: EMAIL,
-    displayName: DISPLAY,
-    role: 'admin',
-    managerId: null,
-    territoryId: null,
-    phone: '',
-    status: 'active',
-    isE2ETestUser: true, // marker so cleanup can find it
-    hireDate: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  { merge: true }
-);
+  await db.collection('users').doc(uid).set(
+    {
+      email,
+      displayName,
+      role: 'admin',
+      managerId: null,
+      territoryId: null,
+      phone: '',
+      status: 'active',
+      isE2ETestUser: true, // marker so cleanup can find them
+      hireDate: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    { merge: true }
+  );
+}
 
 // The Manager Interview form requires a configured market (hireMarkets defaults
 // empty). Seed one so the E2E test can complete that form. Harmless in prod — it
@@ -80,7 +92,4 @@ if (!existingMarkets.includes('QA Test Market')) {
   console.log('Seeded "QA Test Market" into hireMarkets so the interview form can be tested.');
 }
 
-console.log('\nUse these in your test env:');
-console.log(`  E2E_EMAIL=${EMAIL}`);
-console.log(`  E2E_PASSWORD=${PASSWORD}`);
-console.log(`  uid=${uid}`);
+console.log(`\n${BOT_COUNT} QA bots ready. Passwords = E2E_BOT_SECRET + "#<n>" (not stored in the repo).`);
