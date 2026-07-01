@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Award, BarChart3, CheckCircle2, Clock3, TrendingDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -53,10 +54,17 @@ export function DashboardStats() {
           setStats(data.stats);
         }
 
-        const leaderboardRes = await fetch('/api/portal/leaderboard?period=month&metric=totalPoints&limit=100');
+        const token = await auth?.currentUser?.getIdToken();
+        const leaderboardRes = await fetch(
+          '/api/portal/leaderboard?period=month&metric=totalPoints&limit=100',
+          { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+        );
         if (leaderboardRes.ok) {
           const data = await leaderboardRes.json();
-          const userEntry = data.leaderboard?.find((e: { salesRepId: string }) => e.salesRepId === user.uid);
+          // Prefer the server-computed standing (correct even below the top-N).
+          const userEntry =
+            data.currentUser ??
+            data.leaderboard?.find((e: { salesRepId: string }) => e.salesRepId === user.uid);
           setLeaderboardRank({
             rank: userEntry?.rank || null,
             totalPoints: userEntry?.totalPoints || 0,

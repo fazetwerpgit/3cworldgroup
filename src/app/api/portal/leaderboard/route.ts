@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 
 // GET /api/portal/leaderboard - Get leaderboard data (points-based)
 export async function GET(request: NextRequest) {
   try {
+    // Require a verified login — the standings are internal team data.
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     if (!adminDb) {
       return NextResponse.json(
         { error: 'Database not configured' },
@@ -95,17 +100,21 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Add rankings
-    const rankedLeaderboard = leaderboard.slice(0, limit).map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    }));
+    // Rank the FULL sorted list first, so the caller's rank is correct even when
+    // they fall below the returned top-N cutoff.
+    const fullyRanked = leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
+    const rankedLeaderboard = fullyRanked.slice(0, limit);
+
+    // The caller's own standing (null if they have no approved sales this period).
+    const currentUser = fullyRanked.find((e) => e.salesRepId === gate.uid) ?? null;
 
     return NextResponse.json({
       period,
       metric,
       startDate,
       leaderboard: rankedLeaderboard,
+      totalRanked: fullyRanked.length,
+      currentUser,
     });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
