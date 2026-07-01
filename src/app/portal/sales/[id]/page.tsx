@@ -37,8 +37,8 @@ function PortalShell({ children }: { children: React.ReactNode }) {
 function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-950">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium text-slate-950 dark:text-foreground">{value}</p>
     </div>
   );
 }
@@ -95,15 +95,15 @@ export default function SaleDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300';
       case 'pending':
-        return 'border-amber-200 bg-amber-50 text-amber-700';
+        return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300';
       case 'rejected':
-        return 'border-red-200 bg-red-50 text-red-700';
+        return 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300';
       case 'cancelled':
-        return 'border-gray-200 bg-gray-100 text-gray-700';
+        return 'border-gray-200 bg-gray-100 text-gray-700 dark:border-border dark:bg-muted dark:text-muted-foreground';
       default:
-        return 'border-gray-200 bg-gray-100 text-gray-700';
+        return 'border-gray-200 bg-gray-100 text-gray-700 dark:border-border dark:bg-muted dark:text-muted-foreground';
     }
   };
 
@@ -111,9 +111,9 @@ export default function SaleDetailPage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <PortalShell>
-          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 p-8 text-center shadow-sm">
+          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-            <p className="mt-4 text-slate-500">Loading sale details...</p>
+            <p className="mt-4 text-slate-500 dark:text-muted-foreground">Loading sale details...</p>
           </Card>
         </PortalShell>
       </ProtectedRoute>
@@ -124,10 +124,10 @@ export default function SaleDetailPage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <PortalShell>
-          <Card className="mx-auto max-w-md rounded-lg border-slate-200 p-8 text-center shadow-sm">
+          <Card className="mx-auto max-w-md rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
             <TriangleAlert className="mx-auto mb-4 size-12 text-red-500" />
-            <p className="font-semibold text-slate-950">Sale not found</p>
-            <p className="mt-1 text-slate-500">{error || 'The sale you are looking for does not exist.'}</p>
+            <p className="font-semibold text-slate-950 dark:text-foreground">Sale not found</p>
+            <p className="mt-1 text-slate-500 dark:text-muted-foreground">{error || 'The sale you are looking for does not exist.'}</p>
             <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
               <Link href="/portal/sales">Back to Sales</Link>
             </Button>
@@ -146,12 +146,12 @@ export default function SaleDetailPage() {
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="icon">
                 <Link href="/portal/sales" aria-label="Back to sales">
-                  <ArrowLeft className="size-5 text-slate-600" />
+                  <ArrowLeft className="size-5 text-slate-600 dark:text-muted-foreground" />
                 </Link>
               </Button>
               <div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Sale Details</h1>
-                  <p className="text-sm text-slate-500">ID: {sale.id}</p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">Sale Details</h1>
+                  <p className="text-sm text-slate-500 dark:text-muted-foreground">ID: {sale.id}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -176,9 +176,9 @@ export default function SaleDetailPage() {
             </div>
           </section>
 
-          <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 p-5">
-              <CardTitle className="text-[#0A1F44]">Customer Information</CardTitle>
+          <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+              <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Information</CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -190,9 +190,9 @@ export default function SaleDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 p-5">
-              <CardTitle className="text-[#0A1F44]">Sale Information</CardTitle>
+          <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+              <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Information</CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -202,28 +202,28 @@ export default function SaleDetailPage() {
                 <DetailField label="Created" value={formatDate(sale.createdAt)} />
               </div>
               {sale.notes && (
-                <div className="mt-4 border-t border-slate-100 pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
-                  <p className="mt-1 font-medium text-slate-950">{sale.notes}</p>
+                <div className="mt-4 border-t border-slate-100 dark:border-border pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">Notes</p>
+                  <p className="mt-1 font-medium text-slate-950 dark:text-foreground">{sale.notes}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 p-5">
-              <CardTitle className="text-[#0A1F44]">Plans Sold</CardTitle>
+          <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+              <CardTitle className="text-[#0A1F44] dark:text-foreground">Plans Sold</CardTitle>
             </CardHeader>
             <CardContent className="p-5">
               <div className="space-y-3">
                 {sale.products?.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
                     <div>
-                      <p className="font-medium text-slate-950">{product.productName}</p>
-                      <p className="text-sm text-slate-500">{product.company}</p>
+                      <p className="font-medium text-slate-950 dark:text-foreground">{product.productName}</p>
+                      <p className="text-sm text-slate-500 dark:text-muted-foreground">{product.company}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-slate-950">{formatCurrency(product.unitPrice)}/mo</p>
+                      <p className="font-semibold text-slate-950 dark:text-foreground">{formatCurrency(product.unitPrice)}/mo</p>
                       <p className="text-sm font-medium text-[#5a8f1f]">+{product.points} pts</p>
                     </div>
                   </div>
@@ -260,17 +260,17 @@ export default function SaleDetailPage() {
           </Card>
 
           {(sale.status === 'approved' || sale.status === 'rejected') && sale.approvedBy && (
-            <Card className={`rounded-lg shadow-sm ${sale.status === 'approved' ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+            <Card className={`rounded-lg shadow-sm ${sale.status === 'approved' ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/15' : 'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/15'}`}>
               <CardContent className="pt-6">
-                <h2 className={`mb-2 flex items-center gap-2 text-lg font-semibold ${sale.status === 'approved' ? 'text-emerald-800' : 'text-red-800'}`}>
+                <h2 className={`mb-2 flex items-center gap-2 text-lg font-semibold ${sale.status === 'approved' ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300'}`}>
                   {sale.status === 'approved' ? <Check className="size-5" /> : <X className="size-5" />}
                   {sale.status === 'approved' ? 'Approved' : 'Rejected'}
                 </h2>
-                <p className={sale.status === 'approved' ? 'text-emerald-700' : 'text-red-700'}>
+                <p className={sale.status === 'approved' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}>
                   By: {sale.approverName || sale.approvedBy} on {formatDate(sale.approvedAt)}
                 </p>
                 {sale.rejectionReason && (
-                  <p className="mt-2 text-red-700">
+                  <p className="mt-2 text-red-700 dark:text-red-300">
                     <span className="font-medium">Reason:</span> {sale.rejectionReason}
                   </p>
                 )}

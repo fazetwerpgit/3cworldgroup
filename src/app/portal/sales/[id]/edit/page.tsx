@@ -161,10 +161,10 @@ export default function EditSalePage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <PortalShell>
-          <Card className="mx-auto max-w-md rounded-lg border-slate-200 p-8 text-center shadow-sm">
+          <Card className="mx-auto max-w-md rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
             <Lock className="mx-auto mb-4 size-12 text-red-500" />
-            <p className="font-semibold text-slate-950">Access Denied</p>
-            <p className="mt-1 text-slate-500">Only admins can edit sales.</p>
+            <p className="font-semibold text-slate-950 dark:text-foreground">Access Denied</p>
+            <p className="mt-1 text-slate-500 dark:text-muted-foreground">Only admins can edit sales.</p>
             <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
               <Link href="/portal/sales">Back to Sales</Link>
             </Button>
@@ -178,9 +178,9 @@ export default function EditSalePage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <PortalShell>
-          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 p-8 text-center shadow-sm">
+          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-            <p className="mt-4 text-slate-500">Loading sale...</p>
+            <p className="mt-4 text-slate-500 dark:text-muted-foreground">Loading sale...</p>
           </Card>
         </PortalShell>
       </ProtectedRoute>
@@ -191,8 +191,8 @@ export default function EditSalePage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <PortalShell>
-          <Card className="mx-auto max-w-md rounded-lg border-slate-200 p-8 text-center shadow-sm">
-            <p className="font-semibold text-slate-950">Sale not found</p>
+          <Card className="mx-auto max-w-md rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
+            <p className="font-semibold text-slate-950 dark:text-foreground">Sale not found</p>
             <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
               <Link href="/portal/sales">Back to Sales</Link>
             </Button>
@@ -210,26 +210,26 @@ export default function EditSalePage() {
             <div className="flex items-center gap-4">
             <Button asChild variant="ghost" size="icon">
               <Link href={`/portal/sales/${saleId}`} aria-label="Back to sale details">
-                  <ArrowLeft className="size-5 text-slate-600" />
+                  <ArrowLeft className="size-5 text-slate-600 dark:text-muted-foreground" />
               </Link>
             </Button>
             <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Edit Sale</h1>
-                <p className="text-sm text-slate-500">ID: {sale.id}</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">Edit Sale</h1>
+                <p className="text-sm text-slate-500 dark:text-muted-foreground">ID: {sale.id}</p>
               </div>
             </div>
           </section>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {(formError || error) && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
                 {formError || error}
               </div>
             )}
 
-            <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 p-5">
-                <CardTitle className="text-[#0A1F44]">Sale Status</CardTitle>
+            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Status</CardTitle>
               </CardHeader>
               <CardContent className="p-5">
                 <Label className="mb-1">Status</Label>
@@ -247,9 +247,9 @@ export default function EditSalePage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 p-5">
-                <CardTitle className="text-[#0A1F44]">Customer Address</CardTitle>
+            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Address</CardTitle>
               </CardHeader>
               <CardContent className="p-5">
                 <Label className="mb-1">Installation Address *</Label>
@@ -265,10 +265,10 @@ export default function EditSalePage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 p-5">
-                <CardTitle className="text-[#0A1F44]">
-                  Customer Information <span className="text-sm font-normal text-slate-400">(Optional)</span>
+            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                <CardTitle className="text-[#0A1F44] dark:text-foreground">
+                  Customer Information <span className="text-sm font-normal text-slate-400 dark:text-muted-foreground">(Optional)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-5">
@@ -289,9 +289,9 @@ export default function EditSalePage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 p-5">
-                <CardTitle className="text-[#0A1F44]">Select Plan</CardTitle>
+            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                <CardTitle className="text-[#0A1F44] dark:text-foreground">Select Plan</CardTitle>
               </CardHeader>
               <CardContent className="p-5">
                 <div className="mb-6">
@@ -305,10 +305,10 @@ export default function EditSalePage() {
                         className={`rounded-lg border p-4 text-left transition-colors ${
                           selectedCompany === company.value
                             ? 'border-[#8dc63f] bg-[#8dc63f]/5 shadow-[inset_0_0_0_1px_#8dc63f]'
-                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            : 'border-slate-200 dark:border-border hover:border-slate-300 dark:hover:border-border hover:bg-slate-50 dark:hover:bg-muted'
                         }`}
                       >
-                        <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950'}`}>
+                        <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950 dark:text-foreground'}`}>
                           {company.label}
                         </span>
                       </button>
@@ -330,18 +330,18 @@ export default function EditSalePage() {
                             disabled={added}
                             className={`rounded-lg border p-4 text-left transition-colors ${
                               added
-                                ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-50'
-                                : 'border-slate-200 hover:border-[#8dc63f] hover:bg-[#8dc63f]/5'
+                                ? 'cursor-not-allowed border-slate-200 dark:border-border bg-slate-50 dark:bg-muted opacity-50'
+                                : 'border-slate-200 dark:border-border hover:border-[#8dc63f] hover:bg-[#8dc63f]/5'
                             }`}
                           >
                             <div className="flex justify-between gap-4">
                               <div>
-                                <span className="block font-semibold text-slate-950">{plan.name}</span>
-                                <span className="text-sm text-slate-500">{plan.speed}</span>
+                                <span className="block font-semibold text-slate-950 dark:text-foreground">{plan.name}</span>
+                                <span className="text-sm text-slate-500 dark:text-muted-foreground">{plan.speed}</span>
                               </div>
                               <div className="text-right">
-                                <span className="font-bold text-[#0A1F44]">${plan.price.toFixed(2)}</span>
-                                <span className="block text-xs text-gray-500">/month</span>
+                                <span className="font-bold text-[#0A1F44] dark:text-foreground">${plan.price.toFixed(2)}</span>
+                                <span className="block text-xs text-gray-500 dark:text-muted-foreground">/month</span>
                               </div>
                             </div>
                             <Badge variant="outline" className="mt-2 border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
@@ -359,17 +359,17 @@ export default function EditSalePage() {
                     <Label className="mb-3">Selected Plans</Label>
                     <div className="space-y-2">
                       {products.map((product, index) => (
-                        <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
                           <div>
-                            <span className="font-medium text-slate-950">{product.productName}</span>
+                            <span className="font-medium text-slate-950 dark:text-foreground">{product.productName}</span>
                             <div className="mt-1 flex items-center gap-2">
-                              <span className="text-sm text-gray-500">${product.unitPrice.toFixed(2)}/mo</span>
+                              <span className="text-sm text-gray-500 dark:text-muted-foreground">${product.unitPrice.toFixed(2)}/mo</span>
                               <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
                                 +{product.points} pts
                               </Badge>
                             </div>
                           </div>
-                          <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeProduct(index)} className="text-red-600 hover:bg-red-50 hover:text-red-800">
+                          <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeProduct(index)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-300">
                             <Trash2 className="size-4" />
                             <span className="sr-only">Remove plan</span>
                           </Button>
@@ -381,9 +381,9 @@ export default function EditSalePage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 p-5">
-                <CardTitle className="text-[#0A1F44]">Sale Details</CardTitle>
+            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
+              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Details</CardTitle>
               </CardHeader>
               <CardContent className="p-5">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
