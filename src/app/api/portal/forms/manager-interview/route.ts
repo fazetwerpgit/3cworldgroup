@@ -3,13 +3,22 @@ import { requireVerifiedFieldManagerOrManagement } from '@/lib/auth/requireVerif
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { isValidOption } from '@/lib/forms/formOptions';
-import { isPromotionRole, validateSignatureDataUrl } from '@/lib/forms/managerInterview';
+import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from '@/lib/forms/managerInterview';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
 }
+// Coerce a truthy Yes/No answer to boolean (used for the optional promotion Qs).
 function yn(v: unknown): boolean {
   return v === true || v === 'yes' || v === 'Yes';
+}
+// Strict Yes/No for REQUIRED decision fields: returns null when the value is
+// missing or not an explicit yes/no, so the route can reject it rather than
+// silently recording a "No".
+function requiredYesNo(v: unknown): boolean | null {
+  if (v === true || v === 'yes' || v === 'Yes') return true;
+  if (v === false || v === 'no' || v === 'No') return false;
+  return null;
 }
 
 // POST /api/portal/forms/manager-interview - a manager records a hire decision.
@@ -34,6 +43,9 @@ export async function POST(request: NextRequest) {
     if (!hiringManagerEmail || !candidateFirstName || !candidateLastName || !candidateEmail) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
     }
+    if (!isEmailShaped(hiringManagerEmail) || !isEmailShaped(candidateEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
+    }
     if (!isValidOption(opts.providers, provider)) {
       return NextResponse.json({ error: 'Select a valid provider' }, { status: 400 });
     }
@@ -55,6 +67,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A signature is required' }, { status: 400 });
     }
 
+    // Did-show and extend-offer are required decisions; reject if omitted rather
+    // than silently recording "No".
+    const didShow = requiredYesNo(body.didShow);
+    const extendOffer = requiredYesNo(body.extendOffer);
+    if (didShow === null || extendOffer === null) {
+      return NextResponse.json({ error: 'Answer Did Candidate Show and Extend Offer' }, { status: 400 });
+    }
+
     // Promotion-only answers apply only for promotion roles; drop otherwise.
     const promo = isPromotionRole(jobPosition);
     const completedProduction = promo ? yn(body.completedProduction) : '';
@@ -67,8 +87,8 @@ export async function POST(request: NextRequest) {
       {
         provider, jobPosition, hiringManager, hiringManagerEmail,
         candidateFirstName, candidateLastName, candidateEmail, market,
-        didShow: yn(body.didShow),
-        extendOffer: yn(body.extendOffer),
+        didShow,
+        extendOffer,
         rating,
         completedProduction, completedReading, completedTeamMetric,
         signatureDataUrl: body.signatureDataUrl,
