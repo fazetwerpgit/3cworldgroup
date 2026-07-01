@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
-import { FIBER_COMPANIES, isValidOption } from '@/lib/forms/formOptions';
+import { isValidOption } from '@/lib/forms/formOptions';
+import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -16,8 +17,9 @@ export async function POST(request: NextRequest) {
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const body = await request.json();
+    const opts = await getResolvedFormOptions();
     const companySold = s(body.companySold, 40);
-    if (companySold && !isValidOption(FIBER_COMPANIES, companySold)) {
+    if (companySold && !isValidOption(opts.providers, companySold)) {
       return NextResponse.json({ error: 'Select a valid company' }, { status: 400 });
     }
 

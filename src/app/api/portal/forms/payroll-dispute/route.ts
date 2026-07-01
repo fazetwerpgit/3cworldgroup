@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
-import { PAYROLL_CAMPAIGNS, isValidOption } from '@/lib/forms/formOptions';
+import { isValidOption } from '@/lib/forms/formOptions';
+import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { buildFormAttachmentFolder } from '@/lib/forms/formUploads';
 
 function s(v: unknown, max = 200) {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const body = await request.json();
+    const opts = await getResolvedFormOptions();
     const contractorName = s(body.contractorName, 180);
     const contractorEmail = s(body.contractorEmail, 180);
     const campaign = s(body.campaign, 40);
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!contractorName || !contractorEmail || !typeOfOrder || !dateOfInstall) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
     }
-    if (!isValidOption(PAYROLL_CAMPAIGNS, campaign)) {
+    if (!isValidOption(opts.payrollCampaigns, campaign)) {
       return NextResponse.json({ error: 'Select a valid campaign' }, { status: 400 });
     }
 

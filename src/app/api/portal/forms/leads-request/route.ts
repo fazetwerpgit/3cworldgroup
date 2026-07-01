@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
+import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { buildFormAttachmentFolder } from '@/lib/forms/formUploads';
 import { leadsConditions } from '@/lib/forms/leadsPredicates';
 import {
-  LEADS_CAMPAIGNS,
-  LEADS_MANAGERS,
-  LEADS_LOCATIONS,
   LEADS_CATEGORIES,
   LEADS_REASONS,
   isValidOption,
@@ -30,6 +28,7 @@ export async function POST(request: NextRequest) {
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const body = await request.json();
+    const opts = await getResolvedFormOptions();
     const campaign = s(body.campaign, 40);
     const managerName = s(body.managerName, 120);
     const managerEmail = s(body.managerEmail, 180);
@@ -43,13 +42,13 @@ export async function POST(request: NextRequest) {
     if (!managerEmail || !repFirstName || !repLastName) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
     }
-    if (!isValidOption(LEADS_CAMPAIGNS, campaign)) {
+    if (!isValidOption(opts.leadsCampaigns, campaign)) {
       return NextResponse.json({ error: 'Select a valid campaign' }, { status: 400 });
     }
-    if (!isValidOption(LEADS_MANAGERS, managerName)) {
+    if (!isValidOption(opts.leadsManagers, managerName)) {
       return NextResponse.json({ error: 'Select a valid manager' }, { status: 400 });
     }
-    if (!isValidOption(LEADS_LOCATIONS, location)) {
+    if (!isValidOption(opts.leadsLocations, location)) {
       return NextResponse.json({ error: 'Select a valid location' }, { status: 400 });
     }
     // Category + reason are optional, but if provided must be valid options.

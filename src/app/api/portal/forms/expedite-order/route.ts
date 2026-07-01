@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
-import { EXPEDITE_REASONS, isValidOption } from '@/lib/forms/formOptions';
+import { isValidOption } from '@/lib/forms/formOptions';
+import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { validateAddress } from '@/lib/validation/address';
 
 function s(v: unknown, max = 200) {
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const body = await request.json();
+    const opts = await getResolvedFormOptions();
     const addr = validateAddress({ address: body.address, city: body.city, state: body.state, zip: body.zip });
     if (!addr.ok) return NextResponse.json({ error: addr.error }, { status: 400 });
 
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!customerName || !customerPhone || !orderNumber || !expediteDates) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
     }
-    if (!isValidOption(EXPEDITE_REASONS, reason)) {
+    if (!isValidOption(opts.expediteReasons, reason)) {
       return NextResponse.json({ error: 'Select a valid reason' }, { status: 400 });
     }
 
