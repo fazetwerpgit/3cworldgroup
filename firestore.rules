@@ -111,5 +111,9 @@ service cloud.firestore {
     match /managerInterviews/{id} {
       allow read, write: if false;
     }
+    // Bug reports — any user submits via a gated API route; admins review. Server-only.
+    match /bugReports/{id} {
+      allow read, write: if false;
+    }
   }
 }

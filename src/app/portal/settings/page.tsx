@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import ReportBugCard from '@/components/portal/ReportBugCard';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function SettingsPage() {
@@ -477,6 +478,9 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Report a Bug — available to every role */}
+              <ReportBugCard />
 
               {/* Account Stats */}
               <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
