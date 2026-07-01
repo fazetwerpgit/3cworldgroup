@@ -27,16 +27,25 @@ export async function PUT(request: NextRequest) {
     if (!Array.isArray(body.values)) {
       return NextResponse.json({ error: 'values must be an array' }, { status: 400 });
     }
-    // Clean: strings only, trimmed, non-empty, deduped, capped.
+    if (body.values.length > 100) {
+      return NextResponse.json({ error: 'Too many values (max 100)' }, { status: 400 });
+    }
+    // Reject bad input outright so an admin's mistake surfaces instead of being
+    // silently dropped: every entry must be a non-empty string. Trimming and
+    // de-duplication are then applied as cleaning (not errors).
     const seen = new Set<string>();
     const values: string[] = [];
     for (const raw of body.values) {
-      if (typeof raw !== 'string') continue;
+      if (typeof raw !== 'string') {
+        return NextResponse.json({ error: 'Each value must be text' }, { status: 400 });
+      }
       const v = raw.trim().slice(0, 120);
-      if (!v || seen.has(v)) continue;
+      if (!v) {
+        return NextResponse.json({ error: 'Values cannot be blank' }, { status: 400 });
+      }
+      if (seen.has(v)) continue;
       seen.add(v);
       values.push(v);
-      if (values.length >= 100) break;
     }
 
     await adminDb.collection('formOptions').doc(key).set({

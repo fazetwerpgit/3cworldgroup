@@ -212,7 +212,7 @@ export default function AdminFormOptionsPage() {
 
         <Card className="rounded-lg border-slate-200 bg-slate-50 py-0 shadow-sm">
           <CardContent className="p-5 text-sm text-slate-600">
-            Leads categories and reasons aren't editable here because they control which fields appear on the Leads Request form.
+            Leads categories and reasons cannot be edited here because they control which fields appear on the Leads Request form.
           </CardContent>
         </Card>
       </div>
