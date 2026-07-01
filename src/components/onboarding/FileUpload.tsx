@@ -12,6 +12,7 @@ interface FileUploadProps {
   allowedTypes: string[];
   maxSizeMb?: number;
   extraFields?: Record<string, string>;
+  getHeaders?: () => Promise<HeadersInit>;
   label?: string;
   existingPath?: string;
   onUploaded: (folderPath: string) => void;
@@ -55,6 +56,7 @@ export default function FileUpload({
   allowedTypes,
   maxSizeMb = 4,
   extraFields = {},
+  getHeaders,
   label,
   existingPath,
   onUploaded,
@@ -92,7 +94,8 @@ export default function FileUpload({
       for (const [k, v] of Object.entries(extraFields)) body.set(k, v);
       body.set('file', file);
 
-      const response = await fetch(uploadUrl, { method: 'POST', body });
+      const headers = getHeaders ? await getHeaders() : undefined;
+      const response = await fetch(uploadUrl, { method: 'POST', headers, body });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Upload failed');
 

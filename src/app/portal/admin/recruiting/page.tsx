@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
+import { toCsv, downloadCsv } from '@/lib/export/csv';
 import {
   ApplicationRecord,
   FieldRole,
@@ -55,6 +56,15 @@ const emptyForm = {
   isIBO: false,
   applicationId: '',
 };
+
+const APPLICATION_COLUMNS = [
+  { key: 'name', label: 'Name' },
+  { key: 'city', label: 'City' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'email', label: 'Email' },
+  { key: 'status', label: 'Status' },
+  { key: 'createdAt', label: 'Submitted' },
+];
 
 const statusTone: Record<string, string> = {
   invited: 'border-blue-200 bg-blue-50 text-blue-700',
@@ -395,6 +405,58 @@ export default function RecruitingCommandCenterPage() {
                       </a>
                     </Button>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm xl:col-span-2">
+            <CardHeader className="border-b border-slate-100 p-5">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <CardTitle className="text-base">Website Applications</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={applications.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'applications.csv',
+                      toCsv(APPLICATION_COLUMNS, applications as unknown as Record<string, unknown>[])
+                    )
+                  }
+                >
+                  Download CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              {applications.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                  No website applications yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {applications.map((application) => (
+                    <div
+                      key={application.id}
+                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                        <div>
+                          <p className="font-medium text-slate-950">{application.name}</p>
+                          <p className="mt-1 text-sm text-slate-600">{application.city}</p>
+                        </div>
+                        <Badge variant="outline" className={statusTone[application.status] ?? statusTone.invited}>
+                          {application.status}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-3">
+                        <div>{application.phone}</div>
+                        <div>{application.email}</div>
+                        <div>Submitted {formatDate(application.createdAt ? application.createdAt.toString() : null)}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

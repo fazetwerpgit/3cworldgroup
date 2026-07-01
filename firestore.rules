@@ -89,5 +89,27 @@ service cloud.firestore {
     match /sensitiveAccessLog/{logId} {
       allow read, write: if false;
     }
+
+    // Rep-form submissions (Fiber Report, Expedite Order). Server-only (Admin
+    // SDK); reps submit and management reads via gated API routes, not direct
+    // client Firestore access.
+    match /fiberReports/{id} {
+      allow read, write: if false;
+    }
+    match /expediteOrders/{id} {
+      allow read, write: if false;
+    }
+    match /payrollDisputes/{id} {
+      allow read, write: if false;
+    }
+    match /leadsRequests/{id} {
+      allow read, write: if false;
+    }
+    match /formOptions/{key} {
+      allow read, write: if false;
+    }
+    match /managerInterviews/{id} {
+      allow read, write: if false;
+    }
   }
 }
