@@ -58,12 +58,12 @@ export default function ReportBugCard() {
     <div id="report-bug" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-border dark:bg-card">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44]">
+          <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44] dark:border-border dark:bg-muted dark:text-foreground">
             <Bug className="size-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-[#0A1F44]">Report a Bug</h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">Report a Bug</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
               Found something broken? Let us know and it goes straight to the team.
             </p>
           </div>
@@ -76,7 +76,7 @@ export default function ReportBugCard() {
       </div>
 
       {done ? (
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
           <CheckCircle2 className="size-4" />
           Thanks — your report was sent to the team.
         </div>
@@ -84,7 +84,7 @@ export default function ReportBugCard() {
         open && (
           <form onSubmit={submit} className="mt-4 space-y-4">
             {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
             )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
