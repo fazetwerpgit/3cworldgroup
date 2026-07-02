@@ -31,7 +31,7 @@ export function PortalPageHeader({
 }: PortalPageHeaderProps) {
   return (
     <section
-      className={`portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:ring-1 dark:ring-inset dark:ring-white/10 ${className}`}
+      className={`portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:bg-[#0e2647] dark:ring-1 dark:ring-inset dark:ring-white/15 ${className}`}
     >
       <div
         aria-hidden="true"

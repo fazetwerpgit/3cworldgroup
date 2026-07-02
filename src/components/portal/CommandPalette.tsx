@@ -195,15 +195,23 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const q = query.trim().toLowerCase();
 
   const sections = useMemo(() => {
+    // Token match: every whitespace-separated word must appear somewhere, so
+    // a natural query like "log sale" still finds "Log a sale".
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const matches = (text: string) => {
+      const hay = text.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    };
+
     const result: { heading: string; rows: PaletteRow[] }[] = [];
 
     const pageRows = pageDestinations
-      .filter((p) => p.label.toLowerCase().includes(q))
+      .filter((p) => matches(p.label))
       .map((p) => ({ key: `page:${p.href}`, label: p.label, href: p.href }));
     if (pageRows.length) result.push({ heading: 'Pages', rows: pageRows });
 
     const actionRows = actions
-      .filter((a) => a.label.toLowerCase().includes(q))
+      .filter((a) => matches(a.label))
       .map((a) => ({ key: `action:${a.href}:${a.label}`, label: a.label, href: a.href }));
     if (actionRows.length) result.push({ heading: 'Actions', rows: actionRows });
 
@@ -214,9 +222,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         .filter((s) => {
           const haystack = [s.customerName, s.customerAddress, s.customerPhone]
             .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          return haystack.includes(q);
+            .join(' ');
+          return matches(haystack);
         })
         .slice(0, 50)
         .map((s) => ({

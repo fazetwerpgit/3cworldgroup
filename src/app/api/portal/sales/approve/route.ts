@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { getRequester } from '@/lib/auth/requireManagement';
 import { SaleStatus } from '@/types';
 
 // Helper function to create a notification
@@ -39,13 +41,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Approving/rejecting a sale is a money decision — require a verified
+    // manager+ login and stamp the approver from the VERIFIED identity, never
+    // from client-supplied fields.
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    const requester = await getRequester(gate.uid);
+    if (!requester?.isManagerOrAbove) {
+      return NextResponse.json(
+        { error: 'Forbidden: approval requires manager access' },
+        { status: 403 }
+      );
+    }
+    const approverId = gate.uid;
+    const approverName = requester.name;
+
     const body = await request.json();
-    const { saleId, status, approverId, approverName, rejectionReason } = body;
+    const { saleId, status, rejectionReason } = body;
 
     // Validate required fields
-    if (!saleId || !status || !approverId) {
+    if (!saleId || !status) {
       return NextResponse.json(
-        { error: 'Missing required fields: saleId, status, approverId' },
+        { error: 'Missing required fields: saleId, status' },
         { status: 400 }
       );
     }

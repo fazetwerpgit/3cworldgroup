@@ -7,6 +7,7 @@ import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Sale, FIBER_COMPANIES } from '@/types';
 
 export default function ApprovalsPage() {
@@ -19,7 +20,11 @@ export default function ApprovalsPage() {
 
   const fetchPendingSales = async () => {
     try {
-      const response = await fetch('/api/portal/sales?status=pending&limit=100');
+      // The sales list endpoint requires a verified login.
+      const token = await getIdToken();
+      const response = await fetch('/api/portal/sales?status=pending&limit=100', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (response.ok) {
         const data = await response.json();
         setSales(data.sales);
@@ -40,14 +45,16 @@ export default function ApprovalsPage() {
     setProcessingId(saleId);
 
     try {
+      const token = await getIdToken();
       const response = await fetch('/api/portal/sales/approve', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           saleId,
           status: 'approved',
-          approverId: user.uid,
-          approverName: user.displayName || user.email,
         }),
       });
 
@@ -66,14 +73,16 @@ export default function ApprovalsPage() {
     setProcessingId(showRejectModal);
 
     try {
+      const token = await getIdToken();
       const response = await fetch('/api/portal/sales/approve', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           saleId: showRejectModal,
           status: 'rejected',
-          approverId: user.uid,
-          approverName: user.displayName || user.email,
           rejectionReason,
         }),
       });

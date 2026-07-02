@@ -129,9 +129,12 @@ export function MobileThread({
         </div>
       </div>
 
-      {/* Message list — newest at the bottom. Vertical rhythm is per-message so
+      {/* Message list — newest at the bottom. flex-col + mt-auto spacer
+          bottom-anchors sparse conversations so the latest message sits just
+          above the composer, chat-style. Vertical rhythm is per-message so
           grouped bubbles can tighten up (see mt-* below). */}
-      <div className="flex-1 overflow-auto p-3">
+      <div className="flex flex-1 flex-col overflow-auto p-3">
+        <div aria-hidden="true" className="mt-auto" />
         {loading ? (
           <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
         ) : messages.length === 0 ? (

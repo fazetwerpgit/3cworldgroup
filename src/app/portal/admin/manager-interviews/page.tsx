@@ -22,7 +22,7 @@ const COLUMNS = [
 ];
 
 export default function ManagerInterviewsReviewPage() {
-  const { user } = useAuth();
+  const { user, isRole } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,7 +33,9 @@ export default function ManagerInterviewsReviewPage() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    // ProtectedRoute only gates rendering — skip the fetch for roles that are
+    // about to be redirected so unauthorized loads stay silent (no 403 noise).
+    if (!user || !isRole('admin', 'operations')) return;
     try {
       const res = await authedFetch('/api/portal/forms/manager-interview/review');
       const json = await res.json();
@@ -44,7 +46,7 @@ export default function ManagerInterviewsReviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, authedFetch]);
+  }, [user, isRole, authedFetch]);
 
   useEffect(() => { load(); }, [load]);
 

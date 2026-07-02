@@ -2,23 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { auth } from '@/lib/firebase/config';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
-
-/**
- * Resolve a fresh ID token, waiting for Firebase auth to finish restoring the
- * session if needed — grabbing auth.currentUser too early races on first load.
- */
-async function getIdToken(): Promise<string | null> {
-  if (!auth) return null;
-  if (auth.currentUser) return auth.currentUser.getIdToken();
-  return new Promise((resolve) => {
-    const unsubscribe = auth!.onAuthStateChanged((firebaseUser) => {
-      unsubscribe();
-      resolve(firebaseUser ? firebaseUser.getIdToken() : null);
-    });
-  });
-}
 
 interface SalesFilters {
   status?: SaleStatus;
@@ -192,9 +177,15 @@ export function useSales() {
     setError(null);
 
     try {
+      // The approve endpoint verifies the caller's token and stamps the
+      // approver from it; approverId/Name in the body are legacy-ignored.
+      const token = await getIdToken();
       const response = await fetch('/api/portal/sales/approve', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           saleId,
           status,

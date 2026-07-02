@@ -242,7 +242,9 @@ export default function TeamChatPage() {
                       </Badge>
                     </div>
 
-                    <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
+                    <div className="flex flex-1 flex-col overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4 [&>*+*]:mt-3">
+                      {/* mt-auto spacer bottom-anchors sparse conversations. */}
+                      <div aria-hidden="true" className="mt-auto" />
                       {loadingMessages ? (
                         <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 shadow-sm">
                           <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">

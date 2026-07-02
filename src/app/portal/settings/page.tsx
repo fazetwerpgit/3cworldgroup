@@ -465,7 +465,7 @@ export default function SettingsPage() {
               {/* Account Info */}
               <div className="rounded-lg border border-[#0A1F44]/15 bg-[#0A1F44] p-6 text-white">
                 <div className="flex items-start gap-4">
-                  <div className="p-2 bg-white dark:bg-card/10 rounded-lg">
+                  <div className="rounded-lg bg-white/10 p-2">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>

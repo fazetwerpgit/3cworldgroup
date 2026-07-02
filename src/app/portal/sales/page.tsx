@@ -101,7 +101,7 @@ function SalesContent() {
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
               {/* Command band — same identity as the dashboard. */}
-              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:ring-1 dark:ring-inset dark:ring-white/10">
+              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:bg-[#0e2647] dark:ring-1 dark:ring-inset dark:ring-white/15">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0"
