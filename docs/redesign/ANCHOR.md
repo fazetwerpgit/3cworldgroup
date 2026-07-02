@@ -197,6 +197,14 @@ playbook where they conflict.
   next/prev, expand to full page). Full page remains for deep work.
 
 **Platform**
+- Locked chrome pattern (Slice 2, 2026-07-02): navy sidebar 240px, nav row =
+  36px, left icon (18px) + label, active = `bg-white/10` pill + 2px lime rail +
+  lime icon; section headers 11px uppercase white/40, collapsible with
+  localStorage persistence. Mobile = existing sheet sidebar + new
+  `MobileBottomNav` (Dashboard/Sales/Chat/Board, hidden on /portal/chat).
+- Locked login pattern: navy brand deck + diagonal lime seam (two stacked
+  clip-path layers), `.portal-display` (Archivo) headline, form panel light.
+
 - **Phone is primary for reps** — mobile gets first-class treatment (chat,
   leaderboard, forms especially). Mobile bottom-nav pattern from the playbook
   applies.
