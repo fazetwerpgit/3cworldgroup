@@ -128,7 +128,7 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-[1500px] space-y-5">
       {/* Command band: the workspace carries the same navy + seam identity as
           the login deck. */}
-      <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white">
+      <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:ring-1 dark:ring-inset dark:ring-white/10">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"

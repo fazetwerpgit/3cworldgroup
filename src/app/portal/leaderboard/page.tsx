@@ -85,7 +85,7 @@ export default function LeaderboardPage() {
             <div className="mx-auto max-w-[1500px] space-y-5">
               {/* Command band with YOUR standing built in — the page opens by
                   answering the only question every rep has: where am I? */}
-              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white">
+              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:ring-1 dark:ring-inset dark:ring-white/10">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0"

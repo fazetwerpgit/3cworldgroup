@@ -150,7 +150,7 @@ export function SalesTable({
             <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">
               Your first logged sale starts the board.
             </p>
-            <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+            <Button asChild className="mx-auto mt-4 w-fit bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
               <Link href="/portal/sales/new">Log a sale</Link>
             </Button>
           </>

@@ -101,7 +101,7 @@ function SalesContent() {
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
               {/* Command band — same identity as the dashboard. */}
-              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white">
+              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:ring-1 dark:ring-inset dark:ring-white/10">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0"
@@ -135,7 +135,7 @@ function SalesContent() {
               </section>
 
               {/* Saved-view style status tabs — lime underline marks the active view. */}
-              <div className="portal-enter portal-enter-2 flex items-center gap-1 overflow-x-auto border-b border-slate-200 [-ms-overflow-style:none] [scrollbar-width:none] dark:border-border [&::-webkit-scrollbar]:hidden">
+              <div className="portal-enter portal-enter-2 flex items-center gap-1 overflow-x-auto border-b border-slate-200 [-ms-overflow-style:none] [scrollbar-width:none] max-sm:[mask-image:linear-gradient(90deg,#000_90%,transparent)] dark:border-border [&::-webkit-scrollbar]:hidden">
                 {STATUS_TABS.map((tab) => {
                   const active = statusFilter === tab.value;
                   return (

@@ -106,7 +106,7 @@ export function MiniLeaderboard() {
           </span>
           <Link
             href="/portal/leaderboard"
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-[#5a8f1f] dark:text-muted-foreground"
+            className="-m-2 flex items-center gap-1 p-2 text-xs font-medium text-slate-500 transition-colors hover:text-[#5a8f1f] dark:text-muted-foreground"
           >
             View all
             <ArrowRight className="h-3 w-3" />
