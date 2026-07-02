@@ -123,7 +123,9 @@ export function PortalHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-border dark:bg-card/95 sm:px-6">
+      {/* Safe-area padding keeps the header below the iOS status bar/notch when
+          installed as a home-screen app (env() is 0 in normal browsers). */}
+      <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between border-b border-slate-200 bg-white/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-border dark:bg-card/95 sm:px-6">
         <div className="flex items-center gap-3">
           <button
             onClick={toggleMobileMenu}

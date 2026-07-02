@@ -101,7 +101,7 @@ export function MobileThread({
   onReactionError,
 }: MobileThreadProps) {
   return (
-    <div className="chat-slide-in flex h-[calc(100dvh-4rem)] flex-col bg-slate-50 dark:bg-muted/40">
+    <div className="chat-slide-in flex h-[calc(100dvh-4rem-env(safe-area-inset-top))] flex-col bg-slate-50 dark:bg-muted/40">
       {/* Compact top bar with back arrow (≥40px target). */}
       <div className="flex items-center gap-1 border-b border-slate-200 dark:border-border bg-white/95 dark:bg-card/95 px-1.5 py-1.5 backdrop-blur">
         <button
