@@ -361,6 +361,16 @@ body {
   body[data-portal-bottom-nav] .portal-scope main {
     padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
+
+  /* Inside a phone chat conversation the composer owns the bottom edge: hide
+     the quick-nav bar and reclaim its reserved scroll room. */
+  body[data-chat-thread] [data-slot="mobile-bottom-nav"] {
+    display: none;
+  }
+
+  body[data-chat-thread][data-portal-bottom-nav] .portal-scope main {
+    padding-bottom: 0;
+  }
 }
 
 /* ============================================

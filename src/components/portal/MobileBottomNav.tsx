@@ -25,26 +25,22 @@ const items = [
 
 /**
  * Phone-first quick nav: the four everyday destinations pinned to the bottom
- * of the screen on mobile. Hidden on the chat page (the composer owns the
- * bottom edge there) and on desktop. While mounted it tags <body> so
- * globals.css can reserve scroll room under the bar.
+ * of the screen on mobile. Hidden on desktop. On the chat page it stays visible
+ * on the channel-list screen but is hidden inside a conversation — the chat page
+ * flags <body data-chat-thread> and globals.css collapses the bar (see the
+ * data-slot hook below). While mounted it tags <body> so globals.css can
+ * reserve scroll room under the bar.
  */
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { hasPermission } = useAuth();
 
-  const onChat = pathname.startsWith('/portal/chat');
-  const visible = !onChat;
-
   useEffect(() => {
-    if (!visible) return;
     document.body.dataset.portalBottomNav = 'on';
     return () => {
       delete document.body.dataset.portalBottomNav;
     };
-  }, [visible]);
-
-  if (!visible) return null;
+  }, []);
 
   const isActive = (href: string) =>
     href === '/portal/dashboard' ? pathname === href : pathname.startsWith(href);
@@ -52,6 +48,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Quick navigation"
+      data-slot="mobile-bottom-nav"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0A1F44]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around">

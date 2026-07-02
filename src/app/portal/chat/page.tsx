@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Hash, Lock, MessageSquareText, Send, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { MobileChannelList } from '@/components/chat/MobileChannelList';
+import { MobileThread } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
@@ -32,7 +34,11 @@ export default function TeamChatPage() {
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Phone-only two-screen state: channel list vs. full-screen conversation.
+  // Desktop (lg+) ignores this entirely and always shows the side-by-side panel.
+  const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const mobileMessagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const { channels, loading: loadingChannels, error: channelsError } = useChatChannels();
   const { messages, loading: loadingMessages, error: messagesError } = useMessages(
@@ -77,7 +83,18 @@ export default function TeamChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length, activeChannelId]);
+    mobileMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length, activeChannelId, mobileView]);
+
+  // Flag <body> while the phone conversation is open so globals.css hides the
+  // bottom nav and reclaims its reserved scroll room (composer owns the edge).
+  useEffect(() => {
+    if (mobileView !== 'thread') return;
+    document.body.dataset.chatThread = 'on';
+    return () => {
+      delete document.body.dataset.chatThread;
+    };
+  }, [mobileView]);
 
   const sendMessage = async () => {
     if (!user || !activeChannelId || !draft.trim()) return;
@@ -140,199 +157,238 @@ export default function TeamChatPage() {
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1500px] space-y-5">
-              <PortalPageHeader
-                eyebrow="Team resources"
-                title="Team Chat"
-                description="Live text-only team channels for onboarding, training, and manager coordination — a free Firebase pilot with no media hosting or paid chat vendor."
-              />
+          <main className="flex-1 overflow-auto lg:p-6">
+            {/* Desktop (lg+): the shipped side-by-side panel layout, unchanged. */}
+            <div className="hidden lg:block">
+              <div className="mx-auto max-w-[1500px] space-y-5">
+                <PortalPageHeader
+                  eyebrow="Team resources"
+                  title="Team Chat"
+                  description="Live text-only team channels for onboarding, training, and manager coordination — a free Firebase pilot with no media hosting or paid chat vendor."
+                />
 
-              {shownError && (
-                <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-                  <AlertDescription>{shownError}</AlertDescription>
-                </Alert>
-              )}
+                {shownError && (
+                  <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
+                    <AlertDescription>{shownError}</AlertDescription>
+                  </Alert>
+                )}
 
-              <div className="grid min-h-[680px] grid-cols-1 overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card shadow-sm lg:grid-cols-[320px_1fr]">
-                <aside className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted/70 lg:border-b-0 lg:border-r">
-                  <div className="border-b border-slate-200 dark:border-border p-4">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-foreground">
-                      <MessageSquareText className="size-4 text-[#0A1F44] dark:text-foreground" />
-                      Pilot Channels
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                      Latest 75 messages per channel to control read volume.
-                    </p>
-                  </div>
-                  <div className="space-y-2 p-3">
-                    {loadingChannels ? (
-                      <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
-                        Loading channels...
+                <div className="grid min-h-[680px] grid-cols-1 overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card shadow-sm lg:grid-cols-[320px_1fr]">
+                  <aside className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted/70 lg:border-b-0 lg:border-r">
+                    <div className="border-b border-slate-200 dark:border-border p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-foreground">
+                        <MessageSquareText className="size-4 text-[#0A1F44] dark:text-foreground" />
+                        Pilot Channels
                       </div>
-                    ) : channels.length === 0 ? (
-                      <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
-                        No live channels yet. Ask an admin to sync chat channels.
-                      </div>
-                    ) : (
-                      channels.map((channel) => (
-                        <button
-                          key={channel.id}
-                          type="button"
-                          onClick={() => setActiveChannelId(channel.id)}
-                          className={`w-full cursor-pointer rounded-md border p-3 text-left transition-colors duration-200 ${
-                            channel.id === activeChannelId
-                              ? 'border-[#8dc63f]/50 bg-[#8dc63f]/10 text-slate-950 dark:text-foreground'
-                              : 'border-transparent bg-white dark:bg-card text-slate-700 dark:text-muted-foreground hover:border-slate-200 dark:hover:border-border'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="flex items-center gap-2 text-sm font-semibold">
-                              {channel.audience === 'managers' ? (
-                                <Lock className="size-4 text-slate-500 dark:text-muted-foreground" />
-                              ) : (
-                                <Hash className="size-4 text-slate-500 dark:text-muted-foreground" />
-                              )}
-                              {channel.name}
-                            </span>
-                            <Badge variant="secondary" className="text-[11px]">
-                              {audienceCopy[channel.audience]}
-                            </Badge>
-                          </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-muted-foreground">
-                            {channel.description}
-                          </p>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </aside>
-
-                <section className="flex min-h-[680px] flex-col">
-                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-border p-4">
-                    <div>
-                      <h2 className="font-semibold text-slate-950 dark:text-foreground">
-                        {activeChannel?.name ?? 'Select a channel'}
-                      </h2>
                       <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                        {activeChannel?.description ?? 'Choose a channel to view messages.'}
+                        Latest 75 messages per channel to control read volume.
                       </p>
                     </div>
-                    <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground">
-                      {messages.length} shown
-                    </Badge>
-                  </div>
-
-                  <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
-                    {loadingMessages ? (
-                      <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 shadow-sm">
-                        <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
-                          Loading messages...
-                        </CardContent>
-                      </Card>
-                    ) : messages.length === 0 ? (
-                      <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 text-center shadow-sm">
-                        <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                          <CardTitle className="text-base">No messages yet</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
-                          Start with a short update, question, or field note.
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      messages.map((message) => {
-                        const canDelete = canModerate || message.authorId === user?.uid;
-                        return (
-                          <div
-                            key={message.id}
-                            className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300 dark:hover:border-white/25"
+                    <div className="space-y-2 p-3">
+                      {loadingChannels ? (
+                        <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
+                          Loading channels...
+                        </div>
+                      ) : channels.length === 0 ? (
+                        <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
+                          No live channels yet. Ask an admin to sync chat channels.
+                        </div>
+                      ) : (
+                        channels.map((channel) => (
+                          <button
+                            key={channel.id}
+                            type="button"
+                            onClick={() => setActiveChannelId(channel.id)}
+                            className={`w-full cursor-pointer rounded-md border p-3 text-left transition-colors duration-200 ${
+                              channel.id === activeChannelId
+                                ? 'border-[#8dc63f]/50 bg-[#8dc63f]/10 text-slate-950 dark:text-foreground'
+                                : 'border-transparent bg-white dark:bg-card text-slate-700 dark:text-muted-foreground hover:border-slate-200 dark:hover:border-border'
+                            }`}
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-semibold text-slate-950 dark:text-foreground">
-                                    {message.authorName}
-                                  </span>
-                                  {message.authorRole && (
-                                    <Badge variant="secondary" className="text-[11px]">
-                                      {message.authorRole.replace('_', ' ')}
-                                    </Badge>
-                                  )}
-                                  <span className="text-xs text-slate-500 dark:text-muted-foreground">
-                                    {formatTime(message.createdAt)}
-                                  </span>
-                                </div>
-                                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
-                                  {message.text}
-                                </p>
-                                <ReactionBar
-                                  channelId={activeChannelId}
-                                  messageId={message.id}
-                                  reactionCounts={message.reactionCounts}
-                                  myReactions={message.myReactions}
-                                  onError={setError}
-                                />
-                              </div>
-                              {canDelete && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8 shrink-0 text-slate-400 dark:text-muted-foreground opacity-100 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300 sm:opacity-0 sm:group-hover:opacity-100"
-                                  onClick={() => deleteMessage(message.id)}
-                                  disabled={deletingId === message.id}
-                                  aria-label="Delete message"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              )}
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="flex items-center gap-2 text-sm font-semibold">
+                                {channel.audience === 'managers' ? (
+                                  <Lock className="size-4 text-slate-500 dark:text-muted-foreground" />
+                                ) : (
+                                  <Hash className="size-4 text-slate-500 dark:text-muted-foreground" />
+                                )}
+                                {channel.name}
+                              </span>
+                              <Badge variant="secondary" className="text-[11px]">
+                                {audienceCopy[channel.audience]}
+                              </Badge>
                             </div>
-                          </div>
-                        );
-                      })
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
+                            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-muted-foreground">
+                              {channel.description}
+                            </p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </aside>
 
-                  <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
-                    <div className="flex flex-col gap-3">
-                      <Textarea
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
-                        onKeyDown={(event) => {
-                          // Enter sends; Shift+Enter inserts a newline.
-                          if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault();
-                            sendMessage();
-                          }
-                        }}
-                        placeholder={
-                          activeChannel
-                            ? `Message ${activeChannel.name}...`
-                            : 'Select a channel to send a message...'
-                        }
-                        disabled={!activeChannelId || sending}
-                        rows={3}
-                        className="resize-none"
-                      />
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
-                          Enter to send · Shift+Enter for a new line. No customer PII, card numbers, or SSNs.
+                  <section className="flex min-h-[680px] flex-col">
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-border p-4">
+                      <div>
+                        <h2 className="font-semibold text-slate-950 dark:text-foreground">
+                          {activeChannel?.name ?? 'Select a channel'}
+                        </h2>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
+                          {activeChannel?.description ?? 'Choose a channel to view messages.'}
                         </p>
-                        <Button
-                          type="button"
-                          onClick={sendMessage}
-                          disabled={!activeChannelId || !draft.trim() || sending}
-                          className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-                        >
-                          <Send className="size-4" />
-                          Send
-                        </Button>
+                      </div>
+                      <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground">
+                        {messages.length} shown
+                      </Badge>
+                    </div>
+
+                    <div className="flex-1 space-y-3 overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
+                      {loadingMessages ? (
+                        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 shadow-sm">
+                          <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
+                            Loading messages...
+                          </CardContent>
+                        </Card>
+                      ) : messages.length === 0 ? (
+                        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 text-center shadow-sm">
+                          <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+                            <CardTitle className="text-base">No messages yet</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
+                            Start with a short update, question, or field note.
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        messages.map((message) => {
+                          const canDelete = canModerate || message.authorId === user?.uid;
+                          return (
+                            <div
+                              key={message.id}
+                              className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300 dark:hover:border-white/25"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-semibold text-slate-950 dark:text-foreground">
+                                      {message.authorName}
+                                    </span>
+                                    {message.authorRole && (
+                                      <Badge variant="secondary" className="text-[11px]">
+                                        {message.authorRole.replace('_', ' ')}
+                                      </Badge>
+                                    )}
+                                    <span className="text-xs text-slate-500 dark:text-muted-foreground">
+                                      {formatTime(message.createdAt)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
+                                    {message.text}
+                                  </p>
+                                  <ReactionBar
+                                    channelId={activeChannelId}
+                                    messageId={message.id}
+                                    reactionCounts={message.reactionCounts}
+                                    myReactions={message.myReactions}
+                                    onError={setError}
+                                  />
+                                </div>
+                                {canDelete && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8 shrink-0 text-slate-400 dark:text-muted-foreground opacity-100 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300 sm:opacity-0 sm:group-hover:opacity-100"
+                                    onClick={() => deleteMessage(message.id)}
+                                    disabled={deletingId === message.id}
+                                    aria-label="Delete message"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
+                      <div className="flex flex-col gap-3">
+                        <Textarea
+                          value={draft}
+                          onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
+                          onKeyDown={(event) => {
+                            // Enter sends; Shift+Enter inserts a newline.
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault();
+                              sendMessage();
+                            }
+                          }}
+                          placeholder={
+                            activeChannel
+                              ? `Message ${activeChannel.name}...`
+                              : 'Select a channel to send a message...'
+                          }
+                          disabled={!activeChannelId || sending}
+                          rows={3}
+                          className="resize-none"
+                        />
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                            Enter to send · Shift+Enter for a new line. No customer PII, card numbers, or SSNs.
+                          </p>
+                          <Button
+                            type="button"
+                            onClick={sendMessage}
+                            disabled={!activeChannelId || !draft.trim() || sending}
+                            className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                          >
+                            <Send className="size-4" />
+                            Send
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </section>
+                  </section>
+                </div>
               </div>
+            </div>
+
+            {/* Mobile (< lg): Connecteam-style two-screen — channel list, then a
+                full-screen conversation with a back arrow. */}
+            <div className="lg:hidden">
+              {mobileView === 'thread' ? (
+                <MobileThread
+                  channel={activeChannel}
+                  channelId={activeChannelId}
+                  messages={messages}
+                  loading={loadingMessages}
+                  error={shownError}
+                  currentUserId={user?.uid}
+                  canModerate={canModerate}
+                  draft={draft}
+                  sending={sending}
+                  deletingId={deletingId}
+                  messagesEndRef={mobileMessagesEndRef}
+                  formatTime={formatTime}
+                  onBack={() => setMobileView('list')}
+                  onDraftChange={setDraft}
+                  onSend={sendMessage}
+                  onDelete={deleteMessage}
+                  onReactionError={setError}
+                />
+              ) : (
+                <MobileChannelList
+                  channels={channels}
+                  loading={loadingChannels}
+                  error={shownError}
+                  onOpenChannel={(channelId) => {
+                    setActiveChannelId(channelId);
+                    setMobileView('thread');
+                  }}
+                />
+              )}
             </div>
           </main>
         </div>
