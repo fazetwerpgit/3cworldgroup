@@ -143,7 +143,7 @@ export default function TeamChatPage() {
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
               <PortalPageHeader
-                eyebrow="Team"
+                eyebrow="Team resources"
                 title="Team Chat"
                 description="Live text-only team channels for onboarding, training, and manager coordination — a free Firebase pilot with no media hosting or paid chat vendor."
               />
