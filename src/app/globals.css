@@ -289,6 +289,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Display face for brand moments (login headline, marquee numbers) */
+.portal-display {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+}
+
 /* ============================================
    CHIPR-STYLE DESIGN ELEMENTS
    Sharp shadows, bold typography, energetic vibe

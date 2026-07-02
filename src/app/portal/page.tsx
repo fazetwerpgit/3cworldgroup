@@ -16,13 +16,14 @@ export default function PortalLoginPage() {
     }
   }, [user, loading, router]);
 
-  // Show loading while checking auth state
+  // Show loading while checking auth state — same navy deck as the login so
+  // there is no background flash between the two states.
   if (loading) {
     return (
-      <div className="min-h-screen portal-canvas flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A1F44] mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0A1F44]">
+        <div className="flex items-center gap-3 text-white/70">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[#8dc63f]" />
+          <p className="text-sm">Signing you in…</p>
         </div>
       </div>
     );

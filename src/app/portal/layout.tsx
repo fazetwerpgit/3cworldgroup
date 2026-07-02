@@ -1,7 +1,16 @@
+import { Archivo } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
+
+// Display face for portal brand moments (login, KPI headers) — exposed as
+// --font-archivo and consumed by the .portal-display helper in globals.css.
+const archivo = Archivo({
+  subsets: ['latin'],
+  variable: '--font-archivo',
+  display: 'swap',
+});
 
 export const metadata = {
   title: "Employee Portal | 3C World Group",
@@ -21,7 +30,7 @@ export default function PortalLayout({
           <ServiceWorkerRegistrar />
           {/* .portal-scope gates the portal reskin tokens/overrides in
               globals.css; display:contents keeps it out of the layout. */}
-          <div className="portal-scope contents">{children}</div>
+          <div className={`portal-scope contents ${archivo.variable}`}>{children}</div>
         </MobileMenuProvider>
       </AuthProvider>
     </ThemeProvider>
