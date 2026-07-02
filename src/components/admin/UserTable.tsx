@@ -25,7 +25,8 @@ interface UserTableProps {
 
 const statusColors = {
   active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
-  inactive: 'border-red-200 bg-red-50 text-red-700',
+  inactive:
+    'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300',
 };
 
 const roleLabels: Record<string, string> = {
@@ -48,12 +49,12 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
 
   if (users.length === 0) {
     return (
-      <Card className="rounded-lg border-slate-200 bg-white text-center shadow-sm">
+      <Card className="rounded-lg border-slate-200 bg-white dark:border-border dark:bg-card text-center shadow-sm">
         <CardContent className="py-10">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-muted dark:text-muted-foreground">
             <UserPlus className="h-6 w-6" />
           </div>
-          <p className="font-medium text-slate-950">No users found</p>
+          <p className="font-medium text-slate-950 dark:text-foreground">No users found</p>
           <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
             <Link href="/portal/admin/users/new">Add First User</Link>
           </Button>
@@ -63,10 +64,10 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
   }
 
   return (
-    <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm">
+    <Card className="overflow-hidden rounded-lg border-slate-200 bg-white dark:border-border dark:bg-card py-0 shadow-sm">
       <Table>
-        <TableHeader className="bg-slate-50">
-          <TableRow className="hover:bg-slate-50">
+        <TableHeader className="bg-slate-50 dark:bg-muted/40">
+          <TableRow className="hover:bg-transparent">
             <TableHead className="px-6 text-xs font-semibold uppercase tracking-wider text-slate-500">
               User
             </TableHead>
@@ -88,7 +89,7 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
           {users.map((user) => (
             <TableRow
               key={user.uid}
-              className="border-slate-100 transition-colors hover:bg-slate-50"
+              className="border-slate-100 transition-colors hover:bg-slate-50 dark:border-border dark:hover:bg-muted/40"
             >
               <TableCell className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -104,14 +105,14 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                     />
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-950">
+                    <div className="truncate text-sm font-medium text-slate-950 dark:text-foreground">
                       {user.displayName}
                     </div>
-                    <div className="truncate text-sm text-slate-500">{user.email}</div>
+                    <div className="truncate text-sm text-slate-500 dark:text-muted-foreground">{user.email}</div>
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="px-6 py-4 text-sm text-slate-700">
+              <TableCell className="px-6 py-4 text-sm text-slate-700 dark:text-muted-foreground">
                 {roleLabels[user.role ?? user.fieldRole ?? ''] ||
                   user.role ||
                   user.fieldRole}
@@ -121,14 +122,14 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                   variant="outline"
                   className={
                     statusColors[user.status as keyof typeof statusColors] ||
-                    'border-slate-200 bg-slate-100 text-slate-600'
+                    'border-slate-200 bg-slate-100 text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground'
                   }
                 >
                   {user.status?.charAt(0).toUpperCase() + user.status?.slice(1) ||
                     'Unknown'}
                 </Badge>
               </TableCell>
-              <TableCell className="px-6 py-4 text-sm text-slate-500">
+              <TableCell className="px-6 py-4 text-sm text-slate-500 dark:text-muted-foreground">
                 {formatDate(user.hireDate)}
               </TableCell>
               <TableCell className="px-6 py-4 text-right">
@@ -146,7 +147,7 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                       size="sm"
                       onClick={() => onStatusChange(user.uid, 'inactive')}
                       disabled={loading}
-                      className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                      className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/15 dark:hover:text-amber-200"
                     >
                       Deactivate
                     </Button>
@@ -175,7 +176,7 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                         )
                       }
                       disabled={loading}
-                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/15 dark:hover:text-red-200"
                       title="Delete user"
                     >
                       <Trash2 className="h-4 w-4" />

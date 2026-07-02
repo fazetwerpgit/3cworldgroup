@@ -294,6 +294,23 @@ body {
   font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
+/* Focus is lime inside the portal — overrides the public site's legacy blue
+   outline rule and guarantees a visible ring on form fields even where
+   utility-class focus variants are missing. */
+.portal-scope a:focus-visible,
+.portal-scope button:focus-visible {
+  outline: 2px solid rgba(141, 198, 63, 0.75);
+  outline-offset: 2px;
+}
+
+.portal-scope input:focus-visible,
+.portal-scope select:focus-visible,
+.portal-scope textarea:focus-visible {
+  border-color: #8dc63f;
+  box-shadow: 0 0 0 3px rgba(141, 198, 63, 0.3);
+  outline: none;
+}
+
 /* Micro-interactions: every portal button acknowledges the press. */
 .portal-scope [data-slot="button"] {
   transition:

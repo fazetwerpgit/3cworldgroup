@@ -140,7 +140,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
       <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
         <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44]">Customer Address</CardTitle>
+          <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Address</CardTitle>
         </CardHeader>
         <CardContent className="p-5">
         <div>
@@ -156,14 +156,14 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             className="h-11"
             placeholder="123 Main St, City, State 12345"
           />
-          <p className="mt-1 text-xs text-slate-500">Enter the full address where service will be installed</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">Enter the full address where service will be installed</p>
         </div>
         </CardContent>
       </Card>
 
       <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
         <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44]">Customer Information <span className="text-sm font-normal text-slate-400">(Optional)</span></CardTitle>
+          <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Information <span className="text-sm font-normal text-slate-400">(Optional)</span></CardTitle>
         </CardHeader>
         <CardContent className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -209,7 +209,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
       <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
         <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44]">Select Plan</CardTitle>
+          <CardTitle className="text-[#0A1F44] dark:text-foreground">Select Plan</CardTitle>
         </CardHeader>
         <CardContent className="p-5">
 
@@ -224,10 +224,10 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                 className={`rounded-lg border p-4 text-left transition-colors ${
                   selectedCompany === company.value
                     ? 'border-[#8dc63f] bg-[#8dc63f]/5 shadow-[inset_0_0_0_1px_#8dc63f]'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:border-border dark:hover:border-white/25 dark:hover:bg-muted'
                 }`}
               >
-                <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950'}`}>
+                <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950 dark:text-foreground'}`}>
                   {company.label}
                 </span>
               </button>
@@ -247,18 +247,18 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                   disabled={products.some(p => p.productId === plan.id)}
                   className={`rounded-lg border p-4 text-left transition-colors ${
                     products.some(p => p.productId === plan.id)
-                      ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
-                      : 'border-gray-200 hover:border-[#8dc63f] hover:bg-[#8dc63f]/5'
+                      ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed dark:border-border dark:bg-muted'
+                      : 'border-gray-200 hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-semibold text-slate-950 block">{plan.name}</span>
-                      <span className="text-sm text-slate-500">{plan.speed}</span>
+                      <span className="font-semibold text-slate-950 dark:text-foreground block">{plan.name}</span>
+                      <span className="text-sm text-slate-500 dark:text-muted-foreground">{plan.speed}</span>
                     </div>
                     <div className="text-right">
-                      <span className="font-bold text-[#0A1F44]">${plan.price.toFixed(2)}</span>
-                      <span className="text-xs text-gray-500 block">/month</span>
+                      <span className="font-bold text-[#0A1F44] dark:text-foreground">${plan.price.toFixed(2)}</span>
+                      <span className="text-xs text-gray-500 dark:text-muted-foreground block">/month</span>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1">
@@ -277,11 +277,11 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             <Label className="mb-3">Selected Plans</Label>
             <div className="space-y-2">
               {products.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-border dark:bg-muted">
                   <div>
-                    <span className="font-medium text-slate-950">{product.productName}</span>
+                    <span className="font-medium text-slate-950 dark:text-foreground">{product.productName}</span>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm text-gray-500">${product.unitPrice.toFixed(2)}/mo</span>
+                      <span className="text-sm text-gray-500 dark:text-muted-foreground">${product.unitPrice.toFixed(2)}/mo</span>
                       <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
                         +{product.points} pts
                       </Badge>
@@ -307,7 +307,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
       <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
         <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44]">Sale Details</CardTitle>
+          <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Details</CardTitle>
         </CardHeader>
         <CardContent className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

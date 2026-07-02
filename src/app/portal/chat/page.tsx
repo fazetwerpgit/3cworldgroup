@@ -260,7 +260,7 @@ export default function TeamChatPage() {
                         return (
                           <div
                             key={message.id}
-                            className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300"
+                            className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300 dark:hover:border-white/25"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
@@ -277,7 +277,7 @@ export default function TeamChatPage() {
                                     {formatTime(message.createdAt)}
                                   </span>
                                 </div>
-                                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-muted-foreground">
+                                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
                                   {message.text}
                                 </p>
                                 <ReactionBar

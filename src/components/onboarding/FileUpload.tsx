@@ -108,8 +108,8 @@ export default function FileUpload({
   };
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3">
-      {label && <p className="mb-2 text-xs font-medium text-slate-600">{label}</p>}
+    <div className="rounded-md border border-slate-200 bg-white p-3 dark:border-border dark:bg-card">
+      {label && <p className="mb-2 text-xs font-medium text-slate-600 dark:text-muted-foreground">{label}</p>}
       <input
         ref={inputRef}
         type="file"

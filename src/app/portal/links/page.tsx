@@ -86,7 +86,7 @@ export default function LinksPage() {
                               <RadioTower className="size-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground transition-colors duration-200 group-hover:text-[#4f7f1d] dark:text-green-300">
+                              <h3 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-foreground transition-colors duration-200 group-hover:text-[#4f7f1d] dark:group-hover:text-green-300">
                                 {link.title}
                                 <ExternalLink className="size-4 opacity-60 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none" />
                               </h3>
