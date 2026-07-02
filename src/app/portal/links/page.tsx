@@ -1,8 +1,9 @@
 'use client';
 
-import { ExternalLink, Info, RadioTower, Route, ShieldCheck } from 'lucide-react';
+import { ExternalLink, Info, RadioTower, ShieldCheck } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,29 +40,17 @@ export default function LinksPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                        Quick Links
-                      </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
-                        Field reference
-                      </Badge>
-                    </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      Approved service checks and field reference links for repeated sales workflows.
-                    </p>
-                  </div>
-                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
-                    <Route className="size-5" />
-                  </div>
-                </div>
-              </section>
+              <PortalPageHeader
+                eyebrow="Field reference"
+                title="Quick Links"
+                description="Approved service checks and field reference links for repeated sales workflows."
+              />
 
-              {categories.map((category) => (
-                <section key={category} className="space-y-3">
+              {categories.map((category, categoryIndex) => (
+                <section
+                  key={category}
+                  className={`space-y-3 portal-enter ${categoryIndex === 0 ? 'portal-enter-2' : 'portal-enter-3'}`}
+                >
                   <div className="flex items-center justify-between">
                     <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-muted-foreground">
                       {category}
@@ -99,7 +88,7 @@ export default function LinksPage() {
                 </section>
               ))}
 
-              <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+              <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base text-[#0A1F44] dark:text-foreground">
                     <ShieldCheck className="size-4 text-[#4f7f1d] dark:text-green-300" />

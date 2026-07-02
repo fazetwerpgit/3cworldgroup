@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
@@ -170,14 +171,11 @@ export default function SettingsPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1100px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                  Account Settings
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                  Manage your profile, password, and account details used inside the employee portal.
-                </p>
-              </section>
+              <PortalPageHeader
+                eyebrow="Your account"
+                title="Account Settings"
+                description="Manage your profile, password, and account details used inside the employee portal."
+              />
 
               {/* Success/Error Messages */}
               {success && (
@@ -195,7 +193,7 @@ export default function SettingsPage() {
               )}
 
               {/* Profile Information */}
-              <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
+              <div className="portal-enter portal-enter-2 rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">
                     Profile Information
@@ -203,7 +201,7 @@ export default function SettingsPage() {
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-1 text-sm font-medium text-[#5a8f1f] hover:text-[#4a7c19]"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-200 dark:border-border px-3 py-1.5 text-sm font-medium text-[#5a8f1f] transition-colors hover:bg-slate-50 hover:text-[#4a7c19] dark:hover:bg-muted"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -231,8 +229,8 @@ export default function SettingsPage() {
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-[#8dc63f] shadow-sm">
-                      <span className="text-3xl font-bold text-[#0A1F44]">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-[#0A1F44] shadow-sm ring-2 ring-[#8dc63f]/60">
+                      <span className="text-3xl font-bold text-white">
                         {user?.displayName?.charAt(0).toUpperCase() ||
                           user?.email?.charAt(0).toUpperCase() ||
                           'U'}
@@ -329,7 +327,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Security */}
-              <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
+              <div className="portal-enter portal-enter-3 rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground mb-4">
                   Security
                 </h2>

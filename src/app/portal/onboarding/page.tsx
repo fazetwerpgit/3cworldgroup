@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -160,34 +161,27 @@ export default function OnboardingPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <Badge variant="outline" className="mb-3 border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
-                      Field readiness
-                    </Badge>
-                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                      My Onboarding
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      Complete each clearance item before moving into active selling.
-                      {data?.isIBO ? ' IBO business items are included.' : ''}
-                    </p>
-                  </div>
-                  <div className="grid min-w-[220px] gap-2 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
+              <PortalPageHeader
+                eyebrow="Field readiness"
+                title="My Onboarding"
+                description={`Complete each clearance item before moving into active selling.${
+                  data?.isIBO ? ' IBO business items are included.' : ''
+                }`}
+                stats={
+                  <div className="grid min-w-[220px] gap-2 rounded-lg border border-white/15 bg-white/5 p-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-700 dark:text-muted-foreground">Approved</span>
-                      <span className="font-semibold text-[#0A1F44] dark:text-foreground">
+                      <span className="font-medium text-white/70">Approved</span>
+                      <span className="font-semibold text-white">
                         {data ? `${data.progress.approved}/${data.progress.total}` : '--'}
                       </span>
                     </div>
-                    <Progress value={progressPct} className="h-2" />
-                    <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                    <Progress value={progressPct} className="h-2 bg-white/15" />
+                    <p className="text-xs text-white/60">
                       {data?.progress.complete ? 'Clearance complete' : `${progressPct}% ready`}
                     </p>
                   </div>
-                </div>
-              </section>
+                }
+              />
 
               {error && (
                 <Alert className="border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300">
@@ -197,7 +191,7 @@ export default function OnboardingPage() {
               )}
 
               {loading ? (
-                <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+                <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                   <CardContent className="space-y-4 p-5">
                     <Skeleton className="h-6 w-48" />
                     <Skeleton className="h-16 w-full" />
@@ -205,8 +199,11 @@ export default function OnboardingPage() {
                   </CardContent>
                 </Card>
               ) : (
-                Object.entries(grouped).map(([category, items]) => (
-                  <section key={category} className="space-y-3">
+                Object.entries(grouped).map(([category, items], groupIndex) => (
+                  <section
+                    key={category}
+                    className={`space-y-3 portal-enter ${groupIndex === 0 ? 'portal-enter-2' : 'portal-enter-3'}`}
+                  >
                     <div className="flex items-center justify-between">
                       <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-muted-foreground">
                         {OnboardingCategoryLabels[category as OnboardingCategory] ?? category}

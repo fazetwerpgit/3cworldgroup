@@ -5,6 +5,7 @@ import type { ElementType } from 'react';
 import { AlertCircle, BadgeDollarSign, Clock3, Edit3, Layers3, Save, Users } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -118,37 +119,29 @@ export default function PayStructurePage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                        Pay Structure
-                      </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
-                        Compensation
-                      </Badge>
-                    </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      {data?.scope === 'all'
-                        ? 'Commission tiers for every field role.'
-                        : 'Your current commission tier and override rules.'}
-                    </p>
-                  </div>
-                  {isAdmin && data && !editing && (
+              <PortalPageHeader
+                eyebrow="Compensation"
+                title="Pay Structure"
+                description={
+                  data?.scope === 'all'
+                    ? 'Commission tiers for every field role.'
+                    : 'Your current commission tier and override rules.'
+                }
+                actions={
+                  isAdmin && data && !editing ? (
                     <Button
                       onClick={() => {
                         setDraft(data.tiers);
                         setEditing(true);
                       }}
-                      className="bg-[#0A1F44] text-white hover:bg-[#13294f]"
+                      className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                     >
                       <Edit3 className="size-4" />
                       Edit Rates
                     </Button>
-                  )}
-                </div>
-              </section>
+                  ) : undefined
+                }
+              />
 
               {error && (
                 <Alert className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
@@ -172,7 +165,7 @@ export default function PayStructurePage() {
               )}
 
               {loading ? (
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="portal-enter portal-enter-2 grid gap-4 md:grid-cols-3">
                   {[1, 2, 3].map((item) => (
                     <Card key={item} className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                       <CardContent className="space-y-4 p-5">
@@ -184,7 +177,7 @@ export default function PayStructurePage() {
                   ))}
                 </div>
               ) : (
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="portal-enter portal-enter-2 grid gap-4 lg:grid-cols-3">
                   {tiers.map((tier) => {
                     const TierIcon = TIER_ICON[tier.fieldRole];
                     return (
@@ -214,8 +207,8 @@ export default function PayStructurePage() {
                             )}
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
+                        <CardContent className="pb-5">
+                          <div className="py-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-muted-foreground">
                               Base Commission
                             </p>
@@ -238,7 +231,7 @@ export default function PayStructurePage() {
                             )}
                           </div>
                           {tier.overrideRate !== undefined && (
-                            <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-4">
+                            <div className="border-t border-slate-100 dark:border-border py-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-muted-foreground">
                                 Team Override
                               </p>
@@ -262,7 +255,9 @@ export default function PayStructurePage() {
                             </div>
                           )}
                           {tier.notes && !editing && (
-                            <p className="text-sm text-slate-500 dark:text-muted-foreground">{tier.notes}</p>
+                            <p className="border-t border-slate-100 dark:border-border pt-3 text-sm text-slate-500 dark:text-muted-foreground">
+                              {tier.notes}
+                            </p>
                           )}
                         </CardContent>
                       </Card>

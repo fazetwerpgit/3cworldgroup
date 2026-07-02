@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AlertTriangle, BookOpenCheck, Filter, Video, X } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { AlertTriangle, Filter, Video, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { ResourceGrid } from '@/components/training/ResourceGrid';
 import { ProgressTracker } from '@/components/training/ProgressTracker';
@@ -19,8 +21,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrainingCategory, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 
-export default function TrainingPage() {
+type TrainingTab = 'path' | 'shorts';
+
+const HEADER_COPY: Record<TrainingTab, { title: string; description: string }> = {
+  path: {
+    title: 'University / My Path',
+    description:
+      'Required modules, reference materials, and field refreshers organized as a clear enablement path.',
+  },
+  shorts: {
+    title: 'Shorts',
+    description:
+      'Short-form training clips and quick field refreshers you can watch between appointments.',
+  },
+};
+
+function TrainingContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const {
     resources,
     progress,
@@ -32,6 +50,8 @@ export default function TrainingPage() {
     getIncompleteRequired,
   } = useTraining();
 
+  const initialTab: TrainingTab = searchParams.get('tab') === 'shorts' ? 'shorts' : 'path';
+  const [activeTab, setActiveTab] = useState<TrainingTab>(initialTab);
   const [categoryFilter, setCategoryFilter] = useState<TrainingCategory | ''>('');
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
 
@@ -49,6 +69,7 @@ export default function TrainingPage() {
   const overallProgress = getOverallProgress();
   const incompleteRequired = getIncompleteRequired();
   const hasFilters = Boolean(categoryFilter || typeFilter);
+  const headerCopy = HEADER_COPY[activeTab];
 
   return (
     <ProtectedRoute permissions={['training:read']}>
@@ -58,26 +79,11 @@ export default function TrainingPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                        University / My Path
-                      </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
-                        Training desk
-                      </Badge>
-                    </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      Required modules, reference materials, and field refreshers organized as a clear enablement path.
-                    </p>
-                  </div>
-                  <div className="flex size-11 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
-                    <BookOpenCheck className="size-5" />
-                  </div>
-                </div>
-              </section>
+              <PortalPageHeader
+                eyebrow="Training desk"
+                title={headerCopy.title}
+                description={headerCopy.description}
+              />
 
               {resources.length > 0 && <ProgressTracker {...overallProgress} />}
 
@@ -90,7 +96,11 @@ export default function TrainingPage() {
                 </Alert>
               )}
 
-              <Tabs defaultValue="path" className="w-full">
+              <Tabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as TrainingTab)}
+                className="portal-enter portal-enter-2 w-full"
+              >
                 <TabsList>
                   <TabsTrigger value="path">My Path</TabsTrigger>
                   <TabsTrigger value="shorts">Shorts</TabsTrigger>
@@ -205,5 +215,31 @@ export default function TrainingPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+function TrainingLoadingFallback() {
+  return (
+    <div className="min-h-screen portal-canvas">
+      <PortalHeader />
+      <div className="flex">
+        <PortalSidebar />
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
+          <div className="mx-auto max-w-[1500px] space-y-5">
+            <Skeleton className="h-32 w-full rounded-lg" />
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-64 w-full rounded-lg" />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function TrainingPage() {
+  return (
+    <Suspense fallback={<TrainingLoadingFallback />}>
+      <TrainingContent />
+    </Suspense>
   );
 }

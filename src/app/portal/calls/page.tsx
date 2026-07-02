@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, CalendarClock, Clock3, ExternalLink, Plus, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -214,22 +215,12 @@ export default function CallsSchedulePage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                        Calls Schedule
-                      </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1d] dark:text-green-300">
-                        Live cadence
-                      </Badge>
-                    </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      Recurring onboarding, training, team, manager, and IBO calls with confirmed Meet links.
-                    </p>
-                  </div>
-                  {data?.canManage && (
+              <PortalPageHeader
+                eyebrow="Team resources"
+                title="Calls Schedule"
+                description="Recurring onboarding, training, team, manager, and IBO calls with confirmed Meet links."
+                actions={
+                  data?.canManage ? (
                     <Button
                       onClick={() => setShowForm(true)}
                       className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
@@ -237,9 +228,9 @@ export default function CallsSchedulePage() {
                       <Plus className="size-4" />
                       Add Call
                     </Button>
-                  )}
-                </div>
-              </section>
+                  ) : undefined
+                }
+              />
 
               {error && (
                 <Alert className="border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300">
@@ -249,7 +240,7 @@ export default function CallsSchedulePage() {
               )}
 
               {loading ? (
-                <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+                <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                   <CardContent className="space-y-4 p-5">
                     <Skeleton className="h-6 w-36" />
                     <Skeleton className="h-20 w-full" />
@@ -257,7 +248,7 @@ export default function CallsSchedulePage() {
                   </CardContent>
                 </Card>
               ) : byDay.length === 0 ? (
-                <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+                <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
                   <CardContent className="p-5">
                     <div className="flex gap-4">
                       <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-[#0A1F44] dark:text-foreground">
@@ -293,8 +284,11 @@ export default function CallsSchedulePage() {
                   </CardContent>
                 </Card>
               ) : (
-                byDay.map(({ day, calls }) => (
-                  <section key={day} className="space-y-3">
+                byDay.map(({ day, calls }, groupIndex) => (
+                  <section
+                    key={day}
+                    className={`space-y-3 portal-enter ${groupIndex === 0 ? 'portal-enter-2' : 'portal-enter-3'}`}
+                  >
                     <div className="flex items-center justify-between">
                       <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-muted-foreground">
                         {CallDayLabels[day]}
