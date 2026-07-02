@@ -12,7 +12,6 @@ import { DashboardStats } from '@/components/portal/DashboardStats';
 import { MiniLeaderboard } from '@/components/portal/MiniLeaderboard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function DashboardPage() {
@@ -127,29 +126,35 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      {/* Command band: the workspace carries the same navy + seam identity as
+          the login deck. */}
+      <section className="relative overflow-hidden rounded-lg bg-[#0A1F44] text-white">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              'radial-gradient(ellipse 45% 90% at 8% 100%, rgba(141,198,63,0.16), transparent 70%), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+            backgroundSize: '100% 100%, 28px 28px, 28px 28px',
+          }}
+        />
+        <div className="relative flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                Hey {firstName}
-              </h1>
-              <Badge variant="secondary" className="rounded-md">
-                {roleLabel}
-              </Badge>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-              {today} —{' '}
-              {leadsWithQueue
-                ? 'here’s what’s waiting on you.'
-                : 'here’s where you stand.'}
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+              {today} · {roleLabel}
+            </p>
+            <h1 className="portal-display mt-1.5 text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Hey {firstName}.
+            </h1>
+            <p className="mt-1.5 text-sm text-white/60">
+              {leadsWithQueue ? 'Here’s what’s waiting on you.' : 'Here’s where you stand.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
               asChild
               variant="outline"
-              className="border-slate-200 bg-white dark:border-border dark:bg-card"
+              className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white dark:border-white/20 dark:bg-white/5 dark:hover:bg-white/10"
             >
               <Link href="/portal/calls">
                 <CalendarDays className="h-4 w-4" />

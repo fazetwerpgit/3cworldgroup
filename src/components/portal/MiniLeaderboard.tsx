@@ -52,22 +52,21 @@ export function MiniLeaderboard() {
 
   const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
-  const rankChip = (rank: number, mine: boolean) => {
-    const podium = rank <= 3;
-    return (
-      <span
-        className={`portal-num grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-semibold ${
-          podium
+  const rankChip = (rank: number, mine: boolean) => (
+    <span
+      className={`portal-num grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-semibold ${
+        rank === 1
+          ? 'bg-[#8dc63f] text-[#0A1F44]'
+          : rank <= 3
             ? 'bg-[#8dc63f]/15 text-[#3f6212] dark:bg-[#8dc63f]/20 dark:text-[#d7ecc0]'
             : mine
               ? 'bg-[#0A1F44]/10 text-[#0A1F44] dark:bg-white/10 dark:text-white'
               : 'bg-slate-100 text-slate-500 dark:bg-muted dark:text-muted-foreground'
-        }`}
-      >
-        {rank}
-      </span>
-    );
-  };
+      }`}
+    >
+      {rank}
+    </span>
+  );
 
   const row = (entry: Entry) => {
     const mine = entry.salesRepId === user?.uid;

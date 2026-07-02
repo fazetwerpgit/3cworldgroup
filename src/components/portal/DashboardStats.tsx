@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Award, BarChart3, CheckCircle2, Clock3, TrendingDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -92,22 +91,19 @@ export function DashboardStats() {
   };
 
   if (loading) {
-    // Geometry-true skeleton: mirrors the real card layout so nothing shifts
+    // Geometry-true skeleton: mirrors the real strip layout so nothing shifts
     // when the numbers land.
     return (
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 sm:gap-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="border-slate-200 py-0 shadow-sm dark:border-border">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <Skeleton className="h-3.5 w-24" />
-                <Skeleton className="h-8 w-8 rounded-md" />
-              </div>
-              <Skeleton className="mt-3 h-8 w-20" />
-              <Skeleton className="mt-2 h-3.5 w-28" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm dark:border-border">
+        <div className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-border xl:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white p-4 dark:bg-card sm:p-5">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="mt-3 h-9 w-20" />
+              <Skeleton className="mt-2.5 h-3.5 w-28" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -159,20 +155,35 @@ export function DashboardStats() {
   const changeVariant = (type: ChangeType) =>
     type === 'positive' ? 'success' : type === 'negative' ? 'danger' : 'secondary';
 
+  // One connected strip with hairline dividers (gap-px trick), not floating
+  // cards — the numbers read as a single instrument panel. A faint lime glow
+  // anchors the band; it is the only gradient on the page.
   return (
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 sm:gap-4">
-      {visibleStats.map((stat) => (
-        <Card key={stat.title} className="border-slate-200 py-0 shadow-sm dark:border-border">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="portal-label truncate">{stat.title}</p>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#8dc63f]/10 text-[#5a8f1f]">
+    <div className="relative overflow-hidden rounded-lg border border-slate-200 shadow-sm dark:border-border">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-10"
+        style={{
+          background:
+            'radial-gradient(ellipse 40% 90% at 10% 100%, rgba(141,198,63,0.06), transparent 70%)',
+        }}
+      />
+      <dl className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-border xl:grid-cols-4">
+        {visibleStats.map((stat) => (
+          <div key={stat.title} className="bg-white p-4 dark:bg-card sm:p-5">
+            <dt className="flex items-center justify-between gap-3">
+              <span className="portal-label truncate">{stat.title}</span>
+              <span className="text-slate-300 dark:text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">
                 {stat.icon}
               </span>
-            </div>
-            <p className="portal-kpi mt-3 text-slate-950 dark:text-foreground">{stat.value}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <p className="text-xs text-slate-500 dark:text-muted-foreground">{stat.helper}</p>
+            </dt>
+            <dd className="portal-display portal-kpi mt-2.5 text-[2.1rem] text-slate-950 dark:text-foreground">
+              {stat.value}
+            </dd>
+            <dd className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-muted-foreground">
+                {stat.helper}
+              </span>
               {stat.change && (
                 <Badge variant={changeVariant(stat.change.type)} className="gap-1 rounded-md">
                   {stat.change.type === 'positive' && <TrendingUp className="h-3 w-3" />}
@@ -180,10 +191,10 @@ export function DashboardStats() {
                   {stat.change.text}
                 </Badge>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
