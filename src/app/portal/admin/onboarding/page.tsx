@@ -118,7 +118,11 @@ export default function OnboardingReviewPage() {
           actions={
             <Badge
               variant="outline"
-              className="w-fit rounded-md border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-1 text-amber-700 dark:text-amber-300"
+              className={`w-fit rounded-md px-3 py-1 ${
+                submissions.length > 0
+                  ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300'
+                  : 'border-white/25 bg-white/10 text-white'
+              }`}
             >
               {submissions.length} pending
             </Badge>

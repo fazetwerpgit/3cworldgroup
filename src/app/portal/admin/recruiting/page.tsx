@@ -223,7 +223,13 @@ export default function RecruitingCommandCenterPage() {
               <Badge variant="outline" className="rounded-md border-white/25 bg-white/10 text-white">
                 Website onboarding
               </Badge>
-              <Button type="button" variant="outline" onClick={fetchRecruiting} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={fetchRecruiting}
+                disabled={loading}
+                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white dark:border-white/20 dark:bg-white/5 dark:hover:bg-white/10"
+              >
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <Clipboard className="size-4" />}
                 Refresh
               </Button>
