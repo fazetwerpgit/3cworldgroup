@@ -37,6 +37,44 @@ interface MobileThreadProps {
   onReactionError: (message: string) => void;
 }
 
+/** Grouping window: messages from the same author within this gap merge. */
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+/** First letters of first+last name words (mirrors repInitials in SalesTable). */
+function chatInitials(name: string) {
+  const words = name.split(' ').filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/** Null timestamps are treated as the same day as the neighbouring message. */
+function sameCalendarDay(a: Date | null, b: Date | null) {
+  if (!a || !b) return true;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/** Missing timestamps stay in the current group rather than splitting it. */
+function withinGroupWindow(a: Date | null, b: Date | null) {
+  if (!a || !b) return true;
+  return Math.abs(b.getTime() - a.getTime()) <= GROUP_WINDOW_MS;
+}
+
+/** Today / Yesterday / "Mon, Jul 1" for a day-separator chip. */
+function dayLabel(date: Date) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfThat = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startOfToday.getTime() - startOfThat.getTime()) / 86_400_000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 /**
  * Phone conversation screen (Connecteam-style): compact back bar, chat-bubble
  * messages that fill the height, and a composer pinned to the bottom edge.
@@ -91,8 +129,9 @@ export function MobileThread({
         </div>
       </div>
 
-      {/* Message list — newest at the bottom. */}
-      <div className="flex-1 space-y-3 overflow-auto p-3">
+      {/* Message list — newest at the bottom. Vertical rhythm is per-message so
+          grouped bubbles can tighten up (see mt-* below). */}
+      <div className="flex-1 overflow-auto p-3">
         {loading ? (
           <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
         ) : messages.length === 0 ? (
@@ -100,58 +139,117 @@ export function MobileThread({
             Start with a short update, question, or field note.
           </p>
         ) : (
-          messages.map((message) => {
+          messages.map((message, index) => {
+            const prev = index > 0 ? messages[index - 1] : null;
+            const next = index < messages.length - 1 ? messages[index + 1] : null;
             const isOwn = message.authorId === currentUserId;
             const canDelete = canModerate || isOwn;
+
+            // Day separator whenever the calendar day changes (or at the top).
+            const showDaySeparator = !prev || !sameCalendarDay(message.createdAt, prev.createdAt);
+
+            // A message merges with the previous one when it shares author, day,
+            // and falls inside the 5-minute window. First-of-group carries the
+            // name + avatar; last-of-group carries the timestamp.
+            const groupWithPrev =
+              !!prev &&
+              !showDaySeparator &&
+              prev.authorId === message.authorId &&
+              withinGroupWindow(prev.createdAt, message.createdAt);
+            const groupWithNext =
+              !!next &&
+              next.authorId === message.authorId &&
+              sameCalendarDay(message.createdAt, next.createdAt) &&
+              withinGroupWindow(message.createdAt, next.createdAt);
+            const isFirstOfGroup = !groupWithPrev;
+            const isLastOfGroup = !groupWithNext;
+
+            // Tighten spacing inside a group; keep breathing room between groups.
+            const spacing = showDaySeparator
+              ? ''
+              : index === 0
+                ? ''
+                : isFirstOfGroup
+                  ? 'mt-3'
+                  : 'mt-0.5';
+
             return (
-              <div key={message.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                {!isOwn && (
-                  <div className="mb-1 flex flex-wrap items-center gap-2 px-1">
-                    <span className="text-xs font-semibold text-slate-950 dark:text-foreground">
-                      {message.authorName}
+              <div key={message.id}>
+                {showDaySeparator && message.createdAt && (
+                  <div className="my-3 flex items-center gap-3 px-1">
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-muted-foreground">
+                      {dayLabel(message.createdAt)}
                     </span>
-                    {message.authorRole && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        {message.authorRole.replace('_', ' ')}
-                      </Badge>
-                    )}
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
                   </div>
                 )}
-                <div className={`flex max-w-[85%] items-end gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div
-                    className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm ${
-                      isOwn
-                        ? 'rounded-br-md bg-[#0A1F44] text-white'
-                        : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
-                    }`}
-                  >
-                    {message.text}
-                  </div>
-                  {canDelete && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 shrink-0 text-slate-400 dark:text-muted-foreground hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300"
-                      onClick={() => onDelete(message.id)}
-                      disabled={deletingId === message.id}
-                      aria-label="Delete message"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
+                  {!isOwn && isFirstOfGroup && (
+                    <div className="mb-1 flex flex-wrap items-center gap-2 pl-9 pr-1">
+                      <span className="text-xs font-semibold text-slate-950 dark:text-foreground">
+                        {message.authorName}
+                      </span>
+                      {message.authorRole && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {message.authorRole.replace('_', ' ')}
+                        </Badge>
+                      )}
+                    </div>
                   )}
-                </div>
-                <span className="mt-1 px-1 text-[11px] text-slate-400 dark:text-muted-foreground">
-                  {formatTime(message.createdAt)}
-                </span>
-                <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                  <ReactionBar
-                    channelId={channelId}
-                    messageId={message.id}
-                    reactionCounts={message.reactionCounts}
-                    myReactions={message.myReactions}
-                    onError={onReactionError}
-                  />
+                  <div className={`flex max-w-[85%] items-end gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {/* Avatar gutter (others only): 32px chip on first-of-group,
+                        empty spacer otherwise so grouped bubbles stay aligned. */}
+                    {!isOwn && (
+                      <div className="w-8 shrink-0 self-end">
+                        {isFirstOfGroup && (
+                          <span className="grid size-8 place-items-center rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
+                            {chatInitials(message.authorName)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div
+                      className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm ${
+                        isOwn
+                          ? 'rounded-br-md bg-[#0A1F44] text-white'
+                          : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
+                      }`}
+                    >
+                      {message.text}
+                    </div>
+                    {canDelete && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 shrink-0 text-slate-400 dark:text-muted-foreground hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300"
+                        onClick={() => onDelete(message.id)}
+                        disabled={deletingId === message.id}
+                        aria-label="Delete message"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {isLastOfGroup && (
+                    <span
+                      className={`mt-1 text-[11px] text-slate-400 dark:text-muted-foreground ${
+                        isOwn ? 'px-1' : 'pl-9 pr-1'
+                      }`}
+                    >
+                      {formatTime(message.createdAt)}
+                    </span>
+                  )}
+                  <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start pl-9'}`}>
+                    <ReactionBar
+                      channelId={channelId}
+                      messageId={message.id}
+                      reactionCounts={message.reactionCounts}
+                      myReactions={message.myReactions}
+                      onError={onReactionError}
+                    />
+                  </div>
                 </div>
               </div>
             );
