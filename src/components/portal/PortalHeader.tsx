@@ -257,7 +257,7 @@ export function PortalHeader() {
             aria-label="User menu"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#8dc63f]">
-              <span className="text-sm font-semibold text-white">
+              <span className="text-sm font-semibold text-[#0A1F44]">
                 {user?.displayName?.charAt(0).toUpperCase() ||
                   user?.email?.charAt(0).toUpperCase() ||
                   'U'}

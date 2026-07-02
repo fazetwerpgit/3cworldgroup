@@ -294,6 +294,14 @@ body {
   font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
+/* Reserve scroll room for the mobile bottom nav while it is mounted
+   (MobileBottomNav tags <body> with data-portal-bottom-nav). */
+@media (max-width: 1023px) {
+  body[data-portal-bottom-nav] .portal-scope main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* ============================================
    CHIPR-STYLE DESIGN ELEMENTS
    Sharp shadows, bold typography, energetic vibe

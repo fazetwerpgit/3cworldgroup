@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
+import { MobileBottomNav } from '@/components/portal/MobileBottomNav';
 import { UserRole } from '@/types';
 
 interface NavItem {
@@ -64,15 +65,6 @@ const mainItems: NavItem[] = [
       </svg>
     ),
     permissions: ['sales:read'],
-  },
-  {
-    name: 'Pay Structure',
-    href: '/portal/pay-structure',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
   },
   {
     name: 'Calls Schedule',
@@ -168,6 +160,15 @@ const resourceItems: NavItem[] = [
       </svg>
     ),
     permissions: ['links:read'],
+  },
+  {
+    name: 'Pay Structure',
+    href: '/portal/pay-structure',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
   },
 ];
 
@@ -318,14 +319,9 @@ const adminItems: NavItem[] = [
   },
 ];
 
-function getNavInitials(name: string) {
-  const words = name.split(' ').filter(Boolean);
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase();
-}
-
 // One nav row. Shared by the flat sections and the collapsible Forms folder so
-// every link looks and behaves identically.
+// every link looks and behaves identically. Quiet at rest: icon + label, a
+// 2px lime rail and white/10 pill mark the active route.
 function NavLink({
   item,
   active,
@@ -342,37 +338,25 @@ function NavLink({
       <Link
         href={item.href}
         onClick={onLinkClick}
-        className={`group flex min-h-10 items-center gap-3 rounded-md border py-2.5 text-sm transition-colors duration-200 ${
+        className={`group relative flex h-9 items-center gap-3 rounded-md text-sm transition-colors duration-150 ${
           nested ? 'pl-4 pr-3' : 'px-3'
         } ${
           active
-            ? 'border-white/15 bg-white/[0.12] text-white'
-            : 'border-transparent text-white/68 hover:bg-white/[0.08] hover:text-white'
+            ? 'bg-white/10 font-medium text-white'
+            : 'text-white/60 hover:bg-white/[0.06] hover:text-white'
         }`}
       >
+        {active && (
+          <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-[#8dc63f]" />
+        )}
         <span
-          className={`h-5 w-1 rounded-full transition-colors ${
-            active ? 'bg-[#8dc63f]' : 'bg-transparent'
-          }`}
-        />
-        <span
-          className={`grid h-7 w-7 shrink-0 place-items-center rounded-md text-[11px] font-bold ${
-            active
-              ? 'bg-[#8dc63f] text-[#0A1F44]'
-              : 'bg-white/10 text-white/72 group-hover:text-white'
-          }`}
-          aria-hidden="true"
-        >
-          {getNavInitials(item.name)}
-        </span>
-        <span className="min-w-0 flex-1 truncate font-medium">{item.name}</span>
-        <span
-          className={`shrink-0 transition-colors ${
-            active ? 'text-[#8dc63f]' : 'text-white/35 group-hover:text-white/55'
+          className={`shrink-0 transition-colors [&>svg]:h-[18px] [&>svg]:w-[18px] ${
+            active ? 'text-[#8dc63f]' : 'text-white/45 group-hover:text-white/80'
           }`}
         >
           {item.icon}
         </span>
+        <span className="min-w-0 flex-1 truncate">{item.name}</span>
       </Link>
     </li>
   );
@@ -398,6 +382,9 @@ function CollapsibleNavSection({
   // Restore the saved open/closed state on mount (client only).
   useEffect(() => {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;
+    // Restoring after mount (not via lazy initializer) keeps the server and
+    // first client render identical, avoiding a hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === 'open') setOpen(true);
     else if (saved === 'closed') setOpen(false);
   }, [storageKey]);
@@ -435,7 +422,7 @@ function CollapsibleNavSection({
         </svg>
       </button>
       {isOpen && (
-        <ul className="mt-1 space-y-1">
+        <ul className="mt-1 space-y-0.5">
           {visibleItems.map((item) => (
             <NavLink
               key={item.name}
@@ -491,7 +478,7 @@ export function PortalSidebar() {
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-[258px] bg-[#0A1F44] text-white
+          w-60 bg-[#0A1F44] text-white
           min-h-[calc(100vh-4rem)] flex flex-col border-r border-white/10
           transform transition-transform duration-300 ease-in-out
           lg:transform-none
@@ -549,7 +536,7 @@ export function PortalSidebar() {
 
           {showOperationsSection && (
             <CollapsibleNavSection
-              title="Ops"
+              title="Operations"
               items={operationsItems}
               canAccessItem={canAccessItem}
               isActive={isActive}
@@ -581,6 +568,10 @@ export function PortalSidebar() {
           </Link>
         </div>
       </aside>
+
+      {/* Phone-first quick nav — rendered here because the sidebar is the one
+          piece of chrome every portal page already mounts. */}
+      <MobileBottomNav />
     </>
   );
 }
