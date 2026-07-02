@@ -29,7 +29,7 @@ import { RoleDisplayNames, getEffectiveRole } from '@/types';
 export function PortalHeader() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
   const { isOpen: isMobileMenuOpen, toggle: toggleMobileMenu } = useMobileMenu();
   usePresenceHeartbeat();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -234,14 +234,14 @@ export function PortalHeader() {
               </div>
 
               {notifications.length > 0 && (
-                <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 dark:border-border dark:bg-muted">
-                  <Link
-                    href="/portal/notifications"
-                    onClick={() => setShowNotifications(false)}
-                    className="text-sm text-[#5a8f1f] hover:text-[#4a7c19] font-medium block text-center"
+                <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 dark:border-border dark:bg-muted">
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="block w-full text-center text-sm font-medium text-slate-500 transition-colors hover:text-red-600 dark:text-muted-foreground dark:hover:text-red-400"
                   >
-                    View all notifications
-                  </Link>
+                    Clear all notifications
+                  </button>
                 </div>
               )}
             </div>

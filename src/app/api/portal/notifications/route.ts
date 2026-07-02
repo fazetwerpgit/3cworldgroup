@@ -252,3 +252,54 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+// DELETE /api/portal/notifications - Clear all of a user's notifications
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    const body = await request.json();
+    const { userId, requestedBy } = body;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Same gate as mark-all-read: a user may clear their own bell; management
+    // may clear anyone's.
+    const gate = await requireSelfOrManagement(requestedBy ?? userId, userId);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
+    const snapshot = await adminDb
+      .collection('notifications')
+      .where('userId', '==', userId)
+      .get();
+
+    // Chunked to respect Firestore's 500-op batch limit.
+    for (let i = 0; i < snapshot.docs.length; i += 450) {
+      const batch = adminDb.batch();
+      for (const doc of snapshot.docs.slice(i, i + 450)) {
+        batch.delete(doc.ref);
+      }
+      await batch.commit();
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Cleared ${snapshot.size} notifications`,
+    });
+  } catch (error) {
+    console.error('Error clearing notifications:', error);
+    return NextResponse.json(
+      { error: 'Failed to clear notifications' },
+      { status: 500 }
+    );
+  }
+}

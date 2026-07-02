@@ -101,6 +101,25 @@ export function useNotifications() {
     }
   }, [user]);
 
+  const clearAll = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/portal/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, requestedBy: user.uid }),
+      });
+
+      if (response.ok) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  }, [user]);
+
   // Fetch notifications on mount and periodically
   useEffect(() => {
     if (user) {
@@ -128,5 +147,6 @@ export function useNotifications() {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    clearAll,
   };
 }
