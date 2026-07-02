@@ -1,9 +1,16 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { canAccessChatChannel, getChatChannel } from '@/types';
+import { canAccessChatChannel, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { ensureChatChannelMember } from '@/lib/chat/channels';
+import { ensureChatChannelMember, toChatChannel } from '@/lib/chat/channels';
+
+async function getFirestoreChatChannel(channelId: string): Promise<ChatChannel | null> {
+  if (!adminDb) throw new Error('Database not configured');
+  const snap = await adminDb.collection('chatChannels').doc(channelId).get();
+  if (!snap.exists) return null;
+  return toChatChannel(snap.id, snap.data() ?? {});
+}
 
 // GET /api/portal/chat/messages?channelId=...&limit=50 — verified caller only.
 export async function GET(request: NextRequest) {
@@ -21,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (!channelId) {
       return NextResponse.json({ error: 'channelId is required' }, { status: 400 });
     }
-    const channel = getChatChannel(channelId);
+    const channel = await getFirestoreChatChannel(channelId);
     if (!channel) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
@@ -80,7 +87,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is limited to 1000 characters' }, { status: 400 });
     }
 
-    const channel = getChatChannel(channelId);
+    const channel = await getFirestoreChatChannel(channelId);
     if (!channel) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
@@ -125,7 +132,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'channelId and messageId are required' }, { status: 400 });
     }
 
-    const channel = getChatChannel(channelId);
+    const channel = await getFirestoreChatChannel(channelId);
     if (!channel || !canAccessChatChannel(channel, user.role, user.fieldRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

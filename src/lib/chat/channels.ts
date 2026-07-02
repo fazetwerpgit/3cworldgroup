@@ -1,11 +1,37 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
-import { CHAT_CHANNELS, canAccessChatChannel, ChatChannel } from '@/types';
+import { CHAT_CHANNELS, canAccessChatChannel, ChatChannel, ChatChannelAudience } from '@/types';
 import { resolveRoles, PlatformRole, FieldRole } from '@/types';
 
 export interface ChatChannelMembership {
   channelIds: string[];
   channels: ChatChannel[];
+}
+
+const CHAT_CHANNEL_AUDIENCES: ChatChannelAudience[] = ['all', 'field', 'managers', 'platform'];
+
+export function isChatChannelAudience(value: unknown): value is ChatChannelAudience {
+  return typeof value === 'string' && CHAT_CHANNEL_AUDIENCES.includes(value as ChatChannelAudience);
+}
+
+export function createChannelId(name: string, existingIds: Iterable<string> = []): string {
+  const existing = new Set(existingIds);
+  const base =
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'channel';
+
+  let candidate = base;
+  let suffix = 2;
+  while (existing.has(candidate)) {
+    candidate = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
 }
 
 export function getChatChannelMembershipForUser(
@@ -22,42 +48,70 @@ export function getChatChannelMembershipForUser(
   };
 }
 
-export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
+export function toChatChannel(id: string, data: FirebaseFirestore.DocumentData): ChatChannel | null {
+  if (!isChatChannelAudience(data.audience)) return null;
+
+  return {
+    id: typeof data.id === 'string' && data.id ? data.id : id,
+    name: typeof data.name === 'string' ? data.name : id,
+    description: typeof data.description === 'string' ? data.description : '',
+    audience: data.audience,
+    order: typeof data.order === 'number' && Number.isFinite(data.order) ? data.order : 999,
+    active: data.active !== false,
+  };
+}
+
+export async function getMemberIdsForAudience(audience: ChatChannelAudience): Promise<string[]> {
   if (!adminDb) throw new Error('Database not configured');
 
   const usersSnap = await adminDb.collection('users').where('status', '==', 'active').get();
-  const activeUsers = usersSnap.docs.map((doc) => {
-    const data = doc.data();
-    const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);
-    return { uid: doc.id, role, fieldRole };
-  });
+  const channel: ChatChannel = {
+    id: 'membership-preview',
+    name: 'Membership Preview',
+    description: '',
+    audience,
+    order: 0,
+    active: true,
+  };
 
+  return usersSnap.docs
+    .map((doc) => {
+      const data = doc.data();
+      const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);
+      return { uid: doc.id, role, fieldRole };
+    })
+    .filter((user) => canAccessChatChannel(channel, user.role, user.fieldRole))
+    .map((user) => user.uid);
+}
+
+export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
+  if (!adminDb) throw new Error('Database not configured');
+
+  const channelsSnap = await adminDb.collection('chatChannels').get();
   const batch = adminDb.batch();
+  let channelsSynced = 0;
 
-  for (const channel of CHAT_CHANNELS) {
-    const memberIds = activeUsers
-      .filter((user) => canAccessChatChannel(channel, user.role, user.fieldRole))
-      .map((user) => user.uid);
+  // Sync every Firestore channel, including archived ones. Archived channels remain
+  // hidden by active:false, but keeping role-derived memberIds fresh makes reactivation immediate.
+  for (const doc of channelsSnap.docs) {
+    const channel = toChatChannel(doc.id, doc.data());
+    if (!channel) continue;
 
-    const ref = adminDb.collection('chatChannels').doc(channel.id);
+    const memberIds = await getMemberIdsForAudience(channel.audience);
     batch.set(
-      ref,
+      doc.ref,
       {
         id: channel.id,
-        name: channel.name,
-        description: channel.description,
-        audience: channel.audience,
-        order: channel.order,
-        active: channel.active,
         memberIds,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
+    channelsSynced += 1;
   }
 
   await batch.commit();
-  return { channelsSynced: CHAT_CHANNELS.length };
+  return { channelsSynced };
 }
 
 export async function ensureChatChannelMember(channelId: string, uid: string): Promise<void> {
