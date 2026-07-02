@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { UserTable } from '@/components/admin/UserTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -109,26 +110,22 @@ export default function UsersPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-              User Management
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-              Manage employee accounts, roles, and access status.
-            </p>
-          </div>
-          <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-            <Link href="/portal/admin/users/new">
-              <Plus className="h-4 w-4" />
-              Add User
-            </Link>
-          </Button>
-          </div>
-        </section>
+        <PortalPageHeader
+          compact
+          eyebrow="Administration"
+          title="User Management"
+          description="Manage employee accounts, roles, and access status."
+          actions={
+            <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+              <Link href="/portal/admin/users/new">
+                <Plus className="h-4 w-4" />
+                Add User
+              </Link>
+            </Button>
+          }
+        />
 
-        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+        <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
           <CardContent className="p-5">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -188,21 +185,23 @@ export default function UsersPage() {
           </div>
         )}
 
-        {loading ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
-            <CardContent className="py-8">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading users...</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <UserTable
-            users={users}
-            onStatusChange={handleStatusChange}
-            onDelete={handleDeleteClick}
-            loading={loading || deleting}
-          />
-        )}
+        <div className="portal-enter portal-enter-3">
+          {loading ? (
+            <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
+              <CardContent className="py-8">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
+                <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading users...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <UserTable
+              users={users}
+              onStatusChange={handleStatusChange}
+              onDelete={handleDeleteClick}
+              loading={loading || deleting}
+            />
+          )}
+        </div>
 
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

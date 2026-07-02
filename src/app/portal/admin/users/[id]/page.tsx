@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { UserForm } from '@/components/admin/UserForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -107,42 +108,34 @@ export default function EditUserPage() {
 
         {user && (
           <>
-            <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#8dc63f]/15 text-[#4f7f1e] dark:text-green-300">
-                  <Pencil className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                    Edit User
-                  </h1>
-                  <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                    Update {user.displayName}&apos;s account information,
-                    permissions, and reporting assignment.
+            <PortalPageHeader
+              compact
+              eyebrow="Administration"
+              title="Edit User"
+              description={`Update ${user.displayName}'s account information, permissions, and reporting assignment.`}
+            />
+            <div className="portal-enter portal-enter-2">
+              <UserForm user={user} isEdit />
+              {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
+                <section className="rounded-lg border border-amber-200 dark:border-border bg-amber-50 dark:bg-amber-500/15 p-5">
+                  <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-300">Sensitive (admin only)</h2>
+                  <p className="mt-2 text-sm text-slate-700 dark:text-muted-foreground">
+                    SSN: {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
                   </p>
-                </div>
-              </div>
-            </section>
-            <UserForm user={user} isEdit />
-            {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
-              <section className="rounded-lg border border-amber-200 dark:border-border bg-amber-50 dark:bg-amber-500/15 p-5">
-                <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-300">Sensitive (admin only)</h2>
-                <p className="mt-2 text-sm text-slate-700 dark:text-muted-foreground">
-                  SSN: {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
-                </p>
-                <p className="text-sm text-slate-700 dark:text-muted-foreground">
-                  DL #: {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
-                </p>
-                {!revealed && (
-                  <button
-                    onClick={doReveal}
-                    className="mt-3 rounded-md border border-amber-300 dark:border-amber-500/30 px-3 py-1 text-sm font-medium text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20"
-                  >
-                    Reveal
-                  </button>
-                )}
-              </section>
-            )}
+                  <p className="text-sm text-slate-700 dark:text-muted-foreground">
+                    DL #: {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
+                  </p>
+                  {!revealed && (
+                    <button
+                      onClick={doReveal}
+                      className="mt-3 rounded-md border border-amber-300 dark:border-amber-500/30 px-3 py-1 text-sm font-medium text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20"
+                    >
+                      Reveal
+                    </button>
+                  )}
+                </section>
+              )}
+            </div>
           </>
         )}
       </div>

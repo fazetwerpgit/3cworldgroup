@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -220,16 +221,12 @@ export default function PipelinePage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-              Recruiting Pipeline
-            </h1>
-            <p className="max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-              Track each field rep from onboarding paperwork to channel credentials, active sales, and decommissioning.
-            </p>
-          </div>
-        </section>
+        <PortalPageHeader
+          compact
+          eyebrow="Administration"
+          title="Recruiting Pipeline"
+          description="Track each field rep from onboarding paperwork to channel credentials, active sales, and decommissioning."
+        />
 
         {error && (
           <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
@@ -242,7 +239,7 @@ export default function PipelinePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="portal-enter portal-enter-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {PIPELINE_STAGE_ORDER.map((stage) => {
             const cfg = PipelineStageConfig[stage];
             const selected = stageFilter === stage;
@@ -250,7 +247,7 @@ export default function PipelinePage() {
               <button
                 key={stage}
                 onClick={() => setStageFilter(selected ? '' : stage)}
-                className={`cursor-pointer rounded-lg border bg-white dark:bg-card p-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-muted ${
+                className={`cursor-pointer rounded-lg border bg-white dark:bg-card p-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:hover:border-border dark:hover:bg-muted ${
                   selected
                     ? 'border-[#8dc63f] ring-2 ring-[#8dc63f]/20'
                     : 'border-slate-200 dark:border-border'
@@ -267,14 +264,14 @@ export default function PipelinePage() {
         </div>
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
+          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
               <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading pipeline...</p>
             </CardContent>
           </Card>
         ) : visibleReps.length === 0 ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
+          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-12">
               <p className="font-medium text-slate-950 dark:text-foreground">
                 {stageFilter
@@ -289,7 +286,7 @@ export default function PipelinePage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+          <Card className="portal-enter portal-enter-3 overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -343,7 +340,7 @@ export default function PipelinePage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 rounded-full bg-slate-200">
+                          <div className="h-1.5 w-16 rounded-full bg-slate-200 dark:bg-muted">
                             <div
                               className="h-1.5 rounded-full bg-[#8dc63f]"
                               style={{

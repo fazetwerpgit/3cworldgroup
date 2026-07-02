@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Bell, Check, Lock, Settings, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -81,16 +82,12 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-5">
-      <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-              System Settings
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-              Configure portal defaults used by operations and field teams.
-            </p>
-          </div>
+      <PortalPageHeader
+        compact
+        eyebrow="Administration"
+        title="System Settings"
+        description="Configure portal defaults used by operations and field teams."
+        actions={
           <Button
             type="button"
             onClick={handleSave}
@@ -109,8 +106,8 @@ export default function AdminSettingsPage() {
               </>
             )}
           </Button>
-        </div>
-      </section>
+        }
+      />
 
       {success && (
         <div className="flex items-center gap-2 rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e] dark:text-green-300">
@@ -119,7 +116,7 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      <Card className="overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+      <Card className="portal-enter portal-enter-2 overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
         <div className="flex overflow-x-auto border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted">
           {tabs.map((tab) => (
             <button
@@ -387,7 +384,7 @@ export default function AdminSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-lg border-red-200 dark:border-red-500/30 bg-white dark:bg-card py-0 shadow-sm">
+      <Card className="portal-enter portal-enter-3 rounded-lg border-red-200 dark:border-red-500/30 bg-white dark:bg-card py-0 shadow-sm">
         <CardHeader className="border-b border-red-100 dark:border-red-500/30 bg-red-50/70 dark:bg-red-500/15 p-5">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-red-700 dark:text-red-300">
             <ShieldAlert className="h-5 w-5" />

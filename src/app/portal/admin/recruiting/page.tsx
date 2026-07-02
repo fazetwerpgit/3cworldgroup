@@ -12,6 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -212,27 +213,23 @@ export default function RecruitingCommandCenterPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations', 'l1_manager', 'l2_manager']}>
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                  Recruiting Command Center
-                </h1>
-                <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
-                  Website onboarding
-                </Badge>
-              </div>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                Create invite links, keep recruits inside the website, and activate submitted profiles from one manager queue.
-              </p>
-            </div>
-          <Button type="button" variant="outline" onClick={fetchRecruiting} disabled={loading}>
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <Clipboard className="size-4" />}
-            Refresh
-          </Button>
-        </div>
-        </section>
+        <PortalPageHeader
+          compact
+          eyebrow="Administration"
+          title="Recruiting Command Center"
+          description="Create invite links, keep recruits inside the website, and activate submitted profiles from one manager queue."
+          actions={
+            <>
+              <Badge variant="outline" className="rounded-md border-white/25 bg-white/10 text-white">
+                Website onboarding
+              </Badge>
+              <Button type="button" variant="outline" onClick={fetchRecruiting} disabled={loading}>
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Clipboard className="size-4" />}
+                Refresh
+              </Button>
+            </>
+          }
+        />
 
         {error && (
           <Alert className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-800 dark:text-red-300">
@@ -245,7 +242,7 @@ export default function RecruitingCommandCenterPage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="portal-enter portal-enter-2 grid grid-cols-1 gap-3 md:grid-cols-4">
           <Card className="portal-panel rounded-lg py-0">
             <CardContent className="p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
@@ -280,7 +277,7 @@ export default function RecruitingCommandCenterPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[420px_1fr]">
+        <div className="portal-enter portal-enter-3 grid grid-cols-1 gap-5 xl:grid-cols-[420px_1fr]">
           <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-border p-5">
               <CardTitle className="flex items-center gap-2 text-base">

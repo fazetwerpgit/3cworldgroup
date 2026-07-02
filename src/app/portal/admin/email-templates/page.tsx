@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Copy, FilePlus, Pencil, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -191,17 +192,12 @@ export default function EmailTemplatesPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="mx-auto max-w-[1200px] space-y-5">
-        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                Email Templates
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                Save manager-approved copy for onboarding, performance, and
-                operations follow-up.
-              </p>
-            </div>
+        <PortalPageHeader
+          compact
+          eyebrow="Administration"
+          title="Email Templates"
+          description="Save manager-approved copy for onboarding, performance, and operations follow-up."
+          actions={
             <Button
               type="button"
               onClick={() => {
@@ -213,8 +209,8 @@ export default function EmailTemplatesPage() {
               <FilePlus className="h-4 w-4" />
               New Template
             </Button>
-          </div>
-        </section>
+          }
+        />
 
         {error && (
           <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
@@ -228,14 +224,14 @@ export default function EmailTemplatesPage() {
         )}
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
+          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
               <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading templates...</p>
             </CardContent>
           </Card>
         ) : templates.length === 0 ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
+          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-border p-5">
               <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
                 No templates saved
@@ -264,7 +260,7 @@ export default function EmailTemplatesPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="portal-enter portal-enter-2 space-y-3">
             {templates.map((template) => (
               <Card
                 key={template.id}

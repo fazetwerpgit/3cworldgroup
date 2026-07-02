@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -180,16 +181,12 @@ export default function AdminChatChannelsPage() {
   return (
     <ProtectedRoute roles={['admin']}>
       <div className="mx-auto max-w-[1200px] space-y-5">
-        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-              Team Chat Channels
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-              Create, rename, and remove channels. Members are added automatically by role.
-            </p>
-          </div>
-        </section>
+        <PortalPageHeader
+          compact
+          eyebrow="Administration"
+          title="Team Chat Channels"
+          description="Create, rename, and remove channels. Members are added automatically by role."
+        />
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
@@ -203,7 +200,7 @@ export default function AdminChatChannelsPage() {
           </div>
         )}
 
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
+        <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
           <CardHeader className="border-b border-slate-200 px-5 py-4 dark:border-border">
             <div>
               <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
@@ -260,13 +257,13 @@ export default function AdminChatChannelsPage() {
         </Card>
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
+          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
             <CardContent className="py-10 text-center text-sm text-slate-600 dark:text-muted-foreground">
               Loading chat channels...
             </CardContent>
           </Card>
         ) : (
-          <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
+          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
             <CardHeader className="border-b border-slate-200 px-5 py-4 dark:border-border">
               <div>
                 <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
