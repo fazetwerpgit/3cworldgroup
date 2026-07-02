@@ -311,6 +311,16 @@ body {
   outline: none;
 }
 
+/* Typed text follows the theme. The ui Input/Textarea primitives set no text
+   color, so fields inherit the light body color even inside the dark-scoped
+   portal — making typed text blend into dark surfaces. */
+.portal-scope input,
+.portal-scope select,
+.portal-scope textarea {
+  caret-color: #8dc63f;
+  color: var(--foreground);
+}
+
 /* Micro-interactions: every portal button acknowledges the press. */
 .portal-scope [data-slot="button"] {
   transition:
