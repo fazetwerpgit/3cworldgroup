@@ -299,6 +299,13 @@ export default function TeamChatPage() {
                       <Textarea
                         value={draft}
                         onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
+                        onKeyDown={(event) => {
+                          // Enter sends; Shift+Enter inserts a newline.
+                          if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            sendMessage();
+                          }
+                        }}
                         placeholder={
                           activeChannel
                             ? `Message ${activeChannel.name}...`
@@ -310,7 +317,7 @@ export default function TeamChatPage() {
                       />
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-xs text-slate-500 dark:text-muted-foreground">
-                          Text only. Do not post customer PII, card numbers, SSNs, or private credentials.
+                          Enter to send · Shift+Enter for a new line. No customer PII, card numbers, or SSNs.
                         </p>
                         <Button
                           type="button"
