@@ -92,14 +92,19 @@ export function DashboardStats() {
   };
 
   if (loading) {
+    // Geometry-true skeleton: mirrors the real card layout so nothing shifts
+    // when the numbers land.
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 sm:gap-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="border-slate-200 shadow-sm dark:border-border">
-            <CardContent className="p-4">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="mt-4 h-8 w-16" />
-              <Skeleton className="mt-3 h-4 w-32" />
+          <Card key={i} className="border-slate-200 py-0 shadow-sm dark:border-border">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+              <Skeleton className="mt-3 h-8 w-20" />
+              <Skeleton className="mt-2 h-3.5 w-28" />
             </CardContent>
           </Card>
         ))}
@@ -151,30 +156,25 @@ export function DashboardStats() {
     return stat.permissions.some((p) => hasPermission(p));
   });
 
-  const changeClass = (type: ChangeType) => {
-    if (type === 'positive') return 'text-green-700 bg-green-50 dark:bg-green-500/15 dark:text-green-300';
-    if (type === 'negative') return 'text-red-700 bg-red-50 dark:bg-red-500/15 dark:text-red-300';
-    return 'text-slate-700 bg-slate-100 dark:bg-muted dark:text-muted-foreground';
-  };
+  const changeVariant = (type: ChangeType) =>
+    type === 'positive' ? 'success' : type === 'negative' ? 'danger' : 'secondary';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 sm:gap-4">
       {visibleStats.map((stat) => (
-        <Card key={stat.title} className="border-slate-200 shadow-sm dark:border-border">
-          <CardContent className="p-4">
+        <Card key={stat.title} className="border-slate-200 py-0 shadow-sm dark:border-border">
+          <CardContent className="p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-slate-600 dark:text-muted-foreground">{stat.title}</p>
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#8dc63f]/10 text-[#5a8f1f]">
+              <p className="portal-label truncate">{stat.title}</p>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#8dc63f]/10 text-[#5a8f1f]">
                 {stat.icon}
               </span>
             </div>
-            <div className="mt-4 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-2xl font-semibold text-slate-950 dark:text-foreground">{stat.value}</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{stat.helper}</p>
-              </div>
+            <p className="portal-kpi mt-3 text-slate-950 dark:text-foreground">{stat.value}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-xs text-slate-500 dark:text-muted-foreground">{stat.helper}</p>
               {stat.change && (
-                <Badge className={`rounded-md gap-1 ${changeClass(stat.change.type)}`} variant="secondary">
+                <Badge variant={changeVariant(stat.change.type)} className="gap-1 rounded-md">
                   {stat.change.type === 'positive' && <TrendingUp className="h-3 w-3" />}
                   {stat.change.type === 'negative' && <TrendingDown className="h-3 w-3" />}
                   {stat.change.text}

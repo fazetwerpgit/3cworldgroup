@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -277,9 +278,14 @@ export function LoginForm() {
         <div className="flex flex-col justify-between px-6 pb-10 pt-8 text-white sm:px-10 lg:min-h-screen lg:w-[56%] lg:px-14 lg:pb-14 lg:pt-12 lg:pr-40">
           <div className="flex items-center gap-3 animate-fade-in">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/15">
-              <span className="portal-display text-base font-extrabold tracking-tight text-white">
-                3C
-              </span>
+              <Image
+                src="/logo.png"
+                alt="3C World Group"
+                width={30}
+                height={30}
+                priority
+                className="h-[30px] w-[30px] object-contain"
+              />
             </div>
             <div className="leading-tight">
               <p className="text-sm font-semibold tracking-wide">3C World Group</p>

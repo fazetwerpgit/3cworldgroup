@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -487,8 +488,14 @@ export function PortalSidebar() {
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
           <Link href="/portal/dashboard" onClick={handleLinkClick} className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#8dc63f] text-sm font-black text-[#0A1F44]">
-              3C
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white/10 ring-1 ring-white/15">
+              <Image
+                src="/logo.png"
+                alt="3C World Group"
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
             </span>
             <span>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
