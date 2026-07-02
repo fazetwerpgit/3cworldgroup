@@ -216,6 +216,12 @@ playbook where they conflict.
   decisive actions, totals footer. Mobile = status-edged (border-l-2) cards.
   Empty states: true-empty (CTA) vs filtered-empty (Clear filter). Loading =
   geometry-true skeleton rows.
+- Locked leaderboard pattern: command band carries YOUR standing (rank with
+  lime #, points, sales as Archivo numerals); period tabs + metric segmented
+  control; podium cards for top 3 (2-1-3 order, winner elevated + lime top
+  edge, gold/silver/bronze ring+chip — the one non-brand color exception);
+  ranks 4+ as neutral rows, own row lime-tinted; scoring note as footnote
+  text, not a card. Auth-gated fetches must wait for `user` before firing.
 
 - **Phone is primary for reps** — mobile gets first-class treatment (chat,
   leaderboard, forms especially). Mobile bottom-nav pattern from the playbook
