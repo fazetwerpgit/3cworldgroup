@@ -204,6 +204,18 @@ playbook where they conflict.
   `MobileBottomNav` (Dashboard/Sales/Chat/Board, hidden on /portal/chat).
 - Locked login pattern: navy brand deck + diagonal lime seam (two stacked
   clip-path layers), `.portal-display` (Archivo) headline, form panel light.
+- Locked dashboard pattern (v2): navy command band (grid texture + one lime
+  radial glow + Archivo greeting + eyebrow date/role) → role-ordered content →
+  connected KPI strip (gap-px hairlines, Archivo tabular numerals, count-up).
+  Sections stagger in via .portal-enter/-2/-3/-4.
+- Locked list/table pattern (Sales exemplar): navy command band header →
+  status tabs with lime underline (+count chip where meaningful) → table:
+  uppercase muted headers, 48px rows, right-aligned tabular money, avatar
+  chips for people, Badge tint variants for status, stale-age chip on pending
+  (amber ≥7d, danger ≥14d), hover-revealed quiet actions + always-visible
+  decisive actions, totals footer. Mobile = status-edged (border-l-2) cards.
+  Empty states: true-empty (CTA) vs filtered-empty (Clear filter). Loading =
+  geometry-true skeleton rows.
 
 - **Phone is primary for reps** — mobile gets first-class treatment (chat,
   leaderboard, forms especially). Mobile bottom-nav pattern from the playbook
