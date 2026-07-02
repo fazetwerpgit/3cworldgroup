@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { canAccessChatChannel, getChatChannel } from '@/types';
+import { canAccessChatChannel } from '@/types';
 import { isAllowedChatReactionEmoji, toggleReaction } from '@/lib/chat/reactions';
-import { ensureChatChannelMember } from '@/lib/chat/channels';
+import { ensureChatChannelMember, toChatChannel } from '@/lib/chat/channels';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported reaction emoji' }, { status: 400 });
     }
 
-    const channel = getChatChannel(channelId);
+    // Look up the channel from Firestore so admin-created channels work (not just
+    // the static defaults), matching the messages route.
+    const channelSnap = await adminDb.collection('chatChannels').doc(channelId).get();
+    const channel = channelSnap.exists ? toChatChannel(channelSnap.id, channelSnap.data() ?? {}) : null;
     if (!channel || !canAccessChatChannel(channel, user.role, user.fieldRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
