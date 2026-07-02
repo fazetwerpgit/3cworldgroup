@@ -44,6 +44,10 @@
   --accent: #eef6e6;
   --accent-foreground: #0A1F44;
   --destructive: #dc2626;
+  --success: #8dc63f;
+  --success-foreground: #3f6212;
+  --warning: #f59e0b;
+  --warning-foreground: #92400e;
   --border: #e2e8f0;
   --input: #cbd5e1;
   --ring: #8dc63f;
@@ -55,7 +59,8 @@
   --sidebar: #0A1F44;
   --sidebar-foreground: #f8fafc;
   --sidebar-primary: #8dc63f;
-  --sidebar-primary-foreground: #ffffff;
+  /* Brand rule: never white text on lime */
+  --sidebar-primary-foreground: #0A1F44;
   --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.1);
@@ -82,6 +87,10 @@
   --accent: #1b2b1a;
   --accent-foreground: #d7ecc0;
   --destructive: #f2555a;
+  --success: #9fd44f;
+  --success-foreground: #d7ecc0;
+  --warning: #f59e0b;
+  --warning-foreground: #fcd34d;
   --border: #24344f;
   --input: #2b3d5a;
   --ring: #8dc63f;
@@ -109,6 +118,10 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -217,6 +230,63 @@ body {
     transition-property: background-color, border-color, box-shadow, color, opacity, transform;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
+}
+
+/* ============================================
+   PORTAL RESKIN — Slice 1 (tokens + primitives)
+   Everything here is gated under .portal-scope (set on the portal layout)
+   so the public site and recruit flow are untouched. Unlayered on purpose:
+   these overrides must beat Tailwind utility classes baked into ui/**
+   primitives until pages are individually reskinned.
+   ============================================ */
+
+.portal-scope {
+  /* Brand rule: primary buttons are lime bg + navy text, never white on lime */
+  --primary-foreground: #0a1f44;
+}
+
+.dark .portal-scope {
+  --primary-foreground: #0b1424;
+}
+
+/* Anchor §3: portal cards are rounded-lg, never rounded-xl */
+.portal-scope [data-slot="card"] {
+  border-radius: var(--radius);
+}
+
+/* Command-center table headers: small uppercase muted, financial-grade scan */
+.portal-scope [data-slot="table-head"] {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Skeletons are neutral, never lime-tinted */
+.portal-scope [data-slot="skeleton"] {
+  background-color: var(--border);
+}
+
+/* Portal type scale helpers (anchor §3: title / section / body / meta) */
+.portal-kpi {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-label {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.portal-num {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ============================================

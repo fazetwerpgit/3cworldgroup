@@ -19,7 +19,9 @@ export default function PortalLayout({
       <AuthProvider>
         <MobileMenuProvider>
           <ServiceWorkerRegistrar />
-          {children}
+          {/* .portal-scope gates the portal reskin tokens/overrides in
+              globals.css; display:contents keeps it out of the layout. */}
+          <div className="portal-scope contents">{children}</div>
         </MobileMenuProvider>
       </AuthProvider>
     </ThemeProvider>
