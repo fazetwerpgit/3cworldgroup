@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { getRequester } from '@/lib/auth/requireManagement';
 import { Sale, SaleStatus } from '@/types';
 
 // Helper function to create a notification
@@ -38,9 +40,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Sales rows carry customer PII — require a verified login, and scope
+    // non-management callers to their own sales server-side (never trust the
+    // client's filter for that).
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    const requester = await getRequester(gate.uid);
+    if (!requester) {
+      return NextResponse.json({ error: 'Caller not found' }, { status: 403 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') as SaleStatus | null;
-    const salesRepId = searchParams.get('salesRepId');
+    const salesRepId = requester.isManagerOrAbove
+      ? searchParams.get('salesRepId')
+      : gate.uid;
     const limit = parseInt(searchParams.get('limit') || '50');
 
     // Build query - avoid compound indexes by filtering in memory

@@ -2,7 +2,23 @@
 
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
+
+/**
+ * Resolve a fresh ID token, waiting for Firebase auth to finish restoring the
+ * session if needed — grabbing auth.currentUser too early races on first load.
+ */
+async function getIdToken(): Promise<string | null> {
+  if (!auth) return null;
+  if (auth.currentUser) return auth.currentUser.getIdToken();
+  return new Promise((resolve) => {
+    const unsubscribe = auth!.onAuthStateChanged((firebaseUser) => {
+      unsubscribe();
+      resolve(firebaseUser ? firebaseUser.getIdToken() : null);
+    });
+  });
+}
 
 interface SalesFilters {
   status?: SaleStatus;
@@ -43,7 +59,11 @@ export function useSales() {
       if (filters?.endDate) params.append('endDate', filters.endDate);
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
-      const response = await fetch(`/api/portal/sales?${params.toString()}`);
+      // The list endpoint requires a verified login (sales carry customer PII).
+      const token = await getIdToken();
+      const response = await fetch(`/api/portal/sales?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
 
       if (!response.ok) {
