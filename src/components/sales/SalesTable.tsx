@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, ClipboardList, Eye, Pencil, SearchX, Trash2, X } from 'lucide-react';
 import { Sale, SaleStatus } from '@/types';
@@ -26,6 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { SaleDetailSheet } from './SaleDetailSheet';
 
 interface SalesTableProps {
   sales: Sale[];
@@ -86,9 +87,63 @@ export function SalesTable({
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const canApprove = hasPermission('sales:approve');
   const isAdmin = isRole('admin');
+
+  // Detail sheet: track by id, derive index against the live (filtered) list so
+  // prev/next follows the on-screen order.
+  const selectedIndex = selectedId ? sales.findIndex((s) => s.id === selectedId) : -1;
+
+  // If the open sale drops out of the list (e.g. approved away under a Pending
+  // filter), forget it so the sheet closes instead of stranding. Adjusting state
+  // during render is React's sanctioned pattern here and converges immediately.
+  if (selectedId && selectedIndex === -1) {
+    setSelectedId(null);
+  }
+
+  const selectedSale = selectedIndex >= 0 ? sales[selectedIndex] : null;
+
+  const goPrev = useCallback(() => {
+    setSelectedId((current) => {
+      const i = sales.findIndex((s) => s.id === current);
+      return i > 0 ? sales[i - 1].id ?? null : current;
+    });
+  }, [sales]);
+
+  const goNext = useCallback(() => {
+    setSelectedId((current) => {
+      const i = sales.findIndex((s) => s.id === current);
+      return i >= 0 && i < sales.length - 1 ? sales[i + 1].id ?? null : current;
+    });
+  }, [sales]);
+
+  // Arrow keys + Vim j/k step through the list while the sheet is open; ignore
+  // keystrokes aimed at inputs (e.g. the reject-reason textarea).
+  useEffect(() => {
+    if (!selectedSale) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        goPrev();
+      } else if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        goNext();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedSale, goPrev, goNext]);
 
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'N/A';
@@ -170,8 +225,8 @@ export function SalesTable({
       <>
         {/* Quiet actions reveal on hover; decisive actions stay visible. */}
         <span className={`flex items-center gap-1 ${revealClass}`}>
-          <Button asChild variant="ghost" size={mobile ? 'sm' : 'icon-sm'} title="View">
-            <Link href={`/portal/sales/${sale.id}`} aria-label="View sale">
+          <Button asChild variant="ghost" size={mobile ? 'sm' : 'icon-sm'} title="Open full page">
+            <Link href={`/portal/sales/${sale.id}`} aria-label="Open full page">
               <Eye className="size-4" />
               {mobile && 'View'}
             </Link>
@@ -237,7 +292,8 @@ export function SalesTable({
         {sales.map((sale) => (
           <Card
             key={sale.id}
-            className={`rounded-lg border-slate-200 border-l-2 py-4 shadow-sm dark:border-border ${statusEdge[sale.status]}`}
+            onClick={() => setSelectedId(sale.id ?? null)}
+            className={`cursor-pointer rounded-lg border-slate-200 border-l-2 py-4 shadow-sm dark:border-border ${statusEdge[sale.status]}`}
           >
             <CardContent className="px-4">
               <div className="mb-3 flex items-start justify-between gap-3">
@@ -284,7 +340,10 @@ export function SalesTable({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-border">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-border"
+              >
                 {rowActions(sale, true)}
               </div>
             </CardContent>
@@ -309,7 +368,11 @@ export function SalesTable({
             </TableHeader>
             <TableBody>
               {sales.map((sale) => (
-                <TableRow key={sale.id} className="group h-12 hover:bg-slate-50/80 dark:hover:bg-muted/40">
+                <TableRow
+                  key={sale.id}
+                  onClick={() => setSelectedId(sale.id ?? null)}
+                  className="group h-12 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-muted/40"
+                >
                   <TableCell className="pl-4">
                     <span className="block max-w-56 truncate text-sm font-medium text-slate-950 dark:text-foreground">
                       {sale.customerName || sale.customerAddress || 'Customer pending'}
@@ -348,7 +411,12 @@ export function SalesTable({
                     </span>
                   </TableCell>
                   <TableCell className="pr-4 text-right">
-                    <span className="flex items-center justify-end gap-1">{rowActions(sale)}</span>
+                    <span
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center justify-end gap-1"
+                    >
+                      {rowActions(sale)}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}
@@ -445,6 +513,29 @@ export function SalesTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SaleDetailSheet
+        sale={selectedSale}
+        statusVariant={statusVariant}
+        PendingAge={PendingAge}
+        repInitials={repInitials}
+        index={selectedIndex}
+        total={sales.length}
+        open={!!selectedSale}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+        onPrev={goPrev}
+        onNext={goNext}
+        canPrev={selectedIndex > 0}
+        canNext={selectedIndex >= 0 && selectedIndex < sales.length - 1}
+        canApprove={canApprove}
+        isAdmin={isAdmin}
+        loading={loading}
+        onApprove={handleApprove}
+        onRequestReject={(id) => setShowRejectModal(id)}
+        onRequestDelete={(id) => setShowDeleteModal(id)}
+      />
     </>
   );
 }
