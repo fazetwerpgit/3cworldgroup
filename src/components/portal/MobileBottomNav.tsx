@@ -67,7 +67,11 @@ export function MobileBottomNav() {
                   active ? 'text-[#8dc63f]' : 'text-white/55 hover:text-white'
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon
+                  className={`h-5 w-5 transition-transform duration-150 ${
+                    active ? 'scale-110' : ''
+                  }`}
+                />
                 {item.name}
               </Link>
             </li>

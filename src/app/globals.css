@@ -294,6 +294,40 @@ body {
   font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
+/* Micro-interactions: every portal button acknowledges the press. */
+.portal-scope [data-slot="button"] {
+  transition:
+    background-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.portal-scope [data-slot="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Section entrance: quick, quiet, staggered. Reduced-motion users get the
+   global animation kill-switch in @layer base. */
+@keyframes portalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.portal-enter {
+  animation: portalEnter 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.portal-enter-2 { animation-delay: 60ms; }
+.portal-enter-3 { animation-delay: 120ms; }
+.portal-enter-4 { animation-delay: 180ms; }
+
 /* Reserve scroll room for the mobile bottom nav while it is mounted
    (MobileBottomNav tags <body> with data-portal-bottom-nav). */
 @media (max-width: 1023px) {

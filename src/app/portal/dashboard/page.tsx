@@ -117,8 +117,8 @@ export default function DashboardPage() {
 
   const workGrid = (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-      <div className="xl:col-span-7">{actionQueue}</div>
-      <div className="xl:col-span-5">
+      <div className="portal-enter portal-enter-2 xl:col-span-7">{actionQueue}</div>
+      <div className="portal-enter portal-enter-3 xl:col-span-5">
         <MiniLeaderboard />
       </div>
     </div>
@@ -128,7 +128,7 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-[1500px] space-y-5">
       {/* Command band: the workspace carries the same navy + seam identity as
           the login deck. */}
-      <section className="relative overflow-hidden rounded-lg bg-[#0A1F44] text-white">
+      <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
@@ -176,11 +176,15 @@ export default function DashboardPage() {
       {leadsWithQueue ? (
         <>
           {workGrid}
-          <DashboardStats />
+          <div className="portal-enter portal-enter-4">
+            <DashboardStats />
+          </div>
         </>
       ) : (
         <>
-          <DashboardStats />
+          <div className="portal-enter portal-enter-2">
+            <DashboardStats />
+          </div>
           {workGrid}
         </>
       )}

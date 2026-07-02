@@ -516,13 +516,20 @@ export function PortalSidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <CollapsibleNavSection
-            title="Main"
-            items={mainItems}
-            canAccessItem={canAccessItem}
-            isActive={isActive}
-            onLinkClick={handleLinkClick}
-          />
+          {/* The everyday destinations are THE nav — no label, no collapse.
+              Everything below starts folded and auto-opens on its own routes. */}
+          <ul className="space-y-0.5">
+            {mainItems.filter(canAccessItem).map((item) => (
+              <NavLink
+                key={item.name}
+                item={item}
+                active={isActive(item.href)}
+                onLinkClick={handleLinkClick}
+              />
+            ))}
+          </ul>
+
+          <div className="my-4 border-t border-white/10" />
 
           <CollapsibleNavSection
             title="Forms"
@@ -539,6 +546,7 @@ export function PortalSidebar() {
             canAccessItem={canAccessItem}
             isActive={isActive}
             onLinkClick={handleLinkClick}
+            defaultOpen={false}
           />
 
           {showOperationsSection && (
@@ -548,6 +556,7 @@ export function PortalSidebar() {
               canAccessItem={canAccessItem}
               isActive={isActive}
               onLinkClick={handleLinkClick}
+              defaultOpen={false}
             />
           )}
 
@@ -558,6 +567,7 @@ export function PortalSidebar() {
               canAccessItem={canAccessItem}
               isActive={isActive}
               onLinkClick={handleLinkClick}
+              defaultOpen={false}
             />
           )}
         </nav>

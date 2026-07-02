@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Award, BarChart3, CheckCircle2, Clock3, TrendingDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { useCountUp } from '@/hooks/useCountUp';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -28,10 +29,17 @@ type ChangeType = 'positive' | 'negative' | 'neutral';
 interface StatCard {
   title: string;
   value: string | number;
+  /** When set, the value counts up from 0 on first paint. */
+  numeric?: number;
   helper: string;
   change?: { text: string; type: ChangeType } | null;
   icon: React.ReactNode;
   permissions?: string[];
+}
+
+function CountUpNumber({ n }: { n: number }) {
+  const value = useCountUp(n);
+  return <>{new Intl.NumberFormat('en-US').format(value)}</>;
 }
 
 export function DashboardStats() {
@@ -112,6 +120,7 @@ export function DashboardStats() {
     {
       title: 'Approved Points',
       value: formatNumber(stats?.approvedPoints || 0),
+      numeric: stats?.approvedPoints || 0,
       helper: `${formatNumber(stats?.totalPoints || 0)} total submitted`,
       change: stats?.pointsChange ? getChangeDisplay(stats.pointsChange) : null,
       icon: <Award className="h-4 w-4" />,
@@ -120,6 +129,7 @@ export function DashboardStats() {
     {
       title: 'Sales This Month',
       value: stats?.totalSales || 0,
+      numeric: stats?.totalSales || 0,
       helper: `${stats?.approvedCount || 0} approved, ${stats?.rejectedCount || 0} rejected`,
       change: stats?.salesChange ? getChangeDisplay(stats.salesChange) : null,
       icon: <BarChart3 className="h-4 w-4" />,
@@ -128,6 +138,7 @@ export function DashboardStats() {
     {
       title: 'Pending Approvals',
       value: stats?.pendingCount || 0,
+      numeric: stats?.pendingCount || 0,
       helper: (stats?.pendingCount || 0) > 0 ? 'Awaiting manager review' : 'No pending sales',
       change: (stats?.pendingCount || 0) > 0
         ? { text: `${stats?.pendingCount || 0} open`, type: 'neutral' as const }
@@ -178,7 +189,7 @@ export function DashboardStats() {
               </span>
             </dt>
             <dd className="portal-display portal-kpi mt-2.5 text-[2.1rem] text-slate-950 dark:text-foreground">
-              {stat.value}
+              {stat.numeric !== undefined ? <CountUpNumber n={stat.numeric} /> : stat.value}
             </dd>
             <dd className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 dark:text-muted-foreground">
