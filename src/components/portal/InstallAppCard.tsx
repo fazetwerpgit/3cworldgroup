@@ -52,15 +52,33 @@ export default function InstallAppCard() {
     if (!deferred) return;
     try {
       await deferred.prompt();
-      await deferred.userChoice;
+      // userChoice can hang forever on stale prompts — don't let the button
+      // die silently; give up after 3s and show the manual path.
+      await Promise.race([
+        deferred.userChoice,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+      ]);
       setDeferred(null);
     } catch {
-      // The stashed prompt can go stale (already used, or the browser revoked
-      // it). Fall back to manual instructions instead of a dead button.
       setDeferred(null);
       setPromptFailed(true);
     }
   };
+
+  const manualSteps = isIOS ? (
+    <p className="text-sm text-slate-600 dark:text-muted-foreground">
+      On iPhone/iPad: open this site in <span className="font-medium">Safari</span>, tap the{' '}
+      <span className="font-medium">Share</span> button (square with an arrow), then{' '}
+      <span className="font-medium">Add to Home Screen</span>.
+    </p>
+  ) : (
+    <p className="text-sm text-slate-500 dark:text-muted-foreground">
+      Manual install: browser menu (⋮) →{' '}
+      <span className="font-medium text-slate-700 dark:text-foreground">Add to Home screen</span>{' '}
+      (or <span className="font-medium text-slate-700 dark:text-foreground">Install app</span>).
+      Chrome and Edge also show an install icon in the address bar.
+    </p>
+  );
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-border dark:bg-card">
@@ -81,27 +99,22 @@ export default function InstallAppCard() {
                 Installed — you&apos;re running the app.
               </div>
             ) : deferred ? (
-              <Button type="button" onClick={install} className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                <Download className="size-4" />
-                Install app
-              </Button>
-            ) : isIOS ? (
-              <p className="text-sm text-slate-600 dark:text-muted-foreground">
-                On iPhone/iPad: tap the <span className="font-medium">Share</span> button in
-                Safari, then <span className="font-medium">Add to Home Screen</span>. (Chrome on
-                iPhone: tap Share in the address bar, then Add to Home Screen.)
-              </p>
+              <div className="space-y-3">
+                <Button type="button" onClick={install} className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
+                  <Download className="size-4" />
+                  Install app
+                </Button>
+                {manualSteps}
+              </div>
             ) : (
-              <p className="text-sm text-slate-500 dark:text-muted-foreground">
-                {promptFailed
-                  ? 'The one-tap install didn’t start — use your browser’s menu (⋮) → '
-                  : 'Use your browser’s menu (⋮) → '}
-                <span className="font-medium text-slate-700 dark:text-foreground">
-                  Add to Home screen
-                </span>{' '}
-                (or <span className="font-medium text-slate-700 dark:text-foreground">Install app</span>) —
-                Chrome and Edge also show an install icon in the address bar.
-              </p>
+              <div className="space-y-2">
+                {promptFailed && (
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                    The one-tap install didn&apos;t start — use the manual steps below:
+                  </p>
+                )}
+                {manualSteps}
+              </div>
             )}
           </div>
         </div>
