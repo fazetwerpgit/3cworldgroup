@@ -52,7 +52,7 @@ export function MobileChannelList({ channels, loading, error, onOpenChannel }: M
               key={channel.id}
               type="button"
               onClick={() => onOpenChannel(channel.id)}
-              className="flex w-full items-center gap-3 p-4 text-left transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-muted"
+              className="flex w-full items-center gap-3 p-4 text-left transition-colors duration-150 hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-muted dark:active:bg-muted/80"
             >
               {channel.audience === 'managers' ? (
                 <Lock className="size-5 shrink-0 text-slate-500 dark:text-muted-foreground" />

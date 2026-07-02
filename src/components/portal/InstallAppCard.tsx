@@ -16,6 +16,7 @@ export default function InstallAppCard() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [promptFailed, setPromptFailed] = useState(false);
 
   useEffect(() => {
     // Already running as an installed app?
@@ -23,6 +24,9 @@ export default function InstallAppCard() {
       window.matchMedia('(display-mode: standalone)').matches ||
       // iOS Safari
       (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    // Post-mount detection keeps the server and first client render identical
+    // (hydration-safe), same pattern as the theme/localStorage restores.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInstalled(standalone);
 
     const ua = window.navigator.userAgent.toLowerCase();
@@ -46,9 +50,16 @@ export default function InstallAppCard() {
 
   const install = async () => {
     if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setDeferred(null);
+    try {
+      await deferred.prompt();
+      await deferred.userChoice;
+      setDeferred(null);
+    } catch {
+      // The stashed prompt can go stale (already used, or the browser revoked
+      // it). Fall back to manual instructions instead of a dead button.
+      setDeferred(null);
+      setPromptFailed(true);
+    }
   };
 
   return (
@@ -76,13 +87,20 @@ export default function InstallAppCard() {
               </Button>
             ) : isIOS ? (
               <p className="text-sm text-slate-600 dark:text-muted-foreground">
-                On iPhone/iPad: tap the <span className="font-medium">Share</span> button, then{' '}
-                <span className="font-medium">Add to Home Screen</span>.
+                On iPhone/iPad: tap the <span className="font-medium">Share</span> button in
+                Safari, then <span className="font-medium">Add to Home Screen</span>. (Chrome on
+                iPhone: tap Share in the address bar, then Add to Home Screen.)
               </p>
             ) : (
               <p className="text-sm text-slate-500 dark:text-muted-foreground">
-                Open this site in Chrome or Edge and use the install icon in the address bar, or your
-                browser&apos;s menu → Install.
+                {promptFailed
+                  ? 'The one-tap install didn’t start — use your browser’s menu (⋮) → '
+                  : 'Use your browser’s menu (⋮) → '}
+                <span className="font-medium text-slate-700 dark:text-foreground">
+                  Add to Home screen
+                </span>{' '}
+                (or <span className="font-medium text-slate-700 dark:text-foreground">Install app</span>) —
+                Chrome and Edge also show an install icon in the address bar.
               </p>
             )}
           </div>

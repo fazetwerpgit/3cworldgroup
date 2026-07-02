@@ -81,9 +81,17 @@ export default function TeamChatPage() {
     }
   }, [activeChannelId, channels]);
 
+  // Jump instantly to the bottom when a conversation opens; animate only for
+  // new messages arriving in the same view (smooth-scrolling from the top on
+  // open reads as lag).
+  const scrollContextRef = useRef('');
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    mobileMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const context = `${activeChannelId}:${mobileView}`;
+    const behavior: ScrollBehavior =
+      scrollContextRef.current === context ? 'smooth' : 'auto';
+    scrollContextRef.current = context;
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+    mobileMessagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   }, [messages.length, activeChannelId, mobileView]);
 
   // Flag <body> while the phone conversation is open so globals.css hides the
@@ -98,6 +106,10 @@ export default function TeamChatPage() {
 
   const sendMessage = async () => {
     if (!user || !activeChannelId || !draft.trim()) return;
+    // Optimistic: clear the box immediately so typing never waits on the
+    // network; restore the text if the send fails.
+    const text = draft;
+    setDraft('');
     setSending(true);
     setError('');
     try {
@@ -106,14 +118,14 @@ export default function TeamChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           channelId: activeChannelId,
-          text: draft,
+          text,
         }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to send message');
-      setDraft('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
+      setDraft((current) => current || text);
     } finally {
       setSending(false);
     }
@@ -332,7 +344,7 @@ export default function TeamChatPage() {
                               ? `Message ${activeChannel.name}...`
                               : 'Select a channel to send a message...'
                           }
-                          disabled={!activeChannelId || sending}
+                          disabled={!activeChannelId}
                           rows={3}
                           className="resize-none"
                         />
