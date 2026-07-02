@@ -308,6 +308,16 @@ const adminItems: NavItem[] = [
     ),
   },
   {
+    name: 'Chat Channels',
+    href: '/portal/admin/chat-channels',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m-7 7V5a2 2 0 012-2h12a2 2 0 012 2v9a2 2 0 01-2 2H8l-4 3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h5m-2.5-2.5v5" />
+      </svg>
+    ),
+  },
+  {
     name: 'System Settings',
     href: '/portal/admin/settings',
     icon: (

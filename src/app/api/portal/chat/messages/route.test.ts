@@ -11,8 +11,20 @@ const setMock = vi.fn(async () => undefined);
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: () => ({
-      doc: () => ({
-        get: vi.fn(async () => ({ exists: true, data: () => ({ memberIds: ['real-uid'] }) })),
+      doc: (channelId: string) => ({
+        get: vi.fn(async () => ({
+          id: channelId,
+          exists: channelId === 'all-company',
+          data: () => channelId === 'all-company' ? ({
+            id: 'all-company',
+            name: 'All Company',
+            description: 'Company-wide updates and quick coordination.',
+            audience: 'all',
+            order: 1,
+            active: true,
+            memberIds: ['real-uid'],
+          }) : undefined,
+        })),
         set: setMock,
         collection: () => ({ add: addMock }),
       }),
