@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
@@ -109,40 +110,36 @@ export default function OnboardingReviewPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                Onboarding Review
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                Review submitted onboarding items before reps move forward in the website-driven onboarding flow.
-              </p>
-            </div>
+        <PortalPageHeader
+          compact
+          eyebrow="Review queue"
+          title="Onboarding Review"
+          description="Review submitted onboarding items before reps move forward in the website-driven onboarding flow."
+          actions={
             <Badge
               variant="outline"
               className="w-fit rounded-md border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-1 text-amber-700 dark:text-amber-300"
             >
               {submissions.length} pending
             </Badge>
-          </div>
-        </section>
+          }
+        />
 
         {error && (
-          <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          <div className="portal-enter portal-enter-2 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
 
         {loading ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
+          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-8">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
               <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading submissions...</p>
             </CardContent>
           </Card>
         ) : submissions.length === 0 ? (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
+          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-12">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
                 <Check className="h-6 w-6" />
@@ -154,11 +151,11 @@ export default function OnboardingReviewPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="portal-enter portal-enter-2 space-y-3">
             {submissions.map((submission) => (
               <Card
                 key={submission.id}
-                className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-colors hover:border-slate-300"
+                className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/25"
               >
                 <CardContent className="p-5">
                   <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">

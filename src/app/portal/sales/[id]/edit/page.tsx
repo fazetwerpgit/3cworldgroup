@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Check, Lock, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -206,21 +207,25 @@ export default function EditSalePage() {
     <ProtectedRoute permissions={['sales:read']}>
       <PortalShell>
         <div className="mx-auto max-w-[1100px] space-y-5">
-          <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-            <div className="flex items-center gap-4">
-            <Button asChild variant="ghost" size="icon">
-              <Link href={`/portal/sales/${saleId}`} aria-label="Back to sale details">
-                  <ArrowLeft className="size-5 text-slate-600 dark:text-muted-foreground" />
-              </Link>
-            </Button>
-            <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">Edit Sale</h1>
-                <p className="text-sm text-slate-500 dark:text-muted-foreground">ID: {sale.id}</p>
-              </div>
-            </div>
-          </section>
+          <Button
+            asChild
+            variant="ghost"
+            className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground"
+          >
+            <Link href={`/portal/sales/${saleId}`} aria-label="Back to sale details">
+              <ArrowLeft className="size-4" />
+              Back to sale details
+            </Link>
+          </Button>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <PortalPageHeader
+            compact
+            eyebrow="Sales workspace"
+            title="Edit Sale"
+            description={`ID: ${sale.id}`}
+          />
+
+          <form onSubmit={handleSubmit} className="portal-enter portal-enter-2 space-y-6">
             {(formError || error) && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
                 {formError || error}

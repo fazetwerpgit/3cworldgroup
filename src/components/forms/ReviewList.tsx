@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
 
 interface ReviewRow {
@@ -47,47 +48,56 @@ export default function ReviewList({
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">{title}</h1>
-          <div className="flex items-center gap-2">
+      <PortalPageHeader
+        compact
+        eyebrow="Review queue"
+        title={title}
+        actions={
+          <>
             {downloadFilename && (
               <Button
                 type="button"
                 variant="outline"
                 disabled={rows.length === 0}
                 onClick={() => downloadCsv(downloadFilename, toCsv(columns, rows))}
+                className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white dark:border-white/20 dark:bg-transparent dark:hover:bg-white/10"
               >
                 Download CSV
               </Button>
             )}
-            <Badge variant="outline" className="rounded-md border-amber-200 bg-amber-50 px-3 py-1 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
+            <span
+              className={`rounded-md border px-3 py-1 text-sm font-semibold ${
+                pending > 0
+                  ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground'
+              }`}
+            >
               {pending} new
-            </Badge>
-          </div>
-        </div>
-      </section>
+            </span>
+          </>
+        }
+      />
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
+        <div className="portal-enter portal-enter-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
       )}
 
       {loading ? (
-        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm dark:border-border dark:bg-card">
+        <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm dark:border-border dark:bg-card">
           <CardContent className="py-8">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
             <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading…</p>
           </CardContent>
         </Card>
       ) : rows.length === 0 ? (
-        <Card className="rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm dark:border-border dark:bg-card">
+        <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm dark:border-border dark:bg-card">
           <CardContent className="py-12">
             <h3 className="font-semibold text-slate-950 dark:text-foreground">Nothing to review</h3>
             <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">No submissions yet.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="portal-enter portal-enter-2 space-y-3">
           {rows.map((row) => (
             <Card key={row.id} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
               <CardContent className="p-5">

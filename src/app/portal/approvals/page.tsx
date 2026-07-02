@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Check, ClipboardCheck, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sale, FIBER_COMPANIES } from '@/types';
@@ -113,30 +114,34 @@ export default function ApprovalsPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              {/* Header */}
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">Pending Approvals</h1>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      Review sales submissions with the customer, plan, value, and points in one pass.
-                    </p>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
+              {/* Header — navy command band */}
+              <PortalPageHeader
+                compact
+                eyebrow="Review queue"
+                title="Pending Approvals"
+                description="Review sales submissions with the customer, plan, value, and points in one pass."
+                actions={
+                  <div
+                    className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${
+                      sales.length > 0
+                        ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground'
+                    }`}
+                  >
                     <ClipboardCheck className="h-4 w-4" />
                     {sales.length} pending
                   </div>
-                </div>
-              </section>
+                }
+              />
 
               {/* Sales List */}
               {loading ? (
-                <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-8 text-center shadow-sm">
+                <div className="portal-enter portal-enter-2 rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-8 text-center shadow-sm">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8dc63f] mx-auto"></div>
                   <p className="mt-4 text-slate-500 dark:text-muted-foreground">Loading pending sales...</p>
                 </div>
               ) : sales.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-12 text-center shadow-sm">
+                <div className="portal-enter portal-enter-2 rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-12 text-center shadow-sm">
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
                     <Check className="h-7 w-7" />
                   </div>
@@ -144,7 +149,7 @@ export default function ApprovalsPage() {
                   <p className="mt-1 text-slate-500 dark:text-muted-foreground">No pending sales to review right now.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="portal-enter portal-enter-2 space-y-3">
                   {sales.map((sale) => (
                     <div
                       key={sale.id}

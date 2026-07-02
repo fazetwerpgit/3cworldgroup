@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Hash, Lock, MessageSquareText, Radio, Send, Trash2 } from 'lucide-react';
+import { Hash, Lock, MessageSquareText, Send, Trash2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { PortalHeader } from '@/components/portal/PortalHeader';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -141,27 +142,11 @@ export default function TeamChatPage() {
           <PortalSidebar />
           <main className="flex-1 overflow-auto p-4 sm:p-6">
             <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-panel portal-rail rounded-lg p-5 sm:p-6">
-                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-foreground">
-                        Team Chat
-                      </h1>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
-                        Free Firebase pilot
-                      </Badge>
-                      <Badge variant="outline" className="rounded-md border-[#8dc63f]/30 text-[#4f7f1e] dark:text-green-300">
-                        <Radio className="size-3" />
-                        Live
-                      </Badge>
-                    </div>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-muted-foreground">
-                      Text-only team channels for onboarding, training, and manager coordination. No media hosting or paid chat vendor.
-                    </p>
-                  </div>
-                </div>
-              </section>
+              <PortalPageHeader
+                eyebrow="Team"
+                title="Team Chat"
+                description="Live text-only team channels for onboarding, training, and manager coordination — a free Firebase pilot with no media hosting or paid chat vendor."
+              />
 
               {shownError && (
                 <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
