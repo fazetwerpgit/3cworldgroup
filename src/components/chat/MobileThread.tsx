@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { ArrowDown, ChevronDown, ChevronLeft, Clock, Hash, Lock, RotateCw, Send, Trash2, X } from 'lucide-react';
+import { ArrowDown, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, RotateCw, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { ReactionBar } from '@/components/chat/ReactionBar';
+import { GifPicker } from '@/components/chat/GifPicker';
+import type { GifResult } from '@/components/chat/GifPicker';
+import type { LightboxImage } from '@/components/chat/ChatLightbox';
+import { validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
-import { ChatChannel } from '@/types';
+import { ChatChannel, ChatAttachment } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -27,6 +31,17 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
  */
 export type ThreadMessage = ChatMessageView & {
   pendingState?: 'sending' | 'failed';
+  // Optimistic image sends only: a local object URL shown in the pending bubble
+  // (with an upload shimmer) until the real message reconciles in, the original
+  // file so a failed send can retry the upload, the resolved server attachment
+  // cached after a successful upload so a message-POST retry doesn't re-upload,
+  // and the prepared image dimensions so the pending tile reserves its box (no
+  // layout shift). All absent on text/GIF echoes and on real messages.
+  localPreviewUrl?: string;
+  pendingFile?: File;
+  uploadedAttachment?: ChatAttachment;
+  localPreviewWidth?: number;
+  localPreviewHeight?: number;
 };
 
 interface MobileThreadProps {
@@ -40,6 +55,10 @@ interface MobileThreadProps {
   draft: string;
   sending: boolean;
   deletingId: string | null;
+  // GIF feature availability (probed by the page) + the shared verified-token
+  // fetch the GIF picker uses to search Tenor.
+  gifEnabled: boolean;
+  authedFetch: (url: string, init?: RequestInit) => Promise<Response>;
   messagesEndRef: RefObject<HTMLDivElement | null>;
   // Bumped by the page on every own action (send/retry) so the thread always
   // scrolls to the bottom regardless of the reader's scroll position.
@@ -49,10 +68,69 @@ interface MobileThreadProps {
   onOpenInfo: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  // Media sends flow back to the page's optimistic machinery (same as text).
+  onSendImage: (file: File, caption: string) => void;
+  onSendGif: (gif: GifResult) => void;
+  onOpenImage: (image: LightboxImage) => void;
+  onError: (message: string) => void;
   onDelete: (messageId: string) => void;
   onReactionError: (message: string) => void;
   onRetryPending: (message: ThreadMessage) => void;
   onDiscardPending: (messageId: string) => void;
+}
+
+/**
+ * A message's image/GIF rendered as a chat bubble (Connecteam style). Shows the
+ * local preview with an upload shimmer while a pending image echo uploads (not
+ * clickable then); a delivered image/GIF opens the lightbox. Nothing for text.
+ */
+function BubbleImage({
+  message,
+  isOwn,
+  onOpen,
+}: {
+  message: ThreadMessage;
+  isOwn: boolean;
+  onOpen: () => void;
+}) {
+  const previewUrl = message.localPreviewUrl;
+  const src = previewUrl ?? message.attachment?.url;
+  if (!src) return null;
+  // A local preview means the echo hasn't reconciled yet: not clickable, and
+  // shimmering only while the upload is in flight (not once it has failed).
+  const isPendingLocal = !!previewUrl && !!message.pendingState;
+  const isUploading = !!previewUrl && message.pendingState === 'sending';
+  const isFailed = message.pendingState === 'failed';
+  // Reserve the tile's box from known dimensions (upload/Tenor dims on delivered
+  // messages, prepared dims on pending image echoes) so the navy skeleton shows
+  // while loading and the decode causes no layout shift — which would otherwise
+  // nudge the scroll anchor past the pin margin.
+  const width = message.attachment?.width ?? message.localPreviewWidth;
+  const height = message.attachment?.height ?? message.localPreviewHeight;
+  const aspectStyle = width && height ? { aspectRatio: `${width} / ${height}` } : undefined;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={isPendingLocal}
+      aria-label="Open image"
+      className={`relative block w-60 max-w-full overflow-hidden bg-[#0A1F44]/5 shadow-sm ring-1 disabled:cursor-default dark:bg-white/5 ${
+        isFailed ? 'ring-red-400/70 dark:ring-red-500/50' : 'ring-slate-200 dark:ring-border'
+      } ${isOwn ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md'}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={message.text || 'Shared image'}
+        loading="lazy"
+        style={aspectStyle}
+        className={`max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
+      />
+      {isUploading && (
+        <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
+      )}
+    </button>
+  );
 }
 
 /** Grouping window: messages from the same author within this gap merge. */
@@ -110,6 +188,8 @@ export function MobileThread({
   draft,
   sending,
   deletingId,
+  gifEnabled,
+  authedFetch,
   messagesEndRef,
   scrollToBottomSignal,
   formatTime,
@@ -117,12 +197,54 @@ export function MobileThread({
   onOpenInfo,
   onDraftChange,
   onSend,
+  onSendImage,
+  onSendGif,
+  onOpenImage,
+  onError,
   onDelete,
   onReactionError,
   onRetryPending,
   onDiscardPending,
 }: MobileThreadProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Composer media state (mobile owns its own, mirroring the desktop composer).
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachPreview, setAttachPreview] = useState('');
+  const [gifOpen, setGifOpen] = useState(false);
+
+  // Release the staged preview object URL when cleared or swapped.
+  useEffect(() => {
+    if (!attachPreview) return;
+    return () => URL.revokeObjectURL(attachPreview);
+  }, [attachPreview]);
+
+  const pickFile = (file: File | undefined) => {
+    if (!file) return;
+    const validationError = validateSelectedImage(file);
+    if (validationError) {
+      onError(validationError);
+      return;
+    }
+    onError('');
+    setAttachFile(file);
+    setAttachPreview(URL.createObjectURL(file));
+  };
+
+  const clearAttachment = () => {
+    setAttachFile(null);
+    setAttachPreview('');
+  };
+
+  // Send: a staged image takes priority (caption from the draft); otherwise text.
+  const handleSend = () => {
+    if (attachFile) {
+      onSendImage(attachFile, draft);
+      clearAttachment();
+      return;
+    }
+    onSend();
+  };
   // Pinned-ness drives the pill (state, for re-render) and is also read
   // synchronously inside the scroll effect (ref mirror) so a mere pin flip
   // doesn't itself trigger a scroll.
@@ -316,16 +438,33 @@ export function MobileThread({
                         )}
                       </div>
                     )}
-                    <div
-                      className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm portal-motion ${
-                        isOwn
-                          ? 'rounded-br-md bg-[#0A1F44] text-white'
-                          : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
-                      } ${message.pendingState === 'sending' ? 'opacity-70' : ''} ${
-                        isFailed ? 'ring-1 ring-red-400/70 dark:ring-red-500/50' : ''
-                      }`}
-                    >
-                      {message.text}
+                    <div className={`flex min-w-0 flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
+                      {(message.attachment || message.localPreviewUrl) && (
+                        <BubbleImage
+                          message={message}
+                          isOwn={isOwn}
+                          onOpen={() =>
+                            onOpenImage({
+                              url: message.attachment?.url ?? message.localPreviewUrl ?? '',
+                              author: message.authorName,
+                              time: formatTime(message.createdAt),
+                            })
+                          }
+                        />
+                      )}
+                      {message.text && (
+                        <div
+                          className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm portal-motion ${
+                            isOwn
+                              ? 'rounded-br-md bg-[#0A1F44] text-white'
+                              : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
+                          } ${message.pendingState === 'sending' ? 'opacity-70' : ''} ${
+                            isFailed ? 'ring-1 ring-red-400/70 dark:ring-red-500/50' : ''
+                          }`}
+                        >
+                          {message.text}
+                        </div>
+                      )}
                     </div>
                     {canDelete && (
                       <Button
@@ -420,7 +559,76 @@ export function MobileThread({
 
       {/* Composer pinned to the bottom edge. */}
       <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="flex items-end gap-2">
+        {/* Hidden file input — opened by the ImagePlus button. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // Clear so re-picking the same file fires onChange again.
+            event.target.value = '';
+            pickFile(file);
+          }}
+        />
+        {/* Staged-image preview chip. */}
+        {attachFile && attachPreview && (
+          <div className="mb-2 flex items-center gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={attachPreview}
+              alt="Selected image preview"
+              className="size-10 shrink-0 rounded object-cover ring-1 ring-slate-200 dark:ring-border"
+            />
+            <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-muted-foreground">
+              {attachFile.name}
+            </span>
+            <button
+              type="button"
+              onClick={clearAttachment}
+              aria-label="Remove image"
+              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+        <div className="flex items-end gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!channelId}
+            aria-label="Attach an image"
+            className="size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+          >
+            <ImagePlus className="size-5" />
+          </Button>
+          {gifEnabled && (
+            <div className="relative">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setGifOpen((open) => !open)}
+                disabled={!channelId}
+                aria-label="Add a GIF"
+                aria-expanded={gifOpen}
+                className="size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+              >
+                <Sparkles className="size-5" />
+              </Button>
+              {gifOpen && channelId && (
+                <GifPicker
+                  authedFetch={authedFetch}
+                  onSelect={onSendGif}
+                  onClose={() => setGifOpen(false)}
+                />
+              )}
+            </div>
+          )}
           <Textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value.slice(0, 1000))}
@@ -428,7 +636,7 @@ export function MobileThread({
               // Enter sends; Shift+Enter inserts a newline.
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
-                onSend();
+                handleSend();
               }
             }}
             placeholder={channel ? `Message ${channel.name}...` : 'Select a channel...'}
@@ -438,13 +646,13 @@ export function MobileThread({
           />
           <Button
             type="button"
-            onClick={onSend}
-            disabled={!channelId || !draft.trim() || sending}
+            onClick={handleSend}
+            disabled={!channelId || (!draft.trim() && !attachFile) || sending}
             size="icon"
             className="size-10 shrink-0 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-            aria-label="Send message"
+            aria-label={sending ? 'Sending' : 'Send message'}
           >
-            <Send className="size-4" />
+            {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           </Button>
         </div>
         <p className="mt-1.5 text-[11px] text-slate-500 dark:text-muted-foreground">

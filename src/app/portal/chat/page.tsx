@@ -1,9 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ChevronDown, Clock, Hash, Lock, MessageSquareText, RotateCw, Send, Trash2, X } from 'lucide-react';
+import { ArrowDown, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, RotateCw, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
+import { ChatLightbox } from '@/components/chat/ChatLightbox';
+import type { LightboxImage } from '@/components/chat/ChatLightbox';
+import { GifPicker } from '@/components/chat/GifPicker';
+import type { GifResult } from '@/components/chat/GifPicker';
+import { prepareImageForUpload, uploadChatImage, validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { MobileChannelList } from '@/components/chat/MobileChannelList';
 import { MobileThread } from '@/components/chat/MobileThread';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
@@ -20,7 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useMessages } from '@/hooks/chat/useMessages';
 import { auth } from '@/lib/firebase/config';
-import { ChatChannel, getEffectiveRole } from '@/types';
+import { ChatAttachment, ChatChannel, getEffectiveRole } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -28,6 +33,58 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
   managers: 'Managers',
   platform: 'Admin/Ops',
 };
+
+// Probe the GIF feature at most once per browser session (shared across mounts):
+// the proxy answers { enabled } based on whether a Tenor key is configured. The
+// GIF button never renders until this resolves true.
+let gifEnabledProbe: Promise<boolean> | null = null;
+
+/**
+ * A message's image/GIF rendered inside a desktop card. Shows the local preview
+ * with an upload shimmer while a pending image echo is still uploading (not
+ * clickable then); a delivered image/GIF opens the lightbox on click. Renders
+ * nothing for text-only messages.
+ */
+function DesktopAttachment({ message, onOpen }: { message: ThreadMessage; onOpen: () => void }) {
+  const previewUrl = message.localPreviewUrl;
+  const src = previewUrl ?? message.attachment?.url;
+  if (!src) return null;
+  // A local preview means the echo hasn't reconciled yet: not clickable, and
+  // shimmering only while the upload is in flight (not once it has failed).
+  const isPendingLocal = !!previewUrl && !!message.pendingState;
+  const isUploading = !!previewUrl && message.pendingState === 'sending';
+  const isFailed = message.pendingState === 'failed';
+  // Reserve the tile's box from known dimensions (upload/Tenor dims on delivered
+  // messages, prepared dims on pending image echoes) so the navy skeleton is
+  // visible while loading and the image decode causes no layout shift — which
+  // would otherwise nudge the scroll anchor past the pin margin.
+  const width = message.attachment?.width ?? message.localPreviewWidth;
+  const height = message.attachment?.height ?? message.localPreviewHeight;
+  const aspectStyle = width && height ? { aspectRatio: `${width} / ${height}` } : undefined;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={isPendingLocal}
+      aria-label="Open image"
+      className={`relative mt-2 block w-full max-w-xs overflow-hidden rounded-lg bg-[#0A1F44]/5 ring-1 transition disabled:cursor-default dark:bg-white/5 ${
+        isFailed ? 'ring-red-400/70 dark:ring-red-500/50' : 'ring-slate-200 dark:ring-border'
+      }`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={message.text || 'Shared image'}
+        loading="lazy"
+        style={aspectStyle}
+        className={`max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
+      />
+      {isUploading && (
+        <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
+      )}
+    </button>
+  );
+}
 
 export default function TeamChatPage() {
   const { user, hasPermission, isRole } = useAuth();
@@ -38,6 +95,15 @@ export default function TeamChatPage() {
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Media UI: GIF feature availability (probed), full-screen image viewer, and
+  // the desktop composer's staged image + GIF-picker visibility. (Mobile owns
+  // its own copies of these inside MobileThread.)
+  const [gifEnabled, setGifEnabled] = useState(false);
+  const [lightbox, setLightbox] = useState<LightboxImage | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachPreview, setAttachPreview] = useState('');
+  const [gifOpen, setGifOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Optimistic local echoes: shown instantly on send, dropped once the matching
   // real message arrives over the realtime listener (see reconciliation below).
   const [pendingMessages, setPendingMessages] = useState<ThreadMessage[]>([]);
@@ -140,6 +206,56 @@ export default function TeamChatPage() {
     });
   }, [authedFetch, user]);
 
+  // Probe the GIF feature once per session so we only render the GIF button when
+  // a Tenor key is configured server-side (proxy returns { enabled: false }
+  // otherwise). The module-level promise dedupes across mounts.
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    if (!gifEnabledProbe) {
+      gifEnabledProbe = authedFetch('/api/portal/chat/gifs?q=')
+        .then((res) => res.json())
+        .then((json) => !!json.enabled)
+        .catch(() => false);
+    }
+    gifEnabledProbe.then((enabled) => {
+      if (active) setGifEnabled(enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, [authedFetch, user]);
+
+  // Revoke object URLs for image echoes once they're gone from pendingMessages
+  // (reconciled or discarded) so uploading previews don't leak. A ref tracks the
+  // URLs we've handed out; anything no longer live gets released.
+  const trackedPreviewUrls = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const live = new Set(
+      pendingMessages.map((echo) => echo.localPreviewUrl).filter((url): url is string => !!url)
+    );
+    for (const url of trackedPreviewUrls.current) {
+      if (!live.has(url)) {
+        URL.revokeObjectURL(url);
+        trackedPreviewUrls.current.delete(url);
+      }
+    }
+    for (const url of live) trackedPreviewUrls.current.add(url);
+  }, [pendingMessages]);
+  useEffect(() => {
+    const tracked = trackedPreviewUrls.current;
+    return () => {
+      for (const url of tracked) URL.revokeObjectURL(url);
+    };
+  }, []);
+
+  // Release a staged (not-yet-sent) desktop image preview when it's cleared or
+  // swapped so the file picker never leaks its object URL either.
+  useEffect(() => {
+    if (!attachPreview) return;
+    return () => URL.revokeObjectURL(attachPreview);
+  }, [attachPreview]);
+
   useEffect(() => {
     if (!activeChannelId && channels.length > 0) {
       setActiveChannelId(channels[0].id);
@@ -219,18 +335,52 @@ export default function TeamChatPage() {
     };
   }, [mobileView]);
 
-  // POSTs an echo's text; on failure marks that echo 'failed' (retry flips it
-  // back). On success the echo stays put until the realtime feed delivers the
-  // real message and reconciliation drops it — no flicker.
+  // POSTs an echo; on failure marks it 'failed' (retry flips it back). On success
+  // the echo stays put until the realtime feed delivers the real message and
+  // reconciliation drops it — no flicker. Attachment echoes take the SAME path as
+  // text: an image echo first uploads its file (result cached on the echo so a
+  // later message-POST retry won't re-upload), a GIF echo already carries its
+  // Tenor attachment, and reconciliation matches on (authorId, text) exactly as
+  // for text messages.
   const postMessage = useCallback(
     async (echo: ThreadMessage) => {
       setSending(true);
       setError('');
       try {
+        let attachment: ChatAttachment | undefined =
+          echo.uploadedAttachment ?? (echo.attachment?.type === 'gif' ? echo.attachment : undefined);
+        if (echo.pendingFile && !attachment) {
+          const prepared = await prepareImageForUpload(echo.pendingFile);
+          // Publish prepared dimensions before the (slower) upload so the pending
+          // tile reserves its box immediately and its decode causes no shift.
+          if (prepared.width && prepared.height) {
+            const { width: pw, height: ph } = prepared;
+            setPendingMessages((prev) =>
+              prev.map((p) =>
+                p.id === echo.id ? { ...p, localPreviewWidth: pw, localPreviewHeight: ph } : p
+              )
+            );
+          }
+          attachment = await uploadChatImage(
+            authedFetch,
+            echo.channelId,
+            prepared.file,
+            prepared.width,
+            prepared.height
+          );
+          const uploaded = attachment;
+          setPendingMessages((prev) =>
+            prev.map((p) => (p.id === echo.id ? { ...p, uploadedAttachment: uploaded } : p))
+          );
+        }
         const response = await authedFetch('/api/portal/chat/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channelId: echo.channelId, text: echo.text }),
+          body: JSON.stringify({
+            channelId: echo.channelId,
+            text: echo.text,
+            ...(attachment ? { attachment } : {}),
+          }),
         });
         const json = await response.json();
         if (!response.ok) throw new Error(json.error || 'Failed to send message');
@@ -267,6 +417,95 @@ export default function TeamChatPage() {
     setScrollToBottomSignal((tick) => tick + 1);
     void postMessage(echo);
   };
+
+  // Base fields shared by every optimistic echo this user creates.
+  const makeEchoBase = () => ({
+    id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    channelId: activeChannelId,
+    authorId: user!.uid,
+    authorName: user!.displayName,
+    authorRole: getEffectiveRole(user!) ?? undefined,
+    createdAt: new Date(),
+    reactionCounts: {},
+    myReactions: [],
+    pendingState: 'sending' as const,
+  });
+
+  // Optimistic image send: shows a local preview immediately, then uploads +
+  // posts through postMessage (the same reconcile path as text). `caption` is the
+  // current composer text (may be empty). Client-side type/size pre-check mirrors
+  // the server; failures surface via the existing failed-send retry/discard UI.
+  const sendImage = (file: File, caption: string) => {
+    if (!user || !activeChannelId) return;
+    const validationError = validateSelectedImage(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    const echo: ThreadMessage = {
+      ...makeEchoBase(),
+      text: caption.trim(),
+      localPreviewUrl: previewUrl,
+      pendingFile: file,
+    };
+    setPendingMessages((prev) => [...prev, echo]);
+    setDraft('');
+    setScrollToBottomSignal((tick) => tick + 1);
+    void postMessage(echo);
+  };
+
+  // Optimistic GIF send: fires immediately as an attachment-only message (empty
+  // text). The Tenor URL renders straight away — no upload step.
+  const sendGif = (gif: GifResult) => {
+    if (!user || !activeChannelId) return;
+    const attachment: ChatAttachment = { type: 'gif', url: gif.url };
+    if (typeof gif.width === 'number') attachment.width = gif.width;
+    if (typeof gif.height === 'number') attachment.height = gif.height;
+    const echo: ThreadMessage = {
+      ...makeEchoBase(),
+      text: '',
+      attachment,
+    };
+    setPendingMessages((prev) => [...prev, echo]);
+    setScrollToBottomSignal((tick) => tick + 1);
+    void postMessage(echo);
+  };
+
+  // Desktop composer: stage a picked file (with a friendly pre-check) so the
+  // preview chip can show before the user hits Send.
+  const onDesktopFilePicked = (file: File | undefined) => {
+    if (!file) return;
+    const validationError = validateSelectedImage(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError('');
+    setAttachFile(file);
+    setAttachPreview(URL.createObjectURL(file));
+  };
+
+  const clearDesktopAttachment = () => {
+    setAttachFile(null);
+    setAttachPreview('');
+  };
+
+  // Desktop Send: an attached image takes priority (caption from the draft),
+  // otherwise a plain text send.
+  const handleDesktopSend = () => {
+    if (attachFile) {
+      sendImage(attachFile, draft);
+      clearDesktopAttachment();
+      return;
+    }
+    sendMessage();
+  };
+
+  const openLightbox = useCallback((image: LightboxImage) => setLightbox(image), []);
+  // Stable identity so ChatLightbox's key/scroll-lock effect isn't re-run on
+  // every realtime message while the viewer is open.
+  const closeLightbox = useCallback(() => setLightbox(null), []);
 
   const retryPending = (echo: ThreadMessage) => {
     setPendingMessages((prev) =>
@@ -466,9 +705,21 @@ export default function TeamChatPage() {
                                       {formatTime(message.createdAt)}
                                     </span>
                                   </div>
-                                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
-                                    {message.text}
-                                  </p>
+                                  <DesktopAttachment
+                                    message={message}
+                                    onOpen={() =>
+                                      openLightbox({
+                                        url: message.attachment?.url ?? message.localPreviewUrl ?? '',
+                                        author: message.authorName,
+                                        time: formatTime(message.createdAt),
+                                      })
+                                    }
+                                  />
+                                  {message.text && (
+                                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
+                                      {message.text}
+                                    </p>
+                                  )}
                                   {isPending ? (
                                     isFailed ? (
                                       <div className="mt-2 flex items-center gap-3">
@@ -541,6 +792,41 @@ export default function TeamChatPage() {
 
                     <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
                       <div className="flex flex-col gap-3">
+                        {/* Hidden file input — opened by the ImagePlus button. */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            // Clear so re-picking the same file fires onChange again.
+                            event.target.value = '';
+                            onDesktopFilePicked(file);
+                          }}
+                        />
+                        {/* Staged-image preview chip. */}
+                        {attachFile && attachPreview && (
+                          <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={attachPreview}
+                              alt="Selected image preview"
+                              className="size-12 shrink-0 rounded object-cover ring-1 ring-slate-200 dark:ring-border"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-muted-foreground">
+                              {attachFile.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={clearDesktopAttachment}
+                              aria-label="Remove image"
+                              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          </div>
+                        )}
                         <Textarea
                           value={draft}
                           onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
@@ -548,7 +834,7 @@ export default function TeamChatPage() {
                             // Enter sends; Shift+Enter inserts a newline.
                             if (event.key === 'Enter' && !event.shiftKey) {
                               event.preventDefault();
-                              sendMessage();
+                              handleDesktopSend();
                             }
                           }}
                           placeholder={
@@ -561,19 +847,59 @@ export default function TeamChatPage() {
                           className="resize-none"
                         />
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs text-slate-500 dark:text-muted-foreground">
-                            Enter to send · Shift+Enter for a new line. No customer PII, card numbers, or SSNs.
-                          </p>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={!activeChannelId}
+                              aria-label="Attach an image"
+                              className="size-9 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+                            >
+                              <ImagePlus className="size-5" />
+                            </Button>
+                            {gifEnabled && (
+                              <div className="relative">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setGifOpen((open) => !open)}
+                                  disabled={!activeChannelId}
+                                  aria-label="Add a GIF"
+                                  aria-expanded={gifOpen}
+                                  className="size-9 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+                                >
+                                  <Sparkles className="size-5" />
+                                </Button>
+                                {gifOpen && activeChannelId && (
+                                  <GifPicker
+                                    authedFetch={authedFetch}
+                                    onSelect={sendGif}
+                                    onClose={() => setGifOpen(false)}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <Button
                             type="button"
-                            onClick={sendMessage}
-                            disabled={!activeChannelId || !draft.trim() || sending}
+                            onClick={handleDesktopSend}
+                            disabled={!activeChannelId || (!draft.trim() && !attachFile) || sending}
                             className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                           >
-                            <Send className="size-4" />
+                            {sending ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Send className="size-4" />
+                            )}
                             Send
                           </Button>
                         </div>
+                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                          Enter to send · Shift+Enter for a new line. No customer PII, card numbers, or SSNs.
+                        </p>
                       </div>
                     </div>
                   </section>
@@ -596,6 +922,8 @@ export default function TeamChatPage() {
                   draft={draft}
                   sending={sending}
                   deletingId={deletingId}
+                  gifEnabled={gifEnabled}
+                  authedFetch={authedFetch}
                   messagesEndRef={mobileMessagesEndRef}
                   scrollToBottomSignal={scrollToBottomSignal}
                   formatTime={formatTime}
@@ -603,6 +931,10 @@ export default function TeamChatPage() {
                   onOpenInfo={() => setInfoOpen(true)}
                   onDraftChange={setDraft}
                   onSend={sendMessage}
+                  onSendImage={sendImage}
+                  onSendGif={sendGif}
+                  onOpenImage={openLightbox}
+                  onError={setError}
                   onDelete={deleteMessage}
                   onReactionError={setError}
                   onRetryPending={retryPending}
@@ -629,7 +961,13 @@ export default function TeamChatPage() {
               onOpenChange={setInfoOpen}
               isAdmin={isRole('admin')}
               authedFetch={authedFetch}
+              onOpenImage={openLightbox}
+              lightboxOpen={!!lightbox}
             />
+
+            {/* Full-screen image viewer — portaled to <body>, shared by both
+                layouts and the channel-info Media gallery. */}
+            <ChatLightbox image={lightbox} onClose={closeLightbox} />
           </main>
         </div>
       </div>

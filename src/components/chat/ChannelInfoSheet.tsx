@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Hash, Lock, Settings2, Users } from 'lucide-react';
+import { Hash, ImageIcon, Lock, Settings2, Users } from 'lucide-react';
+import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { ChatChannel } from '@/types';
+import { ChatAttachment, ChatChannel } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -27,6 +28,13 @@ interface ChannelMember {
   role: string;
 }
 
+interface ChannelMedia {
+  messageId: string;
+  attachment: ChatAttachment;
+  authorName: string;
+  createdAt: string | null;
+}
+
 interface ChannelInfoSheetProps {
   channel?: ChatChannel;
   open: boolean;
@@ -34,6 +42,26 @@ interface ChannelInfoSheetProps {
   isAdmin: boolean;
   // Shared verified-token fetch from the chat page (same one used for messages).
   authedFetch: (url: string, init?: RequestInit) => Promise<Response>;
+  // Opens the shared full-screen image viewer (owned by the chat page).
+  onOpenImage: (image: LightboxImage) => void;
+  // True while that viewer is open. The sheet is a modal Radix Dialog whose own
+  // Escape/pointer-outside dismissal would otherwise close it underneath the
+  // (portaled) lightbox; these let us suppress the sheet's dismissal at its
+  // source so only the lightbox closes first.
+  lightboxOpen: boolean;
+}
+
+/** Short "Jul 1, 3:04 PM" caption for a media tile's lightbox. */
+function formatMediaTime(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 /** First letters of first+last name words (mirrors chatInitials in MobileThread). */
@@ -56,10 +84,19 @@ export function ChannelInfoSheet({
   onOpenChange,
   isAdmin,
   authedFetch,
+  onOpenImage,
+  lightboxOpen,
 }: ChannelInfoSheetProps) {
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Members | Media segmented view. Media is fetched lazily the first time it's
+  // shown for a channel (mediaLoaded gates the fetch so it runs once).
+  const [tab, setTab] = useState<'members' | 'media'>('members');
+  const [media, setMedia] = useState<ChannelMedia[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState('');
+  const [mediaLoaded, setMediaLoaded] = useState(false);
 
   const channelId = channel?.id;
 
@@ -89,11 +126,60 @@ export function ChannelInfoSheet({
     };
   }, [open, channelId, authedFetch]);
 
+  // Reset the view + media cache whenever the sheet opens or the channel changes
+  // so a freshly-opened sheet always starts on Members with no stale gallery.
+  useEffect(() => {
+    setTab('members');
+    setMedia([]);
+    setMediaError('');
+    setMediaLoaded(false);
+  }, [channelId, open]);
+
+  // Lazy-fetch the media gallery the first time the Media tab is shown.
+  useEffect(() => {
+    if (!open || !channelId || tab !== 'media' || mediaLoaded) return;
+    let cancelled = false;
+    const load = async () => {
+      setMediaLoading(true);
+      setMediaError('');
+      try {
+        const response = await authedFetch(`/api/portal/chat/channels/${channelId}/media`);
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || 'Failed to load media');
+        if (!cancelled) {
+          setMedia(Array.isArray(json.media) ? json.media : []);
+          setMediaLoaded(true);
+        }
+      } catch (err) {
+        if (!cancelled) setMediaError(err instanceof Error ? err.message : 'Failed to load media');
+      } finally {
+        if (!cancelled) setMediaLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, channelId, tab, mediaLoaded, authedFetch]);
+
   const isLocked = channel?.audience === 'managers';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+      <SheetContent
+        side="right"
+        className="w-full gap-0 p-0 sm:max-w-md"
+        onEscapeKeyDown={(event) => {
+          // While the lightbox is up, let it consume Escape — don't close the sheet.
+          if (lightboxOpen) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          // Clicks landing on the portaled lightbox must not dismiss the sheet.
+          if ((event.target as Element)?.closest?.('[data-chat-lightbox]')) {
+            event.preventDefault();
+          }
+        }}
+      >
         <SheetHeader className="border-b border-slate-200 dark:border-border p-4">
           <div className="flex items-center gap-2">
             {isLocked ? (
@@ -120,52 +206,130 @@ export function ChannelInfoSheet({
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
-            <Users className="size-4" />
-            {loading ? 'Members' : `${members.length} member${members.length === 1 ? '' : 's'}`}
+          {/* Members | Media segmented control (house-style track + raised active
+              segment; lime is reserved for primary actions, so the active tab
+              stays neutral). */}
+          <div className="px-4 pt-3 pb-1">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-muted/60">
+              {(['members', 'media'] as const).map((key) => {
+                const isActive = tab === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTab(key)}
+                    aria-pressed={isActive}
+                    className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                      isActive
+                        ? 'bg-white text-slate-950 shadow-sm dark:bg-card dark:text-foreground'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-muted-foreground dark:hover:text-foreground'
+                    }`}
+                  >
+                    {key === 'members' ? <Users className="size-4" /> : <ImageIcon className="size-4" />}
+                    {key}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
-            {loading ? (
-              <ul className="space-y-1" aria-hidden="true">
-                {[0, 1, 2, 3, 4].map((row) => (
-                  <li key={row} className="flex items-center gap-3 px-2 py-2">
-                    <span className="size-8 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-muted" />
-                    <span className="h-3.5 w-32 animate-pulse rounded bg-slate-200 dark:bg-muted" />
-                  </li>
-                ))}
-              </ul>
-            ) : error ? (
-              <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                {error}
-              </p>
-            ) : members.length === 0 ? (
-              <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                No members yet.
-              </p>
-            ) : (
-              <ul className="space-y-0.5">
-                {members.map((member) => (
-                  <li
-                    key={member.uid}
-                    className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-slate-50 dark:hover:bg-muted/60"
-                  >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
-                      {chatInitials(member.name)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950 dark:text-foreground">
-                      {member.name}
-                    </span>
-                    {member.role && (
-                      <Badge variant="secondary" className="shrink-0 text-[10px]">
-                        {member.role}
-                      </Badge>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {tab === 'members' ? (
+            <>
+              <div className="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
+                <Users className="size-4" />
+                {loading ? 'Members' : `${members.length} member${members.length === 1 ? '' : 's'}`}
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
+                {loading ? (
+                  <ul className="space-y-1" aria-hidden="true">
+                    {[0, 1, 2, 3, 4].map((row) => (
+                      <li key={row} className="flex items-center gap-3 px-2 py-2">
+                        <span className="size-8 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-muted" />
+                        <span className="h-3.5 w-32 animate-pulse rounded bg-slate-200 dark:bg-muted" />
+                      </li>
+                    ))}
+                  </ul>
+                ) : error ? (
+                  <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                    {error}
+                  </p>
+                ) : members.length === 0 ? (
+                  <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                    No members yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {members.map((member) => (
+                      <li
+                        key={member.uid}
+                        className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-slate-50 dark:hover:bg-muted/60"
+                      >
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
+                          {chatInitials(member.name)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950 dark:text-foreground">
+                          {member.name}
+                        </span>
+                        {member.role && (
+                          <Badge variant="secondary" className="shrink-0 text-[10px]">
+                            {member.role}
+                          </Badge>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+              {mediaLoading ? (
+                <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+                  {[0, 1, 2, 3, 4, 5].map((cell) => (
+                    <span
+                      key={cell}
+                      className="aspect-square animate-pulse rounded-md bg-slate-200 dark:bg-muted"
+                    />
+                  ))}
+                </div>
+              ) : mediaError ? (
+                <p className="py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                  {mediaError}
+                </p>
+              ) : media.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                  No photos yet.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {media.map((item) => (
+                    <button
+                      key={item.messageId}
+                      type="button"
+                      onClick={() =>
+                        onOpenImage({
+                          url: item.attachment.url,
+                          author: item.authorName,
+                          time: formatMediaTime(item.createdAt),
+                        })
+                      }
+                      aria-label={`Photo from ${item.authorName}`}
+                      className="aspect-square overflow-hidden rounded-md bg-[#0A1F44]/5 ring-1 ring-slate-200 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:bg-white/5 dark:ring-border"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.attachment.url}
+                        alt={`Shared by ${item.authorName}`}
+                        loading="lazy"
+                        className="size-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {isAdmin && (
             <div className="border-t border-slate-200 dark:border-border p-4">

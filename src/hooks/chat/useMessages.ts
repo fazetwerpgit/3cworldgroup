@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
+import type { ChatAttachment } from '@/types';
 
 export interface ChatMessageView {
   id: string;
@@ -14,6 +15,11 @@ export interface ChatMessageView {
   createdAt: Date | null;
   reactionCounts: Record<string, number>;
   myReactions: string[];
+  // Optional media (image upload or Tenor GIF). Absent on text-only messages.
+  attachment?: ChatAttachment;
+  // Server-set flag mirroring attachment presence (used by media queries). Kept
+  // as a defensive boolean so a malformed doc can't leak a truthy non-bool.
+  hasAttachment?: boolean;
 }
 
 function toDate(value: unknown): Date | null {
@@ -41,6 +47,26 @@ function toCountMap(value: unknown): Record<string, number> {
       .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && count > 0)
       .map(([emoji, count]) => [emoji, count as number])
   );
+}
+
+// Defensive parse of a stored attachment: only a well-formed image/gif with a
+// string url survives; anything malformed is dropped so a bad doc can't crash
+// the thread (or render a broken tile). Dimensions are kept only when finite.
+function toAttachment(value: unknown): ChatAttachment | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  if ((raw.type !== 'image' && raw.type !== 'gif') || typeof raw.url !== 'string' || !raw.url) {
+    return undefined;
+  }
+  const attachment: ChatAttachment = { type: raw.type, url: raw.url };
+  if (typeof raw.width === 'number' && Number.isFinite(raw.width) && raw.width > 0) {
+    attachment.width = raw.width;
+  }
+  if (typeof raw.height === 'number' && Number.isFinite(raw.height) && raw.height > 0) {
+    attachment.height = raw.height;
+  }
+  if (typeof raw.contentType === 'string') attachment.contentType = raw.contentType;
+  return attachment;
 }
 
 export function useMessages(channelId: string | null) {
@@ -88,6 +114,8 @@ export function useMessages(channelId: string | null) {
                     .filter(([, uids]) => uids.includes(uid))
                     .map(([emoji]) => emoji)
                 : [],
+              attachment: toAttachment(data.attachment),
+              hasAttachment: data.hasAttachment === true,
             } satisfies ChatMessageView;
           })
           .reverse();
