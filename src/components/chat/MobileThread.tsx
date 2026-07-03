@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { ArrowDown, ChevronLeft, Clock, Hash, Lock, RotateCw, Send, Trash2, X } from 'lucide-react';
+import { ArrowDown, ChevronDown, ChevronLeft, Clock, Hash, Lock, RotateCw, Send, Trash2, X } from 'lucide-react';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,7 @@ interface MobileThreadProps {
   scrollToBottomSignal: number;
   formatTime: (date: Date | null) => string;
   onBack: () => void;
+  onOpenInfo: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onDelete: (messageId: string) => void;
@@ -113,6 +114,7 @@ export function MobileThread({
   scrollToBottomSignal,
   formatTime,
   onBack,
+  onOpenInfo,
   onDraftChange,
   onSend,
   onDelete,
@@ -202,7 +204,12 @@ export function MobileThread({
         >
           <ChevronLeft className="size-6" />
         </button>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenInfo}
+          aria-label="Channel details"
+          className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-left hover:bg-slate-100 dark:hover:bg-muted"
+        >
           {channel?.audience === 'managers' ? (
             <Lock className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
           ) : (
@@ -216,7 +223,8 @@ export function MobileThread({
               {audienceCopy[channel.audience]}
             </Badge>
           )}
-        </div>
+          <ChevronDown className="size-4 shrink-0 text-slate-400 dark:text-muted-foreground" />
+        </button>
       </div>
 
       {/* Message list — newest at the bottom. flex-col + mt-auto spacer

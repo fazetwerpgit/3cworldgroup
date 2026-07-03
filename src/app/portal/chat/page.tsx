@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Clock, Hash, Lock, MessageSquareText, RotateCw, Send, Trash2, X } from 'lucide-react';
+import { ArrowDown, ChevronDown, Clock, Hash, Lock, MessageSquareText, RotateCw, Send, Trash2, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { MobileChannelList } from '@/components/chat/MobileChannelList';
 import { MobileThread } from '@/components/chat/MobileThread';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
@@ -29,8 +30,10 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
 };
 
 export default function TeamChatPage() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, isRole } = useAuth();
   const [activeChannelId, setActiveChannelId] = useState('');
+  // Channel-info Sheet (shared by desktop header title + mobile thread top bar).
+  const [infoOpen, setInfoOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -388,9 +391,18 @@ export default function TeamChatPage() {
                   <section className="flex min-h-[680px] flex-col">
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-border p-4">
                       <div>
-                        <h2 className="font-semibold text-slate-950 dark:text-foreground">
+                        <button
+                          type="button"
+                          onClick={() => setInfoOpen(true)}
+                          disabled={!activeChannel}
+                          aria-label="Channel details"
+                          className="flex min-h-10 items-center gap-1.5 rounded-md text-left font-semibold text-slate-950 dark:text-foreground hover:text-[#0A1F44] disabled:cursor-default disabled:hover:text-slate-950 dark:hover:text-white dark:disabled:hover:text-foreground"
+                        >
                           {activeChannel?.name ?? 'Select a channel'}
-                        </h2>
+                          {activeChannel && (
+                            <ChevronDown className="size-4 shrink-0 text-slate-400 dark:text-muted-foreground" />
+                          )}
+                        </button>
                         <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                           {activeChannel?.description ?? 'Choose a channel to view messages.'}
                         </p>
@@ -588,6 +600,7 @@ export default function TeamChatPage() {
                   scrollToBottomSignal={scrollToBottomSignal}
                   formatTime={formatTime}
                   onBack={() => setMobileView('list')}
+                  onOpenInfo={() => setInfoOpen(true)}
                   onDraftChange={setDraft}
                   onSend={sendMessage}
                   onDelete={deleteMessage}
@@ -607,6 +620,16 @@ export default function TeamChatPage() {
                 />
               )}
             </div>
+
+            {/* Channel-info Sheet — opened from the desktop header title or the
+                mobile thread top bar; members fetched lazily on open. */}
+            <ChannelInfoSheet
+              channel={activeChannel}
+              open={infoOpen}
+              onOpenChange={setInfoOpen}
+              isAdmin={isRole('admin')}
+              authedFetch={authedFetch}
+            />
           </main>
         </div>
       </div>
