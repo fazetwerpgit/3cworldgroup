@@ -11,6 +11,17 @@ export interface ChatChannel {
   active: boolean;
 }
 
+// A single media attachment on a message. `image` is a file the sender uploaded
+// to our own storage bucket (url is a Firebase tokened download URL scoped to the
+// channel's folder); `gif` is a Tenor-hosted GIF (url host is media.tenor.com).
+export interface ChatAttachment {
+  type: 'image' | 'gif';
+  url: string;
+  width?: number;
+  height?: number;
+  contentType?: string;
+}
+
 export interface ChatMessage {
   id: string;
   channelId: string;
@@ -21,6 +32,11 @@ export interface ChatMessage {
   createdAt: Date;
   deletedAt?: Date;
   deletedBy?: string;
+  // Optional media. `hasAttachment` mirrors `attachment != null` so Firestore can
+  // query media messages (where hasAttachment == true); both are absent on the
+  // pre-media message docs, which must keep rendering exactly as before.
+  attachment?: ChatAttachment;
+  hasAttachment?: boolean;
 }
 
 export const CHAT_CHANNELS: ChatChannel[] = [

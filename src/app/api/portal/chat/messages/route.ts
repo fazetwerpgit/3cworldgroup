@@ -4,6 +4,11 @@ import { adminDb } from '@/lib/firebase/admin';
 import { canAccessChatChannel, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { ensureChatChannelMember, toChatChannel } from '@/lib/chat/channels';
+import {
+  getChatStorageBucketName,
+  readStoredAttachment,
+  validateMessageAttachment,
+} from '@/lib/chat/media';
 
 async function getFirestoreChatChannel(channelId: string): Promise<ChatChannel | null> {
   if (!adminDb) throw new Error('Database not configured');
@@ -49,6 +54,7 @@ export async function GET(request: NextRequest) {
       .filter((doc) => !doc.data().deletedAt)
       .map((doc) => {
         const data = doc.data();
+        const attachment = readStoredAttachment(data.attachment);
         return {
           id: doc.id,
           channelId,
@@ -57,6 +63,8 @@ export async function GET(request: NextRequest) {
           authorName: data.authorName ?? '3C User',
           authorRole: data.authorRole,
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
+          // Only present on media messages; omitted otherwise so legacy docs are byte-identical.
+          ...(attachment ? { attachment, hasAttachment: true } : {}),
         };
       })
       .slice(0, limit)
@@ -79,8 +87,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const channelId = typeof body.channelId === 'string' ? body.channelId : '';
     const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const hasAttachmentInput = body.attachment !== undefined && body.attachment !== null;
 
-    if (!channelId || !text) {
+    if (!channelId) {
+      return NextResponse.json({ error: 'channelId is required' }, { status: 400 });
+    }
+    // Text is optional ONLY when a (later-validated) attachment is present.
+    if (!text && !hasAttachmentInput) {
       return NextResponse.json({ error: 'channelId and text are required' }, { status: 400 });
     }
     if (text.length > 1000) {
@@ -94,6 +107,22 @@ export async function POST(request: NextRequest) {
     if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // Validate the attachment shape/origin server-side (post-access, pre-write). A
+    // present-but-invalid attachment is rejected, never silently dropped.
+    let attachment;
+    if (hasAttachmentInput) {
+      const bucketName = getChatStorageBucketName();
+      if (!bucketName) {
+        return NextResponse.json({ error: 'Storage is not configured' }, { status: 500 });
+      }
+      const validated = validateMessageAttachment(body.attachment, channelId, bucketName);
+      if (!validated.ok) {
+        return NextResponse.json({ error: validated.error }, { status: 400 });
+      }
+      attachment = validated.attachment;
+    }
+
     await ensureChatChannelMember(channelId, user.uid);
 
     const messageRef = await adminDb!
@@ -108,6 +137,8 @@ export async function POST(request: NextRequest) {
         authorRole: user.effectiveRole ?? null,
         createdAt: FieldValue.serverTimestamp(),
         deletedAt: null,
+        // hasAttachment lets Firestore query media messages; both set iff valid attachment.
+        ...(attachment ? { attachment, hasAttachment: true } : {}),
       });
 
     return NextResponse.json({ success: true, messageId: messageRef.id });
