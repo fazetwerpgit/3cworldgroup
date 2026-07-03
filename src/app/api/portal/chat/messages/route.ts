@@ -185,9 +185,8 @@ export async function POST(request: NextRequest) {
 
     await ensureChatChannelMember(channelId, user.uid);
 
-    const messageRef = await adminDb!
-      .collection('chatChannels')
-      .doc(channelId)
+    const channelRef = adminDb!.collection('chatChannels').doc(channelId);
+    const messageRef = await channelRef
       .collection('messages')
       .add({
         channelId,
@@ -202,6 +201,15 @@ export async function POST(request: NextRequest) {
         // Reply quote only when a valid source resolved.
         ...(replyTo ? { replyTo } : {}),
       });
+
+    // Stamp the channel's last-activity time so clients can badge unread channels
+    // (users/{uid}/chatReads receipts are compared against this). Merged so the
+    // rest of the channel doc is untouched; a failure here must not fail the send.
+    try {
+      await channelRef.set({ lastMessageAt: FieldValue.serverTimestamp() }, { merge: true });
+    } catch (bumpError) {
+      console.error('Error bumping channel lastMessageAt:', bumpError);
+    }
 
     return NextResponse.json({ success: true, messageId: messageRef.id });
   } catch (error) {

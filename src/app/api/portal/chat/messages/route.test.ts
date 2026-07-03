@@ -174,6 +174,22 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     expect(written.authorName).toBe('Real User');
   });
 
+  it('merges lastMessageAt onto the channel doc when a message is sent', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'hi there' }));
+    expect(res.status).toBe(200);
+    // real-uid is already a member of all-company, so ensureChatChannelMember
+    // short-circuits without a channel write — the only channel-level set here is
+    // the lastMessageAt bump.
+    expect(setMock).toHaveBeenCalledTimes(1);
+    const [payload, options] = setMock.mock.calls[0] as unknown as [
+      Record<string, unknown>,
+      { merge?: boolean } | undefined,
+    ];
+    expect(payload.lastMessageAt).toBeDefined();
+    expect(options?.merge).toBe(true);
+  });
+
   it('rejects an empty message', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(req({ channelId: 'all-company', text: '   ' }));

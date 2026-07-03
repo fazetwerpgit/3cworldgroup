@@ -16,6 +16,8 @@ interface MobileChannelListProps {
   channels: ChatChannel[];
   loading: boolean;
   error?: string;
+  // Per-channel unread flag (dot-style badge; no counts). Missing/false = read.
+  unreadByChannel?: Record<string, boolean>;
   onOpenChannel: (channelId: string) => void;
 }
 
@@ -24,7 +26,13 @@ interface MobileChannelListProps {
  * full-width tappable channel rows that push into the full-screen thread.
  * Bottom nav stays visible here. Desktop never renders this (lg:hidden owner).
  */
-export function MobileChannelList({ channels, loading, error, onOpenChannel }: MobileChannelListProps) {
+export function MobileChannelList({
+  channels,
+  loading,
+  error,
+  unreadByChannel,
+  onOpenChannel,
+}: MobileChannelListProps) {
   return (
     <div className="space-y-4 p-4">
       <h1 className="portal-display text-xl font-bold tracking-tight text-slate-950 dark:text-foreground">
@@ -61,9 +69,19 @@ export function MobileChannelList({ channels, loading, error, onOpenChannel }: M
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate font-semibold text-slate-950 dark:text-foreground">
+                  <span
+                    className={`truncate text-slate-950 dark:text-foreground ${
+                      unreadByChannel?.[channel.id] ? 'font-semibold' : 'font-medium'
+                    }`}
+                  >
                     {channel.name}
                   </span>
+                  {unreadByChannel?.[channel.id] && (
+                    <span
+                      aria-label="Unread messages"
+                      className="size-2 shrink-0 rounded-full bg-[#8dc63f] ring-2 ring-white dark:ring-[#0e2647]"
+                    />
+                  )}
                   <Badge variant="secondary" className="shrink-0 text-[11px]">
                     {audienceCopy[channel.audience]}
                   </Badge>

@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
+import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { useMessages } from '@/hooks/chat/useMessages';
 import { auth } from '@/lib/firebase/config';
 import { ChatAttachment, ChatChannel, ChatReplySnippet, getEffectiveRole } from '@/types';
@@ -148,6 +149,60 @@ export default function TeamChatPage() {
   );
   const canModerate = hasPermission('chat:moderate');
   const shownError = error || channelsError || messagesError;
+
+  // Unread badges: compare each channel's streamed lastMessageAt against this
+  // user's own read receipts. All-read until reads settle (see the hook).
+  const { unreadByChannel } = useChatUnread(channels, user?.uid);
+
+  // Whether the desktop (lg+) layout is the one on screen. Both layouts render in
+  // the DOM (CSS toggles them), so mark-read needs the breakpoint to know which
+  // channel is actually being viewed: desktop always shows its active channel,
+  // while mobile only "opens" a channel in the thread view.
+  const [isLgUp, setIsLgUp] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsLgUp(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  // The channel currently visible to this reader (empty when none is open): the
+  // active channel on desktop, or the active channel only while the mobile thread
+  // is open. Mark-read keys off this so the auto-selected channel on the mobile
+  // list screen isn't silently marked read.
+  const viewingChannelId =
+    activeChannelId && (isLgUp || mobileView === 'thread') ? activeChannelId : '';
+
+  // Newest delivered message time in the open channel — re-runs the mark-read
+  // effect when a message arrives while viewing (own sends included, which is how
+  // your own send never badges your channel).
+  const latestMessageAt =
+    messages.length > 0 ? messages[messages.length - 1].createdAt?.getTime() ?? 0 : 0;
+
+  // Mark the open channel read on open, and again as new messages arrive while
+  // viewing — throttled to ~2s so a burst doesn't hammer writes (a trailing write
+  // captures the final state). Switching channels marks immediately.
+  const markReadRef = useRef<{ channelId: string; at: number }>({ channelId: '', at: 0 });
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid || !viewingChannelId) return;
+    const now = Date.now();
+    const last = markReadRef.current;
+    const isNewChannel = last.channelId !== viewingChannelId;
+    if (isNewChannel || now - last.at >= 2000) {
+      markReadRef.current = { channelId: viewingChannelId, at: now };
+      void markChannelRead(uid, viewingChannelId);
+      return;
+    }
+    // Within the throttle window: schedule one trailing write so the last message
+    // in a burst is still acknowledged.
+    const timer = setTimeout(() => {
+      markReadRef.current = { channelId: viewingChannelId, at: Date.now() };
+      void markChannelRead(uid, viewingChannelId);
+    }, 2000 - (now - last.at));
+    return () => clearTimeout(timer);
+  }, [viewingChannelId, latestMessageAt, user?.uid]);
 
   // Merged render list: real messages first, then this channel's un-reconciled
   // echoes (in send order). Reconciliation happens HERE, synchronously, so the
@@ -742,13 +797,19 @@ export default function TeamChatPage() {
                             }`}
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <span className="flex items-center gap-2 text-sm font-semibold">
+                              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
                                 {channel.audience === 'managers' ? (
-                                  <Lock className="size-4 text-slate-500 dark:text-muted-foreground" />
+                                  <Lock className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
                                 ) : (
-                                  <Hash className="size-4 text-slate-500 dark:text-muted-foreground" />
+                                  <Hash className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
                                 )}
-                                {channel.name}
+                                <span className="truncate">{channel.name}</span>
+                                {unreadByChannel[channel.id] && (
+                                  <span
+                                    aria-label="Unread messages"
+                                    className="size-2 shrink-0 rounded-full bg-[#8dc63f] ring-2 ring-white dark:ring-[#0e2647]"
+                                  />
+                                )}
                               </span>
                               <Badge variant="secondary" className="text-[11px]">
                                 {audienceCopy[channel.audience]}
@@ -1156,6 +1217,7 @@ export default function TeamChatPage() {
                   channels={channels}
                   loading={loadingChannels}
                   error={shownError}
+                  unreadByChannel={unreadByChannel}
                   onOpenChannel={(channelId) => {
                     setActiveChannelId(channelId);
                     setMobileView('thread');

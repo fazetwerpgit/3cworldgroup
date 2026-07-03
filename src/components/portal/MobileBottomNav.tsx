@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DollarSign, LayoutDashboard, MessageSquare, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChatChannels } from '@/hooks/chat/useChatChannels';
+import { useChatUnread } from '@/hooks/chat/useChatUnread';
 
 const items = [
   {
@@ -33,7 +35,12 @@ const items = [
  */
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  // Chat unread indicator. This nav lives outside the chat page, so it runs its
+  // own channel + read-receipt subscriptions (independent of the page's); the
+  // hooks are safe to mount more than once. Returns all-read when unauthenticated.
+  const { channels } = useChatChannels();
+  const { anyUnread } = useChatUnread(channels, user?.uid);
 
   useEffect(() => {
     document.body.dataset.portalBottomNav = 'on';
@@ -64,11 +71,19 @@ export function MobileBottomNav() {
                   active ? 'text-[#8dc63f]' : 'text-white/55 hover:text-white'
                 }`}
               >
-                <Icon
-                  className={`h-5 w-5 transition-transform duration-150 ${
-                    active ? 'scale-110' : ''
-                  }`}
-                />
+                <span className="relative">
+                  <Icon
+                    className={`h-5 w-5 transition-transform duration-150 ${
+                      active ? 'scale-110' : ''
+                    }`}
+                  />
+                  {item.name === 'Chat' && anyUnread && (
+                    <span
+                      aria-label="Unread messages"
+                      className="absolute -right-1 -top-0.5 size-2 rounded-full bg-[#8dc63f] ring-2 ring-[#0A1F44]"
+                    />
+                  )}
+                </span>
                 {item.name}
               </Link>
             </li>

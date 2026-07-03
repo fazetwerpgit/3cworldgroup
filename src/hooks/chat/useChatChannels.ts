@@ -1,11 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { ChatChannel } from '@/types';
 
-export type ChatChannelDoc = ChatChannel & { memberIds?: string[] };
+// lastMessageAt is server-stamped on the channel doc when a message is sent (via
+// the messages POST route). Unread badges compare it against the caller's own
+// read receipt. Absent on channels that have never received a message.
+export type ChatChannelDoc = ChatChannel & {
+  memberIds?: string[];
+  lastMessageAt?: Date | null;
+};
+
+function toDate(value: unknown): Date | null {
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  return null;
+}
 
 export function useChatChannels() {
   const [channels, setChannels] = useState<ChatChannelDoc[]>([]);
@@ -44,6 +59,7 @@ export function useChatChannels() {
               order: typeof data.order === 'number' ? data.order : 999,
               active: data.active !== false,
               memberIds: Array.isArray(data.memberIds) ? data.memberIds : [],
+              lastMessageAt: toDate(data.lastMessageAt),
             } as ChatChannelDoc;
           })
           .sort((a, b) => a.order - b.order);
