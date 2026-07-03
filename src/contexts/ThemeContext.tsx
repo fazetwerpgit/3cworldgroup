@@ -58,6 +58,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const resolvedTheme: ResolvedTheme =
     theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
 
+  // Mirror the theme onto <body> so Radix overlays (Sheet/Dialog/Dropdown) that
+  // portal to document.body — outside the wrapper div below — still pick up the
+  // `dark` class and the `.portal-scope` token/focus rules. classList.add/remove
+  // (never className=) so we never clobber classes other libraries put on body.
+  // Cleanup removes BOTH so unmount (leaving /portal) can't leak dark styles
+  // onto the public marketing site.
+  useEffect(() => {
+    const body = document.body;
+    body.classList.add('portal-scope');
+    if (resolvedTheme === 'dark') {
+      body.classList.add('dark');
+    } else {
+      body.classList.remove('dark');
+    }
+    return () => {
+      body.classList.remove('portal-scope');
+      body.classList.remove('dark');
+    };
+  }, [resolvedTheme]);
+
   const toggleTheme = useCallback(() => {
     // Toggling from 'system' pins whichever mode is the opposite of what the
     // user currently sees.
