@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
-import type { ChatAttachment } from '@/types';
+import type { ChatAttachment, ChatReplySnippet } from '@/types';
 
 export interface ChatMessageView {
   id: string;
@@ -20,6 +20,9 @@ export interface ChatMessageView {
   // Server-set flag mirroring attachment presence (used by media queries). Kept
   // as a defensive boolean so a malformed doc can't leak a truthy non-bool.
   hasAttachment?: boolean;
+  // Server-stamped reply quote + edit marker. Absent on untouched/legacy docs.
+  replyTo?: ChatReplySnippet;
+  editedAt?: Date | null;
 }
 
 function toDate(value: unknown): Date | null {
@@ -69,6 +72,21 @@ function toAttachment(value: unknown): ChatAttachment | undefined {
   return attachment;
 }
 
+// Defensive parse of a stored reply quote: a well-formed object with a non-empty
+// messageId survives; anything malformed is dropped so a bad doc can't crash the
+// thread. authorName/text fall back to safe defaults.
+function toReplyTo(value: unknown): ChatReplySnippet | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const messageId = typeof raw.messageId === 'string' ? raw.messageId : '';
+  if (!messageId) return undefined;
+  return {
+    messageId,
+    authorName: typeof raw.authorName === 'string' && raw.authorName ? raw.authorName : '3C User',
+    text: typeof raw.text === 'string' ? raw.text : '',
+  };
+}
+
 export function useMessages(channelId: string | null) {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,6 +134,8 @@ export function useMessages(channelId: string | null) {
                 : [],
               attachment: toAttachment(data.attachment),
               hasAttachment: data.hasAttachment === true,
+              replyTo: toReplyTo(data.replyTo),
+              editedAt: toDate(data.editedAt),
             } satisfies ChatMessageView;
           })
           .reverse();

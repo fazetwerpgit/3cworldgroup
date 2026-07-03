@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, RotateCw, Send, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, Check, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, Pencil, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
@@ -9,6 +9,7 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
 import { prepareImageForUpload, uploadChatImage, validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { MessageActions } from '@/components/chat/MessageActions';
 import { MobileChannelList } from '@/components/chat/MobileChannelList';
 import { MobileThread } from '@/components/chat/MobileThread';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
@@ -25,7 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useMessages } from '@/hooks/chat/useMessages';
 import { auth } from '@/lib/firebase/config';
-import { ChatAttachment, ChatChannel, getEffectiveRole } from '@/types';
+import { ChatAttachment, ChatChannel, ChatReplySnippet, getEffectiveRole } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -93,8 +94,21 @@ export default function TeamChatPage() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Reply/edit composer modes (shared by both layouts — the composer state lives
+  // here so mobile and desktop stay in lockstep). replyTarget quotes a message on
+  // the next send; editTarget rewrites an existing own message. Mutually exclusive.
+  const [replyTarget, setReplyTarget] = useState<ThreadMessage | null>(null);
+  const [editTarget, setEditTarget] = useState<ThreadMessage | null>(null);
+  // Optimistic edits: messageId → the new text + local editedAt, applied over the
+  // realtime feed until the snapshot confirms the change (see displayMessages).
+  const [pendingEdits, setPendingEdits] = useState<Record<string, { text: string; editedAt: Date }>>({});
+  // Mirror of editTarget for the channel-switch reset effect (which must not re-run
+  // every time an edit is staged, so it can't depend on editTarget directly).
+  const editTargetRef = useRef<ThreadMessage | null>(null);
+  useEffect(() => {
+    editTargetRef.current = editTarget;
+  }, [editTarget]);
   // Media UI: GIF feature availability (probed), full-screen image viewer, and
   // the desktop composer's staged image + GIF-picker visibility. (Mobile owns
   // its own copies of these inside MobileThread.)
@@ -186,6 +200,48 @@ export default function TeamChatPage() {
       return next.length === prev.length ? prev : next;
     });
   }, [messages, activeChannelId]);
+
+  // Render list with optimistic edits layered on top of the reconciled thread. The
+  // reconcile memo above is left untouched (edits never change the message count, so
+  // all scroll/pill machinery keeps reading threadMessages.length); only the
+  // rendered text/editedAt are overridden here until the realtime snapshot confirms.
+  const displayMessages = useMemo<ThreadMessage[]>(() => {
+    if (Object.keys(pendingEdits).length === 0) return threadMessages;
+    return threadMessages.map((message) => {
+      const edit = pendingEdits[message.id];
+      return edit ? { ...message, text: edit.text, editedAt: edit.editedAt } : message;
+    });
+  }, [threadMessages, pendingEdits]);
+
+  // Drop an optimistic edit once the realtime message confirms it (editedAt present
+  // and the stored text matches what we saved) so the override can't get stuck.
+  useEffect(() => {
+    setPendingEdits((prev) => {
+      const ids = Object.keys(prev);
+      if (ids.length === 0) return prev;
+      let changed = false;
+      const next = { ...prev };
+      for (const id of ids) {
+        const real = messages.find((message) => message.id === id);
+        if (real && real.editedAt && real.text === prev[id].text) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [messages]);
+
+  // Switching channels abandons any staged reply/edit: a staged reply carries the
+  // previous channel's replyToMessageId (server 400s, and Retry would re-post the
+  // same stale id forever), and a staged edit would PATCH the wrong channel. Clear
+  // both; only the edit case (draft = another message's text) clears the composer —
+  // a plain in-progress draft is preserved. pendingEdits stays (keyed by doc id).
+  useEffect(() => {
+    setReplyTarget(null);
+    if (editTargetRef.current) setDraft('');
+    setEditTarget(null);
+  }, [activeChannelId]);
 
   // All chat calls carry a verified Firebase ID token; the server derives identity
   // from it (never a client-supplied userId).
@@ -380,6 +436,8 @@ export default function TeamChatPage() {
             channelId: echo.channelId,
             text: echo.text,
             ...(attachment ? { attachment } : {}),
+            // Reply rides the same send path; the server re-stamps the snippet.
+            ...(echo.replyToMessageId ? { replyToMessageId: echo.replyToMessageId } : {}),
           }),
         });
         const json = await response.json();
@@ -396,6 +454,23 @@ export default function TeamChatPage() {
     [authedFetch]
   );
 
+  // A locally-built reply quote for an optimistic echo (author + snippet), mirroring
+  // the server's rule: text sliced to 140, or Photo/GIF for an attachment-only source.
+  // The server re-stamps authoritative values on the delivered message.
+  const makeReplySnippet = (message: ThreadMessage): ChatReplySnippet => {
+    const trimmed = message.text?.trim();
+    if (trimmed) return { messageId: message.id, authorName: message.authorName, text: trimmed.slice(0, 140) };
+    const kind = message.attachment ? (message.attachment.type === 'gif' ? 'GIF' : 'Photo') : '';
+    return { messageId: message.id, authorName: message.authorName, text: kind };
+  };
+
+  // Reply fields for the next echo — empty unless a reply is staged. Cleared by the
+  // caller after building the echo.
+  const stagedReplyFields = () =>
+    replyTarget
+      ? { replyTo: makeReplySnippet(replyTarget), replyToMessageId: replyTarget.id }
+      : {};
+
   const sendMessage = () => {
     if (!user || !activeChannelId || !draft.trim()) return;
     // Local echo appears instantly; the composer clears so typing never waits
@@ -411,9 +486,11 @@ export default function TeamChatPage() {
       reactionCounts: {},
       myReactions: [],
       pendingState: 'sending',
+      ...stagedReplyFields(),
     };
     setPendingMessages((prev) => [...prev, echo]);
     setDraft('');
+    setReplyTarget(null);
     setScrollToBottomSignal((tick) => tick + 1);
     void postMessage(echo);
   };
@@ -448,9 +525,11 @@ export default function TeamChatPage() {
       text: caption.trim(),
       localPreviewUrl: previewUrl,
       pendingFile: file,
+      ...stagedReplyFields(),
     };
     setPendingMessages((prev) => [...prev, echo]);
     setDraft('');
+    setReplyTarget(null);
     setScrollToBottomSignal((tick) => tick + 1);
     void postMessage(echo);
   };
@@ -468,6 +547,9 @@ export default function TeamChatPage() {
       attachment,
     };
     setPendingMessages((prev) => [...prev, echo]);
+    // A GIF fires immediately and never carries a quote; drop any staged reply so the
+    // bar doesn't linger over an unrelated instant send.
+    setReplyTarget(null);
     setScrollToBottomSignal((tick) => tick + 1);
     void postMessage(echo);
   };
@@ -519,9 +601,65 @@ export default function TeamChatPage() {
     setPendingMessages((prev) => prev.filter((p) => p.id !== echoId));
   };
 
+  // Reply/edit entry points (shared by both layouts). Starting one mode cancels the
+  // other so the composer is never ambiguously staged.
+  const startReply = (message: ThreadMessage) => {
+    // Leaving edit mode: the draft holds another message's text — clear it (matches
+    // cancelEdit) so a reply can't accidentally send the edited message's content. A
+    // plain in-progress draft (not editing) is preserved for the reply.
+    if (editTarget) setDraft('');
+    setEditTarget(null);
+    setReplyTarget(message);
+  };
+  const cancelReply = () => setReplyTarget(null);
+  const startEdit = (message: ThreadMessage) => {
+    setReplyTarget(null);
+    setEditTarget(message);
+    setDraft(message.text);
+  };
+  const cancelEdit = () => {
+    setEditTarget(null);
+    setDraft('');
+  };
+
+  const copyMessageText = (text: string) => {
+    if (!text) return;
+    void navigator.clipboard?.writeText(text).catch(() => {
+      setError('Could not copy to clipboard');
+    });
+  };
+
+  // Save an edit: optimistically rewrite the local message, then PATCH. On failure
+  // the optimistic override is rolled back and the error surfaces like a failed send.
+  const saveEdit = async () => {
+    if (!user || !activeChannelId || !editTarget) return;
+    const text = draft.trim();
+    if (!text) return;
+    const target = editTarget;
+    setPendingEdits((prev) => ({ ...prev, [target.id]: { text, editedAt: new Date() } }));
+    setEditTarget(null);
+    setDraft('');
+    setError('');
+    try {
+      const response = await authedFetch('/api/portal/chat/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: activeChannelId, messageId: target.id, text }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Failed to edit message');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to edit message');
+      setPendingEdits((prev) => {
+        const next = { ...prev };
+        delete next[target.id];
+        return next;
+      });
+    }
+  };
+
   const deleteMessage = async (messageId: string) => {
     if (!user || !activeChannelId) return;
-    setDeletingId(messageId);
     setError('');
     try {
       const response = await authedFetch('/api/portal/chat/messages', {
@@ -536,8 +674,6 @@ export default function TeamChatPage() {
       if (!response.ok) throw new Error(json.error || 'Failed to delete message');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete message');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -675,12 +811,13 @@ export default function TeamChatPage() {
                           </CardContent>
                         </Card>
                       ) : (
-                        threadMessages.map((message) => {
+                        displayMessages.map((message) => {
                           const isPending = !!message.pendingState;
                           const isFailed = message.pendingState === 'failed';
-                          // Echoes block delete/reactions until they resolve.
-                          const canDelete =
-                            !isPending && (canModerate || message.authorId === user?.uid);
+                          const isOwn = message.authorId === user?.uid;
+                          // Echoes block actions until they resolve.
+                          const canEdit = isOwn && !!message.text;
+                          const canDelete = canModerate || isOwn;
                           return (
                             <div
                               key={message.id}
@@ -704,7 +841,22 @@ export default function TeamChatPage() {
                                     <span className="text-xs text-slate-500 dark:text-muted-foreground">
                                       {formatTime(message.createdAt)}
                                     </span>
+                                    {message.editedAt && (
+                                      <span className="text-xs text-slate-400 dark:text-muted-foreground">
+                                        (edited)
+                                      </span>
+                                    )}
                                   </div>
+                                  {message.replyTo && (
+                                    <div className="mt-2 rounded-r border-l-2 border-[#8dc63f] bg-slate-50 px-2.5 py-1.5 dark:bg-muted/50">
+                                      <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                        {message.replyTo.authorName}
+                                      </p>
+                                      <p className="line-clamp-2 text-xs text-slate-500 dark:text-muted-foreground">
+                                        {message.replyTo.text}
+                                      </p>
+                                    </div>
+                                  )}
                                   <DesktopAttachment
                                     message={message}
                                     onOpen={() =>
@@ -756,18 +908,19 @@ export default function TeamChatPage() {
                                     />
                                   )}
                                 </div>
-                                {canDelete && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-8 shrink-0 text-slate-400 dark:text-muted-foreground opacity-100 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300 sm:opacity-0 sm:group-hover:opacity-100"
-                                    onClick={() => deleteMessage(message.id)}
-                                    disabled={deletingId === message.id}
-                                    aria-label="Delete message"
-                                  >
-                                    <Trash2 className="size-4" />
-                                  </Button>
+                                {!isPending && (
+                                  <MessageActions
+                                    triggerClassName="opacity-100 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                    config={{
+                                      hasText: !!message.text,
+                                      canEdit,
+                                      canDelete,
+                                      onReply: () => startReply(message),
+                                      onCopy: () => copyMessageText(message.text),
+                                      onEdit: () => startEdit(message),
+                                      onDelete: () => deleteMessage(message.id),
+                                    }}
+                                  />
                                 )}
                               </div>
                             </div>
@@ -827,20 +980,64 @@ export default function TeamChatPage() {
                             </button>
                           </div>
                         )}
+                        {/* Reply / edit staging bar (lime left border, X to cancel). */}
+                        {replyTarget && (
+                          <div className="flex items-start gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                Replying to {replyTarget.authorName}
+                              </p>
+                              <p className="truncate text-xs text-slate-500 dark:text-muted-foreground">
+                                {makeReplySnippet(replyTarget).text}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={cancelReply}
+                              aria-label="Cancel reply"
+                              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          </div>
+                        )}
+                        {editTarget && (
+                          <div className="flex items-center gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+                            <Pencil className="size-3.5 shrink-0 text-slate-500 dark:text-muted-foreground" />
+                            <span className="flex-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                              Editing message
+                            </span>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              aria-label="Cancel edit"
+                              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          </div>
+                        )}
                         <Textarea
                           value={draft}
                           onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
                           onKeyDown={(event) => {
-                            // Enter sends; Shift+Enter inserts a newline.
+                            // Enter sends (or saves an edit); Shift+Enter inserts a
+                            // newline; Esc cancels edit mode.
                             if (event.key === 'Enter' && !event.shiftKey) {
                               event.preventDefault();
-                              handleDesktopSend();
+                              if (editTarget) void saveEdit();
+                              else handleDesktopSend();
+                            } else if (event.key === 'Escape' && editTarget) {
+                              event.preventDefault();
+                              cancelEdit();
                             }
                           }}
                           placeholder={
-                            activeChannel
-                              ? `Message ${activeChannel.name}...`
-                              : 'Select a channel to send a message...'
+                            editTarget
+                              ? 'Edit your message...'
+                              : activeChannel
+                                ? `Message ${activeChannel.name}...`
+                                : 'Select a channel to send a message...'
                           }
                           disabled={!activeChannelId}
                           rows={3}
@@ -853,7 +1050,7 @@ export default function TeamChatPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => fileInputRef.current?.click()}
-                              disabled={!activeChannelId}
+                              disabled={!activeChannelId || !!editTarget}
                               aria-label="Attach an image"
                               className="size-9 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
                             >
@@ -866,7 +1063,7 @@ export default function TeamChatPage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => setGifOpen((open) => !open)}
-                                  disabled={!activeChannelId}
+                                  disabled={!activeChannelId || !!editTarget}
                                   aria-label="Add a GIF"
                                   aria-expanded={gifOpen}
                                   className="size-9 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
@@ -885,16 +1082,22 @@ export default function TeamChatPage() {
                           </div>
                           <Button
                             type="button"
-                            onClick={handleDesktopSend}
-                            disabled={!activeChannelId || (!draft.trim() && !attachFile) || sending}
+                            onClick={editTarget ? () => void saveEdit() : handleDesktopSend}
+                            disabled={
+                              !activeChannelId ||
+                              (editTarget ? !draft.trim() : !draft.trim() && !attachFile) ||
+                              sending
+                            }
                             className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                           >
                             {sending ? (
                               <Loader2 className="size-4 animate-spin" />
+                            ) : editTarget ? (
+                              <Check className="size-4" />
                             ) : (
                               <Send className="size-4" />
                             )}
-                            Send
+                            {editTarget ? 'Save' : 'Send'}
                           </Button>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-muted-foreground">
@@ -914,19 +1117,21 @@ export default function TeamChatPage() {
                 <MobileThread
                   channel={activeChannel}
                   channelId={activeChannelId}
-                  messages={threadMessages}
+                  messages={displayMessages}
                   loading={loadingMessages}
                   error={shownError}
                   currentUserId={user?.uid}
                   canModerate={canModerate}
                   draft={draft}
                   sending={sending}
-                  deletingId={deletingId}
                   gifEnabled={gifEnabled}
                   authedFetch={authedFetch}
                   messagesEndRef={mobileMessagesEndRef}
                   scrollToBottomSignal={scrollToBottomSignal}
                   formatTime={formatTime}
+                  replyTarget={replyTarget}
+                  editTarget={editTarget}
+                  replySnippet={makeReplySnippet}
                   onBack={() => setMobileView('list')}
                   onOpenInfo={() => setInfoOpen(true)}
                   onDraftChange={setDraft}
@@ -939,6 +1144,12 @@ export default function TeamChatPage() {
                   onReactionError={setError}
                   onRetryPending={retryPending}
                   onDiscardPending={discardPending}
+                  onReply={startReply}
+                  onEdit={startEdit}
+                  onCopy={copyMessageText}
+                  onCancelReply={cancelReply}
+                  onCancelEdit={cancelEdit}
+                  onSaveEdit={saveEdit}
                 />
               ) : (
                 <MobileChannelList

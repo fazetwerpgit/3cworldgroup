@@ -10,6 +10,25 @@ import {
   validateMessageAttachment,
 } from '@/lib/chat/media';
 
+// Build the server-stamped reply snippet from the SOURCE message's stored doc.
+// Client-supplied snippet fields are never used: text is the source's own text
+// sliced to 140 chars, or 'Photo' / 'GIF' when the source was attachment-only.
+function buildReplySnippet(
+  messageId: string,
+  data: FirebaseFirestore.DocumentData
+): { messageId: string; authorName: string; text: string } {
+  const authorName =
+    typeof data.authorName === 'string' && data.authorName ? data.authorName : '3C User';
+  const rawText = typeof data.text === 'string' ? data.text.trim() : '';
+  let text = '';
+  if (rawText) {
+    text = rawText.slice(0, 140);
+  } else if (data.attachment && typeof data.attachment === 'object') {
+    text = (data.attachment as { type?: unknown }).type === 'gif' ? 'GIF' : 'Photo';
+  }
+  return { messageId, authorName, text };
+}
+
 // Returns the channel view AND its raw doc data — the raw data carries extraMemberIds,
 // which userCanAccessChannelDoc needs to honor manually-added members.
 async function getFirestoreChatChannel(
@@ -62,6 +81,14 @@ export async function GET(request: NextRequest) {
       .map((doc) => {
         const data = doc.data();
         const attachment = readStoredAttachment(data.attachment);
+        const replyTo =
+          data.replyTo && typeof data.replyTo === 'object'
+            ? {
+                messageId: String((data.replyTo as { messageId?: unknown }).messageId ?? ''),
+                authorName: String((data.replyTo as { authorName?: unknown }).authorName ?? '3C User'),
+                text: String((data.replyTo as { text?: unknown }).text ?? ''),
+              }
+            : null;
         return {
           id: doc.id,
           channelId,
@@ -72,6 +99,9 @@ export async function GET(request: NextRequest) {
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
           // Only present on media messages; omitted otherwise so legacy docs are byte-identical.
           ...(attachment ? { attachment, hasAttachment: true } : {}),
+          // Reply quote + edit marker only when set; legacy docs stay byte-identical.
+          ...(replyTo && replyTo.messageId ? { replyTo } : {}),
+          ...(data.editedAt ? { editedAt: data.editedAt?.toDate?.()?.toISOString?.() ?? null } : {}),
         };
       })
       .slice(0, limit)
@@ -130,6 +160,29 @@ export async function POST(request: NextRequest) {
       attachment = validated.attachment;
     }
 
+    // Optional reply target — must be a live (non-deleted) message in THIS channel.
+    // The snippet is resolved server-side from the source doc; any client-supplied
+    // reply snippet is ignored entirely.
+    let replyTo: { messageId: string; authorName: string; text: string } | undefined;
+    const replyToMessageId =
+      typeof body.replyToMessageId === 'string' ? body.replyToMessageId : '';
+    if (replyToMessageId) {
+      const sourceSnap = await adminDb!
+        .collection('chatChannels')
+        .doc(channelId)
+        .collection('messages')
+        .doc(replyToMessageId)
+        .get();
+      if (!sourceSnap.exists) {
+        return NextResponse.json({ error: 'Reply target not found' }, { status: 400 });
+      }
+      const sourceData = sourceSnap.data() ?? {};
+      if (sourceData.deletedAt) {
+        return NextResponse.json({ error: 'Reply target not found' }, { status: 400 });
+      }
+      replyTo = buildReplySnippet(replyToMessageId, sourceData);
+    }
+
     await ensureChatChannelMember(channelId, user.uid);
 
     const messageRef = await adminDb!
@@ -146,12 +199,75 @@ export async function POST(request: NextRequest) {
         deletedAt: null,
         // hasAttachment lets Firestore query media messages; both set iff valid attachment.
         ...(attachment ? { attachment, hasAttachment: true } : {}),
+        // Reply quote only when a valid source resolved.
+        ...(replyTo ? { replyTo } : {}),
       });
 
     return NextResponse.json({ success: true, messageId: messageRef.id });
   } catch (error) {
     console.error('Error sending chat message:', error);
     return NextResponse.json({ error: 'Failed to send chat message' }, { status: 500 });
+  }
+}
+
+// PATCH — edit the text of your OWN message. Author only: even moderators cannot
+// edit someone else's message (they can delete via DELETE, but not rewrite). Only
+// text + editedAt change; attachment / replyTo / reactions are left untouched.
+export async function PATCH(request: NextRequest) {
+  try {
+    const result = await getVerifiedChatUser(request);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    const user = result.user;
+
+    const body = await request.json();
+    const channelId = typeof body.channelId === 'string' ? body.channelId : '';
+    const messageId = typeof body.messageId === 'string' ? body.messageId : '';
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+
+    if (!channelId || !messageId) {
+      return NextResponse.json({ error: 'channelId and messageId are required' }, { status: 400 });
+    }
+    // Edited text must be non-empty and within the same 1..1000 bound as new sends.
+    if (!text || text.length > 1000) {
+      return NextResponse.json({ error: 'Message must be 1 to 1000 characters' }, { status: 400 });
+    }
+
+    const found = await getFirestoreChatChannel(channelId);
+    if (
+      !found ||
+      !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const messageRef = adminDb!
+      .collection('chatChannels')
+      .doc(channelId)
+      .collection('messages')
+      .doc(messageId);
+    const messageDoc = await messageRef.get();
+    if (!messageDoc.exists) {
+      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
+    const message = messageDoc.data() ?? {};
+    // A deleted message can't be edited back into existence.
+    if (message.deletedAt) {
+      return NextResponse.json({ error: 'Message has been deleted' }, { status: 400 });
+    }
+    // Author ONLY — moderators can delete others' messages but never rewrite them.
+    if (message.authorId !== user.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    await messageRef.set(
+      { text: text.slice(0, 1000), editedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error editing chat message:', error);
+    return NextResponse.json({ error: 'Failed to edit chat message' }, { status: 500 });
   }
 }
 

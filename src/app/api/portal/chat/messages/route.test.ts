@@ -10,6 +10,47 @@ const addMock = vi.fn<(doc: Record<string, unknown>) => Promise<{ id: string }>>
   async () => ({ id: 'msg123' })
 );
 const setMock = vi.fn(async () => undefined);
+// Per-message set (edit path) — recorded separately so PATCH assertions don't
+// collide with the channel-level set used by ensureChatChannelMember.
+const msgSetMock = vi.fn<
+  (payload: Record<string, unknown>, options?: { merge?: boolean }) => Promise<undefined>
+>(async () => undefined);
+
+// Message docs addressed by messages.doc(id) — reply sources and PATCH targets.
+// deletedAt truthy ⇒ soft-deleted.
+const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
+  'src-text': { authorId: 'other-uid', authorName: 'Author One', text: 'Original message text', deletedAt: null },
+  'src-long': { authorId: 'other-uid', authorName: 'Author One', text: 'x'.repeat(300), deletedAt: null },
+  'src-photo': {
+    authorId: 'other-uid',
+    authorName: 'Author One',
+    text: '',
+    attachment: { type: 'image', url: 'https://example/x.png' },
+    deletedAt: null,
+  },
+  'src-gif': {
+    authorId: 'other-uid',
+    authorName: 'Author One',
+    text: '',
+    attachment: { type: 'gif', url: 'https://media.tenor.com/x.gif' },
+    deletedAt: null,
+  },
+  'src-deleted': { authorId: 'other-uid', authorName: 'Author One', text: 'gone', deletedAt: { seconds: 1 } },
+  'own-msg': { authorId: 'real-uid', authorName: 'Real User', text: 'my message', deletedAt: null },
+  'others-msg': { authorId: 'someone-else', authorName: 'Someone', text: 'not mine', deletedAt: null },
+  'deleted-msg': { authorId: 'real-uid', authorName: 'Real User', text: 'was here', deletedAt: { seconds: 1 } },
+};
+
+function messagesDoc(messageId: string) {
+  return {
+    get: vi.fn(async () => ({
+      id: messageId,
+      exists: messageId in MESSAGE_DOCS,
+      data: () => MESSAGE_DOCS[messageId],
+    })),
+    set: msgSetMock,
+  };
+}
 
 // Two channel docs: the audience-'all' default, and a managers channel that entry_rep
 // CANNOT reach by role but IS listed in extraMemberIds (the manually-added path).
@@ -45,13 +86,13 @@ vi.mock('@/lib/firebase/admin', () => ({
           data: () => CHANNEL_DOCS[channelId],
         })),
         set: setMock,
-        collection: () => ({ add: addMock }),
+        collection: () => ({ add: addMock, doc: messagesDoc }),
       }),
     }),
   },
 }));
 
-import { POST } from './route';
+import { POST, PATCH } from './route';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 
 const mockGate = getVerifiedChatUser as unknown as ReturnType<typeof vi.fn>;
@@ -59,6 +100,13 @@ const mockGate = getVerifiedChatUser as unknown as ReturnType<typeof vi.fn>;
 function req(body: unknown) {
   return new NextRequest('http://localhost/api/portal/chat/messages', {
     method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+function patchReq(body: unknown) {
+  return new NextRequest('http://localhost/api/portal/chat/messages', {
+    method: 'PATCH',
     body: JSON.stringify(body),
   });
 }
@@ -85,10 +133,24 @@ function imageUrl(channelId: string, name = 'abc.png') {
   return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encoded}?alt=media&token=tok`;
 }
 
+// A moderator (admin) identity — used to prove moderators still can't EDIT others.
+const MODERATOR = {
+  ok: true,
+  user: {
+    uid: 'mod-uid',
+    displayName: 'Mod User',
+    role: 'admin',
+    fieldRole: undefined,
+    effectiveRole: 'admin',
+    canModerate: true,
+  },
+};
+
 beforeEach(() => {
   mockGate.mockReset();
   addMock.mockClear();
   setMock.mockClear();
+  msgSetMock.mockClear();
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
 });
 
@@ -225,5 +287,123 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     const res = await POST(req({ channelId: 'managers-extra', text: 'should fail' }));
     expect(res.status).toBe(403);
     expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a reply to an unknown message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'hi', replyToMessageId: 'nope' }));
+    expect(res.status).toBe(400);
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a reply to a deleted message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'hi', replyToMessageId: 'src-deleted' }));
+    expect(res.status).toBe(400);
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('stamps the reply snippet from the SOURCE doc, ignoring any client-supplied snippet', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(
+      req({
+        channelId: 'all-company',
+        text: 'my reply',
+        replyToMessageId: 'src-text',
+        // Client tries to spoof the quote — must be ignored.
+        replyTo: { messageId: 'src-text', authorName: 'FAKE', text: 'FAKE SNIPPET' },
+      })
+    );
+    expect(res.status).toBe(200);
+    const written = addMock.mock.calls[0][0] as {
+      replyTo?: { messageId: string; authorName: string; text: string };
+    };
+    expect(written.replyTo).toEqual({
+      messageId: 'src-text',
+      authorName: 'Author One',
+      text: 'Original message text',
+    });
+  });
+
+  it('uses "Photo" / "GIF" as the snippet when the source was attachment-only', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+
+    await POST(req({ channelId: 'all-company', text: 'nice pic', replyToMessageId: 'src-photo' }));
+    const photoReply = (addMock.mock.calls[0][0] as { replyTo?: { text: string } }).replyTo;
+    expect(photoReply?.text).toBe('Photo');
+
+    addMock.mockClear();
+    await POST(req({ channelId: 'all-company', text: 'lol', replyToMessageId: 'src-gif' }));
+    const gifReply = (addMock.mock.calls[0][0] as { replyTo?: { text: string } }).replyTo;
+    expect(gifReply?.text).toBe('GIF');
+  });
+
+  it('truncates a long source snippet to 140 chars', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'hi', replyToMessageId: 'src-long' }));
+    expect(res.status).toBe(200);
+    const written = addMock.mock.calls[0][0] as { replyTo?: { text: string } };
+    expect(written.replyTo?.text).toHaveLength(140);
+  });
+});
+
+describe('PATCH /api/portal/chat/messages (edit own)', () => {
+  it('rejects an unauthenticated caller', async () => {
+    mockGate.mockResolvedValue({ ok: false, error: 'Missing authentication token', status: 401 });
+    const res = await PATCH(patchReq({ channelId: 'all-company', messageId: 'own-msg', text: 'x' }));
+    expect(res.status).toBe(401);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects editing someone else’s message (403)', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await PATCH(patchReq({ channelId: 'all-company', messageId: 'others-msg', text: 'hijack' }));
+    expect(res.status).toBe(403);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a moderator editing someone else’s message (403) — delete ≠ edit', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    const res = await PATCH(patchReq({ channelId: 'all-company', messageId: 'others-msg', text: 'moderated' }));
+    expect(res.status).toBe(403);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects editing a deleted message (400)', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await PATCH(patchReq({ channelId: 'all-company', messageId: 'deleted-msg', text: 'undelete' }));
+    expect(res.status).toBe(400);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects empty text (400)', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await PATCH(patchReq({ channelId: 'all-company', messageId: 'own-msg', text: '   ' }));
+    expect(res.status).toBe(400);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects text over 1000 chars (400)', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await PATCH(
+      patchReq({ channelId: 'all-company', messageId: 'own-msg', text: 'x'.repeat(1001) })
+    );
+    expect(res.status).toBe(400);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('edits an own message: sets text + editedAt and leaves the attachment untouched', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await PATCH(patchReq({ channelId: 'all-company', messageId: 'own-msg', text: 'edited now' }));
+    expect(res.status).toBe(200);
+    expect(msgSetMock).toHaveBeenCalledTimes(1);
+    const [payload, options] = msgSetMock.mock.calls[0];
+    expect(payload.text).toBe('edited now');
+    expect(payload.editedAt).toBeDefined();
+    // Merge write that never touches attachment / replyTo / reactions.
+    expect(options?.merge).toBe(true);
+    expect(payload).not.toHaveProperty('attachment');
+    expect(payload).not.toHaveProperty('replyTo');
+    expect(payload).not.toHaveProperty('reactions');
   });
 });

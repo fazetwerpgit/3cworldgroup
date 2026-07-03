@@ -2,18 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { ArrowDown, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, RotateCw, Send, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, Check, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, Pencil, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
+import { MessageActionSheet } from '@/components/chat/MessageActions';
+import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
-import { ChatChannel, ChatAttachment } from '@/types';
+import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -42,6 +44,9 @@ export type ThreadMessage = ChatMessageView & {
   uploadedAttachment?: ChatAttachment;
   localPreviewWidth?: number;
   localPreviewHeight?: number;
+  // Set on optimistic reply echoes so the page's postMessage includes it and the
+  // pending bubble can show its quote before the server echo reconciles.
+  replyToMessageId?: string;
 };
 
 interface MobileThreadProps {
@@ -54,7 +59,6 @@ interface MobileThreadProps {
   canModerate: boolean;
   draft: string;
   sending: boolean;
-  deletingId: string | null;
   // GIF feature availability (probed by the page) + the shared verified-token
   // fetch the GIF picker uses to search Tenor.
   gifEnabled: boolean;
@@ -64,6 +68,11 @@ interface MobileThreadProps {
   // scrolls to the bottom regardless of the reader's scroll position.
   scrollToBottomSignal: number;
   formatTime: (date: Date | null) => string;
+  // Reply/edit composer modes are owned by the page (shared with desktop). The
+  // snippet builder mirrors the server rule for the staged reply preview.
+  replyTarget: ThreadMessage | null;
+  editTarget: ThreadMessage | null;
+  replySnippet: (message: ThreadMessage) => ChatReplySnippet;
   onBack: () => void;
   onOpenInfo: () => void;
   onDraftChange: (value: string) => void;
@@ -77,6 +86,13 @@ interface MobileThreadProps {
   onReactionError: (message: string) => void;
   onRetryPending: (message: ThreadMessage) => void;
   onDiscardPending: (messageId: string) => void;
+  // Message-action callbacks (Reply/Copy/Edit) + composer mode cancels/save.
+  onReply: (message: ThreadMessage) => void;
+  onEdit: (message: ThreadMessage) => void;
+  onCopy: (text: string) => void;
+  onCancelReply: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
 }
 
 /**
@@ -187,12 +203,14 @@ export function MobileThread({
   canModerate,
   draft,
   sending,
-  deletingId,
   gifEnabled,
   authedFetch,
   messagesEndRef,
   scrollToBottomSignal,
   formatTime,
+  replyTarget,
+  editTarget,
+  replySnippet,
   onBack,
   onOpenInfo,
   onDraftChange,
@@ -205,8 +223,29 @@ export function MobileThread({
   onReactionError,
   onRetryPending,
   onDiscardPending,
+  onReply,
+  onEdit,
+  onCopy,
+  onCancelReply,
+  onCancelEdit,
+  onSaveEdit,
 }: MobileThreadProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Long-press → bottom action sheet. A single shared timer/target avoids per-row
+  // hooks: touchstart on a bubble arms a 500ms timer; move/scroll/end cancel it;
+  // firing opens the sheet for that message.
+  const [actionSheet, setActionSheet] = useState<ThreadMessage | null>(null);
+  const longPressTimer = useRef<number | undefined>(undefined);
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = undefined;
+    }
+  };
+  const startLongPress = (message: ThreadMessage) => {
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => setActionSheet(message), 500);
+  };
   // Composer media state (mobile owns its own, mirroring the desktop composer).
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachFile, setAttachFile] = useState<File | null>(null);
@@ -236,8 +275,13 @@ export function MobileThread({
     setAttachPreview('');
   };
 
-  // Send: a staged image takes priority (caption from the draft); otherwise text.
+  // Send: an active edit saves; otherwise a staged image takes priority (caption
+  // from the draft); otherwise a plain text send.
   const handleSend = () => {
+    if (editTarget) {
+      onSaveEdit();
+      return;
+    }
     if (attachFile) {
       onSendImage(attachFile, draft);
       clearAttachment();
@@ -355,7 +399,7 @@ export function MobileThread({
           grouped bubbles can tighten up (see mt-* below). The relative wrapper
           hosts the floating jump-to-latest pill so it clears the composer. */}
       <div className="relative flex flex-1 flex-col overflow-hidden">
-        <div ref={scrollRef} className="flex flex-1 flex-col overflow-auto p-3">
+        <div ref={scrollRef} onScroll={clearLongPress} className="flex flex-1 flex-col overflow-auto p-3">
         <div aria-hidden="true" className="mt-auto" />
         {loading ? (
           <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
@@ -370,9 +414,6 @@ export function MobileThread({
             const isOwn = message.authorId === currentUserId;
             const isPending = !!message.pendingState;
             const isFailed = message.pendingState === 'failed';
-            // Echoes are always the reader's own; block delete/reactions until
-            // the message resolves into the realtime feed.
-            const canDelete = !isPending && (canModerate || isOwn);
 
             // Day separator whenever the calendar day changes (or at the top).
             const showDaySeparator = !prev || !sameCalendarDay(message.createdAt, prev.createdAt);
@@ -438,7 +479,32 @@ export function MobileThread({
                         )}
                       </div>
                     )}
-                    <div className={`flex min-w-0 flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`flex min-w-0 flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}
+                      onTouchStart={() => !isPending && startLongPress(message)}
+                      onTouchMove={clearLongPress}
+                      onTouchEnd={clearLongPress}
+                      onTouchCancel={clearLongPress}
+                      onContextMenu={(event) => {
+                        // Long-press on mobile also fires the browser context menu —
+                        // suppress it so our action sheet is the only affordance.
+                        if (!isPending) event.preventDefault();
+                      }}
+                    >
+                      {message.replyTo && (
+                        <div
+                          className={`max-w-full rounded-lg border-l-2 border-[#8dc63f] bg-slate-100 px-2.5 py-1.5 dark:bg-muted/70 ${
+                            isOwn ? 'rounded-br-md' : 'rounded-bl-md'
+                          }`}
+                        >
+                          <p className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                            {message.replyTo.authorName}
+                          </p>
+                          <p className="line-clamp-2 text-[11px] text-slate-500 dark:text-muted-foreground">
+                            {message.replyTo.text}
+                          </p>
+                        </div>
+                      )}
                       {(message.attachment || message.localPreviewUrl) && (
                         <BubbleImage
                           message={message}
@@ -466,19 +532,6 @@ export function MobileThread({
                         </div>
                       )}
                     </div>
-                    {canDelete && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 shrink-0 text-slate-400 dark:text-muted-foreground hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/15 dark:hover:text-red-300"
-                        onClick={() => onDelete(message.id)}
-                        disabled={deletingId === message.id}
-                        aria-label="Delete message"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    )}
                   </div>
                   {/* Pending echoes swap the timestamp/reactions for a status
                       caption; failed sends offer retry/discard inline. */}
@@ -517,6 +570,7 @@ export function MobileThread({
                           }`}
                         >
                           {formatTime(message.createdAt)}
+                          {message.editedAt && <span className="ml-1">(edited)</span>}
                         </span>
                       )}
                       <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start pl-9'}`}>
@@ -572,6 +626,43 @@ export function MobileThread({
             pickFile(file);
           }}
         />
+        {/* Reply / edit staging bar (lime left border, X to cancel). */}
+        {replyTarget && (
+          <div className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                Replying to {replyTarget.authorName}
+              </p>
+              <p className="truncate text-[11px] text-slate-500 dark:text-muted-foreground">
+                {replySnippet(replyTarget).text}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              aria-label="Cancel reply"
+              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+        {editTarget && (
+          <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+            <Pencil className="size-3.5 shrink-0 text-slate-500 dark:text-muted-foreground" />
+            <span className="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+              Editing message
+            </span>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              aria-label="Cancel edit"
+              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
         {/* Staged-image preview chip. */}
         {attachFile && attachPreview && (
           <div className="mb-2 flex items-center gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
@@ -600,7 +691,7 @@ export function MobileThread({
             variant="ghost"
             size="icon"
             onClick={() => fileInputRef.current?.click()}
-            disabled={!channelId}
+            disabled={!channelId || !!editTarget}
             aria-label="Attach an image"
             className="size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
           >
@@ -613,7 +704,7 @@ export function MobileThread({
                 variant="ghost"
                 size="icon"
                 onClick={() => setGifOpen((open) => !open)}
-                disabled={!channelId}
+                disabled={!channelId || !!editTarget}
                 aria-label="Add a GIF"
                 aria-expanded={gifOpen}
                 className="size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
@@ -633,13 +724,19 @@ export function MobileThread({
             value={draft}
             onChange={(event) => onDraftChange(event.target.value.slice(0, 1000))}
             onKeyDown={(event) => {
-              // Enter sends; Shift+Enter inserts a newline.
+              // Enter sends (or saves an edit); Shift+Enter inserts a newline;
+              // Esc cancels edit mode.
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 handleSend();
+              } else if (event.key === 'Escape' && editTarget) {
+                event.preventDefault();
+                onCancelEdit();
               }
             }}
-            placeholder={channel ? `Message ${channel.name}...` : 'Select a channel...'}
+            placeholder={
+              editTarget ? 'Edit your message...' : channel ? `Message ${channel.name}...` : 'Select a channel...'
+            }
             disabled={!channelId}
             rows={1}
             className="max-h-32 min-h-[2.5rem] flex-1 resize-none"
@@ -647,18 +744,46 @@ export function MobileThread({
           <Button
             type="button"
             onClick={handleSend}
-            disabled={!channelId || (!draft.trim() && !attachFile) || sending}
+            disabled={
+              !channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending
+            }
             size="icon"
             className="size-10 shrink-0 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-            aria-label={sending ? 'Sending' : 'Send message'}
+            aria-label={editTarget ? 'Save edit' : sending ? 'Sending' : 'Send message'}
           >
-            {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+            {sending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : editTarget ? (
+              <Check className="size-4" />
+            ) : (
+              <Send className="size-4" />
+            )}
           </Button>
         </div>
         <p className="mt-1.5 text-[11px] text-slate-500 dark:text-muted-foreground">
           Enter to send · Shift+Enter for a new line. No customer PII.
         </p>
       </div>
+
+      {/* Long-press action sheet — Reply / Copy / Edit / Delete for one message. */}
+      <MessageActionSheet
+        open={!!actionSheet}
+        authorName={actionSheet?.authorName}
+        config={
+          actionSheet
+            ? ({
+                hasText: !!actionSheet.text,
+                canEdit: actionSheet.authorId === currentUserId && !!actionSheet.text,
+                canDelete: canModerate || actionSheet.authorId === currentUserId,
+                onReply: () => onReply(actionSheet),
+                onCopy: () => onCopy(actionSheet.text),
+                onEdit: () => onEdit(actionSheet),
+                onDelete: () => onDelete(actionSheet.id),
+              } satisfies MessageActionsConfig)
+            : null
+        }
+        onClose={() => setActionSheet(null)}
+      />
     </div>
   );
 }

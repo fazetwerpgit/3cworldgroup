@@ -22,6 +22,15 @@ export interface ChatAttachment {
   contentType?: string;
 }
 
+// A server-resolved quote of the message being replied to. The snippet text is
+// stamped from the SOURCE doc at send time (never trusted from the client) and
+// capped at 140 chars, or 'Photo' / 'GIF' when the source was attachment-only.
+export interface ChatReplySnippet {
+  messageId: string;
+  authorName: string;
+  text: string;
+}
+
 export interface ChatMessage {
   id: string;
   channelId: string;
@@ -37,6 +46,10 @@ export interface ChatMessage {
   // pre-media message docs, which must keep rendering exactly as before.
   attachment?: ChatAttachment;
   hasAttachment?: boolean;
+  // Optional reply quote (server-stamped) and edit marker. Both absent on
+  // untouched/legacy docs, which must render exactly as before.
+  replyTo?: ChatReplySnippet;
+  editedAt?: Date;
 }
 
 export const CHAT_CHANNELS: ChatChannel[] = [
