@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
-import { canAccessChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { toChatChannel } from '@/lib/chat/channels';
+import { toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   MAX_UPLOAD_BYTES,
   buildTokenedDownloadUrl,
@@ -41,11 +40,12 @@ export async function POST(request: NextRequest) {
     if (!snap.exists) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    const channel = toChatChannel(snap.id, snap.data() ?? {});
+    const data = snap.data() ?? {};
+    const channel = toChatChannel(snap.id, data);
     if (!channel) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
+    if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

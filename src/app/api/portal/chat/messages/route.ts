@@ -1,20 +1,27 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { canAccessChatChannel, ChatChannel } from '@/types';
+import { ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { ensureChatChannelMember, toChatChannel } from '@/lib/chat/channels';
+import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   getChatStorageBucketName,
   readStoredAttachment,
   validateMessageAttachment,
 } from '@/lib/chat/media';
 
-async function getFirestoreChatChannel(channelId: string): Promise<ChatChannel | null> {
+// Returns the channel view AND its raw doc data — the raw data carries extraMemberIds,
+// which userCanAccessChannelDoc needs to honor manually-added members.
+async function getFirestoreChatChannel(
+  channelId: string
+): Promise<{ channel: ChatChannel; data: FirebaseFirestore.DocumentData } | null> {
   if (!adminDb) throw new Error('Database not configured');
   const snap = await adminDb.collection('chatChannels').doc(channelId).get();
   if (!snap.exists) return null;
-  return toChatChannel(snap.id, snap.data() ?? {});
+  const data = snap.data() ?? {};
+  const channel = toChatChannel(snap.id, data);
+  if (!channel) return null;
+  return { channel, data };
 }
 
 // GET /api/portal/chat/messages?channelId=...&limit=50 — verified caller only.
@@ -33,11 +40,11 @@ export async function GET(request: NextRequest) {
     if (!channelId) {
       return NextResponse.json({ error: 'channelId is required' }, { status: 400 });
     }
-    const channel = await getFirestoreChatChannel(channelId);
-    if (!channel) {
+    const found = await getFirestoreChatChannel(channelId);
+    if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     await ensureChatChannelMember(channelId, user.uid);
@@ -100,11 +107,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is limited to 1000 characters' }, { status: 400 });
     }
 
-    const channel = await getFirestoreChatChannel(channelId);
-    if (!channel) {
+    const found = await getFirestoreChatChannel(channelId);
+    if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -163,8 +170,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'channelId and messageId are required' }, { status: 400 });
     }
 
-    const channel = await getFirestoreChatChannel(channelId);
-    if (!channel || !canAccessChatChannel(channel, user.role, user.fieldRole)) {
+    const found = await getFirestoreChatChannel(channelId);
+    if (!found || !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

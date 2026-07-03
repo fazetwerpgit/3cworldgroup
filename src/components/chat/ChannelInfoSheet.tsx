@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Hash, ImageIcon, Lock, Settings2, Users } from 'lucide-react';
+import { Hash, ImageIcon, Loader2, Lock, Settings2, UserPlus, Users, X } from 'lucide-react';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,13 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
 };
 
 interface ChannelMember {
+  uid: string;
+  name: string;
+  role: string;
+  isExtra?: boolean;
+}
+
+interface AddableUser {
   uid: string;
   name: string;
   role: string;
@@ -90,6 +97,14 @@ export function ChannelInfoSheet({
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Admin-only add-people state. `addable` arrives on the members response only when
+  // the caller is an admin; `mutatingUid` disables the row being added/removed.
+  const [addable, setAddable] = useState<AddableUser[]>([]);
+  const [showAddPeople, setShowAddPeople] = useState(false);
+  const [mutatingUid, setMutatingUid] = useState<string | null>(null);
+  // Kept separate from `error` (which owns the member-list state) so a failed add/remove
+  // surfaces near the button without blanking the member list.
+  const [actionError, setActionError] = useState('');
   // Members | Media segmented view. Media is fetched lazily the first time it's
   // shown for a channel (mediaLoaded gates the fetch so it runs once).
   const [tab, setTab] = useState<'members' | 'media'>('members');
@@ -100,31 +115,42 @@ export function ChannelInfoSheet({
 
   const channelId = channel?.id;
 
+  // Shared member fetch — used by the lazy-load effect and re-run after every add/remove
+  // mutation so the list (and the admin-only addable pick-list) stays authoritative.
+  const loadMembers = useCallback(
+    async (isCancelled?: () => boolean) => {
+      if (!channelId) return;
+      setLoading(true);
+      setError('');
+      try {
+        const response = await authedFetch(`/api/portal/chat/channels/${channelId}/members`);
+        const json = await response.json();
+        if (isCancelled?.()) return;
+        if (!response.ok) throw new Error(json.error || 'Failed to load members');
+        setMembers(Array.isArray(json.members) ? json.members : []);
+        setAddable(Array.isArray(json.addable) ? json.addable : []);
+      } catch (err) {
+        if (isCancelled?.()) return;
+        setError(err instanceof Error ? err.message : 'Failed to load members');
+      } finally {
+        if (!isCancelled?.()) setLoading(false);
+      }
+    },
+    [authedFetch, channelId]
+  );
+
   // Lazy load: only fetch while open and for a known channel. Re-runs when the
   // opened channel changes so switching channels never shows stale members.
   useEffect(() => {
     if (!open || !channelId) return;
     let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      setError('');
-      setMembers([]);
-      try {
-        const response = await authedFetch(`/api/portal/chat/channels/${channelId}/members`);
-        const json = await response.json();
-        if (!response.ok) throw new Error(json.error || 'Failed to load members');
-        if (!cancelled) setMembers(Array.isArray(json.members) ? json.members : []);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load members');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
+    setMembers([]);
+    setAddable([]);
+    void loadMembers(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [open, channelId, authedFetch]);
+  }, [open, channelId, loadMembers]);
 
   // Reset the view + media cache whenever the sheet opens or the channel changes
   // so a freshly-opened sheet always starts on Members with no stale gallery.
@@ -133,7 +159,62 @@ export function ChannelInfoSheet({
     setMedia([]);
     setMediaError('');
     setMediaLoaded(false);
+    setShowAddPeople(false);
+    setActionError('');
   }, [channelId, open]);
+
+  // Add a user to this channel's extra members, then refetch to reflect the change.
+  const addMember = async (uid: string) => {
+    if (!channelId) return;
+    setMutatingUid(uid);
+    setActionError('');
+    try {
+      const response = await authedFetch(
+        `/api/portal/chat/channels/${channelId}/members/manage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid }),
+        }
+      );
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to add member');
+      }
+      await loadMembers();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to add member');
+    } finally {
+      setMutatingUid(null);
+    }
+  };
+
+  // Remove a manually-added member (plain confirm), then refetch.
+  const removeMember = async (uid: string, name: string) => {
+    if (!channelId) return;
+    if (!window.confirm(`Remove ${name} from this channel?`)) return;
+    setMutatingUid(uid);
+    setActionError('');
+    try {
+      const response = await authedFetch(
+        `/api/portal/chat/channels/${channelId}/members/manage`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid }),
+        }
+      );
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to remove member');
+      }
+      await loadMembers();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to remove member');
+    } finally {
+      setMutatingUid(null);
+    }
+  };
 
   // Lazy-fetch the media gallery the first time the Media tab is shown.
   useEffect(() => {
@@ -240,6 +321,70 @@ export function ChannelInfoSheet({
                 {loading ? 'Members' : `${members.length} member${members.length === 1 ? '' : 's'}`}
               </div>
 
+              {/* Admin-only: add people. Toggles an inline pick-list of active users not
+                  already in the channel. Non-admins never see this (isAdmin gate). */}
+              {isAdmin && (
+                <div className="px-4 pb-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAddPeople((v) => !v)}
+                    aria-expanded={showAddPeople}
+                    className="w-full justify-center border-slate-200 dark:border-border"
+                  >
+                    <UserPlus className="size-4" />
+                    Add people
+                  </Button>
+
+                  {actionError && (
+                    <p className="mt-2 text-center text-xs text-red-600 dark:text-red-400">{actionError}</p>
+                  )}
+
+                  {showAddPeople && (
+                    <div className="mt-2 rounded-lg border border-slate-200 dark:border-border">
+                      {addable.length === 0 ? (
+                        <p className="px-3 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                          {loading ? 'Loading…' : 'Everyone is already here.'}
+                        </p>
+                      ) : (
+                        <ul className="max-h-56 space-y-0.5 overflow-auto p-1">
+                          {addable.map((person) => (
+                            <li
+                              key={person.uid}
+                              className="flex items-center gap-3 rounded-md px-2 py-1.5"
+                            >
+                              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
+                                {chatInitials(person.name)}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950 dark:text-foreground">
+                                {person.name}
+                              </span>
+                              {person.role && (
+                                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                  {person.role}
+                                </Badge>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void addMember(person.uid)}
+                                disabled={mutatingUid !== null}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#8dc63f] px-3 py-1 text-xs font-semibold text-[#0A1F44] transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] disabled:opacity-50"
+                              >
+                                {mutatingUid === person.uid ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  'Add'
+                                )}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
                 {loading ? (
                   <ul className="space-y-1" aria-hidden="true">
@@ -271,10 +416,33 @@ export function ChannelInfoSheet({
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950 dark:text-foreground">
                           {member.name}
                         </span>
+                        {member.isExtra && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-[#8dc63f]/50 text-[10px] text-[#4f7a12] dark:text-[#a5d65e]"
+                          >
+                            Added
+                          </Badge>
+                        )}
                         {member.role && (
                           <Badge variant="secondary" className="shrink-0 text-[10px]">
                             {member.role}
                           </Badge>
+                        )}
+                        {isAdmin && member.isExtra && (
+                          <button
+                            type="button"
+                            onClick={() => void removeMember(member.uid, member.name)}
+                            disabled={mutatingUid !== null}
+                            aria-label={`Remove ${member.name}`}
+                            className="grid size-6 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                          >
+                            {mutatingUid === member.uid ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <X className="size-3.5" />
+                            )}
+                          </button>
                         )}
                       </li>
                     ))}

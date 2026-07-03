@@ -6,24 +6,43 @@ vi.mock('@/lib/chat/access', () => ({
   getVerifiedChatUser: vi.fn(),
 }));
 
-const addMock = vi.fn(async (_doc: Record<string, unknown>) => ({ id: 'msg123' }));
+const addMock = vi.fn<(doc: Record<string, unknown>) => Promise<{ id: string }>>(
+  async () => ({ id: 'msg123' })
+);
 const setMock = vi.fn(async () => undefined);
+
+// Two channel docs: the audience-'all' default, and a managers channel that entry_rep
+// CANNOT reach by role but IS listed in extraMemberIds (the manually-added path).
+const CHANNEL_DOCS: Record<string, Record<string, unknown>> = {
+  'all-company': {
+    id: 'all-company',
+    name: 'All Company',
+    description: 'Company-wide updates and quick coordination.',
+    audience: 'all',
+    order: 1,
+    active: true,
+    memberIds: ['real-uid'],
+  },
+  'managers-extra': {
+    id: 'managers-extra',
+    name: 'Managers',
+    description: 'Manager alignment',
+    audience: 'managers',
+    order: 4,
+    active: true,
+    memberIds: ['mgr-1', 'real-uid'],
+    extraMemberIds: ['real-uid'],
+  },
+};
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: () => ({
       doc: (channelId: string) => ({
         get: vi.fn(async () => ({
           id: channelId,
-          exists: channelId === 'all-company',
-          data: () => channelId === 'all-company' ? ({
-            id: 'all-company',
-            name: 'All Company',
-            description: 'Company-wide updates and quick coordination.',
-            audience: 'all',
-            order: 1,
-            active: true,
-            memberIds: ['real-uid'],
-          }) : undefined,
+          exists: channelId in CHANNEL_DOCS,
+          data: () => CHANNEL_DOCS[channelId],
         })),
         set: setMock,
         collection: () => ({ add: addMock }),
@@ -177,5 +196,34 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     };
     expect(written.attachment?.width).toBeUndefined();
     expect(written.attachment?.height).toBeUndefined();
+  });
+
+  it('lets a manually-added member (extraMemberIds) post to a channel their role would deny', async () => {
+    // entry_rep cannot reach a managers-audience channel by role, but is in extraMemberIds.
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'managers-extra', text: 'added rep here' }));
+    expect(res.status).toBe(200);
+    expect(addMock).toHaveBeenCalledTimes(1);
+    const written = addMock.mock.calls[0][0] as { authorId: string; channelId: string };
+    expect(written.authorId).toBe('real-uid');
+    expect(written.channelId).toBe('managers-extra');
+  });
+
+  it('still 403s a non-member on a channel their role denies (extras do not widen everyone)', async () => {
+    // rep-2 is neither audience-derived nor in extraMemberIds for managers-extra.
+    mockGate.mockResolvedValue({
+      ok: true,
+      user: {
+        uid: 'rep-2',
+        displayName: 'Rep Two',
+        role: undefined,
+        fieldRole: 'entry_rep',
+        effectiveRole: 'entry_rep',
+        canModerate: false,
+      },
+    });
+    const res = await POST(req({ channelId: 'managers-extra', text: 'should fail' }));
+    expect(res.status).toBe(403);
+    expect(addMock).not.toHaveBeenCalled();
   });
 });

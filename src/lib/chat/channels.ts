@@ -61,6 +61,31 @@ export function toChatChannel(id: string, data: FirebaseFirestore.DocumentData):
   };
 }
 
+/** The manually-added members stored on a channel doc, cleaned to non-empty strings. */
+export function readExtraMemberIds(data: FirebaseFirestore.DocumentData): string[] {
+  return Array.isArray(data.extraMemberIds)
+    ? data.extraMemberIds.filter((id: unknown): id is string => typeof id === 'string' && !!id)
+    : [];
+}
+
+// Access gate that works on the RAW channel doc (not just the ChatChannel view) so it
+// can honor manual additions: a uid in extraMemberIds gets in even when the role/audience
+// check fails. Every chat route gates on this so added people see the channel and its
+// messages/media. Falls back to the audience check for everyone else.
+export function userCanAccessChannelDoc(
+  data: FirebaseFirestore.DocumentData,
+  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole }
+): boolean {
+  const channel = toChatChannel(typeof data.id === 'string' ? data.id : '', data);
+  // A malformed (unparseable) or archived (active:false) channel is off-limits to
+  // EVERYONE — extras included. Only fall through to the manual-members check once the
+  // channel parses and is active, so archiving a channel revokes extras too (matching the
+  // pre-task behavior where an inactive channel 403'd even admins).
+  if (!channel || !channel.active) return false;
+  if (canAccessChatChannel(channel, identity.role, identity.fieldRole)) return true;
+  return readExtraMemberIds(data).includes(identity.uid);
+}
+
 export async function getMemberIdsForAudience(audience: ChatChannelAudience): Promise<string[]> {
   if (!adminDb) throw new Error('Database not configured');
 
@@ -94,10 +119,27 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
   // Sync every Firestore channel, including archived ones. Archived channels remain
   // hidden by active:false, but keeping role-derived memberIds fresh makes reactivation immediate.
   for (const doc of channelsSnap.docs) {
-    const channel = toChatChannel(doc.id, doc.data());
+    const data = doc.data();
+    const channel = toChatChannel(doc.id, data);
     if (!channel) continue;
 
-    const memberIds = await getMemberIdsForAudience(channel.audience);
+    const audienceMemberIds = await getMemberIdsForAudience(channel.audience);
+
+    // Manual additions must survive sync: keep extra members that still resolve to an
+    // ACTIVE user doc so the memberIds-based Firestore realtime rules keep letting them in.
+    // Deactivated extras are pruned from memberIds (they stay in extraMemberIds, so
+    // reactivation restores realtime access on the next sync) — mirrors the audience filter.
+    const extraMemberIds = readExtraMemberIds(data);
+    let existingExtras: string[] = [];
+    if (extraMemberIds.length > 0) {
+      const refs = extraMemberIds.map((id) => adminDb!.collection('users').doc(id));
+      const extraDocs = await adminDb.getAll(...refs);
+      existingExtras = extraDocs
+        .filter((d) => d.exists && d.data()?.status === 'active')
+        .map((d) => d.id);
+    }
+
+    const memberIds = Array.from(new Set([...audienceMemberIds, ...existingExtras]));
     batch.set(
       doc.ref,
       {

@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { canAccessChatChannel, getEffectiveRole, resolveRoles, RoleDisplayNames } from '@/types';
+import { getEffectiveRole, resolveRoles, RoleDisplayNames } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { toChatChannel } from '@/lib/chat/channels';
+import { readExtraMemberIds, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 
 // Never resolve an unbounded member list — cap the fan-out of user reads.
 const MAX_MEMBERS = 200;
+// Cap the admin-only "addable" suggestion list.
+const MAX_ADDABLE = 50;
 
 interface ChannelMember {
+  uid: string;
+  name: string;
+  role: string;
+  isExtra: boolean;
+}
+
+interface AddableUser {
   uid: string;
   name: string;
   role: string;
@@ -57,13 +66,14 @@ export async function GET(
     if (!channel) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!canAccessChatChannel(channel, user.role, user.fieldRole)) {
+    if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const memberIds: string[] = Array.isArray(data.memberIds)
       ? data.memberIds.filter((id: unknown): id is string => typeof id === 'string' && !!id)
       : [];
+    const extraSet = new Set(readExtraMemberIds(data));
     const boundedIds = memberIds.slice(0, MAX_MEMBERS);
 
     let members: ChannelMember[] = [];
@@ -74,12 +84,35 @@ export async function GET(
         .filter((doc) => doc.exists)
         .map((doc) => {
           const userData = doc.data() ?? {};
-          return { uid: doc.id, name: memberName(userData), role: memberRole(userData) };
+          return {
+            uid: doc.id,
+            name: memberName(userData),
+            role: memberRole(userData),
+            isExtra: extraSet.has(doc.id),
+          };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    return NextResponse.json({ members, memberCount: members.length });
+    // Admins get a pick-list of people they can add (active users not already members).
+    // Never returned to non-admins — the key is entirely absent for them.
+    const isAdmin = user.role === 'admin';
+    if (!isAdmin) {
+      return NextResponse.json({ members, memberCount: members.length });
+    }
+
+    const memberIdSet = new Set(memberIds);
+    const usersSnap = await adminDb.collection('users').where('status', '==', 'active').get();
+    const addable: AddableUser[] = usersSnap.docs
+      .filter((doc) => !memberIdSet.has(doc.id))
+      .map((doc) => {
+        const userData = doc.data() ?? {};
+        return { uid: doc.id, name: memberName(userData), role: memberRole(userData) };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, MAX_ADDABLE);
+
+    return NextResponse.json({ members, memberCount: members.length, addable });
   } catch (error) {
     console.error('Error loading chat channel members:', error);
     return NextResponse.json({ error: 'Failed to load channel members' }, { status: 500 });

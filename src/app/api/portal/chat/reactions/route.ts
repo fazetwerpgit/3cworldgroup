@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { canAccessChatChannel } from '@/types';
 import { isAllowedChatReactionEmoji, toggleReaction } from '@/lib/chat/reactions';
-import { ensureChatChannelMember, toChatChannel } from '@/lib/chat/channels';
+import { ensureChatChannelMember, userCanAccessChannelDoc } from '@/lib/chat/channels';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,10 +24,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up the channel from Firestore so admin-created channels work (not just
-    // the static defaults), matching the messages route.
+    // the static defaults), matching the messages route. Gate on the raw doc so manually
+    // added members (extraMemberIds) can react on the channels they can already read/post.
     const channelSnap = await adminDb.collection('chatChannels').doc(channelId).get();
-    const channel = channelSnap.exists ? toChatChannel(channelSnap.id, channelSnap.data() ?? {}) : null;
-    if (!channel || !canAccessChatChannel(channel, user.role, user.fieldRole)) {
+    if (
+      !channelSnap.exists ||
+      !userCanAccessChannelDoc(channelSnap.data() ?? {}, {
+        uid: user.uid,
+        role: user.role,
+        fieldRole: user.fieldRole,
+      })
+    ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     await ensureChatChannelMember(channelId, user.uid);
