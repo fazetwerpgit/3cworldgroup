@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { ChevronLeft, Hash, Lock, Send, Trash2 } from 'lucide-react';
+import { ArrowDown, ChevronLeft, Clock, Hash, Lock, RotateCw, Send, Trash2, X } from 'lucide-react';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +18,21 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
   platform: 'Admin/Ops',
 };
 
+/**
+ * A message as rendered in the thread: a real Firestore message, or an
+ * optimistic local echo the page pushed on send. `pendingState` is only set on
+ * echoes; real messages omit it. Echoes are shaped like real messages so they
+ * participate in grouping/day-separators naturally, but must not offer
+ * reactions or delete until they resolve into the realtime feed.
+ */
+export type ThreadMessage = ChatMessageView & {
+  pendingState?: 'sending' | 'failed';
+};
+
 interface MobileThreadProps {
   channel?: ChatChannel;
   channelId: string;
-  messages: ChatMessageView[];
+  messages: ThreadMessage[];
   loading: boolean;
   error?: string;
   currentUserId?: string;
@@ -29,12 +41,17 @@ interface MobileThreadProps {
   sending: boolean;
   deletingId: string | null;
   messagesEndRef: RefObject<HTMLDivElement | null>;
+  // Bumped by the page on every own action (send/retry) so the thread always
+  // scrolls to the bottom regardless of the reader's scroll position.
+  scrollToBottomSignal: number;
   formatTime: (date: Date | null) => string;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onDelete: (messageId: string) => void;
   onReactionError: (message: string) => void;
+  onRetryPending: (message: ThreadMessage) => void;
+  onDiscardPending: (messageId: string) => void;
 }
 
 /** Grouping window: messages from the same author within this gap merge. */
@@ -93,13 +110,86 @@ export function MobileThread({
   sending,
   deletingId,
   messagesEndRef,
+  scrollToBottomSignal,
   formatTime,
   onBack,
   onDraftChange,
   onSend,
   onDelete,
   onReactionError,
+  onRetryPending,
+  onDiscardPending,
 }: MobileThreadProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Pinned-ness drives the pill (state, for re-render) and is also read
+  // synchronously inside the scroll effect (ref mirror) so a mere pin flip
+  // doesn't itself trigger a scroll.
+  const [pinned, setPinned] = useState(true);
+  const pinnedRef = useRef(true);
+  const [newCount, setNewCount] = useState(0);
+  // Previous message count / channel, tracked in state so the unseen counter is
+  // adjusted during render (React's "info from previous renders" pattern —
+  // avoids a cascading setState inside an effect).
+  const [prevLen, setPrevLen] = useState(messages.length);
+  const [prevChannel, setPrevChannel] = useState(channelId);
+  const contextRef = useRef('');
+  const signalRef = useRef(scrollToBottomSignal);
+
+  if (channelId !== prevChannel) {
+    setPrevChannel(channelId);
+    setPrevLen(messages.length);
+    setNewCount(0);
+  } else if (messages.length !== prevLen) {
+    const grew = messages.length - prevLen;
+    setPrevLen(messages.length);
+    // Own sends force-scroll to the bottom anyway — don't flash the pill when
+    // the newest arrival is the reader's own message (or echo).
+    const newest = messages[messages.length - 1];
+    const ownArrival = !!newest && newest.authorId === currentUserId;
+    if (grew > 0 && !pinned && !ownArrival) setNewCount((count) => count + grew);
+  }
+
+  // Pinned detection: the bottom anchor is "intersecting" while the reader is
+  // within ~150px of the bottom (rootMargin extends the scroller's bottom).
+  useEffect(() => {
+    const anchor = messagesEndRef.current;
+    const root = scrollRef.current;
+    if (!anchor || !root) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        pinnedRef.current = entry.isIntersecting;
+        setPinned(entry.isIntersecting);
+        if (entry.isIntersecting) setNewCount(0);
+      },
+      { root, rootMargin: '0px 0px 150px 0px', threshold: 0 }
+    );
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, [messagesEndRef]);
+
+  // Pure DOM sync (no setState): opening a channel jumps instantly to the
+  // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
+  // new message only scrolls when the reader is already pinned.
+  useEffect(() => {
+    const anchor = messagesEndRef.current;
+    if (!anchor) return;
+    const opening = contextRef.current !== channelId;
+    const forced = signalRef.current !== scrollToBottomSignal;
+    contextRef.current = channelId;
+    signalRef.current = scrollToBottomSignal;
+    if (opening) {
+      anchor.scrollIntoView({ behavior: 'auto', block: 'end' });
+    } else if (forced || pinnedRef.current) {
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [messages.length, channelId, scrollToBottomSignal, messagesEndRef]);
+
+  const jumpToLatest = () => {
+    setPinned(true);
+    setNewCount(0);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  };
+
   return (
     <div className="chat-slide-in flex h-[calc(100dvh-4rem-env(safe-area-inset-top))] flex-col bg-slate-50 dark:bg-muted/40">
       {/* Compact top bar with back arrow (≥40px target). */}
@@ -132,8 +222,10 @@ export function MobileThread({
       {/* Message list — newest at the bottom. flex-col + mt-auto spacer
           bottom-anchors sparse conversations so the latest message sits just
           above the composer, chat-style. Vertical rhythm is per-message so
-          grouped bubbles can tighten up (see mt-* below). */}
-      <div className="flex flex-1 flex-col overflow-auto p-3">
+          grouped bubbles can tighten up (see mt-* below). The relative wrapper
+          hosts the floating jump-to-latest pill so it clears the composer. */}
+      <div className="relative flex flex-1 flex-col overflow-hidden">
+        <div ref={scrollRef} className="flex flex-1 flex-col overflow-auto p-3">
         <div aria-hidden="true" className="mt-auto" />
         {loading ? (
           <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
@@ -146,7 +238,11 @@ export function MobileThread({
             const prev = index > 0 ? messages[index - 1] : null;
             const next = index < messages.length - 1 ? messages[index + 1] : null;
             const isOwn = message.authorId === currentUserId;
-            const canDelete = canModerate || isOwn;
+            const isPending = !!message.pendingState;
+            const isFailed = message.pendingState === 'failed';
+            // Echoes are always the reader's own; block delete/reactions until
+            // the message resolves into the realtime feed.
+            const canDelete = !isPending && (canModerate || isOwn);
 
             // Day separator whenever the calendar day changes (or at the top).
             const showDaySeparator = !prev || !sameCalendarDay(message.createdAt, prev.createdAt);
@@ -213,10 +309,12 @@ export function MobileThread({
                       </div>
                     )}
                     <div
-                      className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm ${
+                      className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm portal-motion ${
                         isOwn
                           ? 'rounded-br-md bg-[#0A1F44] text-white'
                           : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
+                      } ${message.pendingState === 'sending' ? 'opacity-70' : ''} ${
+                        isFailed ? 'ring-1 ring-red-400/70 dark:ring-red-500/50' : ''
                       }`}
                     >
                       {message.text}
@@ -235,30 +333,75 @@ export function MobileThread({
                       </Button>
                     )}
                   </div>
-                  {isLastOfGroup && (
-                    <span
-                      className={`mt-1 text-[11px] text-slate-400 dark:text-muted-foreground ${
-                        isOwn ? 'px-1' : 'pl-9 pr-1'
-                      }`}
-                    >
-                      {formatTime(message.createdAt)}
-                    </span>
+                  {/* Pending echoes swap the timestamp/reactions for a status
+                      caption; failed sends offer retry/discard inline. */}
+                  {isPending ? (
+                    isFailed ? (
+                      <div className="mt-1 flex items-center gap-2 px-1">
+                        <button
+                          type="button"
+                          onClick={() => onRetryPending(message)}
+                          className="flex items-center gap-1 text-[11px] font-medium text-red-600 hover:underline dark:text-red-400"
+                        >
+                          <RotateCw className="size-3" />
+                          Failed — tap to retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDiscardPending(message.id)}
+                          aria-label="Discard message"
+                          className="text-slate-400 hover:text-red-600 dark:text-muted-foreground dark:hover:text-red-400"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="mt-1 flex items-center gap-1 px-1 text-[11px] text-slate-400 dark:text-muted-foreground">
+                        <Clock className="size-3" />
+                        Sending…
+                      </span>
+                    )
+                  ) : (
+                    <>
+                      {isLastOfGroup && (
+                        <span
+                          className={`mt-1 text-[11px] text-slate-400 dark:text-muted-foreground ${
+                            isOwn ? 'px-1' : 'pl-9 pr-1'
+                          }`}
+                        >
+                          {formatTime(message.createdAt)}
+                        </span>
+                      )}
+                      <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start pl-9'}`}>
+                        <ReactionBar
+                          channelId={channelId}
+                          messageId={message.id}
+                          reactionCounts={message.reactionCounts}
+                          myReactions={message.myReactions}
+                          onError={onReactionError}
+                        />
+                      </div>
+                    </>
                   )}
-                  <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start pl-9'}`}>
-                    <ReactionBar
-                      channelId={channelId}
-                      messageId={message.id}
-                      reactionCounts={message.reactionCounts}
-                      myReactions={message.myReactions}
-                      onError={onReactionError}
-                    />
-                  </div>
                 </div>
               </div>
             );
           })
         )}
         <div ref={messagesEndRef} />
+        </div>
+
+        {/* Jump-to-latest pill — only while scrolled up with unseen messages. */}
+        {newCount > 0 && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            className="portal-motion absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#8dc63f] px-3.5 py-1.5 text-xs font-semibold text-[#0A1F44] shadow-lg shadow-black/10 hover:bg-[#7ab82e] dark:shadow-black/40"
+          >
+            {newCount} new message{newCount > 1 ? 's' : ''}
+            <ArrowDown className="size-3.5" />
+          </button>
+        )}
       </div>
 
       {error && (

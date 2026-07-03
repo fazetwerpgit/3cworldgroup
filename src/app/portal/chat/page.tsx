@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Hash, Lock, MessageSquareText, Send, Trash2 } from 'lucide-react';
+import { ArrowDown, Clock, Hash, Lock, MessageSquareText, RotateCw, Send, Trash2, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { MobileChannelList } from '@/components/chat/MobileChannelList';
 import { MobileThread } from '@/components/chat/MobileThread';
+import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
@@ -18,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useMessages } from '@/hooks/chat/useMessages';
 import { auth } from '@/lib/firebase/config';
-import { ChatChannel } from '@/types';
+import { ChatChannel, getEffectiveRole } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -34,11 +35,24 @@ export default function TeamChatPage() {
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Optimistic local echoes: shown instantly on send, dropped once the matching
+  // real message arrives over the realtime listener (see reconciliation below).
+  const [pendingMessages, setPendingMessages] = useState<ThreadMessage[]>([]);
+  // Bumped on every own action (send/retry) so both scrollers force to bottom.
+  const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0);
   // Phone-only two-screen state: channel list vs. full-screen conversation.
   // Desktop (lg+) ignores this entirely and always shows the side-by-side panel.
   const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const mobileMessagesEndRef = useRef<HTMLDivElement | null>(null);
+  // Desktop scroller + jump-to-latest state (mobile owns its own inside MobileThread).
+  const desktopScrollRef = useRef<HTMLDivElement | null>(null);
+  const [desktopPinned, setDesktopPinned] = useState(true);
+  const desktopPinnedRef = useRef(true);
+  const [desktopNewCount, setDesktopNewCount] = useState(0);
+  const [desktopPrevLen, setDesktopPrevLen] = useState(0);
+  const [desktopPrevChannel, setDesktopPrevChannel] = useState('');
+  const desktopSignalRef = useRef(0);
 
   const { channels, loading: loadingChannels, error: channelsError } = useChatChannels();
   const { messages, loading: loadingMessages, error: messagesError } = useMessages(
@@ -51,6 +65,58 @@ export default function TeamChatPage() {
   );
   const canModerate = hasPermission('chat:moderate');
   const shownError = error || channelsError || messagesError;
+
+  // Merged render list: real messages first, then this channel's un-reconciled
+  // echoes (in send order). Reconciliation happens HERE, synchronously, so the
+  // rendered list can never contain both an echo and its delivered real message
+  // in the same frame (an effect would reconcile only after paint → one-frame
+  // duplicate). An echo is reconciled when a real message with the same
+  // (authorId, text) exists — matched one-to-one via a consumed Set so two
+  // identical sends map to two distinct real messages. No time window: a stale
+  // still-"sending" echo must reconcile whenever its message finally shows,
+  // however long that takes. Failed echoes are never matched — they have no
+  // delivered counterpart, so matching them would let a failed send silently
+  // vanish onto an unrelated older message.
+  const threadMessages = useMemo<ThreadMessage[]>(() => {
+    const consumed = new Set<string>();
+    const unreconciled = pendingMessages.filter((echo) => {
+      if (echo.channelId !== activeChannelId) return false;
+      if (echo.pendingState === 'failed') return true;
+      const match = messages.find(
+        (real) => !consumed.has(real.id) && real.authorId === echo.authorId && real.text === echo.text
+      );
+      if (match) {
+        consumed.add(match.id);
+        return false;
+      }
+      return true;
+    });
+    return [...messages, ...unreconciled];
+  }, [messages, pendingMessages, activeChannelId]);
+
+  // State hygiene only: drop reconciled echoes from state so pendingMessages
+  // doesn't grow without bound. Render correctness is already guaranteed by the
+  // synchronous filter above; this mirrors it (same no-window, consumed-Set,
+  // failed-excluded rules) for the active channel's echoes.
+  useEffect(() => {
+    setPendingMessages((prev) => {
+      if (prev.length === 0) return prev;
+      const consumed = new Set<string>();
+      const next = prev.filter((echo) => {
+        if (echo.channelId !== activeChannelId) return true;
+        if (echo.pendingState === 'failed') return true;
+        const match = messages.find(
+          (real) => !consumed.has(real.id) && real.authorId === echo.authorId && real.text === echo.text
+        );
+        if (match) {
+          consumed.add(match.id);
+          return false;
+        }
+        return true;
+      });
+      return next.length === prev.length ? prev : next;
+    });
+  }, [messages, activeChannelId]);
 
   // All chat calls carry a verified Firebase ID token; the server derives identity
   // from it (never a client-supplied userId).
@@ -81,18 +147,64 @@ export default function TeamChatPage() {
     }
   }, [activeChannelId, channels]);
 
-  // Jump instantly to the bottom when a conversation opens; animate only for
-  // new messages arriving in the same view (smooth-scrolling from the top on
-  // open reads as lag).
+  // Adjust the unseen counter during render (React's "info from previous
+  // renders" pattern) so we never setState synchronously inside an effect.
+  if (activeChannelId !== desktopPrevChannel) {
+    setDesktopPrevChannel(activeChannelId);
+    setDesktopPrevLen(threadMessages.length);
+    setDesktopNewCount(0);
+  } else if (threadMessages.length !== desktopPrevLen) {
+    const grew = threadMessages.length - desktopPrevLen;
+    setDesktopPrevLen(threadMessages.length);
+    // Own sends force-scroll to the bottom anyway — don't flash the pill when
+    // the newest arrival is the reader's own message (or echo).
+    const newest = threadMessages[threadMessages.length - 1];
+    const ownArrival = !!newest && newest.authorId === user?.uid;
+    if (grew > 0 && !desktopPinned && !ownArrival) setDesktopNewCount((count) => count + grew);
+  }
+
+  // Desktop pinned detection: the bottom anchor is "intersecting" while the
+  // reader is within ~150px of the bottom (rootMargin extends the scroller).
+  useEffect(() => {
+    const anchor = messagesEndRef.current;
+    const root = desktopScrollRef.current;
+    if (!anchor || !root) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        desktopPinnedRef.current = entry.isIntersecting;
+        setDesktopPinned(entry.isIntersecting);
+        if (entry.isIntersecting) setDesktopNewCount(0);
+      },
+      { root, rootMargin: '0px 0px 150px 0px', threshold: 0 }
+    );
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, []);
+
+  // Desktop smart auto-scroll (mobile owns its own inside MobileThread). Pure
+  // DOM sync (no setState): opening/switching a channel jumps instantly to the
+  // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
+  // new message only scrolls when the reader is already pinned.
   const scrollContextRef = useRef('');
   useEffect(() => {
-    const context = `${activeChannelId}:${mobileView}`;
-    const behavior: ScrollBehavior =
-      scrollContextRef.current === context ? 'smooth' : 'auto';
-    scrollContextRef.current = context;
-    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
-    mobileMessagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
-  }, [messages.length, activeChannelId, mobileView]);
+    const anchor = messagesEndRef.current;
+    if (!anchor) return;
+    const opening = scrollContextRef.current !== activeChannelId;
+    const forced = desktopSignalRef.current !== scrollToBottomSignal;
+    scrollContextRef.current = activeChannelId;
+    desktopSignalRef.current = scrollToBottomSignal;
+    if (opening) {
+      anchor.scrollIntoView({ behavior: 'auto', block: 'end' });
+    } else if (forced || desktopPinnedRef.current) {
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [threadMessages.length, activeChannelId, scrollToBottomSignal]);
+
+  const jumpToLatestDesktop = () => {
+    setDesktopPinned(true);
+    setDesktopNewCount(0);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  };
 
   // Flag <body> while the phone conversation is open so globals.css hides the
   // bottom nav and reclaims its reserved scroll room (composer owns the edge).
@@ -104,31 +216,65 @@ export default function TeamChatPage() {
     };
   }, [mobileView]);
 
-  const sendMessage = async () => {
+  // POSTs an echo's text; on failure marks that echo 'failed' (retry flips it
+  // back). On success the echo stays put until the realtime feed delivers the
+  // real message and reconciliation drops it — no flicker.
+  const postMessage = useCallback(
+    async (echo: ThreadMessage) => {
+      setSending(true);
+      setError('');
+      try {
+        const response = await authedFetch('/api/portal/chat/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channelId: echo.channelId, text: echo.text }),
+        });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || 'Failed to send message');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+        setPendingMessages((prev) =>
+          prev.map((p) => (p.id === echo.id ? { ...p, pendingState: 'failed' as const } : p))
+        );
+      } finally {
+        setSending(false);
+      }
+    },
+    [authedFetch]
+  );
+
+  const sendMessage = () => {
     if (!user || !activeChannelId || !draft.trim()) return;
-    // Optimistic: clear the box immediately so typing never waits on the
-    // network; restore the text if the send fails.
-    const text = draft;
+    // Local echo appears instantly; the composer clears so typing never waits
+    // on the network.
+    const echo: ThreadMessage = {
+      id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      channelId: activeChannelId,
+      text: draft.trim(),
+      authorId: user.uid,
+      authorName: user.displayName,
+      authorRole: getEffectiveRole(user) ?? undefined,
+      createdAt: new Date(),
+      reactionCounts: {},
+      myReactions: [],
+      pendingState: 'sending',
+    };
+    setPendingMessages((prev) => [...prev, echo]);
     setDraft('');
-    setSending(true);
-    setError('');
-    try {
-      const response = await authedFetch('/api/portal/chat/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channelId: activeChannelId,
-          text,
-        }),
-      });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to send message');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
-      setDraft((current) => current || text);
-    } finally {
-      setSending(false);
-    }
+    setScrollToBottomSignal((tick) => tick + 1);
+    void postMessage(echo);
+  };
+
+  const retryPending = (echo: ThreadMessage) => {
+    setPendingMessages((prev) =>
+      prev.map((p) => (p.id === echo.id ? { ...p, pendingState: 'sending' as const } : p))
+    );
+    setScrollToBottomSignal((tick) => tick + 1);
+    void postMessage({ ...echo, pendingState: 'sending' });
+  };
+
+  const discardPending = (echoId: string) => {
+    setPendingMessages((prev) => prev.filter((p) => p.id !== echoId));
   };
 
   const deleteMessage = async (messageId: string) => {
@@ -254,7 +400,12 @@ export default function TeamChatPage() {
                       </Badge>
                     </div>
 
-                    <div className="flex flex-1 flex-col overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4 [&>*+*]:mt-3">
+                    {/* relative wrapper hosts the floating jump-to-latest pill. */}
+                    <div className="relative flex flex-1 flex-col overflow-hidden">
+                    <div
+                      ref={desktopScrollRef}
+                      className="flex flex-1 flex-col overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4 [&>*+*]:mt-3"
+                    >
                       {/* mt-auto spacer bottom-anchors sparse conversations. */}
                       <div aria-hidden="true" className="mt-auto" />
                       {loadingMessages ? (
@@ -263,7 +414,7 @@ export default function TeamChatPage() {
                             Loading messages...
                           </CardContent>
                         </Card>
-                      ) : messages.length === 0 ? (
+                      ) : threadMessages.length === 0 ? (
                         <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 text-center shadow-sm">
                           <CardHeader className="border-b border-slate-100 dark:border-border p-5">
                             <CardTitle className="text-base">No messages yet</CardTitle>
@@ -273,12 +424,20 @@ export default function TeamChatPage() {
                           </CardContent>
                         </Card>
                       ) : (
-                        messages.map((message) => {
-                          const canDelete = canModerate || message.authorId === user?.uid;
+                        threadMessages.map((message) => {
+                          const isPending = !!message.pendingState;
+                          const isFailed = message.pendingState === 'failed';
+                          // Echoes block delete/reactions until they resolve.
+                          const canDelete =
+                            !isPending && (canModerate || message.authorId === user?.uid);
                           return (
                             <div
                               key={message.id}
-                              className="group rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card/95 p-4 shadow-sm transition-colors duration-200 hover:border-slate-300 dark:hover:border-white/25"
+                              className={`group rounded-md border bg-white p-4 shadow-sm portal-motion dark:bg-card/95 ${
+                                isFailed
+                                  ? 'border-red-300 dark:border-red-500/40'
+                                  : 'border-slate-200 hover:border-slate-300 dark:border-border dark:hover:border-white/25'
+                              } ${message.pendingState === 'sending' ? 'opacity-70' : ''}`}
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
@@ -298,13 +457,41 @@ export default function TeamChatPage() {
                                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
                                     {message.text}
                                   </p>
-                                  <ReactionBar
-                                    channelId={activeChannelId}
-                                    messageId={message.id}
-                                    reactionCounts={message.reactionCounts}
-                                    myReactions={message.myReactions}
-                                    onError={setError}
-                                  />
+                                  {isPending ? (
+                                    isFailed ? (
+                                      <div className="mt-2 flex items-center gap-3">
+                                        <button
+                                          type="button"
+                                          onClick={() => retryPending(message)}
+                                          className="flex items-center gap-1 text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                                        >
+                                          <RotateCw className="size-3" />
+                                          Failed — tap to retry
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => discardPending(message.id)}
+                                          aria-label="Discard message"
+                                          className="text-slate-400 hover:text-red-600 dark:text-muted-foreground dark:hover:text-red-400"
+                                        >
+                                          <X className="size-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="mt-2 flex items-center gap-1 text-xs text-slate-400 dark:text-muted-foreground">
+                                        <Clock className="size-3" />
+                                        Sending…
+                                      </span>
+                                    )
+                                  ) : (
+                                    <ReactionBar
+                                      channelId={activeChannelId}
+                                      messageId={message.id}
+                                      reactionCounts={message.reactionCounts}
+                                      myReactions={message.myReactions}
+                                      onError={setError}
+                                    />
+                                  )}
                                 </div>
                                 {canDelete && (
                                   <Button
@@ -325,6 +512,19 @@ export default function TeamChatPage() {
                         })
                       )}
                       <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Jump-to-latest pill — only while scrolled up with unseen messages. */}
+                    {desktopNewCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={jumpToLatestDesktop}
+                        className="portal-motion absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#8dc63f] px-4 py-1.5 text-xs font-semibold text-[#0A1F44] shadow-lg shadow-black/10 hover:bg-[#7ab82e] dark:shadow-black/40"
+                      >
+                        {desktopNewCount} new message{desktopNewCount > 1 ? 's' : ''}
+                        <ArrowDown className="size-3.5" />
+                      </button>
+                    )}
                     </div>
 
                     <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
@@ -376,7 +576,7 @@ export default function TeamChatPage() {
                 <MobileThread
                   channel={activeChannel}
                   channelId={activeChannelId}
-                  messages={messages}
+                  messages={threadMessages}
                   loading={loadingMessages}
                   error={shownError}
                   currentUserId={user?.uid}
@@ -385,12 +585,15 @@ export default function TeamChatPage() {
                   sending={sending}
                   deletingId={deletingId}
                   messagesEndRef={mobileMessagesEndRef}
+                  scrollToBottomSignal={scrollToBottomSignal}
                   formatTime={formatTime}
                   onBack={() => setMobileView('list')}
                   onDraftChange={setDraft}
                   onSend={sendMessage}
                   onDelete={deleteMessage}
                   onReactionError={setError}
+                  onRetryPending={retryPending}
+                  onDiscardPending={discardPending}
                 />
               ) : (
                 <MobileChannelList

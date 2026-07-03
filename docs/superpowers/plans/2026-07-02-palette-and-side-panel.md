@@ -132,6 +132,27 @@ pixel-identical — verify by keeping the existing JSX for lg+). No new
 dependencies. No per-channel last-message preview (that would need new data
 reads) — the description line stands in for it.
 
+## Task 4 — Channel info screen (Connecteam-style)
+
+Tapping the channel title (mobile thread top bar AND desktop conversation
+header) opens a channel-info Sheet: channel name + # / lock icon, audience
+chip, description, member count, and the full member list (initials avatar,
+name, role chip — same avatar language as chat bubbles). For admins, a
+"Manage channels" link to /portal/admin/chat-channels. No manual add-member
+control (membership is audience-driven by design; admins change the audience
+in Manage). No media/photos section (text-only pilot — nothing to show).
+
+Needs one small additive API: GET /api/portal/chat/channels/[channelId]/members
+— verified-token gated (same pattern as the other chat routes), verifies the
+caller can access the channel (canAccessChatChannel), resolves the channel's
+memberIds against the users collection server-side, returns
+[{ uid, name, role }] (display fields only, no emails/PII beyond name+role).
+
+Files: NEW api route above; NEW src/components/chat/ChannelInfoSheet.tsx;
+EDIT src/app/portal/chat/page.tsx + src/components/chat/MobileThread.tsx
+(title becomes a button opening the sheet). Dark variants, no new deps,
+existing chat behavior untouched.
+
 ## Verification (each task)
 
 `npx eslint <owned files>` clean; controller runs tsc/build; functional
