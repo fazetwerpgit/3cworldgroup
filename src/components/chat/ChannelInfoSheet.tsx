@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Hash, ImageIcon, Loader2, Lock, Settings2, UserPlus, Users, X } from 'lucide-react';
+import { Hash, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,15 @@ interface ChannelMedia {
   attachment: ChatAttachment;
   authorName: string;
   createdAt: string | null;
+}
+
+interface ChannelPin {
+  messageId: string;
+  text: string;
+  attachment: ChatAttachment | null;
+  authorName: string;
+  createdAt: string | null;
+  pinnedAt: string | null;
 }
 
 interface ChannelInfoSheetProps {
@@ -105,13 +114,17 @@ export function ChannelInfoSheet({
   // Kept separate from `error` (which owns the member-list state) so a failed add/remove
   // surfaces near the button without blanking the member list.
   const [actionError, setActionError] = useState('');
-  // Members | Media segmented view. Media is fetched lazily the first time it's
-  // shown for a channel (mediaLoaded gates the fetch so it runs once).
-  const [tab, setTab] = useState<'members' | 'media'>('members');
+  // Members | Pinned | Media segmented view. Pinned + Media are each fetched lazily
+  // the first time they're shown for a channel (their *Loaded flag gates the fetch).
+  const [tab, setTab] = useState<'members' | 'pinned' | 'media'>('members');
   const [media, setMedia] = useState<ChannelMedia[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaError, setMediaError] = useState('');
   const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [pins, setPins] = useState<ChannelPin[]>([]);
+  const [pinsLoading, setPinsLoading] = useState(false);
+  const [pinsError, setPinsError] = useState('');
+  const [pinsLoaded, setPinsLoaded] = useState(false);
 
   const channelId = channel?.id;
 
@@ -159,6 +172,9 @@ export function ChannelInfoSheet({
     setMedia([]);
     setMediaError('');
     setMediaLoaded(false);
+    setPins([]);
+    setPinsError('');
+    setPinsLoaded(false);
     setShowAddPeople(false);
     setActionError('');
   }, [channelId, open]);
@@ -243,6 +259,35 @@ export function ChannelInfoSheet({
     };
   }, [open, channelId, tab, mediaLoaded, authedFetch]);
 
+  // Lazy-fetch the pinned list the first time the Pinned tab is shown (mirrors Media).
+  useEffect(() => {
+    if (!open || !channelId || tab !== 'pinned' || pinsLoaded) return;
+    let cancelled = false;
+    const load = async () => {
+      setPinsLoading(true);
+      setPinsError('');
+      try {
+        const response = await authedFetch(
+          `/api/portal/chat/messages/pin?channelId=${encodeURIComponent(channelId)}`
+        );
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || 'Failed to load pinned messages');
+        if (!cancelled) {
+          setPins(Array.isArray(json.pins) ? json.pins : []);
+          setPinsLoaded(true);
+        }
+      } catch (err) {
+        if (!cancelled) setPinsError(err instanceof Error ? err.message : 'Failed to load pinned messages');
+      } finally {
+        if (!cancelled) setPinsLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, channelId, tab, pinsLoaded, authedFetch]);
+
   const isLocked = channel?.audience === 'managers';
 
   return (
@@ -287,13 +332,14 @@ export function ChannelInfoSheet({
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* Members | Media segmented control (house-style track + raised active
-              segment; lime is reserved for primary actions, so the active tab
+          {/* Members | Pinned | Media segmented control (house-style track + raised
+              active segment; lime is reserved for primary actions, so the active tab
               stays neutral). */}
           <div className="px-4 pt-3 pb-1">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-muted/60">
-              {(['members', 'media'] as const).map((key) => {
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-muted/60">
+              {(['members', 'pinned', 'media'] as const).map((key) => {
                 const isActive = tab === key;
+                const Icon = key === 'members' ? Users : key === 'pinned' ? Pin : ImageIcon;
                 return (
                   <button
                     key={key}
@@ -306,7 +352,7 @@ export function ChannelInfoSheet({
                         : 'text-slate-500 hover:text-slate-800 dark:text-muted-foreground dark:hover:text-foreground'
                     }`}
                   >
-                    {key === 'members' ? <Users className="size-4" /> : <ImageIcon className="size-4" />}
+                    <Icon className="size-4" />
                     {key}
                   </button>
                 );
@@ -450,6 +496,96 @@ export function ChannelInfoSheet({
                 )}
               </div>
             </>
+          ) : tab === 'pinned' ? (
+            <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
+              {pinsLoading ? (
+                <ul className="space-y-1" aria-hidden="true">
+                  {[0, 1, 2].map((row) => (
+                    <li key={row} className="flex items-center gap-3 px-2 py-2">
+                      <span className="size-8 shrink-0 animate-pulse rounded bg-slate-200 dark:bg-muted" />
+                      <span className="h-3.5 w-40 animate-pulse rounded bg-slate-200 dark:bg-muted" />
+                    </li>
+                  ))}
+                </ul>
+              ) : pinsError ? (
+                <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                  {pinsError}
+                </p>
+              ) : pins.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
+                  No pinned messages yet.
+                </p>
+              ) : (
+                <ul className="space-y-0.5">
+                  {pins.map((pin) => {
+                    const snippet = pin.text
+                      ? pin.text
+                      : pin.attachment
+                        ? pin.attachment.type === 'gif'
+                          ? 'GIF'
+                          : 'Photo'
+                        : '';
+                    const isImage = pin.attachment?.type === 'image' || pin.attachment?.type === 'gif';
+                    const openImage = () => {
+                      if (!pin.attachment) return;
+                      onOpenImage({
+                        url: pin.attachment.url,
+                        author: pin.authorName,
+                        time: formatMediaTime(pin.createdAt),
+                      });
+                    };
+                    const rowInner = (
+                      <>
+                        {pin.attachment && isImage ? (
+                          <span className="size-9 shrink-0 overflow-hidden rounded bg-[#0A1F44]/5 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-border">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={pin.attachment.url}
+                              alt=""
+                              loading="lazy"
+                              className="size-full object-cover"
+                            />
+                          </span>
+                        ) : (
+                          <span className="grid size-9 shrink-0 place-items-center rounded text-slate-400 dark:text-muted-foreground">
+                            <Pin className="size-4" />
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold text-slate-950 dark:text-foreground">
+                            {pin.authorName}
+                          </span>
+                          <span className="block truncate text-xs text-slate-500 dark:text-muted-foreground">
+                            {snippet}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-muted-foreground">
+                          {formatMediaTime(pin.pinnedAt)}
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={pin.messageId}>
+                        {pin.attachment && isImage ? (
+                          <button
+                            type="button"
+                            onClick={openImage}
+                            aria-label={`Pinned photo from ${pin.authorName}`}
+                            className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:hover:bg-muted/60"
+                          >
+                            {rowInner}
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-3 rounded-md px-2 py-2">
+                            {rowInner}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
               {mediaLoading ? (

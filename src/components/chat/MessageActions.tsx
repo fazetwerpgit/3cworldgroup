@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Copy, MoreHorizontal, Pencil, Reply, Trash2 } from 'lucide-react';
+import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,10 +19,15 @@ export interface MessageActionsConfig {
   hasText: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  // Pin eligibility is broader than delete (managers too — see the pin route);
+  // isPinned drives the Pin/Unpin label. The parent computes both.
+  canPin: boolean;
+  isPinned: boolean;
   onReply: () => void;
   onCopy: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onTogglePin: () => void;
 }
 
 interface ActionItem {
@@ -41,6 +46,13 @@ function buildActions(config: MessageActionsConfig): ActionItem[] {
   ];
   if (config.hasText) {
     items.push({ key: 'copy', label: 'Copy text', icon: Copy, onSelect: config.onCopy });
+  }
+  if (config.canPin) {
+    items.push(
+      config.isPinned
+        ? { key: 'unpin', label: 'Unpin', icon: PinOff, onSelect: config.onTogglePin }
+        : { key: 'pin', label: 'Pin', icon: Pin, onSelect: config.onTogglePin }
+    );
   }
   if (config.canEdit) {
     items.push({ key: 'edit', label: 'Edit', icon: Pencil, onSelect: config.onEdit });

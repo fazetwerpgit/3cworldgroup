@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Check, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, Pencil, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowDown, Check, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
@@ -148,6 +148,10 @@ export default function TeamChatPage() {
     [activeChannelId, channels]
   );
   const canModerate = hasPermission('chat:moderate');
+  // Pinning is broader than moderation: admin/operations OR field managers (l1/l2),
+  // mirroring the pin route's server check. Reps can't pin. isRole matches either
+  // the platform role or the field role (see AuthContext.isRole).
+  const canPin = isRole('admin', 'operations', 'l1_manager', 'l2_manager');
   const shownError = error || channelsError || messagesError;
 
   // Unread badges: compare each channel's streamed lastMessageAt against this
@@ -732,6 +736,29 @@ export default function TeamChatPage() {
     }
   };
 
+  // Pin/unpin a message. Pin state is low-urgency, so there's no optimistic
+  // overlay — the realtime snapshot (useMessages maps isPinned) flips the icon a
+  // beat later. Failures surface via the shared error banner, like delete.
+  const togglePin = async (message: ThreadMessage) => {
+    if (!user || !activeChannelId) return;
+    setError('');
+    try {
+      const response = await authedFetch('/api/portal/chat/messages/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: activeChannelId,
+          messageId: message.id,
+          pinned: !message.isPinned,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Failed to pin message');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to pin message');
+    }
+  };
+
   const formatTime = (date: Date | null) => {
     if (!date) return 'Just now';
     return date.toLocaleString('en-US', {
@@ -907,6 +934,12 @@ export default function TeamChatPage() {
                                         (edited)
                                       </span>
                                     )}
+                                    {message.isPinned && (
+                                      <Pin
+                                        aria-label="Pinned"
+                                        className="size-3 text-slate-400 dark:text-muted-foreground"
+                                      />
+                                    )}
                                   </div>
                                   {message.replyTo && (
                                     <div className="mt-2 rounded-r border-l-2 border-[#8dc63f] bg-slate-50 px-2.5 py-1.5 dark:bg-muted/50">
@@ -976,10 +1009,13 @@ export default function TeamChatPage() {
                                       hasText: !!message.text,
                                       canEdit,
                                       canDelete,
+                                      canPin,
+                                      isPinned: !!message.isPinned,
                                       onReply: () => startReply(message),
                                       onCopy: () => copyMessageText(message.text),
                                       onEdit: () => startEdit(message),
                                       onDelete: () => deleteMessage(message.id),
+                                      onTogglePin: () => void togglePin(message),
                                     }}
                                   />
                                 )}
@@ -1183,6 +1219,7 @@ export default function TeamChatPage() {
                   error={shownError}
                   currentUserId={user?.uid}
                   canModerate={canModerate}
+                  canPin={canPin}
                   draft={draft}
                   sending={sending}
                   gifEnabled={gifEnabled}
@@ -1208,6 +1245,7 @@ export default function TeamChatPage() {
                   onReply={startReply}
                   onEdit={startEdit}
                   onCopy={copyMessageText}
+                  onTogglePin={togglePin}
                   onCancelReply={cancelReply}
                   onCancelEdit={cancelEdit}
                   onSaveEdit={saveEdit}

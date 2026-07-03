@@ -50,6 +50,12 @@ export interface ChatMessage {
   // untouched/legacy docs, which must render exactly as before.
   replyTo?: ChatReplySnippet;
   editedAt?: Date;
+  // Optional pin marker. `isPinned` mirrors the presence of a pin so Firestore can
+  // query pinned messages; pinnedAt/pinnedBy record when/who. All absent on
+  // unpinned/legacy docs, which must render exactly as before.
+  isPinned?: boolean;
+  pinnedAt?: Date;
+  pinnedBy?: string;
 }
 
 export const CHAT_CHANNELS: ChatChannel[] = [

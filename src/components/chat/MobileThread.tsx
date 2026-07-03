@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { ArrowDown, Check, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, Pencil, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowDown, Check, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
@@ -57,6 +57,9 @@ interface MobileThreadProps {
   error?: string;
   currentUserId?: string;
   canModerate: boolean;
+  // Pin eligibility (admin/operations or l1/l2 managers) — the page derives it and
+  // the long-press sheet shows Pin/Unpin only for eligible users.
+  canPin: boolean;
   draft: string;
   sending: boolean;
   // GIF feature availability (probed by the page) + the shared verified-token
@@ -90,6 +93,7 @@ interface MobileThreadProps {
   onReply: (message: ThreadMessage) => void;
   onEdit: (message: ThreadMessage) => void;
   onCopy: (text: string) => void;
+  onTogglePin: (message: ThreadMessage) => void;
   onCancelReply: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
@@ -201,6 +205,7 @@ export function MobileThread({
   error,
   currentUserId,
   canModerate,
+  canPin,
   draft,
   sending,
   gifEnabled,
@@ -226,6 +231,7 @@ export function MobileThread({
   onReply,
   onEdit,
   onCopy,
+  onTogglePin,
   onCancelReply,
   onCancelEdit,
   onSaveEdit,
@@ -571,6 +577,9 @@ export function MobileThread({
                         >
                           {formatTime(message.createdAt)}
                           {message.editedAt && <span className="ml-1">(edited)</span>}
+                          {message.isPinned && (
+                            <Pin aria-label="Pinned" className="ml-1 inline-block size-3 align-[-1px]" />
+                          )}
                         </span>
                       )}
                       <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start pl-9'}`}>
@@ -775,10 +784,13 @@ export function MobileThread({
                 hasText: !!actionSheet.text,
                 canEdit: actionSheet.authorId === currentUserId && !!actionSheet.text,
                 canDelete: canModerate || actionSheet.authorId === currentUserId,
+                canPin,
+                isPinned: !!actionSheet.isPinned,
                 onReply: () => onReply(actionSheet),
                 onCopy: () => onCopy(actionSheet.text),
                 onEdit: () => onEdit(actionSheet),
                 onDelete: () => onDelete(actionSheet.id),
+                onTogglePin: () => onTogglePin(actionSheet),
               } satisfies MessageActionsConfig)
             : null
         }

@@ -23,6 +23,9 @@ export interface ChatMessageView {
   // Server-stamped reply quote + edit marker. Absent on untouched/legacy docs.
   replyTo?: ChatReplySnippet;
   editedAt?: Date | null;
+  // Pin marker (defensive boolean + when it was pinned). Absent on unpinned/legacy docs.
+  isPinned?: boolean;
+  pinnedAt?: Date | null;
 }
 
 function toDate(value: unknown): Date | null {
@@ -136,6 +139,8 @@ export function useMessages(channelId: string | null) {
               hasAttachment: data.hasAttachment === true,
               replyTo: toReplyTo(data.replyTo),
               editedAt: toDate(data.editedAt),
+              isPinned: data.isPinned === true,
+              pinnedAt: toDate(data.pinnedAt),
             } satisfies ChatMessageView;
           })
           .reverse();
