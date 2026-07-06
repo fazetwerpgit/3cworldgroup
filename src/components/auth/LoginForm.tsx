@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 
 type FormMode = 'login' | 'forgot';
 
@@ -28,25 +29,6 @@ function GoogleIcon() {
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z" />
     </svg>
   );
-}
-
-// Turn Firebase auth error codes into plain-language, actionable messages.
-function friendlyAuthError(err: unknown): string {
-  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
-  const raw = err instanceof Error ? err.message : '';
-  const c = `${code} ${raw}`;
-  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found'))
-    return 'Invalid email or password. Please try again.';
-  if (c.includes('invalid-email')) return 'That email address doesn’t look right.';
-  if (c.includes('user-disabled')) return 'This account has been disabled. Contact your manager.';
-  if (c.includes('too-many-requests')) return 'Too many attempts. Wait a minute, then try again.';
-  if (c.includes('network-request-failed')) return 'Network problem. Check your connection and try again.';
-  if (c.includes('popup-closed-by-user') || c.includes('cancelled-popup-request')) return 'Sign-in was cancelled.';
-  if (c.includes('popup-blocked')) return 'Your browser blocked the sign-in window. Allow pop-ups and try again.';
-  if (c.includes('account-exists-with-different-credential'))
-    return 'This email already uses a password. Sign in with your email and password below.';
-  if (c.includes('not-configured')) return 'Sign-in isn’t configured. Contact your administrator.';
-  return 'Something went wrong signing in. Please try again.';
 }
 
 export function LoginForm() {
@@ -312,7 +294,10 @@ export function LoginForm() {
           </form>
 
           <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            Need an account? Contact your manager.
+            Need an account?{' '}
+            <Link href="/portal/signup" className="font-medium text-[#5a8f1f] hover:underline dark:text-[#9fd44f]">
+              Create one
+            </Link>
           </p>
         </>
       )}
