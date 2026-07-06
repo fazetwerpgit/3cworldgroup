@@ -29,12 +29,12 @@ function req(q?: string) {
 
 beforeEach(() => {
   mockGate.mockReset();
-  delete process.env.TENOR_API_KEY;
+  delete process.env.GIPHY_API_KEY;
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete process.env.TENOR_API_KEY;
+  delete process.env.GIPHY_API_KEY;
 });
 
 describe('GET /api/portal/chat/gifs', () => {
@@ -44,7 +44,7 @@ describe('GET /api/portal/chat/gifs', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns enabled:false with no results when TENOR_API_KEY is unset', async () => {
+  it('returns enabled:false with no results when GIPHY_API_KEY is unset', async () => {
     mockGate.mockResolvedValue(REP);
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
@@ -58,23 +58,25 @@ describe('GET /api/portal/chat/gifs', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('proxies Tenor and maps results without leaking the key', async () => {
+  it('proxies GIPHY and maps results without leaking the key', async () => {
     mockGate.mockResolvedValue(REP);
-    process.env.TENOR_API_KEY = 'super-secret-key';
+    process.env.GIPHY_API_KEY = 'super-secret-key';
 
     const fetchSpy = vi.fn(async (_url: string) => ({
       ok: true,
       json: async () => ({
-        results: [
+        data: [
           {
             id: 'g1',
-            media_formats: {
-              gif: { url: 'https://media.tenor.com/g1/full.gif', dims: [480, 270] },
-              tinygif: { url: 'https://media.tenor.com/g1/tiny.gif' },
+            images: {
+              // GIPHY returns width/height as STRINGS.
+              original: { url: 'https://media.giphy.com/g1/full.gif', width: '480', height: '270' },
+              fixed_width: { url: 'https://media.giphy.com/g1/fw.gif' },
+              downsized: { url: 'https://media.giphy.com/g1/down.gif' },
             },
           },
-          // No gif format → filtered out.
-          { id: 'g2', media_formats: { tinygif: { url: 'https://media.tenor.com/g2/tiny.gif' } } },
+          // No original.url → filtered out.
+          { id: 'g2', images: { fixed_width: { url: 'https://media.giphy.com/g2/fw.gif' } } },
         ],
       }),
     }));
@@ -88,25 +90,59 @@ describe('GET /api/portal/chat/gifs', () => {
     expect(json.results).toEqual([
       {
         id: 'g1',
-        url: 'https://media.tenor.com/g1/full.gif',
-        previewUrl: 'https://media.tenor.com/g1/tiny.gif',
+        url: 'https://media.giphy.com/g1/full.gif',
+        // fixed_width wins over downsized.
+        previewUrl: 'https://media.giphy.com/g1/fw.gif',
+        // String dims parsed to finite numbers.
         width: 480,
         height: 270,
       },
     ]);
-    // The key travels to Tenor but never appears in the client-facing payload.
+    // The key travels to GIPHY but never appears in the client-facing payload.
     const calledUrl = fetchSpy.mock.calls[0][0] as string;
-    expect(calledUrl).toContain('key=super-secret-key');
+    expect(calledUrl).toContain('/v1/gifs/search');
+    expect(calledUrl).toContain('api_key=super-secret-key');
     expect(JSON.stringify(json)).not.toContain('super-secret-key');
   });
 
-  it('handles an upstream Tenor error gracefully without leaking the key', async () => {
+  it('falls back through preview urls and drops non-positive dimensions', async () => {
     mockGate.mockResolvedValue(REP);
-    process.env.TENOR_API_KEY = 'super-secret-key';
+    process.env.GIPHY_API_KEY = 'k';
+    const fetchSpy = vi.fn(async (_url: string) => ({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            id: 'g3',
+            images: {
+              original: { url: 'https://media3.giphy.com/g3/full.gif', width: '0', height: 'nope' },
+              preview_gif: { url: 'https://media3.giphy.com/g3/preview.gif' },
+            },
+          },
+        ],
+      }),
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const res = await GET(req('dogs'));
+    const json = await res.json();
+
+    expect(json.results).toEqual([
+      {
+        id: 'g3',
+        url: 'https://media3.giphy.com/g3/full.gif',
+        previewUrl: 'https://media3.giphy.com/g3/preview.gif',
+      },
+    ]);
+  });
+
+  it('handles an upstream GIPHY error gracefully without leaking the key', async () => {
+    mockGate.mockResolvedValue(REP);
+    process.env.GIPHY_API_KEY = 'super-secret-key';
     const fetchSpy = vi.fn(async (_url: string) => ({
       ok: false,
       status: 500,
-      json: async () => ({ error: 'tenor exploded' }),
+      json: async () => ({ error: 'giphy exploded' }),
     }));
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -118,15 +154,15 @@ describe('GET /api/portal/chat/gifs', () => {
     expect(JSON.stringify(json)).not.toContain('super-secret-key');
   });
 
-  it('uses the featured endpoint when q is empty', async () => {
+  it('uses the trending endpoint when q is empty', async () => {
     mockGate.mockResolvedValue(REP);
-    process.env.TENOR_API_KEY = 'k';
-    const fetchSpy = vi.fn(async (_url: string) => ({ ok: true, json: async () => ({ results: [] }) }));
+    process.env.GIPHY_API_KEY = 'k';
+    const fetchSpy = vi.fn(async (_url: string) => ({ ok: true, json: async () => ({ data: [] }) }));
     vi.stubGlobal('fetch', fetchSpy);
 
     await GET(req());
 
     const calledUrl = fetchSpy.mock.calls[0][0] as string;
-    expect(calledUrl).toContain('/v2/featured');
+    expect(calledUrl).toContain('/v1/gifs/trending');
   });
 });

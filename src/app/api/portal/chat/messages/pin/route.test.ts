@@ -236,7 +236,7 @@ describe('GET /api/portal/chat/messages/pin', () => {
         data: {
           isPinned: true,
           text: '',
-          attachment: { type: 'gif', url: 'https://media.tenor.com/g/x.gif' },
+          attachment: { type: 'gif', url: 'https://media.giphy.com/g/x.gif' },
           authorName: 'B',
           createdAt: { toDate: () => new Date('2026-07-02T00:00:00Z') },
           pinnedAt: { toDate: () => new Date('2026-07-02T10:00:00Z') },

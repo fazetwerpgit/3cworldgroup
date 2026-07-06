@@ -138,7 +138,7 @@ describe('GET /api/portal/chat/channels/[channelId]/media', () => {
         id: 'm2',
         data: {
           hasAttachment: true,
-          attachment: { type: 'gif', url: 'https://media.tenor.com/g/x.gif' },
+          attachment: { type: 'gif', url: 'https://media.giphy.com/g/x.gif' },
           authorName: 'Rep Two',
           deletedAt: { toDate: () => new Date() },
           createdAt: { toDate: () => new Date('2026-06-30T00:00:00Z') },

@@ -32,7 +32,7 @@ const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
     authorId: 'other-uid',
     authorName: 'Author One',
     text: '',
-    attachment: { type: 'gif', url: 'https://media.tenor.com/x.gif' },
+    attachment: { type: 'gif', url: 'https://media.giphy.com/x.gif' },
     deletedAt: null,
   },
   'src-deleted': { authorId: 'other-uid', authorName: 'Author One', text: 'gone', deletedAt: { seconds: 1 } },
@@ -224,12 +224,12 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     expect(written.attachment).toMatchObject({ type: 'image', width: 800, height: 600 });
   });
 
-  it('accepts a valid Tenor gif attachment', async () => {
+  it('accepts a valid GIPHY gif attachment', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(
       req({
         channelId: 'all-company',
-        attachment: { type: 'gif', url: 'https://media.tenor.com/abc/def.gif' },
+        attachment: { type: 'gif', url: 'https://media.giphy.com/abc/def.gif' },
       })
     );
     expect(res.status).toBe(200);
@@ -250,10 +250,10 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     expect(addMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a gif url that is not on media.tenor.com', async () => {
+  it('rejects a gif url that is not on a giphy.com host', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(
-      req({ channelId: 'all-company', attachment: { type: 'gif', url: 'https://evil.example.com/x.gif' } })
+      req({ channelId: 'all-company', attachment: { type: 'gif', url: 'https://evilgiphy.com/x.gif' } })
     );
     expect(res.status).toBe(400);
     expect(addMock).not.toHaveBeenCalled();

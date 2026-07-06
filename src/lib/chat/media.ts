@@ -75,7 +75,7 @@ type AttachmentValidation =
 
 /**
  * Validate a client-supplied attachment for a message POST. Image URLs must live
- * under this channel's storage folder; gif URLs must be https on media.tenor.com.
+ * under this channel's storage folder; gif URLs must be https on a giphy.com host.
  * width/height are clamped (dropped if not finite/positive/≤4096). Returns a
  * sanitized attachment that is safe to persist.
  */
@@ -110,7 +110,11 @@ export function validateMessageAttachment(
     } catch {
       return { ok: false, error: 'Invalid gif url' };
     }
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'media.tenor.com') {
+    // Require https AND a giphy.com host. Exact-suffix match so 'evilgiphy.com' is
+    // rejected while 'media.giphy.com'/'media3.giphy.com' are accepted.
+    const isGiphyHost =
+      parsed.hostname === 'giphy.com' || parsed.hostname.endsWith('.giphy.com');
+    if (parsed.protocol !== 'https:' || !isGiphyHost) {
       return { ok: false, error: 'Gif url is not permitted' };
     }
   }

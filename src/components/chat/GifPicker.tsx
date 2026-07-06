@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
-// One Tenor result mapped by the /api/portal/chat/gifs proxy.
+// One GIPHY result mapped by the /api/portal/chat/gifs proxy.
 export interface GifResult {
   id: string;
   url: string;
@@ -17,7 +17,7 @@ type AuthedFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 /**
  * Anchored GIF search popover. Mount it inside a `relative` wrapper in the
- * composer; it positions itself above the trigger. Fetches Tenor featured GIFs
+ * composer; it positions itself above the trigger. Fetches GIPHY trending GIFs
  * on open, then debounced search (300ms) as the query changes. Tapping a GIF
  * fires `onSelect` and closes. Closes on Esc or an outside click. The parent
  * only renders this when the GIF feature probed as enabled.
@@ -140,7 +140,7 @@ export function GifPicker({
       </div>
 
       <p className="border-t border-slate-100 px-2.5 py-1.5 text-[10px] text-slate-400 dark:border-border dark:text-muted-foreground">
-        Powered by Tenor
+        Powered By GIPHY
       </p>
     </div>
   );
