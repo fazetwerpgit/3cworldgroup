@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
+import { deriveResourceType } from '@/lib/training/fileKind';
 
 // GET /api/portal/training - Get training resources
 export async function GET(request: NextRequest) {
@@ -18,6 +19,14 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const isRequired = searchParams.get('required');
 
+    const includeAll = searchParams.get('all') === 'true';
+    if (includeAll) {
+      const gate = await requireManagement(searchParams.get('requestedBy'));
+      if (!gate.ok) {
+        return NextResponse.json({ error: gate.error }, { status: gate.status });
+      }
+    }
+
     // Simple query - filter and sort in memory to avoid index requirements
     const snapshot = await adminDb.collection('training').get();
     let resources: TrainingResource[] = [];
@@ -25,7 +34,7 @@ export async function GET(request: NextRequest) {
     snapshot.forEach((doc) => {
       const data = doc.data();
       // Only include published resources
-      if (data.isPublished) {
+      if (includeAll || data.isPublished) {
         resources.push({
           id: doc.id,
           ...data,
@@ -83,6 +92,10 @@ export async function POST(request: NextRequest) {
       isRequired,
       isPublished,
       order,
+      storagePath,
+      fileName,
+      mimeType,
+      fileSize,
     } = body;
 
     // Only admin/operations may create training content.
@@ -102,7 +115,7 @@ export async function POST(request: NextRequest) {
     const newResource = {
       title,
       description: description || '',
-      type,
+      type: mimeType ? deriveResourceType(mimeType) : (type || 'document'),
       category,
       url: url || '',
       thumbnailUrl: thumbnailUrl || '',
@@ -111,6 +124,10 @@ export async function POST(request: NextRequest) {
       isRequired: isRequired || false,
       isPublished: isPublished !== false,
       order: order || 0,
+      storagePath: storagePath || '',
+      fileName: fileName || '',
+      mimeType: mimeType || '',
+      fileSize: fileSize || 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
