@@ -8,102 +8,88 @@ service cloud.firestore {
              u.fieldRole in ['l1_manager', 'l2_manager'];
     }
 
-    // Authenticated users can read their own user profile
-    match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Is the signed-in caller an APPROVED (active) user? Self-signups are
+    // status 'pending' and fail this until an admin flips them to 'active'
+    // (Admin SDK / Console, which bypass rules).
+    function isApproved() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
     }
 
-    // Admin can read all users
+    // A user may create ONLY their own profile, ONLY pending, ONLY these 3
+    // fields. No client update/delete — approval + edits go through the Admin
+    // SDK. Self-read is allowed at any status so the pending screen can load.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['email', 'status', 'createdAt']);
+      allow update, delete: if false;
+    }
+
+    // Admin/ops can read all users.
     match /users/{userId} {
       allow read: if request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'operations'];
     }
 
-    // Per-user chat read receipts: users/{uid}/chatReads/{channelId} { lastReadAt }.
-    // Client-written (the one chat doc reps write directly) so unread badges work
-    // without a server round-trip. A user only ever touches their own receipts,
-    // and a write must carry exactly a timestamp lastReadAt — nothing else.
+    // Per-user chat read receipts (client-written). Approved users only.
     match /users/{userId}/chatReads/{channelId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId &&
+      allow read: if isApproved() && request.auth.uid == userId;
+      allow write: if isApproved() && request.auth.uid == userId &&
         request.resource.data.keys().hasOnly(['lastReadAt']) &&
         request.resource.data.lastReadAt is timestamp;
     }
 
-    // Sales - authenticated users can read and create
     match /sales/{saleId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      allow read: if isApproved();
+      allow create: if isApproved();
+      allow update, delete: if isApproved();
     }
 
-    // Notifications - users can read/update their own
     match /notifications/{notifId} {
-      allow read, update: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read, update: if isApproved();
+      allow create: if isApproved();
     }
 
-    // Training resources - authenticated can read
     match /training/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isApproved();
+      allow write: if isApproved();
     }
 
-    // User progress - users manage their own
     match /userProgress/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isApproved();
     }
 
-    // Leaderboard - authenticated can read
     match /leaderboard/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isApproved();
+      allow write: if isApproved();
     }
 
-    // Onboarding item progress - a user reads their own; management reads all.
-    // All writes go through the server (Admin SDK), which bypasses these rules,
-    // so client writes are denied.
     match /userOnboarding/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isApproved() &&
         (resource.data.userId == request.auth.uid || isManagement());
       allow write: if false;
     }
 
-    // Channel credentialing progress - same access model as userOnboarding.
     match /userChannelOnboarding/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isApproved() &&
         (resource.data.userId == request.auth.uid || isManagement());
       allow write: if false;
     }
 
-    // Onboarding invites carry token hashes; only the server (Admin SDK) and the
-    // public token route may touch them. No direct client access.
     match /onboardingInvites/{docId} {
       allow read, write: if false;
     }
-
-    // Candidate onboarding submissions - server-only (Admin SDK).
     match /candidateOnboarding/{docId} {
       allow read, write: if false;
     }
-
-    // Encrypted sensitive onboarding fields (SSN, DL#). Server-only (Admin SDK).
-    // No client ever reads or writes these; the admin reveal goes through an
-    // admin-gated, token-verified API route, not direct Firestore access.
     match /userSensitive/{uid} {
       allow read, write: if false;
     }
-
-    // Audit log of sensitive-field reveals. Server-only.
     match /sensitiveAccessLog/{logId} {
       allow read, write: if false;
     }
-
-    // Rep-form submissions (Fiber Report, Expedite Order). Server-only (Admin
-    // SDK); reps submit and management reads via gated API routes, not direct
-    // client Firestore access.
     match /fiberReports/{id} {
       allow read, write: if false;
     }
@@ -122,31 +108,26 @@ service cloud.firestore {
     match /managerInterviews/{id} {
       allow read, write: if false;
     }
-    // Bug reports — any user submits via a gated API route; admins review. Server-only.
     match /bugReports/{id} {
       allow read, write: if false;
     }
-    // Per-form submission-alert toggles. Server-only; admins flip via a gated route.
     match /formAlerts/{key} {
       allow read, write: if false;
     }
 
-    // Team chat channels: clients may only read channels/messages/reactions for
-    // channels where the server-maintained memberIds list contains their uid.
-    // All writes remain server-only via Admin SDK.
     match /chatChannels/{channelId} {
-      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      allow read: if isApproved() && request.auth.uid in resource.data.memberIds;
       allow write: if false;
     }
 
     match /chatChannels/{channelId}/messages/{messageId} {
-      allow read: if request.auth != null &&
+      allow read: if isApproved() &&
         request.auth.uid in get(/databases/$(database)/documents/chatChannels/$(channelId)).data.memberIds;
       allow write: if false;
     }
 
     match /chatChannels/{channelId}/messages/{messageId}/reactions/{reactionId} {
-      allow read: if request.auth != null &&
+      allow read: if isApproved() &&
         request.auth.uid in get(/databases/$(database)/documents/chatChannels/$(channelId)).data.memberIds;
       allow write: if false;
     }
