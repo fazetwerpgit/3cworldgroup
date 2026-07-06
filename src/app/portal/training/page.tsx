@@ -112,22 +112,34 @@ function TrainingContent() {
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div className="flex flex-col gap-3 sm:flex-row">
                           <div className="grid gap-2">
-                            <Label htmlFor="training-category" className="text-sm text-slate-700 dark:text-muted-foreground">
-                              Category
-                            </Label>
-                            <NativeSelect
-                              id="training-category"
-                              value={categoryFilter}
-                              onChange={(event) => setCategoryFilter(event.target.value as TrainingCategory | '')}
-                              className="w-full min-w-48 bg-white dark:bg-card"
-                            >
-                              <option value="">All Categories</option>
+                            <Label className="text-sm text-slate-700 dark:text-muted-foreground">Carrier</Label>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setCategoryFilter('')}
+                                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                                  categoryFilter === ''
+                                    ? 'border-[#8dc63f] bg-[#8dc63f]/10 text-[#5a8f1f]'
+                                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted'
+                                }`}
+                              >
+                                All
+                              </button>
                               {TRAINING_CATEGORIES.map((category) => (
-                                <option key={category.value} value={category.value}>
+                                <button
+                                  key={category.value}
+                                  type="button"
+                                  onClick={() => setCategoryFilter(category.value)}
+                                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                                    categoryFilter === category.value
+                                      ? 'border-[#8dc63f] bg-[#8dc63f]/10 text-[#5a8f1f]'
+                                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted'
+                                  }`}
+                                >
                                   {category.label}
-                                </option>
+                                </button>
                               ))}
-                            </NativeSelect>
+                            </div>
                           </div>
                           <div className="grid gap-2">
                             <Label htmlFor="training-type" className="text-sm text-slate-700 dark:text-muted-foreground">
