@@ -35,10 +35,14 @@ export function buildFormAttachmentFolder(uid: string, formType: string, slot?: 
 export const FORM_UPLOAD_SLOTS: Record<string, string[]> = {
   'payroll-dispute': [''],
   'leads-request': ['hostile', 'blind-knock', 'lasso'],
-  'sale-proof': [''],
 };
 
+// sale-proof uploads use a per-sale unique id as the slot, so one rep's sales
+// never share (and overwrite) a screenshot folder. Other forms use fixed slots.
+const SALE_PROOF_SLOT = /^[A-Za-z0-9_-]{8,64}$/;
+
 export function isAllowedFormUpload(formType: string, slot: string): boolean {
+  if (formType === 'sale-proof') return SALE_PROOF_SLOT.test(slot);
   const slots = FORM_UPLOAD_SLOTS[formType];
   return Array.isArray(slots) && slots.includes(slot);
 }

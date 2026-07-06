@@ -47,6 +47,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [formError, setFormError] = useState('');
+  const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -370,6 +371,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             <Label className="mb-1">Screenshot (if no order # / BTN)</Label>
             <FileUpload
               itemId="sale-proof"
+              slot={proofUploadId}
               accept="image/*,application/pdf"
               allowedTypes={FORM_ATTACHMENT_TYPES}
               uploadUrl="/api/portal/forms/upload"

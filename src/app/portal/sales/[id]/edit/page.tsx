@@ -66,6 +66,7 @@ export default function EditSalePage() {
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
 
   const isAdmin = isRole('admin');
   const saleId = params.id as string;
@@ -448,6 +449,7 @@ export default function EditSalePage() {
                     <Label className="mb-1">Screenshot (if no order # / BTN)</Label>
                     <FileUpload
                       itemId="sale-proof"
+                      slot={proofUploadId}
                       accept="image/*,application/pdf"
                       allowedTypes={FORM_ATTACHMENT_TYPES}
                       uploadUrl="/api/portal/forms/upload"

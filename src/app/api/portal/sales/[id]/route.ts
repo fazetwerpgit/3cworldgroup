@@ -95,6 +95,16 @@ export async function PUT(
       );
     }
 
+    if (body.proofScreenshotPath) {
+      const expectedPrefix = `form-attachments/${existing?.salesRepId}/sale-proof/`;
+      if (!String(body.proofScreenshotPath).startsWith(expectedPrefix)) {
+        return NextResponse.json(
+          { error: 'Invalid screenshot reference' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Allowlist of fields a sale edit may set. Approval status and its audit
     // trail are controlled only by /sales/approve; ownership, points, and
     // server-managed timestamps are immutable here. This closes the

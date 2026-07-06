@@ -157,6 +157,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (proofScreenshotPath) {
+      const expectedPrefix = `form-attachments/${salesRepId}/sale-proof/`;
+      if (!String(proofScreenshotPath).startsWith(expectedPrefix)) {
+        return NextResponse.json(
+          { error: 'Invalid screenshot reference' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Calculate points server-side based on products to prevent cheating
     let calculatedPoints = 0;
     if (Array.isArray(products)) {

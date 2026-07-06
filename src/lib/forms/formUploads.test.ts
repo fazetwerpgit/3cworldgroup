@@ -60,10 +60,16 @@ describe('isAllowedFormUpload', () => {
 });
 
 describe('sale-proof uploads', () => {
-  it('accepts the sale-proof single slot', () => {
-    expect(isAllowedFormUpload('sale-proof', '')).toBe(true);
+  it('accepts a valid unique slot id', () => {
+    expect(isAllowedFormUpload('sale-proof', 'a1b2c3d4e5')).toBe(true);
   });
-  it('rejects an unknown slot for sale-proof', () => {
-    expect(isAllowedFormUpload('sale-proof', 'nope')).toBe(false);
+  it('rejects an empty slot (needs a unique id)', () => {
+    expect(isAllowedFormUpload('sale-proof', '')).toBe(false);
+  });
+  it('rejects a slot with unsafe characters', () => {
+    expect(isAllowedFormUpload('sale-proof', '../../etc')).toBe(false);
+  });
+  it('rejects a too-short slot', () => {
+    expect(isAllowedFormUpload('sale-proof', 'abc')).toBe(false);
   });
 });

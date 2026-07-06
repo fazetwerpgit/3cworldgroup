@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 interface FileUploadProps {
   itemId: string;
-  slot?: 'front' | 'back';
+  slot?: string;
   uploadUrl: string;
   accept: string;
   allowedTypes: string[];
