@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { TRAINING_CATEGORIES, ResourceCategoryConfig } from './training';
 
 describe('training carrier categories', () => {
-  it('exposes exactly the four carriers in order', () => {
+  it('exposes exactly the five carriers in order', () => {
     expect(TRAINING_CATEGORIES).toEqual([
-      { value: 'att_tfiber', label: 'AT&T T-Fiber' },
+      { value: 'att', label: 'AT&T' },
+      { value: 'tfiber', label: 'T-Fiber' },
       { value: 'verizon_frontier', label: 'Verizon/Frontier' },
       { value: 'xfinity', label: 'Xfinity' },
       { value: 'directv', label: 'DirecTV' },

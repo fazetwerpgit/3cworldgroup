@@ -1,7 +1,7 @@
 import { UserRole } from './auth';
 
 export type ResourceType = 'video' | 'document' | 'link' | 'quiz';
-export type TrainingCategory = 'att_tfiber' | 'verizon_frontier' | 'xfinity' | 'directv';
+export type TrainingCategory = 'att' | 'tfiber' | 'verizon_frontier' | 'xfinity' | 'directv';
 
 // Keep ResourceCategory as alias for backward compatibility
 export type ResourceCategory = TrainingCategory;
@@ -47,7 +47,8 @@ export const ResourceTypeConfig: Record<ResourceType, { name: string; icon: stri
 };
 
 export const ResourceCategoryConfig: Record<ResourceCategory, { name: string; description: string }> = {
-  att_tfiber: { name: 'AT&T T-Fiber', description: 'AT&T T-Fiber training and resources' },
+  att: { name: 'AT&T', description: 'AT&T training and resources' },
+  tfiber: { name: 'T-Fiber', description: 'T-Fiber training and resources' },
   verizon_frontier: { name: 'Verizon/Frontier', description: 'Verizon and Frontier training and resources' },
   xfinity: { name: 'Xfinity', description: 'Xfinity training and resources' },
   directv: { name: 'DirecTV', description: 'DirecTV training and resources' },
@@ -62,7 +63,8 @@ export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
 ];
 
 export const TRAINING_CATEGORIES: { value: TrainingCategory; label: string }[] = [
-  { value: 'att_tfiber', label: 'AT&T T-Fiber' },
+  { value: 'att', label: 'AT&T' },
+  { value: 'tfiber', label: 'T-Fiber' },
   { value: 'verizon_frontier', label: 'Verizon/Frontier' },
   { value: 'xfinity', label: 'Xfinity' },
   { value: 'directv', label: 'DirecTV' },
