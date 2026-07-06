@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginForm } from '@/components/auth/LoginForm';
+import { PendingApproval } from '@/components/auth/PendingApproval';
 
 export default function PortalLoginPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, pendingApproval } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -32,6 +33,10 @@ export default function PortalLoginPage() {
   // If user is logged in, show nothing (will redirect)
   if (user) {
     return null;
+  }
+
+  if (pendingApproval) {
+    return <PendingApproval />;
   }
 
   // Show login form
