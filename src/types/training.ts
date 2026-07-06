@@ -1,7 +1,7 @@
 import { UserRole } from './auth';
 
 export type ResourceType = 'video' | 'document' | 'link' | 'quiz';
-export type TrainingCategory = 'onboarding' | 'product' | 'sales_technique' | 'compliance' | 'general';
+export type TrainingCategory = 'att_tfiber' | 'verizon_frontier' | 'xfinity' | 'directv';
 
 // Keep ResourceCategory as alias for backward compatibility
 export type ResourceCategory = TrainingCategory;
@@ -47,11 +47,10 @@ export const ResourceTypeConfig: Record<ResourceType, { name: string; icon: stri
 };
 
 export const ResourceCategoryConfig: Record<ResourceCategory, { name: string; description: string }> = {
-  onboarding: { name: 'Onboarding', description: 'Get started with 3C World Group' },
-  product: { name: 'Product Knowledge', description: 'Learn about our products and services' },
-  sales_technique: { name: 'Sales Techniques', description: 'Improve your sales skills' },
-  compliance: { name: 'Compliance', description: 'Required compliance training' },
-  general: { name: 'General', description: 'General company information' },
+  att_tfiber: { name: 'AT&T T-Fiber', description: 'AT&T T-Fiber training and resources' },
+  verizon_frontier: { name: 'Verizon/Frontier', description: 'Verizon and Frontier training and resources' },
+  xfinity: { name: 'Xfinity', description: 'Xfinity training and resources' },
+  directv: { name: 'DirecTV', description: 'DirecTV training and resources' },
 };
 
 // Arrays for forms and filters
@@ -63,9 +62,8 @@ export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
 ];
 
 export const TRAINING_CATEGORIES: { value: TrainingCategory; label: string }[] = [
-  { value: 'onboarding', label: 'Onboarding' },
-  { value: 'product', label: 'Product Knowledge' },
-  { value: 'sales_technique', label: 'Sales Techniques' },
-  { value: 'compliance', label: 'Compliance' },
-  { value: 'general', label: 'General' },
+  { value: 'att_tfiber', label: 'AT&T T-Fiber' },
+  { value: 'verizon_frontier', label: 'Verizon/Frontier' },
+  { value: 'xfinity', label: 'Xfinity' },
+  { value: 'directv', label: 'DirecTV' },
 ];
