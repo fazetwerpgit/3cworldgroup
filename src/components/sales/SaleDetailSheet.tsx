@@ -1,6 +1,7 @@
 'use client';
 
 import type { ComponentType } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -12,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { Sale, SaleStatus } from '@/types';
+import { auth } from '@/lib/firebase/config';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -92,6 +94,8 @@ export function SaleDetailSheet({
   onRequestReject,
   onRequestDelete,
 }: SaleDetailSheetProps) {
+  const [proofLoading, setProofLoading] = useState(false);
+
   // Radix keeps the content mounted through the close animation; guard the body.
   if (!sale) {
     return <Sheet open={open} onOpenChange={onOpenChange} />;
@@ -99,6 +103,22 @@ export function SaleDetailSheet({
 
   const saleId = sale.id!;
   const showApproval = canApprove && sale.status === 'pending';
+
+  const openScreenshot = async () => {
+    if (!sale.proofScreenshotPath) return;
+    setProofLoading(true);
+    try {
+      const t = await auth?.currentUser?.getIdToken();
+      const res = await fetch(
+        `/api/portal/forms/attachment?path=${encodeURIComponent(sale.proofScreenshotPath)}`,
+        { headers: t ? { Authorization: `Bearer ${t}` } : undefined }
+      );
+      const json = await res.json();
+      if (res.ok && json.url) window.open(json.url, '_blank', 'noopener');
+    } finally {
+      setProofLoading(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -182,6 +202,26 @@ export function SaleDetailSheet({
           )}
           {sale.customerEmail && <Field label="Email">{sale.customerEmail}</Field>}
           {sale.customerAddress && <Field label="Address">{sale.customerAddress}</Field>}
+
+          {sale.productSold && <Field label="Product sold">{sale.productSold}</Field>}
+          {sale.orderNumberOrBtn && (
+            <Field label="Order # / BTN">
+              <span className="portal-num">{sale.orderNumberOrBtn}</span>
+            </Field>
+          )}
+          {sale.proofScreenshotPath && (
+            <Field label="Screenshot">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openScreenshot}
+                disabled={proofLoading}
+              >
+                {proofLoading ? 'Opening…' : 'View screenshot'}
+              </Button>
+            </Field>
+          )}
 
           {sale.notes && (
             <Field label="Notes">
