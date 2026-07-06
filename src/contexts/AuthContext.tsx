@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   updatePassword,
@@ -11,18 +12,20 @@ import {
   EmailAuthProvider,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { User, AuthState, RolePermissions, UserRole, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasPermission: (permission: string) => boolean;
   isRole: (...roles: UserRole[]) => boolean;
   refreshUser: () => Promise<void>;
+  clearPendingApproval: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,7 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     loading: true,
     error: null,
+    pendingApproval: false,
   });
+
+  // While a client-side signup is running, ignore onAuthStateChanged churn so
+  // signUp() deterministically owns the final state (avoids a create→setDoc race).
+  const signingUp = useRef(false);
 
   const fetchUserData = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     if (!db) return null;
@@ -75,26 +83,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: null,
         loading: false,
         error: 'Firebase is not configured. Please set up your environment variables.',
+        pendingApproval: false,
       });
       return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (signingUp.current) return; // signUp() owns state during signup
       if (firebaseUser) {
         const userData = await fetchUserData(firebaseUser);
         if (userData) {
-          if (userData.status !== 'active') {
+          if (userData.status === 'active') {
+            setState({ user: userData, loading: false, error: null, pendingApproval: false });
+          } else if (userData.status === 'pending') {
+            if (auth) await firebaseSignOut(auth);
+            setState({ user: null, loading: false, error: null, pendingApproval: true });
+          } else {
+            if (auth) await firebaseSignOut(auth);
             setState({
               user: null,
               loading: false,
-              error: 'Your account is not active. Please contact an administrator.',
-            });
-            if (auth) await firebaseSignOut(auth);
-          } else {
-            setState({
-              user: userData,
-              loading: false,
-              error: null,
+              error: 'Your account has been deactivated. Please contact an administrator.',
+              pendingApproval: false,
             });
           }
         } else {
@@ -102,10 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             user: null,
             loading: false,
             error: 'User profile not found. Please contact an administrator.',
+            pendingApproval: false,
           });
         }
       } else {
-        setState({ user: null, loading: false, error: null });
+        // Preserve pendingApproval so the pending screen survives the sign-out.
+        setState((prev) => ({ ...prev, user: null, loading: false, error: null }));
       }
     });
 
@@ -126,13 +138,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signUp = async (email: string, password: string) => {
+    if (!auth || !db) throw new Error('auth/not-configured');
+    signingUp.current = true;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        email,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      await firebaseSignOut(auth);
+      setState({ user: null, loading: false, error: null, pendingApproval: true });
+    } catch (error) {
+      setState((prev) => ({ ...prev, loading: false }));
+      throw error;
+    } finally {
+      signingUp.current = false;
+    }
+  };
+
+  // Let the pending screen return to the login form without a page reload.
+  const clearPendingApproval = () => {
+    setState((prev) => ({ ...prev, pendingApproval: false }));
+  };
+
   const signOut = async () => {
     if (!auth) {
       throw new Error('Firebase Auth is not configured');
     }
     try {
       await firebaseSignOut(auth);
-      setState({ user: null, loading: false, error: null });
+      setState({ user: null, loading: false, error: null, pendingApproval: false });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
       setState((prev) => ({ ...prev, error: errorMessage }));
@@ -194,12 +232,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         ...state,
         signIn,
+        signUp,
         signOut,
         resetPassword,
         changePassword,
         hasPermission,
         isRole,
         refreshUser,
+        clearPendingApproval,
       }}
     >
       {children}

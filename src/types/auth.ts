@@ -166,4 +166,7 @@ export interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
+  // True after a pending (unapproved) account signs in or signs up — the entry
+  // page shows the "pending approval" screen instead of the login form.
+  pendingApproval: boolean;
 }
