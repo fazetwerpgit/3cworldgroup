@@ -3,6 +3,7 @@ import { adminDb, initError } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { getRequester } from '@/lib/auth/requireManagement';
 import { Sale, SaleStatus } from '@/types';
+import { hasSaleProof } from '@/lib/sales/proof';
 
 // Helper function to create a notification
 async function createNotification(
@@ -132,12 +133,26 @@ export async function POST(request: NextRequest) {
       totalValue,
       totalPoints,
       notes,
+      orderNumberOrBtn,
+      proofScreenshotPath,
+      productSold,
     } = body;
 
     // Validate required fields - only address and products are required
     if (!salesRepId || !customerAddress || !products || products.length === 0) {
       return NextResponse.json(
         { error: 'Missing required fields: salesRepId, customerAddress, products' },
+        { status: 400 }
+      );
+    }
+
+    if (!productSold || !String(productSold).trim()) {
+      return NextResponse.json({ error: 'Product sold is required' }, { status: 400 });
+    }
+
+    if (!hasSaleProof({ orderNumberOrBtn, proofScreenshotPath })) {
+      return NextResponse.json(
+        { error: 'Provide an order number / BTN or upload a screenshot' },
         { status: 400 }
       );
     }
@@ -165,6 +180,9 @@ export async function POST(request: NextRequest) {
       status: 'pending' as SaleStatus, // Requires approval
       saleDate: new Date(),
       notes: notes || '',
+      orderNumberOrBtn: orderNumberOrBtn || '',
+      proofScreenshotPath: proofScreenshotPath || '',
+      productSold: productSold || '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
