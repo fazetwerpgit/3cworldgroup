@@ -18,7 +18,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | ''>('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'pending' | ''>('');
   const [deleteConfirm, setDeleteConfirm] = useState<{
     userId: string;
     userName: string;
@@ -74,6 +74,27 @@ export default function UsersPage() {
       fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user');
+    }
+  };
+
+  // Approve a self-signup: activate the account and give it a default rep role
+  // so it's usable immediately. Admins can change the role afterward via Edit.
+  const handleApprove = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/portal/auth/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active', fieldRole: 'entry_rep', requestedBy: currentUser?.uid }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to approve user');
+      }
+
+      fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve user');
     }
   };
 
@@ -150,11 +171,12 @@ export default function UsersPage() {
                 <NativeSelect
                   value={statusFilter}
                   onChange={(e) =>
-                    setStatusFilter(e.target.value as 'active' | 'inactive' | '')
+                    setStatusFilter(e.target.value as 'active' | 'inactive' | 'pending' | '')
                   }
                   className="w-36"
                 >
                   <NativeSelectOption value="">All</NativeSelectOption>
+                  <NativeSelectOption value="pending">Pending approval</NativeSelectOption>
                   <NativeSelectOption value="active">Active</NativeSelectOption>
                   <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
                 </NativeSelect>
@@ -197,6 +219,7 @@ export default function UsersPage() {
             <UserTable
               users={users}
               onStatusChange={handleStatusChange}
+              onApprove={handleApprove}
               onDelete={handleDeleteClick}
               loading={loading || deleting}
             />

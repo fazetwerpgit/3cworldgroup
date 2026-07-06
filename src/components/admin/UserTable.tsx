@@ -19,12 +19,15 @@ import {
 interface UserTableProps {
   users: User[];
   onStatusChange?: (userId: string, status: 'active' | 'inactive') => void;
+  onApprove?: (userId: string) => void;
   onDelete?: (userId: string, userName: string) => void;
   loading?: boolean;
 }
 
 const statusColors = {
   active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
+  pending:
+    'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300',
   inactive:
     'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300',
 };
@@ -37,7 +40,7 @@ const roleLabels: Record<string, string> = {
   l2_manager: 'L2 Manager',
 };
 
-export function UserTable({ users, onStatusChange, onDelete, loading }: UserTableProps) {
+export function UserTable({ users, onStatusChange, onApprove, onDelete, loading }: UserTableProps) {
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
@@ -140,6 +143,17 @@ export function UserTable({ users, onStatusChange, onDelete, loading }: UserTabl
                       Edit
                     </Link>
                   </Button>
+                  {onApprove && user.status === 'pending' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => onApprove(user.uid)}
+                      disabled={loading}
+                      className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                    >
+                      Approve
+                    </Button>
+                  )}
                   {onStatusChange && user.status === 'active' && (
                     <Button
                       type="button"
