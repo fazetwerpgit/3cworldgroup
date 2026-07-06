@@ -4,12 +4,50 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import {
+  GoogleAuthProvider,
+  browserLocalPersistence,
+  setPersistence,
+  signInWithPopup,
+} from 'firebase/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 
 type FormMode = 'login' | 'forgot';
 
 const inputClasses =
   'w-full h-11 rounded-md border border-slate-300 bg-white px-3.5 text-[15px] text-slate-950 placeholder:text-slate-400 outline-none transition-[border-color,box-shadow] duration-150 focus:border-[#8dc63f] focus:ring-2 focus:ring-[#8dc63f]/30 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-400';
+
+// Multi-color Google "G", inline so no network/image dependency.
+function GoogleIcon() {
+  return (
+    <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z" />
+    </svg>
+  );
+}
+
+// Turn Firebase auth error codes into plain-language, actionable messages.
+function friendlyAuthError(err: unknown): string {
+  const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
+  const raw = err instanceof Error ? err.message : '';
+  const c = `${code} ${raw}`;
+  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found'))
+    return 'Invalid email or password. Please try again.';
+  if (c.includes('invalid-email')) return 'That email address doesn’t look right.';
+  if (c.includes('user-disabled')) return 'This account has been disabled. Contact your manager.';
+  if (c.includes('too-many-requests')) return 'Too many attempts. Wait a minute, then try again.';
+  if (c.includes('network-request-failed')) return 'Network problem. Check your connection and try again.';
+  if (c.includes('popup-closed-by-user') || c.includes('cancelled-popup-request')) return 'Sign-in was cancelled.';
+  if (c.includes('popup-blocked')) return 'Your browser blocked the sign-in window. Allow pop-ups and try again.';
+  if (c.includes('account-exists-with-different-credential'))
+    return 'This email already uses a password. Sign in with your email and password below.';
+  if (c.includes('not-configured')) return 'Sign-in isn’t configured. Contact your administrator.';
+  return 'Something went wrong signing in. Please try again.';
+}
 
 export function LoginForm() {
   const { signIn, error: authError, resetPassword } = useAuth();
@@ -17,6 +55,7 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [formMode, setFormMode] = useState<FormMode>('login');
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -27,21 +66,28 @@ export function LoginForm() {
     setLoading(true);
 
     try {
+      // Keep reps signed in across reloads and browser restarts.
+      if (auth) await setPersistence(auth, browserLocalPersistence);
       await signIn(email, password);
     } catch (err: unknown) {
-      // Error is already handled in AuthContext
-      if (err instanceof Error) {
-        // Map Firebase error codes to user-friendly messages
-        if (err.message.includes('invalid-credential')) {
-          setError('Invalid email or password. Please try again.');
-        } else if (err.message.includes('too-many-requests')) {
-          setError('Too many failed attempts. Please try again later.');
-        } else {
-          setError('Failed to sign in. Please check your credentials.');
-        }
-      }
+      setError(friendlyAuthError(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      if (!auth) throw new Error('auth/not-configured');
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithPopup(auth, new GoogleAuthProvider());
+      // AuthContext's onAuthStateChanged loads the profile and routes on success.
+    } catch (err: unknown) {
+      setError(friendlyAuthError(err));
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -145,12 +191,42 @@ export function LoginForm() {
             Sign in
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Use your company email.
+            Use your Google account or company email.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <div className="mt-8 space-y-5">
             {(error || authError) && errorBanner(error || authError || '')}
 
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className="portal-motion flex h-11 w-full items-center justify-center gap-2.5 rounded-md border border-slate-300 bg-white px-4 text-[15px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+            >
+              {googleLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Signing in…
+                </span>
+              ) : (
+                <>
+                  <GoogleIcon />
+                  Continue with Google
+                </>
+              )}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+              <span className="text-xs font-medium uppercase tracking-wider text-slate-400">or</span>
+              <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-5 space-y-5">
             <div>
               <label htmlFor="email" className="portal-label mb-2 block">
                 Email address
@@ -207,7 +283,7 @@ export function LoginForm() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || googleLoading}
               className="portal-motion h-11 w-full rounded-md bg-[#8dc63f] font-semibold text-[#0A1F44] hover:bg-[#7ab82e] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? (
