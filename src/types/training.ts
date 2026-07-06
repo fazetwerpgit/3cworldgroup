@@ -16,6 +16,12 @@ export interface TrainingResource {
   thumbnailUrl?: string;
   duration?: number; // For videos, in minutes
 
+  // Uploaded-file fields (University content). Absent on legacy link resources.
+  storagePath?: string; // e.g. training/{uploadId}/{filename}
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+
   requiredRoles: UserRole[]; // Empty means all roles can access
   isRequired: boolean; // Required for onboarding
 
