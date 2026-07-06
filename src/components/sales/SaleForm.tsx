@@ -19,6 +19,10 @@ import {
   getPlansByCompany,
   getPlanById
 } from '@/types';
+import FileUpload from '@/components/onboarding/FileUpload';
+import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
+import { hasSaleProof } from '@/lib/sales/proof';
+import { auth } from '@/lib/firebase/config';
 
 interface SaleFormProps {
   onSuccess?: () => void;
@@ -36,6 +40,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     customerAddress: '',
     saleType: 'new_service' as SaleType,
     notes: '',
+    orderNumberOrBtn: '',
+    proofScreenshotPath: '',
+    productSold: '',
   });
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [products, setProducts] = useState<SaleProduct[]>([]);
@@ -100,6 +107,16 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
     if (products.length === 0) {
       setFormError('Please add at least one plan');
+      return;
+    }
+
+    if (!formData.productSold.trim()) {
+      setFormError('Please enter the product sold');
+      return;
+    }
+
+    if (!hasSaleProof(formData)) {
+      setFormError('Enter an order number / BTN, or upload a screenshot');
       return;
     }
 
@@ -327,6 +344,45 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             </NativeSelect>
           </div>
           <div>
+            <Label className="mb-1">Product Sold *</Label>
+            <Input
+              type="text"
+              name="productSold"
+              value={formData.productSold}
+              onChange={handleChange}
+              placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice"
+            />
+          </div>
+          <div>
+            <Label className="mb-1">Order Number or BTN</Label>
+            <Input
+              type="text"
+              name="orderNumberOrBtn"
+              value={formData.orderNumberOrBtn}
+              onChange={handleChange}
+              placeholder="Order # or billing phone number"
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
+              Required unless you upload a screenshot below.
+            </p>
+          </div>
+          <div>
+            <Label className="mb-1">Screenshot (if no order # / BTN)</Label>
+            <FileUpload
+              itemId="sale-proof"
+              accept="image/*,application/pdf"
+              allowedTypes={FORM_ATTACHMENT_TYPES}
+              uploadUrl="/api/portal/forms/upload"
+              extraFields={{ formType: 'sale-proof' }}
+              existingPath={formData.proofScreenshotPath || undefined}
+              getHeaders={async (): Promise<HeadersInit> => {
+                const t = await auth?.currentUser?.getIdToken();
+                return t ? { Authorization: `Bearer ${t}` } : {};
+              }}
+              onUploaded={(path) => setFormData((p) => ({ ...p, proofScreenshotPath: path }))}
+            />
+          </div>
+          <div className="md:col-span-2">
             <Label className="mb-1">Notes</Label>
             <Input
               type="text"
