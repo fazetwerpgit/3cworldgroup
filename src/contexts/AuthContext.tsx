@@ -144,11 +144,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        email,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
+      try {
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          email,
+          status: 'pending',
+          createdAt: serverTimestamp(),
+        });
+      } catch (docError) {
+        // Roll back the just-created auth account so the profile write can be
+        // retried cleanly instead of failing with email-already-in-use.
+        try {
+          await cred.user.delete();
+        } catch {
+          if (auth) await firebaseSignOut(auth);
+        }
+        throw docError;
+      }
       await firebaseSignOut(auth);
       setState({ user: null, loading: false, error: null, pendingApproval: true });
     } catch (error) {
