@@ -35,6 +35,7 @@ export function buildFormAttachmentFolder(uid: string, formType: string, slot?: 
 export const FORM_UPLOAD_SLOTS: Record<string, string[]> = {
   'payroll-dispute': [''],
   'leads-request': ['hostile', 'blind-knock', 'lasso'],
+  'sale-proof': [''],
 };
 
 export function isAllowedFormUpload(formType: string, slot: string): boolean {

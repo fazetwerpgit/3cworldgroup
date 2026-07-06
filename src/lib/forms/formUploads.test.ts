@@ -58,3 +58,12 @@ describe('isAllowedFormUpload', () => {
     expect(isAllowedFormUpload('unknown-form', '')).toBe(false);
   });
 });
+
+describe('sale-proof uploads', () => {
+  it('accepts the sale-proof single slot', () => {
+    expect(isAllowedFormUpload('sale-proof', '')).toBe(true);
+  });
+  it('rejects an unknown slot for sale-proof', () => {
+    expect(isAllowedFormUpload('sale-proof', 'nope')).toBe(false);
+  });
+});

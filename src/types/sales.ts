@@ -33,6 +33,9 @@ export interface CreateSaleData {
   totalValue: number;
   totalPoints: number;
   notes?: string;
+  orderNumberOrBtn?: string;
+  proofScreenshotPath?: string;
+  productSold?: string;
 }
 
 export interface Sale {
@@ -54,6 +57,9 @@ export interface Sale {
   totalValue: number;
   totalPoints: number;
   commission?: number;
+  orderNumberOrBtn?: string;
+  proofScreenshotPath?: string;
+  productSold?: string;
 
   // Status & workflow
   status: SaleStatus;
