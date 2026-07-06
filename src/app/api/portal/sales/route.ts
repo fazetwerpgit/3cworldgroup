@@ -119,11 +119,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Creating a sale writes a row under a rep's identity; require a verified
+    // token and stamp the rep from it — never trust a client-supplied salesRepId.
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    const salesRepId = gate.uid;
+    const salesRepName = gate.name;
+
+    // Derive the approving manager from the rep's own profile server-side — never
+    // trust a client-supplied managerId (it routes the approval notification).
+    const repSnap = await adminDb.collection('users').doc(salesRepId).get();
+    const managerId = repSnap.data()?.reportsToId || null;
+
     const body = await request.json();
     const {
-      salesRepId,
-      salesRepName,
-      managerId,
       customerName,
       customerPhone,
       customerEmail,
@@ -131,7 +142,6 @@ export async function POST(request: NextRequest) {
       saleType,
       products,
       totalValue,
-      totalPoints,
       notes,
       orderNumberOrBtn,
       proofScreenshotPath,
@@ -139,9 +149,9 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields - only address and products are required
-    if (!salesRepId || !customerAddress || !products || products.length === 0) {
+    if (!customerAddress || !products || products.length === 0) {
       return NextResponse.json(
-        { error: 'Missing required fields: salesRepId, customerAddress, products' },
+        { error: 'Missing required fields: customerAddress, products' },
         { status: 400 }
       );
     }

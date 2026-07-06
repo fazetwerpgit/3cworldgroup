@@ -93,9 +93,14 @@ export function useSales() {
     setError(null);
 
     try {
+      // The create endpoint requires a verified token and stamps the rep from it.
+      const token = await getIdToken();
       const response = await fetch('/api/portal/sales', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(saleData),
       });
       const data = await response.json();
