@@ -109,6 +109,9 @@ export async function PUT(
       'totalValue',
       'managerId',
       'notes',
+      'orderNumberOrBtn',
+      'proofScreenshotPath',
+      'productSold',
     ] as const;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
