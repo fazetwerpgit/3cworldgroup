@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import { ref, getDownloadURL } from 'firebase/storage';
 import {
   ArrowLeft,
   AlertTriangle,
@@ -26,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { storage } from '@/lib/firebase/config';
 import { TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 
 export default function TrainingDetailPage() {
@@ -33,6 +35,7 @@ export default function TrainingDetailPage() {
   const { user } = useAuth();
   const { currentResource, progress, loading, error, fetchResource, fetchProgress, markComplete } = useTraining();
   const [marking, setMarking] = useState(false);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   const resourceId = params.id as string;
   const resourceProgress = progress[resourceId];
@@ -44,6 +47,28 @@ export default function TrainingDetailPage() {
   useEffect(() => {
     if (user) fetchProgress(user.uid);
   }, [user, fetchProgress]);
+
+  useEffect(() => {
+    const path = currentResource?.storagePath;
+    if (!path || !storage) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFileUrl(null);
+      return;
+    }
+
+    let active = true;
+    getDownloadURL(ref(storage, path))
+      .then((url) => {
+        if (active) setFileUrl(url);
+      })
+      .catch(() => {
+        if (active) setFileUrl(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentResource?.storagePath]);
 
   const handleMarkComplete = async () => {
     if (!user || !resourceId) return;
@@ -161,6 +186,32 @@ export default function TrainingDetailPage() {
                       <CardTitle className="text-lg text-[#0A1F44] dark:text-foreground">Content</CardTitle>
                     </CardHeader>
                     <CardContent className="p-5">
+                      {currentResource.storagePath && (
+                        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-black">
+                          {!fileUrl ? (
+                            <div className="p-8 text-center text-sm text-white/70">Loading content...</div>
+                          ) : currentResource.type === 'video' ? (
+                            <video controls preload="metadata" src={fileUrl} className="max-h-[70vh] w-full bg-black" />
+                          ) : currentResource.mimeType === 'application/pdf' ? (
+                            <iframe src={fileUrl} title={currentResource.title} className="h-[75vh] w-full bg-white" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={fileUrl} alt={currentResource.title} className="max-h-[75vh] w-full object-contain bg-black" />
+                          )}
+                        </div>
+                      )}
+
+                      {currentResource.storagePath && fileUrl && (
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-block text-sm font-medium text-[#5a8f1f] hover:underline"
+                        >
+                          Open in new tab
+                        </a>
+                      )}
+
                       {currentResource.type === 'video' && currentResource.url && (
                         <div className="aspect-video overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-black">
                           <iframe
@@ -200,7 +251,7 @@ export default function TrainingDetailPage() {
                         </div>
                       )}
 
-                      {!currentResource.url && (
+                      {!currentResource.url && !currentResource.storagePath && (
                         <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-8 text-center text-sm text-slate-600 dark:text-muted-foreground">
                           No content available for this resource.
                         </div>
