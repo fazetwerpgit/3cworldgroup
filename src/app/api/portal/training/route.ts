@@ -104,8 +104,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
+    // Server derives type from MIME for uploaded files; legacy link resources
+    // still pass an explicit type.
+    const resolvedType = mimeType ? deriveResourceType(mimeType) : type;
+
     // Validate required fields
-    if (!title || !type || !category) {
+    if (!title || !resolvedType || !category) {
       return NextResponse.json(
         { error: 'Missing required fields: title, type, category' },
         { status: 400 }
@@ -115,7 +119,7 @@ export async function POST(request: NextRequest) {
     const newResource = {
       title,
       description: description || '',
-      type: mimeType ? deriveResourceType(mimeType) : (type || 'document'),
+      type: resolvedType,
       category,
       url: url || '',
       thumbnailUrl: thumbnailUrl || '',
