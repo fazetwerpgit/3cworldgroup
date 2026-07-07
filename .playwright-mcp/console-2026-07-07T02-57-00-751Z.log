@@ -1,3 +1,0 @@
-[      94ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
-[     111ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
-[   14429ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://firebasestorage.googleapis.com/v0/b/cworldgroup-cca68.firebasestorage.app/o?name=training%2F038217c34baf402096c84dce24012209%2Fsmoke-test.pdf:0
