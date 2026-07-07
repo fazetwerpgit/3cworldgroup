@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
 
@@ -120,7 +120,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
     }
 
+    const data = doc.data();
     await docRef.delete();
+
+    // Best-effort: remove the uploaded file(s) under training/{uploadId}/.
+    if (data?.storagePath) {
+      try {
+        const folder = String(data.storagePath).replace(/[^/]+$/, ''); // training/{uploadId}/
+        // Guard against a malformed path collapsing to an empty prefix (which
+        // would target the whole bucket); only ever delete under training/.
+        if (folder.startsWith('training/')) {
+          await getOnboardingBucket().deleteFiles({ prefix: folder, force: true });
+        }
+      } catch (err) {
+        console.error('Training file cleanup failed:', err);
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
