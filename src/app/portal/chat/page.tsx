@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowDown, Check, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
@@ -9,6 +10,7 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
 import { prepareImageForUpload, uploadChatImage, validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { MessageActions } from '@/components/chat/MessageActions';
 import { MobileChannelList } from '@/components/chat/MobileChannelList';
 import { MobileThread } from '@/components/chat/MobileThread';
@@ -26,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { useMessages } from '@/hooks/chat/useMessages';
+import { getAuthorColor } from '@/lib/chat/authorColor';
 import { auth } from '@/lib/firebase/config';
 import { ChatAttachment, ChatChannel, ChatReplySnippet, getEffectiveRole } from '@/types';
 
@@ -918,7 +921,20 @@ export default function TeamChatPage() {
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <span className="font-semibold text-slate-950 dark:text-foreground">
+                                    <ChatAvatar
+                                      authorId={message.authorId}
+                                      authorName={message.authorName}
+                                      size="sm"
+                                    />
+                                    <span
+                                      style={
+                                        {
+                                          '--an': getAuthorColor(message.authorId).name,
+                                          '--an-dark': getAuthorColor(message.authorId).nameDark,
+                                        } as CSSProperties
+                                      }
+                                      className="font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
+                                    >
                                       {message.authorName}
                                     </span>
                                     {message.authorRole && (

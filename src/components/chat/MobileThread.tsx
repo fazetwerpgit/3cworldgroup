@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import { ArrowDown, Check, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
@@ -15,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
+import { getAuthorColor } from '@/lib/chat/authorColor';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
@@ -155,14 +157,6 @@ function BubbleImage({
 
 /** Grouping window: messages from the same author within this gap merge. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
-
-/** First letters of first+last name words (mirrors repInitials in SalesTable). */
-function chatInitials(name: string) {
-  const words = name.split(' ').filter(Boolean);
-  if (words.length === 0) return '?';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
 
 /** Null timestamps are treated as the same day as the neighbouring message. */
 function sameCalendarDay(a: Date | null, b: Date | null) {
@@ -463,7 +457,15 @@ export function MobileThread({
                 <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
                   {!isOwn && isFirstOfGroup && (
                     <div className="mb-1 flex flex-wrap items-center gap-2 pl-9 pr-1">
-                      <span className="text-xs font-semibold text-slate-950 dark:text-foreground">
+                      <span
+                        style={
+                          {
+                            '--an': getAuthorColor(message.authorId).name,
+                            '--an-dark': getAuthorColor(message.authorId).nameDark,
+                          } as CSSProperties
+                        }
+                        className="text-xs font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
+                      >
                         {message.authorName}
                       </span>
                       {message.authorRole && (
@@ -479,9 +481,11 @@ export function MobileThread({
                     {!isOwn && (
                       <div className="w-8 shrink-0 self-end">
                         {isFirstOfGroup && (
-                          <span className="grid size-8 place-items-center rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
-                            {chatInitials(message.authorName)}
-                          </span>
+                          <ChatAvatar
+                            authorId={message.authorId}
+                            authorName={message.authorName}
+                            size="md"
+                          />
                         )}
                       </div>
                     )}
