@@ -38,6 +38,10 @@ const roleLabels: Record<string, string> = {
   entry_rep: 'Account Executive',
   l1_manager: 'L1 Manager',
   l2_manager: 'L2 Manager',
+  ibo_level_1: 'IBO Level 1',
+  ibo_level_2: 'IBO Level 2',
+  ibo_level_3: 'IBO Level 3',
+  ibo_level_4: 'IBO Level 4',
 };
 
 export function UserTable({ users, onStatusChange, onApprove, onDelete, loading }: UserTableProps) {

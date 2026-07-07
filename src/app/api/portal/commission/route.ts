@@ -7,7 +7,15 @@ import {
   resolveRoles,
 } from '@/types';
 
-const FIELD_ROLES: FieldRole[] = ['entry_rep', 'l1_manager', 'l2_manager'];
+const FIELD_ROLES: FieldRole[] = [
+  'entry_rep',
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+];
 
 // Load tiers from config/commission, falling back to the zero placeholders.
 async function loadTiers(): Promise<{

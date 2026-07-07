@@ -68,6 +68,8 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 
 import { createChannelId, syncChatChannels } from './channels';
+import { canAccessChatChannel } from '@/types';
+import type { ChatChannel } from '@/types';
 
 describe('createChannelId', () => {
   it('creates lowercase dash slugs from spaces, punctuation, and casing', () => {
@@ -115,5 +117,20 @@ describe('syncChatChannels', () => {
     // Audience-derived manager kept, active manual rep kept; deleted + deactivated pruned.
     expect([...memberIds].sort()).toEqual(['mgr-1', 'rep-x']);
     // The manual-additions list itself is preserved (merge write leaves it in place).
+  });
+});
+
+describe('canAccessChatChannel', () => {
+  it('allows an IBO level 1 user to access a managers channel', () => {
+    const channel: ChatChannel = {
+      id: 'managers',
+      name: 'Managers',
+      description: '',
+      audience: 'managers',
+      order: 1,
+      active: true,
+    };
+
+    expect(canAccessChatChannel(channel, undefined, 'ibo_level_1')).toBe(true);
   });
 });

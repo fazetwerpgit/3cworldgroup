@@ -1,0 +1,203 @@
+- generic [ref=f2e1]:
+  - generic [ref=f2e4]:
+    - banner [ref=f2e18]:
+      - generic [ref=f2e19]:
+        - button "Toggle menu" [ref=f2e20]:
+          - img [ref=f2e21]
+        - link "3C World Group" [ref=f2e22] [cursor=pointer]:
+          - /url: /portal/dashboard
+          - img "3C World Group" [ref=f2e23]
+      - generic [ref=f2e24]:
+        - button "Search" [ref=f2e25]:
+          - img [ref=f2e26]
+        - button "Notifications" [ref=f2e30]:
+          - img [ref=f2e31]
+        - button "User menu" [ref=f2e35]:
+          - generic [ref=f2e37]: Q
+          - img [ref=f2e38]
+    - generic [ref=f2e40]:
+      - complementary [ref=f2e41]:
+        - generic [ref=f2e42]:
+          - link "3C World Group Employee Portal 3C Console" [ref=f2e43] [cursor=pointer]:
+            - /url: /portal/dashboard
+            - img "3C World Group" [ref=f2e45]
+            - generic [ref=f2e46]:
+              - generic [ref=f2e47]: Employee Portal
+              - generic [ref=f2e48]: 3C Console
+          - button "Close menu" [ref=f2e49]:
+            - img [ref=f2e50]
+        - navigation [ref=f2e52]:
+          - list [ref=f2e53]:
+            - listitem [ref=f2e54]:
+              - link "Dashboard" [ref=f2e55] [cursor=pointer]:
+                - /url: /portal/dashboard
+                - img [ref=f2e57]
+                - generic [ref=f2e59]: Dashboard
+            - listitem [ref=f2e60]:
+              - link "Team Chat" [ref=f2e61] [cursor=pointer]:
+                - /url: /portal/chat
+                - img [ref=f2e63]
+                - generic [ref=f2e65]: Team Chat
+            - listitem [ref=f2e66]:
+              - link "Leaderboard" [ref=f2e67] [cursor=pointer]:
+                - /url: /portal/leaderboard
+                - img [ref=f2e69]
+                - generic [ref=f2e71]: Leaderboard
+            - listitem [ref=f2e72]:
+              - link "Sales" [ref=f2e73] [cursor=pointer]:
+                - /url: /portal/sales
+                - img [ref=f2e75]
+                - generic [ref=f2e77]: Sales
+            - listitem [ref=f2e78]:
+              - link "Calls Schedule" [ref=f2e79] [cursor=pointer]:
+                - /url: /portal/calls
+                - img [ref=f2e81]
+                - generic [ref=f2e83]: Calls Schedule
+            - listitem [ref=f2e84]:
+              - link "My Onboarding" [ref=f2e85] [cursor=pointer]:
+                - /url: /portal/onboarding
+                - img [ref=f2e87]
+                - generic [ref=f2e89]: My Onboarding
+          - button "Forms" [ref=f2e92]:
+            - generic [ref=f2e93]: Forms
+            - img [ref=f2e94]
+          - button "Resources" [ref=f2e97]:
+            - generic [ref=f2e98]: Resources
+            - img [ref=f2e99]
+          - generic [ref=f2e101]:
+            - button "Operations" [ref=f2e102]:
+              - generic [ref=f2e103]: Operations
+              - img [ref=f2e104]
+            - list [ref=f2e106]:
+              - listitem [ref=f2e107]:
+                - link "Onboarding Review" [ref=f2e108] [cursor=pointer]:
+                  - /url: /portal/admin/onboarding
+                  - img [ref=f2e110]
+                  - generic [ref=f2e112]: Onboarding Review
+              - listitem [ref=f2e113]:
+                - link "University Content" [ref=f2e114] [cursor=pointer]:
+                  - /url: /portal/admin/university
+                  - img [ref=f2e117]
+                  - generic [ref=f2e119]: University Content
+              - listitem [ref=f2e120]:
+                - link "Fiber Reports" [ref=f2e121] [cursor=pointer]:
+                  - /url: /portal/admin/fiber-reports
+                  - img [ref=f2e123]
+                  - generic [ref=f2e125]: Fiber Reports
+              - listitem [ref=f2e126]:
+                - link "Expedite Orders" [ref=f2e127] [cursor=pointer]:
+                  - /url: /portal/admin/expedite-orders
+                  - img [ref=f2e129]
+                  - generic [ref=f2e131]: Expedite Orders
+              - listitem [ref=f2e132]:
+                - link "Payroll Disputes" [ref=f2e133] [cursor=pointer]:
+                  - /url: /portal/admin/payroll-disputes
+                  - img [ref=f2e135]
+                  - generic [ref=f2e137]: Payroll Disputes
+              - listitem [ref=f2e138]:
+                - link "Manager Interviews" [ref=f2e139] [cursor=pointer]:
+                  - /url: /portal/admin/manager-interviews
+                  - img [ref=f2e141]
+                  - generic [ref=f2e143]: Manager Interviews
+              - listitem [ref=f2e144]:
+                - link "Leads Requests" [ref=f2e145] [cursor=pointer]:
+                  - /url: /portal/admin/leads-requests
+                  - img [ref=f2e147]
+                  - generic [ref=f2e149]: Leads Requests
+              - listitem [ref=f2e150]:
+                - link "Recruiting Pipeline" [ref=f2e151] [cursor=pointer]:
+                  - /url: /portal/admin/pipeline
+                  - img [ref=f2e153]
+                  - generic [ref=f2e155]: Recruiting Pipeline
+              - listitem [ref=f2e156]:
+                - link "Recruit Onboarding" [ref=f2e157] [cursor=pointer]:
+                  - /url: /portal/admin/recruiting
+                  - img [ref=f2e159]
+                  - generic [ref=f2e161]: Recruit Onboarding
+              - listitem [ref=f2e162]:
+                - link "Email Templates" [ref=f2e163] [cursor=pointer]:
+                  - /url: /portal/admin/email-templates
+                  - img [ref=f2e165]
+                  - generic [ref=f2e167]: Email Templates
+              - listitem [ref=f2e168]:
+                - link "Pending Approvals" [ref=f2e169] [cursor=pointer]:
+                  - /url: /portal/approvals
+                  - img [ref=f2e171]
+                  - generic [ref=f2e173]: Pending Approvals
+              - listitem [ref=f2e174]:
+                - link "Bug Reports" [ref=f2e175] [cursor=pointer]:
+                  - /url: /portal/admin/bug-reports
+                  - img [ref=f2e177]
+                  - generic [ref=f2e179]: Bug Reports
+          - button "Admin" [ref=f2e181]:
+            - generic [ref=f2e182]: Admin
+            - img [ref=f2e183]
+        - link "Back to Main Site" [ref=f2e186] [cursor=pointer]:
+          - /url: /
+          - img [ref=f2e187]
+          - generic [ref=f2e189]: Back to Main Site
+      - navigation "Quick navigation" [ref=f2e190]:
+        - list [ref=f2e191]:
+          - listitem [ref=f2e192]:
+            - link "Dashboard" [ref=f2e193] [cursor=pointer]:
+              - /url: /portal/dashboard
+              - img [ref=f2e195]
+              - text: Dashboard
+          - listitem [ref=f2e200]:
+            - link "Sales" [ref=f2e201] [cursor=pointer]:
+              - /url: /portal/sales
+              - img [ref=f2e203]
+              - text: Sales
+          - listitem [ref=f2e205]:
+            - link "Chat" [ref=f2e206] [cursor=pointer]:
+              - /url: /portal/chat
+              - img [ref=f2e208]
+              - text: Chat
+          - listitem [ref=f2e210]:
+            - link "Board" [ref=f2e211] [cursor=pointer]:
+              - /url: /portal/leaderboard
+              - img [ref=f2e213]
+              - text: Board
+      - main [ref=f2e219]:
+        - generic [ref=f2e220]:
+          - generic [ref=f2e223]:
+            - paragraph [ref=f2e224]: Admin
+            - heading "University Content" [level=1] [ref=f2e225]
+            - paragraph [ref=f2e226]: Upload documents and videos for reps, organized by carrier.
+          - generic [ref=f2e254]: "Firebase Storage: User does not have permission to access 'training/038217c34baf402096c84dce24012209/smoke-test.pdf'. (storage/unauthorized)"
+          - generic [ref=f2e227]:
+            - generic [ref=f2e229]: Add content
+            - generic [ref=f2e230]:
+              - generic [ref=f2e231]:
+                - generic [ref=f2e232]: Title *
+                - textbox "e.g. AT&T Fiber install walkthrough" [ref=f2e233]
+              - generic [ref=f2e234]:
+                - generic [ref=f2e235]: Carrier *
+                - generic [ref=f2e236]:
+                  - combobox [ref=f2e237]:
+                    - option "AT&T" [selected]
+                    - option "T-Fiber"
+                    - option "Verizon/Frontier"
+                    - option "Xfinity"
+                    - option "DirecTV"
+                  - img
+              - generic [ref=f2e238]:
+                - generic [ref=f2e239]: Description
+                - textbox "Optional short summary" [ref=f2e240]
+              - generic [ref=f2e241]:
+                - generic [ref=f2e242]: File (PDF, image, or video)
+                - button "Choose File" [active] [ref=f2e243]
+              - generic [ref=f2e244]:
+                - generic [ref=f2e245]:
+                  - checkbox "Required training" [ref=f2e246]
+                  - text: Required training
+                - generic [ref=f2e247]:
+                  - checkbox "Publish immediately" [checked] [ref=f2e248]
+                  - text: Publish immediately
+                - button "Save content" [disabled]
+          - generic [ref=f2e249]:
+            - generic [ref=f2e251]: Existing content
+            - paragraph [ref=f2e253]: No content yet.
+  - button "Open Next.js Dev Tools" [ref=f2e13] [cursor=pointer]:
+    - img [ref=f2e14]
+  - alert [ref=f2e17]

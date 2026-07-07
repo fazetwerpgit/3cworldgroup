@@ -1,0 +1,48 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e105]:
+    - generic [ref=f1e106]:
+      - generic [ref=f1e107]:
+        - img "3C World Group" [ref=f1e109]
+        - generic [ref=f1e110]:
+          - paragraph [ref=f1e111]: 3C World Group
+          - paragraph [ref=f1e112]: Employee Portal
+      - generic [ref=f1e113]:
+        - heading "The day starts here." [level=2] [ref=f1e114]:
+          - text: The day starts
+          - text: here.
+        - paragraph [ref=f1e115]: Your numbers, your team, your next move — all in one place.
+    - generic [ref=f1e119]:
+      - paragraph [ref=f1e120]: Employee portal
+      - heading "Sign in" [level=1] [ref=f1e121]
+      - paragraph [ref=f1e122]: Use your Google account or company email.
+      - generic [ref=f1e123]:
+        - button "Continue with Google" [ref=f1e124]:
+          - img [ref=f1e125]
+          - text: Continue with Google
+        - generic [ref=f1e132]: or
+      - generic [ref=f1e134]:
+        - generic [ref=f1e135]:
+          - generic [ref=f1e136]: Email address
+          - textbox "Email address" [ref=f1e137]:
+            - /placeholder: you@3cworldgroup.com
+        - generic [ref=f1e138]:
+          - generic [ref=f1e139]:
+            - generic [ref=f1e140]: Password
+            - button "Forgot password?" [ref=f1e141]
+          - generic [ref=f1e142]:
+            - textbox "Password" [ref=f1e143]:
+              - /placeholder: Enter your password
+            - button "Show password" [ref=f1e144]:
+              - img [ref=f1e145]
+        - button "Sign in" [ref=f1e148]
+      - paragraph [ref=f1e149]:
+        - text: Need an account?
+        - link "Create one" [ref=f1e150] [cursor=pointer]:
+          - /url: /portal/signup
+      - link "Back to main site" [ref=f1e152] [cursor=pointer]:
+        - /url: /
+        - img [ref=f1e153]
+        - text: Back to main site
+  - button "Open Next.js Dev Tools" [ref=f1e13] [cursor=pointer]:
+    - img [ref=f1e14]
+  - alert [ref=f1e17]

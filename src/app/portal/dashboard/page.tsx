@@ -18,7 +18,16 @@ export default function DashboardPage() {
   const { user, hasPermission, isRole } = useAuth();
   const effectiveRole = getEffectiveRole(user);
   const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : 'Team Member';
-  const canManageRecruiting = isRole('admin', 'operations', 'l1_manager', 'l2_manager');
+  const canManageRecruiting = isRole(
+    'admin',
+    'operations',
+    'l1_manager',
+    'l2_manager',
+    'ibo_level_1',
+    'ibo_level_2',
+    'ibo_level_3',
+    'ibo_level_4'
+  );
 
   // Managers, ops, and admins open on the work waiting for them; reps open on
   // their own numbers (client decision, ANCHOR.md §9).
@@ -58,7 +67,15 @@ export default function DashboardPage() {
       title: 'Continue onboarding',
       description: 'Finish required documents and role-specific steps.',
       href: '/portal/onboarding',
-      show: isRole('entry_rep', 'l1_manager', 'l2_manager'),
+      show: isRole(
+        'entry_rep',
+        'l1_manager',
+        'l2_manager',
+        'ibo_level_1',
+        'ibo_level_2',
+        'ibo_level_3',
+        'ibo_level_4'
+      ),
       tone: 'neutral',
     },
     {

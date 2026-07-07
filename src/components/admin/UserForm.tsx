@@ -19,6 +19,10 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'entry_rep', label: 'Account Executive' },
   { value: 'l1_manager', label: 'L1 Manager' },
   { value: 'l2_manager', label: 'L2 Manager' },
+  { value: 'ibo_level_1', label: 'IBO Level 1' },
+  { value: 'ibo_level_2', label: 'IBO Level 2' },
+  { value: 'ibo_level_3', label: 'IBO Level 3' },
+  { value: 'ibo_level_4', label: 'IBO Level 4' },
   { value: 'operations', label: 'Operations' },
   { value: 'admin', label: 'Administrator' },
 ];

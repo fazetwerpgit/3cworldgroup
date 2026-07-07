@@ -5,7 +5,7 @@ service cloud.firestore {
     function isManagement() {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       return u.role in ['admin', 'operations'] ||
-             u.fieldRole in ['l1_manager', 'l2_manager'];
+             u.fieldRole in ['l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'];
     }
 
     // Is the signed-in caller an APPROVED (active) user? Self-signups are

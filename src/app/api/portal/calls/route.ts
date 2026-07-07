@@ -4,6 +4,7 @@ import {
   CALL_DAY_ORDER,
   CallAudience,
   CallDay,
+  IBO_FIELD_ROLES,
   resolveRoles,
 } from '@/types';
 
@@ -43,7 +44,10 @@ export async function GET(request: NextRequest) {
       userDoc.data()?.fieldRole
     );
     const seesManagerCalls =
-      !!role || fieldRole === 'l1_manager' || fieldRole === 'l2_manager';
+      !!role ||
+      fieldRole === 'l1_manager' ||
+      fieldRole === 'l2_manager' ||
+      (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
 
     const snapshot = await adminDb.collection('scheduledCalls').get();
     const calls = snapshot.docs

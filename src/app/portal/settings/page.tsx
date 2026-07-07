@@ -149,6 +149,10 @@ export default function SettingsPage() {
       operations: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300',
       l1_manager: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
       l2_manager: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+      ibo_level_1: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+      ibo_level_2: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+      ibo_level_3: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
+      ibo_level_4: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
       entry_rep: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-muted-foreground',
     };
     return colors[role] || 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-muted-foreground';

@@ -154,7 +154,17 @@ export default function OnboardingPage() {
       : 0;
 
   return (
-    <ProtectedRoute roles={['entry_rep', 'l1_manager', 'l2_manager']}>
+    <ProtectedRoute
+      roles={[
+        'entry_rep',
+        'l1_manager',
+        'l2_manager',
+        'ibo_level_1',
+        'ibo_level_2',
+        'ibo_level_3',
+        'ibo_level_4',
+      ]}
+    >
       <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">

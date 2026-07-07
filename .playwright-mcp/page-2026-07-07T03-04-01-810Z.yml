@@ -1,0 +1,5 @@
+- generic [active] [ref=f13e1]:
+  - paragraph [ref=f13e7]: Loading...
+  - button "Open Next.js Dev Tools" [ref=f13e13] [cursor=pointer]:
+    - img [ref=f13e14]
+  - alert [ref=f13e17]

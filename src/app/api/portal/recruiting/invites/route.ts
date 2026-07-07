@@ -3,12 +3,14 @@ import { adminDb } from '@/lib/firebase/admin';
 import {
   ApplicationRecord,
   FieldRole,
+  FieldRoles,
+  IBO_FIELD_ROLES,
   OnboardingInvite,
   resolveRoles,
 } from '@/types';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 
-const VALID_FIELD_ROLES: FieldRole[] = ['entry_rep', 'l1_manager', 'l2_manager'];
+const VALID_FIELD_ROLES: FieldRole[] = Object.values(FieldRoles);
 
 function clean(value: unknown, max = 200) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -24,7 +26,8 @@ async function getRequester(userId: string) {
     role === 'admin' ||
     role === 'operations' ||
     fieldRole === 'l1_manager' ||
-    fieldRole === 'l2_manager';
+    fieldRole === 'l2_manager' ||
+    (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
   return {
     uid: userId,
     role,

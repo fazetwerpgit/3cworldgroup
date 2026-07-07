@@ -1,0 +1,26 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e58]:
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - img "3C World Group" [ref=e62]
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: 3C World Group
+          - paragraph [ref=e65]: Employee Portal
+      - generic [ref=e66]:
+        - heading "The day starts here." [level=2] [ref=e67]:
+          - text: The day starts
+          - text: here.
+        - paragraph [ref=e68]: Your numbers, your team, your next move — all in one place.
+    - generic [ref=e72]:
+      - img [ref=e74]
+      - paragraph [ref=e77]: Employee portal
+      - heading "Account pending approval" [level=1] [ref=e78]
+      - paragraph [ref=e79]: Your account is awaiting admin approval. If you signed up with email and password, check your inbox and spam folder for a verification email. You’ll be able to sign in once it’s approved — no need to sign up again.
+      - button "Back to sign in" [ref=e81]
+      - link "Back to main site" [ref=e83] [cursor=pointer]:
+        - /url: /
+        - img [ref=e84]
+        - text: Back to main site
+  - button "Open Next.js Dev Tools" [ref=e49] [cursor=pointer]:
+    - img [ref=e50]
+  - alert [ref=e53]

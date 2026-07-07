@@ -1,0 +1,123 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e221]:
+    - banner [ref=f5e222]:
+      - generic [ref=f5e223]:
+        - button "Toggle menu" [ref=f5e224]:
+          - img [ref=f5e225]
+        - link "3C World Group" [ref=f5e226] [cursor=pointer]:
+          - /url: /portal/dashboard
+          - img "3C World Group" [ref=f5e227]
+      - generic [ref=f5e228]:
+        - button "Search" [ref=f5e229]:
+          - img [ref=f5e230]
+        - button "Notifications" [ref=f5e234]:
+          - img [ref=f5e235]
+        - button "User menu" [ref=f5e239]:
+          - generic [ref=f5e241]: Q
+          - img [ref=f5e242]
+    - generic [ref=f5e244]:
+      - complementary [ref=f5e245]:
+        - generic [ref=f5e246]:
+          - link "3C World Group Employee Portal 3C Console" [ref=f5e247] [cursor=pointer]:
+            - /url: /portal/dashboard
+            - img "3C World Group" [ref=f5e249]
+            - generic [ref=f5e250]:
+              - generic [ref=f5e251]: Employee Portal
+              - generic [ref=f5e252]: 3C Console
+          - button "Close menu" [ref=f5e253]:
+            - img [ref=f5e254]
+        - navigation [ref=f5e256]:
+          - list [ref=f5e257]:
+            - listitem [ref=f5e258]:
+              - link "Dashboard" [ref=f5e259] [cursor=pointer]:
+                - /url: /portal/dashboard
+                - img [ref=f5e261]
+                - generic [ref=f5e263]: Dashboard
+            - listitem [ref=f5e264]:
+              - link "Team Chat" [ref=f5e265] [cursor=pointer]:
+                - /url: /portal/chat
+                - img [ref=f5e267]
+                - generic [ref=f5e269]: Team Chat
+            - listitem [ref=f5e270]:
+              - link "Leaderboard" [ref=f5e271] [cursor=pointer]:
+                - /url: /portal/leaderboard
+                - img [ref=f5e273]
+                - generic [ref=f5e275]: Leaderboard
+            - listitem [ref=f5e276]:
+              - link "Sales" [ref=f5e277] [cursor=pointer]:
+                - /url: /portal/sales
+                - img [ref=f5e279]
+                - generic [ref=f5e281]: Sales
+            - listitem [ref=f5e282]:
+              - link "Calls Schedule" [ref=f5e283] [cursor=pointer]:
+                - /url: /portal/calls
+                - img [ref=f5e285]
+                - generic [ref=f5e287]: Calls Schedule
+            - listitem [ref=f5e288]:
+              - link "My Onboarding" [ref=f5e289] [cursor=pointer]:
+                - /url: /portal/onboarding
+                - img [ref=f5e291]
+                - generic [ref=f5e293]: My Onboarding
+          - button "Forms" [ref=f5e296]:
+            - generic [ref=f5e297]: Forms
+            - img [ref=f5e298]
+          - generic [ref=f5e300]:
+            - button "Resources" [ref=f5e301]:
+              - generic [ref=f5e302]: Resources
+              - img [ref=f5e303]
+            - list [ref=f5e305]:
+              - listitem [ref=f5e306]:
+                - link "University" [ref=f5e307] [cursor=pointer]:
+                  - /url: /portal/training
+                  - img [ref=f5e310]
+                  - generic [ref=f5e312]: University
+              - listitem [ref=f5e313]:
+                - link "Links" [ref=f5e314] [cursor=pointer]:
+                  - /url: /portal/links
+                  - img [ref=f5e316]
+                  - generic [ref=f5e318]: Links
+              - listitem [ref=f5e319]:
+                - link "Pay Structure" [ref=f5e320] [cursor=pointer]:
+                  - /url: /portal/pay-structure
+                  - img [ref=f5e322]
+                  - generic [ref=f5e324]: Pay Structure
+          - button "Operations" [ref=f5e326]:
+            - generic [ref=f5e327]: Operations
+            - img [ref=f5e328]
+          - button "Admin" [ref=f5e331]:
+            - generic [ref=f5e332]: Admin
+            - img [ref=f5e333]
+        - link "Back to Main Site" [ref=f5e336] [cursor=pointer]:
+          - /url: /
+          - img [ref=f5e337]
+          - generic [ref=f5e339]: Back to Main Site
+      - navigation "Quick navigation" [ref=f5e340]:
+        - list [ref=f5e341]:
+          - listitem [ref=f5e342]:
+            - link "Dashboard" [ref=f5e343] [cursor=pointer]:
+              - /url: /portal/dashboard
+              - img [ref=f5e345]
+              - text: Dashboard
+          - listitem [ref=f5e350]:
+            - link "Sales" [ref=f5e351] [cursor=pointer]:
+              - /url: /portal/sales
+              - img [ref=f5e353]
+              - text: Sales
+          - listitem [ref=f5e355]:
+            - link "Chat" [ref=f5e356] [cursor=pointer]:
+              - /url: /portal/chat
+              - img [ref=f5e358]
+              - text: Chat
+          - listitem [ref=f5e360]:
+            - link "Board" [ref=f5e361] [cursor=pointer]:
+              - /url: /portal/leaderboard
+              - img [ref=f5e363]
+              - text: Board
+      - main [ref=f5e369]:
+        - link "Back to Training" [ref=f5e371] [cursor=pointer]:
+          - /url: /portal/training
+          - img
+          - text: Back to Training
+  - button "Open Next.js Dev Tools" [ref=f5e13] [cursor=pointer]:
+    - img [ref=f5e14]
+  - alert [ref=f5e17]

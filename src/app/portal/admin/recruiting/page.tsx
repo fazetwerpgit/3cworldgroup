@@ -92,7 +92,16 @@ export default function RecruitingCommandCenterPage() {
 
   const canAccess =
     hasPermission('recruiting:read') ||
-    isRole('admin', 'operations', 'l1_manager', 'l2_manager');
+    isRole(
+      'admin',
+      'operations',
+      'l1_manager',
+      'l2_manager',
+      'ibo_level_1',
+      'ibo_level_2',
+      'ibo_level_3',
+      'ibo_level_4'
+    );
 
   const fetchRecruiting = useCallback(async () => {
     if (!user || !canAccess) return;
@@ -211,7 +220,18 @@ export default function RecruitingCommandCenterPage() {
   const waitingApplications = applications.length;
 
   return (
-    <ProtectedRoute roles={['admin', 'operations', 'l1_manager', 'l2_manager']}>
+    <ProtectedRoute
+      roles={[
+        'admin',
+        'operations',
+        'l1_manager',
+        'l2_manager',
+        'ibo_level_1',
+        'ibo_level_2',
+        'ibo_level_3',
+        'ibo_level_4',
+      ]}
+    >
       <div className="mx-auto max-w-[1500px] space-y-5">
         <PortalPageHeader
           compact
@@ -366,6 +386,10 @@ export default function RecruitingCommandCenterPage() {
                     <option value="entry_rep">Account Executive</option>
                     <option value="l1_manager">L1 Manager</option>
                     <option value="l2_manager">L2 Manager</option>
+                    <option value="ibo_level_1">IBO Level 1</option>
+                    <option value="ibo_level_2">IBO Level 2</option>
+                    <option value="ibo_level_3">IBO Level 3</option>
+                    <option value="ibo_level_4">IBO Level 4</option>
                   </NativeSelect>
                 </div>
                 <label className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 dark:border-border p-3 text-sm">

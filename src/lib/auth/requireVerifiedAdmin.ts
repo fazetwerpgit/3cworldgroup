@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { resolveRoles } from '@/types';
+import { IBO_FIELD_ROLES, resolveRoles } from '@/types';
 
 // Verifies a real Firebase ID token and returns the caller's uid + user doc data.
 // Shared by the verified-auth helpers below. Expects: Authorization: Bearer <idToken>.
@@ -70,7 +70,11 @@ export async function requireVerifiedFieldManagerOrManagement(
   if (!c.ok) return c;
   const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
   const allowed =
-    role === 'admin' || role === 'operations' || fieldRole === 'l1_manager' || fieldRole === 'l2_manager';
+    role === 'admin' ||
+    role === 'operations' ||
+    fieldRole === 'l1_manager' ||
+    fieldRole === 'l2_manager' ||
+    (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
   if (!allowed) {
     return { ok: false, error: 'Forbidden: manager access required', status: 403 };
   }

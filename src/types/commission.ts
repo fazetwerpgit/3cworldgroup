@@ -12,6 +12,10 @@ export const DEFAULT_COMMISSION: CommissionConfig[] = [
   { fieldRole: 'entry_rep', baseRate: 0 },
   { fieldRole: 'l1_manager', baseRate: 0, overrideRate: 0 },
   { fieldRole: 'l2_manager', baseRate: 0, overrideRate: 0 },
+  { fieldRole: 'ibo_level_1', baseRate: 0, overrideRate: 0 },
+  { fieldRole: 'ibo_level_2', baseRate: 0, overrideRate: 0 },
+  { fieldRole: 'ibo_level_3', baseRate: 0, overrideRate: 0 },
+  { fieldRole: 'ibo_level_4', baseRate: 0, overrideRate: 0 },
 ];
 
 // Firestore doc shape (config/commission). Rates are editable config -

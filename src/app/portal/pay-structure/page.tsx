@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ElementType } from 'react';
-import { AlertCircle, BadgeDollarSign, Clock3, Edit3, Layers3, Save, Users } from 'lucide-react';
+import { AlertCircle, BadgeDollarSign, Briefcase, Clock3, Edit3, Layers3, Save, Users } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
@@ -27,12 +27,20 @@ const TIER_NOTES: Record<FieldRole, string> = {
   entry_rep: 'Commission on your own approved sales.',
   l1_manager: 'Commission on your own sales plus an override on your team.',
   l2_manager: 'Commission on your own sales plus an override on your organization.',
+  ibo_level_1: 'Commission on your own sales plus an IBO team override.',
+  ibo_level_2: 'Commission on your own sales plus an IBO team override.',
+  ibo_level_3: 'Commission on your own sales plus an IBO team override.',
+  ibo_level_4: 'Commission on your own sales plus an IBO team override.',
 };
 
 const TIER_ICON: Record<FieldRole, ElementType> = {
   entry_rep: BadgeDollarSign,
   l1_manager: Users,
   l2_manager: Layers3,
+  ibo_level_1: Briefcase,
+  ibo_level_2: Briefcase,
+  ibo_level_3: Briefcase,
+  ibo_level_4: Briefcase,
 };
 
 export default function PayStructurePage() {

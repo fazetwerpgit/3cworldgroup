@@ -38,7 +38,7 @@ const mainDestinations: NavDestination[] = [
   {
     label: 'My Onboarding',
     href: '/portal/onboarding',
-    roles: ['entry_rep', 'l1_manager', 'l2_manager'],
+    roles: ['entry_rep', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
   },
 ];
 
@@ -50,7 +50,7 @@ const formDestinations: NavDestination[] = [
   {
     label: 'Manager Interview',
     href: '/portal/manager-interview',
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager'],
+    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
   },
 ];
 
@@ -71,7 +71,7 @@ const operationsDestinations: NavDestination[] = [
   {
     label: 'Recruit Onboarding',
     href: '/portal/admin/recruiting',
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager'],
+    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
   },
   { label: 'Email Templates', href: '/portal/admin/email-templates', roles: ['admin', 'operations'] },
   { label: 'Pending Approvals', href: '/portal/approvals', permissions: ['sales:approve'] },
@@ -123,7 +123,18 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       ...formDestinations,
       ...resourceDestinations,
     ];
-    if (isRole('admin', 'operations', 'l1_manager', 'l2_manager')) {
+    if (
+      isRole(
+        'admin',
+        'operations',
+        'l1_manager',
+        'l2_manager',
+        'ibo_level_1',
+        'ibo_level_2',
+        'ibo_level_3',
+        'ibo_level_4'
+      )
+    ) {
       list.push(...operationsDestinations);
     }
     if (isRole('admin')) {

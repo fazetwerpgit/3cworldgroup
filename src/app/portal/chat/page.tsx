@@ -151,10 +151,19 @@ export default function TeamChatPage() {
     [activeChannelId, channels]
   );
   const canModerate = hasPermission('chat:moderate');
-  // Pinning is broader than moderation: admin/operations OR field managers (l1/l2),
+  // Pinning is broader than moderation: admin/operations OR field managers,
   // mirroring the pin route's server check. Reps can't pin. isRole matches either
   // the platform role or the field role (see AuthContext.isRole).
-  const canPin = isRole('admin', 'operations', 'l1_manager', 'l2_manager');
+  const canPin = isRole(
+    'admin',
+    'operations',
+    'l1_manager',
+    'l2_manager',
+    'ibo_level_1',
+    'ibo_level_2',
+    'ibo_level_3',
+    'ibo_level_4'
+  );
   const shownError = error || channelsError || messagesError;
 
   // Unread badges: compare each channel's streamed lastMessageAt against this

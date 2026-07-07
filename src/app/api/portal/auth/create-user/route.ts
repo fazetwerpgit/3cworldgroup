@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { PlatformRole, FieldRole } from '@/types';
+import { PlatformRole, FieldRole, FieldRoles } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
 import { validateAddress } from '@/lib/validation/address';
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     // Validate roles: `role` is platform-only, `fieldRole` is field-only
     const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
-    const validFieldRoles: FieldRole[] = ['entry_rep', 'l1_manager', 'l2_manager'];
+    const validFieldRoles: FieldRole[] = Object.values(FieldRoles);
     if (role && !validPlatformRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },

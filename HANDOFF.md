@@ -4,10 +4,36 @@ For the next coding agent, especially Claude running a Max workflow. Read this
 before touching code. This repo is in the middle of an employee-portal redesign,
 not a public marketing-site redesign.
 
-Last updated: 2026-07-06
-Current checkpoint: see "Session Handoff 2026-07-06" below; the rest of this doc
+Last updated: 2026-07-07
+Current checkpoint: see "Session Handoff 2026-07-07" below; the rest of this doc
 is standing project background (intent, stack, design system, constraints) and
 still applies.
+
+## Session Handoff 2026-07-07
+
+### Completed (this session)
+- **IBO role with 4 levels** — plan `~/.claude/plans/so-there-are-gonna-fluffy-hanrahan.md`.
+  Added `ibo_level_1..4` to the `FieldRole` union (`src/types/auth.ts`, exports
+  `IBO_FIELD_ROLES`), mirroring the l1/l2 manager pattern. Each level is its own
+  pay tier in `DEFAULT_COMMISSION` (placeholder $0 base + override; admin fills
+  real rates on `/portal/pay-structure`). IBOs behave exactly like L1/L2
+  managers: `isManagerOrAbove` (`src/lib/auth/requireManagement.ts`), verified
+  field-manager gate, Managers chat channel + pinning, manager calls, recruiting
+  invite/convert, manager-interview + onboarding routes, all sidebar/palette/
+  dashboard manager groupings. Existing `isIBO`/`iboOwnerId`/`iboName` fields
+  are business-entity linkage, INDEPENDENT of these roles (documented in
+  auth.ts) — untouched, no migration.
+  Gates: tsc, 272 tests, build all green. Firestore rules DEPLOYED to prod.
+  Client decisions: admin assigns levels manually; IBOs inherit the current
+  broad manager sales visibility (team-only scoping deliberately deferred —
+  would affect L1/L2 too).
+
+### Open items / next steps
+- Run the admin chat-channel sync once after the app deploys so existing
+  Managers channel `memberIds` pick up IBO users.
+- Future: automated payroll — on sale submission, compute pay from the rep's
+  `fieldRole` commission tier. Client doesn't have the real pay scales yet.
+- Pre-existing repo-wide lint debt still fails `npm run lint` (unrelated files).
 
 ## Session Handoff 2026-07-06
 

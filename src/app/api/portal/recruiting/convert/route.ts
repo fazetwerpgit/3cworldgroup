@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { resolveRoles } from '@/types';
+import { IBO_FIELD_ROLES, resolveRoles } from '@/types';
 
 async function getRequester(userId: string) {
   if (!adminDb) return null;
@@ -12,7 +12,8 @@ async function getRequester(userId: string) {
     role === 'admin' ||
     role === 'operations' ||
     fieldRole === 'l1_manager' ||
-    fieldRole === 'l2_manager';
+    fieldRole === 'l2_manager' ||
+    (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
   return {
     uid: userId,
     role,

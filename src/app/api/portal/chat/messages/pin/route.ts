@@ -1,12 +1,12 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { PlatformRole, FieldRole } from '@/types';
+import { PlatformRole, FieldRole, IBO_FIELD_ROLES } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { readStoredAttachment } from '@/lib/chat/media';
 
-// Who may pin/unpin: platform admins/operations OR field managers (l1/l2). This is
+// Who may pin/unpin: platform admins/operations OR field managers. This is
 // BROADER than canModerate (which is admin/operations only) — pinning is a
 // lightweight curation act managers are trusted with, deleting others' messages is
 // not. Reps are excluded. Derived from the same role facts the client mirrors.
@@ -15,7 +15,8 @@ function canPinMessages(user: { role?: PlatformRole; fieldRole?: FieldRole }): b
     user.role === 'admin' ||
     user.role === 'operations' ||
     user.fieldRole === 'l1_manager' ||
-    user.fieldRole === 'l2_manager'
+    user.fieldRole === 'l2_manager' ||
+    (user.fieldRole ? IBO_FIELD_ROLES.includes(user.fieldRole) : false)
   );
 }
 
@@ -54,7 +55,7 @@ function pinnedAtMillis(value: unknown): number {
 
 // POST /api/portal/chat/messages/pin — pin or unpin a message. Body:
 // { channelId, messageId, pinned: boolean }. Allowed for admin/operations or
-// l1/l2 managers; reps 403. The message must exist and not be deleted.
+// field managers; reps 403. The message must exist and not be deleted.
 export async function POST(request: NextRequest) {
   try {
     const result = await getVerifiedChatUser(request);

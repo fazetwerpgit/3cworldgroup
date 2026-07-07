@@ -2,7 +2,14 @@
 export type PlatformRole = 'admin' | 'operations';
 
 // Field sales roles
-export type FieldRole = 'entry_rep' | 'l1_manager' | 'l2_manager';
+export type FieldRole =
+  | 'entry_rep'
+  | 'l1_manager'
+  | 'l2_manager'
+  | 'ibo_level_1'
+  | 'ibo_level_2'
+  | 'ibo_level_3'
+  | 'ibo_level_4';
 
 /** @deprecated Use PlatformRole | FieldRole instead */
 export type UserRole = PlatformRole | FieldRole;
@@ -17,7 +24,18 @@ export const FieldRoles = {
   ENTRY_REP: 'entry_rep',
   L1_MANAGER: 'l1_manager',
   L2_MANAGER: 'l2_manager',
+  IBO_LEVEL_1: 'ibo_level_1',
+  IBO_LEVEL_2: 'ibo_level_2',
+  IBO_LEVEL_3: 'ibo_level_3',
+  IBO_LEVEL_4: 'ibo_level_4',
 } as const;
+
+export const IBO_FIELD_ROLES: readonly FieldRole[] = [
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+];
 
 // Base permissions everyone gets
 const BASE_PERMISSIONS = [
@@ -80,6 +98,10 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
   entry_rep: [...FIELD_REP_PERMISSIONS],
   l1_manager: [...FIELD_MANAGER_PERMISSIONS],
   l2_manager: [...FIELD_MANAGER_PERMISSIONS],
+  ibo_level_1: [...FIELD_MANAGER_PERMISSIONS],
+  ibo_level_2: [...FIELD_MANAGER_PERMISSIONS],
+  ibo_level_3: [...FIELD_MANAGER_PERMISSIONS],
+  ibo_level_4: [...FIELD_MANAGER_PERMISSIONS],
 };
 
 // Role display names for UI
@@ -89,6 +111,10 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   entry_rep: 'Account Executive',
   l1_manager: 'L1 Manager',
   l2_manager: 'L2 Manager',
+  ibo_level_1: 'IBO Level 1',
+  ibo_level_2: 'IBO Level 2',
+  ibo_level_3: 'IBO Level 3',
+  ibo_level_4: 'IBO Level 4',
 };
 
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
@@ -137,6 +163,9 @@ export interface User {
   displayName: string;
   role?: PlatformRole;       // Back-office users only
   fieldRole?: FieldRole;     // Field sales users only
+  // IBO fields link the user to an IBO business entity for LLC/document
+  // ownership. They are independent of ibo_level_* field roles, which are sales
+  // role / pay tier / team-lead levels.
   isIBO: boolean;
   reportsToId?: string;
   // IBO Rep linkage: a rep working under an IBO owner. The owner (a User with

@@ -1,0 +1,5 @@
+- generic [active] [ref=f4e1]:
+  - paragraph [ref=f4e7]: Signing you in…
+  - button "Open Next.js Dev Tools" [ref=f4e13] [cursor=pointer]:
+    - img [ref=f4e14]
+  - alert [ref=f4e17]

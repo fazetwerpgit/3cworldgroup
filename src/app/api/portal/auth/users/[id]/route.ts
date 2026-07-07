@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { User, PlatformRole, FieldRole, resolveRoles } from '@/types';
+import { User, PlatformRole, FieldRole, FieldRoles, resolveRoles } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
 import { validateAddress } from '@/lib/validation/address';
 
@@ -101,7 +101,7 @@ export async function PUT(
 
     // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
     const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
-    const validFieldRoles: FieldRole[] = ['entry_rep', 'l1_manager', 'l2_manager'];
+    const validFieldRoles: FieldRole[] = Object.values(FieldRoles);
     if (role && fieldRole) {
       return NextResponse.json(
         { error: 'Provide either role (platform) or fieldRole (field sales), not both' },
