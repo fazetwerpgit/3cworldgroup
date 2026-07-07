@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -14,6 +15,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
+import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { User, AuthState, RolePermissions, UserRole, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
@@ -30,6 +32,14 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type FetchUserDataResult =
+  | { status: 'found'; user: User }
+  | { status: 'missing' }
+  | { status: 'error'; error: unknown };
+
+const missingProfileMessage = 'User profile not found. Please contact an administrator.';
+const profileLoadErrorMessage = 'We could not load your profile. Please try signing in again.';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -41,44 +51,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // While a client-side signup is running, ignore onAuthStateChanged churn so
   // signUp() deterministically owns the final state (avoids a create→setDoc race).
   const signingUp = useRef(false);
+  const bootstrappingPendingProfile = useRef(false);
 
-  const fetchUserData = async (firebaseUser: FirebaseUser): Promise<User | null> => {
-    if (!db) return null;
+  const fetchUserData = async (firebaseUser: FirebaseUser): Promise<FetchUserDataResult> => {
+    if (!db) return { status: 'error', error: new Error('Firestore is not configured') };
     try {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
         return {
-          uid: firebaseUser.uid,
-          email: userData.email,
-          displayName: userData.displayName,
-          ...resolveRoles(userData.role, userData.fieldRole),
-          isIBO: userData.isIBO ?? false,
-          // TODO: migrate Firestore managerId -> reportsToId
-          reportsToId: userData.reportsToId ?? userData.managerId,
-          territoryId: userData.territoryId,
-          phone: userData.phone,
-          address: userData.address,
-          city: userData.city,
-          state: userData.state,
-          zip: userData.zip,
-          avatarUrl: userData.avatarUrl,
-          status: userData.status,
-          hireDate: userData.hireDate?.toDate(),
-          createdAt: userData.createdAt?.toDate(),
-          updatedAt: userData.updatedAt?.toDate(),
-        } as User;
+          status: 'found',
+          user: {
+            uid: firebaseUser.uid,
+            email: userData.email,
+            displayName: userData.displayName,
+            ...resolveRoles(userData.role, userData.fieldRole),
+            isIBO: userData.isIBO ?? false,
+            // TODO: migrate Firestore managerId -> reportsToId
+            reportsToId: userData.reportsToId ?? userData.managerId,
+            territoryId: userData.territoryId,
+            phone: userData.phone,
+            address: userData.address,
+            city: userData.city,
+            state: userData.state,
+            zip: userData.zip,
+            avatarUrl: userData.avatarUrl,
+            status: userData.status,
+            hireDate: userData.hireDate?.toDate(),
+            createdAt: userData.createdAt?.toDate(),
+            updatedAt: userData.updatedAt?.toDate(),
+          } as User,
+        };
       }
-      return null;
+      return { status: 'missing' };
     } catch (error) {
       console.error('Error fetching user data:', error);
-      return null;
+      return { status: 'error', error };
     }
   };
 
   useEffect(() => {
     // If Firebase isn't configured, just set loading to false
-    if (!isFirebaseConfigured() || !auth) {
+    if (!isFirebaseConfigured() || !auth || !db) {
       setState({
         user: null,
         loading: false,
@@ -88,11 +102,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const firestore = db;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (signingUp.current) return; // signUp() owns state during signup
+      if (signingUp.current || bootstrappingPendingProfile.current) return; // explicit auth flows own state
       if (firebaseUser) {
-        const userData = await fetchUserData(firebaseUser);
-        if (userData) {
+        const userDataResult = await fetchUserData(firebaseUser);
+        if (userDataResult.status === 'found') {
+          const userData = userDataResult.user;
           if (userData.status === 'active') {
             setState({ user: userData, loading: false, error: null, pendingApproval: false });
           } else if (userData.status === 'pending') {
@@ -107,11 +124,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               pendingApproval: false,
             });
           }
+        } else if (userDataResult.status === 'missing') {
+          if (firebaseUser.email) {
+            bootstrappingPendingProfile.current = true;
+            try {
+              await setDoc(doc(firestore, 'users', firebaseUser.uid), {
+                email: firebaseUser.email,
+                status: 'pending',
+                createdAt: serverTimestamp(),
+              });
+              if (auth) await firebaseSignOut(auth);
+              setState({ user: null, loading: false, error: null, pendingApproval: true });
+            } catch (profileError) {
+              console.error('Error creating pending user profile:', profileError);
+              if (auth) await firebaseSignOut(auth);
+              setState({
+                user: null,
+                loading: false,
+                error: missingProfileMessage,
+                pendingApproval: false,
+              });
+            } finally {
+              bootstrappingPendingProfile.current = false;
+            }
+          } else {
+            if (auth) await firebaseSignOut(auth);
+            setState({
+              user: null,
+              loading: false,
+              error: missingProfileMessage,
+              pendingApproval: false,
+            });
+          }
         } else {
+          console.error('User profile read failed:', userDataResult.error);
+          if (auth) await firebaseSignOut(auth);
           setState({
             user: null,
             loading: false,
-            error: 'User profile not found. Please contact an administrator.',
+            error: profileLoadErrorMessage,
             pendingApproval: false,
           });
         }
@@ -132,8 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
-      setState((prev) => ({ ...prev, loading: false, error: errorMessage }));
+      setState((prev) => ({ ...prev, loading: false, error: friendlyAuthError(error) }));
       throw error;
     }
   };
@@ -159,6 +209,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (auth) await firebaseSignOut(auth);
         }
         throw docError;
+      }
+      try {
+        await sendEmailVerification(cred.user, { url: `${window.location.origin}/portal` });
+      } catch (verificationError) {
+        console.warn('Failed to send verification email:', verificationError);
       }
       await firebaseSignOut(auth);
       setState({ user: null, loading: false, error: null, pendingApproval: true });
@@ -218,9 +273,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) return;
     const currentUser = auth.currentUser;
     if (currentUser) {
-      const userData = await fetchUserData(currentUser);
-      if (userData) {
-        setState((prev) => ({ ...prev, user: userData }));
+      const userDataResult = await fetchUserData(currentUser);
+      if (userDataResult.status === 'found') {
+        setState((prev) => ({ ...prev, user: userDataResult.user }));
       }
     }
   };
