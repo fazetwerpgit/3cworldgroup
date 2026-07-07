@@ -4,9 +4,68 @@ For the next coding agent, especially Claude running a Max workflow. Read this
 before touching code. This repo is in the middle of an employee-portal redesign,
 not a public marketing-site redesign.
 
-Last updated: 2026-06-08
-Branch: `master`
-Current checkpoint: portal UX redesign and admin polish pass
+Last updated: 2026-07-06
+Current checkpoint: see "Session Handoff 2026-07-06" below; the rest of this doc
+is standing project background (intent, stack, design system, constraints) and
+still applies.
+
+## Session Handoff 2026-07-06
+
+Operating rules for the next session: follow **# Model Routing & Orchestration**
+in `~/.claude/CLAUDE.md` — the main loop orchestrates; delegate execution
+(Codex/gpt-5.5 default, sonnet/opus subagents), review diffs against specs,
+never spawn Fable subagents.
+
+### Completed (merged + pushed — verified: master == origin/master @ `776c2a1`)
+- University carriers + sales proof — plan
+  `docs/superpowers/plans/2026-07-06-university-carriers-and-sales-proof.md`,
+  all 8 tasks done, commit `f4b76ab`.
+- Portal self-signup approval flow — plan
+  `docs/superpowers/plans/2026-07-06-portal-self-signup-approval.md`, all 6
+  tasks done, commit `5999da2`. Firestore rules deployed to prod
+  (`cworldgroup-cca68`).
+- Admin approve-pending-users fix — commit `776c2a1` (Approve action +
+  "Pending approval" filter in `src/components/admin/UserTable.tsx` and
+  `src/app/portal/admin/users/page.tsx`). Verified end-to-end (Playwright +
+  Admin SDK reads); build passed. Landed on master and pushed.
+
+### Completed (this session)
+- University content upload — ALL 8 tasks done
+  (`docs/superpowers/plans/2026-07-06-university-content-upload.md`). Admin
+  upload page at `/portal/admin/university`, rep viewing on
+  `/portal/training/[id]`. Storage rules DEPLOYED to prod. Full gates green
+  (249 tests, tsc, build) plus a live Playwright smoke test: upload → save →
+  rep view → delete → storage cleanup, all verified end-to-end.
+  - Bug found by the smoke test and fixed in `3cbbd02`: the training POST API
+    validated `type` before deriving it from `mimeType`, rejecting every save
+    from the new form.
+  - Prod infra fix (user-approved): granted `roles/datastore.viewer` to the
+    Storage service agent (`service-55311478672@gcp-sa-firebasestorage`), which
+    cross-service `firestore.get()` in storage.rules requires — without it all
+    uploads got `storage/unauthorized`. Non-interactive `firebase deploy` skips
+    this grant; remember it for future cross-service rules.
+  - Smoke-test helpers left in `.audit/`: `uni-smoke-role.mjs` (role toggle by
+    email), `uni-smoke-storage-check.mjs` (list `training/`),
+    `uni-smoke-storage-cleanup.mjs`. QA bot `qa-e2e-1` restored to
+    `l1_manager` (no `role` field), bucket `training/` prefix clean.
+
+### Queued, not started
+- Mobile chat edit/delete bug (user-reported; scope not yet investigated).
+
+### Environment notes
+- Dev server may still be running on `localhost:3000` from the previous session.
+- Test fixtures cleaned up (pending-verify user deleted, qa-e2e-1 restored to
+  `l1_manager`). Throwaway verification scripts live in `.audit/` — reusable
+  for admin-flow verification, but resolve the QA bot by **email**, not
+  hardcoded UID (stale UIDs previously caused a Firestore NOT_FOUND).
+- E2E test-user creation pattern: `scripts/e2e-create-test-user.mjs`.
+
+### Suggested order
+1. Finish `feat/university-content-upload` tasks 6–8 per its plan file —
+   delegate implementation to Codex with self-contained specs, review diffs,
+   run gates via an agent; deploy the storage rule; merge/push. (Branch exists
+   locally @ `a0d66a1`, not on origin.)
+2. Investigate + fix the mobile chat edit/delete bug (delegate exploration).
 
 ## Product Intent
 
