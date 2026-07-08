@@ -4,10 +4,74 @@ For the next coding agent, especially Claude running a Max workflow. Read this
 before touching code. This repo is in the middle of an employee-portal redesign,
 not a public marketing-site redesign.
 
-Last updated: 2026-07-07
-Current checkpoint: see "Session Handoff 2026-07-07" below; the rest of this doc
+Last updated: 2026-07-08
+Current checkpoint: see "Session Handoff 2026-07-08" below; the rest of this doc
 is standing project background (intent, stack, design system, constraints) and
 still applies.
+
+## Session Handoff 2026-07-08 — Onboarding Automation (branch feat/onboarding-automation)
+
+### Completed (this session)
+All 14 tasks of `docs/superpowers/plans/2026-07-08-onboarding-automation.md`, executed
+via subagent-driven development (Codex implementer, Claude reviewers; audit trail in
+`.superpowers/sdd/progress.md`, untracked). Branch 53ae856..ff12e59 (24 commits) is
+**merge-ready** per the final whole-branch review. NOT yet merged to main.
+
+- **Roles**: general_manager, gm_in_training, office_manager; light-vetting (no
+  SSN/DL/screen items); promotion warning when a light-vetting role is assigned
+  without base onboarding history.
+- **Checklist**: fcra_auth e-sign item; role-filtered vetting via appliesToRoles.
+- **Comms**: shared createNotification (+6 types), Postmark sendEmail (never throws)
+  + all transactional templates, dispatchToUser (bell awaited, push+email allSettled).
+- **Alert engine**: alertTasks collection — broadcast to management, one-tap claim
+  (transaction), resolve, 24h re-nag; GET /api/portal/alerts + claim route.
+- **E-sign**: EsignProvider interface (frozen contract) + SignWell impl. Doc-verified:
+  webhook HMAC key is the WEBHOOK ID, not the API key (resolution chain ending in
+  SIGNWELL_WEBHOOK_ID env). Auto-send envelopes on wizard submit; webhook auto-approves.
+- **Activation gate** (decision 6 behavior change): convert/approve no longer set
+  status active. computeReadiness + POST /api/portal/onboarding/activate; an
+  activation_ready alert fires when a pending user goes all-green; manager activates.
+- **Stall cron**: hourly Vercel cron (vercel.json) — 24h/72h/7d nudges, 72h manager
+  alert, 7d atRisk flag, alert re-nag; per-user failure isolation with incremental
+  sent-tier persistence.
+- **Self-signup funnel**: signup-notify -> pending_assignment alert; admin assigns
+  role via picker (status STAYS pending) -> checklist-ready email + e-sign kickoff;
+  pending badge/banner count role-less signups only.
+- **UI**: admin ActionQueue (claim/Activate, 30s poll) + at-risk badges on review
+  rows; rep onboarding wizard redesigned as a stepper (OnboardingWizard.tsx).
+- **Auth fix (final-review Critical)**: pending users WITH a fieldRole can now sign
+  in (mid-onboarding); only role-less pending signups hit the awaiting-approval
+  screen (`src/lib/auth/pendingApproval.ts`).
+
+Gates at HEAD ff12e59: tsc clean, 323/323 tests, production build clean.
+
+### Deploy checklist (blocking — alongside merge)
+1. `firebase deploy --only firestore:rules` (locks alertTasks, onboardingNudges).
+2. Firestore composite indexes for alertTasks queries (first-run errors give links).
+3. Vercel env: CRON_SECRET, APP_BASE_URL, ESIGN_PROVIDER=signwell,
+   POSTMARK_SERVER_TOKEN, EMAIL_FROM, SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID,
+   SIGNWELL_TEST_MODE=true, SIGNWELL_TEMPLATE_CONTRACT / _DIRECT_DEPOSIT /
+   _PAY_STRUCTURE / _FCRA (note: `_FCRA`, not `_FCRA_AUTH`).
+4. SignWell: 4 templates (single `signer` placeholder each); register webhook
+   `https://<domain>/api/webhooks/esign`; webhook ID -> SIGNWELL_WEBHOOK_ID.
+5. Postmark server + verified sender. Then run the plan's Final Verification E2E smoke.
+
+### Follow-ups (non-blocking, ranked)
+1. `review_needed` AlertTaskKind declared + UI-handled but never produced — wire into
+   the submit path or drop it.
+2. Notifications firestore rule requires status active — pending reps get email/push
+   but an empty bell (and console permission-denied noise). Consider self-only reads.
+3. Status-free write endpoints (e.g. POST /api/portal/sales) now reachable by
+   pending+role reps pre-vetting — confirm intended or add status checks.
+4. Escape user-sourced strings in email HTML; bell icon fallback for new notification
+   types; activation_ready staleness if an item is rejected post-alert; kickoff-guard/
+   signup-notify unit tests; GET checklist early-return lacks `progress` for role-less
+   users; UserForm `as FieldRole` assertion; route auth hardening (plan-noted project).
+
+### Open decisions
+- Merge strategy (merge/PR): branch ready; superpowers:finishing-a-development-branch.
+- Adobe Sign: if the tier includes API access, implement adobesign.ts against the
+  frozen EsignProvider interface and flip ESIGN_PROVIDER — drop-in by design.
 
 ## Session Handoff 2026-07-07
 
