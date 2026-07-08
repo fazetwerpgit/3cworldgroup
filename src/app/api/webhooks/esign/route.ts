@@ -51,7 +51,11 @@ export async function POST(request: Request) {
     message: `${item.label} is complete.`,
     link: '/portal/onboarding',
   });
-  await maybeFlagActivationReady(userId);
+  try {
+    await maybeFlagActivationReady(userId);
+  } catch (error) {
+    console.error('[esign webhook] failed to flag activation readiness', error);
+  }
 
   return NextResponse.json({ ok: true });
 }
