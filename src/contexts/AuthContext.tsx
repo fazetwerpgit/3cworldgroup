@@ -200,6 +200,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: 'pending',
           createdAt: serverTimestamp(),
         });
+        void fetch('/api/portal/auth/signup-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: cred.user.uid }),
+        }).catch(() => {});
       } catch (docError) {
         // Roll back the just-created auth account so the profile write can be
         // retried cleanly instead of failing with email-already-in-use.

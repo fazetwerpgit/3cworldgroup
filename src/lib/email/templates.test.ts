@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inviteEmail, nudgeEmail, activationEmail, managerAlertEmail } from './templates';
+import { inviteEmail, nudgeEmail, checklistReadyEmail, activationEmail, managerAlertEmail } from './templates';
 
 describe('email templates', () => {
   it('invite email contains the invite URL in html and text', () => {
@@ -18,6 +18,16 @@ describe('email templates', () => {
     const d7 = nudgeEmail({ name: 'Sam', tier: 'd7', portalUrl: 'https://portal.test/portal/onboarding' });
     expect(h24.subject).not.toEqual(d7.subject);
     expect(d7.htmlBody).toContain('https://portal.test/portal/onboarding');
+  });
+
+  it('checklist ready email contains the onboarding URL in html and text', () => {
+    const e = checklistReadyEmail({
+      name: 'Sam',
+      portalUrl: 'https://portal.test/portal/onboarding',
+    });
+    expect(e.subject).toBe('Your onboarding checklist is ready');
+    expect(e.htmlBody).toContain('https://portal.test/portal/onboarding');
+    expect(e.textBody).toContain('https://portal.test/portal/onboarding');
   });
 
   it('activation and manager alert emails render', () => {

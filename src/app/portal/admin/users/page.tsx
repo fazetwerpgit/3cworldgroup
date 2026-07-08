@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, UserRole, RoleDisplayNames } from '@/types';
+import { FieldRole, FieldRoles, User, UserRole, RoleDisplayNames } from '@/types';
+
+const FIELD_ROLE_OPTIONS = Object.values(FieldRoles) as FieldRole[];
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -24,6 +26,12 @@ export default function UsersPage() {
     userId: string;
     userName: string;
   } | null>(null);
+  const [approveConfirm, setApproveConfirm] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
+  const [approveFieldRole, setApproveFieldRole] = useState<FieldRole>('entry_rep');
+  const [approving, setApproving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -86,14 +94,25 @@ export default function UsersPage() {
     }
   };
 
-  // Approve a self-signup: activate the account and give it a default rep role
-  // so it's usable immediately. Admins can change the role afterward via Edit.
-  const handleApprove = async (userId: string) => {
+  const handleApproveClick = (userId: string) => {
+    const target = users.find((u) => u.uid === userId);
+    setApproveFieldRole('entry_rep');
+    setApproveConfirm({
+      userId,
+      userName: target?.displayName || target?.email || 'this user',
+    });
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!approveConfirm) return;
+
+    setApproving(true);
+    setError('');
     try {
-      const response = await fetch(`/api/portal/auth/users/${userId}`, {
+      const response = await fetch(`/api/portal/auth/users/${approveConfirm.userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active', fieldRole: 'entry_rep', requestedBy: currentUser?.uid }),
+        body: JSON.stringify({ fieldRole: approveFieldRole, requestedBy: currentUser?.uid }),
       });
 
       if (!response.ok) {
@@ -102,8 +121,11 @@ export default function UsersPage() {
       }
 
       fetchUsers();
+      setApproveConfirm(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to approve user');
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -185,7 +207,7 @@ export default function UsersPage() {
                   className="w-36"
                 >
                   <NativeSelectOption value="">All</NativeSelectOption>
-                  <NativeSelectOption value="pending">Pending approval</NativeSelectOption>
+                  <NativeSelectOption value="pending">Pending</NativeSelectOption>
                   <NativeSelectOption value="active">Active</NativeSelectOption>
                   <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
                 </NativeSelect>
@@ -241,12 +263,60 @@ export default function UsersPage() {
             <UserTable
               users={users}
               onStatusChange={handleStatusChange}
-              onApprove={handleApprove}
+              onApprove={handleApproveClick}
               onDelete={handleDeleteClick}
-              loading={loading || deleting}
+              loading={loading || approving || deleting}
             />
           )}
         </div>
+
+        {approveConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="w-full max-w-md rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-xl">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">Assign Role</h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-muted-foreground">
+                  Assign a role to <strong>{approveConfirm.userName}</strong>. Their account stays pending until
+                  the onboarding checklist is complete.
+                </p>
+                <div className="mt-5 space-y-2">
+                  <label className="text-sm font-medium text-slate-700 dark:text-muted-foreground">
+                    Field role
+                  </label>
+                  <NativeSelect
+                    value={approveFieldRole}
+                    onChange={(e) => setApproveFieldRole(e.target.value as FieldRole)}
+                    disabled={approving}
+                  >
+                    {FIELD_ROLE_OPTIONS.map((value) => (
+                      <NativeSelectOption key={value} value={value}>
+                        {RoleDisplayNames[value]}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setApproveConfirm(null)}
+                    disabled={approving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleApproveConfirm}
+                    disabled={approving}
+                    className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                  >
+                    {approving ? 'Assigning...' : 'Assign Role'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

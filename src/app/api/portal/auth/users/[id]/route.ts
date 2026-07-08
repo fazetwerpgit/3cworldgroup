@@ -13,6 +13,10 @@ import {
 import { requireManagement } from '@/lib/auth/requireManagement';
 import { validateAddress } from '@/lib/validation/address';
 import { needsPromotionWarning } from '@/lib/onboarding/promotionCheck';
+import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
+import { dispatchToUser } from '@/lib/alerts/dispatch';
+import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { appBaseUrl, checklistReadyEmail } from '@/lib/email/templates';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -107,6 +111,7 @@ export async function PUT(
     if (!doc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+    const existingFieldRole = doc.get('fieldRole') as FieldRole | undefined;
 
     // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
     const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
@@ -167,6 +172,7 @@ export async function PUT(
     if (zip !== undefined)
       updateData.zip = addressCheck.clean.zip ?? FieldValue.delete();
     if (status !== undefined) updateData.status = status;
+    const shouldKickoffChecklist = !!fieldRole && !existingFieldRole;
 
     // Update displayName in Firebase Auth if changed
     if (displayName) {
@@ -174,6 +180,36 @@ export async function PUT(
     }
 
     await docRef.update(updateData);
+
+    if (shouldKickoffChecklist) {
+      const updatedDisplayName =
+        (displayName as string | undefined) ??
+        (doc.get('displayName') as string | undefined) ??
+        (doc.get('email') as string | undefined) ??
+        'Rep';
+      try {
+        await Promise.all([
+          resolveAlertTasks(id, ['pending_assignment']),
+          dispatchToUser({
+            userId: id,
+            type: 'system',
+            title: 'Your onboarding checklist is ready',
+            message: 'Your position was assigned. Complete your checklist to go active.',
+            link: '/portal/onboarding',
+            email: checklistReadyEmail({
+              name: updatedDisplayName,
+              portalUrl: `${appBaseUrl()}/portal/onboarding`,
+            }),
+          }),
+        ]);
+      } catch (error) {
+        console.error('[users] checklist kickoff notification failed:', error);
+      }
+
+      void sendPendingEsignDocs(id).catch((err) =>
+        console.error('[users] esign kickoff failed', err)
+      );
+    }
 
     let promotionWarning = false;
     try {

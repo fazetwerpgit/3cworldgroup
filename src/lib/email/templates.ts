@@ -43,6 +43,16 @@ export function nudgeEmail(p: { name: string; tier: NudgeTier; portalUrl: string
   };
 }
 
+export function checklistReadyEmail(p: { name: string; portalUrl: string }): EmailContent {
+  const subject = 'Your onboarding checklist is ready';
+  const line = 'Your position was assigned. Complete your onboarding checklist to go active.';
+  return {
+    subject,
+    textBody: `Hi ${p.name},\n\n${line}\n\nContinue: ${p.portalUrl}\n`,
+    htmlBody: layout(subject, `<p>Hi ${p.name},</p><p>${line}</p><p><a href="${p.portalUrl}">Continue onboarding</a></p><p>${p.portalUrl}</p>`),
+  };
+}
+
 export function itemRejectedEmail(p: { name: string; itemLabel: string; reason: string; portalUrl: string }): EmailContent {
   const subject = `Action needed: ${p.itemLabel} was returned`;
   return {
