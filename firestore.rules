@@ -117,6 +117,9 @@ service cloud.firestore {
     match /alertTasks/{taskId} {
       allow read, write: if false;
     }
+    match /onboardingNudges/{uid} {
+      allow read, write: if false;
+    }
 
     match /chatChannels/{channelId} {
       allow read: if isApproved() && request.auth.uid in resource.data.memberIds;
