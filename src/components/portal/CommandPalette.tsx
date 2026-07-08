@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { Sale, UserRole } from '@/types';
+import { FieldRoles, Sale, UserRole } from '@/types';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -38,7 +38,7 @@ const mainDestinations: NavDestination[] = [
   {
     label: 'My Onboarding',
     href: '/portal/onboarding',
-    roles: ['entry_rep', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
+    roles: Object.values(FieldRoles),
   },
 ];
 

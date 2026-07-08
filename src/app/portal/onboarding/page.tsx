@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { OnboardingItem, OnboardingStatus } from '@/types';
+import { FieldRoles, OnboardingItem, OnboardingStatus } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
 import OnboardingWizard, { type WizardItem } from '@/components/onboarding/OnboardingWizard';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
@@ -269,17 +269,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <ProtectedRoute
-      roles={[
-        'entry_rep',
-        'l1_manager',
-        'l2_manager',
-        'ibo_level_1',
-        'ibo_level_2',
-        'ibo_level_3',
-        'ibo_level_4',
-      ]}
-    >
+    <ProtectedRoute roles={Object.values(FieldRoles)}>
       <div className="min-h-screen portal-canvas">
         <PortalHeader />
         <div className="flex">

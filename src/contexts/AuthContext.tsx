@@ -16,6 +16,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
+import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
 import { User, AuthState, RolePermissions, UserRole, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
@@ -112,9 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = userDataResult.user;
           if (userData.status === 'active') {
             setState({ user: userData, loading: false, error: null, pendingApproval: false });
-          } else if (userData.status === 'pending') {
+          } else if (isAwaitingRoleAssignment(userData)) {
             if (auth) await firebaseSignOut(auth);
             setState({ user: null, loading: false, error: null, pendingApproval: true });
+          } else if (userData.status === 'pending') {
+            setState({ user: userData, loading: false, error: null, pendingApproval: false });
           } else {
             if (auth) await firebaseSignOut(auth);
             setState({
