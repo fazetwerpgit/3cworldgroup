@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
+import { RoleDisplayNames, User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
+import type { FieldRole } from '@/types';
 import { US_STATES } from '@/lib/validation/address';
 
 interface UserFormProps {
@@ -23,9 +24,16 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'ibo_level_2', label: 'IBO Level 2' },
   { value: 'ibo_level_3', label: 'IBO Level 3' },
   { value: 'ibo_level_4', label: 'IBO Level 4' },
+  { value: 'general_manager', label: 'General Manager' },
+  { value: 'gm_in_training', label: 'GM in Training' },
+  { value: 'office_manager', label: 'Office Manager' },
   { value: 'operations', label: 'Operations' },
   { value: 'admin', label: 'Administrator' },
 ];
+
+interface UserUpdateResponse {
+  promotionWarning?: boolean;
+}
 
 export function UserForm({ user, isEdit = false }: UserFormProps) {
   const router = useRouter();
@@ -60,9 +68,12 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     setLoading(true);
 
     try {
-      const rolePayload = isPlatformRole(formData.role)
-        ? { role: formData.role }
-        : { fieldRole: formData.role };
+      const assignedFieldRole = isPlatformRole(formData.role)
+        ? undefined
+        : (formData.role as FieldRole);
+      const rolePayload = assignedFieldRole
+        ? { fieldRole: assignedFieldRole }
+        : { role: formData.role };
 
       if (isEdit && user) {
         const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
@@ -82,9 +93,16 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           }),
         });
 
-        const data = await response.json();
+        const data = (await response.json()) as UserUpdateResponse & { error?: string };
         if (!response.ok) {
           throw new Error(data.error || 'Failed to update user');
+        }
+
+        if (data.promotionWarning === true && assignedFieldRole) {
+          sessionStorage.setItem(
+            'adminUserPromotionWarning',
+            `${formData.displayName} was assigned ${RoleDisplayNames[assignedFieldRole]} but has not completed base onboarding. Confirm this is an internal promotion.`
+          );
         }
       } else {
         if (!formData.password) {

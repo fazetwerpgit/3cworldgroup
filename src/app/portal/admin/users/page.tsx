@@ -17,6 +17,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [promotionWarning, setPromotionWarning] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'pending' | ''>('');
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -54,6 +55,14 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    const warning = sessionStorage.getItem('adminUserPromotionWarning');
+    if (!warning) return;
+
+    setPromotionWarning(warning);
+    sessionStorage.removeItem('adminUserPromotionWarning');
+  }, []);
 
   const handleStatusChange = async (
     userId: string,
@@ -204,6 +213,19 @@ export default function UsersPage() {
         {error && (
           <div className="rounded-lg border border-red-200 dark:border-border bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
+          </div>
+        )}
+
+        {promotionWarning && (
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
+            <span>{promotionWarning}</span>
+            <button
+              type="button"
+              className="shrink-0 text-xs font-semibold uppercase tracking-wide text-amber-900 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-50"
+              onClick={() => setPromotionWarning('')}
+            >
+              Dismiss
+            </button>
           </div>
         )}
 

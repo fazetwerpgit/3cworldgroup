@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { User, PlatformRole, FieldRole, FieldRoles, resolveRoles } from '@/types';
+import {
+  User,
+  PlatformRole,
+  FieldRole,
+  FieldRoles,
+  LIGHT_VETTING_ROLES,
+  OnboardingStatus,
+  resolveRoles,
+} from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
 import { validateAddress } from '@/lib/validation/address';
+import { needsPromotionWarning } from '@/lib/onboarding/promotionCheck';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -166,7 +175,20 @@ export async function PUT(
 
     await docRef.update(updateData);
 
-    return NextResponse.json({ success: true });
+    let promotionWarning = false;
+    if (fieldRole && (LIGHT_VETTING_ROLES as readonly string[]).includes(fieldRole)) {
+      const snap = await adminDb
+        .collection('userOnboarding')
+        .where('userId', '==', id)
+        .get();
+      const statuses: Record<string, OnboardingStatus> = {};
+      snap.forEach((d) => {
+        statuses[d.get('itemId') as string] = d.get('status') as OnboardingStatus;
+      });
+      promotionWarning = needsPromotionWarning(fieldRole, statuses);
+    }
+
+    return NextResponse.json({ success: true, promotionWarning });
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json(
