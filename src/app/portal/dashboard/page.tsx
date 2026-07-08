@@ -44,13 +44,6 @@ export default function DashboardPage() {
 
   const actionItems = [
     {
-      title: 'Log a new sale',
-      description: 'Submit customer and plan details for review.',
-      href: '/portal/sales/new',
-      show: hasPermission('sales:write'),
-      tone: 'primary',
-    },
-    {
       title: 'Review pending sales',
       description: 'Work through submitted sales that need manager action.',
       href: '/portal/approvals',
@@ -179,14 +172,6 @@ export default function DashboardPage() {
                 Calls
               </Link>
             </Button>
-            {hasPermission('sales:write') && (
-              <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                <Link href="/portal/sales/new">
-                  Log sale
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            )}
           </div>
         </div>
       </section>
