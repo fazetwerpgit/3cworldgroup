@@ -44,64 +44,74 @@ export async function runOnboardingNudges(
   let flaggedAtRisk = 0;
 
   for (const userDoc of pending.docs) {
-    const uid = userDoc.id;
-    if (!userDoc.get('fieldRole')) continue;
+    try {
+      const uid = userDoc.id;
+      if (!userDoc.get('fieldRole')) continue;
 
-    const itemsSnap = await db.collection('userOnboarding').where('userId', '==', uid).get();
-    let lastActivity = toDate(userDoc.get('createdAt')) ?? now;
-    itemsSnap.forEach((doc) => {
-      const updatedAt = toDate(doc.get('updatedAt'));
-      if (updatedAt && updatedAt > lastActivity) lastActivity = updatedAt;
-    });
-
-    const { ready } = await getActivationReadiness(uid);
-    if (ready) continue;
-
-    const nudgeRef = db.doc(`onboardingNudges/${uid}`);
-    const nudgeSnap = await nudgeRef.get();
-    const sent = (nudgeSnap.get('sent') as NudgeTier[] | undefined) ?? [];
-    const due = dueNudges(lastActivity, now, sent);
-    if (due.length === 0) continue;
-
-    const name = (userDoc.get('displayName') as string | undefined) ?? 'there';
-    const portalUrl = `${appBaseUrl()}/portal/onboarding`;
-
-    for (const tier of due) {
-      await dispatchToUser({
-        userId: uid,
-        type: 'onboarding_nudge',
-        title:
-          tier === 'h24'
-            ? 'Your onboarding is waiting'
-            : tier === 'h72'
-              ? 'Onboarding reminder'
-              : 'Final onboarding reminder',
-        message: 'Pick up where you left off - a few steps remain.',
-        link: '/portal/onboarding',
-        email: nudgeEmail({ name, tier, portalUrl }),
+      const itemsSnap = await db.collection('userOnboarding').where('userId', '==', uid).get();
+      let lastActivity = toDate(userDoc.get('createdAt')) ?? now;
+      itemsSnap.forEach((doc) => {
+        const updatedAt = toDate(doc.get('updatedAt'));
+        if (updatedAt && updatedAt > lastActivity) lastActivity = updatedAt;
       });
 
-      if (tier === 'h72') {
-        await createAlertTask({
-          kind: 'stalled_rep',
-          subjectUserId: uid,
-          subjectName: name,
-          title: `${name} has stalled in onboarding`,
-          message: 'No progress for 72 hours. Reach out and unblock them.',
-          link: '/portal/admin/onboarding',
-        });
-      }
+      const { ready } = await getActivationReadiness(uid);
+      if (ready) continue;
 
-      if (tier === 'd7') {
-        await userDoc.ref.update({ atRisk: true, updatedAt: now });
-        flaggedAtRisk += 1;
-      }
+      const nudgeRef = db.doc(`onboardingNudges/${uid}`);
+      const nudgeSnap = await nudgeRef.get();
+      const sent = (nudgeSnap.get('sent') as NudgeTier[] | undefined) ?? [];
+      const due = dueNudges(lastActivity, now, sent);
+      if (due.length === 0) continue;
 
-      nudged += 1;
+      const name = (userDoc.get('displayName') as string | undefined) ?? 'there';
+      const portalUrl = `${appBaseUrl()}/portal/onboarding`;
+      const sentNow: NudgeTier[] = [];
+
+      try {
+        for (const tier of due) {
+          await dispatchToUser({
+            userId: uid,
+            type: 'onboarding_nudge',
+            title:
+              tier === 'h24'
+                ? 'Your onboarding is waiting'
+                : tier === 'h72'
+                  ? 'Onboarding reminder'
+                  : 'Final onboarding reminder',
+            message: 'Pick up where you left off - a few steps remain.',
+            link: '/portal/onboarding',
+            email: nudgeEmail({ name, tier, portalUrl }),
+          });
+
+          sentNow.push(tier);
+          nudged += 1;
+
+          if (tier === 'h72') {
+            await createAlertTask({
+              kind: 'stalled_rep',
+              subjectUserId: uid,
+              subjectName: name,
+              title: `${name} has stalled in onboarding`,
+              message: 'No progress for 72 hours. Reach out and unblock them.',
+              link: '/portal/admin/onboarding',
+            });
+          }
+
+          if (tier === 'd7') {
+            await userDoc.ref.update({ atRisk: true, updatedAt: now });
+            flaggedAtRisk += 1;
+          }
+        }
+      } finally {
+        if (sentNow.length > 0) {
+          // v1 intentionally does not re-arm previously sent tiers after new progress.
+          await nudgeRef.set({ sent: [...sent, ...sentNow], updatedAt: now }, { merge: true });
+        }
+      }
+    } catch (error) {
+      console.error('[nudges] failed to process user', userDoc.id, error);
     }
-
-    // v1 intentionally does not re-arm previously sent tiers after new progress.
-    await nudgeRef.set({ sent: [...sent, ...due], updatedAt: now }, { merge: true });
   }
 
   return { nudged, flaggedAtRisk };
