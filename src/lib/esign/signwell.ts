@@ -24,14 +24,15 @@ function templateIdFor(docKey: EsignDocKey): string {
 function webhookVerificationKey(
   payload: { event?: { webhook_id?: string; webhookId?: string } },
   headers: Headers
-): string {
-  return (
+): string | null {
+  const key =
     payload.event?.webhook_id ??
     payload.event?.webhookId ??
     headers.get('x-signwell-webhook-id') ??
     process.env.SIGNWELL_WEBHOOK_ID ??
-    requireApiKey()
-  );
+    process.env.SIGNWELL_API_KEY ??
+    null;
+  return key || null;
 }
 
 export function verifySignwellHash(eventType: string, eventTime: string, hash: string, key: string): boolean {
@@ -81,7 +82,8 @@ export const signwellProvider: EsignProvider = {
     const type = String(payload.event?.type ?? '');
     const time = String(payload.event?.time ?? '');
     const hash = String(payload.event?.hash ?? '');
-    if (!verifySignwellHash(type, time, hash, webhookVerificationKey(payload, headers))) return null;
+    const key = webhookVerificationKey(payload, headers);
+    if (!key || !verifySignwellHash(type, time, hash, key)) return null;
 
     const obj = payload.data?.object;
     const envelopeId = String(obj?.id ?? '');

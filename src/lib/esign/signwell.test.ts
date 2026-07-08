@@ -50,3 +50,55 @@ describe('signwellProvider.createEnvelope', () => {
     ).rejects.toThrow(/SIGNWELL_TEMPLATE/);
   });
 });
+
+describe('signwellProvider.parseWebhook', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns null for malformed JSON', async () => {
+    await expect(signwellProvider.parseWebhook('{nope', new Headers())).resolves.toBeNull();
+  });
+
+  it('returns null for valid JSON with a missing or invalid hash', async () => {
+    const body = JSON.stringify({
+      event: { type: 'document_completed', time: '1751970000', hash: 'deadbeef', webhook_id: 'wh_123' },
+      data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
+    });
+
+    await expect(signwellProvider.parseWebhook(body, new Headers())).resolves.toBeNull();
+  });
+
+  it('returns null without throwing when no verification key can be resolved', async () => {
+    const previousApiKey = process.env.SIGNWELL_API_KEY;
+    const previousWebhookId = process.env.SIGNWELL_WEBHOOK_ID;
+    delete process.env.SIGNWELL_API_KEY;
+    delete process.env.SIGNWELL_WEBHOOK_ID;
+    const body = JSON.stringify({
+      event: { type: 'document_completed', time: '1751970000', hash: 'deadbeef' },
+      data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
+    });
+
+    try {
+      await expect(signwellProvider.parseWebhook(body, new Headers())).resolves.toBeNull();
+    } finally {
+      process.env.SIGNWELL_API_KEY = previousApiKey;
+      process.env.SIGNWELL_WEBHOOK_ID = previousWebhookId;
+    }
+  });
+
+  it('returns a completed event for a correctly signed payload', async () => {
+    const key = 'wh_123';
+    const hash = createHmac('sha256', key).update('document_completed@1751970000').digest('hex');
+    const body = JSON.stringify({
+      event: { type: 'document_completed', time: '1751970000', hash, webhook_id: key },
+      data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
+    });
+
+    await expect(signwellProvider.parseWebhook(body, new Headers())).resolves.toEqual({
+      envelopeId: 'doc_123',
+      status: 'completed',
+      metadata: { userId: 'u1', itemId: 'contract' },
+    });
+  });
+});
