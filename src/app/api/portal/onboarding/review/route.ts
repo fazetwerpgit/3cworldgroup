@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // Collect unique user ids to join display names in one batch
     const userIds = [...new Set(snapshot.docs.map((d) => d.data().userId as string))];
-    const userMap = new Map<string, { displayName?: string; email?: string }>();
+    const userMap = new Map<string, { displayName?: string; email?: string; atRisk: boolean }>();
     if (userIds.length > 0) {
       const userDocs = await adminDb.getAll(
         ...userIds.map((id) => adminDb!.collection('users').doc(id))
@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
       for (const doc of userDocs) {
         if (doc.exists) {
           const d = doc.data();
-          userMap.set(doc.id, { displayName: d?.displayName, email: d?.email });
+          userMap.set(doc.id, {
+            displayName: d?.displayName,
+            email: d?.email,
+            atRisk: !!doc.get('atRisk'),
+          });
         }
       }
     }
@@ -96,6 +100,7 @@ export async function GET(request: NextRequest) {
           files: storage ? await signFolderFiles(data.reference ?? null) : [],
           userName: user?.displayName ?? user?.email ?? data.userId,
           userEmail: user?.email ?? '',
+          atRisk: !!user?.atRisk,
           submittedAt: data.submittedAt?.toDate() ?? null,
         };
       })

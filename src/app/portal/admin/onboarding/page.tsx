@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Lock, X } from 'lucide-react';
+import ActionQueue from '@/components/admin/ActionQueue';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ interface Submission {
   files: { name: string; url: string; contentType: string }[];
   userName: string;
   userEmail: string;
+  atRisk: boolean;
   submittedAt: string | null;
 }
 
@@ -134,6 +136,8 @@ export default function OnboardingReviewPage() {
           </div>
         )}
 
+        <ActionQueue />
+
         {loading ? (
           <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
             <CardContent className="py-8">
@@ -168,9 +172,16 @@ export default function OnboardingReviewPage() {
                           {submission.userName?.charAt(0).toUpperCase() || 'U'}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="truncate font-semibold text-slate-950 dark:text-foreground">
-                            {submission.userName}
-                          </h3>
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <h3 className="truncate font-semibold text-slate-950 dark:text-foreground">
+                              {submission.userName}
+                            </h3>
+                            {submission.atRisk && (
+                              <Badge variant="destructive" className="rounded-md px-2 py-0.5">
+                                At risk
+                              </Badge>
+                            )}
+                          </div>
                           <p className="truncate text-xs text-slate-500 dark:text-muted-foreground">
                             {submission.userEmail}
                           </p>
