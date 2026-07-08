@@ -10,6 +10,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardStats } from '@/components/portal/DashboardStats';
 import { MiniLeaderboard } from '@/components/portal/MiniLeaderboard';
+import { PendingSignupsBanner } from '@/components/portal/PendingSignupsBanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
@@ -189,6 +190,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <PendingSignupsBanner />
 
       {leadsWithQueue ? (
         <>

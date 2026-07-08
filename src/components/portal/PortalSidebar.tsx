@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { MobileBottomNav } from '@/components/portal/MobileBottomNav';
+import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { UserRole } from '@/types';
 
 interface NavItem {
@@ -23,6 +24,8 @@ interface NavSectionProps {
   canAccessItem: (item: NavItem) => boolean;
   isActive: (href: string) => boolean;
   onLinkClick: () => void;
+  /** Optional numeric badge per item (e.g. pending-signup count on Users). Zero/undefined hides it. */
+  getBadgeCount?: (item: NavItem) => number | undefined;
 }
 
 // Top of the sidebar: the everyday destinations. Team Chat and Leaderboard are
@@ -348,11 +351,13 @@ function NavLink({
   active,
   onLinkClick,
   nested = false,
+  badgeCount,
 }: {
   item: NavItem;
   active: boolean;
   onLinkClick: () => void;
   nested?: boolean;
+  badgeCount?: number;
 }) {
   return (
     <li>
@@ -378,6 +383,11 @@ function NavLink({
           {item.icon}
         </span>
         <span className="min-w-0 flex-1 truncate">{item.name}</span>
+        {!!badgeCount && (
+          <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#8dc63f] px-1.5 text-[11px] font-semibold leading-none text-[#0A1F44]">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
       </Link>
     </li>
   );
@@ -392,10 +402,14 @@ function CollapsibleNavSection({
   canAccessItem,
   isActive,
   onLinkClick,
+  getBadgeCount,
   defaultOpen = true,
 }: NavSectionProps & { defaultOpen?: boolean }) {
   const visibleItems = items.filter(canAccessItem);
   const hasActiveChild = visibleItems.some((item) => isActive(item.href));
+  // A badged item (e.g. pending signups on Users) should never hide inside a
+  // collapsed folder — force the section open while anything in it is badged.
+  const hasBadgedChild = visibleItems.some((item) => !!getBadgeCount?.(item));
   const storageKey = `3c-nav-${title.toLowerCase()}`;
 
   const [open, setOpen] = useState(defaultOpen);
@@ -410,8 +424,8 @@ function CollapsibleNavSection({
     else if (saved === 'closed') setOpen(false);
   }, [storageKey]);
 
-  // Always show the section that contains the current page.
-  const isOpen = open || hasActiveChild;
+  // Always show the section that contains the current page or has a badge.
+  const isOpen = open || hasActiveChild || hasBadgedChild;
 
   const toggle = () => {
     const next = !isOpen;
@@ -450,6 +464,7 @@ function CollapsibleNavSection({
               item={item}
               active={isActive(item.href)}
               onLinkClick={onLinkClick}
+              badgeCount={getBadgeCount?.(item)}
               nested
             />
           ))}
@@ -488,6 +503,9 @@ export function PortalSidebar() {
     'ibo_level_4'
   );
   const showAdminSection = isRole('admin');
+  const pendingSignupsCount = usePendingSignupsCount(showAdminSection);
+  const getAdminBadgeCount = (item: NavItem) =>
+    item.href === '/portal/admin/users' ? pendingSignupsCount : undefined;
 
   // Handle link click on mobile - close menu
   const handleLinkClick = () => {
@@ -596,6 +614,7 @@ export function PortalSidebar() {
               canAccessItem={canAccessItem}
               isActive={isActive}
               onLinkClick={handleLinkClick}
+              getBadgeCount={getAdminBadgeCount}
               defaultOpen={false}
             />
           )}
