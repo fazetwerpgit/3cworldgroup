@@ -46,14 +46,6 @@ async function broadcast(task: NewAlertTask & { id: string }): Promise<void> {
   const db = requireDb();
   const userIds = await getManagementUserIds();
 
-  await createNotificationForMany(userIds, {
-    type: 'alert_task',
-    title: task.title,
-    message: task.message,
-    link: task.link,
-    metadata: { alertTaskId: task.id, kind: task.kind },
-  });
-
   const email = managerAlertEmail({
     title: task.title,
     message: task.message,
@@ -61,14 +53,23 @@ async function broadcast(task: NewAlertTask & { id: string }): Promise<void> {
   });
 
   const results = await Promise.allSettled(
-    userIds.flatMap((uid) => [
-      sendPushToUser(uid, { title: task.title, body: task.message, url: task.link }),
-      (async () => {
-        const snap = await db.collection('users').doc(uid).get();
-        const to = snap.get('email') as string | undefined;
-        if (to) await sendEmail({ to, ...email });
-      })(),
-    ])
+    [
+      createNotificationForMany(userIds, {
+        type: 'alert_task',
+        title: task.title,
+        message: task.message,
+        link: task.link,
+        metadata: { alertTaskId: task.id, kind: task.kind },
+      }),
+      ...userIds.flatMap((uid) => [
+        sendPushToUser(uid, { title: task.title, body: task.message, url: task.link }),
+        (async () => {
+          const snap = await db.collection('users').doc(uid).get();
+          const to = snap.get('email') as string | undefined;
+          if (to) await sendEmail({ to, ...email });
+        })(),
+      ]),
+    ]
   );
 
   results.forEach((result) => {
