@@ -1,4 +1,4 @@
-import { FieldRole } from './auth';
+import type { FieldRole } from './auth';
 
 export type OnboardingCategory = 'paperwork' | 'financial' | 'business' | 'credential';
 export type OnboardingStatus = 'not_started' | 'submitted' | 'approved' | 'rejected';
@@ -19,26 +19,43 @@ export interface OnboardingItem {
   iboOnly: boolean;
   sensitive: boolean;
   referenceKind: ReferenceKind;
-  signatureProvider?: 'adobe_sign'; // Set when the item is completed via e-signature
+  signatureProvider?: 'adobe_sign' | 'signwell'; // Set when the item is completed via e-signature
   order: number;
+}
+
+/** The original seven roles that get full vetting (screen, SSN, DL). */
+export const BASE_VETTING_ROLES: readonly FieldRole[] = [
+  'entry_rep',
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+];
+
+/** Light-vetting roles (GM, GM-in-training, Office Manager) skip SSN/DL/screen. */
+export function requiresHeavyVetting(fieldRole: FieldRole): boolean {
+  return (BASE_VETTING_ROLES as readonly string[]).includes(fieldRole);
 }
 
 // Onboarding checklist definitions
 export const ONBOARDING_ITEMS: OnboardingItem[] = [
   // Base items - all field roles
   { id: 'w9', label: 'W-9', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 1 },
+  { id: 'fcra_auth', label: 'Background Check Authorization (FCRA)', category: 'credential', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: false, referenceKind: 'esign', order: 2 },
   // Background / drug screen carries DL# + SSN through the vendor - stored as a
   // vendor reference only, never the raw numbers.
-  { id: 'background_check', label: 'Background / Drug Screen Authorization', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'vendor', order: 2 },
-  { id: 'dl_photos', label: "Driver's License Photos (Front & Back)", category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 3 },
-  { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 4 },
-  { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 5 },
-  { id: 'pay_structure', label: 'Compensation', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 6 },
-  { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'manual', order: 7 },
+  { id: 'background_check', label: 'Background / Drug Screen Authorization', category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'vendor', order: 3 },
+  { id: 'dl_photos', label: "Driver's License Photos (Front & Back)", category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 4 },
+  { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 5 },
+  { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 6 },
+  { id: 'pay_structure', label: 'Compensation', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 7 },
+  { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'manual', order: 8 },
   // IBO-only items (the IBO owner holds these; IBO Reps under an owner skip them)
-  { id: 'llc_sos', label: 'LLC / Secretary of State', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 8 },
-  { id: 'insurance', label: 'Proof of Insurance', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 9 },
-  { id: 'chargeback_card', label: 'Chargeback Credit Card', category: 'financial', appliesToRoles: [], iboOnly: true, sensitive: true, referenceKind: 'vendor', order: 10 },
+  { id: 'llc_sos', label: 'LLC / Secretary of State', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 9 },
+  { id: 'insurance', label: 'Proof of Insurance', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 10 },
+  { id: 'chargeback_card', label: 'Chargeback Credit Card', category: 'financial', appliesToRoles: [], iboOnly: true, sensitive: true, referenceKind: 'vendor', order: 11 },
 ];
 
 // Per-user progress on an onboarding item

@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { OnboardingItem, RoleDisplayNames, FieldRole } from '@/types';
+import { OnboardingItem, RoleDisplayNames, FieldRole, requiresHeavyVetting } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
@@ -149,6 +149,7 @@ export default function PublicOnboardingPage() {
   const roleLabel = data?.invite.intendedFieldRole
     ? RoleDisplayNames[data.invite.intendedFieldRole]
     : 'Field Representative';
+  const heavyVetting = data ? requiresHeavyVetting(data.invite.intendedFieldRole) : false;
 
   if (loading) {
     return (
@@ -358,41 +359,45 @@ export default function PublicOnboardingPage() {
                   </p>
                 )}
               </div>
-              <div>
-                <Label>Social Security Number</Label>
-                <Input
-                  value={profile.ssn}
-                  onChange={(event) =>
-                    setProfile((prev) => ({ ...prev, ssn: event.target.value }))
-                  }
-                  placeholder="123-45-6789"
-                  inputMode="numeric"
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <Label>Driver&apos;s License Number</Label>
-                <Input
-                  value={profile.dlNumber}
-                  onChange={(event) =>
-                    setProfile((prev) => ({ ...prev, dlNumber: event.target.value }))
-                  }
-                  autoComplete="off"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={profile.backgroundCheckAuth}
-                  onChange={(event) =>
-                    setProfile((prev) => ({ ...prev, backgroundCheckAuth: event.target.checked }))
-                  }
-                />
-                I authorize a background / drug screen.
-              </label>
-              <p className="text-xs text-slate-400 sm:col-span-2">
-                Your SSN and license number are encrypted and only visible to authorized administrators.
-              </p>
+              {heavyVetting && (
+                <>
+                  <div>
+                    <Label>Social Security Number</Label>
+                    <Input
+                      value={profile.ssn}
+                      onChange={(event) =>
+                        setProfile((prev) => ({ ...prev, ssn: event.target.value }))
+                      }
+                      placeholder="123-45-6789"
+                      inputMode="numeric"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label>Driver&apos;s License Number</Label>
+                    <Input
+                      value={profile.dlNumber}
+                      onChange={(event) =>
+                        setProfile((prev) => ({ ...prev, dlNumber: event.target.value }))
+                      }
+                      autoComplete="off"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={profile.backgroundCheckAuth}
+                      onChange={(event) =>
+                        setProfile((prev) => ({ ...prev, backgroundCheckAuth: event.target.checked }))
+                      }
+                    />
+                    I authorize a background / drug screen.
+                  </label>
+                  <p className="text-xs text-slate-400 sm:col-span-2">
+                    Your SSN and license number are encrypted and only visible to authorized administrators.
+                  </p>
+                </>
+              )}
               <div className="sm:col-span-2">
                 <Label>Create Portal Password</Label>
                 <Input

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { hashInviteToken } from '@/lib/recruiting/tokens';
-import { getOnboardingItemsForUser, looksLikeRawSensitiveData } from '@/types';
+import { getOnboardingItemsForUser, looksLikeRawSensitiveData, requiresHeavyVetting } from '@/types';
+import type { SensitiveDoc } from '@/types/sensitive';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 import { validateAddress } from '@/lib/validation/address';
@@ -146,6 +147,7 @@ export async function POST(
       );
     }
 
+    const heavyVetting = requiresHeavyVetting(data.intendedFieldRole);
     const items = getOnboardingItemsForUser(data.intendedFieldRole, data.isIBO ?? false);
     const missing = items.filter((item) => !clean(references[item.id], 500));
     if (missing.length > 0) {
@@ -191,14 +193,18 @@ export async function POST(
     // Sensitive fields (SSN, DL#, background-check auth) travel as their own body
     // keys, NEVER inside the references map, so the looksLikeRawSensitiveData
     // guardrail on references is not triggered. They are encrypted before storage.
-    const sensitive = buildSensitiveDoc({
-      ssn: typeof body.ssn === 'string' ? body.ssn : undefined,
-      dlNumber: typeof body.dlNumber === 'string' ? body.dlNumber : undefined,
-      backgroundCheckAuth:
-        typeof body.backgroundCheckAuth === 'boolean' ? body.backgroundCheckAuth : undefined,
-    });
-    if (!sensitive.ok) {
-      return NextResponse.json({ error: sensitive.error }, { status: 400 });
+    let sensitiveDoc: Partial<SensitiveDoc> = {};
+    if (heavyVetting) {
+      const sensitive = buildSensitiveDoc({
+        ssn: typeof body.ssn === 'string' ? body.ssn : undefined,
+        dlNumber: typeof body.dlNumber === 'string' ? body.dlNumber : undefined,
+        backgroundCheckAuth:
+          typeof body.backgroundCheckAuth === 'boolean' ? body.backgroundCheckAuth : undefined,
+      });
+      if (!sensitive.ok) {
+        return NextResponse.json({ error: sensitive.error }, { status: 400 });
+      }
+      sensitiveDoc = sensitive.doc;
     }
 
     const now = new Date();
@@ -228,9 +234,9 @@ export async function POST(
     batch.set(adminDb.collection('users').doc(userRecord.uid), userProfile);
 
     // Write the encrypted sensitive doc only when there is something to store.
-    if (Object.keys(sensitive.doc).length > 0) {
+    if (heavyVetting && Object.keys(sensitiveDoc).length > 0) {
       batch.set(adminDb.collection('userSensitive').doc(userRecord.uid), {
-        ...sensitive.doc,
+        ...sensitiveDoc,
         updatedAt: now,
         updatedBy: userRecord.uid,
       });

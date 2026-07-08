@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { ESIGN_ITEM_IDS, isEsignItem, ADOBE_SIGN_DASHBOARD_URL } from './esign';
 
 describe('ESIGN_ITEM_IDS', () => {
-  it('contains exactly the three esign items', () => {
+  it('contains exactly the four esign items', () => {
     expect(new Set(ESIGN_ITEM_IDS)).toEqual(
-      new Set(['contract', 'direct_deposit', 'pay_structure'])
+      new Set(['contract', 'direct_deposit', 'pay_structure', 'fcra_auth'])
     );
   });
 });
