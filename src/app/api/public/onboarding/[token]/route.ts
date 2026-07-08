@@ -7,6 +7,7 @@ import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 import { validateAddress } from '@/lib/validation/address';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
+import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -320,6 +321,10 @@ export async function POST(
       });
       throw commitError;
     }
+
+    void sendPendingEsignDocs(userRecord.uid).catch((err) =>
+      console.error('[onboarding] esign auto-send failed', err)
+    );
 
     await adminDb.collection('notifications').add({
       userId: data.ownerId,
