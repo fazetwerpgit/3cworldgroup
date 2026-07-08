@@ -2162,58 +2162,84 @@ git commit -m "feat(cron): hourly stall-detection nudges (24h/72h/7d) and alert 
 
 ---
 
-### Task 12: Self-registration door
+### Task 12: Self-registration funnel hookup (REVISED 2026-07-08)
+
+> Original task assumed no self-signup existed. WRONG: self-signup shipped 2026-07-06
+> (spec: `docs/superpowers/specs/2026-07-06-portal-self-signup-approval-design.md`).
+> It is client-SDK based: `AuthContext.signUp()` (`src/contexts/AuthContext.tsx` ~191-226)
+> does `createUserWithEmailAndPassword` + `setDoc(users/{uid}, { email, status:'pending', createdAt })`.
+> `POST /api/portal/auth/signup` is INTENTIONALLY disabled per that spec — leave it alone.
+> Admins already see pending signups in realtime (`src/hooks/admin/usePendingSignupsCount.ts`
+> onSnapshot badge/banner). Approval = admin Users page `handleApprove`
+> (`src/app/portal/admin/users/page.tsx` ~82-94) → `PUT /api/portal/auth/users/[id]`
+> with `{ status:'active', fieldRole:'entry_rep' }` — status and fieldRole can arrive in
+> the SAME call, or fieldRole can be set separately later via `UserForm.tsx`.
 
 **Files:**
-- Modify: `src/app/api/portal/auth/signup/route.ts` (currently returns 403 with the original code commented out)
-- Create: `src/app/register/page.tsx`
-- Modify: `src/app/api/portal/auth/users/[id]/route.ts` (role assignment kicks off the funnel)
-- Modify: the login page (grep `src/app` for the sign-in page component) — add a "New rep? Register here" link to `/register`
-- Test: covered by route-level behavior; no new pure logic (the funnel-kickoff logic reuses tested helpers)
+- Create: `src/app/api/portal/auth/signup-notify/route.ts`
+- Modify: `src/contexts/AuthContext.tsx` (fire-and-forget notify after successful signup)
+- Modify: `src/app/api/portal/auth/users/[id]/route.ts` (fieldRole-transition detection kicks off the funnel)
+- Modify: `src/app/portal/admin/users/page.tsx` (`handleApprove` currently hardcodes `fieldRole:'entry_rep'` — it must let the admin pick the role; see Step 3)
+- Test: covered by route-level behavior; funnel-kickoff logic reuses tested helpers
 
 **Interfaces:**
-- Consumes: `createAlertTask`/`resolveAlertTasks` (Task 7), `sendPendingEsignDocs` (Task 9), `dispatchToUser` (Task 6), `adminAuth`/`adminDb`.
-- Produces: `POST /api/portal/auth/signup` body `{ displayName, email, phone, password }` → creates a `pending` user with NO fieldRole and broadcasts a `pending_assignment` alertTask. Role assignment via the existing PUT route resolves that task and starts the checklist funnel.
+- Consumes: `createAlertTask`/`resolveAlertTasks` (Task 7), `sendPendingEsignDocs` (Task 9), `dispatchToUser` (Task 6), `adminDb`.
+- Produces: `POST /api/portal/auth/signup-notify` body `{ uid }` → broadcasts a `pending_assignment` alertTask (idempotent via createAlertTask dedupe). The PUT users route detects a fieldRole transition (none → set) on a user and starts the checklist funnel.
 
-- [ ] **Step 1: Re-enable signup**
+- [ ] **Step 1: Signup-notify endpoint**
 
-In `src/app/api/portal/auth/signup/route.ts`: restore the commented-out original creation logic as the base, then shape it to: validate `displayName`/`email`/`password` (min 8 chars) presence → `adminAuth.createUser({ email, password, displayName })` → write `users/{uid}`:
+The signup write is client-side, so the alert engine (server-only) needs a small hook. Create `src/app/api/portal/auth/signup-notify/route.ts`:
 
 ```ts
-{
-  email, displayName, phone: phone ?? '',
-  isIBO: false,
-  status: 'pending',
-  // NO fieldRole and NO role: unassigned pool. Sensitive data is NOT collected here
-  // (design decision 1: nothing sensitive before a manager assigns a role).
-  hireDate: now, createdAt: now, updatedAt: now,
+import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase/admin';
+import { createAlertTask } from '@/lib/alerts/alertTasks';
+
+export async function POST(request: Request) {
+  const { uid } = (await request.json()) as { uid?: string };
+  if (!uid) return NextResponse.json({ error: 'uid required' }, { status: 400 });
+
+  // Only ever notifies about a real, still-pending, role-less user doc —
+  // safe to leave unauthenticated-but-validated (the caller just signed up
+  // and has no session yet that portal API gates recognize).
+  const snap = await adminDb.doc(`users/${uid}`).get();
+  if (!snap.exists || snap.get('status') !== 'pending' || snap.get('fieldRole')) {
+    return NextResponse.json({ ok: true });
+  }
+  const name = (snap.get('displayName') as string) ?? (snap.get('email') as string) ?? uid;
+  await createAlertTask({
+    kind: 'pending_assignment',
+    subjectUserId: uid,
+    subjectName: name,
+    title: `${name} self-registered and needs a position`,
+    message: 'Assign their role to start onboarding.',
+    link: '/portal/admin/users',
+  });
+  return NextResponse.json({ ok: true });
 }
 ```
 
-Then broadcast:
+(createAlertTask's dedupe makes repeat calls harmless.)
+
+- [ ] **Step 2: Call it after signup**
+
+In `src/contexts/AuthContext.tsx` `signUp()`, after the `setDoc` succeeds, add fire-and-forget:
 
 ```ts
-import { createAlertTask } from '@/lib/alerts/alertTasks';
-
-await createAlertTask({
-  kind: 'pending_assignment',
-  subjectUserId: uid,
-  subjectName: displayName,
-  title: `${displayName} self-registered and needs a position`,
-  message: 'Assign their role to start onboarding.',
-  link: '/portal/admin/users',
-});
+void fetch('/api/portal/auth/signup-notify', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ uid: cred.user.uid }),
+}).catch(() => {});
 ```
 
-Return `{ ok: true }`. On any Firestore failure after `createUser`, delete the auth user (mirror the rollback pattern in `src/app/api/public/onboarding/[token]/route.ts`).
-
-- [ ] **Step 2: Registration page**
-
-Create `src/app/register/page.tsx` — a public client component styled like `/onboard/[token]` (reuse its form field classes / `src/components/ui/*` inputs): fields Name, Email, Phone (optional), Password; submit → `POST /api/portal/auth/signup`; on success replace the form with: "You're in the pool. A manager will assign your position shortly - you'll get an email when your onboarding checklist is ready." Handle 4xx by showing the error text inline.
+(Use the actual credential variable name in that function. Must not block or fail signup.)
 
 - [ ] **Step 3: Role assignment kicks off the funnel**
 
-In `src/app/api/portal/auth/users/[id]/route.ts` PUT: detect the kickoff condition — incoming `fieldRole` is set AND the user's previous doc had no `fieldRole` AND `status` is `'pending'`. When true, after the update succeeds:
+In `src/app/api/portal/auth/users/[id]/route.ts` PUT: the handler already fetches the existing doc before writing (~lines 142-167). Detect the kickoff condition — incoming `fieldRole` is set AND the previous doc had NO `fieldRole`. (Do not require `status === 'pending'` in the guard: the approve path sets `status:'active'` and `fieldRole` in the same call, and design decision 6 still wants the checklist funnel for them. Note the promotion warning from Task 3 already covers light-vetting roles here.) When true, after the update succeeds:
+
+Also in `src/app/portal/admin/users/page.tsx` `handleApprove`: replace the hardcoded `fieldRole: 'entry_rep'` with a role picker (small select in the approve confirmation using `RoleDisplayNames` field-role entries, defaulting to `entry_rep`) so decision 1 ("manager assigns the position") is honored. Additionally, per decision 6, the approve flow should set `status` to remain `'pending'` until onboarding completes — change `handleApprove` to send only `{ fieldRole }` (keep status pending; activation now happens via Task 10's activate route when the checklist is green).
 
 ```ts
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
@@ -2235,17 +2261,13 @@ void sendPendingEsignDocs(id).catch((err) => console.error('[users] esign kickof
 
 (If reusing the h24 nudge template reads oddly here, add a small `checklistReadyEmail(p: { name: string; portalUrl: string }): EmailContent` to `src/lib/email/templates.ts` with subject "Your onboarding checklist is ready" and the same layout — preferred.)
 
-- [ ] **Step 4: Login page link**
+- [ ] **Step 4: Gates and commit**
 
-Find the sign-in page (grep for the login form under `src/app`) and add under the form: `New rep without an invite? <Link href="/register">Register here</Link>`.
-
-- [ ] **Step 5: Gates and commit**
-
-Run: `npm test`, `npx tsc --noEmit`, `npm run build` → clean. Manually verify with `npm run dev`: register at `/register`, confirm the user appears in the admin users page as pending, assign `entry_rep`, confirm the checklist-ready notification appears.
+Run: `npm test`, `npx tsc --noEmit`, `npm run build` → clean. Manually verify with `npm run dev`: sign up at `/portal/signup`, confirm the pending_assignment alert fires, approve with a role from the admin users page, confirm the checklist-ready notification + e-sign kickoff.
 
 ```bash
-git add src/app/api/portal/auth/signup src/app/register src/app/api/portal/auth/users src/lib/email/templates.ts
-git commit -m "feat(auth): self-registration pool; role assignment kicks off onboarding funnel"
+git add src/app/api/portal/auth/signup-notify src/contexts/AuthContext.tsx src/app/api/portal/auth/users src/app/portal/admin/users src/lib/email/templates.ts
+git commit -m "feat(auth): wire self-signup into alert engine; role assignment kicks off onboarding funnel"
 ```
 
 ---
