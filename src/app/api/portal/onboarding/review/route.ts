@@ -3,7 +3,9 @@ import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { requireManagement } from '@/lib/auth/requireManagement';
-import { createNotification } from '@/lib/notifications/createNotification';
+import { dispatchToUser } from '@/lib/alerts/dispatch';
+import { appBaseUrl, itemRejectedEmail } from '@/lib/email/templates';
+import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -191,7 +193,7 @@ export async function POST(request: NextRequest) {
     try {
       // Notify the rep of the outcome
       if (status === 'approved') {
-        await createNotification({
+        await dispatchToUser({
           userId,
           type: 'onboarding_approved',
           title: `${item.label} Approved`,
@@ -199,14 +201,26 @@ export async function POST(request: NextRequest) {
           link: '/portal/onboarding',
           metadata: { itemId },
         });
+        void maybeFlagActivationReady(userId).catch((error) => {
+          console.error('Failed to flag activation readiness after item approval:', error);
+        });
       } else {
-        await createNotification({
+        const userSnap = await adminDb.collection('users').doc(userId).get();
+        const name = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
+        const reason = rejectionReason.trim();
+        await dispatchToUser({
           userId,
           type: 'onboarding_rejected',
           title: `${item.label} Needs Attention`,
-          message: rejectionReason.trim(),
+          message: reason,
           link: '/portal/onboarding',
-          metadata: { itemId, rejectionReason: rejectionReason.trim() },
+          email: itemRejectedEmail({
+            name,
+            itemLabel: item.label,
+            reason,
+            portalUrl: `${appBaseUrl()}/portal/onboarding`,
+          }),
+          metadata: { itemId, rejectionReason: reason },
         });
       }
     } catch (error) {

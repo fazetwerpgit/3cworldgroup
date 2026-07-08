@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { adminDb } from '@/lib/firebase/admin';
+import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { IBO_FIELD_ROLES, resolveRoles } from '@/types';
 
 async function getRequester(userId: string) {
@@ -122,8 +124,6 @@ export async function POST(request: NextRequest) {
       ),
       adminDb.collection('users').doc(invite.convertedUserId).set(
         {
-          status: 'active',
-          hireDate: now,
           updatedAt: now,
         },
         { merge: true }
@@ -140,6 +140,17 @@ export async function POST(request: NextRequest) {
         { merge: true }
       );
     }
+
+    await dispatchToUser({
+      userId: invite.convertedUserId,
+      type: 'onboarding_approved',
+      title: 'Application approved',
+      message: 'Your application was approved. Finish your remaining onboarding steps to go active.',
+      link: '/portal/onboarding',
+    });
+    void maybeFlagActivationReady(invite.convertedUserId).catch((error) => {
+      console.error('Failed to flag activation readiness after recruit conversion:', error);
+    });
 
     return NextResponse.json({ success: true, status: 'converted' });
   } catch (error) {

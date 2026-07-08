@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { getEsignProvider } from '@/lib/esign/provider';
 import { createNotification } from '@/lib/notifications/createNotification';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
+import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 
 export async function POST(request: Request) {
   const raw = await request.text();
@@ -20,6 +21,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  const item = ONBOARDING_ITEMS.find((candidate) => candidate.id === itemId);
+  if (!item) {
+    console.error('[esign webhook] completed event has unknown itemId', {
+      envelopeId: event.envelopeId,
+      itemId,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   const now = new Date();
   await adminDb.doc(`userOnboarding/${userId}_${itemId}`).set(
     {
@@ -34,14 +44,14 @@ export async function POST(request: Request) {
     { merge: true }
   );
 
-  const label = ONBOARDING_ITEMS.find((item) => item.id === itemId)?.label ?? itemId;
   await createNotification({
     userId,
     type: 'esign_completed',
     title: 'Document signed',
-    message: `${label} is complete.`,
+    message: `${item.label} is complete.`,
     link: '/portal/onboarding',
   });
+  await maybeFlagActivationReady(userId);
 
   return NextResponse.json({ ok: true });
 }
