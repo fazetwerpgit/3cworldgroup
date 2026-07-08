@@ -355,13 +355,13 @@ export default function OnboardingPage() {
             ) : submitModal && isEsignItem(submitModal.id) ? (
               <div className="space-y-2">
                 <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 dark:bg-slate-800 text-[#0A1F44] dark:text-foreground">
-                  Adobe Sign
+                  E-signature
                 </Badge>
                 <p className="text-xs text-slate-500 dark:text-muted-foreground">{ESIGN_HELPER_TEXT}</p>
                 <Input
                   value={reference}
                   onChange={(event) => setReference(event.target.value)}
-                  placeholder="Adobe Sign confirmation"
+                  placeholder="E-signature confirmation"
                   maxLength={500}
                 />
               </div>

@@ -484,13 +484,13 @@ export default function PublicOnboardingPage() {
                   ) : isEsignItem(item.id) ? (
                     <div className="space-y-2">
                       <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 text-[#0A1F44]">
-                        Adobe Sign
+                        E-signature
                       </Badge>
                       <p className="text-xs text-slate-500">{ESIGN_HELPER_TEXT}</p>
                       <Textarea
                         value={references[item.id] || ''}
                         onChange={(event) => updateReference(item.id, event.target.value)}
-                        placeholder="Adobe Sign confirmation"
+                        placeholder="E-signature confirmation"
                         required
                       />
                     </div>

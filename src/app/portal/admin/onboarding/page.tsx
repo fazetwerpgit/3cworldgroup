@@ -10,7 +10,6 @@ import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
-import { ADOBE_SIGN_DASHBOARD_URL } from '@/lib/onboarding/esign';
 
 interface Submission {
   id: string;
@@ -245,16 +244,8 @@ export default function OnboardingReviewPage() {
                         <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-sm text-slate-700 dark:text-muted-foreground">
                           <div className="mb-2 flex items-center gap-2">
                             <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 dark:bg-slate-800 text-[#0A1F44] dark:text-foreground">
-                              Adobe Sign
+                              E-signature
                             </Badge>
-                            <a
-                              href={ADOBE_SIGN_DASHBOARD_URL}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-medium text-[#4f7f1e] dark:text-green-300 hover:underline"
-                            >
-                              Open Adobe Sign ↗
-                            </a>
                           </div>
                           {submission.reference ? (
                             <>

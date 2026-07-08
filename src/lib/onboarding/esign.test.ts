@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ESIGN_ITEM_IDS, isEsignItem, ADOBE_SIGN_DASHBOARD_URL } from './esign';
+import { ESIGN_HELPER_TEXT, ESIGN_ITEM_IDS, isEsignItem } from './esign';
 
 describe('ESIGN_ITEM_IDS', () => {
   it('contains exactly the four esign items', () => {
@@ -24,8 +24,10 @@ describe('isEsignItem', () => {
   });
 });
 
-describe('ADOBE_SIGN_DASHBOARD_URL', () => {
-  it('is an absolute https adobesign url', () => {
-    expect(ADOBE_SIGN_DASHBOARD_URL).toMatch(/^https:\/\/.*adobesign\.com/);
+describe('ESIGN_HELPER_TEXT', () => {
+  it('uses provider-neutral e-sign copy', () => {
+    expect(ESIGN_HELPER_TEXT).toBe(
+      "We've emailed you this document for e-signature. Check your inbox - it completes here automatically once signed."
+    );
   });
 });
