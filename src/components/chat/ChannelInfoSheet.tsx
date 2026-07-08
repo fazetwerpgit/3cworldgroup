@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Hash, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
+import { ChevronLeft, Hash, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -308,6 +308,14 @@ export function ChannelInfoSheet({
       >
         <SheetHeader className="border-b border-slate-200 dark:border-border p-4">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label="Back to chat"
+              className="grid size-10 shrink-0 place-items-center rounded-md text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted -ml-2"
+            >
+              <ChevronLeft className="size-6" />
+            </button>
             {isLocked ? (
               <Lock className="size-5 shrink-0 text-slate-500 dark:text-muted-foreground" />
             ) : (
