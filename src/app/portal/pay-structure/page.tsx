@@ -31,6 +31,9 @@ const TIER_NOTES: Record<FieldRole, string> = {
   ibo_level_2: 'Commission on your own sales plus an IBO team override.',
   ibo_level_3: 'Commission on your own sales plus an IBO team override.',
   ibo_level_4: 'Commission on your own sales plus an IBO team override.',
+  general_manager: 'General Manager commission on your own sales plus an override on your team.',
+  gm_in_training: 'GM in Training commission on your own approved sales.',
+  office_manager: 'Office Manager commission on your own sales plus an override on your team.',
 };
 
 const TIER_ICON: Record<FieldRole, ElementType> = {
@@ -41,6 +44,9 @@ const TIER_ICON: Record<FieldRole, ElementType> = {
   ibo_level_2: Briefcase,
   ibo_level_3: Briefcase,
   ibo_level_4: Briefcase,
+  general_manager: Users,
+  gm_in_training: BadgeDollarSign,
+  office_manager: Users,
 };
 
 export default function PayStructurePage() {

@@ -87,7 +87,7 @@ const mainItems: NavItem[] = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
-    roles: ['entry_rep', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
+    roles: ['entry_rep', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4', 'general_manager', 'gm_in_training', 'office_manager'],
   },
 ];
 
@@ -138,7 +138,7 @@ const formItems: NavItem[] = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       </svg>
     ),
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
+    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4', 'general_manager', 'office_manager'],
   },
 ];
 
@@ -266,7 +266,7 @@ const operationsItems: NavItem[] = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3M12 14a4 4 0 10-8 0v1h8v-1zm-4-6a3 3 0 100-6 3 3 0 000 6z" />
       </svg>
     ),
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
+    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4', 'general_manager', 'office_manager'],
   },
   {
     name: 'Email Templates',
@@ -500,7 +500,9 @@ export function PortalSidebar() {
     'ibo_level_1',
     'ibo_level_2',
     'ibo_level_3',
-    'ibo_level_4'
+    'ibo_level_4',
+    'general_manager',
+    'office_manager'
   );
   const showAdminSection = isRole('admin');
   const pendingSignupsCount = usePendingSignupsCount(showAdminSection);

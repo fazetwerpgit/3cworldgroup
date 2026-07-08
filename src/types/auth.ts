@@ -9,7 +9,10 @@ export type FieldRole =
   | 'ibo_level_1'
   | 'ibo_level_2'
   | 'ibo_level_3'
-  | 'ibo_level_4';
+  | 'ibo_level_4'
+  | 'general_manager'
+  | 'gm_in_training'
+  | 'office_manager';
 
 /** @deprecated Use PlatformRole | FieldRole instead */
 export type UserRole = PlatformRole | FieldRole;
@@ -28,6 +31,9 @@ export const FieldRoles = {
   IBO_LEVEL_2: 'ibo_level_2',
   IBO_LEVEL_3: 'ibo_level_3',
   IBO_LEVEL_4: 'ibo_level_4',
+  GENERAL_MANAGER: 'general_manager',
+  GM_IN_TRAINING: 'gm_in_training',
+  OFFICE_MANAGER: 'office_manager',
 } as const;
 
 export const IBO_FIELD_ROLES: readonly FieldRole[] = [
@@ -35,6 +41,25 @@ export const IBO_FIELD_ROLES: readonly FieldRole[] = [
   'ibo_level_2',
   'ibo_level_3',
   'ibo_level_4',
+];
+
+/** Internal-promotion roles: no background screen, SSN, DL#, or DL photos. */
+export const LIGHT_VETTING_ROLES: readonly FieldRole[] = [
+  'general_manager',
+  'gm_in_training',
+  'office_manager',
+];
+
+/** Field roles treated as management for gating and alert broadcast. */
+export const MANAGEMENT_FIELD_ROLES: readonly FieldRole[] = [
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+  'general_manager',
+  'office_manager',
 ];
 
 // Base permissions everyone gets
@@ -102,6 +127,9 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
   ibo_level_2: [...FIELD_MANAGER_PERMISSIONS],
   ibo_level_3: [...FIELD_MANAGER_PERMISSIONS],
   ibo_level_4: [...FIELD_MANAGER_PERMISSIONS],
+  general_manager: [...FIELD_MANAGER_PERMISSIONS],
+  gm_in_training: [...FIELD_REP_PERMISSIONS],
+  office_manager: [...FIELD_MANAGER_PERMISSIONS],
 };
 
 // Role display names for UI
@@ -115,6 +143,9 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   ibo_level_2: 'IBO Level 2',
   ibo_level_3: 'IBO Level 3',
   ibo_level_4: 'IBO Level 4',
+  general_manager: 'General Manager',
+  gm_in_training: 'GM in Training',
+  office_manager: 'Office Manager',
 };
 
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);

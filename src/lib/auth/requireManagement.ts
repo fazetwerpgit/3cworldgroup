@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { resolveRoles, PlatformRole, FieldRole, IBO_FIELD_ROLES } from '@/types';
+import { resolveRoles, PlatformRole, FieldRole, MANAGEMENT_FIELD_ROLES } from '@/types';
 
 /**
  * Server-side caller identity, resolved from a client-supplied userId.
@@ -21,7 +21,7 @@ export interface Requester {
   isManagement: boolean;
   /** admin only */
   isAdmin: boolean;
-  /** admin, operations, l1_manager, l2_manager, or IBO levels */
+  /** admin, operations, or management field roles */
   isManagerOrAbove: boolean;
 }
 
@@ -44,9 +44,7 @@ export async function getRequester(
   const isAdmin = role === 'admin';
   const isManagerOrAbove =
     isManagement ||
-    fieldRole === 'l1_manager' ||
-    fieldRole === 'l2_manager' ||
-    (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
+    (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
 
   return {
     uid: userId,
