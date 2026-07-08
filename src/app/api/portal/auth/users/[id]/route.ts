@@ -176,16 +176,20 @@ export async function PUT(
     await docRef.update(updateData);
 
     let promotionWarning = false;
-    if (fieldRole && (LIGHT_VETTING_ROLES as readonly string[]).includes(fieldRole)) {
-      const snap = await adminDb
-        .collection('userOnboarding')
-        .where('userId', '==', id)
-        .get();
-      const statuses: Record<string, OnboardingStatus> = {};
-      snap.forEach((d) => {
-        statuses[d.get('itemId') as string] = d.get('status') as OnboardingStatus;
-      });
-      promotionWarning = needsPromotionWarning(fieldRole, statuses);
+    try {
+      if (fieldRole && (LIGHT_VETTING_ROLES as readonly string[]).includes(fieldRole)) {
+        const snap = await adminDb
+          .collection('userOnboarding')
+          .where('userId', '==', id)
+          .get();
+        const statuses: Record<string, OnboardingStatus> = {};
+        snap.forEach((d) => {
+          statuses[d.get('itemId') as string] = d.get('status') as OnboardingStatus;
+        });
+        promotionWarning = needsPromotionWarning(fieldRole, statuses);
+      }
+    } catch (error) {
+      console.error('[users] Failed to compute promotion warning:', error);
     }
 
     return NextResponse.json({ success: true, promotionWarning });
