@@ -8,11 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 
 // Pure so it's cheap to unit test independent of the Firestore listener.
 export function pendingSignupsLabel(count: number): string {
-  return `${count} signup${count === 1 ? '' : 's'} awaiting approval`;
+  return `${count} signup${count === 1 ? '' : 's'} awaiting role assignment`;
 }
 
 /**
- * Admin-only dashboard banner surfacing self-signups stuck in 'pending'.
+ * Admin-only dashboard banner surfacing self-signups still awaiting a field role.
  * Renders nothing for non-admins or once the queue is empty.
  */
 export function PendingSignupsBanner() {

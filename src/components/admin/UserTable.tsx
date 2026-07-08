@@ -147,7 +147,7 @@ export function UserTable({ users, onStatusChange, onApprove, onDelete, loading 
                       Edit
                     </Link>
                   </Button>
-                  {onApprove && user.status === 'pending' && (
+                  {onApprove && user.status === 'pending' && !user.fieldRole && (
                     <Button
                       type="button"
                       size="sm"
