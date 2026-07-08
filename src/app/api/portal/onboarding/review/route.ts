@@ -3,6 +3,7 @@ import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { requireManagement } from '@/lib/auth/requireManagement';
+import { createNotification } from '@/lib/notifications/createNotification';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -33,33 +34,6 @@ async function signFolderFiles(
   } catch (error) {
     console.error('Failed to sign storage files for review:', error);
     return [];
-  }
-}
-
-// Helper function to create a notification (mirrors sales/approve)
-async function createNotification(
-  userId: string,
-  type: string,
-  title: string,
-  message: string,
-  link?: string,
-  metadata?: Record<string, unknown>
-) {
-  if (!adminDb) return;
-
-  try {
-    await adminDb.collection('notifications').add({
-      userId,
-      type,
-      title,
-      message,
-      link,
-      metadata: metadata || {},
-      read: false,
-      createdAt: new Date(),
-    });
-  } catch (error) {
-    console.error('Error creating notification:', error);
   }
 }
 
@@ -214,25 +188,29 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     });
 
-    // Notify the rep of the outcome
-    if (status === 'approved') {
-      await createNotification(
-        userId,
-        'onboarding_approved',
-        `${item.label} Approved`,
-        `Your ${item.label} submission has been approved.`,
-        '/portal/onboarding',
-        { itemId }
-      );
-    } else {
-      await createNotification(
-        userId,
-        'onboarding_rejected',
-        `${item.label} Needs Attention`,
-        rejectionReason.trim(),
-        '/portal/onboarding',
-        { itemId, rejectionReason: rejectionReason.trim() }
-      );
+    try {
+      // Notify the rep of the outcome
+      if (status === 'approved') {
+        await createNotification({
+          userId,
+          type: 'onboarding_approved',
+          title: `${item.label} Approved`,
+          message: `Your ${item.label} submission has been approved.`,
+          link: '/portal/onboarding',
+          metadata: { itemId },
+        });
+      } else {
+        await createNotification({
+          userId,
+          type: 'onboarding_rejected',
+          title: `${item.label} Needs Attention`,
+          message: rejectionReason.trim(),
+          link: '/portal/onboarding',
+          metadata: { itemId, rejectionReason: rejectionReason.trim() },
+        });
+      }
+    } catch (error) {
+      console.error('Error creating notification:', error);
     }
 
     return NextResponse.json({

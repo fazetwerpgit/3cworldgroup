@@ -8,7 +8,13 @@ export type NotificationType =
   | 'onboarding_approved'
   | 'onboarding_rejected'
   | 'announcement'
-  | 'system';
+  | 'system'
+  | 'onboarding_nudge'
+  | 'esign_completed'
+  | 'activation_ready'
+  | 'rep_activated'
+  | 'pending_assignment'
+  | 'alert_task';
 
 export interface Notification {
   id: string;
@@ -40,4 +46,10 @@ export const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   onboarding_rejected: 'bg-red-50 text-red-700',
   announcement: 'bg-orange-50 text-orange-700',
   system: 'bg-gray-50 text-gray-700',
+  onboarding_nudge: 'bg-blue-50 text-blue-700',
+  esign_completed: 'bg-blue-50 text-blue-700',
+  activation_ready: 'bg-blue-50 text-blue-700',
+  rep_activated: 'bg-blue-50 text-blue-700',
+  pending_assignment: 'bg-blue-50 text-blue-700',
+  alert_task: 'bg-orange-50 text-orange-700',
 };

@@ -119,6 +119,12 @@ export function PortalHeader() {
     onboarding_rejected: 'dark:bg-red-500/15 dark:text-red-300',
     announcement: 'dark:bg-orange-500/15 dark:text-orange-300',
     system: 'dark:bg-muted dark:text-muted-foreground',
+    onboarding_nudge: 'dark:bg-blue-500/15 dark:text-blue-300',
+    esign_completed: 'dark:bg-blue-500/15 dark:text-blue-300',
+    activation_ready: 'dark:bg-blue-500/15 dark:text-blue-300',
+    rep_activated: 'dark:bg-blue-500/15 dark:text-blue-300',
+    pending_assignment: 'dark:bg-blue-500/15 dark:text-blue-300',
+    alert_task: 'dark:bg-orange-500/15 dark:text-orange-300',
   };
 
   return (
