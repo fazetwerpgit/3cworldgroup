@@ -9,6 +9,8 @@ import {
   resolveRoles,
 } from '@/types';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
+import { sendEmail } from '@/lib/email/sendEmail';
+import { inviteEmail } from '@/lib/email/templates';
 
 const VALID_FIELD_ROLES: FieldRole[] = Object.values(FieldRoles);
 
@@ -181,6 +183,11 @@ export async function POST(request: NextRequest) {
     }
 
     const inviteUrl = `${request.nextUrl.origin}/onboard/${token}`;
+
+    void sendEmail({
+      to: candidateEmail,
+      ...inviteEmail({ candidateName, ownerName: requester.name, inviteUrl }),
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,
