@@ -96,6 +96,11 @@ export default function UsersPage() {
 
   const handleApproveClick = (userId: string) => {
     const target = users.find((u) => u.uid === userId);
+    if (target?.fieldRole) {
+      setError('This user already has a role assigned and is waiting for onboarding completion.');
+      return;
+    }
+
     setApproveFieldRole('entry_rep');
     setApproveConfirm({
       userId,
