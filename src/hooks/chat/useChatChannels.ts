@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase/config';
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/firebase/config';
 import { ChatChannel } from '@/types';
 
 // lastMessageAt is server-stamped on the channel doc when a message is sent (via
@@ -23,12 +24,14 @@ function toDate(value: unknown): Date | null {
 }
 
 export function useChatChannels() {
+  const { user } = useAuth();
   const [channels, setChannels] = useState<ChatChannelDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Pending reps lack rules access to chat, so only active users subscribe.
+  const uid = user?.status === 'active' ? user.uid : undefined;
 
   useEffect(() => {
-    const uid = auth?.currentUser?.uid;
     if (!db || !uid) {
       setChannels([]);
       setLoading(false);
@@ -73,7 +76,7 @@ export function useChatChannels() {
         setLoading(false);
       }
     );
-  }, [auth?.currentUser?.uid]);
+  }, [uid]);
 
   return { channels, loading, error };
 }

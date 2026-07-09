@@ -47,9 +47,12 @@ service cloud.firestore {
       allow update, delete: if isApproved();
     }
 
+    // Notifications are created/updated exclusively server-side (Admin SDK via
+    // /api/portal/notifications and lib/notifications). Clients may only read
+    // their own — at ANY status, so mid-onboarding (pending) reps see their bell.
     match /notifications/{notifId} {
-      allow read, update: if isApproved();
-      allow create: if isApproved();
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false;
     }
 
     match /training/{docId} {
