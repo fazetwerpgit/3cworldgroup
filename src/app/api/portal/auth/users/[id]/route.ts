@@ -17,6 +17,7 @@ import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { appBaseUrl, checklistReadyEmail } from '@/lib/email/templates';
+import { restampAuthor } from '@/lib/chat/restampAuthor';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -112,6 +113,8 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     const existingFieldRole = doc.get('fieldRole') as FieldRole | undefined;
+    const existingRole = doc.get('role') as PlatformRole | undefined;
+    const existingDisplayName = doc.get('displayName') as string | undefined;
 
     // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
     const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
@@ -150,7 +153,12 @@ export async function PUT(
       updatedAt: new Date(),
     };
 
-    if (displayName !== undefined) updateData.displayName = displayName;
+    // An empty/whitespace displayName is treated as no change: never persist
+    // it (Firestore or Auth), since downstream chat/UI falls back to email
+    // when displayName is falsy.
+    const trimmedDisplayName =
+      typeof displayName === 'string' ? displayName.trim() : undefined;
+    if (trimmedDisplayName) updateData.displayName = trimmedDisplayName;
     // A user is either platform or field: assigning one role kind clears the
     // other so a stale legacy `role` value can't shadow the new fieldRole.
     if (role !== undefined) {
@@ -175,11 +183,31 @@ export async function PUT(
     const shouldKickoffChecklist = !!fieldRole && !existingFieldRole;
 
     // Update displayName in Firebase Auth if changed
-    if (displayName) {
-      await adminAuth.updateUser(id, { displayName });
+    if (trimmedDisplayName) {
+      await adminAuth.updateUser(id, { displayName: trimmedDisplayName });
     }
 
     await docRef.update(updateData);
+
+    // Re-stamp denormalized chat author fields on this user's OLD messages so
+    // they don't keep showing a stale name/role forever. Only when something
+    // actually changed to a new value; a backfill failure must never roll
+    // back the profile update itself (already committed above).
+    const nameChanged = !!trimmedDisplayName && trimmedDisplayName !== existingDisplayName;
+    const newEffectiveRole =
+      role !== undefined ? role : fieldRole !== undefined ? fieldRole : undefined;
+    const existingEffectiveRole = existingRole ?? existingFieldRole;
+    const roleChanged = newEffectiveRole !== undefined && newEffectiveRole !== existingEffectiveRole;
+    if (nameChanged || roleChanged) {
+      try {
+        await restampAuthor(id, {
+          ...(nameChanged ? { authorName: trimmedDisplayName } : {}),
+          ...(roleChanged ? { authorRole: newEffectiveRole ?? null } : {}),
+        });
+      } catch (error) {
+        console.error('[users] Failed to re-stamp chat author fields:', error);
+      }
+    }
 
     if (shouldKickoffChecklist) {
       const updatedDisplayName =
