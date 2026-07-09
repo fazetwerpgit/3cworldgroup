@@ -23,14 +23,17 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
 
   const authoredMessageIds: string[] = [];
 
-  let lastId: string | undefined;
+  // startAfter needs the DocumentSnapshot, not the bare id string: a collection-
+  // group document ID isn't a valid path on its own (it throws "odd number of
+  // segments"), which would silently abort pagination past the first page.
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined;
   for (;;) {
     let query = adminDb
       .collectionGroup('messages')
       .where('authorId', '==', uid)
       .orderBy(FieldPath.documentId())
       .limit(BATCH_LIMIT);
-    if (lastId) query = query.startAfter(lastId);
+    if (lastDoc) query = query.startAfter(lastDoc);
 
     const snap = await query.get();
     if (snap.empty) break;
@@ -45,7 +48,7 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
     }
     await batch.commit();
 
-    lastId = snap.docs[snap.docs.length - 1].id;
+    lastDoc = snap.docs[snap.docs.length - 1];
     if (snap.docs.length < BATCH_LIMIT) break;
   }
 
@@ -55,14 +58,14 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
 
   for (let i = 0; i < authoredMessageIds.length; i += IN_CHUNK_SIZE) {
     const chunk = authoredMessageIds.slice(i, i + IN_CHUNK_SIZE);
-    let lastReplyId: string | undefined;
+    let lastReplyDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined;
     for (;;) {
       let query = adminDb
         .collectionGroup('messages')
         .where('replyTo.messageId', 'in', chunk)
         .orderBy(FieldPath.documentId())
         .limit(BATCH_LIMIT);
-      if (lastReplyId) query = query.startAfter(lastReplyId);
+      if (lastReplyDoc) query = query.startAfter(lastReplyDoc);
 
       const snap = await query.get();
       if (snap.empty) break;
@@ -73,7 +76,7 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
       }
       await batch.commit();
 
-      lastReplyId = snap.docs[snap.docs.length - 1].id;
+      lastReplyDoc = snap.docs[snap.docs.length - 1];
       if (snap.docs.length < BATCH_LIMIT) break;
     }
   }
