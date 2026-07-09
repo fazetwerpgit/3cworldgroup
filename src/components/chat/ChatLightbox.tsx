@@ -8,6 +8,8 @@ export interface LightboxImage {
   url: string;
   author?: string;
   time?: string;
+  /** Overrides the default "Shared by <author>" alt text for non-chat callers. */
+  alt?: string;
 }
 
 /**
@@ -83,7 +85,7 @@ export function ChatLightbox({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image.url}
-          alt={image.author ? `Shared by ${image.author}` : 'Shared image'}
+          alt={image.alt ?? (image.author ? `Shared by ${image.author}` : 'Shared image')}
           onClick={(event) => event.stopPropagation()}
           className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
         />

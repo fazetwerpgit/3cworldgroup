@@ -22,6 +22,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { ChatLightbox } from '@/components/chat/ChatLightbox';
+import type { LightboxImage } from '@/components/chat/ChatLightbox';
 
 interface SaleDetailSheetProps {
   sale: Sale | null;
@@ -95,6 +97,8 @@ export function SaleDetailSheet({
   onRequestDelete,
 }: SaleDetailSheetProps) {
   const [proofLoading, setProofLoading] = useState(false);
+  const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
 
   // Radix keeps the content mounted through the close animation; guard the body.
   if (!sale) {
@@ -107,6 +111,7 @@ export function SaleDetailSheet({
   const openScreenshot = async () => {
     if (!sale.proofScreenshotPath) return;
     setProofLoading(true);
+    setProofError(null);
     try {
       const t = await auth?.currentUser?.getIdToken();
       const res = await fetch(
@@ -114,7 +119,13 @@ export function SaleDetailSheet({
         { headers: t ? { Authorization: `Bearer ${t}` } : undefined }
       );
       const json = await res.json();
-      if (res.ok && json.url) window.open(json.url, '_blank', 'noopener');
+      if (res.ok && json.url) {
+        setProofImage({ url: json.url, alt: 'Proof screenshot' });
+      } else {
+        setProofError('Could not load the screenshot. Try again.');
+      }
+    } catch {
+      setProofError('Could not load the screenshot. Try again.');
     } finally {
       setProofLoading(false);
     }
@@ -226,6 +237,9 @@ export function SaleDetailSheet({
               >
                 {proofLoading ? 'Opening…' : 'View screenshot'}
               </Button>
+              {proofError && (
+                <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{proofError}</p>
+              )}
             </Field>
           )}
 
@@ -302,6 +316,7 @@ export function SaleDetailSheet({
           </Button>
         </div>
       </SheetContent>
+      <ChatLightbox image={proofImage} onClose={() => setProofImage(null)} />
     </Sheet>
   );
 }
