@@ -175,11 +175,6 @@ export default function EditSalePage() {
       return;
     }
 
-    if (!formData.installDate) {
-      setFormError('Please select the install date');
-      return;
-    }
-
     if (!hasSaleProof(formData)) {
       setFormError('Enter an order number / BTN, or upload a screenshot');
       return;
@@ -463,13 +458,12 @@ export default function EditSalePage() {
                     />
                   </div>
                   <div>
-                    <Label className="mb-1">Install Date *</Label>
+                    <Label className="mb-1">Install Date</Label>
                     <Input
                       type="date"
                       name="installDate"
                       value={formData.installDate}
                       onChange={handleChange}
-                      required
                       className="h-11"
                     />
                   </div>
