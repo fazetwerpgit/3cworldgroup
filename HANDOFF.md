@@ -55,15 +55,25 @@ MERGED to master (13de182, fast-forward) and DEPLOYED to Vercel production
    equality-only (index merging, no composite needed).
 3. PARTIAL — Vercel prod env set: CRON_SECRET (generated), APP_BASE_URL
    (`https://www.3cworldgroup.com` — apex 307s to www, use www everywhere),
-   ESIGN_PROVIDER=signwell, SIGNWELL_TEST_MODE=true. Gotcha: pipe values via
+   ESIGN_PROVIDER=signwell, SIGNWELL_TEST_MODE=true, SIGNWELL_API_KEY,
+   SIGNWELL_WEBHOOK_ID (all mirrored in .env.local). Gotcha: pipe values via
    bash `printf '%s'`, PowerShell pipes append CRLF and Vercel rejects/breaks.
-   STILL MISSING: SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID,
-   POSTMARK_SERVER_TOKEN, EMAIL_FROM — blocked on Jacob's accounts.
-4. TODO (Jacob) — SignWell: template-free document sending is now code-backed;
-   register webhook `https://www.3cworldgroup.com/api/webhooks/esign`;
-   webhook ID -> SIGNWELL_WEBHOOK_ID.
-5. TODO (Jacob) — Postmark server + verified sender. Then redeploy and run
-   the plan's Final Verification E2E smoke.
+   STILL MISSING: POSTMARK_SERVER_TOKEN, EMAIL_FROM.
+4. DONE — SignWell fully live, TEMPLATE-FREE (free plan's 1-template cap
+   bypassed): signwell.ts posts /v1/documents with file_base64 from
+   assets/esign/*.pdf (placeholders; generator script in scripts/) and coded
+   field coordinates (ece0e40, coord fix 926140b). COORDS ARE 96DPI PIXELS
+   FROM TOP-LEFT (sw = pt*4/3), not PDF points — placement visually verified
+   via test_mode + embedded_signing preview. Webhook registered via API
+   (works on free plan), ID 9f593de0-44af-4a6e-98e4-88ce59907901. Free tier
+   = 25 API docs/mo; upgrade to Business ($30/mo) past ~6 hires/mo. Real
+   PDFs later: drop into assets/esign/, adjust DOCUMENTS coords. W9 exists
+   as a PDF but is NOT wired as a checklist docKey (deliberate, pending ask).
+5. IN PROGRESS (Jacob) — Postmark: domain verification + account approval
+   submitted 2026-07-09, approval can take ~24h. When token + from-address
+   arrive: set POSTMARK_SERVER_TOKEN + EMAIL_FROM (Vercel prod + .env.local),
+   `vercel deploy --prod`, then run the plan's Final Verification E2E smoke
+   (signup -> alert -> role assign -> e-sign -> webhook approve -> activate).
 NOTE: cron is DAILY at 14:00 UTC (a5db9d6) — Vercel Hobby forbids hourly.
 Tiers (24h/72h/7d) still work, nudges just land up to a day late. Restore
 `0 * * * *` on Pro upgrade, or hit the endpoint hourly from an external
