@@ -20,7 +20,7 @@
 - Email must NEVER break a flow: `sendEmail` returns `{ok:false}` and logs instead of throwing; callers fire-and-forget with `.catch`.
 - Postmark free dev tier (100 emails/mo, may be restricted to own-domain recipients until production approval) — fine for build/testing; upgrade before real rep volume.
 - E-sign: first provider is **SignWell** behind the `EsignProvider` interface. Adobe Sign swaps in later ONLY if the account tier includes API access (unconfirmed as of 2026-07-08). No code outside `src/lib/esign/` may reference a concrete provider.
-- New env vars introduced by this plan (add to `.env.local` and Vercel): `POSTMARK_SERVER_TOKEN`, `EMAIL_FROM`, `APP_BASE_URL`, `ESIGN_PROVIDER` (default `signwell`), `SIGNWELL_API_KEY`, `SIGNWELL_TEST_MODE`, `SIGNWELL_TEMPLATE_CONTRACT`, `SIGNWELL_TEMPLATE_DIRECT_DEPOSIT`, `SIGNWELL_TEMPLATE_PAY_STRUCTURE`, `SIGNWELL_TEMPLATE_FCRA`, `CRON_SECRET`.
+- New env vars introduced by this plan (add to `.env.local` and Vercel): `POSTMARK_SERVER_TOKEN`, `EMAIL_FROM`, `APP_BASE_URL`, `ESIGN_PROVIDER` (default `signwell`), `SIGNWELL_API_KEY`, `SIGNWELL_TEST_MODE`, `CRON_SECRET`.
 - Commit after every task (new commits, never amend). No emojis anywhere.
 - `Date`/`Timestamp` convention: Admin SDK writes use `new Date()` (matches existing routes, e.g. the invite-submit batch).
 
@@ -1282,7 +1282,7 @@ git commit -m "feat(alerts): broadcast+claim alertTasks engine with 24h re-nag"
 - Test: `src/lib/esign/signwell.test.ts`
 
 **Interfaces:**
-- Consumes: env `ESIGN_PROVIDER`, `SIGNWELL_API_KEY`, `SIGNWELL_TEST_MODE`, `SIGNWELL_TEMPLATE_*`.
+- Consumes: env `ESIGN_PROVIDER`, `SIGNWELL_API_KEY`, `SIGNWELL_TEST_MODE`.
 - Produces (everything downstream depends on these EXACT names):
 
 ```ts
@@ -1317,7 +1317,7 @@ export function getEsignProvider(): EsignProvider; // ESIGN_PROVIDER env, defaul
 
 - [ ] **Step 0: Verify SignWell API shape**
 
-The request/response field names below are from SignWell's v1 API as understood at plan time. Before implementing, fetch current SignWell docs (context7 or https://developers.signwell.com) and confirm: the create-document-from-template endpoint path, `template_fields` prefill shape, `metadata` passthrough, and the webhook payload/hash-verification scheme. Adjust FIELD NAMES only — the `EsignProvider` interface above must not change.
+The request/response field names below are from SignWell's v1 API as understood at plan time. Before implementing, fetch current SignWell docs (context7 or https://developers.signwell.com) and confirm: the create-document endpoint path, raw `files`/2-D `fields` request shape, `metadata` passthrough, and the webhook payload/hash-verification scheme. Adjust FIELD NAMES only — the `EsignProvider` interface above must not change.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1341,7 +1341,7 @@ describe('signwellProvider.createEnvelope', () => {
   beforeEach(() => {
     vi.stubEnv('SIGNWELL_API_KEY', 'sw_key');
     vi.stubEnv('SIGNWELL_TEST_MODE', 'true');
-    vi.stubEnv('SIGNWELL_TEMPLATE_CONTRACT', 'tpl_contract');
+    vi.stubEnv('SIGNWELL_API_KEY', 'sw_key');
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'doc_123' }), { status: 201 })));
   });
   afterEach(() => {
@@ -1360,20 +1360,20 @@ describe('signwellProvider.createEnvelope', () => {
     expect(result.envelopeId).toBe('doc_123');
     const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.template_id).toBe('tpl_contract');
+    expect(body.files[0].file_base64).toEqual(expect.any(String));
     expect(body.metadata).toEqual({ userId: 'u1', itemId: 'contract' });
     expect(body.recipients[0].email).toBe('sam@x.com');
     expect((init.headers as Record<string, string>)['X-Api-Key']).toBe('sw_key');
   });
 
   it('throws a descriptive error when the template env is missing', async () => {
-    vi.stubEnv('SIGNWELL_TEMPLATE_CONTRACT', '');
+    vi.stubEnv('SIGNWELL_API_KEY', '');
     await expect(
       signwellProvider.createEnvelope({
         docKey: 'contract', userId: 'u1', itemId: 'contract',
         signerName: 'S', signerEmail: 's@x.com',
       })
-    ).rejects.toThrow(/SIGNWELL_TEMPLATE/);
+    ).rejects.toThrow(/SIGNWELL_API_KEY/);
   });
 });
 ```
@@ -1414,17 +1414,7 @@ function requireApiKey(): string {
   return key;
 }
 
-function templateIdFor(docKey: EsignDocKey): string {
-  const map: Record<EsignDocKey, string | undefined> = {
-    contract: process.env.SIGNWELL_TEMPLATE_CONTRACT,
-    direct_deposit: process.env.SIGNWELL_TEMPLATE_DIRECT_DEPOSIT,
-    pay_structure: process.env.SIGNWELL_TEMPLATE_PAY_STRUCTURE,
-    fcra_auth: process.env.SIGNWELL_TEMPLATE_FCRA,
-  };
-  const id = map[docKey];
-  if (!id) throw new Error(`Missing SIGNWELL_TEMPLATE_* env var for docKey "${docKey}"`);
-  return id;
-}
+// Template-free flow reads assets/esign PDFs and posts files/fields to /documents.
 
 export function verifySignwellHash(eventType: string, eventTime: string, hash: string, apiKey: string): boolean {
   const expected = createHmac('sha256', apiKey).update(`${eventType}@${eventTime}`).digest('hex');
@@ -1436,7 +1426,7 @@ export const signwellProvider: EsignProvider = {
   id: 'signwell',
 
   async createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult> {
-    const res = await fetch(`${SIGNWELL_BASE}/document_templates/documents/`, {
+    const res = await fetch(`${SIGNWELL_BASE}/documents`, {
       method: 'POST',
       headers: {
         'X-Api-Key': requireApiKey(),
@@ -1444,13 +1434,12 @@ export const signwellProvider: EsignProvider = {
       },
       body: JSON.stringify({
         test_mode: process.env.SIGNWELL_TEST_MODE === 'true',
-        template_id: templateIdFor(req.docKey),
+        name: req.docKey,
         embedded_signing: false,
         metadata: { userId: req.userId, itemId: req.itemId },
         recipients: [
-          { id: '1', placeholder_name: 'signer', name: req.signerName, email: req.signerEmail },
+          { id: 'signer', name: req.signerName, email: req.signerEmail },
         ],
-        template_fields: Object.entries(req.prefill ?? {}).map(([api_id, value]) => ({ api_id, value })),
       }),
     });
     if (!res.ok) {
@@ -1738,7 +1727,7 @@ git add src/lib/esign src/app/api/webhooks src/app/api/public/onboarding
 git commit -m "feat(esign): auto-send envelopes on submit, webhook auto-completes items"
 ```
 
-Manual setup note (do not automate): create the four templates in SignWell, set the `SIGNWELL_TEMPLATE_*` env vars, and register the webhook URL `https://<prod-domain>/api/webhooks/esign` in the SignWell dashboard.
+Manual setup note (do not automate): do not create SignWell templates for this flow; use the code-backed PDF assets and register the webhook URL `https://<prod-domain>/api/webhooks/esign` in the SignWell dashboard.
 
 ---
 

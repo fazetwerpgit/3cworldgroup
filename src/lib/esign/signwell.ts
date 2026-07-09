@@ -1,7 +1,60 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { EsignProvider, EsignDocKey, EnvelopeRequest, EnvelopeResult, EsignWebhookEvent } from './provider';
 
 const SIGNWELL_BASE = 'https://www.signwell.com/api/v1';
+const SIGNER_RECIPIENT_ID = 'signer';
+
+type SignWellFieldType = 'signature' | 'date';
+
+interface SignWellField {
+  x: number;
+  y: number;
+  page: number;
+  type: SignWellFieldType;
+  required: boolean;
+  recipient_id: string;
+  api_id: string;
+  width: number;
+  height: number;
+  date_format?: 'MM/DD/YYYY';
+  lock_sign_date?: boolean;
+}
+
+interface SignWellDocumentConfig {
+  file: string;
+  name: string;
+  signature: Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
+  date: Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
+}
+
+const DOCUMENTS: Record<EsignDocKey, SignWellDocumentConfig> = {
+  contract: {
+    file: 'contract.pdf',
+    name: 'Employment Agreement',
+    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
+    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+  },
+  direct_deposit: {
+    file: 'direct_deposit.pdf',
+    name: 'Direct Deposit Authorization',
+    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
+    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+  },
+  pay_structure: {
+    file: 'pay_structure.pdf',
+    name: 'Pay Structure Acknowledgment',
+    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
+    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+  },
+  fcra_auth: {
+    file: 'fcra_auth.pdf',
+    name: 'FCRA Background Check Authorization',
+    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
+    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+  },
+};
 
 function requireApiKey(): string {
   const key = process.env.SIGNWELL_API_KEY;
@@ -9,16 +62,28 @@ function requireApiKey(): string {
   return key;
 }
 
-function templateIdFor(docKey: EsignDocKey): string {
-  const map: Record<EsignDocKey, string | undefined> = {
-    contract: process.env.SIGNWELL_TEMPLATE_CONTRACT,
-    direct_deposit: process.env.SIGNWELL_TEMPLATE_DIRECT_DEPOSIT,
-    pay_structure: process.env.SIGNWELL_TEMPLATE_PAY_STRUCTURE,
-    fcra_auth: process.env.SIGNWELL_TEMPLATE_FCRA,
-  };
-  const id = map[docKey];
-  if (!id) throw new Error(`Missing SIGNWELL_TEMPLATE_* env var for docKey "${docKey}"`);
-  return id;
+async function readDocumentBase64(file: string): Promise<string> {
+  const bytes = await readFile(path.join(process.cwd(), 'assets', 'esign', file));
+  return bytes.toString('base64');
+}
+
+function fieldsFor(docKey: EsignDocKey, config: SignWellDocumentConfig): SignWellField[][] {
+  return [
+    [
+      {
+        ...config.signature,
+        type: 'signature',
+        recipient_id: SIGNER_RECIPIENT_ID,
+        api_id: `${docKey}_signature`,
+      },
+      {
+        ...config.date,
+        type: 'date',
+        recipient_id: SIGNER_RECIPIENT_ID,
+        api_id: `${docKey}_date`,
+      },
+    ],
+  ];
 }
 
 function webhookVerificationKey(
@@ -45,21 +110,26 @@ export const signwellProvider: EsignProvider = {
   id: 'signwell',
 
   async createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult> {
-    const res = await fetch(`${SIGNWELL_BASE}/document_templates/documents`, {
+    const apiKey = requireApiKey();
+    const config = DOCUMENTS[req.docKey];
+    const fileBase64 = await readDocumentBase64(config.file);
+
+    const res = await fetch(`${SIGNWELL_BASE}/documents`, {
       method: 'POST',
       headers: {
-        'X-Api-Key': requireApiKey(),
+        'X-Api-Key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         test_mode: process.env.SIGNWELL_TEST_MODE === 'true',
-        template_id: templateIdFor(req.docKey),
+        name: config.name,
         embedded_signing: false,
         metadata: { userId: req.userId, itemId: req.itemId },
+        files: [{ name: config.file, file_base64: fileBase64 }],
         recipients: [
-          { id: '1', placeholder_name: 'signer', name: req.signerName, email: req.signerEmail },
+          { id: SIGNER_RECIPIENT_ID, name: req.signerName, email: req.signerEmail },
         ],
-        template_fields: Object.entries(req.prefill ?? {}).map(([api_id, value]) => ({ api_id, value })),
+        fields: fieldsFor(req.docKey, config),
       }),
     });
     if (!res.ok) {

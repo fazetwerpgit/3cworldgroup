@@ -57,11 +57,11 @@ MERGED to master (13de182, fast-forward) and DEPLOYED to Vercel production
    (`https://www.3cworldgroup.com` — apex 307s to www, use www everywhere),
    ESIGN_PROVIDER=signwell, SIGNWELL_TEST_MODE=true. Gotcha: pipe values via
    bash `printf '%s'`, PowerShell pipes append CRLF and Vercel rejects/breaks.
-   STILL MISSING: SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID, SIGNWELL_TEMPLATE_*
-   (4), POSTMARK_SERVER_TOKEN, EMAIL_FROM — blocked on Jacob's accounts.
-4. TODO (Jacob) — SignWell: 4 templates (single `signer` placeholder each);
+   STILL MISSING: SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID,
+   POSTMARK_SERVER_TOKEN, EMAIL_FROM — blocked on Jacob's accounts.
+4. TODO (Jacob) — SignWell: template-free document sending is now code-backed;
    register webhook `https://www.3cworldgroup.com/api/webhooks/esign`;
-   webhook ID -> SIGNWELL_WEBHOOK_ID (note: `_FCRA`, not `_FCRA_AUTH`).
+   webhook ID -> SIGNWELL_WEBHOOK_ID.
 5. TODO (Jacob) — Postmark server + verified sender. Then redeploy and run
    the plan's Final Verification E2E smoke.
 NOTE: cron is DAILY at 14:00 UTC (a5db9d6) — Vercel Hobby forbids hourly.

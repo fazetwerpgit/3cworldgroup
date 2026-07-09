@@ -15,7 +15,6 @@ describe('signwellProvider.createEnvelope', () => {
   beforeEach(() => {
     vi.stubEnv('SIGNWELL_API_KEY', 'sw_key');
     vi.stubEnv('SIGNWELL_TEST_MODE', 'true');
-    vi.stubEnv('SIGNWELL_TEMPLATE_CONTRACT', 'tpl_contract');
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'doc_123' }), { status: 201 })));
   });
   afterEach(() => {
@@ -23,7 +22,7 @@ describe('signwellProvider.createEnvelope', () => {
     vi.unstubAllGlobals();
   });
 
-  it('posts the template document with metadata and returns the envelope id', async () => {
+  it('posts a raw PDF document with metadata and returns the envelope id', async () => {
     const result = await signwellProvider.createEnvelope({
       docKey: 'contract',
       userId: 'u1',
@@ -32,22 +31,46 @@ describe('signwellProvider.createEnvelope', () => {
       signerEmail: 'sam@x.com',
     });
     expect(result.envelopeId).toBe('doc_123');
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.template_id).toBe('tpl_contract');
+    expect(url).toBe('https://www.signwell.com/api/v1/documents');
     expect(body.metadata).toEqual({ userId: 'u1', itemId: 'contract' });
-    expect(body.recipients[0].email).toBe('sam@x.com');
+    expect(body.files).toHaveLength(1);
+    expect(body.files[0].name).toBe('contract.pdf');
+    expect(body.files[0].file_base64).toEqual(expect.stringMatching(/^JVBER/));
+    expect(body.recipients).toEqual([{ id: 'signer', name: 'Sam Rep', email: 'sam@x.com' }]);
+    expect(body.fields).toHaveLength(1);
+    expect(body.fields[0]).toEqual([
+      expect.objectContaining({
+        x: 140,
+        y: 614,
+        page: 1,
+        type: 'signature',
+        required: true,
+        recipient_id: 'signer',
+        api_id: 'contract_signature',
+      }),
+      expect.objectContaining({
+        x: 430,
+        y: 618,
+        page: 1,
+        type: 'date',
+        required: true,
+        recipient_id: 'signer',
+        api_id: 'contract_date',
+      }),
+    ]);
     expect((init.headers as Record<string, string>)['X-Api-Key']).toBe('sw_key');
   });
 
-  it('throws a descriptive error when the template env is missing', async () => {
-    vi.stubEnv('SIGNWELL_TEMPLATE_CONTRACT', '');
+  it('throws a descriptive error when the API key env is missing', async () => {
+    vi.stubEnv('SIGNWELL_API_KEY', '');
     await expect(
       signwellProvider.createEnvelope({
         docKey: 'contract', userId: 'u1', itemId: 'contract',
         signerName: 'S', signerEmail: 's@x.com',
       })
-    ).rejects.toThrow(/SIGNWELL_TEMPLATE/);
+    ).rejects.toThrow(/SIGNWELL_API_KEY/);
   });
 });
 
