@@ -83,8 +83,14 @@ email + e-sign fail soft (by design) — invites won't send.
 ### Follow-ups (non-blocking, ranked)
 1. `review_needed` AlertTaskKind declared + UI-handled but never produced — wire into
    the submit path or drop it.
-2. Notifications firestore rule requires status active — pending reps get email/push
-   but an empty bell (and console permission-denied noise). Consider self-only reads.
+2. DONE 2026-07-09 (796ad2b, rules deployed): the bell was never actually blocked
+   (it reads via /api/portal/notifications, which allows self at any status). Real
+   fixes: notifications rule tightened to self-only read / no client writes (any
+   active user could previously read/update/spoof anyone's notifications via the
+   client SDK), and the permission-denied console noise for pending reps traced to
+   the chat listeners (useChatChannels via MobileBottomNav, useChatUnread's
+   chatReads) — both now subscribe only when status is 'active'. Hook changes need
+   the next `vercel deploy --prod` (fold into the Postmark redeploy).
 3. Status-free write endpoints (e.g. POST /api/portal/sales) now reachable by
    pending+role reps pre-vetting — confirm intended or add status checks.
 4. Escape user-sourced strings in email HTML; bell icon fallback for new notification
