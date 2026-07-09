@@ -4,7 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { getRequester } from '@/lib/auth/requireManagement';
 import { Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
-import { parseSaleDateInput } from '@/lib/sales/saleDate';
+import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 
 // Helper function to create a notification
 async function createNotification(
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
         id: doc.id,
         ...data,
         saleDate: data.saleDate?.toDate(),
+        installDate: data.installDate?.toDate(),
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         approvedAt: data.approvedAt?.toDate(),
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
       proofScreenshotPath,
       productSold,
       saleDate,
+      installDate,
     } = body;
 
     // Validate required fields - only address and products are required
@@ -178,6 +180,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
       resolvedSaleDate = parsed.date;
+    }
+
+    // Install date is required on the form but optional server-side for
+    // backward compatibility with older clients — stored null when omitted.
+    let resolvedInstallDate: Date | null = null;
+    if (installDate !== undefined && installDate !== null && installDate !== '') {
+      const parsed = parseInstallDateInput(installDate);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      resolvedInstallDate = parsed.date;
     }
 
     if (proofScreenshotPath) {
@@ -212,6 +225,7 @@ export async function POST(request: NextRequest) {
       totalPoints: calculatedPoints, // Server-calculated, not from client
       status: 'pending' as SaleStatus, // Requires approval
       saleDate: resolvedSaleDate,
+      installDate: resolvedInstallDate,
       notes: notes || '',
       orderNumberOrBtn: orderNumberOrBtn || '',
       proofScreenshotPath: proofScreenshotPath || '',

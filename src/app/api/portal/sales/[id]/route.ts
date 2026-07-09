@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Sale } from '@/types';
 import { getRequester, requireAdmin } from '@/lib/auth/requireManagement';
-import { parseSaleDateInput } from '@/lib/sales/saleDate';
+import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -45,6 +45,7 @@ export async function GET(
       id: doc.id,
       ...data,
       saleDate: data?.saleDate?.toDate(),
+      installDate: data?.installDate?.toDate(),
       createdAt: data?.createdAt?.toDate(),
       updatedAt: data?.updatedAt?.toDate(),
       approvedAt: data?.approvedAt?.toDate(),
@@ -136,6 +137,14 @@ export async function PUT(
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
       updateData.saleDate = parsed.date;
+    }
+
+    if (body.installDate !== undefined && body.installDate !== null && body.installDate !== '') {
+      const parsed = parseInstallDateInput(body.installDate);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      updateData.installDate = parsed.date;
     }
 
     await docRef.update(updateData);

@@ -203,6 +203,7 @@ export default function SaleDetailPage() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <DetailField label="Sales Rep" value={sale.salesRepName} />
                 <DetailField label="Sale Date" value={formatDate(sale.saleDate)} />
+                <DetailField label="Install Date" value={formatDate(sale.installDate)} />
                 <DetailField label="Sale Type" value={<span className="capitalize">{sale.saleType?.replace('_', ' ') || 'N/A'}</span>} />
                 <DetailField label="Created" value={formatDate(sale.createdAt)} />
               </div>

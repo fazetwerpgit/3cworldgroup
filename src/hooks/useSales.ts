@@ -121,8 +121,8 @@ export function useSales() {
 
   const updateSale = useCallback(async (
     id: string,
-    // saleDate is sent as a YYYY-MM-DD string; the API parses it server-side.
-    updates: Partial<Omit<Sale, 'saleDate'>> & { saleDate?: string }
+    // saleDate/installDate are sent as YYYY-MM-DD strings; the API parses them server-side.
+    updates: Partial<Omit<Sale, 'saleDate' | 'installDate'>> & { saleDate?: string; installDate?: string }
   ): Promise<boolean> => {
     setLoading(true);
     setError(null);

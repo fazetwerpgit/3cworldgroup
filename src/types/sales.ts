@@ -30,6 +30,7 @@ export interface CreateSaleData {
   customerAddress: string; // Required
   saleType: SaleType;
   saleDate?: string; // YYYY-MM-DD; server parses to a Date, defaults to now if omitted
+  installDate?: string; // YYYY-MM-DD; server parses to a Date, stored null if omitted
   products: SaleProduct[];
   totalValue: number;
   totalPoints: number;
@@ -71,6 +72,7 @@ export interface Sale {
 
   // Timestamps
   saleDate: Date;
+  installDate?: Date; // older sales predate this field
   createdAt: Date;
   updatedAt: Date;
 

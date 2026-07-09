@@ -58,6 +58,7 @@ export default function EditSalePage() {
     customerAddress: '',
     saleType: 'new_service' as SaleType,
     saleDate: todaySaleDateInput(),
+    installDate: '',
     status: 'pending' as SaleStatus,
     notes: '',
     orderNumberOrBtn: '',
@@ -87,6 +88,9 @@ export default function EditSalePage() {
           saleDate: saleData.saleDate
             ? dateToSaleDateInput(new Date(saleData.saleDate))
             : todaySaleDateInput(),
+          installDate: saleData.installDate
+            ? dateToSaleDateInput(new Date(saleData.installDate))
+            : '',
           status: saleData.status || 'pending',
           notes: saleData.notes || '',
           orderNumberOrBtn: saleData.orderNumberOrBtn || '',
@@ -171,6 +175,11 @@ export default function EditSalePage() {
       return;
     }
 
+    if (!formData.installDate) {
+      setFormError('Please select the install date');
+      return;
+    }
+
     if (!hasSaleProof(formData)) {
       setFormError('Enter an order number / BTN, or upload a screenshot');
       return;
@@ -178,7 +187,10 @@ export default function EditSalePage() {
 
     setSaving(true);
 
-    const updates: Partial<Omit<Sale, 'saleDate'>> & { saleDate?: string } = {
+    const updates: Partial<Omit<Sale, 'saleDate' | 'installDate'>> & {
+      saleDate?: string;
+      installDate?: string;
+    } = {
       ...formData,
       products,
       totalValue: calculateTotalValue(),
@@ -446,6 +458,17 @@ export default function EditSalePage() {
                       value={formData.saleDate}
                       onChange={handleChange}
                       max={todaySaleDateInput()}
+                      required
+                      className="h-11"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1">Install Date *</Label>
+                    <Input
+                      type="date"
+                      name="installDate"
+                      value={formData.installDate}
+                      onChange={handleChange}
                       required
                       className="h-11"
                     />

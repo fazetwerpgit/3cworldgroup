@@ -41,6 +41,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     customerAddress: '',
     saleType: 'new_service' as SaleType,
     saleDate: todaySaleDateInput(),
+    installDate: '',
     notes: '',
     orderNumberOrBtn: '',
     proofScreenshotPath: '',
@@ -125,6 +126,11 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
     if (formData.saleDate > todaySaleDateInput()) {
       setFormError('Sale date cannot be in the future');
+      return;
+    }
+
+    if (!formData.installDate) {
+      setFormError('Please select the install date');
       return;
     }
 
@@ -364,6 +370,17 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
               value={formData.saleDate}
               onChange={handleChange}
               max={todaySaleDateInput()}
+              required
+              className="h-11"
+            />
+          </div>
+          <div>
+            <Label className="mb-1">Install Date *</Label>
+            <Input
+              type="date"
+              name="installDate"
+              value={formData.installDate}
+              onChange={handleChange}
               required
               className="h-11"
             />

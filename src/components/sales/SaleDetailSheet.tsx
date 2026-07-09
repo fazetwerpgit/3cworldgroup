@@ -182,6 +182,12 @@ export function SaleDetailSheet({
             <span className="portal-num">{formatDate(sale.saleDate)}</span>
           </Field>
 
+          {sale.installDate && (
+            <Field label="Install date">
+              <span className="portal-num">{formatDate(sale.installDate)}</span>
+            </Field>
+          )}
+
           <div className="grid grid-cols-2 gap-5">
             <Field label="Value">
               <span className="portal-num block text-right font-medium tabular-nums">
