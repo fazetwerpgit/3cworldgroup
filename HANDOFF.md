@@ -45,16 +45,30 @@ via subagent-driven development (Codex implementer, Claude reviewers; audit trai
 
 Gates at HEAD ff12e59: tsc clean, 323/323 tests, production build clean.
 
-### Deploy checklist (blocking — alongside merge)
-1. `firebase deploy --only firestore:rules` (locks alertTasks, onboardingNudges).
-2. Firestore composite indexes for alertTasks queries (first-run errors give links).
-3. Vercel env: CRON_SECRET, APP_BASE_URL, ESIGN_PROVIDER=signwell,
-   POSTMARK_SERVER_TOKEN, EMAIL_FROM, SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID,
-   SIGNWELL_TEST_MODE=true, SIGNWELL_TEMPLATE_CONTRACT / _DIRECT_DEPOSIT /
-   _PAY_STRUCTURE / _FCRA (note: `_FCRA`, not `_FCRA_AUTH`).
-4. SignWell: 4 templates (single `signer` placeholder each); register webhook
-   `https://<domain>/api/webhooks/esign`; webhook ID -> SIGNWELL_WEBHOOK_ID.
-5. Postmark server + verified sender. Then run the plan's Final Verification E2E smoke.
+### Deploy checklist — status as of 2026-07-09
+MERGED to master (13de182, fast-forward) and DEPLOYED to Vercel production
+(CLI deploy; no git integration on the Vercel project — deploys are manual
+`vercel deploy --prod`).
+1. DONE — firestore rules deployed.
+2. DONE — alertTasks composite index (status+createdAt) added to
+   firestore.indexes.json (53acd19) and deployed; other alert queries are
+   equality-only (index merging, no composite needed).
+3. PARTIAL — Vercel prod env set: CRON_SECRET (generated), APP_BASE_URL
+   (`https://www.3cworldgroup.com` — apex 307s to www, use www everywhere),
+   ESIGN_PROVIDER=signwell, SIGNWELL_TEST_MODE=true. Gotcha: pipe values via
+   bash `printf '%s'`, PowerShell pipes append CRLF and Vercel rejects/breaks.
+   STILL MISSING: SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID, SIGNWELL_TEMPLATE_*
+   (4), POSTMARK_SERVER_TOKEN, EMAIL_FROM — blocked on Jacob's accounts.
+4. TODO (Jacob) — SignWell: 4 templates (single `signer` placeholder each);
+   register webhook `https://www.3cworldgroup.com/api/webhooks/esign`;
+   webhook ID -> SIGNWELL_WEBHOOK_ID (note: `_FCRA`, not `_FCRA_AUTH`).
+5. TODO (Jacob) — Postmark server + verified sender. Then redeploy and run
+   the plan's Final Verification E2E smoke.
+NOTE: cron is DAILY at 14:00 UTC (a5db9d6) — Vercel Hobby forbids hourly.
+Tiers (24h/72h/7d) still work, nudges just land up to a day late. Restore
+`0 * * * *` on Pro upgrade, or hit the endpoint hourly from an external
+scheduler with the CRON_SECRET bearer. Until Postmark/SignWell vars exist,
+email + e-sign fail soft (by design) — invites won't send.
 
 ### Follow-ups (non-blocking, ranked)
 1. `review_needed` AlertTaskKind declared + UI-handled but never produced — wire into
