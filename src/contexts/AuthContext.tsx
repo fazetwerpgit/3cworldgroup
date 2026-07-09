@@ -8,6 +8,7 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   sendEmailVerification,
+  updateProfile,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -21,7 +22,7 @@ import { User, AuthState, RolePermissions, UserRole, resolveRoles } from '@/type
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -191,15 +192,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, displayName: string) => {
     if (!auth || !db) throw new Error('auth/not-configured');
     signingUp.current = true;
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       try {
+        await updateProfile(cred.user, { displayName });
+      } catch (profileError) {
+        console.warn('Failed to set auth displayName:', profileError);
+      }
+      try {
         await setDoc(doc(db, 'users', cred.user.uid), {
           email,
+          displayName,
           status: 'pending',
           createdAt: serverTimestamp(),
         });

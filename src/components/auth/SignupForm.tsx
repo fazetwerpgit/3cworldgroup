@@ -15,6 +15,7 @@ const inputClasses =
 export function SignupForm() {
   const { signUp } = useAuth();
   const router = useRouter();
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +24,7 @@ export function SignupForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const check = validateSignup(email, password);
+    const check = validateSignup(email, password, displayName);
     if (!check.ok) {
       setError(check.error);
       return;
@@ -31,7 +32,7 @@ export function SignupForm() {
     setError('');
     setLoading(true);
     try {
-      await signUp(email.trim(), password);
+      await signUp(email.trim(), password, displayName.trim());
       // AuthContext set pendingApproval; go to /portal, which renders the
       // pending-approval screen (this page only knows how to show the form).
       router.push('/portal');
@@ -55,6 +56,20 @@ export function SignupForm() {
               {error}
             </div>
           )}
+
+          <div>
+            <label htmlFor="signup-name" className="portal-label mb-2 block">Full name</label>
+            <input
+              type="text"
+              id="signup-name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className={inputClasses}
+              placeholder="Jane Doe"
+              autoComplete="name"
+              required
+            />
+          </div>
 
           <div>
             <label htmlFor="signup-email" className="portal-label mb-2 block">Email address</label>

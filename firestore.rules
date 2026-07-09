@@ -16,14 +16,22 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
     }
 
-    // A user may create ONLY their own profile, ONLY pending, ONLY these 3
+    // A user may create ONLY their own profile, ONLY pending, ONLY these 4
     // fields. No client update/delete — approval + edits go through the Admin
     // SDK. Self-read is allowed at any status so the pending screen can load.
+    // displayName is validated ONLY when present: during the deploy window a
+    // client still running the OLD signup code sends just 3 fields (no
+    // displayName), and that write must keep passing so it isn't rolled back
+    // (signUp() deletes the just-created auth user if the profile write fails).
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
         && request.resource.data.status == 'pending'
-        && request.resource.data.keys().hasOnly(['email', 'status', 'createdAt']);
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'status', 'createdAt'])
+        && (!('displayName' in request.resource.data) ||
+            (request.resource.data.displayName is string &&
+             request.resource.data.displayName.size() > 0 &&
+             request.resource.data.displayName.size() <= 100));
       allow update, delete: if false;
     }
 
