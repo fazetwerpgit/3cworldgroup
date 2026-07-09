@@ -29,30 +29,33 @@ interface SignWellDocumentConfig {
   date: Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
 }
 
+// SignWell field x/y are 96dpi pixels from the page's TOP-LEFT (not PDF points,
+// which are 72dpi from bottom-left): sw = pt * 4/3, y measured from the top.
+// Positions below are visually verified against the assets/esign PDFs.
 const DOCUMENTS: Record<EsignDocKey, SignWellDocumentConfig> = {
   contract: {
     file: 'contract.pdf',
     name: 'Employment Agreement',
-    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
-    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
+    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
   },
   direct_deposit: {
     file: 'direct_deposit.pdf',
     name: 'Direct Deposit Authorization',
-    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
-    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
+    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
   },
   pay_structure: {
     file: 'pay_structure.pdf',
     name: 'Pay Structure Acknowledgment',
-    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
-    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
+    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
   },
   fcra_auth: {
     file: 'fcra_auth.pdf',
     name: 'FCRA Background Check Authorization',
-    signature: { x: 140, y: 614, page: 1, required: true, width: 190, height: 40 },
-    date: { x: 430, y: 618, page: 1, required: true, width: 110, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
+    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
   },
 };
 

@@ -42,8 +42,8 @@ describe('signwellProvider.createEnvelope', () => {
     expect(body.fields).toHaveLength(1);
     expect(body.fields[0]).toEqual([
       expect.objectContaining({
-        x: 140,
-        y: 614,
+        x: 187,
+        y: 827,
         page: 1,
         type: 'signature',
         required: true,
@@ -51,8 +51,8 @@ describe('signwellProvider.createEnvelope', () => {
         api_id: 'contract_signature',
       }),
       expect.objectContaining({
-        x: 430,
-        y: 618,
+        x: 573,
+        y: 841,
         page: 1,
         type: 'date',
         required: true,
