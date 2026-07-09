@@ -119,7 +119,11 @@ export function useSales() {
     }
   }, []);
 
-  const updateSale = useCallback(async (id: string, updates: Partial<Sale>): Promise<boolean> => {
+  const updateSale = useCallback(async (
+    id: string,
+    // saleDate is sent as a YYYY-MM-DD string; the API parses it server-side.
+    updates: Partial<Omit<Sale, 'saleDate'>> & { saleDate?: string }
+  ): Promise<boolean> => {
     setLoading(true);
     setError(null);
 

@@ -29,6 +29,7 @@ import {
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
 function PortalShell({ children }: { children: React.ReactNode }) {
@@ -56,6 +57,7 @@ export default function EditSalePage() {
     customerEmail: '',
     customerAddress: '',
     saleType: 'new_service' as SaleType,
+    saleDate: todaySaleDateInput(),
     status: 'pending' as SaleStatus,
     notes: '',
     orderNumberOrBtn: '',
@@ -82,6 +84,9 @@ export default function EditSalePage() {
           customerEmail: saleData.customerEmail || '',
           customerAddress: saleData.customerAddress || '',
           saleType: saleData.saleType || 'new_service',
+          saleDate: saleData.saleDate
+            ? dateToSaleDateInput(new Date(saleData.saleDate))
+            : todaySaleDateInput(),
           status: saleData.status || 'pending',
           notes: saleData.notes || '',
           orderNumberOrBtn: saleData.orderNumberOrBtn || '',
@@ -155,6 +160,17 @@ export default function EditSalePage() {
       setFormError('Please enter the product sold');
       return;
     }
+
+    if (!formData.saleDate) {
+      setFormError('Please select the sale date');
+      return;
+    }
+
+    if (formData.saleDate > todaySaleDateInput()) {
+      setFormError('Sale date cannot be in the future');
+      return;
+    }
+
     if (!hasSaleProof(formData)) {
       setFormError('Enter an order number / BTN, or upload a screenshot');
       return;
@@ -162,7 +178,7 @@ export default function EditSalePage() {
 
     setSaving(true);
 
-    const updates: Partial<Sale> = {
+    const updates: Partial<Omit<Sale, 'saleDate'>> & { saleDate?: string } = {
       ...formData,
       products,
       totalValue: calculateTotalValue(),
@@ -421,6 +437,18 @@ export default function EditSalePage() {
                         </option>
                       ))}
                     </NativeSelect>
+                  </div>
+                  <div>
+                    <Label className="mb-1">Sale Date *</Label>
+                    <Input
+                      type="date"
+                      name="saleDate"
+                      value={formData.saleDate}
+                      onChange={handleChange}
+                      max={todaySaleDateInput()}
+                      required
+                      className="h-11"
+                    />
                   </div>
                   <div>
                     <Label className="mb-1">Product Sold *</Label>

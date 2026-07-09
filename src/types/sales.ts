@@ -29,6 +29,7 @@ export interface CreateSaleData {
   customerEmail?: string;
   customerAddress: string; // Required
   saleType: SaleType;
+  saleDate?: string; // YYYY-MM-DD; server parses to a Date, defaults to now if omitted
   products: SaleProduct[];
   totalValue: number;
   totalPoints: number;

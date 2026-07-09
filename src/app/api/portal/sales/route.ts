@@ -4,6 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { getRequester } from '@/lib/auth/requireManagement';
 import { Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { parseSaleDateInput } from '@/lib/sales/saleDate';
 
 // Helper function to create a notification
 async function createNotification(
@@ -146,6 +147,7 @@ export async function POST(request: NextRequest) {
       orderNumberOrBtn,
       proofScreenshotPath,
       productSold,
+      saleDate,
     } = body;
 
     // Validate required fields - only address and products are required
@@ -165,6 +167,17 @@ export async function POST(request: NextRequest) {
         { error: 'Provide an order number / BTN or upload a screenshot' },
         { status: 400 }
       );
+    }
+
+    // Sale date is user-editable but optional for backward compatibility with
+    // older clients — fall back to now when omitted, reject when malformed.
+    let resolvedSaleDate = new Date();
+    if (saleDate !== undefined && saleDate !== null && saleDate !== '') {
+      const parsed = parseSaleDateInput(saleDate);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      resolvedSaleDate = parsed.date;
     }
 
     if (proofScreenshotPath) {
@@ -198,7 +211,7 @@ export async function POST(request: NextRequest) {
       totalValue: totalValue || 0,
       totalPoints: calculatedPoints, // Server-calculated, not from client
       status: 'pending' as SaleStatus, // Requires approval
-      saleDate: new Date(),
+      saleDate: resolvedSaleDate,
       notes: notes || '',
       orderNumberOrBtn: orderNumberOrBtn || '',
       proofScreenshotPath: proofScreenshotPath || '',

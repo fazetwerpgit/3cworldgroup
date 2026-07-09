@@ -22,6 +22,7 @@ import {
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
 interface SaleFormProps {
@@ -39,6 +40,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     customerEmail: '',
     customerAddress: '',
     saleType: 'new_service' as SaleType,
+    saleDate: todaySaleDateInput(),
     notes: '',
     orderNumberOrBtn: '',
     proofScreenshotPath: '',
@@ -113,6 +115,16 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
     if (!formData.productSold.trim()) {
       setFormError('Please enter the product sold');
+      return;
+    }
+
+    if (!formData.saleDate) {
+      setFormError('Please select the sale date');
+      return;
+    }
+
+    if (formData.saleDate > todaySaleDateInput()) {
+      setFormError('Sale date cannot be in the future');
       return;
     }
 
@@ -343,6 +355,18 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                 </option>
               ))}
             </NativeSelect>
+          </div>
+          <div>
+            <Label className="mb-1">Sale Date *</Label>
+            <Input
+              type="date"
+              name="saleDate"
+              value={formData.saleDate}
+              onChange={handleChange}
+              max={todaySaleDateInput()}
+              required
+              className="h-11"
+            />
           </div>
           <div>
             <Label className="mb-1">Product Sold *</Label>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Sale } from '@/types';
 import { getRequester, requireAdmin } from '@/lib/auth/requireManagement';
+import { parseSaleDateInput } from '@/lib/sales/saleDate';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -127,6 +128,14 @@ export async function PUT(
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     for (const field of EDITABLE_FIELDS) {
       if (body[field] !== undefined) updateData[field] = body[field];
+    }
+
+    if (body.saleDate !== undefined && body.saleDate !== null && body.saleDate !== '') {
+      const parsed = parseSaleDateInput(body.saleDate);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      updateData.saleDate = parsed.date;
     }
 
     await docRef.update(updateData);
