@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase/config';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { isAbortError } from '@/lib/fetch/isAbortError';
 
 interface SalesStats {
   totalSales: number;
@@ -49,12 +50,16 @@ export function DashboardStats() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let mounted = true;
+
     async function fetchStats() {
       if (!user) return;
 
       try {
         const statsRes = await fetch(
-          `/api/portal/sales/stats?salesRepId=${user.uid}&period=month&requestedBy=${user.uid}`
+          `/api/portal/sales/stats?salesRepId=${user.uid}&period=month&requestedBy=${user.uid}`,
+          { signal: controller.signal }
         );
         if (statsRes.ok) {
           const data = await statsRes.json();
@@ -64,7 +69,10 @@ export function DashboardStats() {
         const token = await auth?.currentUser?.getIdToken();
         const leaderboardRes = await fetch(
           '/api/portal/leaderboard?period=month&metric=totalPoints&limit=100',
-          { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            signal: controller.signal,
+          }
         );
         if (leaderboardRes.ok) {
           const data = await leaderboardRes.json();
@@ -78,13 +86,18 @@ export function DashboardStats() {
           });
         }
       } catch (error) {
+        if (!mounted || isAbortError(error, controller.signal)) return;
         console.error('Error fetching dashboard stats:', error);
       } finally {
-        setLoading(false);
+        if (mounted && !controller.signal.aborted) setLoading(false);
       }
     }
 
     fetchStats();
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
   }, [user]);
 
   const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);

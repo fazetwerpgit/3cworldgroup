@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Notification } from '@/types/notifications';
+import { isAbortError } from '@/lib/fetch/isAbortError';
 
 export function useNotifications() {
   const { user } = useAuth();
@@ -11,21 +12,23 @@ export function useNotifications() {
   const [loading, setLoading] = useState(false);
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
 
   const fetchNotifications = useCallback(async (limit = 20) => {
     if (!user) return;
 
-    // Cancel any in-flight request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+    // Cancel any in-flight request. Some browsers report an aborted fetch as a
+    // TypeError rather than an AbortError, so keep the local controller for the
+    // catch/finally checks below.
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setLoading(true);
     try {
       const response = await fetch(
         `/api/portal/notifications?userId=${user.uid}&limit=${limit}&requestedBy=${user.uid}`,
-        { signal: abortControllerRef.current.signal }
+        { signal: controller.signal }
       );
       if (response.ok) {
         const data = await response.json();
@@ -34,10 +37,10 @@ export function useNotifications() {
       }
     } catch (error) {
       // Ignore abort errors
-      if (error instanceof Error && error.name === 'AbortError') return;
+      if (!mountedRef.current || isAbortError(error, controller.signal)) return;
       console.error('Error fetching notifications:', error);
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current === controller) setLoading(false);
     }
   }, [user]);
 
@@ -122,6 +125,7 @@ export function useNotifications() {
 
   // Fetch notifications on mount and periodically
   useEffect(() => {
+    mountedRef.current = true;
     if (user) {
       fetchNotifications();
 
@@ -131,6 +135,7 @@ export function useNotifications() {
       }, 30000);
 
       return () => {
+        mountedRef.current = false;
         clearInterval(interval);
         // Cancel any in-flight request on unmount
         if (abortControllerRef.current) {

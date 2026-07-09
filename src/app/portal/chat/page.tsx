@@ -14,6 +14,7 @@ import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { MessageActions } from '@/components/chat/MessageActions';
 import { MobileChannelList } from '@/components/chat/MobileChannelList';
 import { MobileThread } from '@/components/chat/MobileThread';
+import { isAbortError } from '@/lib/fetch/isAbortError';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { PortalHeader } from '@/components/portal/PortalHeader';
@@ -328,9 +329,16 @@ export default function TeamChatPage() {
   // Firestore rules allow the realtime channel/message listeners to read member docs.
   useEffect(() => {
     if (!user) return;
-    authedFetch('/api/portal/chat/channels').catch((err) => {
+    const controller = new AbortController();
+    let mounted = true;
+    authedFetch('/api/portal/chat/channels', { signal: controller.signal }).catch((err) => {
+      if (!mounted || isAbortError(err, controller.signal)) return;
       console.error('Error bootstrapping chat channels:', err);
     });
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
   }, [authedFetch, user]);
 
   // Probe the GIF feature once per session so we only render the GIF button when

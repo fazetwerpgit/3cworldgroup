@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isAbortError } from '@/lib/fetch/isAbortError';
 
 interface Entry {
   salesRepId: string;
@@ -26,13 +27,19 @@ export function MiniLeaderboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let mounted = true;
+
     async function fetchBoard() {
       if (!user) return;
       try {
         const token = await auth?.currentUser?.getIdToken();
         const res = await fetch(
           '/api/portal/leaderboard?period=month&metric=totalPoints&limit=5',
-          { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            signal: controller.signal,
+          }
         );
         if (res.ok) {
           const data = await res.json();
@@ -40,12 +47,17 @@ export function MiniLeaderboard() {
           setMe(data.currentUser ?? null);
         }
       } catch (error) {
+        if (!mounted || isAbortError(error, controller.signal)) return;
         console.error('Error fetching mini leaderboard:', error);
       } finally {
-        setLoading(false);
+        if (mounted && !controller.signal.aborted) setLoading(false);
       }
     }
     fetchBoard();
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
   }, [user]);
 
   if (!hasPermission('leaderboard:read')) return null;
