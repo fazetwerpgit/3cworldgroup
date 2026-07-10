@@ -16,6 +16,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { appBaseUrl, checklistReadyEmail } from '@/lib/email/templates';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
+import { restampDisplayName } from '@/lib/users/restampDisplayName';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -212,6 +213,18 @@ export async function PUT(
         });
       } catch (error) {
         console.error('[users] Failed to re-stamp chat author fields:', error);
+      }
+    }
+
+    // Re-stamp every other denormalized display-name copy whenever a
+    // non-empty name is provided, even when it equals the stored name. This
+    // lets an admin re-save a user to backfill records that were stale before
+    // this propagation existed; failures remain fail-soft like chat restamps.
+    if (trimmedDisplayName) {
+      try {
+        await restampDisplayName(id, trimmedDisplayName);
+      } catch (error) {
+        console.error('[users] Failed to re-stamp denormalized display names:', error);
       }
     }
 
