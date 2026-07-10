@@ -4,6 +4,7 @@ export type PlatformRole = 'admin' | 'operations';
 // Field sales roles
 export type FieldRole =
   | 'entry_rep'
+  | 'entry_level_rep'
   | 'l1_manager'
   | 'l2_manager'
   | 'ibo_level_1'
@@ -25,6 +26,7 @@ export const PlatformRoles = {
 
 export const FieldRoles = {
   ENTRY_REP: 'entry_rep',
+  ENTRY_LEVEL_REP: 'entry_level_rep',
   L1_MANAGER: 'l1_manager',
   L2_MANAGER: 'l2_manager',
   IBO_LEVEL_1: 'ibo_level_1',
@@ -121,6 +123,7 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
     'recruiting:convert',
   ],
   entry_rep: [...FIELD_REP_PERMISSIONS],
+  entry_level_rep: [...FIELD_REP_PERMISSIONS],
   l1_manager: [...FIELD_MANAGER_PERMISSIONS],
   l2_manager: [...FIELD_MANAGER_PERMISSIONS],
   ibo_level_1: [...FIELD_MANAGER_PERMISSIONS],
@@ -137,6 +140,7 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   admin: 'Administrator',
   operations: 'Operations',
   entry_rep: 'Account Executive',
+  entry_level_rep: 'Entry Level Rep',
   l1_manager: 'L1 Manager',
   l2_manager: 'L2 Manager',
   ibo_level_1: 'IBO Level 1',
@@ -150,6 +154,11 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
 
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
 const FIELD_ROLE_VALUES: readonly string[] = Object.values(FieldRoles);
+
+/** Only entry-level reps must complete the onboarding checklist. */
+export function roleRequiresOnboarding(fieldRole?: FieldRole): boolean {
+  return fieldRole === 'entry_level_rep';
+}
 
 // Defensive mapping for raw role data read from Firestore.
 // Validates values against the role unions and tolerates field roles

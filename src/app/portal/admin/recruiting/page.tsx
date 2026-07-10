@@ -53,7 +53,7 @@ const emptyForm = {
   candidateEmail: '',
   candidatePhone: '',
   candidateCity: '',
-  intendedFieldRole: 'entry_rep' as FieldRole,
+  intendedFieldRole: 'entry_level_rep' as FieldRole,
   isIBO: false,
   applicationId: '',
 };
@@ -383,6 +383,7 @@ export default function RecruitingCommandCenterPage() {
                       }))
                     }
                   >
+                    <option value="entry_level_rep">Entry Level Rep</option>
                     <option value="entry_rep">Account Executive</option>
                     <option value="l1_manager">L1 Manager</option>
                     <option value="l2_manager">L2 Manager</option>

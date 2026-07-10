@@ -25,6 +25,7 @@ interface PayStructureResponse {
 
 const TIER_NOTES: Record<FieldRole, string> = {
   entry_rep: 'Commission on your own approved sales.',
+  entry_level_rep: 'Entry-level onboarding role; commission begins after promotion.',
   l1_manager: 'Commission on your own sales plus an override on your team.',
   l2_manager: 'Commission on your own sales plus an override on your organization.',
   ibo_level_1: 'Commission on your own sales plus an IBO team override.',
@@ -38,6 +39,7 @@ const TIER_NOTES: Record<FieldRole, string> = {
 
 const TIER_ICON: Record<FieldRole, ElementType> = {
   entry_rep: BadgeDollarSign,
+  entry_level_rep: BadgeDollarSign,
   l1_manager: Users,
   l2_manager: Layers3,
   ibo_level_1: Briefcase,

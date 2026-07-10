@@ -32,7 +32,7 @@ beforeEach(() => {
   createEnvelopeMock.mockClear();
   dispatchMock.mockClear();
   store.set('users/u1', {
-    fieldRole: 'entry_rep',
+    fieldRole: 'entry_level_rep',
     isIBO: false,
     displayName: 'Sam Rep',
     email: 'sam@x.com',

@@ -2,6 +2,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { nudgeEmail, appBaseUrl, type NudgeTier } from '@/lib/email/templates';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
+import { roleRequiresOnboarding } from '@/types/auth';
 import { getActivationReadiness } from './activation';
 
 export type { NudgeTier };
@@ -46,7 +47,7 @@ export async function runOnboardingNudges(
   for (const userDoc of pending.docs) {
     try {
       const uid = userDoc.id;
-      if (!userDoc.get('fieldRole')) continue;
+      if (!roleRequiresOnboarding(userDoc.get('fieldRole'))) continue;
 
       const itemsSnap = await db.collection('userOnboarding').where('userId', '==', uid).get();
       let lastActivity = toDate(userDoc.get('createdAt')) ?? now;

@@ -1,4 +1,5 @@
 import type { FieldRole } from './auth';
+import { roleRequiresOnboarding } from './auth';
 
 export type OnboardingCategory = 'paperwork' | 'financial' | 'business' | 'credential';
 export type OnboardingStatus = 'not_started' | 'submitted' | 'approved' | 'rejected';
@@ -23,9 +24,10 @@ export interface OnboardingItem {
   order: number;
 }
 
-/** The original seven roles that get full vetting (screen, SSN, DL). */
+/** Field roles that get full vetting (screen, SSN, DL). */
 export const BASE_VETTING_ROLES: readonly FieldRole[] = [
   'entry_rep',
+  'entry_level_rep',
   'l1_manager',
   'l2_manager',
   'ibo_level_1',
@@ -118,6 +120,8 @@ export function looksLikeRawSensitiveData(value: string): boolean {
 
 // Helper to get the onboarding checklist for a user
 export function getOnboardingItemsForUser(fieldRole: FieldRole, isIBO: boolean): OnboardingItem[] {
+  if (!roleRequiresOnboarding(fieldRole)) return [];
+
   return ONBOARDING_ITEMS
     .filter(
       (item) =>

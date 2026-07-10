@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
-import { RoleDisplayNames, User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
+import { User, UserRole, getEffectiveRole, isPlatformRole } from '@/types';
 import type { FieldRole } from '@/types';
 import { US_STATES } from '@/lib/validation/address';
 
@@ -18,6 +18,7 @@ interface UserFormProps {
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'entry_rep', label: 'Account Executive' },
+  { value: 'entry_level_rep', label: 'Entry Level Rep' },
   { value: 'l1_manager', label: 'L1 Manager' },
   { value: 'l2_manager', label: 'L2 Manager' },
   { value: 'ibo_level_1', label: 'IBO Level 1' },
@@ -30,10 +31,6 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'operations', label: 'Operations' },
   { value: 'admin', label: 'Administrator' },
 ];
-
-interface UserUpdateResponse {
-  promotionWarning?: boolean;
-}
 
 export function UserForm({ user, isEdit = false }: UserFormProps) {
   const router = useRouter();
@@ -89,21 +86,17 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             state: formData.state,
             zip: formData.zip,
             managerId: formData.managerId || null,
-            status: formData.status,
+            // Only send status when the admin changed it: an explicit status
+            // suppresses the server's assign-role instant activation.
+            ...(formData.status !== user.status ? { status: formData.status } : {}),
           }),
         });
 
-        const data = (await response.json()) as UserUpdateResponse & { error?: string };
+        const data = (await response.json()) as { error?: string };
         if (!response.ok) {
           throw new Error(data.error || 'Failed to update user');
         }
 
-        if (data.promotionWarning === true && assignedFieldRole) {
-          sessionStorage.setItem(
-            'adminUserPromotionWarning',
-            `${formData.displayName} was assigned ${RoleDisplayNames[assignedFieldRole]} but has not completed base onboarding. Confirm this is an internal promotion.`
-          );
-        }
       } else {
         if (!formData.password) {
           throw new Error('Password is required for new users');
@@ -144,22 +137,22 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
           {error}
         </div>
       )}
 
-      <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-        <CardHeader className="border-b border-slate-100 p-5">
-          <h2 className="text-lg font-semibold text-slate-950">Account Information</h2>
-          <p className="text-sm text-slate-500">
+      <Card className="rounded-lg border-slate-200 bg-white dark:border-border dark:bg-card py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-foreground">Account Information</h2>
+          <p className="text-sm text-slate-500 dark:text-muted-foreground">
             Basic account details used for sign-in and employee records.
           </p>
         </CardHeader>
         <CardContent className="p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 Email Address *
               </label>
               <Input
@@ -172,7 +165,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                 placeholder="employee@3cworldgroup.com"
               />
               {isEdit && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                   Email cannot be changed after creation.
                 </p>
               )}
@@ -196,7 +189,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             )}
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 Display Name *
               </label>
               <Input
@@ -210,7 +203,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 Phone Number
               </label>
               <Input
@@ -223,7 +216,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             </div>
 
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 Street Address
               </label>
               <Input
@@ -236,7 +229,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 City
               </label>
               <Input
@@ -249,7 +242,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 State
               </label>
               <NativeSelect
@@ -283,17 +276,17 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm">
-        <CardHeader className="border-b border-slate-100 p-5">
-          <h2 className="text-lg font-semibold text-slate-950">Role & Permissions</h2>
-          <p className="text-sm text-slate-500">
+      <Card className="rounded-lg border-slate-200 bg-white dark:border-border dark:bg-card py-0 shadow-sm">
+        <CardHeader className="border-b border-slate-100 dark:border-border p-5">
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-foreground">Role & Permissions</h2>
+          <p className="text-sm text-slate-500 dark:text-muted-foreground">
             Choose the portal role and reporting assignment.
           </p>
         </CardHeader>
         <CardContent className="p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 Role *
               </label>
               <NativeSelect
@@ -313,7 +306,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
 
             {isEdit && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                   Status
                 </label>
                 <NativeSelect
@@ -322,6 +315,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                   onChange={handleChange}
                   className="w-full"
                 >
+                  <NativeSelectOption value="pending">Pending</NativeSelectOption>
                   <NativeSelectOption value="active">Active</NativeSelectOption>
                   <NativeSelectOption value="inactive">Inactive</NativeSelectOption>
                 </NativeSelect>
@@ -329,7 +323,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             )}
 
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
                 Manager ID
               </label>
               <Input
@@ -339,7 +333,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                 onChange={handleChange}
                 placeholder="Optional - Enter manager user ID"
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
                 Assign a manager for this user. This supports sales approval workflow.
               </p>
             </div>

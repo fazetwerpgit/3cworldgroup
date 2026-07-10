@@ -81,16 +81,30 @@ describe('dueNudges', () => {
 });
 
 describe('runOnboardingNudges', () => {
+  it('skips pending users whose role does not require onboarding', async () => {
+    store.set('users/account-executive', {
+      status: 'pending',
+      fieldRole: 'entry_rep',
+      createdAt: idleFor(8 * 24),
+    });
+
+    await expect(runOnboardingNudges(now)).resolves.toEqual({
+      nudged: 0,
+      flaggedAtRisk: 0,
+    });
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
   it('persists successful tiers and continues to later users after one user fails', async () => {
     store.set('users/u1', {
       status: 'pending',
-      fieldRole: 'entry_rep',
+      fieldRole: 'entry_level_rep',
       displayName: 'First Rep',
       createdAt: idleFor(73),
     });
     store.set('users/u2', {
       status: 'pending',
-      fieldRole: 'entry_rep',
+      fieldRole: 'entry_level_rep',
       displayName: 'Second Rep',
       createdAt: idleFor(25),
     });

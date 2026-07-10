@@ -19,7 +19,6 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [promotionWarning, setPromotionWarning] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'pending' | ''>('');
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -30,8 +29,14 @@ export default function UsersPage() {
     userId: string;
     userName: string;
   } | null>(null);
-  const [approveFieldRole, setApproveFieldRole] = useState<FieldRole>('entry_rep');
+  const [acceptConfirm, setAcceptConfirm] = useState<{
+    userId: string;
+    userName: string;
+    fieldRole: FieldRole;
+  } | null>(null);
+  const [approveFieldRole, setApproveFieldRole] = useState<FieldRole>('entry_level_rep');
   const [approving, setApproving] = useState(false);
+  const [accepting, setAccepting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -64,14 +69,6 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  useEffect(() => {
-    const warning = sessionStorage.getItem('adminUserPromotionWarning');
-    if (!warning) return;
-
-    setPromotionWarning(warning);
-    sessionStorage.removeItem('adminUserPromotionWarning');
-  }, []);
-
   const handleStatusChange = async (
     userId: string,
     status: 'active' | 'inactive'
@@ -101,11 +98,55 @@ export default function UsersPage() {
       return;
     }
 
-    setApproveFieldRole('entry_rep');
+    setApproveFieldRole('entry_level_rep');
     setApproveConfirm({
       userId,
       userName: target?.displayName || target?.email || 'this user',
     });
+  };
+
+  const handleAcceptClick = (userId: string) => {
+    const target = users.find((u) => u.uid === userId);
+    if (!target?.fieldRole || target.status !== 'pending') {
+      setError('This user is not a pending user with an assigned role.');
+      return;
+    }
+
+    setAcceptConfirm({
+      userId,
+      userName: target.displayName || target.email || 'this user',
+      fieldRole: target.fieldRole,
+    });
+  };
+
+  const handleAcceptConfirm = async () => {
+    if (!acceptConfirm) return;
+
+    setAccepting(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/portal/auth/users/${acceptConfirm.userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'active',
+          requestedBy: currentUser?.uid,
+          ...(acceptConfirm.fieldRole === 'entry_level_rep' ? { fieldRole: 'entry_rep' } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to accept user');
+      }
+
+      await fetchUsers();
+      setAcceptConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to accept user');
+    } finally {
+      setAccepting(false);
+    }
   };
 
   const handleApproveConfirm = async () => {
@@ -243,19 +284,6 @@ export default function UsersPage() {
           </div>
         )}
 
-        {promotionWarning && (
-          <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-            <span>{promotionWarning}</span>
-            <button
-              type="button"
-              className="shrink-0 text-xs font-semibold uppercase tracking-wide text-amber-900 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-50"
-              onClick={() => setPromotionWarning('')}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
         <div className="portal-enter portal-enter-3">
           {loading ? (
             <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card text-center shadow-sm">
@@ -269,8 +297,9 @@ export default function UsersPage() {
               users={users}
               onStatusChange={handleStatusChange}
               onApprove={handleApproveClick}
+              onAccept={handleAcceptClick}
               onDelete={handleDeleteClick}
-              loading={loading || approving || deleting}
+              loading={loading || approving || accepting || deleting}
             />
           )}
         </div>
@@ -316,6 +345,41 @@ export default function UsersPage() {
                     className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                   >
                     {approving ? 'Assigning...' : 'Assign Role'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {acceptConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <Card className="w-full max-w-md rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-xl">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">Accept User</h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-muted-foreground">
+                  This skips the remaining onboarding steps and activates{' '}
+                  <strong>{acceptConfirm.userName}</strong>
+                  {acceptConfirm.fieldRole === 'entry_level_rep'
+                    ? ' as an Account Executive.'
+                    : '.'}
+                </p>
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAcceptConfirm(null)}
+                    disabled={accepting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleAcceptConfirm}
+                    disabled={accepting}
+                    className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                  >
+                    {accepting ? 'Accepting...' : 'Accept & Activate'}
                   </Button>
                 </div>
               </CardContent>

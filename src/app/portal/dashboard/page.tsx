@@ -61,15 +61,7 @@ export default function DashboardPage() {
       title: 'Continue onboarding',
       description: 'Finish required documents and role-specific steps.',
       href: '/portal/onboarding',
-      show: isRole(
-        'entry_rep',
-        'l1_manager',
-        'l2_manager',
-        'ibo_level_1',
-        'ibo_level_2',
-        'ibo_level_3',
-        'ibo_level_4'
-      ),
+      show: isRole('entry_level_rep'),
       tone: 'neutral',
     },
     {

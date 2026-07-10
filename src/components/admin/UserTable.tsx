@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil, Trash2, UserPlus } from 'lucide-react';
+import { Check, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { User } from '@/types';
 import { isOnline } from '@/lib/presence/isOnline';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ interface UserTableProps {
   users: User[];
   onStatusChange?: (userId: string, status: 'active' | 'inactive') => void;
   onApprove?: (userId: string) => void;
+  onAccept?: (userId: string) => void;
   onDelete?: (userId: string, userName: string) => void;
   loading?: boolean;
 }
@@ -36,6 +37,7 @@ const roleLabels: Record<string, string> = {
   admin: 'Administrator',
   operations: 'Operations',
   entry_rep: 'Account Executive',
+  entry_level_rep: 'Entry Level Rep',
   l1_manager: 'L1 Manager',
   l2_manager: 'L2 Manager',
   ibo_level_1: 'IBO Level 1',
@@ -44,7 +46,7 @@ const roleLabels: Record<string, string> = {
   ibo_level_4: 'IBO Level 4',
 };
 
-export function UserTable({ users, onStatusChange, onApprove, onDelete, loading }: UserTableProps) {
+export function UserTable({ users, onStatusChange, onApprove, onAccept, onDelete, loading }: UserTableProps) {
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
@@ -156,6 +158,18 @@ export function UserTable({ users, onStatusChange, onApprove, onDelete, loading 
                       className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
                     >
                       Approve
+                    </Button>
+                  )}
+                  {onAccept && user.status === 'pending' && user.fieldRole && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => onAccept(user.uid)}
+                      disabled={loading}
+                      className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+                    >
+                      <Check className="h-4 w-4" />
+                      Accept
                     </Button>
                   )}
                   {onStatusChange && user.status === 'active' && (

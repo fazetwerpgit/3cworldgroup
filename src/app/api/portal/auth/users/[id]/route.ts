@@ -6,13 +6,11 @@ import {
   PlatformRole,
   FieldRole,
   FieldRoles,
-  LIGHT_VETTING_ROLES,
-  OnboardingStatus,
+  roleRequiresOnboarding,
   resolveRoles,
 } from '@/types';
 import { requireManagement } from '@/lib/auth/requireManagement';
 import { validateAddress } from '@/lib/validation/address';
-import { needsPromotionWarning } from '@/lib/onboarding/promotionCheck';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
@@ -180,7 +178,15 @@ export async function PUT(
     if (zip !== undefined)
       updateData.zip = addressCheck.clean.zip ?? FieldValue.delete();
     if (status !== undefined) updateData.status = status;
-    const shouldKickoffChecklist = !!fieldRole && !existingFieldRole;
+    const shouldKickoffChecklist =
+      fieldRole === 'entry_level_rep' && existingFieldRole !== 'entry_level_rep';
+    const assigningRole = role !== undefined || fieldRole !== undefined;
+    const shouldActivateImmediately =
+      assigningRole &&
+      status === undefined &&
+      doc.get('status') === 'pending' &&
+      !roleRequiresOnboarding(fieldRole);
+    if (shouldActivateImmediately) updateData.status = 'active';
 
     // Update displayName in Firebase Auth if changed
     if (trimmedDisplayName) {
@@ -239,24 +245,24 @@ export async function PUT(
       );
     }
 
-    let promotionWarning = false;
-    try {
-      if (fieldRole && (LIGHT_VETTING_ROLES as readonly string[]).includes(fieldRole)) {
-        const snap = await adminDb
-          .collection('userOnboarding')
-          .where('userId', '==', id)
-          .get();
-        const statuses: Record<string, OnboardingStatus> = {};
-        snap.forEach((d) => {
-          statuses[d.get('itemId') as string] = d.get('status') as OnboardingStatus;
-        });
-        promotionWarning = needsPromotionWarning(fieldRole, statuses);
+    if (shouldActivateImmediately) {
+      try {
+        await Promise.all([
+          resolveAlertTasks(id, ['pending_assignment']),
+          dispatchToUser({
+            userId: id,
+            type: 'system',
+            title: 'Your account is active',
+            message: 'Your account is active and ready to use.',
+            link: '/portal',
+          }),
+        ]);
+      } catch (error) {
+        console.error('[users] activation notification failed:', error);
       }
-    } catch (error) {
-      console.error('[users] Failed to compute promotion warning:', error);
     }
 
-    return NextResponse.json({ success: true, promotionWarning });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json(

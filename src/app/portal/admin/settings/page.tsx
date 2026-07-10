@@ -40,7 +40,7 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>({
     pointsPerSale: { min: 1, max: 15, default: 5 },
     autoApprove: true,
-    defaultRole: 'entry_rep',
+    defaultRole: 'entry_level_rep',
     leaderboardPeriods: ['week', 'month', 'quarter', 'year'],
     companyName: '3C World Group',
     supportEmail: 'support@3cworldgroup.com',
@@ -175,6 +175,9 @@ export default function AdminSettingsPage() {
                   }
                   className="w-full"
                 >
+                  <NativeSelectOption value="entry_level_rep">
+                    Entry Level Rep
+                  </NativeSelectOption>
                   <NativeSelectOption value="entry_rep">
                     Account Executive
                   </NativeSelectOption>

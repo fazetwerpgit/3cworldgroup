@@ -1,11 +1,12 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { createAlertTask } from '@/lib/alerts/alertTasks';
+import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
+import { dispatchToUser } from '@/lib/alerts/dispatch';
 import {
   getOnboardingItemsForUser,
   type OnboardingItem,
   type OnboardingStatus,
 } from '@/types/onboarding';
-import type { FieldRole } from '@/types/auth';
+import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 
 export interface ActivationReadiness {
   ready: boolean;
@@ -43,28 +44,41 @@ export async function getActivationReadiness(userId: string): Promise<Activation
 
   const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
   if (!fieldRole) return { ready: false, missing: ['fieldRole'] };
+  if (!roleRequiresOnboarding(fieldRole)) return { ready: false, missing: [] };
 
   const applicable = getOnboardingItemsForUser(fieldRole, !!userSnap.get('isIBO'));
   return computeReadiness(applicable, await loadStatuses(userId));
 }
 
-/** Call after any approval path. Alerts management when a pending user goes all-green. */
+/** Call after any approval path. Completes the gate when a pending user goes all-green. */
 export async function maybeFlagActivationReady(userId: string): Promise<void> {
   if (!adminDb) return;
 
-  const userSnap = await adminDb.doc(`users/${userId}`).get();
+  const userRef = adminDb.doc(`users/${userId}`);
+  const userSnap = await userRef.get();
   if (!userSnap.exists || userSnap.get('status') !== 'pending') return;
+
+  const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
+  if (!roleRequiresOnboarding(fieldRole)) return;
 
   const { ready } = await getActivationReadiness(userId);
   if (!ready) return;
 
-  const name = (userSnap.get('displayName') as string | undefined) ?? userId;
-  await createAlertTask({
-    kind: 'activation_ready',
-    subjectUserId: userId,
-    subjectName: name,
-    title: `${name} is ready to activate`,
-    message: 'All onboarding items are approved. One click makes them active.',
-    link: '/portal/admin/onboarding',
+  const now = new Date();
+  await userRef.update({
+    fieldRole: 'entry_rep',
+    status: 'active',
+    hireDate: now,
+    atRisk: null,
+    updatedAt: now,
+  });
+  await resolveAlertTasks(userId);
+
+  await dispatchToUser({
+    userId,
+    type: 'rep_activated',
+    title: "Onboarding complete — you're now an Account Executive",
+    message: 'Your onboarding is complete and your account is active.',
+    link: '/portal',
   });
 }

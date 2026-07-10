@@ -6,6 +6,7 @@ import { activationEmail } from '@/lib/email/templates';
 import { adminDb } from '@/lib/firebase/admin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { getActivationReadiness } from '@/lib/onboarding/activation';
+import { roleRequiresOnboarding } from '@/types/auth';
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +51,9 @@ export async function POST(request: Request) {
     const now = new Date();
     await userRef.update({
       status: 'active',
+      ...(roleRequiresOnboarding(userSnap.get('fieldRole'))
+        ? { fieldRole: 'entry_rep' }
+        : {}),
       hireDate: now,
       atRisk: FieldValue.delete(),
       updatedAt: now,

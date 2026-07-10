@@ -4,7 +4,17 @@ import {
   RoleDisplayNames,
   LIGHT_VETTING_ROLES,
   MANAGEMENT_FIELD_ROLES,
+  roleRequiresOnboarding,
 } from './auth';
+
+describe('roleRequiresOnboarding', () => {
+  it('requires onboarding only for entry-level reps', () => {
+    expect(roleRequiresOnboarding('entry_level_rep')).toBe(true);
+    expect(roleRequiresOnboarding('entry_rep')).toBe(false);
+    expect(roleRequiresOnboarding('l1_manager')).toBe(false);
+    expect(roleRequiresOnboarding()).toBe(false);
+  });
+});
 
 describe('new field roles', () => {
   it('resolves the three new roles as field roles', () => {
