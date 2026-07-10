@@ -68,10 +68,12 @@ export function MiniLeaderboard() {
     <span
       className={`portal-num grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-semibold ${
         rank === 1
-          ? 'bg-[#8dc63f] text-[#0A1F44]'
-          : rank <= 3
-            ? 'bg-[#8dc63f]/15 text-[#3f6212] dark:bg-[#8dc63f]/20 dark:text-[#d7ecc0]'
-            : mine
+          ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+          : rank === 2
+            ? 'bg-slate-200 text-slate-700 dark:bg-slate-500/30 dark:text-slate-300'
+            : rank === 3
+              ? 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300'
+              : mine
               ? 'bg-[#0A1F44]/10 text-[#0A1F44] dark:bg-white/10 dark:text-white'
               : 'bg-slate-100 text-slate-500 dark:bg-muted dark:text-muted-foreground'
       }`}
