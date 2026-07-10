@@ -4,10 +4,52 @@ For the next coding agent, especially Claude running a Max workflow. Read this
 before touching code. This repo is in the middle of an employee-portal redesign,
 not a public marketing-site redesign.
 
-Last updated: 2026-07-08
-Current checkpoint: see "Session Handoff 2026-07-08" below; the rest of this doc
+Last updated: 2026-07-10
+Current checkpoint: see "Session Handoff 2026-07-10" below; the rest of this doc
 is standing project background (intent, stack, design system, constraints) and
 still applies.
+
+## Session Handoff 2026-07-10 — Postmark live, form-submission emails shipped
+
+### Completed (this session)
+- **Postmark approved + fully configured.** POSTMARK_SERVER_TOKEN and
+  EMAIL_FROM (`alerts@3cworldgroup.com`, domain signature) are set in Vercel
+  production (verified via `vercel env ls`) AND `.env.local`. A real test
+  email was sent through the API and delivered — token + sender confirmed
+  working. This closes the "STILL MISSING" item in the 2026-07-08 deploy
+  checklist (item 3) and unblocks item 5.
+- **Form-submission email alerts shipped** (commit `3a5029e` on master,
+  deployed): `src/lib/forms/notifySubmission.ts` now also emails each
+  admin/operations user (users/{uid}.email) via the existing
+  `src/lib/email/sendEmail.ts`, using a new `formSubmissionEmail` template in
+  `src/lib/email/templates.ts`. Same per-form `formAlerts/{key}` toggle gates
+  bell + email together; email failures are logged, never block submission.
+  Implementation by Codex, diff-reviewed; tsc + production build green.
+- **Deploy note — git integration is NOW ACTIVE**: the push to master
+  auto-deployed to production (deployment aliased to www.3cworldgroup.com,
+  Ready). The 2026-07-09 note "no git integration, manual `vercel deploy
+  --prod`" is obsolete. This deploy also shipped the 796ad2b chat-hook
+  changes that were waiting for "the next deploy" (follow-up 2 below).
+- ONBOARDING_FIELD_ENCRYPTION_KEY confirmed present in Vercel production —
+  the only remaining pre-Formstack-cancellation item is the USER rotating the
+  Formstack password.
+- Gotcha: `.gitignore` has `.env*`, which excludes even `.env.example` — its
+  Postmark placeholder additions exist locally but cannot be committed.
+
+### Next section (suggested order)
+1. **Final Verification E2E smoke** from the onboarding-automation plan, now
+   unblocked by Postmark: signup -> pending_assignment alert -> role assign ->
+   checklist email -> e-sign (SignWell test_mode) -> webhook approve ->
+   activate. Emails now actually send, so verify real delivery too.
+2. **Formstack cancellation**: everything technical is done; user must rotate
+   the Formstack password, then cancel the subscription.
+3. **Mobile chat edit/delete bug** (user-reported 2026-07-06, still queued,
+   scope never investigated).
+4. Small cleanup: `bug-report/route.ts` still uses its own local
+   `notifyAdmins` — no email, ignores formAlerts toggles; unify onto
+   `notifySubmission`.
+5. Leaderboard gamification round-2 mockups (see memory
+   project-leaderboard-gamification).
 
 ## Session Handoff 2026-07-08 — Onboarding Automation (branch feat/onboarding-automation)
 
@@ -58,7 +100,7 @@ MERGED to master (13de182, fast-forward) and DEPLOYED to Vercel production
    ESIGN_PROVIDER=signwell, SIGNWELL_TEST_MODE=true, SIGNWELL_API_KEY,
    SIGNWELL_WEBHOOK_ID (all mirrored in .env.local). Gotcha: pipe values via
    bash `printf '%s'`, PowerShell pipes append CRLF and Vercel rejects/breaks.
-   STILL MISSING: POSTMARK_SERVER_TOKEN, EMAIL_FROM.
+   DONE 2026-07-10: POSTMARK_SERVER_TOKEN + EMAIL_FROM set (see top handoff).
 4. DONE — SignWell fully live, TEMPLATE-FREE (free plan's 1-template cap
    bypassed): signwell.ts posts /v1/documents with file_base64 from
    assets/esign/*.pdf (placeholders; generator script in scripts/) and coded
@@ -447,7 +489,9 @@ If the boss wants more polish:
 
 - The app should not store raw SSNs, card numbers, or bank-account numbers.
   Store status/reference/vendor token only.
-- Email templates are copy-paste only. The app does not send email.
+- The admin email-templates page is copy-paste only, but the app DOES send
+  transactional email via Postmark (`src/lib/email/sendEmail.ts`) as of
+  2026-07-10 — onboarding comms, alert broadcasts, form-submission alerts.
 - Google Meet links only for calls; no in-app video hosting.
 - Pipeline stage is derived from user/onboarding/channel/sales state, not a
   manually stored stage.
