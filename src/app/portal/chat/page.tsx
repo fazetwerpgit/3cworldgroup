@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowDown, Check, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -39,6 +39,36 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
   managers: 'Managers',
   platform: 'Admin/Ops',
 };
+
+function getLocalDayKey(createdAt: Date | null) {
+  const date = createdAt ?? new Date();
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function isSameLocalDay(first: Date, second: Date) {
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
+}
+
+function formatDayDivider(createdAt: Date | null) {
+  const date = createdAt ?? new Date();
+  const today = new Date();
+  if (isSameLocalDay(date, today)) return 'Today';
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (isSameLocalDay(date, yesterday)) return 'Yesterday';
+
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
 
 // Probe the GIF feature at most once per browser session (shared across mounts):
 // the proxy answers { enabled } based on whether a Tenor key is configured. The
@@ -791,14 +821,14 @@ export default function TeamChatPage() {
 
   return (
     <ProtectedRoute permissions={['chat:read']}>
-      <div className="min-h-screen portal-canvas">
+      <div className="min-h-screen portal-canvas lg:flex lg:h-dvh lg:flex-col">
         <PortalHeader />
-        <div className="flex">
+        <div className="flex lg:min-h-0 lg:flex-1">
           <PortalSidebar />
-          <main className="flex-1 overflow-auto lg:p-6">
+          <main className="flex-1 overflow-auto lg:min-h-0 lg:overflow-hidden lg:p-6">
             {/* Desktop (lg+): the shipped side-by-side panel layout, unchanged. */}
-            <div className="hidden lg:block">
-              <div className="mx-auto max-w-[1500px] space-y-5">
+            <div className="hidden lg:flex lg:min-h-0 lg:h-full lg:flex-col">
+              <div className="mx-auto flex min-h-0 w-full max-w-[1500px] flex-1 flex-col space-y-5">
                 <PortalPageHeader
                   eyebrow="Team resources"
                   title="Team Chat"
@@ -811,8 +841,8 @@ export default function TeamChatPage() {
                   </Alert>
                 )}
 
-                <div className="grid min-h-[680px] grid-cols-1 overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card shadow-sm lg:grid-cols-[320px_1fr]">
-                  <aside className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted/70 lg:border-b-0 lg:border-r">
+                <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card lg:grid-cols-[320px_1fr]">
+                  <aside className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted/70 lg:flex lg:min-h-0 lg:flex-col lg:border-b-0 lg:border-r">
                     <div className="border-b border-slate-200 dark:border-border p-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-foreground">
                         <MessageSquareText className="size-4 text-[#0A1F44] dark:text-foreground" />
@@ -822,7 +852,7 @@ export default function TeamChatPage() {
                         Latest 75 messages per channel to control read volume.
                       </p>
                     </div>
-                    <div className="space-y-2 p-3">
+                    <div className="space-y-2 p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                       {loadingChannels ? (
                         <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
                           Loading channels...
@@ -871,7 +901,7 @@ export default function TeamChatPage() {
                     </div>
                   </aside>
 
-                  <section className="flex min-h-[680px] flex-col">
+                  <section className="flex min-h-0 flex-col">
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-border p-4">
                       <div>
                         <button
@@ -896,10 +926,10 @@ export default function TeamChatPage() {
                     </div>
 
                     {/* relative wrapper hosts the floating jump-to-latest pill. */}
-                    <div className="relative flex flex-1 flex-col overflow-hidden">
+                    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
                     <div
                       ref={desktopScrollRef}
-                      className="flex flex-1 flex-col overflow-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4 [&>*+*]:mt-3"
+                      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4 [scrollbar-color:rgb(203_213_225)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb:hover]:bg-slate-400 [&>*+*]:mt-3 dark:[scrollbar-color:rgb(71_85_105)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 dark:[&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
                     >
                       {/* mt-auto spacer bottom-anchors sparse conversations. */}
                       <div aria-hidden="true" className="mt-auto" />
@@ -919,7 +949,11 @@ export default function TeamChatPage() {
                           </CardContent>
                         </Card>
                       ) : (
-                        displayMessages.map((message) => {
+                        displayMessages.map((message, index) => {
+                          const previousMessage = displayMessages[index - 1];
+                          const showDayDivider =
+                            !previousMessage ||
+                            getLocalDayKey(previousMessage.createdAt) !== getLocalDayKey(message.createdAt);
                           const isPending = !!message.pendingState;
                           const isFailed = message.pendingState === 'failed';
                           const isOwn = message.authorId === user?.uid;
@@ -927,14 +961,21 @@ export default function TeamChatPage() {
                           const canEdit = isOwn && !!message.text;
                           const canDelete = canModerate || isOwn;
                           return (
-                            <div
-                              key={message.id}
-                              className={`group rounded-md border bg-white p-4 shadow-sm portal-motion dark:bg-card/95 ${
+                            <Fragment key={message.id}>
+                              {showDayDivider && (
+                                <div className="flex items-center justify-center">
+                                  <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-slate-500 dark:border-border dark:bg-card/80 dark:text-muted-foreground">
+                                    {formatDayDivider(message.createdAt)}
+                                  </span>
+                                </div>
+                              )}
+                              <div
+                                className={`group rounded-md border bg-white p-4 shadow-sm portal-motion dark:bg-card/95 ${
                                 isFailed
                                   ? 'border-red-300 dark:border-red-500/40'
                                   : 'border-slate-200 hover:border-slate-300 dark:border-border dark:hover:border-white/25'
-                              } ${message.pendingState === 'sending' ? 'opacity-70' : ''}`}
-                            >
+                                } ${message.pendingState === 'sending' ? 'opacity-70' : ''}`}
+                              >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -1053,7 +1094,8 @@ export default function TeamChatPage() {
                                   />
                                 )}
                               </div>
-                            </div>
+                              </div>
+                            </Fragment>
                           );
                         })
                       )}
