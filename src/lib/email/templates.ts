@@ -88,3 +88,13 @@ export function managerAlertEmail(p: { title: string; message: string; link: str
     htmlBody: layout(p.title, `<p>${p.message}</p><p><a href="${p.link}">Open in portal</a></p>`),
   };
 }
+
+export function formSubmissionEmail(p: { formName: string; submittedBy: string; link: string }): EmailContent {
+  const subject = `New ${p.formName} submission`;
+  const submittedBy = p.submittedBy || 'A team member';
+  return {
+    subject,
+    textBody: `${submittedBy} submitted a ${p.formName}.\n\nReview it here: ${p.link}\n`,
+    htmlBody: layout(subject, `<p>${submittedBy} submitted a <strong>${p.formName}</strong>.</p><p><a href="${p.link}">Review submission</a></p>`),
+  };
+}

@@ -1,4 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
+import { sendEmail } from '@/lib/email/sendEmail';
+import { appBaseUrl, formSubmissionEmail } from '@/lib/email/templates';
 import { resolveRoles } from '@/types';
 
 // Per-form alert config. Each rebuilt form has a stable key; the label + review
@@ -69,6 +71,33 @@ export async function notifySubmission(formKey: string, submittedBy: string): Pr
         })
       )
     );
+
+    try {
+      const email = formSubmissionEmail({
+        formName: meta.label,
+        submittedBy,
+        link: `${appBaseUrl()}${meta.reviewLink}`,
+      });
+      const results = await Promise.allSettled(
+        uids.map(async (uid) => {
+          const user = await adminDb!.collection('users').doc(uid).get();
+          const to = user.get('email') as string | undefined;
+          if (!to) return;
+
+          const result = await sendEmail({ to, ...email });
+          if (!result.ok) {
+            console.error(`[forms] failed to email ${formKey} submission alert to ${to}:`, result.error);
+          }
+        })
+      );
+      results.forEach((result) => {
+        if (result.status === 'rejected') {
+          console.error(`[forms] failed to send ${formKey} submission email alert:`, result.reason);
+        }
+      });
+    } catch (err) {
+      console.error(`Failed to send ${formKey} submission email alerts:`, err);
+    }
   } catch (err) {
     console.error(`Failed to send ${formKey} submission alerts:`, err);
   }
