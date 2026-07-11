@@ -9,11 +9,13 @@ Current checkpoint: see "Session Handoff 2026-07-10 — Leaderboard Broadcast
 redesign" below; the rest of this doc is standing project background (intent,
 stack, design system, constraints) and still applies.
 
-## Session Handoff 2026-07-11 — Leaderboard Phase 2 (rank history) shipped (local)
+## Session Handoff 2026-07-11 — Leaderboard Phase 2 (rank history) DEPLOYED
 
 ### Completed (this session)
-- **Phase 2 delivered on master, LOCAL ONLY — NOT PUSHED** (pushing auto-deploys
-  to production; user has not approved deploy). Commits 6a85850, 50842db,
+- **DEPLOYED 2026-07-11**: user approved; master pushed (81603b8..fa9943f),
+  Vercel production build Ready, www.3cworldgroup.com serving it. This shipped
+  leaderboard phase 1 (7ea24cd) + phase 2 + the Xfinity commit together.
+- **Phase 2 delivered on master.** Commits 6a85850, 50842db,
   9aeb342, 67c712b, f275458 (+ docs 18a29e1/bdc0e75). Spec:
   `docs/superpowers/specs/2026-07-10-leaderboard-phase2-design.md`; plan:
   `docs/superpowers/plans/2026-07-10-leaderboard-phase2-history.md`; SDD audit
