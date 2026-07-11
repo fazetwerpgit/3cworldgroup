@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, ArrowUpRight, Crown, Target, Trophy } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, ArrowUpRight, Crown, Flame, Target, Trophy } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Sparkline } from '@/components/leaderboard/Sparkline';
 
 export interface LeaderboardEntry {
   rank: number;
@@ -11,6 +12,9 @@ export interface LeaderboardEntry {
   salesRepName: string;
   totalSales: number;
   totalPoints: number;
+  movement?: number | null;
+  spark?: (number | null)[];
+  streakDays?: number;
 }
 
 type Metric = 'totalPoints' | 'totalSales';
@@ -83,6 +87,40 @@ function CountUpValue({ value }: { value: number }) {
   }, [value]);
 
   return <>{formatNumber(displayValue)}</>;
+}
+
+// Movement since end of yesterday. noHistory = first day of a period (every
+// movement is null) — render a neutral dash instead of a wall of "New".
+function MovementIndicator({ movement, noHistory }: { movement: number | null | undefined; noHistory: boolean }) {
+  if (noHistory || movement === 0) {
+    return <span className="text-xs font-bold text-slate-300 dark:text-muted-foreground" aria-hidden="true">-</span>;
+  }
+  if (movement === null || movement === undefined) {
+    return (
+      <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground">
+        New
+      </span>
+    );
+  }
+  const up = movement > 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${up ? 'text-[#5f8f20] dark:text-[#8dc63f]' : 'text-amber-600 dark:text-amber-400'}`}>
+      {up ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}
+      {Math.abs(movement)}
+      <span className="sr-only">{up ? 'up' : 'down'} {Math.abs(movement)} since yesterday</span>
+    </span>
+  );
+}
+
+// Consecutive selling days; hidden below 2 so rows aren't noisy.
+function StreakChip({ streakDays }: { streakDays: number | undefined }) {
+  if (!streakDays || streakDays < 2) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+      <Flame className="size-3" aria-hidden="true" />
+      {streakDays}-day streak
+    </span>
+  );
 }
 
 function ChaseProgress({ current, target, highlighted }: { current: number; target: number; highlighted: boolean }) {
@@ -191,7 +229,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
   );
 }
 
-function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[]; currentUserId?: string; metric: Metric }) {
+function Podium({ entries, currentUserId, metric, noHistory }: { entries: LeaderboardEntry[]; currentUserId?: string; metric: Metric; noHistory: boolean }) {
   const podium = entries.filter((entry) => entry.rank <= 3).sort((a, b) => a.rank - b.rank);
   const podiumOrder: Record<number, string> = {
     1: 'sm:order-2',
@@ -227,6 +265,10 @@ function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[
                 <div className="mt-3 flex items-center justify-center gap-1.5">
                   <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${m.chip}`}>{m.label}</span>
                   {mine && <Badge className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">You</Badge>}
+                  <MovementIndicator movement={entry.movement} noHistory={noHistory} />
+                </div>
+                <div className="mt-1.5 flex justify-center empty:hidden">
+                  <StreakChip streakDays={entry.streakDays} />
                 </div>
                 <p className="mt-2 truncate font-semibold text-slate-950 dark:text-foreground">{entry.salesRepName}</p>
                 <p className={`portal-display portal-num mt-4 font-extrabold tracking-tight text-slate-950 dark:text-foreground ${winner ? 'text-5xl' : 'text-4xl'}`}>
@@ -245,7 +287,7 @@ function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[
   );
 }
 
-function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; currentUserId?: string; metric: Metric }) {
+function ChaseTable({ entries, currentUser, currentUserId, metric, noHistory }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; currentUserId?: string; metric: Metric; noHistory: boolean }) {
   const rest = entries.filter((entry) => entry.rank >= 4).sort((a, b) => a.rank - b.rank);
   if (rest.length === 0) return null;
   const unit = metricUnit(metric);
@@ -261,8 +303,8 @@ function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: 
         <p className="text-right text-xs text-slate-500 dark:text-muted-foreground">Every rep stays on the board.</p>
       </div>
       <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-        <div className="hidden grid-cols-[52px_minmax(0,1fr)_110px_120px] items-center gap-4 border-b border-slate-100 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:border-border dark:text-muted-foreground sm:grid">
-          <span>Rank</span><span>Rep</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span>
+        <div className="hidden grid-cols-[76px_minmax(0,1fr)_64px_110px_120px] items-center gap-4 border-b border-slate-100 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:border-border dark:text-muted-foreground sm:grid">
+          <span>Rank</span><span>Rep</span><span className="text-center">Trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span>
         </div>
         <CardContent className="space-y-0 px-0">
           {rest.map((entry, index) => {
@@ -278,18 +320,26 @@ function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: 
                 className={`portal-enter relative border-b border-slate-100 transition-colors duration-200 last:border-b-0 hover:bg-slate-50 dark:border-border dark:hover:bg-white/[0.035] ${mine ? 'border-l-2 border-l-[#8dc63f] bg-[#8dc63f]/[0.07] dark:bg-[#8dc63f]/10' : ''}`}
                 style={{ animationDelay: `${Math.min(index * 42, 420)}ms` }}
               >
-                <div className="grid min-h-[72px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[52px_minmax(0,1fr)_110px_120px] sm:gap-4 sm:px-5">
-                  <span className="portal-num grid size-8 place-items-center rounded-md bg-slate-100 text-sm font-bold text-slate-500 dark:bg-muted dark:text-muted-foreground sm:size-9">{entry.rank}</span>
+                <div className="grid min-h-[72px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[76px_minmax(0,1fr)_64px_110px_120px] sm:gap-4 sm:px-5">
+                  <span className="flex items-center gap-1.5">
+                    <span className="portal-num grid size-8 shrink-0 place-items-center rounded-md bg-slate-100 text-sm font-bold text-slate-500 dark:bg-muted dark:text-muted-foreground sm:size-9">{entry.rank}</span>
+                    <span className="hidden sm:inline-flex"><MovementIndicator movement={entry.movement} noHistory={noHistory} /></span>
+                  </span>
                   <div className="flex min-w-0 items-center gap-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0A1F44]/[0.07] text-[11px] font-bold text-[#0A1F44] dark:bg-white/10 dark:text-white">{initialsOf(entry.salesRepName)}</span>
                     <div className="min-w-0">
                       <p className={`truncate text-sm ${mine ? 'font-semibold text-slate-950 dark:text-foreground' : 'text-slate-700 dark:text-foreground'}`}>{entry.salesRepName}</p>
-                      {mine && <Badge className="mt-1 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">You</Badge>}
-                      <span className={`mt-1 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold sm:hidden ${mine ? 'border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#5f8f20] dark:text-[#8dc63f]' : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground'}`}>
-                        {gap === null ? '--' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`}
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {mine && <Badge className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">You</Badge>}
+                        <span className="inline-flex sm:hidden"><MovementIndicator movement={entry.movement} noHistory={noHistory} /></span>
+                        <StreakChip streakDays={entry.streakDays} />
+                        <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold sm:hidden ${mine ? 'border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#5f8f20] dark:text-[#8dc63f]' : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground'}`}>
+                          {gap === null ? '--' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`}
+                        </span>
                       </span>
                     </div>
                   </div>
+                  <span className="hidden justify-center sm:flex"><Sparkline spark={entry.spark ?? []} mine={mine} /></span>
                   <p className="portal-display portal-num text-right text-lg font-extrabold tracking-tight text-slate-950 dark:text-foreground">{formatNumber(currentValue)} <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-muted-foreground">{unit}</span></p>
                   <p className={`hidden justify-self-end rounded-full border px-2 py-1 text-right text-[10px] font-semibold sm:inline-flex ${mine ? 'border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#5f8f20] dark:text-[#8dc63f]' : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground'}`}>{gap === null ? '--' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`}</p>
                 </div>
@@ -306,12 +356,13 @@ function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: 
 export function LeaderboardTable({ entries, currentUser, currentUserId, metric, period }: LeaderboardTableProps) {
   if (entries.length === 0) return <EmptyState />;
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
+  const noHistory = ordered.every((entry) => (entry.movement ?? null) === null);
 
   return (
     <div className="space-y-5">
-      <Podium entries={ordered} currentUserId={currentUserId} metric={metric} />
+      <Podium entries={ordered} currentUserId={currentUserId} metric={metric} noHistory={noHistory} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <ChaseTable entries={ordered} currentUser={currentUser} currentUserId={currentUserId} metric={metric} />
+      <ChaseTable entries={ordered} currentUser={currentUser} currentUserId={currentUserId} metric={metric} noHistory={noHistory} />
       <p className="px-1 text-xs text-slate-400 dark:text-muted-foreground">Rankings use approved sales for the selected period. Point values vary by product and plan.</p>
     </div>
   );

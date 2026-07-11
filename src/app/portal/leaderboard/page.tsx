@@ -161,6 +161,7 @@ function BoardSkeleton() {
                 <Skeleton className="size-8 rounded-md" />
                 <Skeleton className="size-9 rounded-full" />
                 <Skeleton className="h-4 flex-1" />
+                <Skeleton className="hidden h-4 w-16 sm:block" />
                 <Skeleton className="h-5 w-14" />
                 <Skeleton className="hidden h-5 w-20 sm:block" />
               </div>
