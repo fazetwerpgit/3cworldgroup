@@ -4,10 +4,68 @@ For the next coding agent, especially Claude running a Max workflow. Read this
 before touching code. This repo is in the middle of an employee-portal redesign,
 not a public marketing-site redesign.
 
-Last updated: 2026-07-10
-Current checkpoint: see "Session Handoff 2026-07-10" below; the rest of this doc
-is standing project background (intent, stack, design system, constraints) and
-still applies.
+Last updated: 2026-07-10 (leaderboard session)
+Current checkpoint: see "Session Handoff 2026-07-10 — Leaderboard Broadcast
+redesign" below; the rest of this doc is standing project background (intent,
+stack, design system, constraints) and still applies.
+
+## Session Handoff 2026-07-10 — Leaderboard Broadcast redesign shipped (local)
+
+### Completed (this session)
+- **Leaderboard "Broadcast" redesign implemented and verified** (commit
+  `7ea24cd` on master, **LOCAL ONLY — NOT PUSHED**; pushing auto-deploys to
+  production, user has not approved deploy yet). Files:
+  `src/app/portal/leaderboard/page.tsx`,
+  `src/components/leaderboard/LeaderboardTable.tsx`. Full spec (still
+  accurate): `docs/redesign/leaderboard-2c-spec.md`. Locked pattern updated in
+  `docs/redesign/ANCHOR.md` §9 ("Locked leaderboard pattern v2").
+- Design chosen by the user across 3 mockup rounds (9 HTML mockups, built by
+  Codex/gpt-5.6-luna, live-reviewed). Winner = "2C Broadcast": weekly
+  challenge docked in the command band, podium + crown + count-up + baseline,
+  "Across the board" ticker (top closer / closest race / your climb / team
+  pulse), continuous chase table with gap-to-next chips + progress bars on the
+  user's row and neighbors.
+- Verified: tsc, eslint (touched files), production build, independent
+  Claude (opus) diff review (2 defects found and fixed: skeleton geometry,
+  weekly-challenge zero-sales stuck on "Loading"), signed-in screenshots
+  light+dark, desktop+390px mobile (2 mobile defects found and fixed:
+  duplicated challenge label, podium stacking 2-1-3 instead of 1-2-3).
+
+### Decisions / constraints for phase 2
+- **Deferred, needs rank-history storage**: rank-movement arrows, 7-day
+  sparklines, streaks, expandable week-by-week rows. Phase 2 starts with a
+  rank/points snapshot store (e.g. scheduled aggregation into a
+  `leaderboardSnapshots` collection) — API is currently computed on the fly in
+  `/api/portal/leaderboard` with no history.
+- **Challenge bonus points NOT displayed** ("+15 bonus pts" from the mockup):
+  not wired into scoring; showing an unpaid reward would mislead reps. Needs
+  client sign-off + scoring change before display. Challenge target is
+  tunable: `WEEKLY_CHALLENGE` const at top of the leaderboard page.tsx.
+- Data shape available to the page: `{rank, salesRepId, salesRepName,
+  totalSales, totalPoints}` per entry + server-computed `currentUser`. The
+  page calls `useLeaderboard()` twice (main period + a 'week' instance for the
+  challenge); both auth-gated on `user`.
+
+### Gotchas discovered
+- **Tailwind v4 scans repo .md files**: a Windows-style path with backslashes
+  (`\11c6bab0...`) in a committed doc parses as a CSS escape → build fails
+  with "Invalid code point". Use forward slashes in all committed docs.
+- Dev server: port 3000 is often held by a stale process; `npm run dev` falls
+  back to 3002. Check the dev-task output for the real port.
+- QA bots (`qa-e2e-*@3cworldgroup.test`) exist but `E2E_BOT_SECRET` is not in
+  `.env.local` — their passwords are unknown; resetting them requires the
+  user to run `node scripts/e2e-create-test-user.mjs` themselves (permission
+  classifier blocks credential actions in auto mode). This session verified
+  signed-in via the user logging into the Playwright browser manually.
+- The permission classifier also blocks Admin SDK custom-token minting and
+  credential grepping — don't attempt; ask the user.
+
+### Next task (user-stated): Phase 2
+Rank history + the deferred features. Suggested slices: 1) snapshot storage +
+API extension (needs approval per ANCHOR scope — API changes were out of
+redesign scope, phase 2 is a feature, confirm with user), 2) movement arrows
+from snapshot delta, 3) sparklines, 4) streaks. Also pending user decisions:
+push/deploy the leaderboard commit; bonus-points wiring.
 
 ## Session Handoff 2026-07-10 — Postmark live, form-submission emails shipped
 
