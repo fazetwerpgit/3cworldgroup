@@ -9,6 +9,39 @@ Current checkpoint: see "Session Handoff 2026-07-10 — Leaderboard Broadcast
 redesign" below; the rest of this doc is standing project background (intent,
 stack, design system, constraints) and still applies.
 
+## Session Handoff 2026-07-11 — Leaderboard Phase 2 (rank history) shipped (local)
+
+### Completed (this session)
+- **Phase 2 delivered on master, LOCAL ONLY — NOT PUSHED** (pushing auto-deploys
+  to production; user has not approved deploy). Commits 6a85850, 50842db,
+  9aeb342, 67c712b, f275458 (+ docs 18a29e1/bdc0e75). Spec:
+  `docs/superpowers/specs/2026-07-10-leaderboard-phase2-design.md`; plan:
+  `docs/superpowers/plans/2026-07-10-leaderboard-phase2-history.md`; SDD audit
+  trail in `.superpowers/sdd/progress.md` (untracked).
+- Features: movement arrows (vs yesterday, ET day bucketing, "New" chip,
+  all-dash on first day of period), 7-day rank sparklines (chase table only,
+  hidden <sm), selling-day streak chips (>=2 only; weekends + today-grace never
+  break). All computed on the fly from existing sales — NO new
+  collections/rules/indexes/cron. Engine: `src/lib/leaderboard/history.ts`
+  (pure, unit-tested) + `src/lib/leaderboard/sparkline.ts`; API enrichment is
+  fail-soft in `/api/portal/leaderboard`; UI in `LeaderboardTable.tsx` +
+  `Sparkline.tsx`.
+- Verified: tsc, 346/346 vitest (14 new engine + 5 sparkline tests),
+  production build, per-task opus reviews + final whole-branch opus review
+  (READY TO MERGE), signed-in screenshots light+dark, desktop+390 (real data =
+  only 3 reps, so chase/sparklines verified via a browser-level API mock of an
+  8-rep board — display-only, nothing written to Firestore). 0 console errors.
+  Shots in `.superpowers/sdd/shots/`.
+- **CAUTION for the deploy decision**: a stray external commit `413dda2`
+  ("feat(sales): add Xfinity carrier with 8 plans") landed on master mid-run
+  from ANOTHER session — pushing master deploys leaderboard phase 1 + phase 2
+  + that Xfinity change together. Verify the Xfinity commit is wanted before
+  pushing.
+- Deferred fast-follows (final-review minors, none blocking): hoist dayKey's
+  Intl formatter to module level; dedupe chip styling in LeaderboardTable;
+  short-circuit history for the weekly limit-1 call; bonus-points wiring still
+  pending client sign-off; expandable week-by-week rows deliberately out.
+
 ## Session Handoff 2026-07-10 — Leaderboard Broadcast redesign shipped (local)
 
 ### Completed (this session)
