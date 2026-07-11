@@ -216,12 +216,27 @@ playbook where they conflict.
   decisive actions, totals footer. Mobile = status-edged (border-l-2) cards.
   Empty states: true-empty (CTA) vs filtered-empty (Clear filter). Loading =
   geometry-true skeleton rows.
-- Locked leaderboard pattern: command band carries YOUR standing (rank with
-  lime #, points, sales as Archivo numerals); period tabs + metric segmented
-  control; podium cards for top 3 (2-1-3 order, winner elevated + lime top
-  edge, gold/silver/bronze ring+chip — the one non-brand color exception);
-  ranks 4+ as neutral rows, own row lime-tinted; scoring note as footnote
-  text, not a card. Auth-gated fetches must wait for `user` before firing.
+- Locked leaderboard pattern (v2 "Broadcast", 2026-07-10): command band
+  carries YOUR standing (rank with lime #, points, sales as Archivo numerals)
+  + micro progress "X pts to #N" + a docked WEEKLY CHALLENGE strip at the
+  band's bottom edge (white/5 overlay, hairline top border; progress = user's
+  approved sales this week vs `WEEKLY_CHALLENGE.targetSales`, countdown to
+  Sunday; NO bonus-pts display — not wired into scoring, client decision
+  pending). Period tabs + metric segmented control. Podium top 3: DOM order
+  1-2-3 (mobile stacks winner first), sm:order 2-1-3, winner elevated + lime
+  top edge + line-art crown, gold/silver/bronze ring+chip (the one non-brand
+  color exception), count-up numerals (skipped under prefers-reduced-motion),
+  hairline baseline platform. "Across the board" ticker band: left rail label
+  + 4 hairline-divided cells (Top closer / Closest race / Your climb / Team
+  pulse), all derived from the fetched entries, graceful fallbacks per state.
+  Ranks 4+ = "the chase": neutral rows, gap-to-next chip per row, user row +
+  neighbors carry a 2px baseline progress bar toward the next rank, own row
+  lime edge + tint. Scoring note as footnote text, not a card. Auth-gated
+  fetches must wait for `user` before firing. Deferred pending rank-history
+  storage: movement arrows, sparklines, streaks, expandable weekly rows.
+  Gotcha: Tailwind v4 scans repo .md files — backslash-hex Windows paths in
+  docs (e.g. `\11c6...`) parse as CSS escapes and break the build; use
+  forward slashes in any committed doc.
 
 - **Phone is primary for reps** — mobile gets first-class treatment (chat,
   leaderboard, forms especially). Mobile bottom-nav pattern from the playbook
