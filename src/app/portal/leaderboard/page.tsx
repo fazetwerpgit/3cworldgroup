@@ -56,7 +56,7 @@ function ArenaMast({
         <span className="mr-2 inline-block size-3 align-[-1px] bg-[#8dc63f] dark:bg-[#d9a520] dark:shadow-[0_0_16px_rgba(245,215,128,0.5)]" aria-hidden="true" />
         3C World Group / Arena
       </span>
-      <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.1em] text-[#687384] dark:text-[#9caabd]">
+      <div className="flex items-center gap-[18px] font-['Consolas'] text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#687384] dark:text-[#9caabd]">
         <div className="flex items-center gap-2" aria-label="Leaderboard period">
           {periodOptions.map((option) => (
             <button
@@ -64,7 +64,7 @@ function ArenaMast({
               type="button"
               aria-pressed={period === option.value}
               onClick={() => setPeriod(option.value)}
-              className={`cursor-pointer transition-colors duration-150 ${period === option.value ? 'text-[#0A1F44] underline decoration-[#8dc63f] decoration-2 underline-offset-4 dark:text-[#f6f7f8] dark:decoration-[#d9a520]' : 'hover:text-[#0A1F44] dark:hover:text-[#f6f7f8]'}`}
+              className={`cursor-pointer transition-colors duration-150 ${period === option.value ? 'text-[#8dc63f]' : 'hover:text-[#8dc63f]'}`}
             >
               {option.label.replace('This ', '')}
             </button>
@@ -78,13 +78,13 @@ function ArenaMast({
               type="button"
               aria-pressed={metric === option.value}
               onClick={() => setMetric(option.value)}
-              className={`cursor-pointer transition-colors duration-150 ${metric === option.value ? 'text-[#0A1F44] dark:text-[#f6f7f8]' : 'hover:text-[#0A1F44] dark:hover:text-[#f6f7f8]'}`}
+              className={`cursor-pointer transition-colors duration-150 ${metric === option.value ? 'text-[#8dc63f]' : 'hover:text-[#8dc63f]'}`}
             >
               {option.label}
             </button>
           ))}
         </div>
-        <span className="hidden sm:inline">· Live</span>
+        <span>· LIVE</span>
       </div>
     </div>
   );
@@ -93,7 +93,6 @@ function ArenaMast({
 function WeeklyChallenge({ sales, loading }: { sales: number | null; loading: boolean }) {
   const [now, setNow] = useState(() => new Date());
   const complete = sales !== null && sales >= WEEKLY_CHALLENGE.targetSales;
-  const progress = sales === null ? 0 : Math.min(100, Math.round((sales / WEEKLY_CHALLENGE.targetSales) * 100));
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60_000);
@@ -101,19 +100,16 @@ function WeeklyChallenge({ sales, loading }: { sales: number | null; loading: bo
   }, []);
 
   return (
-    <div className="relative grid gap-3 border-b-[5px] border-[#0A1F44] bg-[#8dc63f] px-[19px] py-4 text-[#0A1F44] shadow-[0_14px_34px_rgba(141,198,63,0.11)] dark:border-[#e7edf4] sm:grid-cols-[1fr_1.7fr_auto] sm:items-center sm:gap-5">
-      <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em]">Weekly challenge</span>
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-5">
-        <strong className="font-['Trebuchet_MS'] text-[15px] font-black sm:text-[18px]">
-          {complete ? `Challenge complete · ${WEEKLY_CHALLENGE.targetSales} of ${WEEKLY_CHALLENGE.targetSales}` : `Close ${WEEKLY_CHALLENGE.targetSales} sales by Sunday`}
-        </strong>
-        <div className="h-[9px] min-w-0 bg-[rgba(10,31,68,0.22)] sm:min-w-[180px]" aria-label={`${sales ?? 0} of ${WEEKLY_CHALLENGE.targetSales} complete`}>
-          <span className="block h-full bg-[#0A1F44] transition-[width] duration-300" style={{ width: `${progress}%` }} />
-        </div>
+    <div className="relative grid gap-3 border-b-[5px] border-[#0A1F44] bg-[#8dc63f] px-[19px] py-4 text-[#0A1F44] shadow-[0_14px_34px_rgba(141,198,63,0.11)] dark:border-[#e7edf4] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
+      <div>
+        <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em]">Weekly challenge</span>
+        <span className="mt-2 block font-['Consolas'] text-[11px] font-black whitespace-nowrap sm:text-[12px]">
+          {loading || sales === null ? `-- / ${WEEKLY_CHALLENGE.targetSales} · Loading` : `${Math.min(sales, WEEKLY_CHALLENGE.targetSales)} / ${WEEKLY_CHALLENGE.targetSales} · ${countdownToSunday(now)}`}
+        </span>
       </div>
-      <span className="font-['Consolas'] text-[11px] font-black whitespace-nowrap sm:text-[12px]">
-        {loading || sales === null ? `-- / ${WEEKLY_CHALLENGE.targetSales} · Loading` : `${Math.min(sales, WEEKLY_CHALLENGE.targetSales)} / ${WEEKLY_CHALLENGE.targetSales} · ${countdownToSunday(now)}`}
-      </span>
+      <strong className="font-['Trebuchet_MS'] text-[15px] font-black sm:text-[18px]">
+        {complete ? `Challenge complete · ${WEEKLY_CHALLENGE.targetSales} of ${WEEKLY_CHALLENGE.targetSales}` : `Close ${WEEKLY_CHALLENGE.targetSales} sales by Sunday`}
+      </strong>
     </div>
   );
 }
@@ -123,7 +119,7 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
   const unit = metric === 'totalPoints' ? 'pts' : 'sales';
 
   return (
-    <aside className="self-end border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
+    <aside className="w-full max-w-[280px] min-w-0 justify-self-end self-end border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
       <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em] text-[#8dc63f] dark:text-[#d9a520]">Your standing</span>
       <div className="mt-[15px] inline-flex items-baseline gap-[0.08em] font-['Trebuchet_MS'] text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.12em]">
         <small className="text-[0.4em] tracking-normal">#</small>
@@ -170,8 +166,8 @@ function BoardSkeleton() {
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
-  const { leaderboard, currentUser, loading, error, fetchLeaderboard, getUserRank } = useLeaderboard();
-  const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard, getUserRank: getWeeklyUserRank } = useLeaderboard();
+  const { leaderboard, currentUser, loading, error, fetchLeaderboard } = useLeaderboard();
+  const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard } = useLeaderboard();
   const [period, setPeriod] = useState<Period>('month');
   const [metric, setMetric] = useState<Metric>('totalPoints');
 
@@ -185,11 +181,11 @@ export default function LeaderboardPage() {
     fetchWeeklyLeaderboard('week', 'totalSales', 1);
   }, [user, fetchWeeklyLeaderboard]);
 
-  const userRank = user ? getUserRank(user.uid) : null;
-  const weeklyStanding = user ? weeklyCurrentUser ?? getWeeklyUserRank(user.uid) : null;
+  const userRank = currentUser;
+  const weeklyStanding = weeklyCurrentUser;
   const weeklySales = weeklyLoading ? weeklyStanding?.totalSales ?? null : weeklyStanding?.totalSales ?? 0;
-  const periodLabel = periodOptions.find((option) => option.value === period)?.label ?? '';
-  const metricLabel = metric === 'totalPoints' ? 'points' : 'sales';
+  const periodLabel = period === 'week' ? 'WEEK TO DATE' : period === 'month' ? 'MONTH TO DATE' : period === 'year' ? 'YEAR TO DATE' : 'ALL TIME';
+  const metricLabel = metric === 'totalPoints' ? 'POINTS' : 'SALES';
   const userName = userRank?.salesRepName ?? currentUser?.salesRepName ?? user?.displayName ?? user?.email ?? 'Your standing';
 
   return (
@@ -203,10 +199,10 @@ export default function LeaderboardPage() {
             <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_42%,transparent_35%,rgba(0,0,0,0.46)_100%)] opacity-70 mix-blend-multiply dark:block" aria-hidden="true" />
             <div className="relative z-10 mx-auto w-full max-w-[1500px] px-[clamp(14px,3.6vw,56px)] pb-8 pt-[19px]">
               <ArenaMast period={period} metric={metric} setPeriod={setPeriod} setMetric={setMetric} />
-              <header className="grid gap-[30px] border-b border-[#0A1F44] py-[46px] dark:border-[#e7edf4] lg:grid-cols-[1.5fr_0.75fr]">
-                <div>
+              <header className="grid gap-[30px] border-b border-[#0A1F44] py-[46px] dark:border-[#e7edf4] lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-[clamp(30px,4%,48px)]" style={{ containerType: 'inline-size' }}>
+                <div className="min-w-0">
                   <p className="font-['Trebuchet_MS'] text-[11px] font-black uppercase tracking-[0.2em] text-[#687384]">{periodLabel} / ranked by {metricLabel}</p>
-                  <h1 className="mt-[13px] mb-[17px] font-['Trebuchet_MS'] text-[clamp(55px,13vw,188px)] font-black uppercase leading-[0.75] tracking-[-0.115em] text-[#0A1F44] dark:text-white dark:[text-shadow:0_0_26px_rgba(255,255,255,0.07)]">Leaderboard</h1>
+                  <h1 className="mt-[13px] mb-[17px] whitespace-nowrap font-['Trebuchet_MS'] text-[clamp(55px,13cqw,188px)] font-black uppercase leading-[0.75] tracking-[-0.115em] text-[#0A1F44] dark:bg-[linear-gradient(145deg,#ffffff_0%,#e8edf2_25%,#aab6c2_56%,#6e7a86_82%,#f4f7fa_100%)] dark:bg-clip-text dark:text-transparent dark:[text-shadow:0_0_26px_rgba(255,255,255,0.07)]">Leaderboard</h1>
                   <p className="max-w-[520px] text-[15px] leading-[1.45] text-[#687384]">A scoreboard for the people making the number move. The lead is visible.<br className="hidden sm:block" /> The next opportunity is yours.</p>
                 </div>
                 <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
@@ -216,7 +212,7 @@ export default function LeaderboardPage() {
               {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
               <div className="pt-11">
-                {loading || !user ? <BoardSkeleton /> : <LeaderboardTable entries={leaderboard} currentUser={currentUser ?? userRank} currentUserId={user.uid} metric={metric} period={period} />}
+                {loading || !user ? <BoardSkeleton /> : <LeaderboardTable entries={leaderboard} currentUser={currentUser} metric={metric} period={period} />}
               </div>
             </div>
           </main>

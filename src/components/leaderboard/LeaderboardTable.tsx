@@ -21,7 +21,6 @@ type Period = 'week' | 'month' | 'year' | 'all';
 interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
   currentUser?: LeaderboardEntry | null;
-  currentUserId?: string;
   metric: Metric;
   period: Period;
 }
@@ -41,6 +40,10 @@ function metricValue(entry: LeaderboardEntry, metric: Metric) {
 
 function metricUnit(metric: Metric) {
   return metric === 'totalPoints' ? 'pts' : 'sales';
+}
+
+function periodLabel(period: Period) {
+  return period === 'week' ? 'week to date' : period === 'month' ? 'month to date' : period === 'year' ? 'year to date' : 'all time';
 }
 
 function CountUpValue({ value }: { value: number }) {
@@ -77,7 +80,7 @@ function MovementIndicator({ movement, noHistory }: { movement: number | null | 
   }
   const up = movement > 0;
   return (
-    <span className={`inline-flex items-center gap-1 font-['Consolas'] text-[10px] font-black ${up ? 'text-[#8dc63f]' : 'text-[#ad7116] dark:text-[#d9a520]'}`}>
+    <span className={`inline-flex items-center gap-1 font-['Consolas'] text-[10px] font-black ${up ? 'text-[#8dc63f]' : 'text-[#ad7116]'}`}>
       {up ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}
       {Math.abs(movement)}
       <span className="sr-only">{up ? 'up' : 'down'} {Math.abs(movement)} since yesterday</span>
@@ -88,8 +91,8 @@ function MovementIndicator({ movement, noHistory }: { movement: number | null | 
 function StreakChip({ streakDays, mine = false }: { streakDays: number | undefined; mine?: boolean }) {
   if (!streakDays || streakDays < 2) return null;
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-[3px] text-[9px] font-black ${mine ? 'border border-[#0A1F44]/30 bg-[#0A1F44]/10 text-[#0A1F44] dark:border-[#0A1F44]/30 dark:bg-[#0A1F44]/10 dark:text-[#0A1F44]' : 'text-[#ad7116] dark:text-[#d9a520]'}`}>
-      <Flame className="size-3" aria-hidden="true" />
+    <span className={`inline-flex items-center gap-1 rounded-[99px] px-1.5 py-[3px] text-[9px] font-black ${mine ? 'border border-[#0A1F44]/30 bg-[#0A1F44]/10 text-[#0A1F44] dark:border-[#0A1F44]/30 dark:bg-[#0A1F44]/10 dark:text-[#0A1F44]' : 'bg-[#0A1F44] text-[#d9a520]'}`}>
+      <Flame className="size-3 fill-current" aria-hidden="true" />
       {streakDays}-day streak
     </span>
   );
@@ -105,7 +108,7 @@ function ChaseProgress({ current, target, highlighted }: { current: number; targ
   }, [percent]);
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-[rgba(141,198,63,0.23)] dark:bg-[rgba(10,31,68,0.24)]">
+    <div className="col-[2_/_-1] h-1 overflow-hidden bg-[rgba(141,198,63,0.23)] dark:bg-[rgba(10,31,68,0.24)]">
       <div className={`h-full transition-[width] duration-300 ease-out ${highlighted ? 'bg-[#8dc63f] dark:bg-[#0A1F44]' : 'bg-[#8dc63f] dark:bg-[#75869d]'}`} style={{ width: started ? `${percent}%` : '0%' }} />
     </div>
   );
@@ -176,7 +179,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
   );
 }
 
-function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[]; currentUserId?: string; metric: Metric }) {
+function Podium({ entries, currentUser, metric, period }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; period: Period }) {
   const podium = entries.filter((entry) => entry.rank <= 3).sort((a, b) => a.rank - b.rank);
   const podiumEntries = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
   const gridColumns = podium.length === 3 ? 'sm:grid-cols-[1fr_1.25fr_1fr]' : podium.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1';
@@ -186,11 +189,11 @@ function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[
     <section className="mb-[46px]" aria-labelledby="podium-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
         <h2 id="podium-heading" className="font-['Trebuchet_MS'] text-[22px] font-black uppercase tracking-[-0.04em]">Top performers</h2>
-        <p className="text-right text-[10px] uppercase tracking-[0.15em] text-[#687384]">Approved {unit} · selected period</p>
+        <p className="text-right text-[10px] uppercase tracking-[0.15em] text-[#687384]">Approved {metric === 'totalPoints' ? 'points' : 'sales'} · {periodLabel(period)}</p>
       </div>
       <div className={`grid gap-0 bg-[#0A1F44] text-white dark:bg-[radial-gradient(circle_at_50%_31%,rgba(245,215,128,0.18),transparent_26%),linear-gradient(180deg,#0d2449,#06142b)] dark:text-[#f6f7f8] dark:shadow-[0_25px_70px_rgba(0,0,0,0.24)] ${gridColumns}`}>
         {podiumEntries.map((entry) => {
-          const mine = entry.salesRepId === currentUserId;
+          const mine = entry.salesRepId === currentUser?.salesRepId;
           const winner = entry.rank === 1;
           const rankStyle = entry.rank === 1
             ? 'text-[#0A1F44] dark:bg-[linear-gradient(145deg,#fff3bd_0%,#f5d780_18%,#d9a520_52%,#8a6a1f_82%,#f5d780_100%)] dark:bg-clip-text dark:text-transparent dark:[text-shadow:0_0_30px_rgba(245,215,128,0.32)]'
@@ -218,11 +221,10 @@ function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[
   );
 }
 
-function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; currentUserId?: string; metric: Metric }) {
+function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric }) {
   const rest = entries.filter((entry) => entry.rank >= 4).sort((a, b) => a.rank - b.rank);
   if (rest.length === 0) return null;
   const unit = metricUnit(metric);
-  const ownRank = currentUser?.rank ?? null;
   const noHistory = entries.every((entry) => (entry.movement ?? null) === null);
 
   return (
@@ -234,8 +236,7 @@ function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: 
       <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">
         <div className="hidden min-h-[38px] grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] items-center gap-[15px] px-3 text-[9px] font-black uppercase tracking-[0.16em] text-[#687384] sm:grid"><span>Rank / move</span><span>Rep</span><span>7-day trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span></div>
         {rest.map((entry, index) => {
-          const mine = entry.salesRepId === currentUserId;
-          const neighbor = ownRank !== null && Math.abs(entry.rank - ownRank) === 1;
+          const mine = entry.salesRepId === currentUser?.salesRepId;
           const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
           const currentValue = metricValue(entry, metric);
           const aboveValue = above ? metricValue(above, metric) : 0;
@@ -253,8 +254,8 @@ function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: 
               </div>
               <span className="hidden justify-center sm:flex"><Sparkline spark={entry.spark ?? []} mine={mine} /></span>
               <div className="num text-right font-['Consolas'] text-[17px] font-black">{formatNumber(currentValue)} <small className={`font-['Trebuchet_MS'] text-[9px] tracking-[0.12em] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : 'text-[#687384]'}`}>{unit}</small></div>
-              <div className={`col-span-2 justify-self-start border border-[#0A1F44] px-2 py-1 font-['Consolas'] text-[10px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
-              {(neighbor || mine) && <ChaseProgress current={currentValue} target={aboveValue} highlighted={mine} />}
+              <div className={`${gap === null ? 'grid size-7 place-items-center rounded-full p-0 text-[13px]' : 'rounded-[99px] px-2 py-1'} col-span-2 justify-self-start border border-[#0A1F44] font-['Consolas'] text-[10px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
+              {mine && <ChaseProgress current={currentValue} target={aboveValue} highlighted />}
             </div>
           );
         })}
@@ -263,15 +264,15 @@ function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: 
   );
 }
 
-export function LeaderboardTable({ entries, currentUser, currentUserId, metric, period }: LeaderboardTableProps) {
+export function LeaderboardTable({ entries, currentUser, metric, period }: LeaderboardTableProps) {
   if (entries.length === 0) return <EmptyState />;
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
 
   return (
     <div>
-      <Podium entries={ordered} currentUserId={currentUserId} metric={metric} />
+      <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <ChaseTable entries={ordered} currentUser={currentUser} currentUserId={currentUserId} metric={metric} />
+      <ChaseTable entries={ordered} currentUser={currentUser} metric={metric} />
       <footer className="flex justify-between gap-3 border-t border-[#0A1F44] pt-3 text-[10px] text-[#687384] dark:border-[#e7edf4] max-sm:block">
         <span>Rankings use approved sales for the selected period.</span>
         <span className="max-sm:mt-2 max-sm:block">Point values vary by product and plan · refreshed moments ago.</span>
