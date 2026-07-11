@@ -119,9 +119,9 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
   const unit = metric === 'totalPoints' ? 'pts' : 'sales';
 
   return (
-    <aside className="w-full max-w-[280px] min-w-0 justify-self-end self-end border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
+    <aside className="min-h-[178px] w-full max-w-[280px] min-w-0 justify-self-end self-end border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
       <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em] text-[#8dc63f] dark:text-[#d9a520]">Your standing</span>
-      <div className="mt-[15px] inline-flex items-baseline gap-[0.08em] font-['Trebuchet_MS'] text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.12em]">
+      <div className="mt-[15px] flex w-fit items-baseline gap-[0.08em] font-['Trebuchet_MS'] text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.12em]">
         <small className="text-[0.4em] tracking-normal">#</small>
         {userRank?.rank ?? '—'}
       </div>
@@ -199,10 +199,10 @@ export default function LeaderboardPage() {
             <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_42%,transparent_35%,rgba(0,0,0,0.46)_100%)] opacity-70 mix-blend-multiply dark:block" aria-hidden="true" />
             <div className="relative z-10 mx-auto w-full max-w-[1500px] px-[clamp(14px,3.6vw,56px)] pb-8 pt-[19px]">
               <ArenaMast period={period} metric={metric} setPeriod={setPeriod} setMetric={setMetric} />
-              <header className="grid gap-[30px] border-b border-[#0A1F44] py-[46px] dark:border-[#e7edf4] lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-[clamp(30px,4%,48px)]" style={{ containerType: 'inline-size' }}>
-                <div className="min-w-0">
+              <header className="grid gap-[30px] border-b border-[#0A1F44] py-[46px] dark:border-[#e7edf4] lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-[clamp(30px,4%,48px)]">
+                <div className="min-w-0" style={{ containerType: 'inline-size' }}>
                   <p className="font-['Trebuchet_MS'] text-[11px] font-black uppercase tracking-[0.2em] text-[#687384]">{periodLabel} / ranked by {metricLabel}</p>
-                  <h1 className="mt-[13px] mb-[17px] whitespace-nowrap font-['Trebuchet_MS'] text-[clamp(55px,13cqw,188px)] font-black uppercase leading-[0.75] tracking-[-0.115em] text-[#0A1F44] dark:bg-[linear-gradient(145deg,#ffffff_0%,#e8edf2_25%,#aab6c2_56%,#6e7a86_82%,#f4f7fa_100%)] dark:bg-clip-text dark:text-transparent dark:[text-shadow:0_0_26px_rgba(255,255,255,0.07)]">Leaderboard</h1>
+                  <h1 className="mt-[13px] mb-[17px] whitespace-nowrap font-['Trebuchet_MS'] text-[clamp(55px,20cqw,188px)] font-black uppercase leading-[0.75] tracking-[-0.115em] text-[#0A1F44] dark:bg-[linear-gradient(145deg,#ffffff_0%,#e8edf2_25%,#aab6c2_56%,#6e7a86_82%,#f4f7fa_100%)] dark:bg-clip-text dark:text-transparent dark:[text-shadow:0_0_26px_rgba(255,255,255,0.07)]">Leaderboard</h1>
                   <p className="max-w-[520px] text-[15px] leading-[1.45] text-[#687384]">A scoreboard for the people making the number move. The lead is visible.<br className="hidden sm:block" /> The next opportunity is yours.</p>
                 </div>
                 <ArenaStanding userRank={userRank} userName={userName} metric={metric} />

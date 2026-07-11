@@ -91,7 +91,7 @@ function MovementIndicator({ movement, noHistory }: { movement: number | null | 
 function StreakChip({ streakDays, mine = false }: { streakDays: number | undefined; mine?: boolean }) {
   if (!streakDays || streakDays < 2) return null;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-[99px] px-1.5 py-[3px] text-[9px] font-black ${mine ? 'border border-[#0A1F44]/30 bg-[#0A1F44]/10 text-[#0A1F44] dark:border-[#0A1F44]/30 dark:bg-[#0A1F44]/10 dark:text-[#0A1F44]' : 'bg-[#0A1F44] text-[#d9a520]'}`}>
+    <span className={`inline-flex items-center gap-1 rounded-[99px] px-1.5 py-[3px] text-[9px] font-black ${mine ? 'border border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44] dark:text-white' : 'bg-[#0A1F44] text-[#d9a520]'}`}>
       <Flame className="size-3 fill-current" aria-hidden="true" />
       {streakDays}-day streak
     </span>
@@ -238,10 +238,11 @@ function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntr
         {rest.map((entry, index) => {
           const mine = entry.salesRepId === currentUser?.salesRepId;
           const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
+          const below = entries.find((candidate) => candidate.rank === entry.rank + 1);
           const currentValue = metricValue(entry, metric);
           const aboveValue = above ? metricValue(above, metric) : 0;
           const gap = above ? Math.max(0, aboveValue - currentValue) : null;
-          const gapLabel = gap === null ? '—' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`;
+          const gapLabel = gap === null || !below ? '—' : `${formatNumber(gap)} ${unit}`;
           return (
             <div key={entry.salesRepId} className={`relative grid min-h-[77px] grid-cols-[43px_minmax(0,1fr)_auto] items-center gap-[9px] border-b border-[rgba(10,31,68,0.22)] px-1 py-2.5 transition-colors duration-150 last:border-0 hover:bg-[rgba(141,198,63,0.12)] dark:border-white/15 dark:hover:bg-[rgba(245,215,128,0.08)] sm:grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] sm:gap-[15px] sm:px-3 ${mine ? 'bg-[#0A1F44] text-white shadow-[inset_7px_0_#8dc63f] dark:bg-[#8dc63f] dark:text-[#0A1F44] dark:border-[#8dc63f] dark:shadow-[inset_7px_0_#d7edaf,0_0_30px_rgba(141,198,63,0.12)]' : ''}`} style={{ animationDelay: `${Math.min(index * 42, 420)}ms` }}>
               <div className="flex items-center gap-[9px] font-['Consolas']"><b className="text-[21px]">{String(entry.rank).padStart(2, '0')}</b><MovementIndicator movement={entry.movement} noHistory={noHistory} /></div>
@@ -254,7 +255,7 @@ function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntr
               </div>
               <span className="hidden justify-center sm:flex"><Sparkline spark={entry.spark ?? []} mine={mine} /></span>
               <div className="num text-right font-['Consolas'] text-[17px] font-black">{formatNumber(currentValue)} <small className={`font-['Trebuchet_MS'] text-[9px] tracking-[0.12em] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : 'text-[#687384]'}`}>{unit}</small></div>
-              <div className={`${gap === null ? 'grid size-7 place-items-center rounded-full p-0 text-[13px]' : 'rounded-[99px] px-2 py-1'} col-span-2 justify-self-start border border-[#0A1F44] font-['Consolas'] text-[10px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
+              <div className={`${gap === null || !below ? 'grid size-7 place-items-center rounded-full p-0 text-[13px]' : 'rounded-[99px] px-2 py-1'} col-span-2 justify-self-start border border-[#0A1F44] font-['Consolas'] text-[10px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
               {mine && <ChaseProgress current={currentValue} target={aboveValue} highlighted />}
             </div>
           );
