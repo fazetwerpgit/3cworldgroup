@@ -104,6 +104,7 @@ export const FIBER_COMPANIES: { value: string; label: string; logo?: string }[] 
   { value: 'tfiber', label: 'TFiber (T-Mobile)' },
   { value: 'att', label: 'AT&T Fiber' },
   { value: 'frontier', label: 'Frontier Fiber' },
+  { value: 'xfinity', label: 'Xfinity' },
 ];
 
 // Fiber plans with pricing (based on 2025 research)
@@ -127,6 +128,16 @@ export const FIBER_PLANS: FiberPlan[] = [
   { id: 'frontier-1gig', company: 'frontier', name: 'Frontier Fiber 1 Gig', speed: '1 Gbps', price: 64.99, points: 7 },
   { id: 'frontier-2gig', company: 'frontier', name: 'Frontier Fiber 2 Gig', speed: '2 Gbps', price: 99.99, points: 10 },
   { id: 'frontier-5gig', company: 'frontier', name: 'Frontier Fiber 5 Gig', speed: '5 Gbps', price: 154.99, points: 15 },
+
+  // Xfinity Plans
+  { id: 'xfinity-500', company: 'xfinity', name: 'Xfinity 500', speed: '500 Mbps', price: 55.00, points: 5 },
+  { id: 'xfinity-1gig', company: 'xfinity', name: 'Xfinity 1 Gig', speed: '1 Gbps', price: 70.00, points: 8 },
+  { id: 'xfinity-2gig', company: 'xfinity', name: 'Xfinity 2 Gig', speed: '2 Gbps', price: 100.00, points: 10 },
+  { id: 'xfinity-eero-secure', company: 'xfinity', name: 'EERO Secure', speed: 'Add-on', price: 10.00, points: 2 },
+  { id: 'xfinity-wireless-byod', company: 'xfinity', name: 'Wireless BYOD', speed: 'Mobile line', price: 45.00, points: 4 },
+  { id: 'xfinity-wireless-standard', company: 'xfinity', name: 'Wireless Standard', speed: 'Mobile line', price: 45.00, points: 5 },
+  { id: 'xfinity-tv', company: 'xfinity', name: 'Xfinity TV', speed: 'TV service', price: 60.00, points: 5 },
+  { id: 'xfinity-home-phone', company: 'xfinity', name: 'Home Phone', speed: 'Voice line', price: 30.00, points: 3 },
 ];
 
 // Helper to get plans by company
