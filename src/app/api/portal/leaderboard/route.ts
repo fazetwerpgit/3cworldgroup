@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import {
+  computeHistory,
+  dayKey,
+  type HistoryEnrichment,
+  type SaleRecord,
+} from '@/lib/leaderboard/history';
 
 // GET /api/portal/leaderboard - Get leaderboard data (points-based)
 export async function GET(request: NextRequest) {
@@ -63,14 +69,25 @@ export async function GET(request: NextRequest) {
       totalPoints: number;
     }> = {};
 
+    const allSales: SaleRecord[] = [];
+    const periodSales: SaleRecord[] = [];
+
     salesSnapshot.forEach((doc) => {
       const sale = doc.data();
 
-      // Filter by date in code (avoids needing composite index)
       const saleDate = sale.saleDate?.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
+      const record: SaleRecord = {
+        salesRepId: sale.salesRepId,
+        saleDate,
+        totalPoints: sale.totalPoints || 0,
+      };
+      allSales.push(record);
+
+      // Filter by date in code (avoids needing composite index)
       if (saleDate.getTime() < startTimestamp) {
         return; // Skip sales before the period
       }
+      periodSales.push(record);
 
       const repId = sale.salesRepId;
 
@@ -88,7 +105,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Convert to array and sort by metric
-    let leaderboard = Object.values(salesByRep);
+    const leaderboard = Object.values(salesByRep);
 
     switch (metric) {
       case 'totalSales':
@@ -103,10 +120,37 @@ export async function GET(request: NextRequest) {
     // Rank the FULL sorted list first, so the caller's rank is correct even when
     // they fall below the returned top-N cutoff.
     const fullyRanked = leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
-    const rankedLeaderboard = fullyRanked.slice(0, limit);
+
+    // Phase 2: rank history (movement vs yesterday, 7-day spark, streaks).
+    // Fail-soft — a history bug must never take down the leaderboard.
+    let history: Map<string, HistoryEnrichment> | null = null;
+    try {
+      history = computeHistory({
+        periodSales,
+        allSales,
+        currentRanks: new Map(fullyRanked.map((e) => [e.salesRepId, e.rank])),
+        periodStartKey: dayKey(startDate),
+        metric: metric === 'totalSales' ? 'totalSales' : 'totalPoints',
+        now: new Date(),
+      });
+    } catch (historyError) {
+      console.error('Leaderboard history enrichment failed:', historyError);
+    }
+
+    const withHistory = <T extends { salesRepId: string }>(entry: T) => {
+      const h = history?.get(entry.salesRepId);
+      return {
+        ...entry,
+        movement: h?.movement ?? null,
+        spark: h?.spark ?? [],
+        streakDays: h?.streakDays ?? 0,
+      };
+    };
+
+    const rankedLeaderboard = fullyRanked.slice(0, limit).map(withHistory);
 
     // The caller's own standing (null if they have no approved sales this period).
-    const currentUser = fullyRanked.find((e) => e.salesRepId === gate.uid) ?? null;
+    const rawCurrentUser = fullyRanked.find((e) => e.salesRepId === gate.uid) ?? null;
 
     return NextResponse.json({
       period,
@@ -114,7 +158,7 @@ export async function GET(request: NextRequest) {
       startDate,
       leaderboard: rankedLeaderboard,
       totalRanked: fullyRanked.length,
-      currentUser,
+      currentUser: rawCurrentUser ? withHistory(rawCurrentUser) : null,
     });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);

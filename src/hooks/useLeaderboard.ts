@@ -9,6 +9,9 @@ interface LeaderboardEntry {
   salesRepName: string;
   totalSales: number;
   totalPoints: number;
+  movement?: number | null;
+  spark?: (number | null)[];
+  streakDays?: number;
 }
 
 type Period = 'week' | 'month' | 'year' | 'all';
