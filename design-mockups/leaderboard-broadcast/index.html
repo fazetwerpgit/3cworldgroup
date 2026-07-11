@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2C Broadcast &mdash; Leaderboard Mockup</title>
+  <style>
+    :root {
+      --canvas: #f3f6fa;
+      --canvas-wash: #eaf0f7;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --surface-muted: #f0f4f8;
+      --navy: #0a1f44;
+      --navy-raised: #102955;
+      --text: #10213c;
+      --text-strong: #0a1f44;
+      --muted: #69778c;
+      --muted-strong: #536279;
+      --line: #dbe3ed;
+      --line-soft: #e8edf3;
+      --lime: #8dc63f;
+      --lime-deep: #5f8f20;
+      --gold: #d99e13;
+      --gold-soft: #fff4cf;
+      --silver: #718096;
+      --silver-soft: #eef2f6;
+      --bronze: #b76d2f;
+      --bronze-soft: #fff0e6;
+      --amber: #b87508;
+      --amber-soft: #fff7df;
+      --down: #bd730c;
+      --shadow: 0 8px 20px rgba(10, 31, 68, .06);
+      --shadow-raised: 0 16px 28px rgba(10, 31, 68, .11);
+      --radius: 8px;
+      --display: "Trebuchet MS", "Segoe UI", sans-serif;
+      --body: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html.dark {
+      --canvas: #08172f;
+      --canvas-wash: #0a1d39;
+      --surface: #10264b;
+      --surface-soft: #132b53;
+      --surface-muted: #18335f;
+      --navy-raised: #12305d;
+      --text: #edf3fb;
+      --text-strong: #ffffff;
+      --muted: #9cadc4;
+      --muted-strong: #b9c7d9;
+      --line: rgba(255, 255, 255, .12);
+      --line-soft: rgba(255, 255, 255, .08);
+      --gold-soft: rgba(217, 158, 19, .18);
+      --silver-soft: rgba(148, 163, 184, .18);
+      --bronze-soft: rgba(183, 109, 47, .18);
+      --amber-soft: rgba(184, 117, 8, .16);
+      --shadow: 0 10px 24px rgba(0, 0, 0, .18);
+      --shadow-raised: 0 18px 34px rgba(0, 0, 0, .26);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--canvas); transition: background-color .2s ease; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 88% -8%, rgba(141, 198, 63, .08), transparent 28rem),
+        linear-gradient(180deg, var(--canvas-wash) 0, var(--canvas) 20rem, var(--canvas) 100%);
+      font-family: var(--body);
+      font-size: 14px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+      transition: color .2s ease, background .2s ease;
+    }
+    button { font: inherit; }
+    button:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+    h1, h2, h3, p { margin: 0; }
+    svg { display: block; }
+    .page-shell { width: min(1500px, calc(100% - 40px)); margin: 0 auto; padding: 20px 0 28px; }
+    .display, .number { font-family: var(--display); font-variant-numeric: tabular-nums; }
+    .display { letter-spacing: -.045em; }
+    .eyebrow, .section-kicker, .table-label, .stat-label, .ticker-label {
+      color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .15em; line-height: 1; text-transform: uppercase;
+    }
+
+    .mockup-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .identity { display: flex; align-items: center; gap: 10px; color: var(--navy); }
+    html.dark .identity { color: var(--text); }
+    .identity-mark { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 7px; color: var(--navy); background: var(--lime); font-size: 11px; font-weight: 900; letter-spacing: -.08em; }
+    .identity-copy { font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+    .identity-copy span { color: var(--muted); font-weight: 500; }
+    .theme-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 31px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted-strong); background: var(--surface); cursor: pointer; box-shadow: var(--shadow); transition: color .16s ease, background .16s ease, border-color .16s ease; }
+    .theme-toggle:hover { color: var(--text-strong); border-color: var(--lime); }
+    .theme-toggle svg { width: 15px; height: 15px; }
+    .theme-toggle .moon { display: none; }
+    html.dark .theme-toggle .sun { display: none; }
+    html.dark .theme-toggle .moon { display: block; }
+    .theme-toggle-label { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+
+    .command-band { position: relative; overflow: hidden; border-radius: var(--radius); color: #fff; background: var(--navy); box-shadow: var(--shadow-raised); isolation: isolate; }
+    .command-band::before { position: absolute; inset: 0; z-index: -2; content: ""; opacity: .75; background-image: linear-gradient(rgba(194, 214, 242, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(194, 214, 242, .055) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(90deg, black, transparent 86%); }
+    .command-band::after { position: absolute; top: -180px; left: 34%; z-index: -1; width: 480px; height: 480px; content: ""; border-radius: 50%; background: radial-gradient(circle, rgba(141, 198, 63, .17), transparent 67%); pointer-events: none; }
+    .band-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(390px, .9fr); gap: 30px; padding: 27px 30px 24px; }
+    .band-copy { align-self: center; }
+    .band-copy .eyebrow { color: #9fb2cf; }
+    .band-copy h1 { margin-top: 13px; color: #fff; font-size: clamp(42px, 5vw, 64px); font-weight: 800; line-height: .95; }
+    .band-subtitle { max-width: 510px; margin-top: 14px; color: #aab9d0; font-size: 13px; }
+    .band-status { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; color: #d2dceb; font-size: 11px; font-weight: 700; }
+    .band-status::before { width: 6px; height: 6px; content: ""; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 4px rgba(141, 198, 63, .12); }
+    .standing { align-self: center; padding-left: 28px; border-left: 1px solid rgba(255,255,255,.13); }
+    .standing-topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: rgba(255,255,255,.54); font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .you-badge { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; border: 1px solid rgba(141, 198, 63, .38); border-radius: 999px; color: var(--lime); background: rgba(141, 198, 63, .11); font-size: 9px; font-weight: 900; letter-spacing: .12em; line-height: 1; text-transform: uppercase; }
+    .standing-metrics { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 18px; }
+    .standing-metric { padding-right: 16px; }
+    .standing-metric + .standing-metric { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.1); }
+    .standing .stat-label { color: rgba(255,255,255,.45); }
+    .standing .stat-value { display: block; margin-top: 6px; color: #fff; font-size: 36px; font-weight: 800; line-height: .95; }
+    .standing .stat-value.accent { color: var(--lime); }
+    .standing-progress { margin-top: 19px; }
+    .progress-copy { display: flex; justify-content: space-between; gap: 12px; color: rgba(255,255,255,.58); font-size: 11px; }
+    .progress-copy strong { color: var(--lime); }
+    .progress-track { height: 5px; margin-top: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
+    .progress-fill { width: 98%; height: 100%; border-radius: inherit; background: var(--lime); box-shadow: 0 0 14px rgba(141,198,63,.3); }
+
+    .challenge-strip { display: grid; grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1fr) auto auto; align-items: center; gap: 24px; min-height: 68px; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.045); }
+    .challenge-heading { display: flex; align-items: center; gap: 11px; }
+    .challenge-mark { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(141,198,63,.38); border-radius: 7px; color: var(--lime); background: rgba(141,198,63,.09); }
+    .challenge-mark svg { width: 16px; height: 16px; }
+    .challenge-kicker { margin-bottom: 4px; color: var(--lime); font-size: 9px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; }
+    .challenge-title { color: #fff; font-size: 13px; font-weight: 700; }
+    .challenge-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+    .challenge-step { height: 6px; border-radius: 999px; background: rgba(255,255,255,.12); }
+    .challenge-step.complete { background: var(--lime); box-shadow: 0 0 10px rgba(141,198,63,.2); }
+    .challenge-progress-copy { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; color: rgba(255,255,255,.46); font-size: 10px; }
+    .challenge-progress-copy strong { color: rgba(255,255,255,.72); }
+    .challenge-count { padding-left: 22px; border-left: 1px solid rgba(255,255,255,.1); color: rgba(255,255,255,.74); font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .challenge-time { color: rgba(255,255,255,.72); font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+    .controls-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 22px 0 24px; }
+    .period-tabs { display: flex; align-items: center; gap: 1px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+    .period-tabs::-webkit-scrollbar { display: none; }
+    .period-tab { position: relative; padding: 10px 13px 11px; border: 0; color: var(--muted); background: transparent; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .period-tab:hover, .period-tab.active { color: var(--text-strong); }
+    .period-tab.active::after { position: absolute; right: 10px; bottom: -1px; left: 10px; height: 2px; content: ""; border-radius: 999px 999px 0 0; background: var(--lime); }
+    .metric-toggle { display: inline-flex; align-items: center; gap: 8px; }
+    .control-label { color: var(--muted); font-size: 11px; font-weight: 700; }
+    .metric-switch { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); }
+    .metric-option { min-width: 68px; padding: 6px 11px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; cursor: pointer; font-size: 12px; font-weight: 700; }
+    .metric-option.active { color: #fff; background: var(--navy); }
+    html.dark .metric-option.active { background: rgba(255,255,255,.14); }
+
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 11px; }
+    .section-heading h2 { margin-top: 5px; color: var(--text-strong); font-size: 18px; font-weight: 800; }
+    .section-note { color: var(--muted); font-size: 11px; }
+    .podium-stage { position: relative; padding-bottom: 10px; }
+    .podium-stage::after { position: absolute; right: 0; bottom: 0; left: 0; z-index: 0; height: 1px; content: ""; background: linear-gradient(90deg, transparent, var(--line) 8%, var(--line) 92%, transparent); box-shadow: 0 5px 18px rgba(10,31,68,.07); }
+    .podium-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 1.14fr) minmax(0, 1fr); align-items: end; gap: 12px; }
+    .podium-card { position: relative; min-height: 265px; overflow: hidden; border: 1px solid var(--line); border-top: 2px solid var(--rank-color); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); text-align: center; transition: transform .18s ease-out, box-shadow .18s ease-out, border-color .18s ease-out; }
+    .podium-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-raised); }
+    .podium-card.rank-1 { order: 2; min-height: 300px; border-top-width: 3px; background: linear-gradient(145deg, var(--surface), var(--surface-soft)); box-shadow: var(--shadow-raised); }
+    .podium-card.rank-2 { order: 1; margin-top: 14px; }
+    .podium-card.rank-3 { order: 3; margin-top: 14px; }
+    .podium-content { position: relative; padding: 20px 18px 17px; }
+    .rank-1 .podium-content { padding: 24px 22px 19px; }
+    .crown { position: absolute; top: 15px; right: 16px; width: 27px; height: 27px; color: rgba(217,158,19,.82); }
+    .avatar { display: grid; width: 49px; height: 49px; margin: 8px auto 0; place-items: center; border: 2px solid var(--rank-color); border-radius: 50%; color: var(--navy); background: var(--surface-muted); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rank-color) 14%, transparent); font-family: var(--display); font-size: 14px; font-weight: 900; letter-spacing: -.04em; }
+    .rank-1 .avatar { width: 63px; height: 63px; margin-top: 3px; border-width: 3px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--rank-color) 14%, transparent), 0 0 26px color-mix(in srgb, var(--rank-color) 18%, transparent); }
+    html.dark .avatar { color: #fff; background: rgba(255,255,255,.1); }
+    .medal-chip { display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border: 1px solid color-mix(in srgb, var(--rank-color) 35%, transparent); border-radius: 5px; color: var(--rank-color); background: var(--rank-soft); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .podium-badges { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 13px; }
+    .podium-name { max-width: 90%; margin: 7px auto 0; overflow: hidden; color: var(--text-strong); font-size: 15px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-1 .podium-name { font-size: 18px; }
+    .podium-value { margin-top: 17px; color: var(--text-strong); font-size: 43px; font-weight: 900; line-height: .9; }
+    .rank-1 .podium-value { font-size: 57px; }
+    .unit { margin-left: 5px; color: var(--muted); font-family: var(--body); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .podium-meta { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 17px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 11px; }
+    .podium-meta strong { color: var(--text-strong); }
+    .movement { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .movement.up { color: var(--lime-deep); }
+    .movement.down { color: var(--down); }
+    html.dark .movement.up { color: var(--lime); }
+    html.dark .movement.down { color: #f0b34e; }
+    .movement svg { width: 13px; height: 13px; }
+    .movement.new { padding: 3px 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface-soft); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .steady { color: var(--muted); font-weight: 900; }
+
+    .ticker-section { margin-top: 20px; }
+    .ticker-band { display: grid; grid-template-columns: 116px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+    .ticker-rail { display: flex; align-items: center; justify-content: center; padding: 14px; border-right: 1px solid var(--line-soft); background: var(--surface-soft); }
+    .ticker-rail-label { color: var(--lime-deep); line-height: 1.45; text-align: center; }
+    html.dark .ticker-rail-label { color: var(--lime); }
+    .ticker-cells { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .ticker-cell { min-height: 112px; padding: 15px 16px; border-right: 1px solid var(--line-soft); transition: background .16s ease-out; }
+    .ticker-cell:last-child { border-right: 0; }
+    .ticker-cell:hover { background: var(--surface-soft); }
+    .ticker-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .ticker-icon { width: 16px; height: 16px; color: var(--lime-deep); }
+    html.dark .ticker-icon { color: var(--lime); }
+    .ticker-fact { margin-top: 14px; overflow: hidden; color: var(--text-strong); font-size: 19px; font-weight: 900; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+    .ticker-support { margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .ticker-support strong { color: var(--text-strong); }
+    .race-pair { display: inline-flex; align-items: center; gap: 6px; }
+    .mini-avatar { display: grid; width: 19px; height: 19px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--navy); background: var(--surface-muted); font-size: 8px; font-weight: 900; }
+    html.dark .mini-avatar { color: #fff; background: rgba(255,255,255,.1); }
+    .race-vs { color: var(--muted); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+
+    .chase-section { margin-top: 24px; }
+    .table-card { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+    .table-head, .table-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 64px 118px 132px; align-items: center; gap: 15px; }
+    .table-head { padding: 11px 17px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+    .table-head .right { text-align: right; }
+    .table-row { position: relative; min-height: 70px; padding: 11px 17px; border-bottom: 1px solid var(--line-soft); transition: background .16s ease-out; }
+    .table-row:last-child { border-bottom: 0; }
+    .table-row:hover { background: var(--surface-soft); }
+    .table-row.mine { border-left: 2px solid var(--lime); background: color-mix(in srgb, var(--lime) 8%, var(--surface)); }
+    .rank-cell { display: flex; align-items: center; gap: 8px; }
+    .rank-square { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 6px; color: var(--muted-strong); background: var(--surface-muted); font-size: 13px; font-weight: 900; }
+    html.dark .rank-square { color: var(--muted-strong); background: rgba(255,255,255,.09); }
+    .rep-cell { display: flex; min-width: 0; align-items: center; gap: 11px; }
+    .rep-avatar { display: grid; width: 35px; height: 35px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--navy); background: color-mix(in srgb, var(--navy) 9%, var(--surface)); font-size: 10px; font-weight: 900; }
+    html.dark .rep-avatar { color: #fff; background: rgba(255,255,255,.1); }
+    .rep-copy { min-width: 0; }
+    .rep-name { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+    .mine .rep-name { color: var(--text-strong); font-weight: 800; }
+    .rep-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+    .streak-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid rgba(184,117,8,.25); border-radius: 999px; color: var(--amber); background: var(--amber-soft); font-size: 9px; font-weight: 800; white-space: nowrap; }
+    .streak-chip svg { width: 11px; height: 11px; }
+    html.dark .streak-chip { color: #f0bd63; }
+    .mobile-gap { display: none; }
+    .trend { display: flex; align-items: center; justify-content: center; }
+    .trend svg { width: 64px; height: 20px; overflow: visible; color: #8795aa; }
+    .mine .trend svg { color: var(--lime-deep); }
+    html.dark .trend svg { color: #8395af; }
+    html.dark .mine .trend svg { color: var(--lime); }
+    .row-value { color: var(--text-strong); font-size: 17px; font-weight: 900; text-align: right; white-space: nowrap; }
+    .gap-pill { justify-self: end; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface-soft); font-size: 10px; font-weight: 800; text-align: right; white-space: nowrap; }
+    .mine .gap-pill { border-color: rgba(141,198,63,.34); color: var(--lime-deep); background: rgba(141,198,63,.11); }
+    html.dark .mine .gap-pill { color: var(--lime); }
+    .row-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; overflow: hidden; background: var(--line-soft); }
+    .row-progress span { display: block; height: 100%; border-radius: 0 999px 999px 0; background: #9da9b9; }
+    .mine .row-progress span { background: var(--lime); box-shadow: 0 0 12px rgba(141,198,63,.35); }
+    .footnote { margin-top: 12px; padding: 0 3px; color: var(--muted); font-size: 11px; }
+    .footer-note { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; letter-spacing: .01em; }
+    .footer-note a { color: var(--lime-deep); font-weight: 700; text-decoration: none; }
+    html.dark .footer-note a { color: var(--lime); }
+
+    .reveal { animation: rise .42s cubic-bezier(.2,.8,.2,1) both; }
+    .reveal-1 { animation-delay: .06s; }
+    .reveal-2 { animation-delay: .12s; }
+    .reveal-3 { animation-delay: .18s; }
+    .reveal-4 { animation-delay: .24s; }
+    .reveal-5 { animation-delay: .30s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+    @media (max-width: 860px) {
+      .band-grid { grid-template-columns: 1fr; gap: 24px; }
+      .standing { padding-left: 0; border-left: 0; }
+      .challenge-strip { grid-template-columns: minmax(220px, 1fr) minmax(170px, .9fr) auto; gap: 16px; }
+      .challenge-count { display: none; }
+      .ticker-band { grid-template-columns: 95px minmax(0, 1fr); }
+      .ticker-cells { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ticker-cell:nth-child(2) { border-right: 0; }
+      .ticker-cell:nth-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
+    }
+
+    @media (max-width: 639px) {
+      .page-shell { width: min(100% - 24px, 500px); padding-top: 12px; }
+      .mockup-bar { margin-bottom: 13px; }
+      .identity-copy span { display: none; }
+      .theme-toggle-label { display: none; }
+      .theme-toggle { padding: 7px; }
+      .band-grid { gap: 22px; padding: 22px 18px 20px; }
+      .band-copy h1 { font-size: 43px; }
+      .band-subtitle { font-size: 12px; }
+      .standing-metrics { margin-top: 15px; }
+      .standing .stat-value { font-size: 30px; }
+      .standing-metric { padding-right: 11px; }
+      .standing-metric + .standing-metric { padding-left: 11px; }
+      .challenge-strip { grid-template-columns: 1fr; gap: 13px; padding: 13px 18px 15px; }
+      .challenge-time { justify-self: start; }
+      .controls-row { align-items: stretch; flex-direction: column; gap: 13px; margin: 17px 0 20px; }
+      .metric-toggle { justify-content: space-between; }
+      .period-tabs { width: 100%; }
+      .period-tab { flex: 1 0 auto; padding-right: 9px; padding-left: 9px; text-align: center; }
+      .section-heading { align-items: start; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+      .section-note { text-align: left; }
+      .podium-grid { grid-template-columns: 1fr; gap: 9px; }
+      .podium-card, .podium-card.rank-1, .podium-card.rank-2, .podium-card.rank-3 { order: initial; min-height: 0; margin-top: 0; text-align: left; }
+      .podium-content, .rank-1 .podium-content { display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; grid-template-rows: auto auto auto; column-gap: 12px; align-items: center; padding: 13px 14px; }
+      .rank-1 .podium-content { grid-template-columns: 64px minmax(0, 1fr) auto; }
+      .crown { top: 11px; right: 12px; width: 22px; height: 22px; }
+      .avatar, .rank-1 .avatar { grid-column: 1; grid-row: 1 / span 3; width: 45px; height: 45px; margin: 0; }
+      .rank-1 .avatar { width: 55px; height: 55px; }
+      .podium-badges { grid-column: 2; grid-row: 1; justify-content: start; margin: 0; }
+      .podium-name, .rank-1 .podium-name { grid-column: 2; grid-row: 2; max-width: none; margin: 3px 0 0; font-size: 14px; }
+      .podium-value, .rank-1 .podium-value { grid-column: 3; grid-row: 1 / span 2; margin: 0 17px 0 0; font-size: 26px; text-align: right; }
+      .podium-meta { grid-column: 2 / span 2; grid-row: 3; justify-content: start; margin: 5px 0 0; padding-top: 6px; font-size: 10px; }
+      .ticker-band { grid-template-columns: 1fr; }
+      .ticker-rail { min-height: 48px; border-right: 0; border-bottom: 1px solid var(--line-soft); }
+      .ticker-rail-label { font-size: 10px; }
+      .ticker-cells { grid-template-columns: 1fr 1fr; }
+      .ticker-cell { min-height: 105px; padding: 13px 12px; }
+      .ticker-fact { margin-top: 12px; font-size: 16px; }
+      .table-head { display: none; }
+      .table-row { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; min-height: 73px; padding: 10px 11px; }
+      .rank-cell { align-self: start; }
+      .rank-square { width: 32px; height: 32px; }
+      .rep-cell { align-items: flex-start; gap: 9px; }
+      .rep-avatar { width: 32px; height: 32px; }
+      .rep-name { padding-top: 2px; }
+      .trend { display: none; }
+      .row-value { align-self: start; padding-top: 2px; font-size: 15px; }
+      .gap-pill { display: none; }
+      .mobile-gap { display: inline-flex; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="mockup-bar">
+      <div class="identity">
+        <div class="identity-mark" aria-hidden="true">2C</div>
+        <div class="identity-copy">2C Broadcast <span>/ employee portal</span></div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.4 15.2A8.7 8.7 0 0 1 8.8 3.6 8.7 8.7 0 1 0 20.4 15.2Z"/></svg>
+        <span class="theme-toggle-label">Theme</span>
+      </button>
+    </header>
+
+    <main>
+      <section class="command-band reveal" aria-labelledby="page-title">
+        <div class="band-grid">
+          <div class="band-copy">
+            <p class="eyebrow">This month &middot; ranked by approved points</p>
+            <h1 class="display" id="page-title">Leaderboard</h1>
+            <p class="band-subtitle">Every rank is up for grabs. The board resets with the period.</p>
+            <p class="band-status">Live board &middot; updated moments ago</p>
+          </div>
+          <div class="standing">
+            <div class="standing-topline"><span>Your standing</span><span class="you-badge">You</span></div>
+            <div class="standing-metrics">
+              <div class="standing-metric"><span class="stat-label">Your rank</span><span class="stat-value number accent">#5</span></div>
+              <div class="standing-metric"><span class="stat-label">Points</span><span class="stat-value number">973</span></div>
+              <div class="standing-metric"><span class="stat-label">Sales</span><span class="stat-value number">8</span></div>
+            </div>
+            <div class="standing-progress">
+              <div class="progress-copy"><span>15 pts to #4</span><strong>98%</strong></div>
+              <div class="progress-track" aria-label="98 percent of rank 4 points"><div class="progress-fill"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="challenge-strip">
+          <div class="challenge-heading">
+            <span class="challenge-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5 11 15l4.5-5"/><path d="M8 3.7 9 2M16 3.7 15 2"/></svg></span>
+            <div><p class="challenge-kicker">Weekly challenge</p><p class="challenge-title">Close 3 sales by Sunday</p></div>
+          </div>
+          <div>
+            <div class="challenge-steps" aria-label="2 of 3 weekly challenge steps complete"><span class="challenge-step complete"></span><span class="challenge-step complete"></span><span class="challenge-step"></span></div>
+            <div class="challenge-progress-copy"><strong>2 of 3 closed</strong><span>Approved sales this week</span></div>
+          </div>
+          <p class="challenge-count">2 of 3 closed</p>
+          <p class="challenge-time">2d 14h left</p>
+        </div>
+      </section>
+
+      <div class="controls-row reveal reveal-1">
+        <nav class="period-tabs" aria-label="Leaderboard period">
+          <button class="period-tab" type="button" data-period="week">This Week</button>
+          <button class="period-tab active" type="button" data-period="month" aria-current="page">This Month</button>
+          <button class="period-tab" type="button" data-period="year">This Year</button>
+          <button class="period-tab" type="button" data-period="all">All Time</button>
+        </nav>
+        <div class="metric-toggle">
+          <span class="control-label">Show</span>
+          <div class="metric-switch" role="group" aria-label="Leaderboard metric">
+            <button class="metric-option active" type="button" data-metric="points">Points</button>
+            <button class="metric-option" type="button" data-metric="sales">Sales</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="reveal reveal-2" aria-labelledby="podium-heading">
+        <div class="section-heading"><div><p class="section-kicker">Top performers</p><h2 class="display" id="podium-heading">The podium</h2></div><p class="section-note">Approved points</p></div>
+        <div class="podium-stage">
+          <div class="podium-grid">
+            <article class="podium-card rank-1" style="--rank-color: #d99e13; --rank-soft: var(--gold-soft);">
+              <div class="podium-content">
+                <svg class="crown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-label="Top ranked"><path d="m3 7 4 4 5-7 5 7 4-4-2 11H5L3 7Z"/><path d="M5 21h14"/></svg>
+                <div class="avatar">JR</div>
+                <div class="podium-badges"><span class="medal-chip">1st</span><span class="movement steady" aria-label="No rank change">&mdash;</span></div>
+                <div class="podium-badges" style="margin-top:6px;"><span class="streak-chip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.3 2.7c.4 3.1-1.1 4.7-2.4 6.1-1 1-1.8 1.9-1.8 3.4 0 1.1.6 2.1 1.5 2.7-.1-1.3.5-2.5 1.8-3.5 2.8 2.1 4.1 4.2 4.1 6.4 0 .8-.2 1.5-.5 2.1 2.7-1.3 4.4-4 4.4-7.1 0-3.7-2.2-7.2-7.1-10.1Z"/></svg>4-day streak</span></div>
+                <p class="podium-name">Jordan Reed</p>
+                <p class="podium-value display number">1,284 <span class="unit">pts</span></p>
+                <p class="podium-meta"><span><strong>12</strong> approved sales</span></p>
+              </div>
+            </article>
+            <article class="podium-card rank-2" style="--rank-color: #718096; --rank-soft: var(--silver-soft);">
+              <div class="podium-content">
+                <div class="avatar">MC</div>
+                <div class="podium-badges"><span class="medal-chip">2nd</span><span class="movement up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 14 6-6 6 6"/><path d="M12 8v10"/></svg>+1</span></div>
+                <p class="podium-name">Maya Collins</p>
+                <p class="podium-value display number">1,146 <span class="unit">pts</span></p>
+                <p class="podium-meta"><span><strong>10</strong> approved sales</span></p>
+              </div>
+            </article>
+            <article class="podium-card rank-3" style="--rank-color: #b76d2f; --rank-soft: var(--bronze-soft);">
+              <div class="podium-content">
+                <div class="avatar">CW</div>
+                <div class="podium-badges"><span class="medal-chip">3rd</span><span class="movement down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 10 6 6 6-6"/><path d="M12 16V6"/></svg>-1</span></div>
+                <p class="podium-name">Chris Walker</p>
+                <p class="podium-value display number">1,012 <span class="unit">pts</span></p>
+                <p class="podium-meta"><span><strong>9</strong> approved sales</span></p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="ticker-section reveal reveal-3" aria-labelledby="ticker-heading">
+        <div class="ticker-band">
+          <div class="ticker-rail"><span class="ticker-rail-label" id="ticker-heading">Across<br>the board</span></div>
+          <div class="ticker-cells">
+            <article class="ticker-cell"><div class="ticker-topline"><p class="ticker-label">Top closer</p><svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 2.3 5 5.4.6-4 3.7 1.1 5.4-4.8-2.8-4.8 2.8 1.1-5.4-4-3.7 5.4-.6L12 3Z"/></svg></div><p class="ticker-fact display">Jordan Reed</p><p class="ticker-support"><strong>12</strong> approved sales</p></article>
+            <article class="ticker-cell"><div class="ticker-topline"><p class="ticker-label">Closest race</p><svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="7" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><path d="M10 12h4"/></svg></div><p class="ticker-fact display race-pair"><span class="mini-avatar">MC</span><span class="race-vs">VS</span><span class="mini-avatar">CW</span></p><p class="ticker-support"><strong>134 pts apart</strong> &middot; #2 vs #3</p></article>
+            <article class="ticker-cell"><div class="ticker-topline"><p class="ticker-label">Your climb</p><svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 16 10 10l4 4 6-7"/><path d="M15 7h5v5"/></svg></div><p class="ticker-fact display">15 pts</p><p class="ticker-support"><strong>to #4</strong> &middot; keep climbing</p></article>
+            <article class="ticker-cell"><div class="ticker-topline"><p class="ticker-label">Team pulse</p><svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 13h4l2-7 4 12 2-5h4"/></svg></div><p class="ticker-fact display">7,042 pts</p><p class="ticker-support"><strong>8 reps</strong> on the board &middot; 12 days left</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="chase-section reveal reveal-4" aria-labelledby="chase-heading">
+        <div class="section-heading"><div><p class="section-kicker">Your race &middot; ranks 4+</p><h2 class="display" id="chase-heading">The chase</h2></div><p class="section-note">Every rep stays on the board.</p></div>
+        <div class="table-card">
+          <div class="table-head table-label"><span>Rank</span><span>Rep</span><span>Trend</span><span class="right">Points</span><span class="right">Gap to next</span></div>
+          <div class="table-row">
+            <div class="rank-cell"><span class="rank-square number">4</span><span class="movement up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 14 6-6 6 6"/><path d="M12 8v10"/></svg>+2</span></div>
+            <div class="rep-cell"><span class="rep-avatar">EB</span><div class="rep-copy"><p class="rep-name">Elena Brooks</p><div class="rep-meta"><span class="streak-chip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.3 2.7c.4 3.1-1.1 4.7-2.4 6.1-1 1-1.8 1.9-1.8 3.4 0 1.1.6 2.1 1.5 2.7-.1-1.3.5-2.5 1.8-3.5 2.8 2.1 4.1 4.2 4.1 6.4 0 .8-.2 1.5-.5 2.1 2.7-1.3 4.4-4 4.4-7.1 0-3.7-2.2-7.2-7.1-10.1Z"/></svg>3-day streak</span><span class="mobile-gap gap-pill">24 pts to #3</span></div></div></div>
+            <div class="trend"><svg viewBox="0 0 64 20" aria-hidden="true"><polyline points="3,15 12.7,13 22.3,14 32,10 41.7,11 51.3,7 61,5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <p class="row-value number">988 <span class="unit">pts</span></p><span class="gap-pill">24 pts</span><div class="row-progress"><span style="width: 98%;"></span></div>
+          </div>
+          <div class="table-row mine">
+            <div class="rank-cell"><span class="rank-square number">5</span><span class="movement up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 14 6-6 6 6"/><path d="M12 8v10"/></svg>+3</span></div>
+            <div class="rep-cell"><span class="rep-avatar">MH</span><div class="rep-copy"><p class="rep-name">Marcus Hill <span class="you-badge">You</span></p><div class="rep-meta"><span class="streak-chip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.3 2.7c.4 3.1-1.1 4.7-2.4 6.1-1 1-1.8 1.9-1.8 3.4 0 1.1.6 2.1 1.5 2.7-.1-1.3.5-2.5 1.8-3.5 2.8 2.1 4.1 4.2 4.1 6.4 0 .8-.2 1.5-.5 2.1 2.7-1.3 4.4-4 4.4-7.1 0-3.7-2.2-7.2-7.1-10.1Z"/></svg>3-day streak</span><span class="mobile-gap gap-pill">15 pts to #4</span></div></div></div>
+            <div class="trend"><svg viewBox="0 0 64 20" aria-hidden="true"><polyline points="3,4 12.7,7 22.3,5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="41.7,13 51.3,10 61,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <p class="row-value number">973 <span class="unit">pts</span></p><span class="gap-pill">15 pts to #4</span><div class="row-progress"><span style="width: 98%;"></span></div>
+          </div>
+          <div class="table-row">
+            <div class="rank-cell"><span class="rank-square number">6</span><span class="movement down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 10 6 6 6-6"/><path d="M12 16V6"/></svg>-1</span></div>
+            <div class="rep-cell"><span class="rep-avatar">PS</span><div class="rep-copy"><p class="rep-name">Priya Shah</p><div class="rep-meta"><span class="mobile-gap gap-pill">32 pts</span></div></div></div>
+            <div class="trend"><svg viewBox="0 0 64 20" aria-hidden="true"><polyline points="3,7 12.7,9 22.3,11 32,9 41.7,13 51.3,15 61,14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <p class="row-value number">941 <span class="unit">pts</span></p><span class="gap-pill">32 pts</span><div class="row-progress"><span style="width: 97%;"></span></div>
+          </div>
+          <div class="table-row">
+            <div class="rank-cell"><span class="rank-square number">7</span><span class="movement steady" aria-label="No rank change">&mdash;</span></div>
+            <div class="rep-cell"><span class="rep-avatar">AL</span><div class="rep-copy"><p class="rep-name">Andre Lewis</p><div class="rep-meta"><span class="streak-chip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.3 2.7c.4 3.1-1.1 4.7-2.4 6.1-1 1-1.8 1.9-1.8 3.4 0 1.1.6 2.1 1.5 2.7-.1-1.3.5-2.5 1.8-3.5 2.8 2.1 4.1 4.2 4.1 6.4 0 .8-.2 1.5-.5 2.1 2.7-1.3 4.4-4 4.4-7.1 0-3.7-2.2-7.2-7.1-10.1Z"/></svg>5-day streak</span><span class="mobile-gap gap-pill">54 pts</span></div></div></div>
+            <div class="trend"><svg viewBox="0 0 64 20" aria-hidden="true"><polyline points="3,9 12.7,10 22.3,8 32,11 41.7,10 51.3,12 61,12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <p class="row-value number">887 <span class="unit">pts</span></p><span class="gap-pill">54 pts</span>
+          </div>
+          <div class="table-row">
+            <div class="rank-cell"><span class="rank-square number">8</span><span class="movement new">New</span></div>
+            <div class="rep-cell"><span class="rep-avatar">TJ</span><div class="rep-copy"><p class="rep-name">Taylor James</p><div class="rep-meta"><span class="mobile-gap gap-pill">86 pts</span></div></div></div>
+            <div class="trend"><svg viewBox="0 0 64 20" aria-hidden="true"><circle cx="3" cy="10" r="1.7" fill="currentColor"/></svg></div>
+            <p class="row-value number">801 <span class="unit">pts</span></p><span class="gap-pill">86 pts</span>
+          </div>
+        </div>
+        <p class="footnote">Rankings use approved sales for the selected period. Point values vary by product and plan.</p>
+      </section>
+    </main>
+
+    <footer class="footer-note">Static mockup regenerated 2026-07-11 from leaderboard-2c-spec.md; live page: <a href="/portal/leaderboard">/portal/leaderboard</a></footer>
+  </div>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var toggle = document.getElementById('theme-toggle');
+      toggle.addEventListener('click', function () {
+        var dark = root.classList.toggle('dark');
+        toggle.setAttribute('aria-pressed', String(dark));
+        toggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+      });
+
+      document.querySelectorAll('[data-period]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          document.querySelectorAll('[data-period]').forEach(function (item) { item.classList.remove('active'); item.removeAttribute('aria-current'); });
+          button.classList.add('active');
+          button.setAttribute('aria-current', 'page');
+        });
+      });
+
+      document.querySelectorAll('[data-metric]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          document.querySelectorAll('[data-metric]').forEach(function (item) { item.classList.remove('active'); });
+          button.classList.add('active');
+        });
+      });
+    }());
+  </script>
+</body>
+</html>
