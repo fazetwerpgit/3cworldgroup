@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leaderboard &mdash; Spotlight Arena</title>
+  <style>
+    :root{color-scheme:light;--bg:#f7f8f5;--paper:#f7f8f5;--white:#fff;--ink:#0A1F44;--muted:#687384;--line:#0A1F44;--navy:#0A1F44;--green:#8dc63f;--amber:#ad7116;--gold:#d9a520;--silver:#aab6c2;--bronze:#b4703a;--metal-gold:linear-gradient(145deg,#fff3bd 0%,#f5d780 18%,#d9a520 52%,#8a6a1f 82%,#f5d780 100%);--metal-silver:linear-gradient(145deg,#ffffff 0%,#e8edf2 25%,#aab6c2 56%,#6e7a86 82%,#f4f7fa 100%);--metal-bronze:linear-gradient(145deg,#ffe2bd 0%,#e8b98a 25%,#b4703a 55%,#7a4a22 84%,#f1c99a 100%)}
+    html.dark{color-scheme:dark;--bg:#030916;--paper:#030916;--white:#0d2952;--ink:#f6f7f8;--muted:#9caabd;--line:#e7edf4}
+    *{box-sizing:border-box}
+    body{margin:0;min-width:320px;background:radial-gradient(circle at 50% 21%,rgba(217,165,32,.13),transparent 24%),var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",Arial,sans-serif}
+    body:before{content:"";position:fixed;z-index:5;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,transparent 35%,rgba(0,0,0,.46) 100%);mix-blend-mode:multiply;opacity:.72}
+    html:not(.dark) body:before{display:none}
+    .arena-shell{position:relative;z-index:1;width:min(1500px,100%);margin:auto;padding:19px clamp(14px,3.6vw,56px) 29px}
+    .mast{display:flex;justify-content:space-between;align-items:center;border-bottom:5px solid var(--navy);padding-bottom:12px}
+    .dark .mast{border-color:var(--green)}
+    .mark{font-weight:900;letter-spacing:.2em;font-size:11px}
+    .mark::before{content:"";display:inline-block;width:12px;height:12px;background:var(--green);margin-right:8px;vertical-align:-1px}
+    .dark .mark::before{background:var(--gold);box-shadow:0 0 16px rgba(245,215,128,.5)}
+    .meta{display:flex;align-items:center;gap:18px;text-transform:uppercase;letter-spacing:.13em;font-size:9px;font-weight:800;color:var(--muted)}
+    .theme-toggle{border:2px solid var(--navy);background:transparent;color:var(--ink);padding:6px 9px;cursor:pointer;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em}
+    .dark .theme-toggle{border-color:var(--green);background:var(--paper)}
+    .hero{display:grid;grid-template-columns:1.5fr .75fr;gap:30px;padding:46px 0 36px;border-bottom:1px solid var(--navy)}
+    .dark .hero{border-color:var(--line)}
+    .hero-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.2em;font-weight:900;color:var(--muted)}
+    h1{font-size:clamp(68px,13vw,188px);line-height:.75;letter-spacing:-.115em;margin:13px 0 17px;font-weight:900;text-transform:uppercase}
+    .dark h1{text-shadow:0 0 26px rgba(255,255,255,.07)}
+    .hero-desc{max-width:520px;margin:0;color:var(--muted);font-size:15px;line-height:1.45}
+    .standing{align-self:end;border:5px solid var(--navy);background:var(--navy);color:#fff;padding:20px 19px 17px;min-height:178px}
+    .dark .standing{border-color:var(--line);background:linear-gradient(145deg,#142f5f,#07162e);box-shadow:0 18px 38px rgba(0,0,0,.22)}
+    .standing-label{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--green);font-weight:900}
+    .dark .standing-label{color:var(--gold)}
+    .standing-rank{font-size:clamp(64px,8vw,100px);font-weight:900;line-height:.75;letter-spacing:-.12em;margin-top:15px;display:inline-flex;align-items:baseline;gap:.08em}
+    .standing-rank small{font-size:.4em;letter-spacing:0}
+    .standing-bottom{display:flex;justify-content:space-between;align-items:end;gap:10px;border-top:1px solid rgba(255,255,255,.35);margin-top:17px;padding-top:10px}
+    .standing-bottom strong{font-size:14px}
+    .standing-bottom span{font-family:Consolas,"Courier New",monospace;font-size:11px;white-space:nowrap}
+    .challenge{display:grid;grid-template-columns:1fr 1.7fr auto;gap:20px;align-items:center;background:var(--green);color:var(--navy);padding:16px 19px;margin:0 0 44px;border-bottom:5px solid var(--navy);box-shadow:0 14px 34px rgba(141,198,63,.11)}
+    .dark .challenge{border-color:var(--line)}
+    .challenge-label{text-transform:uppercase;font-size:10px;letter-spacing:.18em;font-weight:900}
+    .challenge-title{font-size:18px;font-weight:900}
+    .challenge-bar{height:9px;background:rgba(10,31,68,.22)}
+    .challenge-bar span{display:block;width:66.66%;height:100%;background:var(--navy)}
+    .challenge-time{font-family:Consolas,"Courier New",monospace;font-size:12px;font-weight:900;white-space:nowrap}
+    .podium{margin-bottom:46px}
+    .section-head{display:flex;justify-content:space-between;align-items:end;border-bottom:5px solid var(--navy);padding-bottom:10px;margin-bottom:0}
+    .dark .section-head,.dark .chase-title{border-color:var(--line)}
+    .section-head h2{margin:0;font-size:22px;text-transform:uppercase;letter-spacing:-.04em}
+    .section-head p{margin:0;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.15em}
+    .band{display:grid;grid-template-columns:1fr 1.25fr 1fr;grid-template-areas:"silver gold bronze";align-items:start;background:var(--navy);color:#fff;border-bottom:5px solid var(--navy)}
+    .dark .band{background:radial-gradient(circle at 50% 31%,rgba(245,215,128,.18),transparent 26%),linear-gradient(180deg,#0d2449,#06142b);color:var(--ink);border-color:var(--line);box-shadow:0 25px 70px rgba(0,0,0,.24)}
+    .podium-cell{position:relative;min-height:256px;padding:24px 23px 18px;border-right:1px solid rgba(255,255,255,.25);overflow:hidden}
+    .podium-cell:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.05),transparent 23%,transparent 72%,rgba(255,255,255,.04))}
+    .podium-cell.silver{grid-area:silver}
+    .podium-cell.gold{grid-area:gold;min-height:306px;margin-top:-22px;padding-top:45px;background:var(--green);color:var(--navy)}
+    .dark .podium-cell.silver{border-color:rgba(220,228,238,.28)}
+    .dark .podium-cell.gold{margin-top:-20px;padding-top:45px;border:1px solid rgba(245,215,128,.88);border-bottom:0;background:radial-gradient(circle at 50% 0%,rgba(245,215,128,.28),transparent 52%),linear-gradient(145deg,#14376d,#0a1b37 58%,#071426);box-shadow:0 0 85px rgba(217,165,32,.28),inset 0 1px 0 rgba(255,255,255,.25)}
+    .podium-cell.bronze{grid-area:bronze;border:0}
+    .rank{font-size:clamp(86px,11vw,160px);line-height:.67;letter-spacing:-.13em;font-weight:900;color:rgba(255,255,255,.24)}
+    .dark .rank{color:rgba(220,228,238,.22)}
+    .dark .gold .rank{color:transparent;background:var(--metal-gold);-webkit-background-clip:text;background-clip:text;text-shadow:0 0 30px rgba(245,215,128,.32)}
+    .dark .silver .rank{color:transparent;background:var(--metal-silver);-webkit-background-clip:text;background-clip:text}
+    .dark .bronze .rank{color:transparent;background:var(--metal-bronze);-webkit-background-clip:text;background-clip:text}
+    .gold .rank{color:var(--navy)}
+    .crown{position:absolute;right:22px;top:21px;width:28px;height:28px;fill:var(--navy)}
+    .dark .crown{filter:drop-shadow(0 0 11px rgba(245,215,128,.75))}
+    .dark .gold .crown path{fill:url(#gold)}
+    html:not(.dark) .gold .crown path{fill:var(--navy)}
+    .podium-person{display:flex;align-items:center;gap:11px;margin-top:24px}
+    .podium-avatar{display:grid;place-items:center;width:43px;height:43px;background:#31537b;border-radius:50%;font-size:11px;font-weight:900}
+    .gold .podium-avatar{background:var(--navy);color:#fff}
+    .dark .gold .podium-avatar{box-shadow:0 0 20px rgba(245,215,128,.3)}
+    .podium-name{font-size:16px;font-weight:900}
+    .podium-sales{display:block;margin-top:3px;font-family:Consolas,"Courier New",monospace;font-size:11px}
+    .dark .gold .podium-name{color:var(--ink)}
+    .dark .gold .podium-sales{color:var(--muted)}
+    .podium-score{position:absolute;right:22px;bottom:18px;font-family:Consolas,"Courier New",monospace;font-size:25px;font-weight:900}
+    .gold .podium-score{font-size:37px}
+    .dark .gold .podium-score{color:#f5d780;text-shadow:0 0 15px rgba(245,215,128,.6)}
+    .podium-score small{font-family:"Trebuchet MS","Segoe UI",Arial,sans-serif;font-size:9px;letter-spacing:.15em}
+    .ticker{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:45px;border-top:1px solid var(--navy);border-bottom:1px solid var(--navy)}
+    .dark .ticker{border-color:var(--line)}
+    .ticker-cell{padding:15px 17px 18px;border-right:1px solid var(--navy);min-height:109px}
+    .dark .ticker-cell{border-color:var(--line)}
+    .ticker-cell:last-child{border:0}
+    .ticker-label{font-size:10px;text-transform:uppercase;letter-spacing:.16em;font-weight:900;color:var(--muted)}
+    .ticker-value{display:block;margin-top:18px;font-size:20px;font-weight:900;letter-spacing:-.05em}
+    .ticker-note{display:block;color:var(--muted);font-family:Consolas,"Courier New",monospace;font-size:10px;margin-top:5px}
+    .chase{margin-bottom:25px}
+    .chase-title{display:flex;align-items:end;justify-content:space-between;border-bottom:5px solid var(--navy);padding-bottom:10px}
+    .chase-title h2{margin:0;font-size:22px;text-transform:uppercase;letter-spacing:-.04em}
+    .chase-title p{margin:0;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.14em}
+    .table{border-bottom:1px solid var(--navy)}
+    .dark .table{border-color:var(--line)}
+    .row{display:grid;grid-template-columns:100px minmax(200px,1.5fr) 112px 132px 110px 100px;gap:15px;align-items:center;min-height:77px;border-bottom:1px solid rgba(10,31,68,.22);padding:10px 12px}
+    .dark .row{border-color:rgba(220,228,238,.18)}
+    .thead{min-height:38px;font-size:9px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    .row:not(.thead):hover{background:rgba(141,198,63,.12)}
+    .dark .row:not(.thead):hover{background:rgba(245,215,128,.08)}
+    .row.you{background:var(--navy);color:#fff;border-bottom-color:var(--navy);box-shadow:inset 7px 0 var(--green)}
+    .dark .row.you{background:var(--green);color:var(--navy);border-color:var(--green);box-shadow:inset 7px 0 #d7edaf,0 0 30px rgba(141,198,63,.12)}
+    .rank-move{display:flex;align-items:center;gap:9px;font-family:Consolas,"Courier New",monospace}
+    .rank-move b{font-size:21px}
+    .move{font-size:10px;font-weight:900}
+    .up{color:var(--green)}
+    .down{color:var(--amber)}
+    .flat{color:var(--muted)}
+    .new{border:1px solid currentColor;padding:3px 5px;font-size:8px;letter-spacing:.12em}
+    .rep{display:flex;align-items:center;gap:11px;min-width:0}
+    .avatar{display:grid;place-items:center;flex:none;width:35px;height:35px;border-radius:50%;background:var(--navy);color:#fff;font-size:10px;font-weight:900}
+    .you .avatar{background:var(--green);color:var(--navy)}
+    .dark .you .avatar{background:var(--navy);color:#fff}
+    .rep-name{display:block;font-size:14px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .you .rep-name{color:#fff}
+    .dark .you .rep-name{color:var(--navy)}
+    .you-tag{display:inline-block;margin-left:7px;padding:3px 5px;background:var(--green);color:var(--navy);font-size:8px;letter-spacing:.1em}
+    .you .you-tag{background:#fff}
+    .rep-meta{display:block;margin-top:4px;color:var(--muted);font-size:9px}
+    .you .rep-meta{color:rgba(255,255,255,.72)}
+    .dark .you .rep-meta{color:rgba(10,31,68,.72)}
+    .streak{color:var(--amber);margin-left:7px}
+    .dark .streak{display:inline-flex;align-items:center;color:var(--gold);font-style:normal}
+    .streak::before{content:"";display:inline-block;width:7px;height:9px;margin-right:4px;background:currentColor;border-radius:70% 35% 65% 40%;transform:rotate(18deg);vertical-align:-1px}
+    .dark .row.you .streak{color:#0A1F44;border:1px solid rgba(10,31,68,.32);background:rgba(10,31,68,.12);padding:2px 5px;line-height:1.1}
+    .spark{width:96px;height:27px}
+    .spark path{fill:none;stroke:var(--green);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .spark .muted-line{stroke:var(--muted)}
+    .spark circle{fill:var(--green)}
+    .dark .spark path{stroke:#d1d8e1}
+    .dark .spark .muted-line{stroke:#75869d}
+    .dark .spark circle{fill:#d1d8e1}
+    .you .spark path{stroke:#fff}
+    .dark .you .spark path{stroke:var(--navy)}
+    .num{text-align:right;font-family:Consolas,"Courier New",monospace;font-size:17px;font-weight:900}
+    .num small{font-family:"Trebuchet MS","Segoe UI",Arial,sans-serif;font-size:9px;letter-spacing:.12em;color:var(--muted)}
+    .you .num small{color:rgba(255,255,255,.72)}
+    .dark .you .num small{color:rgba(10,31,68,.72)}
+    .gap{justify-self:end;border:1px solid var(--navy);border-radius:99px;padding:6px 9px;font-family:Consolas,"Courier New",monospace;font-size:10px;white-space:nowrap}
+    .dark .gap{border-color:var(--line)}
+    .you .gap{border-color:var(--green);background:var(--green);color:var(--navy)}
+    .dark .you .gap{border-color:var(--navy);background:var(--navy);color:#fff}
+    .progress{grid-column:2 / -1;height:4px;background:rgba(141,198,63,.23);margin-top:-4px}
+    .progress span{display:block;width:58%;height:100%;background:var(--green)}
+    .dark .progress{background:rgba(10,31,68,.24)}
+    .dark .progress span{background:var(--navy)}
+    footer{border-top:1px solid var(--navy);padding-top:14px;color:var(--muted);font-size:10px;display:flex;justify-content:space-between;gap:14px}
+    .dark footer{border-color:var(--line)}
+    @media(max-width:780px){.mast{border-bottom-width:3px}.meta>span{display:none}.hero{grid-template-columns:1fr;gap:25px;padding-top:38px}.standing{max-width:360px}.challenge{grid-template-columns:1fr auto;gap:11px}.challenge-bar{grid-column:1 / -1;grid-row:2}.band{grid-template-columns:1fr;grid-template-areas:"gold" "silver" "bronze"}.podium-cell,.podium-cell.gold{min-height:0;margin:0;padding:17px 16px;display:grid;grid-template-columns:58px 1fr auto;align-items:center;gap:10px}.podium-cell.gold{padding-top:17px}.podium-cell.silver,.podium-cell.gold{border-right:0;border-left:0;border-bottom:1px solid rgba(220,228,238,.24)}.podium-cell.bronze{border:0}.podium-cell .rank{grid-column:3;grid-row:1 / span 2;font-size:74px}.podium-person{grid-column:2;margin:0}.podium-score{position:static;grid-column:2;margin-top:2px;font-size:20px}.gold .podium-score{font-size:24px}.crown{top:9px;right:10px}.ticker{grid-template-columns:1fr 1fr}.ticker-cell:nth-child(2n){border-right:0}.ticker-cell:nth-child(n+3){border-top:1px solid var(--navy)}.dark .ticker-cell:nth-child(n+3){border-color:var(--line)}.row{grid-template-columns:43px minmax(0,1fr) auto;gap:9px;padding:10px 3px}.thead{display:none}.row .num{grid-column:3;grid-row:1}.row .gap{grid-column:2 / -1;grid-row:2;justify-self:start;margin-left:43px}.row .progress{grid-column:2 / -1;grid-row:3;margin-left:43px}.dark .row.you .progress{margin-top:4px}.spark{display:none}footer{display:block}footer span+span{display:block;margin-top:7px}}
+    @media(max-width:430px){.arena-shell{padding-inline:12px}h1{font-size:clamp(55px,17vw,82px)}.challenge-title{font-size:15px}.challenge-time{font-size:10px}.challenge-label{font-size:9px}.standing-bottom span{font-size:10px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+    .theme-toggle{position:static;z-index:20;background:var(--paper)}
+  </style>
+</head>
+<body>
+  <main class="arena-shell">
+    <div class="mast"><span class="mark">3C WORLD GROUP / ARENA</span><div class="meta"><span>JULY 2026 &middot; LIVE</span><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark theme">Theme &#9680;</button></div></div>
+    <header class="hero"><div><p class="hero-kicker">Month to date / ranked by points</p><h1>Leaderboard</h1><p class="hero-desc">A scoreboard for the people making the number move. The lead is visible. The next opportunity is yours.</p></div><aside class="standing"><span class="standing-label">Your standing</span><div class="standing-rank"><small>#</small>5</div><div class="standing-bottom"><strong>Alex Rivera</strong><span>1,840 pts &middot; 17 sales</span></div></aside></header>
+    <div class="challenge"><span class="challenge-label">Weekly challenge</span><strong class="challenge-title">Close 3 sales by Sunday</strong><div class="challenge-bar" aria-label="2 of 3 complete"><span></span></div><span class="challenge-time">2 / 3 &middot; 1d 08h left</span></div>
+    <section class="podium"><div class="section-head"><h2>Top performers</h2><p>Approved points &middot; month to date</p></div><div class="band">
+      <article class="podium-cell silver"><div class="rank">02</div><div class="podium-person"><span class="podium-avatar">JB</span><div><strong class="podium-name">Jordan Blake</strong><span class="podium-sales">25 approved sales</span></div></div><div class="podium-score">2,450 <small>pts</small></div></article>
+      <article class="podium-cell winner gold"><svg class="crown" viewBox="0 0 24 24" aria-label="Gold crown"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff3bd"/><stop offset=".48" stop-color="#d9a520"/><stop offset="1" stop-color="#8a6a1f"/></linearGradient></defs><path fill="url(#gold)" d="m3 7 4.5 4L12 4l4.5 7L21 7l-1.5 13h-15L3 7Zm2.2 11h13.6l.45-4.2-3.1 2.7-4.15-6.45-4.15 6.45-3.1-2.7.45 4.2ZM6 22h12v-1H6v1Z"/></svg><div class="rank">01</div><div class="podium-person"><span class="podium-avatar">MO</span><div><strong class="podium-name">Maya Ortiz</strong><span class="podium-sales">28 approved sales &middot; current leader</span></div></div><div class="podium-score">2,640 <small>pts</small></div></article>
+      <article class="podium-cell bronze"><div class="rank">03</div><div class="podium-person"><span class="podium-avatar">PS</span><div><strong class="podium-name">Priya Shah</strong><span class="podium-sales">23 approved sales</span></div></div><div class="podium-score">2,290 <small>pts</small></div></article>
+    </div></section>
+    <section class="ticker"><div class="ticker-cell"><span class="ticker-label">Top closer</span><strong class="ticker-value">Maya Ortiz</strong><span class="ticker-note">28 approved sales</span></div><div class="ticker-cell"><span class="ticker-label">Closest race</span><strong class="ticker-value">#1 vs #2</strong><span class="ticker-note">190 pts apart</span></div><div class="ticker-cell"><span class="ticker-label">Your climb</span><strong class="ticker-value">95 pts</strong><span class="ticker-note">to #4 Marcus</span></div><div class="ticker-cell"><span class="ticker-label">Team pulse</span><strong class="ticker-value">18,025 pts</strong><span class="ticker-note">8 reps &middot; 20 days left</span></div></section>
+    <section class="chase"><div class="chase-title"><h2>The chase &middot; ranks 4&ndash;8</h2><p>Movement since yesterday</p></div><div class="table"><div class="row thead"><span>Rank / move</span><span>Rep</span><span>7-day trend</span><span>Points</span><span>Gap to next</span></div>
+      <div class="row"><div class="rank-move"><b>04</b><span class="move up">&uarr; 1</span></div><div class="rep"><span class="avatar">MC</span><div><span class="rep-name">Marcus Chen</span><span class="rep-meta">19 sales <i class="streak">3-day streak</i></span></div></div><svg class="spark" viewBox="0 0 96 27" aria-label="Rising 7-day sparkline"><path d="M2 21 14 19 25 21 37 14 49 17 61 10 75 12 94 4"/></svg><div class="num">1,975 <small>PTS</small></div><div class="gap">95 pts</div></div>
+      <div class="row you"><div class="rank-move"><b>05</b><span class="move down">&darr; 1</span></div><div class="rep"><span class="avatar">AR</span><div><span class="rep-name">Alex Rivera <em class="you-tag">YOU</em></span><span class="rep-meta">17 sales <i class="streak">3-day streak</i></span></div></div><svg class="spark" viewBox="0 0 96 27" aria-label="Falling 7-day sparkline"><path d="M2 7 14 10 25 9 37 16 49 13 61 18 75 16 94 21"/></svg><div class="num">1,840 <small>PTS</small></div><div class="gap">135 pts</div><div class="progress"><span></span></div></div>
+      <div class="row"><div class="rank-move"><b>06</b><span class="move flat">&mdash;</span></div><div class="rep"><span class="avatar">TN</span><div><span class="rep-name">Tessa Nguyen</span><span class="rep-meta">16 sales</span></div></div><svg class="spark" viewBox="0 0 96 27" aria-label="Flat 7-day sparkline"><path class="muted-line" d="M2 14 18 13 33 15 48 13 63 14 77 13 94 14"/></svg><div class="num">1,730 <small>PTS</small></div><div class="gap">110 pts</div></div>
+      <div class="row"><div class="rank-move"><b>07</b><span class="move new">NEW</span></div><div class="rep"><span class="avatar">LB</span><div><span class="rep-name">Liam Brooks</span><span class="rep-meta">14 sales</span></div></div><svg class="spark" viewBox="0 0 96 27" aria-label="New 7-day sparkline"><circle cx="48" cy="14" r="3"/></svg><div class="num">1,610 <small>PTS</small></div><div class="gap">120 pts</div></div>
+      <div class="row"><div class="rank-move"><b>08</b><span class="move up">&uarr; 2</span></div><div class="rep"><span class="avatar">NP</span><div><span class="rep-name">Nina Patel</span><span class="rep-meta">13 sales <i class="streak">4-day streak</i></span></div></div><svg class="spark" viewBox="0 0 96 27" aria-label="Broken 7-day sparkline"><path class="muted-line" d="M2 21 15 17 28 20 40 11"/><path class="muted-line" d="M59 15 73 10 94 12"/></svg><div class="num">1,490 <small>PTS</small></div><div class="gap">&mdash;</div></div>
+    </div></section><footer><span>Rankings use approved sales for the selected period.</span><span>Point values vary by product and plan &middot; refreshed moments ago.</span></footer>
+  </main><script>document.getElementById('theme-toggle').addEventListener('click',function(){document.documentElement.classList.toggle('dark');});</script>
+</body>
+</html>
