@@ -5,7 +5,7 @@ import { sparklineGeometry } from '@/lib/leaderboard/sparkline';
 export function Sparkline({ spark, mine }: { spark: (number | null)[]; mine?: boolean }) {
   const { polylines, dots } = sparklineGeometry(spark);
   if (polylines.length === 0 && dots.length === 0) {
-    return <span className="text-[10px] font-semibold text-slate-300 dark:text-muted-foreground">--</span>;
+    return <span aria-hidden="true" className="text-[10px] font-semibold text-slate-300 dark:text-muted-foreground">--</span>;
   }
   return (
     <svg
