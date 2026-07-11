@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Target } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { LeaderboardTable, type LeaderboardEntry } from '@/components/leaderboard/LeaderboardTable';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,10 +29,6 @@ const metricOptions: { value: Metric; label: string }[] = [
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
-function metricValue(entry: LeaderboardEntry, metric: Metric) {
-  return metric === 'totalPoints' ? entry.totalPoints : entry.totalSales;
-}
-
 function countdownToSunday(now: Date) {
   const end = new Date(now);
   end.setHours(0, 0, 0, 0);
@@ -44,15 +39,61 @@ function countdownToSunday(now: Date) {
   return days > 0 ? `${days}d ${hours}h left` : hours > 0 ? `${hours}h left` : 'Under 1h left';
 }
 
-function WeeklyChallenge({
-  sales,
-  loading,
+function ArenaMast({
+  period,
+  metric,
+  setPeriod,
+  setMetric,
 }: {
-  sales: number | null;
-  loading: boolean;
+  period: Period;
+  metric: Metric;
+  setPeriod: (period: Period) => void;
+  setMetric: (metric: Metric) => void;
 }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b-[5px] border-[#0A1F44] pb-3 dark:border-[#8dc63f]">
+      <span className="font-['Trebuchet_MS'] text-[11px] font-black uppercase tracking-[0.2em] text-[#0A1F44] dark:text-[#f6f7f8]">
+        <span className="mr-2 inline-block size-3 align-[-1px] bg-[#8dc63f] dark:bg-[#d9a520] dark:shadow-[0_0_16px_rgba(245,215,128,0.5)]" aria-hidden="true" />
+        3C World Group / Arena
+      </span>
+      <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.1em] text-[#687384] dark:text-[#9caabd]">
+        <div className="flex items-center gap-2" aria-label="Leaderboard period">
+          {periodOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={period === option.value}
+              onClick={() => setPeriod(option.value)}
+              className={`cursor-pointer transition-colors duration-150 ${period === option.value ? 'text-[#0A1F44] underline decoration-[#8dc63f] decoration-2 underline-offset-4 dark:text-[#f6f7f8] dark:decoration-[#d9a520]' : 'hover:text-[#0A1F44] dark:hover:text-[#f6f7f8]'}`}
+            >
+              {option.label.replace('This ', '')}
+            </button>
+          ))}
+        </div>
+        <span aria-hidden="true">·</span>
+        <div className="flex items-center gap-2" aria-label="Leaderboard metric">
+          {metricOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={metric === option.value}
+              onClick={() => setMetric(option.value)}
+              className={`cursor-pointer transition-colors duration-150 ${metric === option.value ? 'text-[#0A1F44] dark:text-[#f6f7f8]' : 'hover:text-[#0A1F44] dark:hover:text-[#f6f7f8]'}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <span className="hidden sm:inline">· Live</span>
+      </div>
+    </div>
+  );
+}
+
+function WeeklyChallenge({ sales, loading }: { sales: number | null; loading: boolean }) {
   const [now, setNow] = useState(() => new Date());
   const complete = sales !== null && sales >= WEEKLY_CHALLENGE.targetSales;
+  const progress = sales === null ? 0 : Math.min(100, Math.round((sales / WEEKLY_CHALLENGE.targetSales) * 100));
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60_000);
@@ -60,117 +101,69 @@ function WeeklyChallenge({
   }, []);
 
   return (
-    <div className="relative z-10 grid gap-3 border-t border-white/10 bg-white/[0.045] px-5 py-3.5 sm:px-6 lg:grid-cols-[minmax(240px,1.3fr)_minmax(190px,1fr)_auto_auto] lg:items-center lg:gap-6">
-      <div className="flex items-center gap-3">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md border border-[#8dc63f]/35 bg-[#8dc63f]/10 text-[#8dc63f]">
-          <Target className="size-4" aria-hidden="true" />
-        </span>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8dc63f]">
-            Weekly challenge
-          </p>
-          <p className="mt-0.5 text-sm font-semibold text-white">
-            {complete ? 'Challenge complete - 3 of 3' : 'Close 3 sales by Sunday'}
-          </p>
+    <div className="relative grid gap-3 border-b-[5px] border-[#0A1F44] bg-[#8dc63f] px-[19px] py-4 text-[#0A1F44] shadow-[0_14px_34px_rgba(141,198,63,0.11)] dark:border-[#e7edf4] sm:grid-cols-[1fr_1.7fr_auto] sm:items-center sm:gap-5">
+      <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em]">Weekly challenge</span>
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-5">
+        <strong className="font-['Trebuchet_MS'] text-[15px] font-black sm:text-[18px]">
+          {complete ? `Challenge complete · ${WEEKLY_CHALLENGE.targetSales} of ${WEEKLY_CHALLENGE.targetSales}` : `Close ${WEEKLY_CHALLENGE.targetSales} sales by Sunday`}
+        </strong>
+        <div className="h-[9px] min-w-0 bg-[rgba(10,31,68,0.22)] sm:min-w-[180px]" aria-label={`${sales ?? 0} of ${WEEKLY_CHALLENGE.targetSales} complete`}>
+          <span className="block h-full bg-[#0A1F44] transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
       </div>
-
-      <div className="min-w-0">
-        <div className="grid grid-cols-3 gap-1.5" aria-label="Weekly challenge progress">
-          {Array.from({ length: WEEKLY_CHALLENGE.targetSales }, (_, index) => (
-            <span
-              key={index}
-              className={`h-1.5 rounded-full transition-colors duration-200 ${
-                sales !== null && index < Math.min(sales, WEEKLY_CHALLENGE.targetSales)
-                  ? 'bg-[#8dc63f] shadow-[0_0_10px_rgba(141,198,63,0.22)]'
-                  : 'bg-white/10'
-              }`}
-            />
-          ))}
-        </div>
-        <div className="mt-1.5 flex justify-between gap-3 text-[10px] text-white/45">
-          <span>{complete ? '3 of 3 closed' : loading || sales === null ? 'Loading progress' : `${Math.min(sales, 3)} of 3 closed`}</span>
-          <span className="text-white/65">Approved sales this week</span>
-        </div>
-      </div>
-
-      <p className="hidden border-l border-white/10 pl-4 text-[11px] font-semibold text-white/65 lg:block lg:whitespace-nowrap">
-        {complete ? '3 of 3' : `${sales === null ? '--' : Math.min(sales, 3)} of 3 closed`}
-      </p>
-      <p className="justify-self-end text-[11px] font-semibold text-white/70 lg:justify-self-start lg:whitespace-nowrap">{countdownToSunday(now)}</p>
+      <span className="font-['Consolas'] text-[11px] font-black whitespace-nowrap sm:text-[12px]">
+        {loading || sales === null ? `-- / ${WEEKLY_CHALLENGE.targetSales} · Loading` : `${Math.min(sales, WEEKLY_CHALLENGE.targetSales)} / ${WEEKLY_CHALLENGE.targetSales} · ${countdownToSunday(now)}`}
+      </span>
     </div>
+  );
+}
+
+function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardEntry | null; userName: string; metric: Metric }) {
+  const rankAbove = userRank?.rank && userRank.rank > 1 ? userRank : null;
+  const unit = metric === 'totalPoints' ? 'pts' : 'sales';
+
+  return (
+    <aside className="self-end border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
+      <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em] text-[#8dc63f] dark:text-[#d9a520]">Your standing</span>
+      <div className="mt-[15px] inline-flex items-baseline gap-[0.08em] font-['Trebuchet_MS'] text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.12em]">
+        <small className="text-[0.4em] tracking-normal">#</small>
+        {userRank?.rank ?? '—'}
+      </div>
+      <div className="mt-[17px] flex items-end justify-between gap-2.5 border-t border-white/35 pt-2.5">
+        <strong className="truncate text-[14px]">{userName}</strong>
+        <span className="shrink-0 font-['Consolas'] text-[10px] whitespace-nowrap sm:text-[11px]">{formatNumber(userRank?.totalPoints ?? 0)} pts · {userRank?.totalSales ?? 0} sales</span>
+      </div>
+      {rankAbove && <span className="sr-only">Metric: {unit}</span>}
+    </aside>
   );
 }
 
 function BoardSkeleton() {
   return (
-    <div className="space-y-5">
-      <div>
-        <div className="mb-3 flex items-end justify-between gap-4">
-          <div>
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="mt-1 h-6 w-32" />
-          </div>
-          <Skeleton className="h-4 w-24" />
+    <div className="space-y-[45px]">
+      <section>
+        <div className="mb-0 flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
+          <Skeleton className="h-7 w-44 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
+          <Skeleton className="h-3 w-36 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
         </div>
-        <div className="relative grid gap-3 pb-3 sm:grid-cols-3 sm:items-end">
-          {[...Array(3)].map((_, index) => (
-            <Card
-              key={index}
-              className={`rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card ${index === 1 ? 'sm:-mt-3' : ''}`}
-            >
-              <CardContent className="min-h-[230px] p-5 text-center sm:min-h-[270px]">
-                <Skeleton className="mx-auto size-12 rounded-full" />
-                <Skeleton className="mx-auto mt-4 h-4 w-24" />
-                <Skeleton className="mx-auto mt-3 h-12 w-28" />
-                <Skeleton className="mx-auto mt-4 h-3 w-32" />
-              </CardContent>
-            </Card>
-          ))}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-px bg-slate-200 dark:bg-border sm:block" />
-        </div>
-      </div>
-
-      <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-        <div className="grid min-h-[156px] grid-cols-2 divide-x divide-y divide-slate-100 dark:divide-border sm:grid-cols-4 sm:divide-y-0">
-          {[...Array(4)].map((_, index) => (
-            <div key={index} className="space-y-3 p-4 sm:p-5">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-6 w-28" />
-              <Skeleton className="h-3 w-24" />
+        <div className="grid gap-0 bg-[#0A1F44] sm:grid-cols-3 dark:bg-[#0d2449]">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className={`min-h-[256px] border-white/20 p-6 ${index === 1 ? 'sm:-mt-5 sm:min-h-[306px] border border-[#d9a520]/50' : 'border-r'}`}>
+              <Skeleton className="h-24 w-24 rounded-none bg-white/10" />
+              <Skeleton className="mt-7 h-11 w-40 rounded-none bg-white/10" />
+              <Skeleton className="mt-8 ml-auto h-8 w-24 rounded-none bg-white/10" />
             </div>
           ))}
         </div>
-      </Card>
-
-      <div>
-        <div className="mb-3 flex items-end justify-between gap-4">
-          <div>
-            <Skeleton className="h-3 w-36" />
-            <Skeleton className="mt-1 h-6 w-28" />
-          </div>
-          <Skeleton className="h-4 w-40" />
-        </div>
-        <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-          <div className="border-b border-slate-100 px-4 py-3 dark:border-border sm:px-5">
-            <Skeleton className="h-3 w-20" />
-          </div>
-          <CardContent className="space-y-0 px-0">
-            {[...Array(6)].map((_, index) => (
-              <div key={index} className="flex min-h-[68px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-border sm:px-5">
-                <Skeleton className="size-8 rounded-md" />
-                <Skeleton className="size-9 rounded-full" />
-                <Skeleton className="h-4 flex-1" />
-                <Skeleton className="hidden h-4 w-16 sm:block" />
-                <Skeleton className="h-5 w-14" />
-                <Skeleton className="hidden h-5 w-20 sm:block" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      </section>
+      <div className="grid grid-cols-2 border-y border-[#0A1F44] dark:border-[#e7edf4] sm:grid-cols-4">
+        {[0, 1, 2, 3].map((index) => <div key={index} className="min-h-[109px] border-r border-[#0A1F44] p-4 last:border-0 dark:border-[#e7edf4] sm:p-[17px]"><Skeleton className="h-3 w-20 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="mt-5 h-6 w-28 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="mt-2 h-3 w-24 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /></div>)}
       </div>
-
-      <Skeleton className="h-3 w-72" />
+      <section>
+        <div className="mb-0 flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]"><Skeleton className="h-7 w-40 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="h-3 w-36 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /></div>
+        <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">{[0, 1, 2, 3, 4].map((index) => <div key={index} className="grid min-h-[77px] grid-cols-[70px_minmax(0,1fr)_110px_100px] items-center gap-4 border-b border-[#0A1F44]/20 px-3 last:border-0 dark:border-white/15"><Skeleton className="h-6 w-10 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><div className="flex items-center gap-3"><Skeleton className="size-9 rounded-full bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="h-4 w-32 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /></div><Skeleton className="h-5 w-16 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="h-5 w-20 rounded-full bg-[#0A1F44]/10 dark:bg-white/10" /></div>)}</div>
+      </section>
+      <Skeleton className="h-3 w-72 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
     </div>
   );
 }
@@ -178,12 +171,7 @@ function BoardSkeleton() {
 export default function LeaderboardPage() {
   const { user } = useAuth();
   const { leaderboard, currentUser, loading, error, fetchLeaderboard, getUserRank } = useLeaderboard();
-  const {
-    currentUser: weeklyCurrentUser,
-    loading: weeklyLoading,
-    fetchLeaderboard: fetchWeeklyLeaderboard,
-    getUserRank: getWeeklyUserRank,
-  } = useLeaderboard();
+  const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard, getUserRank: getWeeklyUserRank } = useLeaderboard();
   const [period, setPeriod] = useState<Period>('month');
   const [metric, setMetric] = useState<Metric>('totalPoints');
 
@@ -200,138 +188,35 @@ export default function LeaderboardPage() {
   const userRank = user ? getUserRank(user.uid) : null;
   const weeklyStanding = user ? weeklyCurrentUser ?? getWeeklyUserRank(user.uid) : null;
   const weeklySales = weeklyLoading ? weeklyStanding?.totalSales ?? null : weeklyStanding?.totalSales ?? 0;
-  const periodLabel = periodOptions.find((o) => o.value === period)?.label ?? '';
-  const rankAbove = useMemo(
-    () => (userRank ? leaderboard.find((entry) => entry.rank === userRank.rank - 1) : undefined),
-    [leaderboard, userRank],
-  );
-  const rankGap = rankAbove && userRank ? Math.max(0, metricValue(rankAbove, metric) - metricValue(userRank, metric)) : null;
-  const rankUnit = metric === 'totalPoints' ? 'pts' : 'sales';
-  const progressPercent = rankAbove && userRank
-    ? Math.min(100, Math.round((metricValue(userRank, metric) / Math.max(1, metricValue(rankAbove, metric))) * 100))
-    : 0;
+  const periodLabel = periodOptions.find((option) => option.value === period)?.label ?? '';
+  const metricLabel = metric === 'totalPoints' ? 'points' : 'sales';
+  const userName = userRank?.salesRepName ?? currentUser?.salesRepName ?? user?.displayName ?? user?.email ?? 'Your standing';
 
   return (
     <ProtectedRoute permissions={['leaderboard:read']}>
-      <div className="min-h-screen portal-canvas">
+      <div className="min-h-screen bg-[#f7f8f5] text-[#0A1F44] dark:bg-[#030916] dark:text-[#f6f7f8]">
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1500px] space-y-5">
-              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:bg-[#0e2647] dark:ring-1 dark:ring-inset dark:ring-white/15">
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(ellipse 45% 90% at 8% 100%, rgba(141,198,63,0.14), transparent 70%), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-                    backgroundSize: '100% 100%, 28px 28px, 28px 28px',
-                  }}
-                />
-                <div className="relative grid gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(390px,0.9fr)] lg:items-end">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                      {periodLabel} &middot; ranked by {metric === 'totalPoints' ? 'approved points' : 'approved sales'}
-                    </p>
-                    <h1 className="portal-display mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Leaderboard</h1>
-                    <p className="mt-2 max-w-xl text-sm text-white/60">
-                      Every rank is up for grabs. The board resets with the period.
-                    </p>
-                  </div>
-
-                  <div className="border-l border-white/10 pl-5 sm:pl-6">
-                    <div className="flex items-center justify-between gap-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">Your standing</p>
-                      <span className="rounded-full border border-[#8dc63f]/35 bg-[#8dc63f]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[#8dc63f]">You</span>
-                    </div>
-                    <dl className="mt-4 grid grid-cols-3">
-                      <div className="pr-4">
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Your rank</dt>
-                        <dd className="portal-display portal-num mt-1 text-4xl font-extrabold leading-none tracking-tight">
-                          {userRank?.rank ? <><span className="text-[#8dc63f]">#</span>{userRank.rank}</> : <span className="text-white/35">&mdash;</span>}
-                        </dd>
-                      </div>
-                      <div className="border-l border-white/10 px-4">
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Points</dt>
-                        <dd className="portal-display portal-num mt-1 text-4xl font-extrabold leading-none tracking-tight">{formatNumber(userRank?.totalPoints ?? 0)}</dd>
-                      </div>
-                      <div className="border-l border-white/10 pl-4">
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/45">Sales</dt>
-                        <dd className="portal-display portal-num mt-1 text-4xl font-extrabold leading-none tracking-tight">{userRank?.totalSales ?? 0}</dd>
-                      </div>
-                    </dl>
-                    {rankGap !== null && userRank && userRank.rank !== 1 && (
-                      <div className="mt-5" aria-label={`${formatNumber(rankGap)} ${rankUnit} to rank ${userRank.rank - 1}`}>
-                        <div className="flex justify-between gap-3 text-[11px] text-white/55">
-                          <span>{formatNumber(rankGap)} {rankUnit} to #{userRank.rank - 1}</span>
-                          <strong className="text-[#8dc63f]">{progressPercent}%</strong>
-                        </div>
-                        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
-                          <div className="h-full rounded-full bg-[#8dc63f] shadow-[0_0_14px_rgba(141,198,63,0.3)] transition-[width] duration-300 ease-out" style={{ width: `${progressPercent}%` }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+          <main className="relative flex-1 overflow-auto bg-[#f7f8f5] dark:bg-[#030916]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%)] dark:bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%),#030916]" aria-hidden="true" />
+            <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_42%,transparent_35%,rgba(0,0,0,0.46)_100%)] opacity-70 mix-blend-multiply dark:block" aria-hidden="true" />
+            <div className="relative z-10 mx-auto w-full max-w-[1500px] px-[clamp(14px,3.6vw,56px)] pb-8 pt-[19px]">
+              <ArenaMast period={period} metric={metric} setPeriod={setPeriod} setMetric={setMetric} />
+              <header className="grid gap-[30px] border-b border-[#0A1F44] py-[46px] dark:border-[#e7edf4] lg:grid-cols-[1.5fr_0.75fr]">
+                <div>
+                  <p className="font-['Trebuchet_MS'] text-[11px] font-black uppercase tracking-[0.2em] text-[#687384]">{periodLabel} / ranked by {metricLabel}</p>
+                  <h1 className="mt-[13px] mb-[17px] font-['Trebuchet_MS'] text-[clamp(55px,13vw,188px)] font-black uppercase leading-[0.75] tracking-[-0.115em] text-[#0A1F44] dark:text-white dark:[text-shadow:0_0_26px_rgba(255,255,255,0.07)]">Leaderboard</h1>
+                  <p className="max-w-[520px] text-[15px] leading-[1.45] text-[#687384]">A scoreboard for the people making the number move. The lead is visible.<br className="hidden sm:block" /> The next opportunity is yours.</p>
                 </div>
-                <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} />
-              </section>
+                <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
+              </header>
+              <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} />
 
-              <div className="portal-enter portal-enter-2 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 [-ms-overflow-style:none] [scrollbar-width:none] dark:border-border [&::-webkit-scrollbar]:hidden">
-                  {periodOptions.map((opt) => {
-                    const active = period === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setPeriod(opt.value)}
-                        className={`relative shrink-0 cursor-pointer px-3 py-2.5 text-sm transition-colors duration-150 ${active ? 'font-semibold text-slate-950 dark:text-foreground' : 'text-slate-500 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-foreground'}`}
-                      >
-                        {opt.label}
-                        {active && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[#8dc63f]" />}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex rounded-md border border-slate-200 bg-white p-0.5 dark:border-border dark:bg-card">
-                  {metricOptions.map((opt) => {
-                    const active = metric === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setMetric(opt.value)}
-                        className={`cursor-pointer rounded px-3 py-1.5 text-sm transition-colors duration-150 ${active ? 'bg-[#0A1F44] font-medium text-white dark:bg-white/15' : 'text-slate-500 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-foreground'}`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
-              {error && (
-                <Card className="rounded-lg border-red-200 bg-red-50 py-0 shadow-sm dark:border-red-500/30 dark:bg-red-500/15">
-                  <CardContent className="flex items-start gap-3 p-5 text-sm text-red-700 dark:text-red-300">
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span>{error}</span>
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="portal-enter portal-enter-3">
-                {loading || !user ? (
-                  <BoardSkeleton />
-                ) : (
-                  <LeaderboardTable
-                    entries={leaderboard}
-                    currentUser={currentUser ?? userRank}
-                    currentUserId={user.uid}
-                    metric={metric}
-                    period={period}
-                  />
-                )}
+              <div className="pt-11">
+                {loading || !user ? <BoardSkeleton /> : <LeaderboardTable entries={leaderboard} currentUser={currentUser ?? userRank} currentUserId={user.uid} metric={metric} period={period} />}
               </div>
             </div>
           </main>

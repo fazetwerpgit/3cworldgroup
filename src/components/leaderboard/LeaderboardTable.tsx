@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, ArrowDown, ArrowUp, ArrowUpRight, Crown, Flame, Target, Trophy } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { ArrowDown, ArrowUp, Crown, Flame } from 'lucide-react';
 import { Sparkline } from '@/components/leaderboard/Sparkline';
 
 export interface LeaderboardEntry {
@@ -45,25 +43,6 @@ function metricUnit(metric: Metric) {
   return metric === 'totalPoints' ? 'pts' : 'sales';
 }
 
-// Medal tints are intentionally limited to the podium identity treatment.
-const medal: Record<number, { chip: string; ring: string; label: string }> = {
-  1: {
-    chip: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
-    ring: 'ring-amber-300 dark:ring-amber-500/50',
-    label: '1st',
-  },
-  2: {
-    chip: 'bg-slate-200 text-slate-700 dark:bg-slate-500/30 dark:text-slate-300',
-    ring: 'ring-slate-300 dark:ring-slate-500/50',
-    label: '2nd',
-  },
-  3: {
-    chip: 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300',
-    ring: 'ring-orange-300 dark:ring-orange-500/50',
-    label: '3rd',
-  },
-};
-
 function CountUpValue({ value }: { value: number }) {
   const [displayValue, setDisplayValue] = useState(0);
 
@@ -71,8 +50,8 @@ function CountUpValue({ value }: { value: number }) {
     let frame = 0;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reducedMotion) {
-      const frame = window.requestAnimationFrame(() => setDisplayValue(value));
-      return () => window.cancelAnimationFrame(frame);
+      const reducedFrame = window.requestAnimationFrame(() => setDisplayValue(value));
+      return () => window.cancelAnimationFrame(reducedFrame);
     }
 
     const startedAt = performance.now();
@@ -89,22 +68,16 @@ function CountUpValue({ value }: { value: number }) {
   return <>{formatNumber(displayValue)}</>;
 }
 
-// Movement since end of yesterday. noHistory = first day of a period (every
-// movement is null) — render a neutral dash instead of a wall of "New".
 function MovementIndicator({ movement, noHistory }: { movement: number | null | undefined; noHistory: boolean }) {
   if (noHistory || movement === 0) {
-    return <span className="text-xs font-bold text-slate-300 dark:text-muted-foreground" aria-hidden="true">-</span>;
+    return <span className="font-['Consolas'] text-[10px] font-black text-[#687384]" aria-hidden="true">—</span>;
   }
   if (movement === null || movement === undefined) {
-    return (
-      <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground">
-        New
-      </span>
-    );
+    return <span className="border border-current px-1.5 py-[3px] text-[8px] font-black uppercase tracking-[0.12em] text-[#687384]">NEW</span>;
   }
   const up = movement > 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${up ? 'text-[#5f8f20] dark:text-[#8dc63f]' : 'text-amber-600 dark:text-amber-400'}`}>
+    <span className={`inline-flex items-center gap-1 font-['Consolas'] text-[10px] font-black ${up ? 'text-[#8dc63f]' : 'text-[#ad7116] dark:text-[#d9a520]'}`}>
       {up ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}
       {Math.abs(movement)}
       <span className="sr-only">{up ? 'up' : 'down'} {Math.abs(movement)} since yesterday</span>
@@ -112,11 +85,10 @@ function MovementIndicator({ movement, noHistory }: { movement: number | null | 
   );
 }
 
-// Consecutive selling days; hidden below 2 so rows aren't noisy.
-function StreakChip({ streakDays }: { streakDays: number | undefined }) {
+function StreakChip({ streakDays, mine = false }: { streakDays: number | undefined; mine?: boolean }) {
   if (!streakDays || streakDays < 2) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+    <span className={`inline-flex items-center gap-1 px-1.5 py-[3px] text-[9px] font-black ${mine ? 'border border-[#0A1F44]/30 bg-[#0A1F44]/10 text-[#0A1F44] dark:border-[#0A1F44]/30 dark:bg-[#0A1F44]/10 dark:text-[#0A1F44]' : 'text-[#ad7116] dark:text-[#d9a520]'}`}>
       <Flame className="size-3" aria-hidden="true" />
       {streakDays}-day streak
     </span>
@@ -133,11 +105,8 @@ function ChaseProgress({ current, target, highlighted }: { current: number; targ
   }, [percent]);
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 overflow-hidden bg-slate-100 dark:bg-white/[0.06]">
-      <div
-        className={`h-full rounded-r-full transition-[width] duration-300 ease-out ${highlighted ? 'bg-[#8dc63f]' : 'bg-slate-400 dark:bg-slate-500'}`}
-        style={{ width: started ? `${percent}%` : '0%' }}
-      />
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-[rgba(141,198,63,0.23)] dark:bg-[rgba(10,31,68,0.24)]">
+      <div className={`h-full transition-[width] duration-300 ease-out ${highlighted ? 'bg-[#8dc63f] dark:bg-[#0A1F44]' : 'bg-[#8dc63f] dark:bg-[#75869d]'}`} style={{ width: started ? `${percent}%` : '0%' }} />
     </div>
   );
 }
@@ -155,11 +124,10 @@ function periodDaysLeft(period: Period) {
 
 function EmptyState() {
   return (
-    <Card className="rounded-lg border-slate-200 bg-white p-10 text-center shadow-sm dark:border-border dark:bg-card">
-      <Trophy className="mx-auto mb-3 size-10 text-slate-300 dark:text-muted-foreground" aria-hidden="true" />
-      <p className="font-medium text-slate-950 dark:text-foreground">The board is wide open</p>
-      <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">First approved sale of the period takes #1.</p>
-    </Card>
+    <div className="border-y border-[#0A1F44] py-14 text-center dark:border-[#e7edf4]">
+      <p className="font-['Trebuchet_MS'] text-lg font-black uppercase tracking-[-0.04em]">The board is wide open</p>
+      <p className="mt-1 text-sm text-[#687384]">First approved sale of the period takes #1.</p>
+    </div>
   );
 }
 
@@ -169,11 +137,9 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
   const topCloser = [...entries].sort((a, b) => b.totalSales - a.totalSales)[0];
   const race = ordered.slice(0, -1).reduce<{ above: LeaderboardEntry; below: LeaderboardEntry; gap: number } | null>((best, above, index) => {
     const below = ordered[index + 1];
-    const aboveValue = metricValue(above, metric);
-    const belowValue = metricValue(below, metric);
-    if (aboveValue === 0 || belowValue === 0) return best;
-    const candidate = { above, below, gap: Math.max(0, aboveValue - belowValue) };
-    return !best || candidate.gap < best.gap ? candidate : best;
+    const gap = Math.max(0, metricValue(above, metric) - metricValue(below, metric));
+    if (metricValue(above, metric) === 0 || metricValue(below, metric) === 0) return best;
+    return !best || gap < best.gap ? { above, below, gap } : best;
   }, null);
   const aboveUser = currentUser ? ordered.find((entry) => entry.rank === currentUser.rank - 1) : undefined;
   const belowUser = currentUser ? ordered.find((entry) => entry.rank === currentUser.rank + 1) : undefined;
@@ -185,170 +151,114 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
   const daysLeft = periodDaysLeft(period);
 
   return (
-    <section className="portal-enter portal-enter-4" aria-labelledby="across-the-board-heading">
-      <div className="grid overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card lg:grid-cols-[116px_minmax(0,1fr)]">
-        <div className="flex min-h-[76px] items-center justify-center border-b border-slate-100 bg-slate-50 px-4 dark:border-border dark:bg-muted/30 lg:border-b-0 lg:border-r">
-          <span id="across-the-board-heading" className="text-center text-[11px] font-bold uppercase leading-relaxed tracking-[0.16em] text-[#5f8f20] dark:text-[#8dc63f]">Across the board</span>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-y divide-slate-100 dark:divide-border sm:grid-cols-4 sm:divide-y-0">
-          <div className="min-h-[116px] p-4 transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-muted-foreground">Top closer</p>
-              <Trophy className="size-4 text-[#5f8f20] dark:text-[#8dc63f]" aria-hidden="true" />
-            </div>
-            <p className="portal-display mt-4 truncate text-lg font-bold tracking-tight text-slate-950 dark:text-foreground">{topCloser?.salesRepName ?? '--'}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{topCloser ? <><strong className="text-slate-950 dark:text-foreground">{formatNumber(topCloser.totalSales)}</strong> approved sales</> : 'No approved sales yet'}</p>
-          </div>
-          <div className="min-h-[116px] p-4 transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-muted-foreground">Closest race</p>
-              <Target className="size-4 text-[#5f8f20] dark:text-[#8dc63f]" aria-hidden="true" />
-            </div>
-            <p className="portal-display mt-4 text-lg font-bold tracking-tight text-slate-950 dark:text-foreground">{race ? `#${race.above.rank} vs #${race.below.rank}` : '--'}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{race ? <><strong className="text-slate-950 dark:text-foreground">{formatNumber(race.gap)} {unit} apart</strong></> : 'Needs two active reps'}</p>
-          </div>
-          <div className="min-h-[116px] p-4 transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-muted-foreground">Your climb</p>
-              <ArrowUpRight className="size-4 text-[#5f8f20] dark:text-[#8dc63f]" aria-hidden="true" />
-            </div>
-            <p className="portal-display mt-4 truncate text-lg font-bold tracking-tight text-slate-950 dark:text-foreground">{!currentUser ? 'First sale' : soleLeader ? 'Top of the board' : currentUser.rank === 1 ? `Leading by ${formatNumber(lead ?? 0)}` : nextGap !== null ? `${formatNumber(nextGap)} ${unit}` : 'Keep climbing'}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? `over #2 in ${unit}` : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</p>
-          </div>
-          <div className="min-h-[116px] p-4 transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-muted-foreground">Team pulse</p>
-              <Activity className="size-4 text-[#5f8f20] dark:text-[#8dc63f]" aria-hidden="true" />
-            </div>
-            <p className="portal-display mt-4 text-lg font-bold tracking-tight text-slate-950 dark:text-foreground">{formatNumber(totalPoints)} pts</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground"><strong className="text-slate-950 dark:text-foreground">{entries.length} reps</strong> on the board{daysLeft !== null ? ` / ${daysLeft} days left` : ''}</p>
-          </div>
-        </div>
+    <section className="mb-[45px] grid grid-cols-2 border-y border-[#0A1F44] dark:border-[#e7edf4] sm:grid-cols-4" aria-label="Team pulse">
+      <div className="min-h-[109px] border-r border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4]">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Top closer</span>
+        <strong className="mt-[18px] block truncate font-['Trebuchet_MS'] text-[20px] font-black tracking-[-0.05em]">{topCloser?.salesRepName ?? '--'}</strong>
+        <span className="mt-1 block font-['Consolas'] text-[10px] text-[#687384]">{topCloser ? `${formatNumber(topCloser.totalSales)} approved sales` : 'No approved sales yet'}</span>
+      </div>
+      <div className="min-h-[109px] border-r border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4]">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Closest race</span>
+        <strong className="mt-[18px] block font-['Trebuchet_MS'] text-[20px] font-black tracking-[-0.05em]">{race ? `#${race.above.rank} vs #${race.below.rank}` : '--'}</strong>
+        <span className="mt-1 block font-['Consolas'] text-[10px] text-[#687384]">{race ? `${formatNumber(race.gap)} ${unit} apart` : 'Needs two active reps'}</span>
+      </div>
+      <div className="min-h-[109px] border-r border-t border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4] sm:border-t-0">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Your climb</span>
+        <strong className="mt-[18px] block truncate font-['Trebuchet_MS'] text-[20px] font-black tracking-[-0.05em]">{!currentUser ? 'First sale' : soleLeader ? 'Top of the board' : currentUser.rank === 1 ? `Leading by ${formatNumber(lead ?? 0)}` : nextGap !== null ? `${formatNumber(nextGap)} ${unit}` : 'Keep climbing'}</strong>
+        <span className="mt-1 block font-['Consolas'] text-[10px] text-[#687384]">{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? 'over #2 in pts' : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</span>
+      </div>
+      <div className="min-h-[109px] border-t border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4] sm:border-t-0">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Team pulse</span>
+        <strong className="mt-[18px] block font-['Trebuchet_MS'] text-[20px] font-black tracking-[-0.05em]">{formatNumber(totalPoints)} pts</strong>
+        <span className="mt-1 block font-['Consolas'] text-[10px] text-[#687384]">{entries.length} reps · {daysLeft ? `${daysLeft} days left` : 'all time'}</span>
       </div>
     </section>
   );
 }
 
-function Podium({ entries, currentUserId, metric, noHistory }: { entries: LeaderboardEntry[]; currentUserId?: string; metric: Metric; noHistory: boolean }) {
+function Podium({ entries, currentUserId, metric }: { entries: LeaderboardEntry[]; currentUserId?: string; metric: Metric }) {
   const podium = entries.filter((entry) => entry.rank <= 3).sort((a, b) => a.rank - b.rank);
-  const podiumOrder: Record<number, string> = {
-    1: 'sm:order-2',
-    2: 'sm:order-1',
-    3: 'sm:order-3',
-  };
+  const podiumEntries = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
+  const gridColumns = podium.length === 3 ? 'sm:grid-cols-[1fr_1.25fr_1fr]' : podium.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1';
   const unit = metricUnit(metric);
 
   return (
-    <section className="portal-enter portal-enter-3" aria-labelledby="podium-heading">
-      <div className="mb-3 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-muted-foreground">Top performers</p>
-          <h2 id="podium-heading" className="portal-display mt-1 text-lg font-bold tracking-tight text-slate-950 dark:text-foreground">The podium</h2>
-        </div>
-        <p className="text-right text-xs text-slate-500 dark:text-muted-foreground">{metric === 'totalPoints' ? 'Approved points' : 'Approved sales'}</p>
+    <section className="mb-[46px]" aria-labelledby="podium-heading">
+      <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
+        <h2 id="podium-heading" className="font-['Trebuchet_MS'] text-[22px] font-black uppercase tracking-[-0.04em]">Top performers</h2>
+        <p className="text-right text-[10px] uppercase tracking-[0.15em] text-[#687384]">Approved {unit} · selected period</p>
       </div>
-      <div className="relative grid gap-3 pb-3 sm:grid-cols-3 sm:items-end">
-        {podium.map((entry) => {
+      <div className={`grid gap-0 bg-[#0A1F44] text-white dark:bg-[radial-gradient(circle_at_50%_31%,rgba(245,215,128,0.18),transparent_26%),linear-gradient(180deg,#0d2449,#06142b)] dark:text-[#f6f7f8] dark:shadow-[0_25px_70px_rgba(0,0,0,0.24)] ${gridColumns}`}>
+        {podiumEntries.map((entry) => {
           const mine = entry.salesRepId === currentUserId;
-          const m = medal[entry.rank];
           const winner = entry.rank === 1;
+          const rankStyle = entry.rank === 1
+            ? 'text-[#0A1F44] dark:bg-[linear-gradient(145deg,#fff3bd_0%,#f5d780_18%,#d9a520_52%,#8a6a1f_82%,#f5d780_100%)] dark:bg-clip-text dark:text-transparent dark:[text-shadow:0_0_30px_rgba(245,215,128,0.32)]'
+            : entry.rank === 2
+              ? 'text-white/25 dark:bg-[linear-gradient(145deg,#ffffff_0%,#e8edf2_25%,#aab6c2_56%,#6e7a86_82%,#f4f7fa_100%)] dark:bg-clip-text dark:text-transparent'
+              : 'text-white/25 dark:bg-[linear-gradient(145deg,#ffe2bd_0%,#e8b98a_25%,#b4703a_55%,#7a4a22_84%,#f1c99a_100%)] dark:bg-clip-text dark:text-transparent';
           return (
-            <Card
-              key={entry.salesRepId}
-              className={`relative overflow-hidden rounded-lg border-slate-200 bg-white py-0 text-center shadow-sm transition-transform duration-200 ease-out hover:-translate-y-1 hover:shadow-md dark:border-border dark:bg-card ${podiumOrder[entry.rank] ?? ''} ${winner ? 'border-t-2 border-t-[#8dc63f] sm:-mt-3' : 'sm:mt-2'} ${mine ? 'bg-[#8dc63f]/5 dark:bg-[#8dc63f]/10' : ''}`}
-            >
-              {winner && <Crown className="absolute right-5 top-5 size-7 text-amber-500/80" aria-label="Top ranked" />}
-              <CardContent className={`relative p-5 ${winner ? 'sm:p-6' : ''}`}>
-                <div className={`mx-auto grid place-items-center rounded-full bg-[#0A1F44]/[0.06] text-sm font-bold text-[#0A1F44] ring-2 dark:bg-white/10 dark:text-white ${winner ? 'size-16 ring-[3px]' : 'size-12'} ${m.ring}`}>
-                  {initialsOf(entry.salesRepName)}
+            <article key={entry.salesRepId} className={`relative min-h-[256px] overflow-hidden border-r border-white/25 p-6 pb-[18px] last:border-0 dark:border-white/20 ${winner ? 'z-10 -mt-5 min-h-[306px] border border-[#f5d780]/90 bg-[#8dc63f] pt-[45px] text-[#0A1F44] dark:-mt-5 dark:border-[#f5d780]/90 dark:bg-[radial-gradient(circle_at_50%_0%,rgba(245,215,128,0.28),transparent_52%),linear-gradient(145deg,#14376d,#0a1b37_58%,#071426)] dark:text-[#f6f7f8] dark:shadow-[0_0_85px_rgba(217,165,32,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]' : ''} ${mine && !winner ? 'bg-[#8dc63f]/10' : ''}`}>
+              {winner && <Crown className="absolute right-[22px] top-[21px] size-7 fill-[#0A1F44] text-[#0A1F44] dark:fill-[#d9a520] dark:text-[#d9a520] dark:drop-shadow-[0_0_11px_rgba(245,215,128,0.75)]" aria-label="Gold crown" />}
+              <div className={`font-['Trebuchet_MS'] text-[clamp(86px,11vw,160px)] font-black leading-[0.67] tracking-[-0.13em] ${rankStyle}`}>{String(entry.rank).padStart(2, '0')}</div>
+              <div className="mt-6 flex items-center gap-[11px]">
+                <span className={`grid size-[43px] shrink-0 place-items-center rounded-full bg-[#31537b] text-[11px] font-black ${winner ? 'bg-[#0A1F44] text-white dark:shadow-[0_0_20px_rgba(245,215,128,0.3)]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
+                <div className="min-w-0">
+                  <strong className="block truncate text-[16px] font-black">{entry.salesRepName}</strong>
+                  <span className="mt-[3px] block font-['Consolas'] text-[10px]">{formatNumber(entry.totalSales)} approved sales{winner ? ' · current leader' : ''}</span>
+                  {mine && <span className="mt-1 inline-block bg-[#8dc63f] px-1.5 py-[3px] text-[8px] font-black uppercase tracking-[0.1em] text-[#0A1F44]">YOU</span>}
                 </div>
-                <div className="mt-3 flex items-center justify-center gap-1.5">
-                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${m.chip}`}>{m.label}</span>
-                  {mine && <Badge className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">You</Badge>}
-                  <MovementIndicator movement={entry.movement} noHistory={noHistory} />
-                </div>
-                <div className="mt-1.5 flex justify-center empty:hidden">
-                  <StreakChip streakDays={entry.streakDays} />
-                </div>
-                <p className="mt-2 truncate font-semibold text-slate-950 dark:text-foreground">{entry.salesRepName}</p>
-                <p className={`portal-display portal-num mt-4 font-extrabold tracking-tight text-slate-950 dark:text-foreground ${winner ? 'text-5xl' : 'text-4xl'}`}>
-                  <CountUpValue value={metricValue(entry, metric)} /> <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-muted-foreground">{unit}</span>
-                </p>
-                <div className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-border dark:text-muted-foreground">
-                  <strong className="text-slate-950 dark:text-foreground">{formatNumber(entry.totalSales)}</strong> approved {entry.totalSales === 1 ? 'sale' : 'sales'}
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className={`absolute bottom-[18px] right-[22px] font-['Consolas'] text-[25px] font-black ${winner ? 'text-[37px] dark:text-[#f5d780] dark:[text-shadow:0_0_15px_rgba(245,215,128,0.6)]' : ''}`}><CountUpValue value={metricValue(entry, metric)} /> <small className="font-['Trebuchet_MS'] text-[9px] tracking-[0.15em]">{unit}</small></div>
+            </article>
           );
         })}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-px bg-slate-200 shadow-[0_5px_18px_rgba(10,31,68,0.08)] dark:bg-border sm:block" />
       </div>
     </section>
   );
 }
 
-function ChaseTable({ entries, currentUser, currentUserId, metric, noHistory }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; currentUserId?: string; metric: Metric; noHistory: boolean }) {
+function ChaseTable({ entries, currentUser, currentUserId, metric }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; currentUserId?: string; metric: Metric }) {
   const rest = entries.filter((entry) => entry.rank >= 4).sort((a, b) => a.rank - b.rank);
   if (rest.length === 0) return null;
   const unit = metricUnit(metric);
   const ownRank = currentUser?.rank ?? null;
+  const noHistory = entries.every((entry) => (entry.movement ?? null) === null);
 
   return (
-    <section className="portal-enter portal-enter-4" aria-labelledby="chase-heading">
-      <div className="mb-3 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-muted-foreground">Your race &middot; ranks 4+</p>
-          <h2 id="chase-heading" className="portal-display mt-1 text-lg font-bold tracking-tight text-slate-950 dark:text-foreground">The chase</h2>
-        </div>
-        <p className="text-right text-xs text-slate-500 dark:text-muted-foreground">Every rep stays on the board.</p>
+    <section className="mb-[25px]" aria-labelledby="chase-heading">
+      <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
+        <h2 id="chase-heading" className="font-['Trebuchet_MS'] text-[22px] font-black uppercase tracking-[-0.04em]">The chase · ranks 4–{entries.length}</h2>
+        <p className="text-right text-[10px] uppercase tracking-[0.14em] text-[#687384]">Movement since yesterday</p>
       </div>
-      <Card className="overflow-hidden rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-        <div className="hidden grid-cols-[76px_minmax(0,1fr)_64px_110px_120px] items-center gap-4 border-b border-slate-100 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:border-border dark:text-muted-foreground sm:grid">
-          <span>Rank</span><span>Rep</span><span className="text-center">Trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span>
-        </div>
-        <CardContent className="space-y-0 px-0">
-          {rest.map((entry, index) => {
-            const mine = entry.salesRepId === currentUserId;
-            const neighbor = ownRank !== null && Math.abs(entry.rank - ownRank) === 1;
-            const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
-            const currentValue = metricValue(entry, metric);
-            const aboveValue = above ? metricValue(above, metric) : 0;
-            const gap = above ? Math.max(0, aboveValue - currentValue) : null;
-            return (
-              <div
-                key={entry.salesRepId}
-                className={`portal-enter relative border-b border-slate-100 transition-colors duration-200 last:border-b-0 hover:bg-slate-50 dark:border-border dark:hover:bg-white/[0.035] ${mine ? 'border-l-2 border-l-[#8dc63f] bg-[#8dc63f]/[0.07] dark:bg-[#8dc63f]/10' : ''}`}
-                style={{ animationDelay: `${Math.min(index * 42, 420)}ms` }}
-              >
-                <div className="grid min-h-[72px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[76px_minmax(0,1fr)_64px_110px_120px] sm:gap-4 sm:px-5">
-                  <span className="flex items-center gap-1.5">
-                    <span className="portal-num grid size-8 shrink-0 place-items-center rounded-md bg-slate-100 text-sm font-bold text-slate-500 dark:bg-muted dark:text-muted-foreground sm:size-9">{entry.rank}</span>
-                    <span className="hidden sm:inline-flex"><MovementIndicator movement={entry.movement} noHistory={noHistory} /></span>
-                  </span>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#0A1F44]/[0.07] text-[11px] font-bold text-[#0A1F44] dark:bg-white/10 dark:text-white">{initialsOf(entry.salesRepName)}</span>
-                    <div className="min-w-0">
-                      <p className={`truncate text-sm ${mine ? 'font-semibold text-slate-950 dark:text-foreground' : 'text-slate-700 dark:text-foreground'}`}>{entry.salesRepName}</p>
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                        {mine && <Badge className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">You</Badge>}
-                        <span className="inline-flex sm:hidden"><MovementIndicator movement={entry.movement} noHistory={noHistory} /></span>
-                        <StreakChip streakDays={entry.streakDays} />
-                        <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold sm:hidden ${mine ? 'border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#5f8f20] dark:text-[#8dc63f]' : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground'}`}>
-                          {gap === null ? '--' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                  <span className="hidden justify-center sm:flex"><Sparkline spark={entry.spark ?? []} mine={mine} /></span>
-                  <p className="portal-display portal-num text-right text-lg font-extrabold tracking-tight text-slate-950 dark:text-foreground">{formatNumber(currentValue)} <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-muted-foreground">{unit}</span></p>
-                  <p className={`hidden justify-self-end rounded-full border px-2 py-1 text-right text-[10px] font-semibold sm:inline-flex ${mine ? 'border-[#8dc63f]/30 bg-[#8dc63f]/10 text-[#5f8f20] dark:text-[#8dc63f]' : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-border dark:bg-muted/50 dark:text-muted-foreground'}`}>{gap === null ? '--' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`}</p>
+      <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">
+        <div className="hidden min-h-[38px] grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] items-center gap-[15px] px-3 text-[9px] font-black uppercase tracking-[0.16em] text-[#687384] sm:grid"><span>Rank / move</span><span>Rep</span><span>7-day trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span></div>
+        {rest.map((entry, index) => {
+          const mine = entry.salesRepId === currentUserId;
+          const neighbor = ownRank !== null && Math.abs(entry.rank - ownRank) === 1;
+          const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
+          const currentValue = metricValue(entry, metric);
+          const aboveValue = above ? metricValue(above, metric) : 0;
+          const gap = above ? Math.max(0, aboveValue - currentValue) : null;
+          const gapLabel = gap === null ? '—' : mine ? `${formatNumber(gap)} ${unit} to #${entry.rank - 1}` : `${formatNumber(gap)} ${unit}`;
+          return (
+            <div key={entry.salesRepId} className={`relative grid min-h-[77px] grid-cols-[43px_minmax(0,1fr)_auto] items-center gap-[9px] border-b border-[rgba(10,31,68,0.22)] px-1 py-2.5 transition-colors duration-150 last:border-0 hover:bg-[rgba(141,198,63,0.12)] dark:border-white/15 dark:hover:bg-[rgba(245,215,128,0.08)] sm:grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] sm:gap-[15px] sm:px-3 ${mine ? 'bg-[#0A1F44] text-white shadow-[inset_7px_0_#8dc63f] dark:bg-[#8dc63f] dark:text-[#0A1F44] dark:border-[#8dc63f] dark:shadow-[inset_7px_0_#d7edaf,0_0_30px_rgba(141,198,63,0.12)]' : ''}`} style={{ animationDelay: `${Math.min(index * 42, 420)}ms` }}>
+              <div className="flex items-center gap-[9px] font-['Consolas']"><b className="text-[21px]">{String(entry.rank).padStart(2, '0')}</b><MovementIndicator movement={entry.movement} noHistory={noHistory} /></div>
+              <div className="flex min-w-0 items-center gap-[11px]">
+                <span className={`grid size-[35px] shrink-0 place-items-center rounded-full bg-[#0A1F44] text-[10px] font-black text-white ${mine ? 'dark:bg-[#0A1F44]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
+                <div className="min-w-0">
+                  <span className={`block truncate text-[14px] font-black ${mine ? 'text-white dark:text-[#0A1F44]' : ''}`}>{entry.salesRepName}{mine && <em className="ml-[7px] bg-[#8dc63f] px-1.5 py-[3px] text-[8px] font-black uppercase not-italic tracking-[0.1em] text-[#0A1F44] dark:bg-white">YOU</em>}</span>
+                  <span className={`mt-1 flex flex-wrap items-center gap-1 text-[9px] text-[#687384] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : ''}`}>{formatNumber(entry.totalSales)} sales <StreakChip streakDays={entry.streakDays} mine={mine} /></span>
                 </div>
-                {neighbor || mine ? <ChaseProgress current={currentValue} target={aboveValue} highlighted={mine} /> : null}
               </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+              <span className="hidden justify-center sm:flex"><Sparkline spark={entry.spark ?? []} mine={mine} /></span>
+              <div className="num text-right font-['Consolas'] text-[17px] font-black">{formatNumber(currentValue)} <small className={`font-['Trebuchet_MS'] text-[9px] tracking-[0.12em] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : 'text-[#687384]'}`}>{unit}</small></div>
+              <div className={`col-span-2 justify-self-start border border-[#0A1F44] px-2 py-1 font-['Consolas'] text-[10px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
+              {(neighbor || mine) && <ChaseProgress current={currentValue} target={aboveValue} highlighted={mine} />}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -356,14 +266,16 @@ function ChaseTable({ entries, currentUser, currentUserId, metric, noHistory }: 
 export function LeaderboardTable({ entries, currentUser, currentUserId, metric, period }: LeaderboardTableProps) {
   if (entries.length === 0) return <EmptyState />;
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
-  const noHistory = ordered.every((entry) => (entry.movement ?? null) === null);
 
   return (
-    <div className="space-y-5">
-      <Podium entries={ordered} currentUserId={currentUserId} metric={metric} noHistory={noHistory} />
+    <div>
+      <Podium entries={ordered} currentUserId={currentUserId} metric={metric} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <ChaseTable entries={ordered} currentUser={currentUser} currentUserId={currentUserId} metric={metric} noHistory={noHistory} />
-      <p className="px-1 text-xs text-slate-400 dark:text-muted-foreground">Rankings use approved sales for the selected period. Point values vary by product and plan.</p>
+      <ChaseTable entries={ordered} currentUser={currentUser} currentUserId={currentUserId} metric={metric} />
+      <footer className="flex justify-between gap-3 border-t border-[#0A1F44] pt-3 text-[10px] text-[#687384] dark:border-[#e7edf4] max-sm:block">
+        <span>Rankings use approved sales for the selected period.</span>
+        <span className="max-sm:mt-2 max-sm:block">Point values vary by product and plan · refreshed moments ago.</span>
+      </footer>
     </div>
   );
 }
