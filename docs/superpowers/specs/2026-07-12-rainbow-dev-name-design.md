@@ -15,11 +15,12 @@ light and dark mode.
   admin role. Other admins keep their normal author colors. Renaming an
   account "Jacob" does not trigger it.
 - Purely presentational — no changes to message storage, sending, or Firestore.
-- Applies everywhere the author name renders in chat:
+- Applies to the message author headers (the primary name display):
   - Desktop chat page message header (`src/app/portal/chat/page.tsx`)
-  - Desktop reply-preview author + "Replying to X" composer chip
-  - Mobile thread message header + reply preview + "Replying to X"
-    (`src/components/chat/MobileThread.tsx`)
+  - Mobile thread message header (`src/components/chat/MobileThread.tsx`)
+- NOT applied to reply-preview snippets / "Replying to X" chips: the stored
+  reply snippet (`ChatReplySnippet`) carries only `authorName`, no `authorId`,
+  and name-matching would defeat the UID gate. Left plain by design.
 - `prefers-reduced-motion`: static rainbow gradient (no animation).
 
 ## Implementation shape
