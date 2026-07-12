@@ -203,7 +203,7 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
           return (
             <article key={entry.salesRepId} className={`relative min-h-[256px] overflow-hidden border-r border-white/25 p-6 pb-[18px] last:border-0 dark:border-white/20 ${winner ? 'z-10 -mt-5 min-h-[306px] border border-[#f5d780]/90 bg-[#8dc63f] pt-[45px] text-[#0A1F44] dark:-mt-5 dark:border-[#f5d780]/90 dark:bg-[radial-gradient(circle_at_50%_0%,rgba(245,215,128,0.28),transparent_52%),linear-gradient(145deg,#14376d,#0a1b37_58%,#071426)] dark:text-[#f6f7f8] dark:shadow-[0_0_85px_rgba(217,165,32,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]' : ''} ${mine && !winner ? 'bg-[#8dc63f]/10' : ''}`}>
               {winner && <Crown className="absolute right-[22px] top-[21px] size-7 fill-[#0A1F44] text-[#0A1F44] dark:fill-[#d9a520] dark:text-[#d9a520] dark:drop-shadow-[0_0_11px_rgba(245,215,128,0.75)]" aria-label="Gold crown" />}
-              <div className={`font-['Trebuchet_MS'] text-[clamp(86px,11vw,160px)] font-black leading-[0.67] tracking-[-0.13em] ${rankStyle}`}>{String(entry.rank).padStart(2, '0')}</div>
+              <div className={`font-['Trebuchet_MS'] text-[clamp(86px,11vw,160px)] font-black leading-[0.67] tracking-[-0.13em] pt-[0.14em] ${rankStyle}`}>{String(entry.rank).padStart(2, '0')}</div>
               <div className="mt-6 flex items-center gap-[11px]">
                 <span className={`grid size-[43px] shrink-0 place-items-center rounded-full bg-[#31537b] text-[11px] font-black ${winner ? 'bg-[#0A1F44] text-white dark:shadow-[0_0_20px_rgba(245,215,128,0.3)]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
