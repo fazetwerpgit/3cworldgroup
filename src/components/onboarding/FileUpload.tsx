@@ -1,7 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, UploadCloud, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ChatLightbox } from '@/components/chat/ChatLightbox';
+import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { Button } from '@/components/ui/button';
 
 interface FileUploadProps {
@@ -65,6 +67,14 @@ export default function FileUpload({
   const [state, setState] = useState<UploadState>(existingPath ? 'uploaded' : 'idle');
   const [fileName, setFileName] = useState(existingPath ? 'Uploaded' : '');
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<LightboxImage | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const handleFile = async (selected: File) => {
     setError('');
@@ -99,6 +109,8 @@ export default function FileUpload({
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Upload failed');
 
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
       setState('uploaded');
       onUploaded(json.path as string);
     } catch (err) {
@@ -149,6 +161,27 @@ export default function FileUpload({
           </span>
         )}
       </div>
+      {state === 'uploaded' && previewUrl && (
+        <div className="mt-3">
+          <button
+            type="button"
+            aria-label="View uploaded image"
+            className="cursor-zoom-in text-left"
+            onClick={() => setLightboxImage({ url: previewUrl, alt: 'Uploaded image' })}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt="Uploaded image"
+              className="h-16 w-auto max-w-[120px] rounded-md border border-slate-200 object-cover dark:border-border"
+            />
+            <span className="mt-1 block text-xs text-slate-500 dark:text-muted-foreground">
+              Tap to view
+            </span>
+          </button>
+        </div>
+      )}
+      <ChatLightbox image={lightboxImage} onClose={() => setLightboxImage(null)} />
     </div>
   );
 }

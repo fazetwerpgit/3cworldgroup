@@ -68,7 +68,7 @@ export function ChatLightbox({
       aria-modal="true"
       aria-label="Image viewer"
       onClick={onClose}
-      className="portal-motion pointer-events-auto fixed inset-0 z-[120] flex flex-col bg-black/90 p-4 backdrop-blur-sm"
+      className="portal-motion pointer-events-auto fixed inset-0 z-[120] flex flex-col bg-black/90 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm"
     >
       <div className="flex justify-end">
         <button
