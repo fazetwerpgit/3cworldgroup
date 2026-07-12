@@ -42,6 +42,32 @@ background (intent, stack, design system, constraints) and still applies.
 - Light mode exists and follows the portal theme toggle; only dark was
   1:1-verified. If the client lives in light mode, run one verify round on it.
 
+### NEXT SESSION: redesign the remaining portal pages
+User's direction (2026-07-12): extend the redesign to the other portal pages.
+The leaderboard's Spotlight Arena treatment is the approved visual bar.
+
+- **Read first:** `docs/redesign/ANCHOR.md` (client decisions locked in §9,
+  read every redesign session) and the Spotlight Arena section above.
+- **Pages still on the old design:** Dashboard (`src/app/portal/page.tsx`),
+  Team Chat, Sales, Calls Schedule, Forms, Resources, Operations, Admin —
+  all under `src/app/portal/*`. Leaderboard is DONE, don't touch it.
+- **Process that worked (user liked it):** mockups first as self-contained
+  HTML in `design-mockups/<page>-round1/` (Codex gpt-5.6-luna builds; serve
+  via `python -m http.server 8899` from design-mockups; screenshot 1440px;
+  self-critique; present numbered options + double-click file paths). After
+  the user picks: goal contract doc + Codex implements + 1:1 opus
+  screenshot-verify loop until PASS, only then push (push = prod deploy;
+  the permission classifier requires the user to say "deploy").
+- **Quality bar (from memory):** recompose pages, don't restyle; the user is
+  non-technical — ask only about what-users-see decisions, one at a time.
+- **Verification recipe:** see "Verification setup that works" above (dev on
+  :3000, user signs into the automation browser window, dark via
+  localStorage 3c-theme, page.route mocks with real API field names).
+- **Design language to carry over:** dark near-black + stage glow, navy
+  #0A1F44 panels, green #8dc63f accents, metallic gradient display numerals,
+  mono/letter-spaced kickers, hairline dividers, pill chips, lucide icons,
+  no emoji. Both themes must work; portal ThemeContext drives dark class.
+
 ## Session Handoff 2026-07-11 — Leaderboard Phase 2 (rank history) DEPLOYED
 
 ### Completed (this session)
