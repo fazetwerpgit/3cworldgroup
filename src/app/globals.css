@@ -1551,5 +1551,16 @@ button:focus-visible {
   pointer-events: none;
 }
 
-/* No prefers-reduced-motion fallback on purpose: the animation IS the feature,
-   it is one name-sized element, and the owner's OS reports reduced motion. */
+/* Exempt from the global reduced-motion freeze (base layer, line ~168): the
+   animation IS the feature, it is one name-sized element, and the owner's OS
+   reports reduced motion. Must out-!important the global rule. */
+@layer base {
+  @media (prefers-reduced-motion: reduce) {
+    .chat-dev-name,
+    .chat-dev-badge,
+    .chat-dev-badge::before {
+      animation-duration: 3s !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+}
