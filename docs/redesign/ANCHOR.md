@@ -172,7 +172,10 @@ playbook where they conflict.
 - Taste anchors: client undecided between reference products → direction call:
   **modern-sleek (Linear/Attio/Stripe) base + Pipedrive-style status color for
   pipeline urgency**.
-- Theme: **light default**; dark mode kept working as a toggle.
+- Theme: ~~light default~~ **SUPERSEDED 2026-07-12: dark-first everywhere**
+  (Spotlight Arena treatment leads on every portal page); light mode kept
+  working as a toggle. See
+  `docs/superpowers/specs/2026-07-12-portal-redesign-campaign-design.md`.
 
 **Dashboard**
 - Rep dashboard leads with **their numbers** (sales MTD, quota progress,
@@ -237,6 +240,13 @@ playbook where they conflict.
   Gotcha: Tailwind v4 scans repo .md files — backslash-hex Windows paths in
   docs (e.g. `\11c6...`) parse as CSS escapes and break the build; use
   forward slashes in any committed doc.
+
+**Campaign 2026-07-12 (full portal, page by page)**
+- Dark-first everywhere; page order, per-page mockup→verify→deploy loop, and
+  merge-with-approval rule live in
+  `docs/superpowers/specs/2026-07-12-portal-redesign-campaign-design.md`.
+- 1:1 screenshot-verify vs the picked mockup is MANDATORY per page — verify
+  until EXACT, not close enough. Push only when the user says "deploy".
 
 - **Phone is primary for reps** — mobile gets first-class treatment (chat,
   leaderboard, forms especially). Mobile bottom-nav pattern from the playbook
