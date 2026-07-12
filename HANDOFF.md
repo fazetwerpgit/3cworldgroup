@@ -4,10 +4,43 @@ For the next coding agent, especially Claude running a Max workflow. Read this
 before touching code. This repo is in the middle of an employee-portal redesign,
 not a public marketing-site redesign.
 
-Last updated: 2026-07-10 (leaderboard session)
-Current checkpoint: see "Session Handoff 2026-07-10 — Leaderboard Broadcast
-redesign" below; the rest of this doc is standing project background (intent,
-stack, design system, constraints) and still applies.
+Last updated: 2026-07-11 (Spotlight Arena re-skin session)
+Current checkpoint: see "Session Handoff 2026-07-11 — Leaderboard Spotlight
+Arena re-skin DEPLOYED" below; the rest of this doc is standing project
+background (intent, stack, design system, constraints) and still applies.
+
+## Session Handoff 2026-07-11 — Leaderboard Spotlight Arena re-skin DEPLOYED
+
+### Completed (this session)
+- **DEPLOYED 2026-07-11**: user approved ("deploy"); master pushed through
+  `7af637e`, production serving 200. Visual re-skin only — all phase-2 data
+  features (movement/sparklines/streaks) untouched and working.
+- **Design source of truth:** `design-mockups/leaderboard-round5/spotlight-arena.html`
+  (user-approved after mockup rounds 2-5; round-5 combines round-2
+  option-3-arena's masthead with round-3 arena-b-spotlight's dark theme +
+  gold/silver/bronze medal podium). Reference screenshot:
+  `.superpowers/sdd/shots/r5v2-spotlight-arena.png`.
+- **Parity contract:** `docs/redesign/leaderboard-spotlight-arena-goal.md` —
+  user mandated a 1:1 screenshot-verify loop: Codex (gpt-5.6-luna) implements,
+  fresh opus reviewers diff implementation screenshots vs the reference until
+  EXACT. Took 4 rounds (23 defects total) to PASS. Commits: 01c1c69 (re-skin),
+  2d60fcd, 5fcbcf9, 8b4d5e3, 6613b5c (parity rounds), 7af637e (podium numeral
+  top-clipping fix, `pt-[0.14em]` on the numeral div).
+- **Sanctioned deviations from mockup:** portal shell around the page;
+  functional period/metric controls in the top strip (restyled) instead of the
+  mockup's static "JULY 2026 · LIVE / THEME".
+- Verification setup that works: local dev on :3000, signed-in Playwright
+  session (user logs into the automation browser window), dark mode via
+  `localStorage['3c-theme']='dark'`, 8-rep display mock via page.route on
+  `**/api/portal/leaderboard**` using REAL field names (salesRepName,
+  totalPoints, totalSales, movement, spark, streakDays) and reusing the real
+  `currentUser.salesRepId` for the You row. Chase fetches limit=100.
+
+### Open items (carried forward)
+- Bonus points still excluded from scoring pending client sign-off.
+- Client still owes carrier→field mapping (sales proof).
+- Light mode exists and follows the portal theme toggle; only dark was
+  1:1-verified. If the client lives in light mode, run one verify round on it.
 
 ## Session Handoff 2026-07-11 — Leaderboard Phase 2 (rank history) DEPLOYED
 
