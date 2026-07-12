@@ -455,8 +455,14 @@ export function MobileThread({
                   </div>
                 )}
                 <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
-                  {!isOwn && isFirstOfGroup && (
-                    <div className="mb-1 flex flex-wrap items-center gap-2 pl-9 pr-1">
+                  {/* Own-message headers are hidden by design, except the
+                      developer identity — it shows on the author's own phone too. */}
+                  {(!isOwn || isDeveloperAuthor(message.authorId)) && isFirstOfGroup && (
+                    <div
+                      className={`mb-1 flex flex-wrap items-center gap-2 ${
+                        isOwn ? 'justify-end pr-1' : 'pl-9 pr-1'
+                      }`}
+                    >
                       {isDeveloperAuthor(message.authorId) ? (
                         <>
                           <span className="text-xs font-semibold chat-dev-name">
