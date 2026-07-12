@@ -1464,3 +1464,83 @@ button:focus-visible {
 .btn-gradient-animated:hover {
   background-position: right center;
 }
+
+/* Animated developer identity styling */
+@keyframes chat-dev-rainbow {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+.chat-dev-name {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #ff2d2d 0%,
+    #ff9a00 14.285%,
+    #f5c400 28.57%,
+    #2dff57 42.855%,
+    #00cfff 57.14%,
+    #7a5cff 71.425%,
+    #ff2dce 85.71%,
+    #ff2d2d 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: chat-dev-rainbow 3s linear infinite;
+}
+
+.chat-dev-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  color: transparent;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      #ff2d2d 0%,
+      #ff9a00 14.285%,
+      #f5c400 28.57%,
+      #2dff57 42.855%,
+      #00cfff 57.14%,
+      #7a5cff 71.425%,
+      #ff2dce 85.71%,
+      #ff2d2d 100%
+    ),
+    linear-gradient(rgba(14, 38, 71, 0.08), rgba(14, 38, 71, 0.08)),
+    repeating-linear-gradient(
+      90deg,
+      #ff2d2d 0%,
+      #ff9a00 14.285%,
+      #f5c400 28.57%,
+      #2dff57 42.855%,
+      #00cfff 57.14%,
+      #7a5cff 71.425%,
+      #ff2dce 85.71%,
+      #ff2d2d 100%
+    );
+  background-size: 200% auto, auto, 200% auto;
+  background-position: 0% 50%, 0 0, 0% 50%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text, padding-box, border-box;
+  background-clip: text, padding-box, border-box;
+  animation: chat-dev-rainbow 3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-dev-name,
+  .chat-dev-badge {
+    animation: none;
+  }
+}

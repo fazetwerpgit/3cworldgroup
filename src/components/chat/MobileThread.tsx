@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
-import { getAuthorColor } from '@/lib/chat/authorColor';
+import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
@@ -457,17 +457,26 @@ export function MobileThread({
                 <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
                   {!isOwn && isFirstOfGroup && (
                     <div className="mb-1 flex flex-wrap items-center gap-2 pl-9 pr-1">
-                      <span
-                        style={
-                          {
-                            '--an': getAuthorColor(message.authorId).name,
-                            '--an-dark': getAuthorColor(message.authorId).nameDark,
-                          } as CSSProperties
-                        }
-                        className="text-xs font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
-                      >
-                        {message.authorName}
-                      </span>
+                      {isDeveloperAuthor(message.authorId) ? (
+                        <>
+                          <span className="text-xs font-semibold chat-dev-name">
+                            {message.authorName}
+                          </span>
+                          <span className="chat-dev-badge">DEV</span>
+                        </>
+                      ) : (
+                        <span
+                          style={
+                            {
+                              '--an': getAuthorColor(message.authorId).name,
+                              '--an-dark': getAuthorColor(message.authorId).nameDark,
+                            } as CSSProperties
+                          }
+                          className="text-xs font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
+                        >
+                          {message.authorName}
+                        </span>
+                      )}
                       {message.authorRole && (
                         <Badge variant="secondary" className="text-[10px]">
                           {message.authorRole.replace('_', ' ')}

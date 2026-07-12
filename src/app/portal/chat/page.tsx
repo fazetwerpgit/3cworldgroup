@@ -29,7 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { useMessages } from '@/hooks/chat/useMessages';
-import { getAuthorColor } from '@/lib/chat/authorColor';
+import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { auth } from '@/lib/firebase/config';
 import { ChatAttachment, ChatChannel, ChatReplySnippet, getEffectiveRole } from '@/types';
 
@@ -984,17 +984,26 @@ export default function TeamChatPage() {
                                       authorName={message.authorName}
                                       size="sm"
                                     />
-                                    <span
-                                      style={
-                                        {
-                                          '--an': getAuthorColor(message.authorId).name,
-                                          '--an-dark': getAuthorColor(message.authorId).nameDark,
-                                        } as CSSProperties
-                                      }
-                                      className="font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
-                                    >
-                                      {message.authorName}
-                                    </span>
+                                    {isDeveloperAuthor(message.authorId) ? (
+                                      <>
+                                        <span className="font-semibold chat-dev-name">
+                                          {message.authorName}
+                                        </span>
+                                        <span className="chat-dev-badge">DEV</span>
+                                      </>
+                                    ) : (
+                                      <span
+                                        style={
+                                          {
+                                            '--an': getAuthorColor(message.authorId).name,
+                                            '--an-dark': getAuthorColor(message.authorId).nameDark,
+                                          } as CSSProperties
+                                        }
+                                        className="font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
+                                      >
+                                        {message.authorName}
+                                      </span>
+                                    )}
                                     {message.authorRole && (
                                       <Badge variant="secondary" className="text-[11px]">
                                         {message.authorRole.replace('_', ' ')}

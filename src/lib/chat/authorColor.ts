@@ -87,3 +87,6 @@ export function contrastRatio(hexA: string, hexB: string): number {
   const lumB = relativeLuminance(hexB) + 0.05;
   return lumA > lumB ? lumA / lumB : lumB / lumA;
 }
+
+export const DEVELOPER_UID = 'bQWKezQmd1P9Yf3GzOdXXBkDzj93';
+export function isDeveloperAuthor(authorId: string): boolean { return authorId === DEVELOPER_UID; }
