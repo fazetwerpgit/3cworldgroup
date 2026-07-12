@@ -1544,18 +1544,12 @@ button:focus-visible {
     #ff2d2d 100%
   );
   background-size: 200% auto;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
+  /* composite inside the shorthand — a separate mask-composite longhand gets
+     dropped/reordered by LightningCSS during the build */
+  mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0);
   animation: chat-dev-rainbow 3s linear infinite;
   pointer-events: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .chat-dev-name,
-  .chat-dev-badge,
-  .chat-dev-badge::before {
-    animation: none;
-  }
-}
+/* No prefers-reduced-motion fallback on purpose: the animation IS the feature,
+   it is one name-sized element, and the owner's OS reports reduced motion. */
