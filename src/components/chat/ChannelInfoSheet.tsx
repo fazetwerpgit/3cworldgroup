@@ -306,7 +306,7 @@ export function ChannelInfoSheet({
           }
         }}
       >
-        <SheetHeader className="border-b border-slate-200 dark:border-border p-4">
+        <SheetHeader className="border-b border-slate-200 dark:border-border p-4 pr-14">
           <div className="flex items-center gap-2">
             <button
               type="button"
