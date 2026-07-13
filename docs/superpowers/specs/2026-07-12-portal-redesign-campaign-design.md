@@ -21,6 +21,17 @@ design language and hard constraints — this doc holds the campaign process).
 4. **Deploy gate:** push = production deploy. Nothing is pushed until the user
    says "deploy". No page starts until the previous one is deployed or parked.
 
+## Picks so far (user-approved mockups)
+
+- Dashboard: option-3 "The Line" — IMPLEMENTED locally (commit 05cb166,
+  parity-verified PASS), deploy PARKED by user 2026-07-13. Not pushed.
+- Sales: option-3 "The Line: Sales" (2026-07-13) — picked, NOT implemented
+  yet. Approvals page folds into the Sales pending view (user-approved
+  merge, old route must keep working). Goal contract still to be written
+  at implementation time.
+- User direction: run ALL pages' mockup rounds first; implement when
+  ready to deploy.
+
 ## Page order (most-used first)
 
 1. Dashboard (`/portal/dashboard`) — IN PROGRESS
