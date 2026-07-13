@@ -95,7 +95,54 @@ adm-opt{1,2,3}-{people,person,catalog,settings}-1440.png +
 adm-opt{1,2,3}-390.png at repo root (my verify only).
 ADMIN PICK MADE 2026-07-13: option-1 The Roster ALL FOUR VIEWS
 (admin-round1/option-1-the-roster.html) — user liked it "all the way
-through", no mix. ALL MOCKUP ROUNDS NOW DONE →
+through", no mix. Committed 106501b. ALL MOCKUP ROUNDS NOW DONE.
+IMPLEMENTATION PHASE STARTED 2026-07-13: user confirmed SHELL (The
+Rail, shell-round1/option-1-the-rail.html) implements FIRST.
+Extraction DONE. GOAL CONTRACT WRITTEN:
+docs/redesign/shell-the-rail-goal.md — key calls baked in: swap
+internals of PortalHeader/PortalSidebar/MobileBottomNav ONLY (zero
+page edits, ~19 direct mounts stay); one nav config feeds sidebar +
+sheet + CommandPalette; left drawer DELETED → 5-slot bottom bar
+(Dashboard/Sales/Chat/Leaderboard/More) + 83vh sheet; TRANSITIONAL:
+forms stay 5 links until Forms hub ships, Pending Approvals link
+stays until Sales pending view ships, bottom slot 4 = Leaderboard
+until Forms hub; real /logo.png; no fake badges; rail collapse
+persisted 3c-rail-collapsed; body data-hooks + chat-thread hiding
+must keep working. Round 1: Codex implemented (5 files:
+PortalHeader/PortalSidebar/MobileBottomNav/CommandPalette/globals.css,
+all gates PASS, zero page edits, nav config = portalNavGroups exported
+from PortalSidebar). Opus reviewer round 1 found 6 defects + 2
+borderline: (1) bottom bar dumped whole first nav group + More
+offscreen — must be exactly Dash/Sales/Chat/Board/More; (2) chunky OS
+scrollbar on rail (worst collapsed); (3) footer overlaps scrolled nav;
+(4) collapsed icons off-center; (5) brand title must be '3C World
+Group / Employee Portal'; (6) bell must be unboxed icon; (7) search
+placement vs mockup; (8) active lime rail 6px top/bottom inset.
+Sheet = fully compliant. Codex fixed all 8 (gates PASS); I removed
+leftover demo subtitle "Spotlight Arena · shell preview" from header.
+Round-2 Opus review = FALSE FAIL: 2-day-old dev server served stale
+globals.css (fixes were in file but not rendered; hard reload no help
+— had to kill node + fresh npm run dev; gotcha saved to memory
+project-stale-dev-server-css). After restart all fixes verified live
+via computed styles. I also fixed mobile brand truncation ("3C WORLD
+GROUP / E…" → wraps 2 lines, white-space:normal in the 430px media
+block). Round-3: 7/8 PASS, one left (footer translucent + didn't
+cover rail bottom) → fixed (full-bleed left/right/bottom:0, solid
+rgb(3,9,22), hairline inset 13px via ::before). Round-4 Opus verdict:
+PASS, zero defects, no regressions. Final gates ALL PASS after my CSS
+edits. SHELL COMMITTED 7438d7e (local only, NOT pushed).
+WAITING: user says "deploy" → push (push = prod). Dev server on
+:3000 = my bg task (restarted fresh 2026-07-13).
+NEXT PAGE after shell deploys (or parks): user picks — suggest
+Dashboard next since it's already implemented (05cb166) and now has
+its correct shell; then Forms hub (which flips nav to single Forms
+link + bottom-bar slot 4 per transitional notes in
+shell-the-rail-goal.md).
+NOTE user asked mid-run if reviewer should be Fable ("if i remember
+correctly") — corrected: standing rule = reviewers on Opus, never
+Fable; user did not push back.
+Per-page gate applies to every page after: goal contract → Codex
+implements → Opus 1:1 verify → gates → user says "deploy" → push. →
 implementation phase per page (goal contract → Codex implements →
 Opus 1:1 verify → gates → user says "deploy" → push).
 
