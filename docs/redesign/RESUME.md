@@ -9,6 +9,24 @@ started, implementation done, deploy — not just at session end).
 
 ## NEXT ACTION
 
+RESOURCES PICK MADE 2026-07-13: option-3 The Line: Resources
+(design-mockups/resources-round1/option-3-the-line-resources.html) —
+hub + University toggle + Rep/Admin pay switch. Fix during verify:
+mobile role pill overlapped header brand in all 3 → top:62px left:9px.
+NOW: MEMBER PAGES round in flight (settings incl. report-a-bug,
+onboarding checklist, signup). Step 1: Codex read-only inventory of
+those pages → step 2: brief + 3 mockups in
+design-mockups/member-round1/ → screenshot 1440+390 (mobile
+viewport-only, scrollTo(0,0), check scrollWidth) → self-critique →
+send ATTACH batches → pick → commit. Bake into brief: plain numbers
+(no leading zeros), numeral top-aligned + paint-fix padding
+(.25em .13em 0 0 / -.25em -.13em 0 0, lh .78, mobile padding-right:0),
+mobile h1 clamp(36px,10.5vw,54px), view/role pills top:72px right
+(desktop) / 62px (mobile) with role pill left at 62px on mobile,
+no 'undefined', segmented picker pattern where choices exist.
+
+## Older context
+
 Calls HYBRID APPROVED by user 2026-07-13
 (design-mockups/calls-round2/hybrid-the-line-calls.html). Fixes applied
 during verify: weekday case-mismatch ("UNDEFINED" everywhere), card clock
@@ -82,7 +100,18 @@ Picks so far (all "The Line" family — dark Spotlight Arena):
 - Forms: The Line: Forms APPROVED 2026-07-13 (forms-round2/
   the-line-forms-final.html — hub + sectioned fill + segmented picker),
   not implemented.
-- Sidebar + shell: IN PROGRESS (mockup round).
+- Sidebar + shell: option-1 The Rail PICKED 2026-07-13 (shell-round1/
+  option-1-the-rail.html; commit 0521283), not implemented.
+- Resources: USER APPROVED hub merge 2026-07-13 (Links + Shorts + Pay
+  Structure in one Resources hub; University stays its own page with a
+  doorway card on the hub; /portal/shorts already just redirects to a
+  University tab). Codex building 3 mockups in
+  design-mockups/resources-round1/ (option-1-field-kit,
+  option-2-the-stacks, option-3-the-line-resources), each = hub view +
+  University view toggle + Rep/Admin switch for the Pay section.
+  Remaining: screenshot 1440+390 (mobile shots viewport-only) →
+  self-critique → send as ATTACH batches → pick → commit. Then: Member
+  pages (settings, onboarding, signup).
 - SCOPE RULING (user, 2026-07-13): EVERY portal page gets the redesign,
   including the sidebar/nav shell itself, form-options, chat-channels,
   user management, email-templates — everything. Full inventory in the
