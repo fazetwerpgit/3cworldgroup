@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3C World Group / The Line / Forms</title>
+  <style>
+    :root{--stage:#030916;--panel:#0a1f44;--ink:#e7edf4;--muted:#9caabd;--lime:#a3e635;--line:rgba(231,237,244,.15);--soft:rgba(231,237,244,.08);--metal:linear-gradient(180deg,#fff 0%,#dbe4ed 38%,#7f8c9b 80%,#f5f7f8 100%);--amber:#efc46f}
+    *{box-sizing:border-box}
+    html{background:var(--stage);color-scheme:dark}
+    body{min-width:320px;margin:0;overflow-x:hidden;background:radial-gradient(circle at 50% 0%,rgba(163,230,53,.09),transparent 24%),radial-gradient(circle at 18% 53%,rgba(21,60,116,.17),transparent 36%),var(--stage);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:56px 56px;mask-image:linear-gradient(to bottom,black,transparent 78%)}
+    button,a,input,select{font:inherit}
+    button{cursor:pointer}
+    .shell{position:relative;z-index:1;width:min(1180px,100%);margin:auto;padding:27px clamp(13px,4vw,58px) 42px}
+    .view-switch{position:fixed;z-index:30;top:72px;right:14px;display:flex;gap:2px;max-width:calc(100vw - 28px);padding:3px;border:1px solid var(--line);border-radius:99px;background:rgba(3,9,22,.94)}
+    .view-switch button{border:0;border-radius:99px;padding:7px 10px;color:var(--muted);background:transparent;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+    .view-switch button[aria-selected=true]{background:var(--lime);color:var(--panel)}
+    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+    .mast{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--lime);padding:6px 0 13px}
+    .mark{font-size:11px;font-weight:900;letter-spacing:.2em}
+    .mark:before{content:"";display:inline-block;width:11px;height:11px;margin-right:8px;background:var(--lime);vertical-align:-1px;box-shadow:0 0 18px rgba(163,230,53,.35)}
+    .mast-meta{color:var(--muted);font:10px ui-monospace,Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}
+    .command{padding:43px 0 24px;border-bottom:1px solid var(--line)}
+    .command-top{display:grid;grid-template-columns:minmax(0,1fr) 170px;align-items:start;gap:28px}
+    .eyebrow{margin:0;color:var(--muted);font:800 10px ui-monospace,Consolas,monospace;letter-spacing:.18em;text-transform:uppercase}
+    .command h1{max-width:740px;margin:13px 0 11px;font-size:clamp(45px,7.8vw,99px);font-weight:950;line-height:.82;letter-spacing:-.1em;text-transform:uppercase}
+    .command h1 span{color:var(--lime)}
+    .context{max-width:610px;margin:0;color:var(--muted);font-size:14px;line-height:1.45}
+    .hero-number{padding-top:31px;text-align:right}
+    .display{display:block;color:transparent;background:var(--metal);-webkit-background-clip:text;background-clip:text;font:900 clamp(70px,9vw,120px)/.78 ui-monospace,Consolas,monospace;letter-spacing:-.13em;padding:.25em .13em 0 0;margin:-.25em -.13em 0 0}
+    .hero-number small{display:block;margin-top:14px;color:var(--muted);font:10px ui-monospace,Consolas,monospace;letter-spacing:.12em;line-height:1.35;text-transform:uppercase}
+    .signal-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:27px;border:1px solid var(--line);background:var(--line)}
+    .signal{min-height:82px;padding:13px 15px;background:rgba(10,31,68,.78)}
+    .signal-label{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}
+    .signal-number{margin-top:12px;line-height:0}
+    .signal-value{display:block;color:transparent;background:var(--metal);-webkit-background-clip:text;background-clip:text;font:900 23px/.8 ui-monospace,Consolas,monospace;letter-spacing:-.08em;padding:.25em .13em 0 0;margin:-.25em -.13em 0 0}
+    .signal-note{display:block;margin-top:10px;color:var(--muted);font:9px ui-monospace,Consolas,monospace}
+    .line-list{margin-top:29px}
+    .section-head{display:flex;align-items:end;justify-content:space-between;gap:15px;border-bottom:1px solid var(--lime);padding-bottom:11px}
+    .section-head h2{margin:0;font-size:23px;letter-spacing:-.06em;text-transform:uppercase}
+    .section-head p{margin:0;color:var(--muted);font:9px ui-monospace,Consolas,monospace;letter-spacing:.12em;text-align:right;text-transform:uppercase}
+    .line-row{display:grid;grid-template-columns:42px 26px minmax(0,1fr) minmax(145px,.55fr) auto 17px;gap:12px;align-items:center;min-height:77px;border-bottom:1px solid var(--soft);transition:background 180ms ease-out}
+    .line-row:hover{background:rgba(163,230,53,.06)}
+    .line-number{display:grid;place-items:center;width:29px;height:29px;border:1px solid var(--lime);border-radius:50%;color:var(--lime);font:10px ui-monospace,Consolas,monospace;font-weight:900}
+    .icon{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+    .line-icon{color:var(--lime)}
+    .line-copy{min-width:0}
+    .line-copy strong{display:block;font-size:14px;font-weight:900}
+    .line-copy span{display:block;margin-top:4px;color:var(--muted);font:9px ui-monospace,Consolas,monospace;line-height:1.35}
+    .line-audience{color:var(--muted);font:9px ui-monospace,Consolas,monospace;line-height:1.4;text-transform:uppercase}
+    .line-audience b{display:block;margin-bottom:4px;color:var(--ink);font:800 10px system-ui,-apple-system,"Segoe UI",sans-serif;text-transform:none}
+    .line-action{border:1px solid var(--lime);border-radius:99px;padding:8px 10px;background:transparent;color:var(--lime);font-size:9px;font-weight:950;letter-spacing:.11em;text-transform:uppercase;white-space:nowrap}
+    .line-action:hover{background:var(--lime);color:var(--panel)}
+    .chevron{width:15px;height:15px;color:var(--muted)}
+    .footer{display:flex;justify-content:space-between;gap:14px;margin-top:25px;padding-top:13px;border-top:1px solid var(--line);color:var(--muted);font:9px ui-monospace,Consolas,monospace;line-height:1.5}
+    .is-hidden{display:none!important}
+    .fill{margin-top:29px}
+    .fill-head{display:flex;align-items:end;justify-content:space-between;gap:18px;border-bottom:1px solid var(--lime);padding-bottom:12px}
+    .fill-head h2{margin:12px 0 0;font-size:34px;line-height:.88;letter-spacing:-.08em;text-transform:uppercase}
+    .fill-head p{max-width:220px;margin:0;color:var(--muted);font:9px ui-monospace,Consolas,monospace;line-height:1.45;text-align:right;text-transform:uppercase}
+    .back-link{border:0;padding:0;background:transparent;color:var(--lime);font:900 9px ui-monospace,Consolas,monospace;letter-spacing:.11em;text-transform:uppercase}
+    .fill-body{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:29px;padding-top:23px}
+    .form-section{border-top:1px solid var(--line);padding-top:15px}
+    .form-section+.form-section{margin-top:26px}
+    .section-label{display:flex;align-items:baseline;gap:10px;margin-bottom:15px}
+    .section-label .eyebrow{color:var(--ink);letter-spacing:.14em}
+    .section-index{color:var(--lime);font:900 10px ui-monospace,Consolas,monospace;letter-spacing:.08em}
+    .identity-line{margin:-2px 0 17px;color:var(--muted);font:10px ui-monospace,Consolas,monospace;letter-spacing:.04em}
+    .identity-line strong{color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12px}
+    .identity-line span{color:var(--lime);padding:0 4px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 15px}
+    .field{min-width:0}
+    .field label,.choice-label{display:block;margin-bottom:7px;color:var(--muted);font:800 9px ui-monospace,Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}
+    .req{color:var(--lime)}
+    .field input,.field select{width:100%;min-height:42px;border:1px solid var(--line);border-radius:0;padding:10px 11px;background:rgba(10,31,68,.76);color:var(--ink);font-size:13px}
+    .field input:hover,.field select:hover{border-color:rgba(163,230,53,.65)}
+    .field.full{grid-column:1/-1}
+    .choice-label{margin-bottom:10px;color:var(--ink)}
+    .choice-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+    .choice-button,.period-button{min-width:0;border:1px solid var(--line);border-radius:3px;padding:11px 8px;background:rgba(10,31,68,.76);color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;transition:background 180ms ease-out,border-color 180ms ease-out,color 180ms ease-out}
+    .choice-button:hover,.period-button:hover{border-color:rgba(163,230,53,.72);color:var(--ink)}
+    .choice-button[aria-pressed=true],.period-button[aria-pressed=true]{border-color:var(--lime);background:var(--lime);color:var(--panel)}
+    .choice-button:focus-visible,.period-button:focus-visible{outline:2px solid var(--lime);outline-offset:3px;box-shadow:0 0 0 4px rgba(163,230,53,.12)}
+    .choice-subrow{display:grid;grid-template-columns:repeat(2,minmax(0,160px));gap:6px;margin-top:7px;padding-left:17px;border-left:1px solid var(--lime)}
+    .period-button{padding:8px 9px;font-size:9px}
+    .choice-summary{margin:8px 0 0;color:var(--muted);font:9px ui-monospace,Consolas,monospace}
+    .drop-zone{position:relative;display:grid;place-items:center;min-height:128px;border:1px dashed rgba(163,230,53,.55);background:repeating-linear-gradient(135deg,rgba(163,230,53,.035) 0 2px,transparent 2px 8px);color:var(--muted);text-align:center}
+    .drop-zone strong{display:block;color:var(--ink);font-size:12px}
+    .drop-zone span{display:block;margin-top:5px;font:9px ui-monospace,Consolas,monospace}
+    .drop-zone input{position:absolute;inset:0;width:100%;height:100%;cursor:pointer;opacity:0}
+    .file-name{color:var(--lime)!important}
+    .proof-hint{margin:9px 0 0;color:var(--muted);font:9px ui-monospace,Consolas,monospace;line-height:1.4}
+    .proof-hint strong{color:var(--ink);font-weight:800}
+    .form-rail{border-left:1px solid var(--line);padding-left:17px;color:var(--muted);font:9px ui-monospace,Consolas,monospace;line-height:1.5;text-transform:uppercase}
+    .form-rail span{display:block;border-top:1px solid var(--soft);padding-top:10px}
+    .form-rail span:first-child{border-top:0;padding-top:0}
+    .form-rail strong{display:block;margin:7px 0 19px;color:var(--ink);font:800 12px system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.25;text-transform:none}
+    .form-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:25px;border-top:1px solid var(--line);padding-top:16px}
+    .primary{border:1px solid var(--lime);border-radius:99px;padding:10px 14px;background:var(--lime);color:var(--panel);font-size:9px;font-weight:950;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+    .primary:hover{background:#c4f45d}
+    .demo-control{border:0;background:transparent;color:var(--muted);font:9px ui-monospace,Consolas,monospace;letter-spacing:.08em;text-decoration:underline;text-underline-offset:3px;text-transform:uppercase}
+    .demo-control:hover{color:var(--lime)}
+    .success{display:flex;align-items:flex-start;gap:12px;margin-top:21px;border-left:2px solid var(--lime);padding:13px 15px;background:rgba(163,230,53,.07)}
+    .success-mark{display:grid;place-items:center;flex:none;width:22px;height:22px;border:1px solid var(--lime);border-radius:50%;color:var(--lime);font:12px ui-monospace,Consolas,monospace}
+    .success strong{display:block;font-size:12px}
+    .success p{margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.4}
+    @keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+    .command,.signal-strip,.line-list,.fill{animation:rise 300ms ease-out both}
+    @media(max-width:800px){
+      .command-top{display:block}
+      .hero-number{margin-top:28px;text-align:left}
+      .command h1{font-size:clamp(36px,10.5vw,54px)}
+      .signal-strip{grid-template-columns:1fr 1fr}
+      .signal:last-child{grid-column:1/-1}
+      .line-row{grid-template-columns:33px 22px minmax(0,1fr) 15px;gap:8px;min-height:73px;padding:8px 0}
+      .line-audience{grid-column:3;grid-row:2}
+      .line-action{grid-column:3;grid-row:3;justify-self:start}
+      .chevron{grid-column:4;grid-row:1}
+      .fill-body{grid-template-columns:1fr;gap:22px}
+      .form-rail{border-top:1px solid var(--line);border-left:0;padding:15px 0 0}
+      .fill-head{align-items:start}
+      .fill-head p{max-width:175px}
+    }
+    @media(max-width:460px){
+      .shell{padding-inline:12px}
+      .view-switch{top:62px;right:9px;max-width:calc(100vw - 18px)}
+      .view-switch button{padding:7px 8px;font-size:8px}
+      .mast{padding-right:108px}
+      .mark{font-size:9px;line-height:1.25}
+      .mast-meta{display:none}
+      .command{padding-top:35px}
+      .context{font-size:12px}
+      .hero-number .display{font-size:103px}
+      .signal{min-height:88px;padding:12px}
+      .signal-value{font-size:20px}
+      .signal-label{font-size:8px}
+      .signal-note{font-size:8px}
+      .section-head{align-items:start}
+      .section-head p{max-width:125px;line-height:1.35}
+      .line-row{grid-template-columns:27px 20px minmax(0,1fr) 13px;gap:7px}
+      .line-number{width:25px;height:25px;font-size:9px}
+      .line-copy strong{font-size:12px}
+      .line-copy span,.line-audience{font-size:8px}
+      .line-action{font-size:8px;padding:7px 8px}
+      .chevron{width:13px;height:13px}
+      .fill-head{display:block}
+      .fill-head p{margin-top:10px;text-align:left}
+      .fill-head h2{font-size:30px}
+      .form-grid{grid-template-columns:1fr}
+      .field.full{grid-column:auto}
+      .choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+      .choice-button{padding:10px 6px;font-size:9px}
+      .choice-subrow{grid-template-columns:repeat(2,minmax(0,1fr));padding-left:12px}
+      .period-button{padding-inline:5px;font-size:8px}
+      .form-actions{gap:8px}
+      .demo-control{font-size:8px;letter-spacing:.05em}
+      .primary{padding:10px 10px;font-size:8px;letter-spacing:.08em}
+      .footer{display:block}
+      .footer span{display:block}
+      .footer span+span{margin-top:8px}
+    }
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+    @media(max-width:460px){.display,.signal-value{padding-right:0;margin-right:0}}
+  </style>
+</head>
+<body>
+  <nav class="view-switch" aria-label="Forms preview views"><button type="button" data-view="home" aria-selected="true">Forms home</button><button type="button" data-view="fill" aria-selected="false">Form fill</button></nav>
+  <main class="shell" id="app">
+    <header class="mast"><span class="mark">3C WORLD GROUP / THE LINE</span><span class="mast-meta">Forms broadcast · America/Chicago</span></header>
+    <section class="command" aria-labelledby="command-title"><div class="command-top"><div><p class="eyebrow">03 / The Line / forms broadcast</p><h1 id="command-title"><span>5 forms</span> on the board.</h1><p class="context">Five routes, one clean signal. Open the form that matches the work, keep the language plain, and let the request move to the right owner.</p></div><div class="hero-number"><strong class="display">5</strong><small>forms available<br>the line is open</small></div></div><div class="signal-strip" aria-label="Forms summary"><div class="signal"><span class="signal-label">Forms available</span><div class="signal-number"><strong class="signal-value">5</strong></div><span class="signal-note">All lanes are live</span></div><div class="signal"><span class="signal-label">Guided routes</span><div class="signal-number"><strong class="signal-value">4</strong></div><span class="signal-note">Payroll includes proof</span></div><div class="signal"><span class="signal-label">Manager only</span><div class="signal-number"><strong class="signal-value">1</strong></div><span class="signal-note">Final interview + signature</span></div></div></section>
+    <section id="home-view" class="line-list" aria-labelledby="line-title"><div class="section-head"><div><p class="eyebrow">Priority ordered / next request</p><h2 id="line-title">Choose your lane</h2></div><p>Five forms<br>ready to open</p></div><div class="rows"><article class="line-row"><span class="line-number">01</span><svg class="icon line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg><div class="line-copy"><strong>Fiber Report</strong><span>Log door-knocking + fiber sales for a pack.</span></div><div class="line-audience"><b>Field reps</b>sales proof / activity</div><button class="line-action" type="button" data-open="Fiber Report">Open form</button><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></article><article class="line-row"><span class="line-number">02</span><svg class="icon line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM7 9h10M7 13h6"/></svg><div class="line-copy"><strong>Expedite Order</strong><span>Request a faster customer install when timing matters.</span></div><div class="line-audience"><b>Reps + managers</b>install priority</div><button class="line-action" type="button" data-open="Expedite Order">Open form</button><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></article><article class="line-row"><span class="line-number">03</span><svg class="icon line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg><div class="line-copy"><strong>Payroll Dispute</strong><span>Report missing or incorrect pay — attach proof.</span></div><div class="line-audience"><b>All contractors</b>screenshot accepted</div><button class="line-action" type="button" data-open="Payroll Dispute">Open form</button><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></article><article class="line-row"><span class="line-number">04</span><svg class="icon line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><div class="line-copy"><strong>Leads Request</strong><span>Request lead packs or report a territory issue.</span></div><div class="line-audience"><b>Field reps</b>long conditional form</div><button class="line-action" type="button" data-open="Leads Request">Open form</button><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></article><article class="line-row"><span class="line-number">05</span><svg class="icon line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 7v5c0 4.5 3.4 7.8 8 9 4.6-1.2 8-4.5 8-9V7l-8-4Z"/><path d="m9 12 2 2 4-4"/></svg><div class="line-copy"><strong>Manager Interview</strong><span>Complete a final candidate interview with a signature.</span></div><div class="line-audience"><b>Managers only</b>final step / signature</div><button class="line-action" type="button" data-open="Manager Interview">Open form</button><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></article></div><div class="footer"><span>Open the lane. Leave the signal clear.</span><span>Representative fill: Payroll Dispute · static demo data</span></div></section>
+    <section id="fill-view" class="fill is-hidden" aria-labelledby="fill-title"><div class="fill-head"><div><button class="back-link" type="button" data-view="home">← Back to forms</button><h2 id="fill-title">Payroll dispute</h2></div><p>Representative fill / lane 03 of 5<br>Static demo data</p></div><div class="fill-body"><div><form id="payroll-form">
+      <section class="form-section" aria-labelledby="who-title"><div class="section-label"><span class="section-index">01</span><p class="eyebrow" id="who-title">Section 01 / Who you are</p></div><p class="identity-line">Submitting as <strong>Marcus Chen</strong><span>·</span>Field contractor</p><div class="form-grid"><div class="field"><label for="contractor-name"><span class="req">●</span> Contractor name</label><input id="contractor-name" name="contractor-name" autocomplete="name" value="Marcus Chen" required></div><div class="field"><label for="contractor-email"><span class="req">●</span> Contractor email</label><input id="contractor-email" name="contractor-email" type="email" autocomplete="email" value="marcus.chen@example.com" required></div></div></section>
+      <section class="form-section" aria-labelledby="happened-title"><div class="section-label"><span class="section-index">02</span><p class="eyebrow" id="happened-title">Section 02 / What happened</p></div><div class="form-grid"><div class="field full"><div class="choice-group" role="group" aria-labelledby="campaign-label"><p class="choice-label" id="campaign-label">Choose one / Campaign</p><div class="choice-grid"><button class="choice-button" type="button" data-campaign="Fiber" aria-pressed="true">Fiber</button><button class="choice-button" type="button" data-campaign="Mobile" aria-pressed="false">Mobile</button><button class="choice-button" type="button" data-campaign="Internet" aria-pressed="false">Internet</button><button class="choice-button" type="button" data-campaign="TV" aria-pressed="false">TV</button></div><div class="choice-subrow" id="campaign-periods" role="group" aria-label="Fiber campaign periods"></div><p class="choice-summary" id="campaign-summary">Fiber · July 2026 selected</p><input id="campaign" name="campaign" type="hidden" value="Fiber — July 2026"><input id="campaign-period" name="campaign-period" type="hidden" value="July 2026"></div></div><div class="field"><label for="order-type"><span class="req">●</span> Order type</label><select id="order-type" name="order-type" required><option>New fiber sale</option><option>Upgrade</option><option>Reconnect</option></select></div><div class="field"><label for="install-date"><span class="req">●</span> Install date</label><input id="install-date" name="install-date" type="date" value="2026-07-11" required></div></div></section>
+      <section class="form-section" aria-labelledby="proof-title"><div class="section-label"><span class="section-index">03</span><p class="eyebrow" id="proof-title">Section 03 / Proof</p></div><div class="field"><label for="screenshot"><span class="req">●</span> Screenshot or proof</label><label class="drop-zone" for="screenshot"><span><strong>Drop a screenshot or PDF here</strong><span>PNG, JPG, or PDF · 10 MB max</span><span class="file-name" id="file-name">No file selected</span></span><input id="screenshot" name="screenshot" type="file" accept="image/png,image/jpeg,application/pdf" required></label><p class="proof-hint"><strong>Good proof:</strong> order ID, campaign, and pay line visible in one frame.</p></div></section>
+      <div class="form-actions"><button class="demo-control" id="preview-success" type="button">Preview success state</button><button class="primary" type="submit">Submit dispute →</button></div>
+    </form><div class="success is-hidden" id="success-state" role="status"><span class="success-mark">✓</span><div><strong>Dispute received · ticket PAY-2048</strong><p>We’ll review the order proof and reply to Marcus Chen’s email. Typical response: one business day.</p></div></div></div><aside class="form-rail"><span>Route status</span><strong>Ready for payroll review</strong><span>Review note</span><strong>One clear proof frame keeps the handoff moving.</strong><span>Representative fill<br>Payroll Dispute · static demo data</span></aside></div></section>
+  </main>
+  <script>
+    const home=document.getElementById('home-view'),fill=document.getElementById('fill-view'),success=document.getElementById('success-state'),fileInput=document.getElementById('screenshot'),fileName=document.getElementById('file-name');
+    const campaignPeriods={Fiber:['July 2026','June 2026'],Mobile:['July 2026','June 2026'],Internet:['July 2026','May 2026'],TV:['July 2026','June 2026']};
+    const campaignInput=document.getElementById('campaign'),periodInput=document.getElementById('campaign-period'),periods=document.getElementById('campaign-periods'),summary=document.getElementById('campaign-summary');
+    let selectedCampaign='Fiber',selectedPeriod='July 2026';
+    function renderPeriods(){const options=campaignPeriods[selectedCampaign]||[];periods.setAttribute('aria-label',selectedCampaign+' campaign periods');periods.innerHTML=options.map((period,index)=>'<button class="period-button" type="button" data-period="'+period+'" aria-pressed="'+String(index===0)+'">'+period+'</button>').join('');selectedPeriod=options[0]||'';campaignInput.value=selectedCampaign+' — '+selectedPeriod;periodInput.value=selectedPeriod;summary.textContent=selectedCampaign+' · '+selectedPeriod+' selected'}
+    function selectCampaign(campaign){if(!campaignPeriods[campaign])return;selectedCampaign=campaign;document.querySelectorAll('[data-campaign]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.campaign===campaign)));renderPeriods()}
+    function selectPeriod(period){selectedPeriod=period;periodInput.value=period;campaignInput.value=selectedCampaign+' — '+period;summary.textContent=selectedCampaign+' · '+period+' selected';document.querySelectorAll('[data-period]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.period===period)))}
+    function showView(view){const isFill=view==='fill';home.classList.toggle('is-hidden',isFill);fill.classList.toggle('is-hidden',!isFill);document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.view===view)));if(isFill)document.getElementById('contractor-name').focus()}
+    document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));
+    document.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>showView('fill')));
+    document.querySelectorAll('[data-campaign]').forEach(button=>button.addEventListener('click',()=>selectCampaign(button.dataset.campaign)));
+    periods.addEventListener('click',event=>{const button=event.target.closest('[data-period]');if(button)selectPeriod(button.dataset.period)});
+    fileInput.addEventListener('change',()=>{fileName.textContent=fileInput.files&&fileInput.files[0]?fileInput.files[0].name:'No file selected'});
+    function showSuccess(){success.classList.remove('is-hidden');success.scrollIntoView({block:'nearest',behavior:'smooth'})}
+    document.getElementById('preview-success').addEventListener('click',showSuccess);
+    document.getElementById('payroll-form').addEventListener('submit',event=>{event.preventDefault();showSuccess()});
+    renderPeriods();
+  </script>
+</body>
+</html>

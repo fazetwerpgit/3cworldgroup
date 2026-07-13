@@ -47,14 +47,28 @@ design language and hard constraints — this doc holds the campaign process).
 
 ## Page order (most-used first)
 
-1. Dashboard (`/portal/dashboard`) — IN PROGRESS
-2. Sales (list + slide-over detail)
+Scope ruling (user, 2026-07-13): EVERY page in the portal gets the
+redesign — including the sidebar/nav shell itself and all admin
+subpages. Full route inventory below; nothing is skipped.
+
+1. Dashboard (`/portal/dashboard`) — picked, implemented locally
+2. Sales (list + `[id]` detail + `[id]/edit` + `new`; approvals folds in)
 3. Team Chat (mobile is first-class here)
 4. Calls Schedule
-5. Forms (whole folder, one consistent treatment)
-6. Resources (University + Links — merge candidate, propose with mockups)
-7. Operations
-8. Admin (users, settings, review queues — last, patterns proven by then)
+5. Forms (hub + fiber-report, expedite-order, payroll-dispute,
+   leads-request, manager-interview — one consistent treatment)
+6. Sidebar + portal shell (nav, header, mobile nav — frames every page)
+7. Resources (training/University + training/[id] + links — merge
+   candidate; plus shorts, pay-structure)
+8. Member pages: settings (incl. report-a-bug), onboarding (field
+   checklist), signup
+9. Operations/admin work queues: admin/pipeline, admin/recruiting,
+   admin/onboarding, and the five form review queues
+   (fiber-reports, expedite-orders, payroll-disputes, leads-requests,
+   manager-interviews) + bug-reports
+10. Admin management: users list + users/[id] + users/new,
+    chat-channels, form-options, email-templates, admin/university,
+    admin/settings
 
 Leaderboard is DONE (Spotlight Arena, deployed 2026-07-11). Do not touch.
 

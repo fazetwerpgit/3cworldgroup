@@ -28,9 +28,22 @@ paint-fix padding (mobile override padding-right:0). GOTCHA: PowerShell
 Get-Content -Raw + Set-Content corrupts UTF-8 (mojibake) — fixed via
 1252→UTF8 byte round-trip; use [IO.File] with explicit UTF8 for bulk
 edits. Screenshots: forms-opt{1,2,3}-{hub,fill}-{1440,390}.png at repo
-root. WAITING on user pick → commit forms-round1 → next page: RESOURCES
-(University+Links merge — propose merge with mockups, needs user
-approval).
+root. PICK MADE: option-3 The Line: Forms (committed 6317004) with changes:
+(a) counts as plain numbers — NO LEADING ZEROS (new campaign-wide rule:
+masthead numerals and stat counts show 5 not 05), (b) form fill must be
+genuinely better-organized — numbered sections (who you are / what
+happened / proof) + tidy segmented choice-picker pattern (this pattern
+will later fix the messy carrier/plan buttons in the sale form; user
+called current forms 'a jumble'). Round-2 BUILT + verified + SENT
+(design-mockups/forms-round2/the-line-forms-final.html): plain 5s,
+numbered fill sections (who you are / what happened / proof),
+segmented campaign picker with dependent sub-row (the pattern that
+will fix Log a Sale's carrier/plan jumble at Sales implementation).
+Fix during verify: mobile h1 13vw→10.5vw (clipped after 05→5 made the
+line longer). WAITING user confirm → commit forms-round2 + spec scope
+update → next page: SIDEBAR + portal shell (new round 6 per expanded
+scope), then RESOURCES (University+Links merge — propose with mockups,
+needs user approval).
 
 NOTE design rule added: the big metallic count numeral in mastheads is
 top-aligned with the headline (applies to every future page mockup).
@@ -53,8 +66,14 @@ Picks so far (all "The Line" family — dark Spotlight Arena):
 - Calls Schedule: HYBRID picked+approved 2026-07-13 (calls-round2/
   hybrid-the-line-calls.html), not implemented.
 - Forms: IN PROGRESS (mockup round).
-- Remaining after that: Forms → Resources (University+Links merge candidate)
-  → Operations → Admin. Leaderboard is DONE/deployed — never touch.
+- SCOPE RULING (user, 2026-07-13): EVERY portal page gets the redesign,
+  including the sidebar/nav shell itself, form-options, chat-channels,
+  user management, email-templates — everything. Full inventory in the
+  campaign spec §Page order (10 rounds). Remaining after Forms:
+  Sidebar+shell → Resources (University+Links merge candidate; +shorts,
+  pay-structure) → Member pages (settings, onboarding, signup) →
+  Ops/admin queues → Admin management. Leaderboard DONE/deployed — never
+  touch.
 
 ## Key files
 
