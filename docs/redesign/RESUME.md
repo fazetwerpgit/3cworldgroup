@@ -14,11 +14,23 @@ Calls HYBRID APPROVED by user 2026-07-13
 during verify: weekday case-mismatch ("UNDEFINED" everywhere), card clock
 numerals clipped ("10:0" → resized per breakpoint), hero "2" numeral
 ink-chopped by background-clip box (padding/margin paint-area fix +
-line-height .78, top-aligned with headline). Committed. NOW: FORMS mockup
-round (Codex read-only inventory of
-form pages under src/app/portal/ → brief → 3 "The Line"-family mockups →
-screenshot/self-critique → send as files). Forms = one consistent treatment
-for the whole folder, per campaign spec.
+line-height .78, top-aligned with headline). Committed. NOW: FORMS mockup round in flight.
+Inventory done (5 native forms: fiber-report, expedite-order,
+payroll-dispute, leads-request, manager-interview; all share one pattern;
+no forms landing page exists). USER APPROVED adding a Forms home page
+(hub listing all 5) 2026-07-13. 3 mockups BUILT + verified + SENT 2026-07-13 in
+design-mockups/forms-round1/ (option-1-form-desk, option-2-paper-trail,
+option-3-the-line-forms), each = hub view + payroll-dispute fill view
+with a fixed top-right view toggle. Fixes applied during verify: view
+toggle moved below header (was overlapping header meta in all 3), opt-2
+mobile headline overflow (13vw→11vw), 1px mobile overflow from numeral
+paint-fix padding (mobile override padding-right:0). GOTCHA: PowerShell
+Get-Content -Raw + Set-Content corrupts UTF-8 (mojibake) — fixed via
+1252→UTF8 byte round-trip; use [IO.File] with explicit UTF8 for bulk
+edits. Screenshots: forms-opt{1,2,3}-{hub,fill}-{1440,390}.png at repo
+root. WAITING on user pick → commit forms-round1 → next page: RESOURCES
+(University+Links merge — propose merge with mockups, needs user
+approval).
 
 NOTE design rule added: the big metallic count numeral in mastheads is
 top-aligned with the headline (applies to every future page mockup).
