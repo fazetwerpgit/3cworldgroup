@@ -9,10 +9,13 @@ started, implementation done, deploy — not just at session end).
 
 ## NEXT ACTION
 
-Calls Schedule mockup round: Codex inventory → brief → 3 mockups (dark
-"The Line" family) → screenshot/self-critique → send mockups to the user as
-FILES via SendUserFile display:render (localhost links don't work for them)
-→ user picks. Then continue page order below.
+Calls Schedule mockups are BUILT (design-mockups/calls-round1/, 3 options,
+today-first + next-call countdown design fix). Self-critique found 2 defects
+(opt2 clipped 10:00 numeral; opt2+opt3 admin band visible in Rep view) —
+Codex fix round dispatched. Remaining: verify fixes via screenshot → send
+the 3 HTML files to the user via SendUserFile display:render (localhost
+links don't work for them) → user picks → commit + update this file. Then
+next page: Forms mockup round (inventory → brief → 3 mockups).
 
 ## Campaign state (mockups-first, implement later)
 
