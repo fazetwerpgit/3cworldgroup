@@ -70,18 +70,34 @@ option-3-the-line-ops + Onboarding review from option-1-the-desk +
 Pipeline from option-3-the-line-ops. (No hybrid file built yet — build
 one only if needed at implementation; the four source views are the
 contract.) Committed.
-NEXT ACTION: final mockup round — ADMIN MANAGEMENT (users list /
-users/[id] / users/new, chat-channels, form-options, email-templates,
-admin/university, admin/settings). Process: Codex read-only inventory
-→ brief in design-mockups/admin-round1/BRIEF.md (copy hard rules from
-ops-round1/BRIEF.md verbatim, incl. rule 7 scoped utility classes +
-Georgia old-style numeral gotcha) → 3 mockups → screenshot verify (my
-eyes only) → SEND .HTML FILES (never screenshots to user) → pick →
-commit. After that: ALL mockup rounds done → implementation phase
-per page (goal contract → Codex implements → Opus 1:1 verify → gates
-→ user says "deploy" → push). Then final round: ADMIN MANAGEMENT (users
-list/[id]/new, chat-channels, form-options, email-templates,
-admin/university, admin/settings).
+NEXT ACTION: ADMIN MANAGEMENT round IN FLIGHT (final mockup round).
+Inventory DONE 2026-07-13 (Codex read-only): 8 pages, 7 different
+layout patterns; NO text search anywhere; 4 delete-confirm styles
+(email-templates delete = NO confirm); save models inconsistent
+(global fake save on settings — handleSave only sleeps 1s, notif
+toggles + Reset buttons have NO handlers); user detail asks for raw
+Manager ID instead of a named picker; ops role route-allowed on users
+pages but link hidden. Brief WRITTEN:
+design-mockups/admin-round1/BRIEF.md — 4 views per mockup (People =
+users list / Person = detail+new / Catalog = shared list-of-things
+pattern demo=email-templates with adoption strip for chat-channels+
+form-options+university / Settings = honest per-section save + typed
+RESET danger room). Hard rules copied from ops brief + new rule 9 (no
+Georgia for big numerals). 3 mockups BUILT + verified + .HTML FILES
+SENT 2026-07-13 (option-1-the-roster, option-2-the-registry,
+option-3-the-line-admin; 4 views each via [data-view] pill nav). Verify
+clean on all 3: scrollWidth 375 at 390, no undefined/NaN/mojibake, pill
+below brand, delete-confirm strips + typed-RESET + named manager picker
++ adoption strip all present. Minor cosmetic notes (not blockers): opt2
+catalog grid has one empty cell (3 template cards in 2×2); settings
+points min/default/max inputs wrap 2+1 in all options. Screenshots
+adm-opt{1,2,3}-{people,person,catalog,settings}-1440.png +
+adm-opt{1,2,3}-390.png at repo root (my verify only).
+ADMIN PICK MADE 2026-07-13: option-1 The Roster ALL FOUR VIEWS
+(admin-round1/option-1-the-roster.html) — user liked it "all the way
+through", no mix. ALL MOCKUP ROUNDS NOW DONE →
+implementation phase per page (goal contract → Codex implements →
+Opus 1:1 verify → gates → user says "deploy" → push).
 
 ## Older context
 
