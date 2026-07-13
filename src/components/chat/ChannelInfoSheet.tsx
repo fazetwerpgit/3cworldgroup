@@ -294,7 +294,7 @@ export function ChannelInfoSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full gap-0 p-0 sm:max-w-md"
+        className="chat-line-info-sheet w-full gap-0 p-0 sm:max-w-md"
         onEscapeKeyDown={(event) => {
           // While the lightbox is up, let it consume Escape — don't close the sheet.
           if (lightboxOpen) event.preventDefault();
@@ -306,7 +306,7 @@ export function ChannelInfoSheet({
           }
         }}
       >
-        <SheetHeader className="border-b border-slate-200 dark:border-border p-4 pr-14">
+        <SheetHeader className="chat-line-info-header border-b border-slate-200 dark:border-border p-4 pr-14">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -344,7 +344,7 @@ export function ChannelInfoSheet({
               active segment; lime is reserved for primary actions, so the active tab
               stays neutral). */}
           <div className="px-4 pt-3 pb-1">
-            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-muted/60">
+            <div className="chat-line-info-tabs grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-muted/60">
               {(['members', 'pinned', 'media'] as const).map((key) => {
                 const isActive = tab === key;
                 const Icon = key === 'members' ? Users : key === 'pinned' ? Pin : ImageIcon;

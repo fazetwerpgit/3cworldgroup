@@ -87,7 +87,7 @@ export function GifPicker({
       ref={panelRef}
       role="dialog"
       aria-label="Search GIFs"
-      className="portal-motion absolute bottom-full left-0 z-30 mb-2 w-[19rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-black/10 dark:border-border dark:bg-card dark:shadow-black/40"
+      className="chat-line-gif-picker portal-motion absolute bottom-full left-0 z-30 mb-2 w-[19rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-black/10 dark:border-border dark:bg-card dark:shadow-black/40"
     >
       <div className="border-b border-slate-200 p-2.5 dark:border-border">
         <div className="relative">

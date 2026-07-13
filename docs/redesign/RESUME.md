@@ -186,9 +186,73 @@ MoM source exists). SALES COMMITTED a25a438 (local only, NOT pushed —
 includes contract doc + M1 fix). AWAITING USER: check
 localhost:3000/portal/sales, say "deploy" to push (would ship shell
 7438d7e + dashboard numfix 0499338 + sales a25a438 together).
-NEXT PAGE after user OK: Team Chat (per build order), pattern =
-extraction → goal contract (numeral hard rule) → Codex implements →
-Opus 1:1 verify → commit → deploy gate. Remaining build
+TEAM CHAT round IN FLIGHT (started without waiting, per user's
+standing "keep the rounds moving" direction; deploy gate still
+user-only). Extraction DONE (scratchpad logs/codex-chat-extract.log,
+UTF-16). CONTRACT WRITTEN + FINALIZED:
+docs/redesign/chat-the-line-goal.md (Sonnet drafted; my decided calls:
+Rep/Manager pill does NOT ship → static role chip in same pill style;
+managers-channel role predicate NOT expanded; data-chat-thread hook
+preservation is a CRITICAL section; ChatLightbox shared — restyle only).
+Codex round-1 build DONE (session 019f5d7c-4efa-79f2-95bc-e422273bfe9f,
+9 files, all gates PASS). MY round-1 verify found 3 defects → Codex FIX
+ROUND 1 running detached (log scratchpad logs/codex-chat-fix1.log,
+marker CODEX-FIX1-COMPLETE x2): D1 desktop whole-main scrolls (rail/
+masthead scroll away; feed must be sole scroll region); D2 mobile list
+missing horizontal padding (kicker/title/PII flush at x=0); D3 mobile
+pinned band says "No pinned message yet" while desktop shows pinned
+"Photo". GOOD: data-chat-thread hook works (verified: real click →
+'on' + bottom nav hidden), real channels render, metallic title whole,
+scrollWidth 375. Shots: chat-impl-1440{,-top,-scrolltop}.png,
+chat-impl-390-{list,thread}.png. MONITOR GOTCHA: grep markers appear
+in the prompt echo at log top — require count >= 2. After fixes: my
+re-verify → fresh Opus review round → commit local.
+CHAT FIX ROUND 1 DONE: relaunch needed (double quotes in prompt broke
+PS arg passing — pass codex prompts via stdin pipe + '-' arg from now
+on). Codex fixed D2 (mobile padding) + D3 partially; D1 still broken
+after its fix (claimed fixed, never browser-verified) — I fixed it
+directly: .chat-line-page min-height:100% → height:100% (720px block
+keeps height:auto). D3 was MISDIAGNOSED: nothing pinned in channel;
+mobile empty state was CORRECT, desktop band was lying "Photo" via
+fallback — fixed pinnedCopy null case in chat/page.tsx, tsc PASS.
+Verified: main clamps (888/888, scrollTop 0), rail pinned, only feed
+scrolls (feedScrollTop 2792); mobile padding restored; both bands say
+"No pinned message yet". Shots chat-fix1-{1440,390-list,390-thread}.png.
+Opus ROUND 1 verdict: FAIL — 1 blocker (mobile thread header built
+Slack-style: hash+chevron, missing kicker + 9px ellipsis description;
+must match mockup back+kicker+30px title+desc+members) + 6 minors.
+MY RULINGS (contract AMENDED, new sanctioned bullets): role chip →
+lime fill/navy text; chevrons removed, title block = info-sheet
+trigger; avatars keep real photos but initials fallback = lime-outline
+(no per-user colors), own stays lime fill; no persistent add-reaction
+smiley (hover-reveal desktop, actions sheet mobile); composer
+placeholder = mockup "Broadcast an update…"; DEV badge sanctioned.
+CODEX FIX ROUND 2 DONE (all 6 fixes; gates PASS). My re-verify PASS
+both breakpoints (chat-fix2-1440.png, chat-fix2-390-thread.png);
+data-chat-thread hook re-verified with real clicks (on→nav hidden,
+back→cleared). Opus ROUND 2 verdict: FAIL on ONE low item only —
+desktop rail kicker dropped mockup range format ("/ 02" vs "01–02");
+I fixed directly (page.tsx kicker → 01–NN), verified live, tsc+
+eslint+build+diff-check ALL PASS. All other 10 checklist items PASS
+1:1. CHAT COMMITTED LOCAL (this commit) — NOT pushed; deploy word
+still pending from user for shell+dashboard+sales+chat together.
+NEXT: CALLS implementation round (approved mockup
+design-mockups/calls-round2/hybrid-the-line-calls.html) — detached
+Codex extraction → Sonnet contract draft (bake in numeral rule +
+font-weight rule + no-leading-zeros) → my finalization → Codex
+implement → verify loop.
+USER FEEDBACK on Sales (2026-07-13): "15 sales on the board" looked
+un-level/funky. ROOT CAUSE (systemic!): Tailwind preflight resets
+h1-h6 font-weight to 400; mockups rely on browser-default bold — thin
+Trebuchet at -.1em tracking reads wobbly. Fixed font-weight:700 on
+.sales-line h1/h2 + sheet h2, verified 700 computed + screenshot,
+committed a07240c. NEW CAMPAIGN HARD RULE for all remaining pages
+(add to every contract): DECLARE font-weight EXPLICITLY on every
+display heading/element-selector rule ported from a mockup; verify
+computed weight, never trust h1/h2 defaults under preflight. NOTE:
+a07240c also swept in Codex's in-progress chat-line CSS (same file,
+inert until chat tsx commits — fine, chat commit completes it).
+Sales committed a25a438+a07240c, awaiting user deploy word. Remaining build
 order after Sales: Chat → Calls → Forms hub+5 forms (flips nav
 transitional items per shell-the-rail-goal.md) → Resources → Member →
 Ops queues → Admin mgmt. Dashboard built (05cb166) awaiting deploy

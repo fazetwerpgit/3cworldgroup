@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
-import { ArrowDown, Check, ChevronDown, ChevronLeft, Clock, Hash, ImagePlus, Loader2, Lock, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowDown, Check, ChevronLeft, Clock, ImagePlus, Loader2, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -18,13 +18,6 @@ import { Textarea } from '@/components/ui/textarea';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
-
-const audienceCopy: Record<ChatChannel['audience'], string> = {
-  all: 'Everyone',
-  field: 'Field users',
-  managers: 'Managers',
-  platform: 'Admin/Ops',
-};
 
 /**
  * A message as rendered in the thread: a real Firestore message, or an
@@ -52,7 +45,9 @@ export type ThreadMessage = ChatMessageView & {
 };
 
 interface MobileThreadProps {
-  channel?: ChatChannel;
+  pinnedMessage: ThreadMessage | null;
+  channelNumber: number;
+  channel?: ChatChannel & { memberIds?: string[] };
   channelId: string;
   messages: ThreadMessage[];
   loading: boolean;
@@ -136,7 +131,8 @@ function BubbleImage({
       onClick={onOpen}
       disabled={isPendingLocal}
       aria-label="Open image"
-      className={`relative block w-60 max-w-full overflow-hidden bg-[#0A1F44]/5 shadow-sm ring-1 disabled:cursor-default dark:bg-white/5 ${
+      data-attachment-type={message.attachment?.type ?? 'image'}
+      className={`chat-line-mobile-attachment relative block w-60 max-w-full overflow-hidden bg-[#0A1F44]/5 shadow-sm ring-1 disabled:cursor-default dark:bg-white/5 ${
         isFailed ? 'ring-red-400/70 dark:ring-red-500/50' : 'ring-slate-200 dark:ring-border'
       } ${isOwn ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md'}`}
     >
@@ -146,7 +142,7 @@ function BubbleImage({
         alt={message.text || 'Shared image'}
         loading="lazy"
         style={aspectStyle}
-        className={`max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
+        className={`chat-line-attachment-image max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
       />
       {isUploading && (
         <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
@@ -192,6 +188,8 @@ function dayLabel(date: Date) {
  * renders this (lg:hidden owner).
  */
 export function MobileThread({
+  pinnedMessage,
+  channelNumber,
   channel,
   channelId,
   messages,
@@ -235,6 +233,7 @@ export function MobileThread({
   // hooks: touchstart on a bubble arms a 500ms timer; move/scroll/end cancel it;
   // firing opens the sheet for that message.
   const [actionSheet, setActionSheet] = useState<ThreadMessage | null>(null);
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
   const longPressTimer = useRef<number | undefined>(undefined);
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -359,14 +358,14 @@ export function MobileThread({
   };
 
   return (
-    <div className="chat-slide-in flex h-[calc(100dvh-4rem-env(safe-area-inset-top))] flex-col bg-slate-50 dark:bg-muted/40">
+    <div className="chat-line-thread chat-slide-in flex h-[calc(100dvh-4rem-env(safe-area-inset-top))] flex-col bg-slate-50 dark:bg-muted/40">
       {/* Compact top bar with back arrow (≥40px target). */}
-      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-border bg-white/95 dark:bg-card/95 px-1.5 py-1.5 backdrop-blur">
+      <div className="chat-line-thread-header flex items-center gap-1 border-b border-slate-200 dark:border-border bg-white/95 dark:bg-card/95 px-1.5 py-1.5 backdrop-blur">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to channels"
-          className="grid size-10 shrink-0 place-items-center rounded-md text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted"
+          className="chat-line-back grid size-10 shrink-0 place-items-center rounded-md text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted"
         >
           <ChevronLeft className="size-6" />
         </button>
@@ -374,23 +373,27 @@ export function MobileThread({
           type="button"
           onClick={onOpenInfo}
           aria-label="Channel details"
-          className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-left hover:bg-slate-100 dark:hover:bg-muted"
+          className="chat-line-thread-info min-w-0 flex-1 rounded-md px-1.5 text-left hover:bg-slate-100 dark:hover:bg-muted"
         >
-          {channel?.audience === 'managers' ? (
-            <Lock className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
-          ) : (
-            <Hash className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
-          )}
-          <span className="truncate font-semibold text-slate-950 dark:text-foreground">
-            {channel?.name ?? 'Channel'}
+          <span className="chat-line-thread-head-copy">
+            <span className="chat-line-thread-kicker">{String(channelNumber).padStart(2, '0')} / {channel?.audience?.toUpperCase() ?? 'CHANNEL'} / BROADCAST</span>
+            <span className="chat-line-thread-name portal-metallic-num">{channel?.name ?? 'Channel'}</span>
+            <span className="chat-line-thread-description">{channel?.description ?? 'Choose a channel to view messages.'}</span>
           </span>
-          {channel && (
-            <Badge variant="secondary" className="shrink-0 text-[11px]">
-              {audienceCopy[channel.audience]}
-            </Badge>
-          )}
-          <ChevronDown className="size-4 shrink-0 text-slate-400 dark:text-muted-foreground" />
         </button>
+        <div className="chat-line-thread-meta">
+          <span className="chat-line-live">LIVE</span>
+          <span>{channel ? `${channel.memberIds?.length ?? 0} members` : '— members'}</span>
+        </div>
+      </div>
+
+      <div className="chat-line-thread-pinned-band">
+        <span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span>
+        <span className="chat-line-pinned-copy">
+          {pinnedMessage?.text || (pinnedMessage?.attachment?.type === 'gif' ? 'GIF' : pinnedMessage?.attachment ? 'Photo' : 'No pinned message yet')}
+          {pinnedMessage?.authorName && <em> · {pinnedMessage.authorName}</em>}
+        </span>
+        <span className="chat-line-pinned-time">{pinnedMessage ? formatTime(pinnedMessage.createdAt) : ''}</span>
       </div>
 
       {/* Message list — newest at the bottom. flex-col + mt-auto spacer
@@ -398,8 +401,8 @@ export function MobileThread({
           above the composer, chat-style. Vertical rhythm is per-message so
           grouped bubbles can tighten up (see mt-* below). The relative wrapper
           hosts the floating jump-to-latest pill so it clears the composer. */}
-      <div className="relative flex flex-1 flex-col overflow-hidden">
-        <div ref={scrollRef} onScroll={clearLongPress} className="flex flex-1 flex-col overflow-auto p-3">
+      <div className="chat-line-thread-stage relative flex flex-1 flex-col overflow-hidden">
+        <div ref={scrollRef} onScroll={clearLongPress} className="chat-line-thread-messages flex flex-1 flex-col overflow-auto p-3">
         <div aria-hidden="true" className="mt-auto" />
         {loading ? (
           <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
@@ -446,20 +449,20 @@ export function MobileThread({
             return (
               <div key={message.id}>
                 {showDaySeparator && message.createdAt && (
-                  <div className="my-3 flex items-center gap-3 px-1">
+                    <div className="chat-line-thread-day my-3 flex items-center gap-3 px-1">
                     <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-muted-foreground">
+                    <span className="chat-line-thread-day-label text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-muted-foreground">
                       {dayLabel(message.createdAt)}
                     </span>
                     <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
                   </div>
                 )}
-                <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
+                <div className={`chat-line-mobile-message flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
                   {/* Own-message headers are hidden by design, except the
                       developer identity — it shows on the author's own phone too. */}
                   {(!isOwn || isDeveloperAuthor(message.authorId)) && isFirstOfGroup && (
                     <div
-                      className={`mb-1 flex flex-wrap items-center gap-2 ${
+                      className={`chat-line-mobile-author mb-1 flex flex-wrap items-center gap-2 ${
                         isOwn ? 'justify-end pr-1' : 'pl-9 pr-1'
                       }`}
                     >
@@ -490,22 +493,23 @@ export function MobileThread({
                       )}
                     </div>
                   )}
-                  <div className={`flex max-w-[85%] items-end gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`chat-line-mobile-bubble-row flex max-w-[85%] items-end gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
                     {/* Avatar gutter (others only): 32px chip on first-of-group,
                         empty spacer otherwise so grouped bubbles stay aligned. */}
                     {!isOwn && (
-                      <div className="w-8 shrink-0 self-end">
+                      <div className="chat-line-mobile-avatar-gutter w-8 shrink-0 self-end">
                         {isFirstOfGroup && (
                           <ChatAvatar
                             authorId={message.authorId}
                             authorName={message.authorName}
                             size="md"
+                            className="chat-line-avatar"
                           />
                         )}
                       </div>
                     )}
                     <div
-                      className={`flex min-w-0 flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}
+                      className={`chat-line-mobile-content flex min-w-0 flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}
                       onTouchStart={() => !isPending && startLongPress(message)}
                       onTouchMove={clearLongPress}
                       onTouchEnd={clearLongPress}
@@ -518,7 +522,7 @@ export function MobileThread({
                     >
                       {message.replyTo && (
                         <div
-                          className={`max-w-full rounded-lg border-l-2 border-[#8dc63f] bg-slate-100 px-2.5 py-1.5 dark:bg-muted/70 ${
+                          className={`chat-line-quote max-w-full rounded-lg border-l-2 border-[#8dc63f] bg-slate-100 px-2.5 py-1.5 dark:bg-muted/70 ${
                             isOwn ? 'rounded-br-md' : 'rounded-bl-md'
                           }`}
                         >
@@ -545,7 +549,7 @@ export function MobileThread({
                       )}
                       {message.text && (
                         <div
-                          className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm portal-motion ${
+                          className={`chat-line-mobile-bubble whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm portal-motion ${
                             isOwn
                               ? 'rounded-br-md bg-[#0A1F44] text-white'
                               : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
@@ -562,7 +566,7 @@ export function MobileThread({
                       caption; failed sends offer retry/discard inline. */}
                   {isPending ? (
                     isFailed ? (
-                      <div className="mt-1 flex items-center gap-2 px-1">
+                        <div className="chat-line-mobile-failed mt-1 flex items-center gap-2 px-1">
                         <button
                           type="button"
                           onClick={() => onRetryPending(message)}
@@ -581,7 +585,7 @@ export function MobileThread({
                         </button>
                       </div>
                     ) : (
-                      <span className="mt-1 flex items-center gap-1 px-1 text-[11px] text-slate-400 dark:text-muted-foreground">
+                      <span className="chat-line-mobile-status mt-1 flex items-center gap-1 px-1 text-[11px] text-slate-400 dark:text-muted-foreground">
                         <Clock className="size-3" />
                         Sending…
                       </span>
@@ -590,7 +594,7 @@ export function MobileThread({
                     <>
                       {isLastOfGroup && (
                         <span
-                          className={`mt-1 text-[11px] text-slate-400 dark:text-muted-foreground ${
+                          className={`chat-line-mobile-timestamp mt-1 text-[11px] text-slate-400 dark:text-muted-foreground ${
                             isOwn ? 'px-1' : 'pl-9 pr-1'
                           }`}
                         >
@@ -607,6 +611,10 @@ export function MobileThread({
                           messageId={message.id}
                           reactionCounts={message.reactionCounts}
                           myReactions={message.myReactions}
+                          forcePickerOpen={reactionPickerMessageId === message.id}
+                          onPickerOpenChange={(open) => {
+                            if (!open && reactionPickerMessageId === message.id) setReactionPickerMessageId(null);
+                          }}
                           onError={onReactionError}
                         />
                       </div>
@@ -625,7 +633,7 @@ export function MobileThread({
           <button
             type="button"
             onClick={jumpToLatest}
-            className="portal-motion absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#8dc63f] px-3.5 py-1.5 text-xs font-semibold text-[#0A1F44] shadow-lg shadow-black/10 hover:bg-[#7ab82e] dark:shadow-black/40"
+            className="chat-line-jump-pill portal-motion absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#8dc63f] px-3.5 py-1.5 text-xs font-semibold text-[#0A1F44] shadow-lg shadow-black/10 hover:bg-[#7ab82e] dark:shadow-black/40"
           >
             {newCount} new message{newCount > 1 ? 's' : ''}
             <ArrowDown className="size-3.5" />
@@ -634,13 +642,13 @@ export function MobileThread({
       </div>
 
       {error && (
-        <Alert className="mx-3 mb-2 w-auto border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
+        <Alert className="chat-line-thread-error mx-3 mb-2 w-auto border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Composer pinned to the bottom edge. */}
-      <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="chat-line-thread-composer border-t border-slate-200 dark:border-border bg-white dark:bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {/* Hidden file input — opened by the ImagePlus button. */}
         <input
           ref={fileInputRef}
@@ -656,7 +664,7 @@ export function MobileThread({
         />
         {/* Reply / edit staging bar (lime left border, X to cancel). */}
         {replyTarget && (
-          <div className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+          <div className="chat-line-compose-strip mb-2 flex items-start gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                 Replying to {replyTarget.authorName}
@@ -676,7 +684,7 @@ export function MobileThread({
           </div>
         )}
         {editTarget && (
-          <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+          <div className="chat-line-compose-strip mb-2 flex items-center gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
             <Pencil className="size-3.5 shrink-0 text-slate-500 dark:text-muted-foreground" />
             <span className="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
               Editing message
@@ -693,7 +701,7 @@ export function MobileThread({
         )}
         {/* Staged-image preview chip. */}
         {attachFile && attachPreview && (
-          <div className="mb-2 flex items-center gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
+          <div className="chat-line-attachment-preview mb-2 flex items-center gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={attachPreview}
@@ -713,7 +721,7 @@ export function MobileThread({
             </button>
           </div>
         )}
-        <div className="flex items-end gap-1.5">
+        <div className="chat-line-thread-composer-row flex items-end gap-1.5">
           <Button
             type="button"
             variant="ghost"
@@ -721,7 +729,7 @@ export function MobileThread({
             onClick={() => fileInputRef.current?.click()}
             disabled={!channelId || !!editTarget}
             aria-label="Attach an image"
-            className="size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+            className="chat-line-tool size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
           >
             <ImagePlus className="size-5" />
           </Button>
@@ -735,7 +743,7 @@ export function MobileThread({
                 disabled={!channelId || !!editTarget}
                 aria-label="Add a GIF"
                 aria-expanded={gifOpen}
-                className="size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+                className="chat-line-tool chat-line-gif-button size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
               >
                 <Sparkles className="size-5" />
               </Button>
@@ -763,11 +771,11 @@ export function MobileThread({
               }
             }}
             placeholder={
-              editTarget ? 'Edit your message...' : channel ? `Message ${channel.name}...` : 'Select a channel...'
+              editTarget ? 'Edit your message...' : 'Broadcast an update…'
             }
             disabled={!channelId}
             rows={1}
-            className="max-h-32 min-h-[2.5rem] flex-1 resize-none"
+            className="chat-line-textarea max-h-32 min-h-[2.5rem] flex-1 resize-none"
           />
           <Button
             type="button"
@@ -776,7 +784,7 @@ export function MobileThread({
               !channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending
             }
             size="icon"
-            className="size-10 shrink-0 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+            className="chat-line-send size-10 shrink-0 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
             aria-label={editTarget ? 'Save edit' : sending ? 'Sending' : 'Send message'}
           >
             {sending ? (
@@ -788,7 +796,7 @@ export function MobileThread({
             )}
           </Button>
         </div>
-        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-muted-foreground">
+        <p className="chat-line-thread-composer-meta mt-1.5 text-[11px] text-slate-500 dark:text-muted-foreground">
           Enter to send · Shift+Enter for a new line. No customer PII.
         </p>
       </div>
@@ -810,6 +818,7 @@ export function MobileThread({
                 onEdit: () => onEdit(actionSheet),
                 onDelete: () => onDelete(actionSheet.id),
                 onTogglePin: () => onTogglePin(actionSheet),
+                onAddReaction: () => setReactionPickerMessageId(actionSheet.id),
               } satisfies MessageActionsConfig)
             : null
         }

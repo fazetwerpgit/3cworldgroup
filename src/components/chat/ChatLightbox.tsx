@@ -68,7 +68,7 @@ export function ChatLightbox({
       aria-modal="true"
       aria-label="Image viewer"
       onClick={onClose}
-      className="portal-motion pointer-events-auto fixed inset-0 z-[120] flex flex-col bg-black/90 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm"
+      className="chat-line-lightbox portal-motion pointer-events-auto fixed inset-0 z-[120] flex flex-col bg-black/90 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm"
     >
       <div className="flex justify-end">
         <button
@@ -76,7 +76,7 @@ export function ChatLightbox({
           type="button"
           onClick={onClose}
           aria-label="Close image"
-          className="grid size-10 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f]"
+          className="chat-line-lightbox-close grid size-10 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f]"
         >
           <X className="size-5" />
         </button>
@@ -87,13 +87,13 @@ export function ChatLightbox({
           src={image.url}
           alt={image.alt ?? (image.author ? `Shared by ${image.author}` : 'Shared image')}
           onClick={(event) => event.stopPropagation()}
-          className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+          className="chat-line-lightbox-image max-h-full max-w-full rounded-lg object-contain shadow-2xl"
         />
       </div>
       {(image.author || image.time) && (
         <div
           onClick={(event) => event.stopPropagation()}
-          className="pt-3 text-center text-sm text-white/80"
+          className="chat-line-lightbox-caption pt-3 text-center text-sm text-white/80"
         >
           {image.author && <span className="font-semibold text-white">{image.author}</span>}
           {image.author && image.time && <span className="px-1.5 text-white/40">·</span>}

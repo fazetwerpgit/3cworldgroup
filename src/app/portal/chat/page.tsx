@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowDown, Check, ChevronDown, Clock, Hash, ImagePlus, Loader2, Lock, MessageSquareText, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowDown, Check, Clock, ImagePlus, Loader2, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
@@ -18,27 +18,15 @@ import { isAbortError } from '@/lib/fetch/isAbortError';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { useMessages } from '@/hooks/chat/useMessages';
-import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
+import { getAuthorColor, getInitials, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { auth } from '@/lib/firebase/config';
-import { ChatAttachment, ChatChannel, ChatReplySnippet, getEffectiveRole } from '@/types';
-
-const audienceCopy: Record<ChatChannel['audience'], string> = {
-  all: 'Everyone',
-  field: 'Field users',
-  managers: 'Managers',
-  platform: 'Admin/Ops',
-};
+import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
 
 function getLocalDayKey(createdAt: Date | null) {
   const date = createdAt ?? new Date();
@@ -53,21 +41,16 @@ function isSameLocalDay(first: Date, second: Date) {
   );
 }
 
-function formatDayDivider(createdAt: Date | null) {
+function formatChatLineDayDivider(createdAt: Date | null) {
   const date = createdAt ?? new Date();
   const today = new Date();
-  if (isSameLocalDay(date, today)) return 'Today';
-
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (isSameLocalDay(date, yesterday)) return 'Yesterday';
+  const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
-  });
+  if (isSameLocalDay(date, today)) return 'TODAY';
+  if (isSameLocalDay(date, yesterday)) return `YESTERDAY · ${dateLabel}`;
+  return dateLabel.toUpperCase();
 }
 
 // Probe the GIF feature at most once per browser session (shared across mounts):
@@ -103,7 +86,8 @@ function DesktopAttachment({ message, onOpen }: { message: ThreadMessage; onOpen
       onClick={onOpen}
       disabled={isPendingLocal}
       aria-label="Open image"
-      className={`relative mt-2 block w-full max-w-xs overflow-hidden rounded-lg bg-[#0A1F44]/5 ring-1 transition disabled:cursor-default dark:bg-white/5 ${
+      data-attachment-type={message.attachment?.type ?? 'image'}
+      className={`chat-line-attachment relative mt-2 block w-full max-w-xs overflow-hidden rounded-lg bg-[#0A1F44]/5 ring-1 transition disabled:cursor-default dark:bg-white/5 ${
         isFailed ? 'ring-red-400/70 dark:ring-red-500/50' : 'ring-slate-200 dark:ring-border'
       }`}
     >
@@ -113,7 +97,7 @@ function DesktopAttachment({ message, onOpen }: { message: ThreadMessage; onOpen
         alt={message.text || 'Shared image'}
         loading="lazy"
         style={aspectStyle}
-        className={`max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
+        className={`chat-line-attachment-image max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
       />
       {isUploading && (
         <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
@@ -207,7 +191,7 @@ export default function TeamChatPage() {
   // while mobile only "opens" a channel in the thread view.
   const [isLgUp, setIsLgUp] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
+    const mq = window.matchMedia('(min-width: 721px)');
     const update = () => setIsLgUp(mq.matches);
     update();
     mq.addEventListener('change', update);
@@ -819,550 +803,138 @@ export default function TeamChatPage() {
     });
   };
 
+  const roleLabel = isRole('admin')
+    ? 'Admin'
+    : isRole('operations')
+      ? 'Operations'
+      : canPin
+        ? 'Manager'
+        : 'Rep';
+  const todayLabel = new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const pinnedMessage = useMemo(() => {
+    let latest: ThreadMessage | null = null;
+    for (const message of displayMessages) {
+      if (!message.isPinned) continue;
+      if (!latest || (message.createdAt?.getTime() ?? 0) >= (latest.createdAt?.getTime() ?? 0)) latest = message;
+    }
+    return latest;
+  }, [displayMessages]);
+  const pinnedCopy = pinnedMessage
+    ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
+    : 'No pinned message yet';
+  const pinnedAuthor = pinnedMessage?.authorName;
+  const pinnedTime = pinnedMessage ? formatTime(pinnedMessage.createdAt) : '';
+
   return (
     <ProtectedRoute permissions={['chat:read']}>
-      <div className="min-h-screen portal-canvas lg:flex lg:h-dvh lg:flex-col">
+      <div className="chat-line-portal min-h-screen portal-canvas lg:flex lg:h-dvh lg:flex-col">
         <PortalHeader />
-        <div className="flex lg:min-h-0 lg:flex-1">
+        <div className="flex min-h-0 lg:flex-1">
           <PortalSidebar />
-          <main className="flex-1 overflow-auto lg:min-h-0 lg:overflow-hidden lg:p-6">
-            {/* Desktop (lg+): the shipped side-by-side panel layout, unchanged. */}
-            <div className="hidden lg:flex lg:min-h-0 lg:h-full lg:flex-col">
-              <div className="mx-auto flex min-h-0 w-full max-w-[1500px] flex-1 flex-col space-y-5">
-                <PortalPageHeader
-                  eyebrow="Team resources"
-                  title="Team Chat"
-                  description="Live text-only team channels for onboarding, training, and manager coordination — a free Firebase pilot with no media hosting or paid chat vendor."
-                />
-
-                {shownError && (
-                  <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-                    <AlertDescription>{shownError}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card lg:grid-cols-[320px_1fr]">
-                  <aside className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted/70 lg:flex lg:min-h-0 lg:flex-col lg:border-b-0 lg:border-r">
-                    <div className="border-b border-slate-200 dark:border-border p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-foreground">
-                        <MessageSquareText className="size-4 text-[#0A1F44] dark:text-foreground" />
-                        Pilot Channels
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                        Latest 75 messages per channel to control read volume.
-                      </p>
+          <main className="chat-line-main flex-1 min-h-0 overflow-hidden">
+            <div className="chat-line-page">
+              <header className="chat-line-masthead">
+                <div className="chat-line-mark"><span aria-hidden="true" />3C WORLD GROUP / THE LINE</div>
+                <p className="chat-line-mast-meta">Team chat · broadcast / {todayLabel}</p>
+                <span className="chat-line-role-chip">{roleLabel}</span>
+              </header>
+              {shownError && <div className="chat-line-alert" role="alert">{shownError}</div>}
+              <div className="chat-line-desktop">
+                <aside className="chat-line-rail">
+                  <p className="chat-line-kicker">Channel switcher / 01–{String(Math.max(channels.length, 1)).padStart(2, '0')}</p>
+                  <h1 className="chat-line-rail-title">The line<br />chat</h1>
+                  <div className="chat-line-channel-list">
+                    {loadingChannels ? [0, 1, 2, 3].map((row) => <div className="chat-line-channel-skeleton" key={row} aria-hidden="true"><span /><span /><span /></div>) : channels.length === 0 ? <p className="chat-line-empty">No live channels yet. Ask an admin to sync chat channels.</p> : channels.map((channel, index) => {
+                      const memberCount = channel.memberIds?.length ?? 0;
+                      return <button key={channel.id} type="button" onClick={() => setActiveChannelId(channel.id)} className={`chat-line-channel ${channel.id === activeChannelId ? 'is-active' : ''}`}>
+                        <span className="chat-line-channel-number">{String(index + 1).padStart(2, '0')}</span>
+                        <span className="chat-line-channel-tick" />
+                        <span className="chat-line-channel-copy"><strong>{channel.name}</strong><small>{channel.description}</small><span className="chat-line-channel-tail">{unreadByChannel[channel.id] && <i aria-label="Unread messages" />}{channel.audience.toUpperCase()} · {memberCount} member{memberCount === 1 ? '' : 's'}</span></span>
+                      </button>;
+                    })}
+                  </div>
+                  <p className="chat-line-rail-note"><strong>Signal discipline</strong><br />Keep customer details out of chat.<br /><br />No customer PII — never card numbers or SSNs.</p>
+                </aside>
+                <section className="chat-line-conversation">
+                  <header className="chat-line-conversation-head">
+                    <div className="chat-line-head-copy">
+                      <button type="button" onClick={() => setInfoOpen(true)} disabled={!activeChannel} className="chat-line-title-button" aria-label="Channel details">
+                        <p className="chat-line-kicker">{activeChannel ? `${String(channels.indexOf(activeChannel) + 1).padStart(2, '0')} / ${activeChannel.audience.toUpperCase()} / BROADCAST` : '— / CHANNEL / BROADCAST'}</p>
+                        <h2 className="chat-line-display-title portal-metallic-num">{activeChannel?.name ?? 'Select a channel'}</h2>
+                        <p className="chat-line-head-description">{activeChannel?.description ?? 'Choose a channel to view messages.'}</p>
+                      </button>
                     </div>
-                    <div className="space-y-2 p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-                      {loadingChannels ? (
-                        <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
-                          Loading channels...
-                        </div>
-                      ) : channels.length === 0 ? (
-                        <div className="rounded-md border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
-                          No live channels yet. Ask an admin to sync chat channels.
-                        </div>
-                      ) : (
-                        channels.map((channel) => (
-                          <button
-                            key={channel.id}
-                            type="button"
-                            onClick={() => setActiveChannelId(channel.id)}
-                            className={`w-full cursor-pointer rounded-md border p-3 text-left transition-colors duration-200 ${
-                              channel.id === activeChannelId
-                                ? 'border-[#8dc63f]/50 bg-[#8dc63f]/10 text-slate-950 dark:text-foreground'
-                                : 'border-transparent bg-white dark:bg-card text-slate-700 dark:text-muted-foreground hover:border-slate-200 dark:hover:border-border'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-                                {channel.audience === 'managers' ? (
-                                  <Lock className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
-                                ) : (
-                                  <Hash className="size-4 shrink-0 text-slate-500 dark:text-muted-foreground" />
-                                )}
-                                <span className="truncate">{channel.name}</span>
-                                {unreadByChannel[channel.id] && (
-                                  <span
-                                    aria-label="Unread messages"
-                                    className="size-2 shrink-0 rounded-full bg-[#8dc63f] ring-2 ring-white dark:ring-[#0e2647]"
-                                  />
-                                )}
-                              </span>
-                              <Badge variant="secondary" className="text-[11px]">
-                                {audienceCopy[channel.audience]}
-                              </Badge>
+                    <div className="chat-line-head-meta"><span className="chat-line-live">LIVE</span><span>{activeChannel ? `${activeChannel.memberIds?.length ?? 0} members` : '— members'}</span></div>
+                  </header>
+                  <div className="chat-line-pinned-band"><span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span><span className="chat-line-pinned-copy">{pinnedCopy || 'No pinned message yet'}{pinnedAuthor && <em> · {pinnedAuthor}</em>}</span><span className="chat-line-pinned-time">{pinnedTime}</span></div>
+                  <div className="chat-line-message-stage">
+                    <div ref={desktopScrollRef} className="chat-line-messages">
+                      <div aria-hidden="true" className="chat-line-scroll-spacer" />
+                      {loadingMessages ? <div className="chat-line-message-skeletons" aria-hidden="true">{[0, 1, 2, 3, 4].map((row) => <span key={row} />)}</div> : threadMessages.length === 0 ? <div className="chat-line-empty-message"><strong>No messages yet</strong><span>Start with a short update, question, or field note.</span></div> : displayMessages.map((message, index) => {
+                        const previousMessage = displayMessages[index - 1];
+                        const showDayDivider = !previousMessage || getLocalDayKey(previousMessage.createdAt) !== getLocalDayKey(message.createdAt);
+                        const grouped = !!previousMessage && !showDayDivider && previousMessage.authorId === message.authorId && Math.abs((message.createdAt?.getTime() ?? 0) - (previousMessage.createdAt?.getTime() ?? 0)) <= 300000;
+                        const isPending = !!message.pendingState;
+                        const isFailed = message.pendingState === 'failed';
+                        const isOwn = message.authorId === user?.uid;
+                        const canEdit = isOwn && !!message.text;
+                        const canDelete = canModerate || isOwn;
+                        return <Fragment key={message.id}>
+                          {showDayDivider && <div className="chat-line-day-divider"><span>{formatChatLineDayDivider(message.createdAt)}</span></div>}
+                          <article className={`chat-line-message ${isOwn ? 'is-own' : ''} ${grouped ? 'is-grouped' : ''} ${isFailed ? 'is-failed' : ''} ${message.pendingState === 'sending' ? 'is-sending' : ''}`}>
+                            <div className="chat-line-avatar-column">{grouped ? <span className="chat-line-avatar-spacer" aria-hidden="true" /> : isOwn ? <span className="chat-line-avatar chat-line-avatar-own" aria-hidden="true">{getInitials(message.authorName)}</span> : <ChatAvatar authorId={message.authorId} authorName={message.authorName} size="sm" className="chat-line-avatar" />}</div>
+                            <div className="chat-line-message-content">
+                              <div className="chat-line-message-top"><strong style={isDeveloperAuthor(message.authorId) ? undefined : ({ '--an': getAuthorColor(message.authorId).name, '--an-dark': getAuthorColor(message.authorId).nameDark } as CSSProperties)} className={isDeveloperAuthor(message.authorId) ? 'chat-dev-name' : 'chat-line-author'}>{message.authorName}</strong>{isDeveloperAuthor(message.authorId) && <span className="chat-dev-badge">DEV</span>}{message.authorRole && <span className="chat-line-role">{message.authorRole.replace(/_/g, ' ')}</span>}<span className="chat-line-timestamp">{formatTime(message.createdAt)}</span></div>
+                              <div className="chat-line-bubble-row">
+                                <div className="chat-line-bubble">
+                                  {message.isPinned && <span className="chat-line-pinned-mini"><Pin aria-hidden="true" /> PINNED</span>}
+                                  {message.replyTo && <div className="chat-line-quote"><strong>{message.replyTo.authorName}</strong><span>{message.replyTo.text}</span></div>}
+                                  <DesktopAttachment message={message} onOpen={() => openLightbox({ url: message.attachment?.url ?? message.localPreviewUrl ?? '', author: message.authorName, time: formatTime(message.createdAt) })} />
+                                  {message.text && <p>{message.text}{message.editedAt && <span className="chat-line-edited"> (edited)</span>}</p>}
+                                  {isPending ? isFailed ? <div className="chat-line-failed-actions"><button type="button" onClick={() => retryPending(message)}><RotateCw aria-hidden="true" /> Failed — tap to retry</button><button type="button" onClick={() => discardPending(message.id)} aria-label="Discard message"><X aria-hidden="true" /></button></div> : <span className="chat-line-message-status"><Clock aria-hidden="true" /> Sending…</span> : <ReactionBar channelId={activeChannelId} messageId={message.id} reactionCounts={message.reactionCounts} myReactions={message.myReactions} onError={setError} />}
+                                </div>
+                                {!isPending && <MessageActions triggerClassName="chat-line-message-actions" config={{ hasText: !!message.text, canEdit, canDelete, canPin, isPinned: !!message.isPinned, onReply: () => startReply(message), onCopy: () => copyMessageText(message.text), onEdit: () => startEdit(message), onDelete: () => deleteMessage(message.id), onTogglePin: () => void togglePin(message) }} />}
+                              </div>
                             </div>
-                            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-muted-foreground">
-                              {channel.description}
-                            </p>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </aside>
-
-                  <section className="flex min-h-0 flex-col">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-border p-4">
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setInfoOpen(true)}
-                          disabled={!activeChannel}
-                          aria-label="Channel details"
-                          className="flex min-h-10 items-center gap-1.5 rounded-md text-left font-semibold text-slate-950 dark:text-foreground hover:text-[#0A1F44] disabled:cursor-default disabled:hover:text-slate-950 dark:hover:text-white dark:disabled:hover:text-foreground"
-                        >
-                          {activeChannel?.name ?? 'Select a channel'}
-                          {activeChannel && (
-                            <ChevronDown className="size-4 shrink-0 text-slate-400 dark:text-muted-foreground" />
-                          )}
-                        </button>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                          {activeChannel?.description ?? 'Choose a channel to view messages.'}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="border-slate-200 dark:border-border text-slate-600 dark:text-muted-foreground">
-                        {messages.length} shown
-                      </Badge>
-                    </div>
-
-                    {/* relative wrapper hosts the floating jump-to-latest pill. */}
-                    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <div
-                      ref={desktopScrollRef}
-                      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[linear-gradient(rgba(10,31,68,.025)_1px,transparent_1px),linear-gradient(90deg,rgba(10,31,68,.025)_1px,transparent_1px)] bg-[size:24px_24px] p-4 [scrollbar-color:rgb(203_213_225)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb:hover]:bg-slate-400 [&>*+*]:mt-3 dark:[scrollbar-color:rgb(71_85_105)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 dark:[&::-webkit-scrollbar-thumb:hover]:bg-slate-500"
-                    >
-                      {/* mt-auto spacer bottom-anchors sparse conversations. */}
-                      <div aria-hidden="true" className="mt-auto" />
-                      {loadingMessages ? (
-                        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 shadow-sm">
-                          <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
-                            Loading messages...
-                          </CardContent>
-                        </Card>
-                      ) : threadMessages.length === 0 ? (
-                        <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card/90 py-0 text-center shadow-sm">
-                          <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                            <CardTitle className="text-base">No messages yet</CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-5 text-sm text-slate-500 dark:text-muted-foreground">
-                            Start with a short update, question, or field note.
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        displayMessages.map((message, index) => {
-                          const previousMessage = displayMessages[index - 1];
-                          const showDayDivider =
-                            !previousMessage ||
-                            getLocalDayKey(previousMessage.createdAt) !== getLocalDayKey(message.createdAt);
-                          const isPending = !!message.pendingState;
-                          const isFailed = message.pendingState === 'failed';
-                          const isOwn = message.authorId === user?.uid;
-                          // Echoes block actions until they resolve.
-                          const canEdit = isOwn && !!message.text;
-                          const canDelete = canModerate || isOwn;
-                          return (
-                            <Fragment key={message.id}>
-                              {showDayDivider && (
-                                <div className="flex items-center justify-center">
-                                  <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-slate-500 dark:border-border dark:bg-card/80 dark:text-muted-foreground">
-                                    {formatDayDivider(message.createdAt)}
-                                  </span>
-                                </div>
-                              )}
-                              <div
-                                className={`group rounded-md border bg-white p-4 shadow-sm portal-motion dark:bg-card/95 ${
-                                isFailed
-                                  ? 'border-red-300 dark:border-red-500/40'
-                                  : 'border-slate-200 hover:border-slate-300 dark:border-border dark:hover:border-white/25'
-                                } ${message.pendingState === 'sending' ? 'opacity-70' : ''}`}
-                              >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <ChatAvatar
-                                      authorId={message.authorId}
-                                      authorName={message.authorName}
-                                      size="sm"
-                                    />
-                                    {isDeveloperAuthor(message.authorId) ? (
-                                      <>
-                                        <span className="font-semibold chat-dev-name">
-                                          {message.authorName}
-                                        </span>
-                                        <span className="chat-dev-badge">DEV</span>
-                                      </>
-                                    ) : (
-                                      <span
-                                        style={
-                                          {
-                                            '--an': getAuthorColor(message.authorId).name,
-                                            '--an-dark': getAuthorColor(message.authorId).nameDark,
-                                          } as CSSProperties
-                                        }
-                                        className="font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
-                                      >
-                                        {message.authorName}
-                                      </span>
-                                    )}
-                                    {message.authorRole && (
-                                      <Badge variant="secondary" className="text-[11px]">
-                                        {message.authorRole.replace('_', ' ')}
-                                      </Badge>
-                                    )}
-                                    <span className="text-xs text-slate-500 dark:text-muted-foreground">
-                                      {formatTime(message.createdAt)}
-                                    </span>
-                                    {message.editedAt && (
-                                      <span className="text-xs text-slate-400 dark:text-muted-foreground">
-                                        (edited)
-                                      </span>
-                                    )}
-                                    {message.isPinned && (
-                                      <Pin
-                                        aria-label="Pinned"
-                                        className="size-3 text-slate-400 dark:text-muted-foreground"
-                                      />
-                                    )}
-                                  </div>
-                                  {message.replyTo && (
-                                    <div className="mt-2 rounded-r border-l-2 border-[#8dc63f] bg-slate-50 px-2.5 py-1.5 dark:bg-muted/50">
-                                      <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                        {message.replyTo.authorName}
-                                      </p>
-                                      <p className="line-clamp-2 text-xs text-slate-500 dark:text-muted-foreground">
-                                        {message.replyTo.text}
-                                      </p>
-                                    </div>
-                                  )}
-                                  <DesktopAttachment
-                                    message={message}
-                                    onOpen={() =>
-                                      openLightbox({
-                                        url: message.attachment?.url ?? message.localPreviewUrl ?? '',
-                                        author: message.authorName,
-                                        time: formatTime(message.createdAt),
-                                      })
-                                    }
-                                  />
-                                  {message.text && (
-                                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
-                                      {message.text}
-                                    </p>
-                                  )}
-                                  {isPending ? (
-                                    isFailed ? (
-                                      <div className="mt-2 flex items-center gap-3">
-                                        <button
-                                          type="button"
-                                          onClick={() => retryPending(message)}
-                                          className="flex items-center gap-1 text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                                        >
-                                          <RotateCw className="size-3" />
-                                          Failed — tap to retry
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => discardPending(message.id)}
-                                          aria-label="Discard message"
-                                          className="text-slate-400 hover:text-red-600 dark:text-muted-foreground dark:hover:text-red-400"
-                                        >
-                                          <X className="size-3.5" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <span className="mt-2 flex items-center gap-1 text-xs text-slate-400 dark:text-muted-foreground">
-                                        <Clock className="size-3" />
-                                        Sending…
-                                      </span>
-                                    )
-                                  ) : (
-                                    <ReactionBar
-                                      channelId={activeChannelId}
-                                      messageId={message.id}
-                                      reactionCounts={message.reactionCounts}
-                                      myReactions={message.myReactions}
-                                      onError={setError}
-                                    />
-                                  )}
-                                </div>
-                                {!isPending && (
-                                  <MessageActions
-                                    triggerClassName="opacity-100 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                                    config={{
-                                      hasText: !!message.text,
-                                      canEdit,
-                                      canDelete,
-                                      canPin,
-                                      isPinned: !!message.isPinned,
-                                      onReply: () => startReply(message),
-                                      onCopy: () => copyMessageText(message.text),
-                                      onEdit: () => startEdit(message),
-                                      onDelete: () => deleteMessage(message.id),
-                                      onTogglePin: () => void togglePin(message),
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              </div>
-                            </Fragment>
-                          );
-                        })
-                      )}
+                          </article>
+                        </Fragment>;
+                      })}
                       <div ref={messagesEndRef} />
                     </div>
-
-                    {/* Jump-to-latest pill — only while scrolled up with unseen messages. */}
-                    {desktopNewCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={jumpToLatestDesktop}
-                        className="portal-motion absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#8dc63f] px-4 py-1.5 text-xs font-semibold text-[#0A1F44] shadow-lg shadow-black/10 hover:bg-[#7ab82e] dark:shadow-black/40"
-                      >
-                        {desktopNewCount} new message{desktopNewCount > 1 ? 's' : ''}
-                        <ArrowDown className="size-3.5" />
-                      </button>
-                    )}
-                    </div>
-
-                    <div className="border-t border-slate-200 dark:border-border bg-white dark:bg-card p-4">
-                      <div className="flex flex-col gap-3">
-                        {/* Hidden file input — opened by the ImagePlus button. */}
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            // Clear so re-picking the same file fires onChange again.
-                            event.target.value = '';
-                            onDesktopFilePicked(file);
-                          }}
-                        />
-                        {/* Staged-image preview chip. */}
-                        {attachFile && attachPreview && (
-                          <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={attachPreview}
-                              alt="Selected image preview"
-                              className="size-12 shrink-0 rounded object-cover ring-1 ring-slate-200 dark:ring-border"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-sm text-slate-600 dark:text-muted-foreground">
-                              {attachFile.name}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={clearDesktopAttachment}
-                              aria-label="Remove image"
-                              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
-                            >
-                              <X className="size-4" />
-                            </button>
-                          </div>
-                        )}
-                        {/* Reply / edit staging bar (lime left border, X to cancel). */}
-                        {replyTarget && (
-                          <div className="flex items-start gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                Replying to {replyTarget.authorName}
-                              </p>
-                              <p className="truncate text-xs text-slate-500 dark:text-muted-foreground">
-                                {makeReplySnippet(replyTarget).text}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={cancelReply}
-                              aria-label="Cancel reply"
-                              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
-                            >
-                              <X className="size-4" />
-                            </button>
-                          </div>
-                        )}
-                        {editTarget && (
-                          <div className="flex items-center gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
-                            <Pencil className="size-3.5 shrink-0 text-slate-500 dark:text-muted-foreground" />
-                            <span className="flex-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                              Editing message
-                            </span>
-                            <button
-                              type="button"
-                              onClick={cancelEdit}
-                              aria-label="Cancel edit"
-                              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
-                            >
-                              <X className="size-4" />
-                            </button>
-                          </div>
-                        )}
-                        <Textarea
-                          value={draft}
-                          onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
-                          onKeyDown={(event) => {
-                            // Enter sends (or saves an edit); Shift+Enter inserts a
-                            // newline; Esc cancels edit mode.
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                              event.preventDefault();
-                              if (editTarget) void saveEdit();
-                              else handleDesktopSend();
-                            } else if (event.key === 'Escape' && editTarget) {
-                              event.preventDefault();
-                              cancelEdit();
-                            }
-                          }}
-                          placeholder={
-                            editTarget
-                              ? 'Edit your message...'
-                              : activeChannel
-                                ? `Message ${activeChannel.name}...`
-                                : 'Select a channel to send a message...'
-                          }
-                          disabled={!activeChannelId}
-                          rows={3}
-                          className="resize-none"
-                        />
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={!activeChannelId || !!editTarget}
-                              aria-label="Attach an image"
-                              className="size-9 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
-                            >
-                              <ImagePlus className="size-5" />
-                            </Button>
-                            {gifEnabled && (
-                              <div className="relative">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setGifOpen((open) => !open)}
-                                  disabled={!activeChannelId || !!editTarget}
-                                  aria-label="Add a GIF"
-                                  aria-expanded={gifOpen}
-                                  className="size-9 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
-                                >
-                                  <Sparkles className="size-5" />
-                                </Button>
-                                {gifOpen && activeChannelId && (
-                                  <GifPicker
-                                    authedFetch={authedFetch}
-                                    onSelect={sendGif}
-                                    onClose={() => setGifOpen(false)}
-                                  />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={editTarget ? () => void saveEdit() : handleDesktopSend}
-                            disabled={
-                              !activeChannelId ||
-                              (editTarget ? !draft.trim() : !draft.trim() && !attachFile) ||
-                              sending
-                            }
-                            className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-                          >
-                            {sending ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : editTarget ? (
-                              <Check className="size-4" />
-                            ) : (
-                              <Send className="size-4" />
-                            )}
-                            {editTarget ? 'Save' : 'Send'}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
-                          Enter to send · Shift+Enter for a new line. No customer PII, card numbers, or SSNs.
-                        </p>
+                    {desktopNewCount > 0 && <button type="button" onClick={jumpToLatestDesktop} className="chat-line-jump-pill">{desktopNewCount} new message{desktopNewCount > 1 ? 's' : ''} <ArrowDown aria-hidden="true" /></button>}
+                  </div>
+                  <div className="chat-line-composer-wrap">
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; onDesktopFilePicked(file); }} />
+                    {attachFile && attachPreview && (
+                      <div className="chat-line-attachment-preview">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={attachPreview} alt="Selected image preview" />
+                        <span>{attachFile.name}</span>
+                        <button type="button" onClick={clearDesktopAttachment} aria-label="Remove image"><X aria-hidden="true" /></button>
                       </div>
+                    )}
+                    {replyTarget && <div className="chat-line-compose-strip"><div><strong>REPLYING TO {replyTarget.authorName}</strong><span>{makeReplySnippet(replyTarget).text}</span></div><button type="button" onClick={cancelReply} aria-label="Cancel reply"><X aria-hidden="true" /></button></div>}
+                    {editTarget && <div className="chat-line-compose-strip"><div><strong>EDITING MESSAGE</strong><span>{editTarget.text}</span></div><button type="button" onClick={cancelEdit} aria-label="Cancel edit"><X aria-hidden="true" /></button></div>}
+                    <div className="chat-line-composer">
+                      <button type="button" className="chat-line-tool" onClick={() => fileInputRef.current?.click()} disabled={!activeChannelId || !!editTarget} aria-label="Attach an image"><ImagePlus aria-hidden="true" /></button>
+                      <Textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (editTarget) void saveEdit(); else handleDesktopSend(); } else if (event.key === 'Escape' && editTarget) { event.preventDefault(); cancelEdit(); } }} placeholder={editTarget ? 'Edit your message...' : 'Broadcast an update…'} disabled={!activeChannelId} rows={1} className="chat-line-textarea" />
+                      {gifEnabled && <div className="chat-line-gif-wrap"><button type="button" className="chat-line-tool chat-line-gif-button" onClick={() => setGifOpen((open) => !open)} disabled={!activeChannelId || !!editTarget} aria-label="Add a GIF" aria-expanded={gifOpen}>GIF</button>{gifOpen && activeChannelId && <GifPicker authedFetch={authedFetch} onSelect={sendGif} onClose={() => setGifOpen(false)} />}</div>}
+                      <button type="button" className="chat-line-send" onClick={editTarget ? () => void saveEdit() : handleDesktopSend} disabled={!activeChannelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}>{sending ? <Loader2 aria-hidden="true" /> : editTarget ? <Check aria-hidden="true" /> : <Send aria-hidden="true" />}<span className="chat-line-send-label">{editTarget ? 'Save' : 'Send'}</span></button>
                     </div>
-                  </section>
-                </div>
+                    <div className="chat-line-composer-meta"><span>No customer PII — never card numbers or SSNs.</span><span>Enter to send · Shift + Enter for line break</span></div>
+                  </div>
+                </section>
               </div>
+              <div className="chat-line-mobile">
+                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} channelId={activeChannelId} messages={displayMessages} loading={loadingMessages} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
+              </div>
+              <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
+              <ChatLightbox image={lightbox} onClose={closeLightbox} />
             </div>
-
-            {/* Mobile (< lg): Connecteam-style two-screen — channel list, then a
-                full-screen conversation with a back arrow. */}
-            <div className="lg:hidden">
-              {mobileView === 'thread' ? (
-                <MobileThread
-                  channel={activeChannel}
-                  channelId={activeChannelId}
-                  messages={displayMessages}
-                  loading={loadingMessages}
-                  error={shownError}
-                  currentUserId={user?.uid}
-                  canModerate={canModerate}
-                  canPin={canPin}
-                  draft={draft}
-                  sending={sending}
-                  gifEnabled={gifEnabled}
-                  authedFetch={authedFetch}
-                  messagesEndRef={mobileMessagesEndRef}
-                  scrollToBottomSignal={scrollToBottomSignal}
-                  formatTime={formatTime}
-                  replyTarget={replyTarget}
-                  editTarget={editTarget}
-                  replySnippet={makeReplySnippet}
-                  onBack={() => setMobileView('list')}
-                  onOpenInfo={() => setInfoOpen(true)}
-                  onDraftChange={setDraft}
-                  onSend={sendMessage}
-                  onSendImage={sendImage}
-                  onSendGif={sendGif}
-                  onOpenImage={openLightbox}
-                  onError={setError}
-                  onDelete={deleteMessage}
-                  onReactionError={setError}
-                  onRetryPending={retryPending}
-                  onDiscardPending={discardPending}
-                  onReply={startReply}
-                  onEdit={startEdit}
-                  onCopy={copyMessageText}
-                  onTogglePin={togglePin}
-                  onCancelReply={cancelReply}
-                  onCancelEdit={cancelEdit}
-                  onSaveEdit={saveEdit}
-                />
-              ) : (
-                <MobileChannelList
-                  channels={channels}
-                  loading={loadingChannels}
-                  error={shownError}
-                  unreadByChannel={unreadByChannel}
-                  onOpenChannel={(channelId) => {
-                    setActiveChannelId(channelId);
-                    setMobileView('thread');
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Channel-info Sheet — opened from the desktop header title or the
-                mobile thread top bar; members fetched lazily on open. */}
-            <ChannelInfoSheet
-              channel={activeChannel}
-              open={infoOpen}
-              onOpenChange={setInfoOpen}
-              isAdmin={isRole('admin')}
-              authedFetch={authedFetch}
-              onOpenImage={openLightbox}
-              lightboxOpen={!!lightbox}
-            />
-
-            {/* Full-screen image viewer — portaled to <body>, shared by both
-                layouts and the channel-info Media gallery. */}
-            <ChatLightbox image={lightbox} onClose={closeLightbox} />
           </main>
         </div>
       </div>

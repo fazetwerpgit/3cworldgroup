@@ -1,31 +1,23 @@
 'use client';
 
-import { ChevronRight, Hash, Lock } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { Lock } from 'lucide-react';
 import { ChatChannel } from '@/types';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
-  all: 'Everyone',
-  field: 'Field users',
-  managers: 'Managers',
-  platform: 'Admin/Ops',
+  all: 'ALL',
+  field: 'FIELD',
+  managers: 'MGRS',
+  platform: 'ADMIN',
 };
 
 interface MobileChannelListProps {
   channels: ChatChannel[];
   loading: boolean;
   error?: string;
-  // Per-channel unread flag (dot-style badge; no counts). Missing/false = read.
   unreadByChannel?: Record<string, boolean>;
   onOpenChannel: (channelId: string) => void;
 }
 
-/**
- * Phone list screen (Connecteam-style): no navy band — a compact title then
- * full-width tappable channel rows that push into the full-screen thread.
- * Bottom nav stays visible here. Desktop never renders this (lg:hidden owner).
- */
 export function MobileChannelList({
   channels,
   loading,
@@ -34,67 +26,41 @@ export function MobileChannelList({
   onOpenChannel,
 }: MobileChannelListProps) {
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="portal-display text-xl font-bold tracking-tight text-slate-950 dark:text-foreground">
-        Team Chat
-      </h1>
+    <section className="chat-line-mobile-channel-screen">
+      <p className="chat-line-mobile-kicker">The Line / mobile channel switcher</p>
+      <h1 className="chat-line-mobile-title portal-metallic-num">Team Chat</h1>
+      <p className="chat-line-mobile-intro">Numbered signals, one calm floor. Select a channel to enter.</p>
 
-      {error && (
-        <Alert className="border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {error && <p className="chat-line-mobile-error" role="alert">{error}</p>}
 
       {loading ? (
-        <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
-          Loading channels...
+        <div className="chat-line-mobile-channel-list" aria-hidden="true">
+          {[0, 1, 2, 3].map((row) => <div className="chat-line-mobile-channel-skeleton" key={row}><span /><span /><span /></div>)}
         </div>
       ) : channels.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-4 text-sm text-slate-500 dark:text-muted-foreground">
-          No live channels yet. Ask an admin to sync chat channels.
-        </div>
+        <p className="chat-line-mobile-empty">No live channels yet. Ask an admin to sync chat channels.</p>
       ) : (
-        <div className="divide-y divide-slate-200 dark:divide-border overflow-hidden rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card">
-          {channels.map((channel) => (
+        <div className="chat-line-mobile-channel-list">
+          {channels.map((channel, index) => (
             <button
               key={channel.id}
               type="button"
               onClick={() => onOpenChannel(channel.id)}
-              className="flex w-full items-center gap-3 p-4 text-left transition-colors duration-150 hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-muted dark:active:bg-muted/80"
+              className={`chat-line-mobile-channel ${index === 0 ? 'is-active' : ''}`}
             >
-              {channel.audience === 'managers' ? (
-                <Lock className="size-5 shrink-0 text-slate-500 dark:text-muted-foreground" />
-              ) : (
-                <Hash className="size-5 shrink-0 text-slate-500 dark:text-muted-foreground" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`truncate text-slate-950 dark:text-foreground ${
-                      unreadByChannel?.[channel.id] ? 'font-semibold' : 'font-medium'
-                    }`}
-                  >
-                    {channel.name}
-                  </span>
-                  {unreadByChannel?.[channel.id] && (
-                    <span
-                      aria-label="Unread messages"
-                      className="size-2 shrink-0 rounded-full bg-[#8dc63f] ring-2 ring-white dark:ring-[#0e2647]"
-                    />
-                  )}
-                  <Badge variant="secondary" className="shrink-0 text-[11px]">
-                    {audienceCopy[channel.audience]}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-muted-foreground">
-                  {channel.description}
-                </p>
-              </div>
-              <ChevronRight className="size-5 shrink-0 text-slate-400 dark:text-muted-foreground" />
+              <span className="chat-line-mobile-number">{String(index + 1).padStart(2, '0')}</span>
+              <span className="chat-line-mobile-tick" />
+              <span className="chat-line-mobile-copy">
+                <strong>{channel.name}{channel.audience === 'managers' && <Lock aria-hidden="true" />}</strong>
+                <small>{channel.description}</small>
+              </span>
+              <span className="chat-line-mobile-audience">{audienceCopy[channel.audience]}{unreadByChannel?.[channel.id] && <i aria-label="Unread messages" />}</span>
             </button>
           ))}
         </div>
       )}
-    </div>
+
+      <p className="chat-line-mobile-pii">No customer PII — never card numbers or SSNs.</p>
+    </section>
   );
 }

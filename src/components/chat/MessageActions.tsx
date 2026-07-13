@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, Trash2 } from 'lucide-react';
+import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,7 @@ export interface MessageActionsConfig {
   onEdit: () => void;
   onDelete: () => void;
   onTogglePin: () => void;
+  onAddReaction?: () => void;
 }
 
 interface ActionItem {
@@ -84,7 +85,7 @@ export function MessageActions({
         <button
           type="button"
           aria-label="Message actions"
-          className={`grid size-8 shrink-0 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground ${triggerClassName}`}
+          className={`chat-line-action-trigger grid size-8 shrink-0 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground ${triggerClassName}`}
         >
           <MoreHorizontal className="size-4" />
         </button>
@@ -139,17 +140,30 @@ export function MessageActionSheet({
       aria-modal="true"
       aria-label="Message actions"
       onClick={onClose}
-      className="portal-motion fixed inset-0 z-[130] flex flex-col justify-end bg-black/50 backdrop-blur-sm"
+      className="chat-line-action-backdrop portal-motion fixed inset-0 z-[130] flex flex-col justify-end bg-black/50 backdrop-blur-sm"
     >
       <div
         onClick={(event) => event.stopPropagation()}
-        className="rounded-t-2xl border-t border-slate-200 bg-white pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl dark:border-border dark:bg-card"
+        className="chat-line-action-sheet rounded-t-2xl border-t border-slate-200 bg-white pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl dark:border-border dark:bg-card"
       >
         <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-slate-200 dark:bg-border" />
         {authorName && (
-          <p className="truncate px-4 py-1.5 text-xs font-medium text-slate-400 dark:text-muted-foreground">
+          <p className="chat-line-action-author truncate px-4 py-1.5 text-xs font-medium text-slate-400 dark:text-muted-foreground">
             {authorName}
           </p>
+        )}
+        {config.onAddReaction && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              config.onAddReaction?.();
+            }}
+            className="chat-line-action-reaction flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-muted"
+          >
+            <SmilePlus className="size-5 shrink-0" />
+            React
+          </button>
         )}
         {items.map((item) => (
           <button
@@ -159,7 +173,7 @@ export function MessageActionSheet({
               onClose();
               item.onSelect();
             }}
-            className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm ${
+            className={`chat-line-action-item flex w-full items-center gap-3 px-4 py-3 text-left text-sm ${
               item.destructive
                 ? 'text-red-600 dark:text-red-400'
                 : 'text-slate-700 dark:text-slate-200'

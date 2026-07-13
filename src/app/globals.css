@@ -3862,7 +3862,8 @@ body.portal-scope {
   isolation: isolate;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  min-height: 100%;
+  /* height (not min-height): the 1fr row must clamp so only the feed scrolls */
+  height: 100%;
   overflow: hidden;
   background-color: var(--chat-line-stage);
   background-image:
@@ -3969,8 +3970,8 @@ body.portal-scope {
   padding: 7px 11px;
   border: 1px solid var(--chat-line-line);
   border-radius: 999px;
-  background: rgba(3, 9, 22, 0.9);
-  color: var(--chat-line-lime);
+  background: var(--chat-line-lime);
+  color: var(--chat-line-panel);
   font-family: ui-monospace, Consolas, monospace;
   font-size: 9px;
   font-weight: 900;
@@ -3991,6 +3992,19 @@ body.portal-scope {
   display: grid;
   min-height: 0;
   grid-template-columns: 276px minmax(0, 1fr);
+}
+
+@media (min-width: 721px) {
+  .chat-line-page {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .chat-line-desktop,
+  .chat-line-conversation {
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 .chat-line-rail {
@@ -4193,14 +4207,20 @@ body.portal-scope {
 }
 
 .chat-line-title-button {
-  display: flex;
-  align-items: center;
+  display: block;
   min-width: 0;
   max-width: 100%;
+  width: 100%;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
+  cursor: pointer;
   text-align: left;
+}
+
+.chat-line-title-button:disabled {
+  cursor: default;
 }
 
 .chat-line-display-title,
@@ -4223,13 +4243,6 @@ body.portal-scope {
   max-width: min(72vw, 900px);
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.chat-line-title-chevron {
-  flex: none;
-  width: 17px;
-  margin-left: 8px;
-  color: var(--chat-line-muted);
 }
 
 .chat-line-head-description {
@@ -4408,6 +4421,12 @@ body.portal-scope {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 9px !important;
   font-weight: 900;
+}
+
+.chat-line-avatar:not(.chat-line-avatar-own) {
+  background: var(--chat-line-panel) !important;
+  color: var(--chat-line-lime) !important;
+  font-family: ui-monospace, Consolas, monospace;
 }
 
 .chat-line-avatar-own {
@@ -4605,6 +4624,29 @@ body.portal-scope {
 .chat-line-message:hover .chat-line-message-actions,
 .chat-line-message:focus-within .chat-line-message-actions {
   opacity: 1;
+}
+
+.chat-line-add-reaction {
+  width: 0 !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+  border-color: transparent !important;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.chat-line-reactions-empty {
+  margin-top: 0 !important;
+}
+
+.chat-line-message:hover .chat-line-add-reaction,
+.chat-line-message:focus-within .chat-line-add-reaction {
+  width: 28px !important;
+  padding-right: 0.5rem !important;
+  padding-left: 0.5rem !important;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .chat-line-attachment,
@@ -4925,6 +4967,7 @@ body.portal-scope {
 @media (max-width: 720px) {
   .chat-line-page {
     display: block;
+    height: auto;
     min-height: 100%;
     overflow: visible;
   }
@@ -4965,7 +5008,7 @@ body.portal-scope {
     min-height: calc(100dvh - 62px - 48px);
   }
 
-  .chat-line-mobile-channel-list {
+  .chat-line-mobile-channel-screen {
     min-height: calc(100dvh - 62px - 48px);
     padding: 28px 14px max(28px, env(safe-area-inset-bottom));
     background: radial-gradient(circle at 70% 0, rgba(21, 60, 116, 0.2), transparent 35%);
@@ -5126,12 +5169,38 @@ body.portal-scope {
   }
 
   .chat-line-thread-info {
+    display: block;
     min-width: 0;
     min-height: 30px;
     color: var(--chat-line-ink);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .chat-line-thread-head-copy {
+    display: block;
+    min-width: 0;
+  }
+
+  .chat-line-thread-kicker {
+    display: block;
+    margin: 0 0 6px;
+    overflow: hidden;
+    color: var(--chat-line-lime);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.13em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .chat-line-thread-name {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: transparent !important;
     background: var(--chat-line-metal);
     background-clip: text;
@@ -5141,15 +5210,21 @@ body.portal-scope {
     letter-spacing: -0.12em;
     line-height: 0.8;
     text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .chat-line-thread-description {
+    display: block;
+    margin-top: 8px;
+    overflow: hidden;
+    color: var(--chat-line-muted);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chat-line-thread-audience {
     display: none;
-  }
-
-  .chat-line-thread-info > svg {
-    width: 13px;
-    flex: none;
   }
 
   .chat-line-thread-meta {
@@ -5277,8 +5352,19 @@ body.portal-scope {
   }
 
   .chat-line-add-reaction {
+    display: none;
     width: 23px !important;
     height: 23px !important;
+  }
+
+  .chat-line-reactions-empty:not(.chat-line-reaction-picker-open) {
+    display: none;
+  }
+
+  .chat-line-reaction-picker-open .chat-line-add-reaction {
+    display: grid;
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .chat-line-thread-composer {

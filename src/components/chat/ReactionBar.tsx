@@ -15,6 +15,8 @@ interface ReactionBarProps {
   messageId: string;
   reactionCounts: Record<string, number>;
   myReactions: string[];
+  forcePickerOpen?: boolean;
+  onPickerOpenChange?: (open: boolean) => void;
   onError?: (message: string) => void;
 }
 
@@ -32,6 +34,8 @@ export function ReactionBar({
   messageId,
   reactionCounts,
   myReactions,
+  forcePickerOpen = false,
+  onPickerOpenChange,
   onError,
 }: ReactionBarProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -56,6 +60,10 @@ export function ReactionBar({
     });
   }, [myReactions]);
 
+  useEffect(() => {
+    if (forcePickerOpen) setPickerOpen(true);
+  }, [forcePickerOpen]);
+
   const effectiveMine = (emoji: string) =>
     overlay.has(emoji) ? overlay.get(emoji)! : myReactions.includes(emoji);
 
@@ -74,6 +82,7 @@ export function ReactionBar({
     if (inFlightRef.current.has(emoji)) return;
     inFlightRef.current.add(emoji);
     setPickerOpen(false);
+    onPickerOpenChange?.(false);
 
     setOverlay((prev) => {
       const current = prev.has(emoji) ? prev.get(emoji)! : myReactions.includes(emoji);
@@ -113,7 +122,7 @@ export function ReactionBar({
   );
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Message reactions">
+    <div className={`chat-line-reactions mt-2 flex flex-wrap items-center gap-1.5 ${active.length > 0 ? 'chat-line-reactions-has' : 'chat-line-reactions-empty'} ${forcePickerOpen ? 'chat-line-reaction-picker-open' : ''}`} aria-label="Message reactions">
       {active.map((emoji) => {
         const count = effectiveCount(emoji);
         const mine = effectiveMine(emoji);
@@ -124,7 +133,7 @@ export function ReactionBar({
             onClick={() => toggle(emoji)}
             aria-pressed={mine}
             title={mine ? 'Remove your reaction' : 'React'}
-            className={`portal-num flex h-7 items-center gap-1 rounded-full border px-2 text-sm transition-colors duration-150 ${
+            className={`chat-line-reaction portal-num flex h-7 items-center gap-1 rounded-full border px-2 text-sm transition-colors duration-150 ${
               mine
                 ? 'border-[#8dc63f]/60 bg-[#8dc63f]/10 text-[#3f6212] dark:bg-[#8dc63f]/15 dark:text-[#d7ecc0]'
                 : 'border-slate-200 bg-white text-slate-600 hover:border-[#8dc63f]/50 hover:bg-[#8dc63f]/5 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:text-foreground'
@@ -136,12 +145,12 @@ export function ReactionBar({
         );
       })}
 
-      <DropdownMenu open={pickerOpen} onOpenChange={setPickerOpen}>
+      <DropdownMenu open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); onPickerOpenChange?.(open); }}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label="Add reaction"
-            className="grid h-7 w-7 place-items-center rounded-full border border-transparent text-slate-400 transition-colors duration-150 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-600 dark:text-muted-foreground dark:hover:border-border dark:hover:bg-muted dark:hover:text-foreground"
+            className="chat-line-add-reaction grid h-7 w-7 place-items-center rounded-full border border-transparent text-slate-400 transition-colors duration-150 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-600 dark:text-muted-foreground dark:hover:border-border dark:hover:bg-muted dark:hover:text-foreground"
           >
             <SmilePlus className="h-4 w-4" />
           </button>
