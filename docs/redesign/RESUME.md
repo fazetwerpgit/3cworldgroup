@@ -9,13 +9,14 @@ started, implementation done, deploy — not just at session end).
 
 ## NEXT ACTION
 
-Calls Schedule mockups are BUILT (design-mockups/calls-round1/, 3 options,
-today-first + next-call countdown design fix). Self-critique found 2 defects
-(opt2 clipped 10:00 numeral; opt2+opt3 admin band visible in Rep view) —
-Codex fix round dispatched. Remaining: verify fixes via screenshot → send
-the 3 HTML files to the user via SendUserFile display:render (localhost
-links don't work for them) → user picks → commit + update this file. Then
-next page: Forms mockup round (inventory → brief → 3 mockups).
+Calls Schedule mockups SENT to user 2026-07-13 (committed 5baaea2; 3 options
+in design-mockups/calls-round1/, all today-first + next-call countdown;
+defects fixed + verified). WAITING on the user's pick. When they pick:
+record it in the campaign spec "Picks so far" + this file, then start the
+next page: FORMS mockup round (Codex read-only inventory of all form pages
+under src/app/portal/ → self-contained brief → 3 "The Line"-family mockups
+→ screenshot/self-critique → SendUserFile display:render). Forms = one
+consistent treatment for the whole folder, per campaign spec.
 
 ## Campaign state (mockups-first, implement later)
 
