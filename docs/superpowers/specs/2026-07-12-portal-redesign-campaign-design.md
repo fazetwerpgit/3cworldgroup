@@ -29,8 +29,15 @@ design language and hard constraints — this doc holds the campaign process).
   yet. Approvals page folds into the Sales pending view (user-approved
   merge, old route must keep working). Goal contract still to be written
   at implementation time.
+- Team Chat: option-3 "The Line: Chat" (2026-07-13) — picked, NOT
+  implemented yet. Includes the mobile fix: always-visible three-dot
+  affordance on own bubbles opening a bottom action sheet (replaces the
+  unreliable long-press).
 - User direction: run ALL pages' mockup rounds first; implement when
   ready to deploy.
+- Session continuity: `docs/redesign/RESUME.md` is the live campaign state,
+  auto-injected at session start by a SessionStart hook in
+  `.claude/settings.json`. Update RESUME.md at every milestone.
 
 ## Page order (most-used first)
 
