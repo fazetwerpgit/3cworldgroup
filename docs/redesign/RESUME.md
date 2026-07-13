@@ -40,10 +40,24 @@ numbered fill sections (who you are / what happened / proof),
 segmented campaign picker with dependent sub-row (the pattern that
 will fix Log a Sale's carrier/plan jumble at Sales implementation).
 Fix during verify: mobile h1 13vw→10.5vw (clipped after 05→5 made the
-line longer). WAITING user confirm → commit forms-round2 + spec scope
-update → next page: SIDEBAR + portal shell (new round 6 per expanded
-scope), then RESOURCES (University+Links merge — propose with mockups,
-needs user approval).
+line longer). SIDEBAR + shell round: inventory DONE (sidebar w-60 navy, 4 collapsible
+groups, header w/ search+bell+avatar, mobile = drawer + 4-slot bottom
+bar w/ naming drift; pain: no desktop collapse, dup icons, bottom bar
+misses most pages). Codex building 3 mockups in
+design-mockups/shell-round1/ (option-1-the-rail = classic + icon-rail
+collapse; option-2-command-deck = 64px icon rail + flyouts;
+option-3-the-line-shell = numbered broadcast index, family favorite).
+Each: shell around placeholder page, Rep/Manager/Admin role switch,
+mobile 5-slot bottom bar + full-nav sheet. Nav notes baked in: Forms
+group → single Forms link w/ badge 5 (hub approved); Pending Approvals
+NOT in nav (moves into Sales). BUILT + verified + SENT 2026-07-13 (8 screenshots as attach batches;
+inline render reportedly not opening for user — use display:attach).
+Fixes during verify: opt2 flyout now starts closed (added 'closed'
+class + mouseenter opens), opt3 .main-kicker CSS rule was missing
+(jammed text). Mobile shots = viewport-only (fullPage paints fixed
+bottom bar mid-content). WAITING user pick → commit shell-round1 →
+next: RESOURCES (University+Links merge — propose with mockups, needs
+user approval).
 
 NOTE design rule added: the big metallic count numeral in mastheads is
 top-aligned with the headline (applies to every future page mockup).
@@ -65,7 +79,10 @@ Picks so far (all "The Line" family — dark Spotlight Arena):
   buggy long-press).
 - Calls Schedule: HYBRID picked+approved 2026-07-13 (calls-round2/
   hybrid-the-line-calls.html), not implemented.
-- Forms: IN PROGRESS (mockup round).
+- Forms: The Line: Forms APPROVED 2026-07-13 (forms-round2/
+  the-line-forms-final.html — hub + sectioned fill + segmented picker),
+  not implemented.
+- Sidebar + shell: IN PROGRESS (mockup round).
 - SCOPE RULING (user, 2026-07-13): EVERY portal page gets the redesign,
   including the sidebar/nav shell itself, form-options, chat-channels,
   user management, email-templates — everything. Full inventory in the
