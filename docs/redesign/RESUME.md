@@ -44,14 +44,44 @@ MEMBER PICK MADE 2026-07-13: option-3 The Line: Member
 (member-round1/option-3-the-line-member.html). NEW CAMPAIGN RULE from
 user: use the real 3C logo wherever it applies at implementation time
 (mockups' "3C" square is placeholder only).
-NOW: OPS/ADMIN QUEUES round in flight (pipeline, recruiting,
-admin/onboarding, 5 form review queues, bug-reports). Step 1: Codex
-read-only inventory → step 2: brief (bake all hard rules from
-member-round1 BRIEF.md incl. scoped .password .show gotcha) + 3
-mockups in design-mockups/ops-round1/ → verify screenshots (my eyes
-only) → SEND THE .HTML FILES to user → pick → commit. Then final
-round: ADMIN MANAGEMENT (users list/[id]/new, chat-channels,
-form-options, email-templates, admin/university, admin/settings).
+NOW: OPS/ADMIN QUEUES round in flight. Inventory DONE (9 admin pages,
+4+ different layouts: pipeline+recruiting bespoke workbenches,
+onboarding = cards + embedded ActionQueue, 5 form queues + bug-reports
+share ReviewList with only new→handled; nobody has search/filters/
+sort; evidence detached from rows). Brief written:
+design-mockups/ops-round1/BRIEF.md — 4 views per mockup (Ops home
+queue index NEW / Review queue shared pattern demo=payroll disputes /
+Onboarding review / Pipeline board), establishes ONE queue design all
+9 pages adopt; recruiting reuses patterns at implementation. All hard
+rules baked in incl. new rule 7 (never style bare utility classes like
+.show — scope to component). 3 mockups BUILT + verified + .HTML FILES SENT 2026-07-13
+(option-1-the-desk, option-2-the-docket, option-3-the-line-ops; 4
+views each via .view-switch [data-view] buttons). Fixes during
+verify: (a) all 3 shared jammed pipeline labels ("MANAGERDana R.") →
+appended `.rep-cell .meta{display:block;margin-bottom:4px}`; (b) opt2
+hero numeral clipped by boxed masthead → grid column 180px→auto +
+font clamp 150→124px; (c) opt2 Georgia italic "2" ball-terminal made
+23 read as "2.3" → font swapped to Cambria upright, letter-spacing
+-.02em (NOTE: Georgia numerals are old-style — avoid for big counts).
+Screenshots ops-opt{1,2,3}-{home,review,onboarding,pipeline}-1440.png
++ mobile at repo root (my verify only). OPS PICK MADE 2026-07-13 — a
+MIX: Ops home from option-1-the-desk + Review queue from
+option-3-the-line-ops + Onboarding review from option-1-the-desk +
+Pipeline from option-3-the-line-ops. (No hybrid file built yet — build
+one only if needed at implementation; the four source views are the
+contract.) Committed.
+NEXT ACTION: final mockup round — ADMIN MANAGEMENT (users list /
+users/[id] / users/new, chat-channels, form-options, email-templates,
+admin/university, admin/settings). Process: Codex read-only inventory
+→ brief in design-mockups/admin-round1/BRIEF.md (copy hard rules from
+ops-round1/BRIEF.md verbatim, incl. rule 7 scoped utility classes +
+Georgia old-style numeral gotcha) → 3 mockups → screenshot verify (my
+eyes only) → SEND .HTML FILES (never screenshots to user) → pick →
+commit. After that: ALL mockup rounds done → implementation phase
+per page (goal contract → Codex implements → Opus 1:1 verify → gates
+→ user says "deploy" → push). Then final round: ADMIN MANAGEMENT (users
+list/[id]/new, chat-channels, form-options, email-templates,
+admin/university, admin/settings).
 
 ## Older context
 
