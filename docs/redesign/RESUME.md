@@ -9,14 +9,19 @@ started, implementation done, deploy — not just at session end).
 
 ## NEXT ACTION
 
-Calls Schedule mockups SENT to user 2026-07-13 (committed 5baaea2; 3 options
-in design-mockups/calls-round1/, all today-first + next-call countdown;
-defects fixed + verified). WAITING on the user's pick. When they pick:
-record it in the campaign spec "Picks so far" + this file, then start the
-next page: FORMS mockup round (Codex read-only inventory of all form pages
-under src/app/portal/ → self-contained brief → 3 "The Line"-family mockups
-→ screenshot/self-critique → SendUserFile display:render). Forms = one
-consistent treatment for the whole folder, per campaign spec.
+Calls HYBRID APPROVED by user 2026-07-13
+(design-mockups/calls-round2/hybrid-the-line-calls.html). Fixes applied
+during verify: weekday case-mismatch ("UNDEFINED" everywhere), card clock
+numerals clipped ("10:0" → resized per breakpoint), hero "2" numeral
+ink-chopped by background-clip box (padding/margin paint-area fix +
+line-height .78, top-aligned with headline). Committed. NOW: FORMS mockup
+round (Codex read-only inventory of
+form pages under src/app/portal/ → brief → 3 "The Line"-family mockups →
+screenshot/self-critique → send as files). Forms = one consistent treatment
+for the whole folder, per campaign spec.
+
+NOTE design rule added: the big metallic count numeral in mastheads is
+top-aligned with the headline (applies to every future page mockup).
 
 ## Campaign state (mockups-first, implement later)
 
@@ -33,7 +38,9 @@ Picks so far (all "The Line" family — dark Spotlight Arena):
 - Team Chat: option-3 The Line: Chat — picked 2026-07-13, not implemented.
   Includes mobile fix: visible ⋯ on own bubbles → action sheet (replaces
   buggy long-press).
-- Calls Schedule: IN PROGRESS (mockup round).
+- Calls Schedule: HYBRID picked+approved 2026-07-13 (calls-round2/
+  hybrid-the-line-calls.html), not implemented.
+- Forms: IN PROGRESS (mockup round).
 - Remaining after that: Forms → Resources (University+Links merge candidate)
   → Operations → Admin. Leaderboard is DONE/deployed — never touch.
 

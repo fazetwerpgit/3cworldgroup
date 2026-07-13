@@ -33,6 +33,12 @@ design language and hard constraints — this doc holds the campaign process).
   implemented yet. Includes the mobile fix: always-visible three-dot
   affordance on own bubbles opening a bottom action sheet (replaces the
   unreliable long-press).
+- Calls Schedule: HYBRID (2026-07-13) — option-3 "The Line" top (masthead
+  headline + NEXT CALL countdown strip) over option-2 "Air Times" bottom
+  (week strip day filter + broadcast time cards). Big count numeral must be
+  TOP-aligned with the headline (user correction, applies to all mockups).
+  Mockup: design-mockups/calls-round2/hybrid-the-line-calls.html. NOT
+  implemented yet.
 - User direction: run ALL pages' mockup rounds first; implement when
   ready to deploy.
 - Session continuity: `docs/redesign/RESUME.md` is the live campaign state,
