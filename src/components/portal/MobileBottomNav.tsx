@@ -1,46 +1,104 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { DollarSign, LayoutDashboard, MessageSquare, Trophy } from 'lucide-react';
+import {
+  ArrowLeftToLine,
+  BadgeDollarSign,
+  LayoutDashboard,
+  Menu,
+  MessageSquare,
+  Trophy,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
+import {
+  portalNavGroups,
+  type PortalNavGroup,
+  type PortalNavItem,
+} from '@/components/portal/CommandPalette';
 
-const items = [
-  {
-    name: 'Dashboard',
-    href: '/portal/dashboard',
-    icon: LayoutDashboard,
-    permission: null as string | null,
-  },
-  { name: 'Sales', href: '/portal/sales', icon: DollarSign, permission: 'sales:read' },
-  { name: 'Chat', href: '/portal/chat', icon: MessageSquare, permission: 'chat:read' },
-  {
-    name: 'Board',
-    href: '/portal/leaderboard',
-    icon: Trophy,
-    permission: 'leaderboard:read',
-  },
+function isItemActive(pathname: string, href: string) {
+  return href === '/portal/dashboard' ? pathname === href : pathname.startsWith(href);
+}
+
+const mobileSlotItems: PortalNavItem[] = [
+  { label: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
+  { label: 'Sales', href: '/portal/sales', icon: BadgeDollarSign, permissions: ['sales:read'] },
+  { label: 'Team Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
+  { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
 ];
 
+function NavGroups({
+  groups,
+  pathname,
+  canAccess,
+  pendingSignupsCount,
+  onLinkClick,
+}: {
+  groups: PortalNavGroup[];
+  pathname: string;
+  canAccess: (item: PortalNavItem) => boolean;
+  pendingSignupsCount: number;
+  onLinkClick: () => void;
+}) {
+  return (
+    <nav className="portal-sheet-nav" aria-label="Full portal navigation">
+      {groups.map((group) => {
+        const visibleItems = group.items.filter(canAccess);
+        if (!visibleItems.length) return null;
+
+        return (
+          <section className="portal-sheet-group" key={group.label ?? 'primary'}>
+            {group.label && <p className="portal-sheet-group-label">{group.label}</p>}
+            <div>
+              {visibleItems.map((item) => {
+                const Icon = item.icon;
+                const badgeCount = item.href === '/portal/admin/users' ? pendingSignupsCount : 0;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onLinkClick}
+                    className={`portal-sheet-link${isItemActive(pathname, item.href) ? ' is-active' : ''}`}
+                  >
+                    <Icon aria-hidden="true" />
+                    <span>{item.label}</span>
+                    {!!badgeCount && <b>{badgeCount > 99 ? '99+' : badgeCount}</b>}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </nav>
+  );
+}
+
 /**
- * Phone-first quick nav: the four everyday destinations pinned to the bottom
- * of the screen on mobile. Hidden on desktop. On the chat page it stays visible
- * on the channel-list screen but is hidden inside a conversation — the chat page
- * flags <body data-chat-thread> and globals.css collapses the bar (see the
- * data-slot hook below). While mounted it tags <body> so globals.css can
- * reserve scroll room under the bar.
+ * The mobile shell: five-slot quick nav plus the full grouped navigation sheet.
+ * The existing MobileMenuContext remains the source of truth for open state.
  */
-export function MobileBottomNav() {
+export function MobileBottomNav({
+  pendingSignupsCount = 0,
+  showAdminSection = false,
+}: {
+  pendingSignupsCount?: number;
+  showAdminSection?: boolean;
+}) {
   const pathname = usePathname();
-  const { hasPermission, user } = useAuth();
-  // Chat unread indicator. This nav lives outside the chat page, so it runs its
-  // own channel + read-receipt subscriptions (independent of the page's); the
-  // hooks are safe to mount more than once. Returns all-read when unauthenticated.
+  const { hasPermission, isRole, user } = useAuth();
+  const { isOpen, toggle, close } = useMobileMenu();
   const { channels } = useChatChannels();
   const { anyUnread } = useChatUnread(channels, user?.uid);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  const previousOverflowRef = useRef('');
 
   useEffect(() => {
     document.body.dataset.portalBottomNav = 'on';
@@ -49,47 +107,124 @@ export function MobileBottomNav() {
     };
   }, []);
 
-  const isActive = (href: string) =>
-    href === '/portal/dashboard' ? pathname === href : pathname.startsWith(href);
+  useEffect(() => {
+    if (isOpen) {
+      if (!wasOpenRef.current) previousOverflowRef.current = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    } else if (wasOpenRef.current) {
+      document.body.style.overflow = previousOverflowRef.current;
+      requestAnimationFrame(() => moreButtonRef.current?.focus());
+    }
+    wasOpenRef.current = isOpen;
+
+    return () => {
+      if (isOpen) document.body.style.overflow = previousOverflowRef.current;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [close, isOpen]);
+
+  const canAccess = (item: PortalNavItem) => {
+    if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
+    if (!item.permissions || item.permissions.length === 0) return true;
+    return item.permissions.some((permission) => hasPermission(permission));
+  };
+
+  const visibleGroups = portalNavGroups.filter(
+    (group) => (!group.roles || isRole(...group.roles)) && group.items.some(canAccess)
+  );
 
   return (
-    <nav
-      aria-label="Quick navigation"
-      data-slot="mobile-bottom-nav"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0A1F44]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
-    >
-      <ul className="mx-auto flex max-w-md items-stretch justify-around">
-        {items.map((item) => {
-          if (item.permission && !hasPermission(item.permission)) return null;
-          const active = isActive(item.href);
-          const Icon = item.icon;
-          return (
-            <li key={item.name} className="flex-1">
-              <Link
-                href={item.href}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
-                  active ? 'text-[#8dc63f]' : 'text-white/55 hover:text-white'
-                }`}
-              >
-                <span className="relative">
-                  <Icon
-                    className={`h-5 w-5 transition-transform duration-150 ${
-                      active ? 'scale-110' : ''
-                    }`}
-                  />
-                  {item.name === 'Chat' && anyUnread && (
-                    <span
-                      aria-label="Unread messages"
-                      className="absolute -right-1 -top-0.5 size-2 rounded-full bg-[#8dc63f] ring-2 ring-[#0A1F44]"
-                    />
-                  )}
-                </span>
-                {item.name}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <>
+      <nav className="portal-mobile-nav" aria-label="Quick navigation" data-slot="mobile-bottom-nav">
+        <ul>
+          {mobileSlotItems.map((item) => {
+            if (!canAccess(item)) {
+              return <li key={item.href} aria-hidden="true" />;
+            }
+
+            const Icon = item.icon;
+            const active = isItemActive(pathname, item.href);
+            return (
+              <li key={item.href}>
+                <Link href={item.href} className={active ? 'is-active' : undefined}>
+                  <span className="portal-mobile-icon-wrap">
+                    <Icon aria-hidden="true" />
+                    {item.label === 'Team Chat' && anyUnread && (
+                      <i aria-label="Unread messages" />
+                    )}
+                  </span>
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+          <li>
+            <button
+              ref={moreButtonRef}
+              type="button"
+              onClick={toggle}
+              className={isOpen ? 'is-active' : undefined}
+              aria-expanded={isOpen}
+              aria-controls="portal-mobile-sheet"
+            >
+              <Menu aria-hidden="true" />
+              <span>More</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      {isOpen && (
+        <div
+          className="portal-sheet-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+        >
+          <section
+            id="portal-mobile-sheet"
+            className="portal-nav-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="portal-sheet-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="portal-sheet-handle" aria-hidden="true" />
+            <div className="portal-sheet-header">
+              <div>
+                <p>The Rail / full navigation</p>
+                <h2 id="portal-sheet-title">More of the portal</h2>
+              </div>
+              <button type="button" onClick={close} aria-label="Close full navigation">
+                <X aria-hidden="true" />
+                <span>Close</span>
+              </button>
+            </div>
+            <NavGroups
+              groups={visibleGroups}
+              pathname={pathname}
+              canAccess={canAccess}
+              pendingSignupsCount={showAdminSection ? pendingSignupsCount : 0}
+              onLinkClick={close}
+            />
+            <Link href="/" className="portal-sheet-footer" onClick={close}>
+              <ArrowLeftToLine aria-hidden="true" />
+              Back to Main Site
+            </Link>
+          </section>
+        </div>
+      )}
+    </>
   );
 }

@@ -2,21 +2,53 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import {
+  BadgeDollarSign,
+  BarChart3,
+  BookOpen,
+  Bug,
+  CalendarClock,
+  CheckSquare,
+  ClipboardCheck,
+  GraduationCap,
+  LayoutDashboard,
+  Link2,
+  Mail,
+  MessageSquare,
+  MessagesSquare,
+  PanelTop,
+  ReceiptText,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  Trophy,
+  UserPlus,
+  Users,
+  WalletCards,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { FieldRoles, Sale, UserRole } from '@/types';
+import { Sale, UserRole } from '@/types';
 
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface NavDestination {
+export interface PortalNavItem {
   label: string;
   href: string;
+  icon: LucideIcon;
   permissions?: string[];
   roles?: UserRole[];
+}
+
+export interface PortalNavGroup {
+  label?: string;
+  roles?: UserRole[];
+  items: PortalNavItem[];
 }
 
 interface ActionDestination {
@@ -27,62 +59,80 @@ interface ActionDestination {
 
 type PaletteRow = { key: string; label: string; href: string; meta?: string };
 
-// Destinations + gating mirror PortalSidebar exactly so the palette can never
-// surface a page the sidebar itself would hide.
-const mainDestinations: NavDestination[] = [
-  { label: 'Dashboard', href: '/portal/dashboard' },
-  { label: 'Team Chat', href: '/portal/chat', permissions: ['chat:read'] },
-  { label: 'Leaderboard', href: '/portal/leaderboard', permissions: ['leaderboard:read'] },
-  { label: 'Sales', href: '/portal/sales', permissions: ['sales:read'] },
-  { label: 'Calls Schedule', href: '/portal/calls' },
+const managerRoles: UserRole[] = [
+  'admin',
+  'operations',
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+  'general_manager',
+  'office_manager',
+];
+
+const platformRoles: UserRole[] = ['admin', 'operations'];
+
+// This is the single portal navigation source of truth. The sidebar, mobile
+// sheet, and palette all consume these same labels, routes, and gates.
+export const portalNavGroups: PortalNavGroup[] = [
   {
-    label: 'My Onboarding',
-    href: '/portal/onboarding',
-    roles: Object.values(FieldRoles),
+    items: [
+      { label: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
+      { label: 'Sales', href: '/portal/sales', icon: BadgeDollarSign, permissions: ['sales:read'] },
+      { label: 'Team Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
+      { label: 'Calls Schedule', href: '/portal/calls', icon: CalendarClock },
+      { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
+      { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, roles: ['entry_level_rep'] },
+    ],
   },
-];
-
-const formDestinations: NavDestination[] = [
-  { label: 'Fiber Report', href: '/portal/fiber-report' },
-  { label: 'Expedite Order', href: '/portal/expedite-order' },
-  { label: 'Payroll Dispute', href: '/portal/payroll-dispute' },
-  { label: 'Leads Request', href: '/portal/leads-request' },
   {
-    label: 'Manager Interview',
-    href: '/portal/manager-interview',
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
+    label: 'Forms',
+    items: [
+      { label: 'Fiber Report', href: '/portal/fiber-report', icon: BarChart3 },
+      { label: 'Expedite Order', href: '/portal/expedite-order', icon: Zap },
+      { label: 'Payroll Dispute', href: '/portal/payroll-dispute', icon: ReceiptText },
+      { label: 'Leads Request', href: '/portal/leads-request', icon: Users },
+      { label: 'Manager Interview', href: '/portal/manager-interview', icon: CheckSquare, roles: managerRoles },
+    ],
   },
-];
-
-const resourceDestinations: NavDestination[] = [
-  { label: 'University', href: '/portal/training', permissions: ['training:read'] },
-  { label: 'Links', href: '/portal/links', permissions: ['links:read'] },
-  { label: 'Pay Structure', href: '/portal/pay-structure' },
-];
-
-const operationsDestinations: NavDestination[] = [
-  { label: 'Onboarding Review', href: '/portal/admin/onboarding', roles: ['admin', 'operations'] },
-  { label: 'Fiber Reports', href: '/portal/admin/fiber-reports', roles: ['admin', 'operations'] },
-  { label: 'Expedite Orders', href: '/portal/admin/expedite-orders', roles: ['admin', 'operations'] },
-  { label: 'Payroll Disputes', href: '/portal/admin/payroll-disputes', roles: ['admin', 'operations'] },
-  { label: 'Manager Interviews', href: '/portal/admin/manager-interviews', roles: ['admin', 'operations'] },
-  { label: 'Leads Requests', href: '/portal/admin/leads-requests', roles: ['admin', 'operations'] },
-  { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', roles: ['admin', 'operations'] },
   {
-    label: 'Recruit Onboarding',
-    href: '/portal/admin/recruiting',
-    roles: ['admin', 'operations', 'l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'],
+    label: 'Resources',
+    items: [
+      { label: 'University', href: '/portal/training', icon: GraduationCap, permissions: ['training:read'] },
+      { label: 'Links', href: '/portal/links', icon: Link2, permissions: ['links:read'] },
+      { label: 'Pay Structure', href: '/portal/pay-structure', icon: WalletCards },
+    ],
   },
-  { label: 'Email Templates', href: '/portal/admin/email-templates', roles: ['admin', 'operations'] },
-  { label: 'Pending Approvals', href: '/portal/approvals', permissions: ['sales:approve'] },
-  { label: 'Bug Reports', href: '/portal/admin/bug-reports', roles: ['admin', 'operations'] },
-];
-
-const adminDestinations: NavDestination[] = [
-  { label: 'User Management', href: '/portal/admin/users', permissions: ['users:read'] },
-  { label: 'Form Options', href: '/portal/admin/form-options' },
-  { label: 'Chat Channels', href: '/portal/admin/chat-channels' },
-  { label: 'System Settings', href: '/portal/admin/settings', permissions: ['settings:read'] },
+  {
+    label: 'Operations',
+    roles: managerRoles,
+    items: [
+      { label: 'Onboarding Review', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
+      { label: 'University Content', href: '/portal/admin/university', icon: BookOpen, roles: platformRoles },
+      { label: 'Fiber Reports', href: '/portal/admin/fiber-reports', icon: BarChart3, roles: platformRoles },
+      { label: 'Expedite Orders', href: '/portal/admin/expedite-orders', icon: Zap, roles: platformRoles },
+      { label: 'Payroll Disputes', href: '/portal/admin/payroll-disputes', icon: ReceiptText, roles: platformRoles },
+      { label: 'Manager Interviews', href: '/portal/admin/manager-interviews', icon: CheckSquare, roles: platformRoles },
+      { label: 'Leads Requests', href: '/portal/admin/leads-requests', icon: Users, roles: platformRoles },
+      { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', icon: PanelTop, roles: platformRoles },
+      { label: 'Recruit Onboarding', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
+      { label: 'Email Templates', href: '/portal/admin/email-templates', icon: Mail, roles: platformRoles },
+      { label: 'Pending Approvals', href: '/portal/approvals', icon: ClipboardCheck, permissions: ['sales:approve'] },
+      { label: 'Bug Reports', href: '/portal/admin/bug-reports', icon: Bug, roles: platformRoles },
+    ],
+  },
+  {
+    label: 'Admin',
+    roles: ['admin'],
+    items: [
+      { label: 'User Management', href: '/portal/admin/users', icon: Users, permissions: ['users:read'] },
+      { label: 'Form Options', href: '/portal/admin/form-options', icon: SlidersHorizontal },
+      { label: 'Chat Channels', href: '/portal/admin/chat-channels', icon: MessagesSquare },
+      { label: 'System Settings', href: '/portal/admin/settings', icon: Settings, permissions: ['settings:read'] },
+    ],
+  },
 ];
 
 const actionDestinations: ActionDestination[] = [
@@ -109,7 +159,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   // Same gate PortalSidebar uses: role restriction wins, then permissions.
   const canAccess = useCallback(
-    (item: NavDestination) => {
+    (item: PortalNavItem) => {
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
       if (!item.permissions || item.permissions.length === 0) return true;
       return item.permissions.some((p) => hasPermission(p));
@@ -118,29 +168,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   );
 
   const pageDestinations = useMemo(() => {
-    const list: NavDestination[] = [
-      ...mainDestinations,
-      ...formDestinations,
-      ...resourceDestinations,
-    ];
-    if (
-      isRole(
-        'admin',
-        'operations',
-        'l1_manager',
-        'l2_manager',
-        'ibo_level_1',
-        'ibo_level_2',
-        'ibo_level_3',
-        'ibo_level_4'
-      )
-    ) {
-      list.push(...operationsDestinations);
-    }
-    if (isRole('admin')) {
-      list.push(...adminDestinations);
-    }
-    return list.filter(canAccess);
+    return portalNavGroups
+      .filter((group) => !group.roles || isRole(...group.roles))
+      .flatMap((group) => group.items)
+      .filter(canAccess);
   }, [canAccess, isRole]);
 
   const actions = useMemo(
