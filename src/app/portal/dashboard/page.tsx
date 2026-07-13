@@ -492,7 +492,7 @@ export default function DashboardPage() {
           {statsLoading ? (
             <Skeleton className="h-[88px] w-56 max-w-full rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
           ) : (
-            <strong className="portal-display block max-w-full whitespace-nowrap text-[clamp(48px,28cqw,118px)] font-black leading-[.86] tracking-[-.11em] max-[700px]:text-[clamp(64px,23vw,92px)]" style={resolvedTheme === 'dark' ? darkMetallicNumberStyle : lightMetallicNumberStyle}>
+            <strong className="portal-display portal-metallic-num block max-w-full whitespace-nowrap text-[clamp(48px,28cqw,118px)] font-black leading-[.86] tracking-[-.11em] max-[700px]:text-[clamp(64px,23vw,92px)]" style={resolvedTheme === 'dark' ? darkMetallicNumberStyle : lightMetallicNumberStyle}>
               <CountUpNumber value={approvedPoints} />
             </strong>
           )}

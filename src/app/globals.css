@@ -294,6 +294,23 @@ body {
   font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
+/* Paint-area fix for background-clip:text display numerals: glyph ink that
+   extends past the text box (tight tracking + sub-1 line-height) is clipped
+   to the padding box, chopping edges off big digits. Pad the paint area and
+   pull the layout back with negative margins. Campaign hard rule — apply to
+   EVERY metallic masthead numeral. */
+.portal-metallic-num {
+  padding: 0.25em 0.13em 0 0;
+  margin: -0.25em -0.13em 0 0;
+}
+
+@media (max-width: 460px) {
+  .portal-metallic-num {
+    padding-right: 0;
+    margin-right: 0;
+  }
+}
+
 /* Focus is lime inside the portal — overrides the public site's legacy blue
    outline rule and guarantees a visible ring on form fields even where
    utility-class focus variants are missing. */
