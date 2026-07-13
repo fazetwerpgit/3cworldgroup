@@ -13,17 +13,45 @@ RESOURCES PICK MADE 2026-07-13: option-3 The Line: Resources
 (design-mockups/resources-round1/option-3-the-line-resources.html) —
 hub + University toggle + Rep/Admin pay switch. Fix during verify:
 mobile role pill overlapped header brand in all 3 → top:62px left:9px.
-NOW: MEMBER PAGES round in flight (settings incl. report-a-bug,
-onboarding checklist, signup). Step 1: Codex read-only inventory of
-those pages → step 2: brief + 3 mockups in
-design-mockups/member-round1/ → screenshot 1440+390 (mobile
-viewport-only, scrollTo(0,0), check scrollWidth) → self-critique →
-send ATTACH batches → pick → commit. Bake into brief: plain numbers
-(no leading zeros), numeral top-aligned + paint-fix padding
-(.25em .13em 0 0 / -.25em -.13em 0 0, lh .78, mobile padding-right:0),
-mobile h1 clamp(36px,10.5vw,54px), view/role pills top:72px right
-(desktop) / 62px (mobile) with role pill left at 62px on mobile,
-no 'undefined', segmented picker pattern where choices exist.
+NOW: MEMBER PAGES round in flight. Inventory DONE (settings = long
+card stack, editable/read-only mixed, bug report buried; onboarding =
+8-item checklist entry_level_rep only, dup progress, horizontal step
+scroll, e-sign items look dead; signup = split AuthShell, no confirm
+password/strength/after-submit clarity). Brief written:
+design-mockups/member-round1/BRIEF.md (all hard rules baked in:
+paint-fix numeral, plain numbers, mobile h1 clamp, pill positions,
+segmented pickers; 3 views per file Settings/Onboarding/Signup).
+3 mockups BUILT + verified + SENT 2026-07-13 in
+design-mockups/member-round1/ (option-1-the-locker,
+option-2-the-ledger, option-3-the-line-member; each = 3 views
+Settings/Onboarding/Signup via pill nav). Fix during verify: generic
+`.show{position:absolute...}` CSS rule (password show/hide) also
+captured `.choice-note.show` in opts 2+3 → appearance note rendered
+jammed at card top-right; scoped rule to `.password .show`. Mobile
+scrollWidth 375 on all, no mojibake/undefined. Screenshots
+mem-opt{1,2,3}-{settings,onboarding,signup}-1440.png +
+mem-opt{1,2,3}-{,onboarding-}390.png at repo root; sent as 3 attach
+batches of 5. Attach files ALSO failed to open for user → published all 15
+shots as one Artifact gallery page (works):
+https://claude.ai/code/artifact/f006f3da-2b2a-4738-8675-0b698335bbb7
+(built via scratchpad build-gallery.ps1 — System.Drawing resize→JPEG
+q72→base64 data URIs; ~1MB page). USER then said he can open sent
+HTML files "almost all the time" → STANDING PRACTICE (in memory too):
+send the mockup .html files themselves via SendUserFile attach;
+screenshots are for my verification only; Artifact gallery = backup.
+The 3 member .html files were re-sent as files 2026-07-13.
+MEMBER PICK MADE 2026-07-13: option-3 The Line: Member
+(member-round1/option-3-the-line-member.html). NEW CAMPAIGN RULE from
+user: use the real 3C logo wherever it applies at implementation time
+(mockups' "3C" square is placeholder only).
+NOW: OPS/ADMIN QUEUES round in flight (pipeline, recruiting,
+admin/onboarding, 5 form review queues, bug-reports). Step 1: Codex
+read-only inventory → step 2: brief (bake all hard rules from
+member-round1 BRIEF.md incl. scoped .password .show gotcha) + 3
+mockups in design-mockups/ops-round1/ → verify screenshots (my eyes
+only) → SEND THE .HTML FILES to user → pick → commit. Then final
+round: ADMIN MANAGEMENT (users list/[id]/new, chat-channels,
+form-options, email-templates, admin/university, admin/settings).
 
 ## Older context
 
