@@ -179,9 +179,16 @@ sales-impl-390-{top,ledger}.png at repo root — hero 1,250 whole,
 commission em-dashes, empty queue copy right, mobile scrollWidth 375,
 5 .portal-metallic-num on page. Dev server RUNNING DETACHED on :3000
 (log scratchpad logs/devserver.log; killed-orphan playbook applied
-twice). NOW: fresh Opus reviewer ROUND 1 running (checklist incl.
-numeral rule + entry-point retargets). Then: fix defects → re-review →
-commit local → user "deploy" → push. Remaining build
+twice). Opus ROUND 1 verdict: PASS, zero blockers; two cosmetic notes
+— M1 sheet date chip had year (fixed: formatDate drops year, tsc+lint
+PASS) and M2 Value MTD support line = real-data substitution (kept, no
+MoM source exists). SALES COMMITTED a25a438 (local only, NOT pushed —
+includes contract doc + M1 fix). AWAITING USER: check
+localhost:3000/portal/sales, say "deploy" to push (would ship shell
+7438d7e + dashboard numfix 0499338 + sales a25a438 together).
+NEXT PAGE after user OK: Team Chat (per build order), pattern =
+extraction → goal contract (numeral hard rule) → Codex implements →
+Opus 1:1 verify → commit → deploy gate. Remaining build
 order after Sales: Chat → Calls → Forms hub+5 forms (flips nav
 transitional items per shell-the-rail-goal.md) → Resources → Member →
 Ops queues → Admin mgmt. Dashboard built (05cb166) awaiting deploy
