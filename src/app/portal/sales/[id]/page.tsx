@@ -93,6 +93,9 @@ export default function SaleDetailPage() {
     }).format(amount);
   };
 
+  const formatCommission = (amount: number | undefined) =>
+    typeof amount === 'number' ? formatCurrency(amount) : '—';
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
@@ -251,7 +254,7 @@ export default function SaleDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs uppercase text-white/60">Commission</p>
-                  <p className="text-2xl font-bold">{formatCurrency(sale.commission || 0)}</p>
+                  <p className="text-2xl font-bold">{formatCommission(sale.commission)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-white/60">Points</p>

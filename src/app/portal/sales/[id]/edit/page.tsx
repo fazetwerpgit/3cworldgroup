@@ -19,7 +19,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Sale,
   SaleType,
-  SaleStatus,
   SaleProduct,
   SALE_TYPES,
   FIBER_COMPANIES,
@@ -59,7 +58,6 @@ export default function EditSalePage() {
     saleType: 'new_service' as SaleType,
     saleDate: todaySaleDateInput(),
     installDate: '',
-    status: 'pending' as SaleStatus,
     notes: '',
     orderNumberOrBtn: '',
     proofScreenshotPath: '',
@@ -91,7 +89,6 @@ export default function EditSalePage() {
           installDate: saleData.installDate
             ? dateToSaleDateInput(new Date(saleData.installDate))
             : '',
-          status: saleData.status || 'pending',
           notes: saleData.notes || '',
           orderNumberOrBtn: saleData.orderNumberOrBtn || '',
           proofScreenshotPath: saleData.proofScreenshotPath || '',
@@ -274,26 +271,6 @@ export default function EditSalePage() {
                 {formError || error}
               </div>
             )}
-
-            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Status</CardTitle>
-              </CardHeader>
-              <CardContent className="p-5">
-                <Label className="mb-1">Status</Label>
-                <NativeSelect
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="min-w-64"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="cancelled">Cancelled</option>
-                </NativeSelect>
-              </CardContent>
-            </Card>
 
             <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
               <CardHeader className="border-b border-slate-100 dark:border-border p-5">

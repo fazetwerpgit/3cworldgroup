@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
         'sale_pending',
         'New Sale Needs Approval',
         `${salesRepName || 'A team member'} submitted a new sale for review.`,
-        '/portal/approvals'
+        '/portal/sales?status=pending'
       );
     }
 

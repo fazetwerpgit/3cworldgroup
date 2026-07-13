@@ -119,7 +119,6 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', icon: PanelTop, roles: platformRoles },
       { label: 'Recruit Onboarding', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
       { label: 'Email Templates', href: '/portal/admin/email-templates', icon: Mail, roles: platformRoles },
-      { label: 'Pending Approvals', href: '/portal/approvals', icon: ClipboardCheck, permissions: ['sales:approve'] },
       { label: 'Bug Reports', href: '/portal/admin/bug-reports', icon: Bug, roles: platformRoles },
     ],
   },
@@ -137,7 +136,7 @@ export const portalNavGroups: PortalNavGroup[] = [
 
 const actionDestinations: ActionDestination[] = [
   { label: 'Log a sale', href: '/portal/sales/new', permission: 'sales:write' },
-  { label: 'Review pending sales', href: '/portal/approvals', permission: 'sales:approve' },
+  { label: 'Review pending sales', href: '/portal/sales?status=pending', permission: 'sales:approve' },
   { label: 'Report a bug', href: '/portal/settings#report-bug' },
 ];
 

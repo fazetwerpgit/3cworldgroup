@@ -131,13 +131,61 @@ cover rail bottom) → fixed (full-bleed left/right/bottom:0, solid
 rgb(3,9,22), hairline inset 13px via ::before). Round-4 Opus verdict:
 PASS, zero defects, no regressions. Final gates ALL PASS after my CSS
 edits. SHELL COMMITTED 7438d7e (local only, NOT pushed).
-WAITING: user says "deploy" → push (push = prod). Dev server on
-:3000 = my bg task (restarted fresh 2026-07-13).
-NEXT PAGE after shell deploys (or parks): user picks — suggest
-Dashboard next since it's already implemented (05cb166) and now has
-its correct shell; then Forms hub (which flips nav to single Forms
-link + bottom-bar slot 4 per transitional notes in
-shell-the-rail-goal.md).
+Shell deploy: user chose LOCAL ONLY for now ("locally ship so i can
+check it out") 2026-07-13 — checking at localhost:3000; prod push
+still needs explicit "deploy".
+USER-REPORTED BUG FIXED + COMMITTED 0499338 2026-07-13: dashboard
+masthead "0" was clipped (background-clip:text paint box). Fix = new
+REUSABLE class `.portal-metallic-num` in globals.css (padding .25em
+.13em 0 0 + negative margins; ≤460px drops right padding) applied to
+the dashboard hero numeral. Verified whole at 1440 + 390 via
+screenshots + computed styles. NEW CAMPAIGN HARD RULE (user explicit:
+"we need to make sure the big numbers arent getting cut off like they
+have been"): EVERY big gradient numeral on every implemented page MUST
+use .portal-metallic-num, and every verify round MUST screenshot each
+big numeral at 1440 AND 390 and confirm no glyph chop — bake this into
+every goal contract from Sales onward. ALSO: dev-server staleness
+playbook extended (memory project-stale-dev-server-css): TaskStop
+leaves orphan node child on :3000 (Stop-Process the child PID), and
+Turbopack persistent cache can serve stale CSS even after restart —
+delete .next + cold start.
+NOW: SALES implementation round IN FLIGHT (incl. Approvals fold-in per
+locked client decision). Codex read-only extraction DONE
+(tasks/b25o416hm.output — full mockup spec Part A + implementation map
+Part B incl. hazards B11.1-B11.10: /portal/approvals link inventory,
+provider-name mismatch mockup vs real constants, totalValue vs value,
+commission not computed, PUT excludes status, per-rep dashboard count
+vs org-wide queue). GOAL CONTRACT WRITTEN + FINALIZED:
+docs/redesign/sales-the-line-goal.md (Sonnet drafted, I resolved the 3
+open calls: commission renders em-dash `—` never $0/fake; all
+"Approvals" labels KEPT but retarget to /portal/sales?status=pending +
+portalNavGroups Pending Approvals entry REMOVED per shell transitional
+note; dashboard pending-count FIXED org-wide for sales:approve in this
+slice — the one sanctioned exception to the file-scope hard rule,
+alongside entry-point retargets in palette/QuickActions/notification).
+CODEX IMPLEMENTATION DONE 2026-07-13 (session
+019f5d4b-76e8-77c2-a4d7-e1197a6e0eda; run was killed twice by harness
+reaping old-session background tasks — finished via DETACHED
+Start-Process with log at scratchpad logs/codex-sales.log; NOTE
+detached PS logs are UTF-16, grep needs conversion). ALL GATES PASS
+(tsc/eslint/build/diff --check), NOT committed. 11 files: sales page +
+SalesTable (queue+ledger) + SaleDetailSheet (bespoke dark) +
+globals.css sales-line-* + approvals→redirect + dashboard org-wide
+pending count + CommandPalette/QuickActions retargets + edit page
+status-dropdown removed + [id] page fake $0 commission removed + sales
+API route = notification-link retarget only (sanctioned). My verify
+shots taken (dark, admin): sales-impl-1440-{top,ledger,sheet}.png +
+sales-impl-390-{top,ledger}.png at repo root — hero 1,250 whole,
+commission em-dashes, empty queue copy right, mobile scrollWidth 375,
+5 .portal-metallic-num on page. Dev server RUNNING DETACHED on :3000
+(log scratchpad logs/devserver.log; killed-orphan playbook applied
+twice). NOW: fresh Opus reviewer ROUND 1 running (checklist incl.
+numeral rule + entry-point retargets). Then: fix defects → re-review →
+commit local → user "deploy" → push. Remaining build
+order after Sales: Chat → Calls → Forms hub+5 forms (flips nav
+transitional items per shell-the-rail-goal.md) → Resources → Member →
+Ops queues → Admin mgmt. Dashboard built (05cb166) awaiting deploy
+decision alongside shell.
 NOTE user asked mid-run if reviewer should be Fable ("if i remember
 correctly") — corrected: standing rule = reviewers on Opus, never
 Fable; user did not push back.

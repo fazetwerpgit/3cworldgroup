@@ -1,13 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Check, ClipboardList, Eye, Pencil, SearchX, Trash2, X } from 'lucide-react';
-import { Sale, SaleStatus } from '@/types';
+import { Check, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { Sale, SaleStatus, FIBER_COMPANIES } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -16,526 +13,309 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SaleDetailSheet } from './SaleDetailSheet';
 
 interface SalesTableProps {
   sales: Sale[];
-  onApprove?: (saleId: string, status: 'approved' | 'rejected', reason?: string) => void;
-  onDelete?: (saleId: string) => void;
+  statusFilter: SaleStatus | '';
+  onStatusFilterChange: (status: SaleStatus | '') => void;
+  onApprove?: (saleId: string, status: 'approved' | 'rejected', reason?: string) => void | Promise<boolean>;
+  onDelete?: (saleId: string) => void | Promise<boolean>;
   loading?: boolean;
-  /** True when a status filter is active — switches the empty state copy. */
-  filtered?: boolean;
-  onClearFilter?: () => void;
 }
 
-const statusVariant: Record<SaleStatus, 'warning' | 'success' | 'danger' | 'secondary'> = {
-  pending: 'warning',
-  approved: 'success',
-  rejected: 'danger',
-  cancelled: 'secondary',
-};
+const STATUS_TABS: { value: SaleStatus | ''; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
-const statusEdge: Record<SaleStatus, string> = {
-  pending: 'border-l-amber-400',
-  approved: 'border-l-[#8dc63f]',
-  rejected: 'border-l-red-400',
-  cancelled: 'border-l-slate-300 dark:border-l-slate-600',
-};
+function formatMoney(value: number) {
+  return `$${Math.round(value).toLocaleString('en-US')}`;
+}
 
-const daysSince = (date: Date | string | undefined) =>
-  date ? Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000) : 0;
-
-/** Stale-deal signal (ANCHOR §9): amber from 7 idle days, red from 14. */
-function PendingAge({ sale }: { sale: Sale }) {
-  if (sale.status !== 'pending') return null;
-  const days = daysSince(sale.saleDate);
-  if (days < 1) return null;
-  const variant = days >= 14 ? 'danger' : days >= 7 ? 'warning' : 'secondary';
-  return (
-    <Badge variant={variant} className="portal-num rounded-md px-1.5 text-[11px]">
-      {days}d
-    </Badge>
-  );
+function formatDate(value: Date | string | undefined) {
+  if (!value) return 'N/A';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function repInitials(name: string) {
   const words = name.split(' ').filter(Boolean);
-  if (words.length === 0) return '?';
+  if (!words.length) return '?';
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+}
+
+function productSummary(sale: Sale) {
+  return (sale.products || [])
+    .map((product) => {
+      const provider = FIBER_COMPANIES.find((item) => item.value === product.company)?.label || product.company;
+      return `${product.productName} / ${provider}`;
+    })
+    .join(' · ');
+}
+
+function ageDays(sale: Sale) {
+  return Math.max(0, Math.floor((Date.now() - new Date(sale.saleDate).getTime()) / 86_400_000));
+}
+
+function ageLabel(sale: Sale) {
+  const days = ageDays(sale);
+  return days === 0 ? 'Today' : `${days}d idle`;
+}
+
+function ageTone(sale: Sale) {
+  const days = ageDays(sale);
+  return days >= 14 ? 'red' : days >= 7 ? 'amber' : '';
+}
+
+function StatusBadge({ status }: { status: SaleStatus }) {
+  return <span className={`sales-line-badge ${status}`}>{status}</span>;
 }
 
 export function SalesTable({
   sales,
+  statusFilter,
+  onStatusFilterChange,
   onApprove,
   onDelete,
-  loading,
-  filtered = false,
-  onClearFilter,
+  loading = false,
 }: SalesTableProps) {
   const { hasPermission, isRole } = useAuth();
-  const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
   const canApprove = hasPermission('sales:approve');
   const isAdmin = isRole('admin');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
 
-  // Detail sheet: track by id, derive index against the live (filtered) list so
-  // prev/next follows the on-screen order.
-  const selectedIndex = selectedId ? sales.findIndex((s) => s.id === selectedId) : -1;
+  const visibleSales = useMemo(
+    () => (statusFilter ? sales.filter((sale) => sale.status === statusFilter) : sales),
+    [sales, statusFilter]
+  );
+  const pendingSales = useMemo(
+    () => [...sales].filter((sale) => sale.status === 'pending').sort((a, b) => ageDays(b) - ageDays(a)),
+    [sales]
+  );
+  const selectedIndex = selectedId ? visibleSales.findIndex((sale) => sale.id === selectedId) : -1;
+  const selectedSale = selectedIndex >= 0 ? visibleSales[selectedIndex] : null;
+  const totalValue = visibleSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+  const commissionValues = visibleSales.flatMap((sale) => typeof sale.commission === 'number' ? [sale.commission] : []);
+  const totalCommission = commissionValues.reduce((sum, value) => sum + value, 0);
+  const commissionLabel = commissionValues.length ? formatMoney(totalCommission) : '—';
 
-  // If the open sale drops out of the list (e.g. approved away under a Pending
-  // filter), forget it so the sheet closes instead of stranding. Adjusting state
-  // during render is React's sanctioned pattern here and converges immediately.
-  if (selectedId && selectedIndex === -1) {
-    setSelectedId(null);
-  }
+  const moveSelection = useCallback((direction: number) => {
+    if (!visibleSales.length) return;
+    const current = visibleSales.findIndex((sale) => sale.id === selectedId);
+    const next = (current + direction + visibleSales.length) % visibleSales.length;
+    setSelectedId(visibleSales[next]?.id || null);
+  }, [selectedId, visibleSales]);
 
-  const selectedSale = selectedIndex >= 0 ? sales[selectedIndex] : null;
-
-  const goPrev = useCallback(() => {
-    setSelectedId((current) => {
-      const i = sales.findIndex((s) => s.id === current);
-      return i > 0 ? sales[i - 1].id ?? null : current;
-    });
-  }, [sales]);
-
-  const goNext = useCallback(() => {
-    setSelectedId((current) => {
-      const i = sales.findIndex((s) => s.id === current);
-      return i >= 0 && i < sales.length - 1 ? sales[i + 1].id ?? null : current;
-    });
-  }, [sales]);
-
-  // Arrow keys + Vim j/k step through the list while the sheet is open; ignore
-  // keystrokes aimed at inputs (e.g. the reject-reason textarea).
   useEffect(() => {
     if (!selectedSale) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        moveSelection(-1);
       }
-      if (e.key === 'ArrowUp' || e.key === 'k') {
-        e.preventDefault();
-        goPrev();
-      } else if (e.key === 'ArrowDown' || e.key === 'j') {
-        e.preventDefault();
-        goNext();
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        moveSelection(1);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedSale, goPrev, goNext]);
+  }, [moveSelection, selectedSale]);
 
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(''), 1800);
   };
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-
-  const handleApprove = (saleId: string) => {
-    if (onApprove) {
-      onApprove(saleId, 'approved');
-    }
+  const decide = async (saleId: string, status: 'approved' | 'rejected', reason?: string): Promise<boolean> => {
+    if (!onApprove) return false;
+    const result = await onApprove(saleId, status, reason);
+    if (result !== false) showToast(status === 'approved' ? 'Sale approved' : 'Sale rejected');
+    return result !== false;
   };
 
-  const handleReject = (saleId: string) => {
-    if (onApprove && rejectionReason) {
-      onApprove(saleId, 'rejected', rejectionReason);
-      setShowRejectModal(null);
-      setRejectionReason('');
-    }
+  const handleReject = async () => {
+    if (!rejectingId || !rejectionReason.trim()) return;
+    const id = rejectingId;
+    setRejectingId(null);
+    setRejectionReason('');
+    await decide(id, 'rejected', rejectionReason.trim());
   };
 
-  const handleDelete = (saleId: string) => {
-    if (onDelete) {
-      onDelete(saleId);
-      setShowDeleteModal(null);
-    }
+  const handleDelete = async () => {
+    if (!deletingId || !onDelete) return;
+    const id = deletingId;
+    setDeletingId(null);
+    await onDelete(id);
   };
 
-  if (sales.length === 0) {
-    // Two empty states: filtered-empty keeps the user oriented; true-empty
-    // invites the first sale.
-    return (
-      <Card className="rounded-lg border-slate-200 bg-white p-10 text-center shadow-sm dark:border-border dark:bg-card">
-        {filtered ? (
-          <>
-            <SearchX className="mx-auto mb-3 size-10 text-slate-300 dark:text-muted-foreground" />
-            <p className="font-medium text-slate-950 dark:text-foreground">
-              No sales match this filter
-            </p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">
-              Try a different status, or clear the filter to see everything.
-            </p>
-            {onClearFilter && (
-              <Button variant="outline" className="mt-4" onClick={onClearFilter}>
-                Clear filter
-              </Button>
-            )}
-          </>
-        ) : (
-          <>
-            <ClipboardList className="mx-auto mb-3 size-10 text-slate-300 dark:text-muted-foreground" />
-            <p className="font-medium text-slate-950 dark:text-foreground">No sales yet</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">
-              Your first logged sale starts the board.
-            </p>
-            <Button asChild className="mx-auto mt-4 w-fit bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-              <Link href="/portal/sales/new">Log a sale</Link>
-            </Button>
-          </>
-        )}
-      </Card>
-    );
-  }
-
-  const totalValue = sales.reduce((sum, s) => sum + (s.totalValue || 0), 0);
-  const totalCommission = sales.reduce((sum, s) => sum + (s.commission || 0), 0);
-
-  const rowActions = (sale: Sale, mobile = false) => {
-    const revealClass = mobile
-      ? ''
-      : 'opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100';
-    return (
-      <>
-        {/* Quiet actions reveal on hover; decisive actions stay visible. */}
-        <span className={`flex items-center gap-1 ${revealClass}`}>
-          <Button asChild variant="ghost" size={mobile ? 'sm' : 'icon-sm'} title="Open full page">
-            <Link href={`/portal/sales/${sale.id}`} aria-label="Open full page">
-              <Eye className="size-4" />
-              {mobile && 'View'}
-            </Link>
-          </Button>
-          {isAdmin && (
-            <>
-              <Button asChild variant="ghost" size={mobile ? 'sm' : 'icon-sm'} title="Edit">
-                <Link href={`/portal/sales/${sale.id}/edit`} aria-label="Edit sale">
-                  <Pencil className="size-4" />
-                  {mobile && 'Edit'}
-                </Link>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size={mobile ? 'sm' : 'icon-sm'}
-                onClick={() => setShowDeleteModal(sale.id!)}
-                disabled={loading}
-                title="Delete"
-                aria-label="Delete sale"
-                className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15"
-              >
-                <Trash2 className="size-4" />
-                {mobile && 'Delete'}
-              </Button>
-            </>
-          )}
+  const rowActions = (sale: Sale) => {
+    if (canApprove && sale.status === 'pending') {
+      return (
+        <span className="sales-line-row-actions" onClick={(event) => event.stopPropagation()}>
+          <button className="approve" type="button" disabled={loading} onClick={() => void decide(sale.id || '', 'approved')}>
+            <Check className="sales-line-action-icon" />Approve
+          </button>
+          <button className="reject" type="button" disabled={loading} onClick={() => setRejectingId(sale.id || null)}>
+            <X className="sales-line-action-icon" />Reject
+          </button>
         </span>
-        {canApprove && sale.status === 'pending' && (
-          <span className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleApprove(sale.id!)}
-              disabled={loading}
-              className="border-[#8dc63f]/40 text-[#3f6212] hover:bg-[#8dc63f]/10 hover:text-[#3f6212] dark:text-[#d7ecc0] dark:hover:bg-[#8dc63f]/15"
-            >
-              <Check className="size-4" />
-              Approve
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowRejectModal(sale.id!)}
-              disabled={loading}
-              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/15"
-            >
-              <X className="size-4" />
-              Reject
-            </Button>
-          </span>
-        )}
-      </>
+      );
+    }
+
+    if (!isAdmin) return null;
+    return (
+      <span className="sales-line-row-actions sales-line-quiet-actions" onClick={(event) => event.stopPropagation()}>
+        <Link className="quiet" href={`/portal/sales/${sale.id}/edit`} aria-label={`Edit ${sale.customerName || 'sale'}`}>
+          <Pencil className="sales-line-action-icon" />Edit
+        </Link>
+        <button className="quiet" type="button" disabled={loading} onClick={() => setDeletingId(sale.id || null)}>
+          <Trash2 className="sales-line-action-icon" />Delete
+        </button>
+      </span>
     );
   };
 
   return (
     <>
-      {/* Mobile: status-edged cards, phone-first. */}
-      <div className="space-y-3 lg:hidden">
-        {sales.map((sale) => (
-          <Card
-            key={sale.id}
-            onClick={() => setSelectedId(sale.id ?? null)}
-            className={`cursor-pointer rounded-lg border-slate-200 border-l-2 py-4 shadow-sm dark:border-border ${statusEdge[sale.status]}`}
-          >
-            <CardContent className="px-4">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate font-semibold text-slate-950 dark:text-foreground">
-                    {sale.customerName || sale.customerAddress || 'Customer pending'}
-                  </h3>
-                  {sale.customerPhone && (
-                    <p className="portal-num text-sm text-slate-500 dark:text-muted-foreground">
-                      {sale.customerPhone}
-                    </p>
-                  )}
-                </div>
-                <span className="flex shrink-0 items-center gap-1.5">
-                  <PendingAge sale={sale} />
-                  <Badge variant={statusVariant[sale.status]} className="rounded-md">
-                    {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-                  </Badge>
-                </span>
-              </div>
-
-              <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="portal-label text-[11px]">Rep</p>
-                  <p className="mt-0.5 text-slate-950 dark:text-foreground">{sale.salesRepName}</p>
-                </div>
-                <div>
-                  <p className="portal-label text-[11px]">Date</p>
-                  <p className="portal-num mt-0.5 text-slate-950 dark:text-foreground">
-                    {formatDate(sale.saleDate)}
-                  </p>
-                </div>
-                <div>
-                  <p className="portal-label text-[11px]">Value</p>
-                  <p className="portal-num mt-0.5 font-medium text-slate-950 dark:text-foreground">
-                    {formatCurrency(sale.totalValue)}
-                  </p>
-                </div>
-                <div>
-                  <p className="portal-label text-[11px]">Commission</p>
-                  <p className="portal-num mt-0.5 font-medium text-[#3f6212] dark:text-[#d7ecc0]">
-                    +{formatCurrency(sale.commission || 0)}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-border"
-              >
-                {rowActions(sale, true)}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Desktop: financial-grade table. */}
-      <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card lg:block">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50/80 dark:bg-muted/40">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4">Customer</TableHead>
-                <TableHead>Rep</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead className="text-right">Commission</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="pr-4 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sales.map((sale) => (
-                <TableRow
-                  key={sale.id}
-                  onClick={() => setSelectedId(sale.id ?? null)}
-                  className="group h-12 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-muted/40"
-                >
-                  <TableCell className="pl-4">
-                    <span className="block max-w-56 truncate text-sm font-medium text-slate-950 dark:text-foreground">
-                      {sale.customerName || sale.customerAddress || 'Customer pending'}
-                    </span>
-                    {sale.customerPhone && (
-                      <span className="portal-num block text-xs text-slate-500 dark:text-muted-foreground">
-                        {sale.customerPhone}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-2">
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#0A1F44]/8 text-[10px] font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
-                        {repInitials(sale.salesRepName)}
-                      </span>
-                      <span className="max-w-40 truncate text-sm text-slate-700 dark:text-muted-foreground">
-                        {sale.salesRepName}
-                      </span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="portal-num text-sm text-slate-700 dark:text-muted-foreground">
-                    {formatDate(sale.saleDate)}
-                  </TableCell>
-                  <TableCell className="portal-num text-right text-sm font-medium text-slate-950 dark:text-foreground">
-                    {formatCurrency(sale.totalValue)}
-                  </TableCell>
-                  <TableCell className="portal-num text-right text-sm text-[#3f6212] dark:text-[#d7ecc0]">
-                    +{formatCurrency(sale.commission || 0)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-1.5">
-                      <Badge variant={statusVariant[sale.status]} className="rounded-md">
-                        {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-                      </Badge>
-                      <PendingAge sale={sale} />
-                    </span>
-                  </TableCell>
-                  <TableCell className="pr-4 text-right">
-                    <span
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center justify-end gap-1"
-                    >
-                      {rowActions(sale)}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter className="bg-slate-50/80 dark:bg-muted/40">
-              <TableRow className="hover:bg-transparent">
-                <TableCell className="pl-4 text-xs font-medium text-slate-500 dark:text-muted-foreground" colSpan={3}>
-                  {sales.length} {sales.length === 1 ? 'sale' : 'sales'}
-                </TableCell>
-                <TableCell className="portal-num text-right text-sm font-semibold text-slate-950 dark:text-foreground">
-                  {formatCurrency(totalValue)}
-                </TableCell>
-                <TableCell className="portal-num text-right text-sm font-medium text-[#3f6212] dark:text-[#d7ecc0]">
-                  +{formatCurrency(totalCommission)}
-                </TableCell>
-                <TableCell colSpan={2} />
-              </TableRow>
-            </TableFooter>
-          </Table>
+      <section className="sales-line-flow">
+        <div className="sales-line-section-head">
+          <div>
+            <p className="sales-line-eyebrow">{canApprove ? 'Priority ordered / manager queue' : 'Your sales / pending status'}</p>
+            <h2>{canApprove ? 'Needs your attention' : 'Your pending'}</h2>
+          </div>
+          <p>{pendingSales.length} pending · {canApprove ? 'oldest first' : 'awaiting review'}</p>
         </div>
-      </div>
 
-      <Dialog
-        open={!!showRejectModal}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowRejectModal(null);
-            setRejectionReason('');
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Sale</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this sale:
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            rows={3}
-            placeholder="Enter rejection reason..."
-          />
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowRejectModal(null);
-                setRejectionReason('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => showRejectModal && handleReject(showRejectModal)}
-              disabled={!rejectionReason || loading || !showRejectModal}
-              variant="destructive"
-            >
-              Reject Sale
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <div className="sales-line-priority-list">
+          {pendingSales.length ? pendingSales.map((sale, index) => (
+            <div className="sales-line-priority-row" key={sale.id} role="button" tabIndex={0} onClick={() => setSelectedId(sale.id || null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}>
+              <span className="sales-line-tick">{String(index + 1).padStart(2, '0')}</span>
+              <FileText className="sales-line-priority-icon" aria-hidden="true" />
+              <div className="sales-line-priority-copy">
+                <strong>{sale.customerName || sale.customerAddress || 'Customer pending'} · {sale.salesRepName}</strong>
+                <span>{productSummary(sale)} · {formatMoney(sale.totalValue || 0)}/mo · {sale.totalPoints || 0} pts</span>
+              </div>
+              <span className={`sales-line-age ${ageTone(sale)}`}>{ageLabel(sale)}</span>
+              {canApprove && (
+                <span className="sales-line-priority-actions" onClick={(event) => event.stopPropagation()}>
+                  <button className="approve" type="button" disabled={loading} onClick={() => void decide(sale.id || '', 'approved')}>Approve</button>
+                  <button className="reject" type="button" disabled={loading} onClick={() => setRejectingId(sale.id || null)}>Reject</button>
+                </span>
+              )}
+            </div>
+          )) : <div className="sales-line-empty-priority">No pending sales in your book.</div>}
+        </div>
+        <p className="sales-line-flow-note">{canApprove ? 'Click any row to open the review sheet. Approve or reject without leaving the flow.' : 'Your pending sales stay visible here. Review actions are manager-only.'}</p>
+      </section>
 
-      <Dialog
-        open={!!showDeleteModal}
-        onOpenChange={(open) => {
-          if (!open) setShowDeleteModal(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Sale</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this sale? This action cannot be undone and will
-              permanently remove the sale record.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowDeleteModal(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => showDeleteModal && handleDelete(showDeleteModal)}
-              disabled={loading || !showDeleteModal}
-              variant="destructive"
-            >
-              Delete Sale
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <section className="sales-line-ledger">
+        <div className="sales-line-ledger-head">
+          <div>
+            <p className="sales-line-eyebrow">{canApprove ? 'The ledger / all statuses' : 'Your ledger / all statuses'}</p>
+            <h2>{canApprove ? 'The rest of the month' : 'Your sales'}</h2>
+          </div>
+          <p>{visibleSales.length} recent records · click a row to inspect</p>
+        </div>
+
+        <nav className="sales-line-tabs" aria-label="Sale status filters">
+          {STATUS_TABS.map((tab) => {
+            const active = statusFilter === tab.value;
+            const count = tab.value === 'pending' ? pendingSales.length : 0;
+            return (
+              <button key={tab.label} className="sales-line-tab" role="tab" type="button" aria-selected={active} onClick={() => { setSelectedId(null); onStatusFilterChange(tab.value); }}>
+                {tab.label}{tab.value === 'pending' && <span className="sales-line-count-chip">{count}</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sales-line-table-wrap">
+          <div className="sales-line-sale-row thead">
+            <span>Customer</span><span>Rep</span><span>Date</span><span>Value</span><span>Commission</span><span>Status</span><span>Actions</span>
+          </div>
+          <div className="sales-line-sale-list">
+            {visibleSales.length ? visibleSales.map((sale) => (
+              <div
+                className={`sales-line-sale-row ${sale.status}`}
+                key={sale.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedId(sale.id || null)}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}
+              >
+                <div className="sales-line-customer-cell"><strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong><span>{productSummary(sale)}</span></div>
+                <div className="sales-line-rep-cell"><span className="sales-line-avatar">{repInitials(sale.salesRepName)}</span>{sale.salesRepName}</div>
+                <div className="sales-line-date-cell">{formatDate(sale.saleDate)}</div>
+                <div className="sales-line-money">{formatMoney(sale.totalValue || 0)}<small>/mo</small></div>
+                <div className="sales-line-money">{typeof sale.commission === 'number' ? formatMoney(sale.commission) : '—'}</div>
+                <div className="sales-line-status-cell"><StatusBadge status={sale.status} />{sale.status === 'pending' && <span className={`sales-line-stale ${ageTone(sale)}`}>{ageLabel(sale)}</span>}</div>
+                <div className="sales-line-actions-cell">{rowActions(sale)}</div>
+              </div>
+            )) : <div className="sales-line-ledger-empty">{statusFilter ? `No ${statusFilter} sales in this view.` : `No sales in ${canApprove ? 'the ledger' : 'your book'}.`}</div>}
+          </div>
+          <div className="sales-line-totals">
+            <span><strong>{visibleSales.length}</strong> visible</span><span /><span /><span className="sales-line-total-value">{formatMoney(totalValue)}</span><span className="sales-line-total-commission">{commissionLabel}</span><span /><span />
+          </div>
+        </div>
+      </section>
 
       <SaleDetailSheet
         sale={selectedSale}
-        statusVariant={statusVariant}
-        PendingAge={PendingAge}
-        repInitials={repInitials}
         index={selectedIndex}
-        total={sales.length}
+        total={visibleSales.length}
         open={!!selectedSale}
-        onOpenChange={(open) => {
-          if (!open) setSelectedId(null);
-        }}
-        onPrev={goPrev}
-        onNext={goNext}
-        canPrev={selectedIndex > 0}
-        canNext={selectedIndex >= 0 && selectedIndex < sales.length - 1}
+        onOpenChange={(open) => { if (!open) setSelectedId(null); }}
+        onPrev={() => moveSelection(-1)}
+        onNext={() => moveSelection(1)}
         canApprove={canApprove}
         isAdmin={isAdmin}
         loading={loading}
-        onApprove={handleApprove}
-        onRequestReject={(id) => setShowRejectModal(id)}
-        onRequestDelete={(id) => setShowDeleteModal(id)}
+        onApprove={(id) => decide(id, 'approved')}
+        onRequestReject={(id) => setRejectingId(id)}
+        onRequestDelete={(id) => setDeletingId(id)}
       />
+
+      <Dialog open={!!rejectingId} onOpenChange={(open) => { if (!open) { setRejectingId(null); setRejectionReason(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject sale</DialogTitle>
+            <DialogDescription>Please provide a reason for rejection. This will be shared with the sales rep.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} rows={3} placeholder="Enter rejection reason..." />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setRejectingId(null); setRejectionReason(''); }}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={!rejectionReason.trim() || loading} onClick={() => void handleReject()}>Reject sale</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete sale</DialogTitle>
+            <DialogDescription>Are you sure you want to delete this sale? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={loading} onClick={() => void handleDelete()}>Delete sale</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className={`sales-line-toast ${toastMessage ? 'show' : ''}`} role="status">{toastMessage}</div>
     </>
   );
 }

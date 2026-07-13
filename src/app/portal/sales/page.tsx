@@ -1,96 +1,138 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { SalesTable } from '@/components/sales/SalesTable';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
-import { SaleStatus } from '@/types';
+import { Sale, SaleStatus } from '@/types';
 
-const STATUS_TABS: { value: SaleStatus | ''; label: string }[] = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
+const STATUS_VALUES: SaleStatus[] = ['pending', 'approved', 'rejected', 'cancelled'];
 
-function TableSkeleton() {
-  // Geometry-true: mirrors the real table rows so the swap is seamless.
+function monthKey(value: Date | string | undefined) {
+  if (!value) return '';
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth()}`;
+}
+
+function sumValue(sales: Sale[]) {
+  return sales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+}
+
+function AnimatedNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      const frame = requestAnimationFrame(() => setDisplay(value));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    const started = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min((now - started) / 650, 1);
+      setDisplay(Math.round(value * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+
+    const frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  return <>{display.toLocaleString('en-US')}</>;
+}
+
+function SalesLineSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border dark:bg-card">
-      <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-border dark:bg-muted/40">
-        <Skeleton className="h-3.5 w-3/4" />
-      </div>
-      {[...Array(6)].map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-4 border-b border-slate-100 px-4 py-3 last:border-0 dark:border-border"
-        >
-          <div className="flex-1 space-y-1.5">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-24" />
+    <div className="sales-line sales-line-loading" aria-label="Loading sales">
+      <div className="sales-line-mast sales-skeleton-line" />
+      <div className="sales-line-command">
+        <div className="sales-line-command-top">
+          <div className="sales-skeleton-stack">
+            <span className="sales-skeleton sales-skeleton-kicker" />
+            <span className="sales-skeleton sales-skeleton-title" />
+            <span className="sales-skeleton sales-skeleton-copy" />
+            <span className="sales-skeleton sales-skeleton-button" />
           </div>
-          <Skeleton className="hidden h-6 w-6 rounded-full sm:block" />
-          <Skeleton className="hidden h-4 w-24 sm:block" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-5 w-20 rounded-md" />
+          <span className="sales-skeleton sales-skeleton-hero" />
         </div>
-      ))}
+        <div className="sales-line-broadcast">
+          {[1, 2, 3, 4].map((item) => <span key={item} className="sales-skeleton sales-skeleton-metric" />)}
+        </div>
+      </div>
+      <div className="sales-skeleton-section">
+        <span className="sales-skeleton sales-skeleton-section-head" />
+        {[1, 2, 3].map((item) => <span key={item} className="sales-skeleton sales-skeleton-row" />)}
+      </div>
+      <div className="sales-skeleton-section">
+        <span className="sales-skeleton sales-skeleton-section-head" />
+        {[1, 2, 3, 4].map((item) => <span key={item} className="sales-skeleton sales-skeleton-row" />)}
+      </div>
     </div>
   );
 }
 
 function SalesContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const { user, hasPermission } = useAuth();
   const { sales, loading, error, fetchSales, approveSale, deleteSale } = useSales();
-  const [statusFilter, setStatusFilter] = useState<SaleStatus | ''>(
-    (searchParams.get('status') as SaleStatus | null) ?? ''
-  );
+  const queryStatus = searchParams.get('status');
+  const statusFilter: SaleStatus | '' = queryStatus && STATUS_VALUES.includes(queryStatus as SaleStatus)
+      ? (queryStatus as SaleStatus)
+      : '';
 
   const canApprove = hasPermission('sales:approve');
   const canViewAll = hasPermission('sales:read');
+  const now = useMemo(() => new Date(), []);
+  const currentMonth = monthKey(now);
+  const mtdSales = sales.filter((sale) => monthKey(sale.saleDate) === currentMonth);
+  const pendingSales = sales.filter((sale) => sale.status === 'pending');
+  const approvedMtd = mtdSales.filter((sale) => sale.status === 'approved').length;
+  const oldestIdle = pendingSales.reduce((oldest, sale) => {
+    const days = Math.max(0, Math.floor((now.getTime() - new Date(sale.saleDate).getTime()) / 86_400_000));
+    return Math.max(oldest, days);
+  }, 0);
+  const commissionCount = sales.filter((sale) => typeof sale.commission === 'number').length;
+  const dateLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
+    .format(now)
+    .toUpperCase();
+  const weekdayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long' })
+    .format(now)
+    .toUpperCase();
 
   useEffect(() => {
-    const filters: { status?: SaleStatus; salesRepId?: string } = {};
+    const filters: { salesRepId?: string; limit?: number } = { limit: 100 };
+    if (!canViewAll && user) filters.salesRepId = user.uid;
+    if (user) fetchSales(filters);
+  }, [canViewAll, fetchSales, user]);
 
-    if (statusFilter) {
-      filters.status = statusFilter;
-    }
-
-    // If user can't view all, only show their own sales
-    if (!canViewAll && user) {
-      filters.salesRepId = user.uid;
-    }
-
-    fetchSales(filters);
-  }, [statusFilter, canViewAll, user, fetchSales]);
-
-  const handleApprove = async (saleId: string, status: 'approved' | 'rejected', reason?: string) => {
-    if (!user) return;
-
-    await approveSale(
-      saleId,
-      status,
-      user.uid,
-      user.displayName || user.email || '',
-      reason
-    );
+  const setFilter = (next: SaleStatus | '') => {
+    router.replace(next ? `${pathname}?status=${next}` : pathname, { scroll: false });
   };
 
-  const handleDelete = async (saleId: string) => {
-    await deleteSale(saleId);
+  const handleApproval = async (
+    saleId: string,
+    status: 'approved' | 'rejected',
+    reason?: string
+  ) => {
+    if (!user) return false;
+    return approveSale(saleId, status, user.uid, user.displayName || user.email || '', reason);
   };
 
-  const pendingInView = sales.filter((s) => s.status === 'pending').length;
+  const managerCopy = canApprove;
+  const boardCount = mtdSales.length;
+  const boardValue = sumValue(mtdSales);
+  const contextCopy = managerCopy
+    ? `${pendingSales.length} submission${pendingSales.length === 1 ? '' : 's'} in flight. Start with the oldest, then let the ledger carry the rest of the month.`
+    : 'Your sales are on the board. Pending statuses stay visible, but review decisions remain with management.';
 
   return (
     <ProtectedRoute permissions={['sales:read']}>
@@ -98,93 +140,64 @@ function SalesContent() {
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1500px] space-y-5">
-              {/* Command band — same identity as the dashboard. */}
-              <section className="portal-enter relative overflow-hidden rounded-lg bg-[#0A1F44] text-white dark:bg-[#0e2647] dark:ring-1 dark:ring-inset dark:ring-white/15">
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(ellipse 45% 90% at 8% 100%, rgba(141,198,63,0.14), transparent 70%), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-                    backgroundSize: '100% 100%, 28px 28px, 28px 28px',
-                  }}
-                />
-                <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+          <main className="sales-line-main flex-1 overflow-auto">
+            <div className="sales-line">
+              <div className="sales-line-mast">
+                <span className="sales-line-mark">3C WORLD GROUP / THE LINE / SALES</span>
+                <span className="sales-line-mast-meta">{dateLabel} · {weekdayLabel}</span>
+              </div>
+
+              <header className="sales-line-command">
+                <div className="sales-line-command-top">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                      Sales workspace
-                    </p>
-                    <h1 className="portal-display mt-1.5 text-3xl font-extrabold tracking-tight">
-                      Sales
-                    </h1>
-                    <p className="mt-1.5 text-sm text-white/60">
-                      {canViewAll
-                        ? 'Review field sales activity and approval status.'
-                        : 'Track your submitted sales and approval status.'}
-                    </p>
-                  </div>
-                  <Button asChild className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                    <Link href="/portal/sales/new">
-                      <Plus className="size-4" />
+                    <p className="sales-line-eyebrow">{managerCopy ? 'Management / priority flow' : 'Field sales / your flow'}</p>
+                    <h1><span>{boardCount} sales</span> on the board.</h1>
+                    <p className="sales-line-context">{contextCopy}</p>
+                    <Link className="sales-line-primary" href="/portal/sales/new">
+                      <Plus className="sales-line-icon" aria-hidden="true" />
                       Log sale
                     </Link>
-                  </Button>
+                  </div>
+                  <div className="sales-line-hero-number">
+                    <strong className="sales-line-display portal-metallic-num"><AnimatedNumber value={boardValue} /></strong>
+                    <small>Monthly value · $ / mo</small>
+                  </div>
                 </div>
-              </section>
 
-              {/* Saved-view style status tabs — lime underline marks the active view. */}
-              <div className="portal-enter portal-enter-2 flex items-center gap-1 overflow-x-auto border-b border-slate-200 [-ms-overflow-style:none] [scrollbar-width:none] max-sm:[mask-image:linear-gradient(90deg,#000_90%,transparent)] dark:border-border [&::-webkit-scrollbar]:hidden">
-                {STATUS_TABS.map((tab) => {
-                  const active = statusFilter === tab.value;
-                  return (
-                    <button
-                      key={tab.label}
-                      type="button"
-                      onClick={() => setStatusFilter(tab.value)}
-                      className={`relative shrink-0 px-3 py-2.5 text-sm transition-colors ${
-                        active
-                          ? 'font-semibold text-slate-950 dark:text-foreground'
-                          : 'text-slate-500 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-foreground'
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {tab.label}
-                        {tab.value === 'pending' && canApprove && pendingInView > 0 && (
-                          <span className="portal-num rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                            {pendingInView}
-                          </span>
-                        )}
-                      </span>
-                      {active && (
-                        <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[#8dc63f]" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                <section className="sales-line-broadcast" aria-label="Sales KPIs">
+                  <div className="sales-line-metric">
+                    <span className="sales-line-metric-label">Value MTD</span>
+                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardValue} /><small>$ / mo</small></strong>
+                    <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records this month</span>
+                  </div>
+                  <div className="sales-line-metric">
+                    <span className="sales-line-metric-label">Sales on board</span>
+                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardCount} /><small>SALES</small></strong>
+                    <span className="sales-line-metric-note">{approvedMtd} approved · {pendingSales.length} pending</span>
+                  </div>
+                  <div className="sales-line-metric">
+                    <span className="sales-line-metric-label">Pending review</span>
+                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={pendingSales.length} /><small>OPEN</small></strong>
+                    <span className="sales-line-metric-note">Oldest <span className="sales-line-lime">{oldestIdle ? `${oldestIdle} days` : 'today'}</span> idle</span>
+                  </div>
+                  <div className="sales-line-metric">
+                    <span className="sales-line-metric-label">Commission MTD</span>
+                    <strong className="sales-line-metric-value portal-metallic-num">—</strong>
+                    <span className="sales-line-metric-note">{commissionCount ? `${commissionCount} recorded value${commissionCount === 1 ? '' : 's'}` : 'No commission values recorded'}</span>
+                  </div>
+                </section>
+              </header>
 
-              {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-                  {error}
-                </div>
-              )}
+              {error && <div className="sales-line-error" role="alert">{error}</div>}
 
-              <div className="portal-enter portal-enter-3">
-                {loading && sales.length === 0 ? (
-                  <TableSkeleton />
-                ) : (
-                  <SalesTable
-                    sales={sales}
-                    onApprove={canApprove ? handleApprove : undefined}
-                    onDelete={handleDelete}
-                    loading={loading}
-                    filtered={statusFilter !== ''}
-                    onClearFilter={() => setStatusFilter('')}
-                  />
-                )}
-              </div>
+              <SalesTable
+                sales={sales}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setFilter}
+                onApprove={canApprove ? handleApproval : undefined}
+                onDelete={deleteSale}
+                loading={loading}
+              />
             </div>
           </main>
         </div>
@@ -199,12 +212,8 @@ function SalesLoadingFallback() {
       <PortalHeader />
       <div className="flex">
         <PortalSidebar />
-        <main className="flex-1 overflow-auto p-4 sm:p-6">
-          <div className="mx-auto max-w-[1500px] space-y-5">
-            <Skeleton className="h-32 w-full rounded-lg" />
-            <Skeleton className="h-10 w-80" />
-            <TableSkeleton />
-          </div>
+        <main className="sales-line-main flex-1 overflow-auto">
+          <SalesLineSkeleton />
         </main>
       </div>
     </div>

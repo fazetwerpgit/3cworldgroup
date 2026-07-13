@@ -343,7 +343,7 @@ export default function DashboardPage() {
 
       try {
         const statsRes = await fetch(
-          `/api/portal/sales/stats?salesRepId=${user.uid}&period=month&requestedBy=${user.uid}`,
+          `/api/portal/sales/stats?${hasPermission('sales:approve') ? '' : `salesRepId=${user.uid}&`}period=month&requestedBy=${user.uid}`,
           { signal: controller.signal }
         );
         if (statsRes.ok) {
@@ -383,7 +383,7 @@ export default function DashboardPage() {
       mounted = false;
       controller.abort();
     };
-  }, [user]);
+  }, [hasPermission, user]);
 
   useEffect(() => {
     setTimeContext(getTimeContext());
@@ -419,7 +419,7 @@ export default function DashboardPage() {
         title: `Review pending sales (${pendingCount})`,
         meta: `${pendingCount} submission${pendingCount === 1 ? '' : 's'} · oldest needs review`,
         tail: pendingCount > 0 ? 'URGENT' : 'REVIEW',
-        href: '/portal/approvals',
+        href: '/portal/sales?status=pending',
         icon: 'review',
       });
       if (isAdmin && pendingSignups > 0) {

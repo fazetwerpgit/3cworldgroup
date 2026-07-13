@@ -38,7 +38,7 @@ const actions: QuickAction[] = [
   {
     title: 'Approve Sales',
     description: 'Review team submissions.',
-    href: '/portal/approvals',
+    href: '/portal/sales?status=pending',
     icon: <CheckCircle2 className="h-5 w-5" />,
     permissions: ['sales:approve'],
   },
