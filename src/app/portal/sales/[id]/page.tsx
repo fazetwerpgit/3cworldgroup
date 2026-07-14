@@ -3,14 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, Pencil, Trash2, TriangleAlert, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  FileText,
+  MapPin,
+  Pencil,
+  Phone,
+  Trash2,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -21,25 +28,60 @@ import {
 } from '@/components/ui/dialog';
 import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sale } from '@/types';
+import { auth } from '@/lib/firebase/config';
+import { ChatLightbox } from '@/components/chat/ChatLightbox';
+import type { LightboxImage } from '@/components/chat/ChatLightbox';
+import { FIBER_COMPANIES, Sale } from '@/types';
 
-function PortalShell({ children }: { children: React.ReactNode }) {
+function companyLabel(company: string) {
+  return FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
+}
+
+function formatMoney(value: number) {
+  return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function formatDate(value: Date | string | undefined) {
+  if (!value) return 'Not provided';
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function commissionLabel(value: number | undefined) {
+  return typeof value === 'number' ? formatMoney(value) : '—';
+}
+
+function dateLabel() {
+  const now = new Date();
+  return {
+    month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now).toUpperCase(),
+    weekday: new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now).toUpperCase(),
+  };
+}
+
+function Mast() {
+  const { month, weekday } = dateLabel();
+  return (
+    <div className="sales-line-mast">
+      <span className="sales-line-mark">3C WORLD GROUP / THE LINE / SALES</span>
+      <span className="sales-line-mast-meta">{month} · {weekday}</span>
+    </div>
+  );
+}
+
+function SalesLineShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen portal-canvas">
       <PortalHeader />
       <div className="flex">
         <PortalSidebar />
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="sales-line-main flex-1 overflow-auto">
+          <div className="sales-line">{children}</div>
+        </main>
       </div>
-    </div>
-  );
-}
-
-function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">{label}</p>
-      <p className="mt-1 font-medium text-slate-950 dark:text-foreground">{value}</p>
     </div>
   );
 }
@@ -52,6 +94,9 @@ export default function SaleDetailPage() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [proofLoading, setProofLoading] = useState(false);
+  const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
 
   const isAdmin = isRole('admin');
   const saleId = params.id as string;
@@ -76,50 +121,36 @@ export default function SaleDetailPage() {
     setShowDeleteModal(false);
   };
 
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatCommission = (amount: number | undefined) =>
-    typeof amount === 'number' ? formatCurrency(amount) : '—';
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300';
-      case 'pending':
-        return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300';
-      case 'rejected':
-        return 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300';
-      case 'cancelled':
-        return 'border-gray-200 bg-gray-100 text-gray-700 dark:border-border dark:bg-muted dark:text-muted-foreground';
-      default:
-        return 'border-gray-200 bg-gray-100 text-gray-700 dark:border-border dark:bg-muted dark:text-muted-foreground';
+  const openScreenshot = async () => {
+    if (!sale?.proofScreenshotPath) return;
+    setProofLoading(true);
+    setProofError(null);
+    try {
+      const token = await auth?.currentUser?.getIdToken();
+      const response = await fetch(
+        `/api/portal/forms/attachment?path=${encodeURIComponent(sale.proofScreenshotPath)}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.url) throw new Error('Could not load the screenshot. Try again.');
+      setProofImage({ url: data.url, alt: 'Sale proof screenshot' });
+    } catch {
+      setProofError('Could not load the screenshot. Try again.');
+    } finally {
+      setProofLoading(false);
     }
   };
 
   if (loading && !sale) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <PortalShell>
-          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-            <p className="mt-4 text-slate-500 dark:text-muted-foreground">Loading sale details...</p>
-          </Card>
-        </PortalShell>
+        <SalesLineShell>
+          <Mast />
+          <div className="sales-line-state-panel">
+            <div className="sales-line-spinner" aria-hidden="true" />
+            <p>Loading sale details...</p>
+          </div>
+        </SalesLineShell>
       </ProtectedRoute>
     );
   }
@@ -127,167 +158,190 @@ export default function SaleDetailPage() {
   if (error || !sale) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <PortalShell>
-          <Card className="mx-auto max-w-md rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
-            <TriangleAlert className="mx-auto mb-4 size-12 text-red-500" />
-            <p className="font-semibold text-slate-950 dark:text-foreground">Sale not found</p>
-            <p className="mt-1 text-slate-500 dark:text-muted-foreground">{error || 'The sale you are looking for does not exist.'}</p>
-            <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-              <Link href="/portal/sales">Back to Sales</Link>
-            </Button>
-          </Card>
-        </PortalShell>
+        <SalesLineShell>
+          <Mast />
+          <div className="sales-line-state-panel">
+            <TriangleAlert className="sales-line-icon-lg" aria-hidden="true" />
+            <strong>Sale not found</strong>
+            <p>{error || 'The sale you are looking for does not exist.'}</p>
+            <Link className="sales-line-btn primary" href="/portal/sales">Back to Sales</Link>
+          </div>
+        </SalesLineShell>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute permissions={['sales:read']}>
-      <PortalShell>
-        <div className="mx-auto max-w-[1100px] space-y-5">
-          <Button
-            asChild
-            variant="ghost"
-            className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground"
-          >
-            <Link href="/portal/sales" aria-label="Back to sales">
-              <ArrowLeft className="size-4" />
-              Back to sales
-            </Link>
-          </Button>
+      <SalesLineShell>
+        <Mast />
 
-          <PortalPageHeader
-            compact
-            eyebrow="Sales workspace"
-            title="Sale Details"
-            description={`ID: ${sale.id}`}
-            actions={
+        <Link className="sales-line-back" href="/portal/sales">
+          <ArrowLeft className="sales-line-icon" aria-hidden="true" />
+          Back to sales
+        </Link>
+
+        <header className="sales-line-subhead">
+          <div>
+            <p className="sales-line-eyebrow">Sales workspace / detail</p>
+            <h1>{sale.customerName || sale.customerAddress || 'Customer pending'}</h1>
+            <p className="sales-line-subhead-id">ID: {sale.id}</p>
+          </div>
+          <div className="sales-line-subhead-actions">
+            <span className={`sales-line-badge ${sale.status}`}>{sale.status}</span>
+            {isAdmin && (
               <>
-                <Badge variant="outline" className={getStatusColor(sale.status)}>
-                  {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-                </Badge>
-                {isAdmin && (
-                  <>
-                    <Button asChild variant="outline">
-                      <Link href={`/portal/sales/${sale.id}/edit`}>
-                        <Pencil className="size-4" />
-                        Edit
-                      </Link>
-                    </Button>
-                    <Button type="button" variant="destructive" onClick={() => setShowDeleteModal(true)}>
-                      <Trash2 className="size-4" />
-                      Delete
-                    </Button>
-                  </>
-                )}
+                <Link className="sales-line-btn" href={`/portal/sales/${sale.id}/edit`}>
+                  <Pencil className="sales-line-icon" aria-hidden="true" />
+                  Edit
+                </Link>
+                <button type="button" className="sales-line-btn danger" onClick={() => setShowDeleteModal(true)}>
+                  <Trash2 className="sales-line-icon" aria-hidden="true" />
+                  Delete
+                </button>
               </>
-            }
-          />
+            )}
+          </div>
+        </header>
 
-          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-              <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Information</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <DetailField label="Address" value={sale.customerAddress || 'Not provided'} />
-                <DetailField label="Name" value={sale.customerName || 'Not provided'} />
-                <DetailField label="Phone" value={sale.customerPhone || 'Not provided'} />
-                <DetailField label="Email" value={sale.customerEmail || 'Not provided'} />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="sales-line-body">
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Customer</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <dl className="sales-line-field-list">
+                <div>
+                  <dt>Address</dt>
+                  <dd className={sale.customerAddress ? '' : 'muted'}>
+                    {sale.customerAddress
+                      ? <><MapPin className="sales-line-inline-icon" aria-hidden="true" /> {sale.customerAddress}</>
+                      : 'Not provided'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Name</dt>
+                  <dd className={sale.customerName ? '' : 'muted'}>{sale.customerName || 'Not provided'}</dd>
+                </div>
+                <div>
+                  <dt>Phone</dt>
+                  <dd className={sale.customerPhone ? '' : 'muted'}>
+                    {sale.customerPhone
+                      ? <a href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}><Phone className="sales-line-inline-icon" aria-hidden="true" /> {sale.customerPhone}</a>
+                      : 'Not provided'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd className={sale.customerEmail ? '' : 'muted'}>{sale.customerEmail || 'Not provided'}</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
 
-          <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-              <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Information</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <DetailField label="Sales Rep" value={sale.salesRepName} />
-                <DetailField label="Sale Date" value={formatDate(sale.saleDate)} />
-                <DetailField label="Install Date" value={formatDate(sale.installDate)} />
-                <DetailField label="Sale Type" value={<span className="capitalize">{sale.saleType?.replace('_', ' ') || 'N/A'}</span>} />
-                <DetailField label="Created" value={formatDate(sale.createdAt)} />
-              </div>
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Sale information</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <dl className="sales-line-field-list">
+                <div>
+                  <dt>Sales rep</dt>
+                  <dd>{sale.salesRepName || 'Not provided'}</dd>
+                </div>
+                <div>
+                  <dt>Sale date</dt>
+                  <dd>{formatDate(sale.saleDate)}</dd>
+                </div>
+                <div>
+                  <dt>Install date</dt>
+                  <dd className={sale.installDate ? '' : 'muted'}>{formatDate(sale.installDate)}</dd>
+                </div>
+                <div>
+                  <dt>Sale type</dt>
+                  <dd className="capitalize">{sale.saleType?.replace('_', ' ') || 'Not provided'}</dd>
+                </div>
+                <div>
+                  <dt>Created</dt>
+                  <dd>{formatDate(sale.createdAt)}</dd>
+                </div>
+              </dl>
               {sale.notes && (
-                <div className="mt-4 border-t border-slate-100 dark:border-border pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">Notes</p>
-                  <p className="mt-1 font-medium text-slate-950 dark:text-foreground">{sale.notes}</p>
+                <div className="sales-line-notes-block">
+                  <p className="sales-line-sheet-label">Rep notes</p>
+                  <p className="sales-line-notes" style={{ color: 'var(--muted)' }}>{sale.notes}</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-            <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-              <CardTitle className="text-[#0A1F44] dark:text-foreground">Plans Sold</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <div className="space-y-3">
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Plans sold</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <div className="sales-line-plan-list">
                 {sale.products?.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
+                  <div className="sales-line-plan-card" key={`${product.productId}-${index}`}>
                     <div>
-                      <p className="font-medium text-slate-950 dark:text-foreground">{product.productName}</p>
-                      <p className="text-sm text-slate-500 dark:text-muted-foreground">{product.company}</p>
+                      <strong>{product.productName}</strong>
+                      <span>{companyLabel(product.company)}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-slate-950 dark:text-foreground">{formatCurrency(product.unitPrice)}/mo</p>
-                      <p className="text-sm font-medium text-[#5a8f1f]">+{product.points} pts</p>
-                    </div>
+                    <b>{formatMoney(product.totalPrice || product.unitPrice)}/mo</b>
+                    <em>{product.points} pts</em>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card className="rounded-lg border-[#0A1F44]/10 bg-[#0A1F44] py-0 text-white shadow-sm">
-            <CardHeader>
-              <CardTitle>Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div>
-                  <p className="text-xs uppercase text-white/60">Total Value</p>
-                  <p className="text-2xl font-bold">{formatCurrency(sale.totalValue || 0)}</p>
-                  <p className="text-xs text-white/60">/month</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-white/60">Commission</p>
-                  <p className="text-2xl font-bold">{formatCommission(sale.commission)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-white/60">Points</p>
-                  <p className="text-2xl font-bold text-[#8dc63f]">+{sale.totalPoints || 0}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-white/60">Plans</p>
-                  <p className="text-2xl font-bold">{sale.products?.length || 0}</p>
-                </div>
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Summary</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <div className="sales-line-summary">
+                <div><small>Monthly value</small><strong>{formatMoney(sale.totalValue || 0)}</strong></div>
+                <div><small>Commission</small><strong>{commissionLabel(sale.commission)}</strong></div>
+                <div><small>Points</small><strong>{sale.totalPoints || 0}</strong></div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
+
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Order / proof</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <div className="sales-line-proof">
+                {sale.orderNumberOrBtn && <span><FileText className="sales-line-proof-icon" aria-hidden="true" />{sale.orderNumberOrBtn}</span>}
+                {sale.proofScreenshotPath ? (
+                  <button type="button" onClick={() => void openScreenshot()} disabled={proofLoading}>
+                    {proofLoading ? 'Opening proof...' : 'View proof screenshot'}
+                  </button>
+                ) : !sale.orderNumberOrBtn ? (
+                  <span>No order number or proof attached</span>
+                ) : null}
+              </div>
+              {proofError && <p className="sales-line-proof-error">{proofError}</p>}
+            </div>
+          </section>
 
           {(sale.status === 'approved' || sale.status === 'rejected') && sale.approvedBy && (
-            <Card className={`rounded-lg shadow-sm ${sale.status === 'approved' ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/15' : 'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/15'}`}>
-              <CardContent className="pt-6">
-                <h2 className={`mb-2 flex items-center gap-2 text-lg font-semibold ${sale.status === 'approved' ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300'}`}>
-                  {sale.status === 'approved' ? <Check className="size-5" /> : <X className="size-5" />}
-                  {sale.status === 'approved' ? 'Approved' : 'Rejected'}
-                </h2>
-                <p className={sale.status === 'approved' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}>
-                  By: {sale.approverName || sale.approvedBy} on {formatDate(sale.approvedAt)}
-                </p>
-                {sale.rejectionReason && (
-                  <p className="mt-2 text-red-700 dark:text-red-300">
-                    <span className="font-medium">Reason:</span> {sale.rejectionReason}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <div className={`sales-line-audit-banner ${sale.status}`}>
+              {sale.status === 'approved'
+                ? <Check className="sales-line-icon" aria-hidden="true" />
+                : <X className="sales-line-icon" aria-hidden="true" />}
+              <div>
+                <h3>{sale.status === 'approved' ? 'Approved' : 'Rejected'}</h3>
+                <p>By {sale.approverName || sale.approvedBy} on {formatDate(sale.approvedAt)}</p>
+                {sale.rejectionReason && <p>Reason: {sale.rejectionReason}</p>}
+              </div>
+            </div>
           )}
         </div>
-      </PortalShell>
+      </SalesLineShell>
+      <ChatLightbox image={proofImage} onClose={() => setProofImage(null)} />
 
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
         <DialogContent>
@@ -301,7 +355,7 @@ export default function SaleDetailPage() {
             <Button type="button" variant="outline" onClick={() => setShowDeleteModal(false)}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleDelete} disabled={deleting} variant="destructive">
+            <Button type="button" onClick={() => void handleDelete()} disabled={deleting} variant="destructive">
               {deleting ? 'Deleting...' : 'Delete Sale'}
             </Button>
           </DialogFooter>

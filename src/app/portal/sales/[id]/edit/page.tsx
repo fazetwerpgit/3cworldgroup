@@ -3,17 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, Lock, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, Lock, Trash2, TriangleAlert } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { NativeSelect } from '@/components/ui/native-select';
 import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -31,13 +24,33 @@ import { hasSaleProof } from '@/lib/sales/proof';
 import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
-function PortalShell({ children }: { children: React.ReactNode }) {
+function dateLabel() {
+  const now = new Date();
+  return {
+    month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now).toUpperCase(),
+    weekday: new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now).toUpperCase(),
+  };
+}
+
+function Mast() {
+  const { month, weekday } = dateLabel();
+  return (
+    <div className="sales-line-mast">
+      <span className="sales-line-mark">3C WORLD GROUP / THE LINE / SALES</span>
+      <span className="sales-line-mast-meta">{month} · {weekday}</span>
+    </div>
+  );
+}
+
+function SalesLineShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen portal-canvas">
       <PortalHeader />
       <div className="flex">
         <PortalSidebar />
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="sales-line-main flex-1 overflow-auto">
+          <div className="sales-line">{children}</div>
+        </main>
       </div>
     </div>
   );
@@ -201,16 +214,15 @@ export default function EditSalePage() {
   if (!isAdmin) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <PortalShell>
-          <Card className="mx-auto max-w-md rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
-            <Lock className="mx-auto mb-4 size-12 text-red-500" />
-            <p className="font-semibold text-slate-950 dark:text-foreground">Access Denied</p>
-            <p className="mt-1 text-slate-500 dark:text-muted-foreground">Only admins can edit sales.</p>
-            <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-              <Link href="/portal/sales">Back to Sales</Link>
-            </Button>
-          </Card>
-        </PortalShell>
+        <SalesLineShell>
+          <Mast />
+          <div className="sales-line-state-panel">
+            <Lock className="sales-line-icon-lg" aria-hidden="true" />
+            <strong>Access Denied</strong>
+            <p>Only admins can edit sales.</p>
+            <Link className="sales-line-btn primary" href="/portal/sales">Back to Sales</Link>
+          </div>
+        </SalesLineShell>
       </ProtectedRoute>
     );
   }
@@ -218,12 +230,13 @@ export default function EditSalePage() {
   if (loading && !sale) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <PortalShell>
-          <Card className="mx-auto max-w-4xl rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-            <p className="mt-4 text-slate-500 dark:text-muted-foreground">Loading sale...</p>
-          </Card>
-        </PortalShell>
+        <SalesLineShell>
+          <Mast />
+          <div className="sales-line-state-panel">
+            <div className="sales-line-spinner" aria-hidden="true" />
+            <p>Loading sale...</p>
+          </div>
+        </SalesLineShell>
       </ProtectedRoute>
     );
   }
@@ -231,244 +244,187 @@ export default function EditSalePage() {
   if (!sale) {
     return (
       <ProtectedRoute permissions={['sales:read']}>
-        <PortalShell>
-          <Card className="mx-auto max-w-md rounded-lg border-slate-200 dark:border-border p-8 text-center shadow-sm">
-            <p className="font-semibold text-slate-950 dark:text-foreground">Sale not found</p>
-            <Button asChild className="mt-4 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-              <Link href="/portal/sales">Back to Sales</Link>
-            </Button>
-          </Card>
-        </PortalShell>
+        <SalesLineShell>
+          <Mast />
+          <div className="sales-line-state-panel">
+            <TriangleAlert className="sales-line-icon-lg" aria-hidden="true" />
+            <strong>Sale not found</strong>
+            <Link className="sales-line-btn primary" href="/portal/sales">Back to Sales</Link>
+          </div>
+        </SalesLineShell>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute permissions={['sales:read']}>
-      <PortalShell>
-        <div className="mx-auto max-w-[1100px] space-y-5">
-          <Button
-            asChild
-            variant="ghost"
-            className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground"
-          >
-            <Link href={`/portal/sales/${saleId}`} aria-label="Back to sale details">
-              <ArrowLeft className="size-4" />
-              Back to sale details
-            </Link>
-          </Button>
+      <SalesLineShell>
+        <Mast />
 
-          <PortalPageHeader
-            compact
-            eyebrow="Sales workspace"
-            title="Edit Sale"
-            description={`ID: ${sale.id}`}
-          />
+        <Link className="sales-line-back" href={`/portal/sales/${saleId}`}>
+          <ArrowLeft className="sales-line-icon" aria-hidden="true" />
+          Back to sale details
+        </Link>
 
-          <form onSubmit={handleSubmit} className="portal-enter portal-enter-2 space-y-6">
-            {(formError || error) && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-                {formError || error}
+        <header className="sales-line-subhead">
+          <div>
+            <p className="sales-line-eyebrow">Sales workspace / edit</p>
+            <h1>Edit Sale</h1>
+            <p className="sales-line-subhead-id">ID: {sale.id}</p>
+          </div>
+        </header>
+
+        <form onSubmit={handleSubmit} className="sales-line-form">
+          {(formError || error) && (
+            <div className="sales-line-error" role="alert">{formError || error}</div>
+          )}
+
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Customer address</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <label className="sales-line-field-label" htmlFor="customerAddress">
+                Installation address <span className="req">*</span>
+              </label>
+              <input
+                id="customerAddress"
+                className="sales-line-input"
+                type="text"
+                name="customerAddress"
+                value={formData.customerAddress}
+                onChange={handleChange}
+                required
+                placeholder="123 Main St, City, State 12345"
+              />
+            </div>
+          </section>
+
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Customer information</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <div className="sales-line-field-grid cols-3">
+                <div>
+                  <label className="sales-line-field-label" htmlFor="customerName">Customer name</label>
+                  <input id="customerName" className="sales-line-input" type="text" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="John Smith" />
+                </div>
+                <div>
+                  <label className="sales-line-field-label" htmlFor="customerPhone">Phone number</label>
+                  <input id="customerPhone" className="sales-line-input" type="tel" name="customerPhone" value={formData.customerPhone} onChange={handleChange} placeholder="(555) 123-4567" />
+                </div>
+                <div>
+                  <label className="sales-line-field-label" htmlFor="customerEmail">Email</label>
+                  <input id="customerEmail" className="sales-line-input" type="email" name="customerEmail" value={formData.customerEmail} onChange={handleChange} placeholder="customer@email.com" />
+                </div>
               </div>
-            )}
+            </div>
+          </section>
 
-            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Address</CardTitle>
-              </CardHeader>
-              <CardContent className="p-5">
-                <Label className="mb-1">Installation Address *</Label>
-                <Input
-                  type="text"
-                  name="customerAddress"
-                  value={formData.customerAddress}
-                  onChange={handleChange}
-                  required
-                  className="h-11"
-                  placeholder="123 Main St, City, State 12345"
-                />
-              </CardContent>
-            </Card>
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Select plan</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <label className="sales-line-field-label">Choose provider</label>
+              <div className="sales-line-provider-grid">
+                {FIBER_COMPANIES.map((company) => (
+                  <button
+                    key={company.value}
+                    type="button"
+                    onClick={() => setSelectedCompany(company.value)}
+                    className={`sales-line-pick ${selectedCompany === company.value ? 'selected' : ''}`}
+                  >
+                    <span>{company.label}</span>
+                  </button>
+                ))}
+              </div>
 
-            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <CardTitle className="text-[#0A1F44] dark:text-foreground">
-                  Customer Information <span className="text-sm font-normal text-slate-400 dark:text-muted-foreground">(Optional)</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div>
-                    <Label className="mb-1">Customer Name</Label>
-                    <Input type="text" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="John Smith" />
-                  </div>
-                  <div>
-                    <Label className="mb-1">Phone Number</Label>
-                    <Input type="tel" name="customerPhone" value={formData.customerPhone} onChange={handleChange} placeholder="(555) 123-4567" />
-                  </div>
-                  <div>
-                    <Label className="mb-1">Email</Label>
-                    <Input type="email" name="customerEmail" value={formData.customerEmail} onChange={handleChange} placeholder="customer@email.com" />
+              {selectedCompany && (
+                <div style={{ marginTop: 16 }}>
+                  <label className="sales-line-field-label">Choose plan</label>
+                  <div className="sales-line-plan-grid">
+                    {availablePlans.map((plan) => {
+                      const added = products.some((p) => p.productId === plan.id);
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => addPlan(plan.id)}
+                          disabled={added}
+                          className="sales-line-pick sales-line-plan-pick"
+                        >
+                          <div className="sales-line-plan-pick-copy">
+                            <strong>{plan.name}</strong>
+                            <small>{plan.speed}</small>
+                          </div>
+                          <div className="sales-line-plan-pick-price">
+                            <b>${plan.price.toFixed(2)}/mo</b>
+                            <em>+{plan.points} pts</em>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              )}
 
-            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <CardTitle className="text-[#0A1F44] dark:text-foreground">Select Plan</CardTitle>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="mb-6">
-                  <Label className="mb-3">Choose Provider</Label>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    {FIBER_COMPANIES.map((company) => (
-                      <button
-                        key={company.value}
-                        type="button"
-                        onClick={() => setSelectedCompany(company.value)}
-                        className={`rounded-lg border p-4 text-left transition-colors ${
-                          selectedCompany === company.value
-                            ? 'border-[#8dc63f] bg-[#8dc63f]/5 shadow-[inset_0_0_0_1px_#8dc63f]'
-                            : 'border-slate-200 dark:border-border hover:border-slate-300 dark:hover:border-border hover:bg-slate-50 dark:hover:bg-muted'
-                        }`}
-                      >
-                        <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950 dark:text-foreground'}`}>
-                          {company.label}
-                        </span>
-                      </button>
+              {products.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <label className="sales-line-field-label">Selected plans</label>
+                  <div className="sales-line-selected-plans">
+                    {products.map((product, index) => (
+                      <div key={index} className="sales-line-selected-plan-row">
+                        <div>
+                          <strong>{product.productName}</strong>
+                          <span>${product.unitPrice.toFixed(2)}/mo · +{product.points} pts</span>
+                        </div>
+                        <button type="button" className="sales-line-remove-plan" onClick={() => removeProduct(index)} aria-label="Remove plan">
+                          <Trash2 className="sales-line-icon" aria-hidden="true" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
+              )}
+            </div>
+          </section>
 
-                {selectedCompany && (
-                  <div className="mb-6">
-                    <Label className="mb-3">Choose Plan</Label>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {availablePlans.map((plan) => {
-                        const added = products.some((p) => p.productId === plan.id);
-                        return (
-                          <button
-                            key={plan.id}
-                            type="button"
-                            onClick={() => addPlan(plan.id)}
-                            disabled={added}
-                            className={`rounded-lg border p-4 text-left transition-colors ${
-                              added
-                                ? 'cursor-not-allowed border-slate-200 dark:border-border bg-slate-50 dark:bg-muted opacity-50'
-                                : 'border-slate-200 dark:border-border hover:border-[#8dc63f] hover:bg-[#8dc63f]/5'
-                            }`}
-                          >
-                            <div className="flex justify-between gap-4">
-                              <div>
-                                <span className="block font-semibold text-slate-950 dark:text-foreground">{plan.name}</span>
-                                <span className="text-sm text-slate-500 dark:text-muted-foreground">{plan.speed}</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-bold text-[#0A1F44] dark:text-foreground">${plan.price.toFixed(2)}</span>
-                                <span className="block text-xs text-gray-500 dark:text-muted-foreground">/month</span>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="mt-2 border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
-                              +{plan.points} pts
-                            </Badge>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {products.length > 0 && (
-                  <div>
-                    <Label className="mb-3">Selected Plans</Label>
-                    <div className="space-y-2">
-                      {products.map((product, index) => (
-                        <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
-                          <div>
-                            <span className="font-medium text-slate-950 dark:text-foreground">{product.productName}</span>
-                            <div className="mt-1 flex items-center gap-2">
-                              <span className="text-sm text-gray-500 dark:text-muted-foreground">${product.unitPrice.toFixed(2)}/mo</span>
-                              <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
-                                +{product.points} pts
-                              </Badge>
-                            </div>
-                          </div>
-                          <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeProduct(index)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-300">
-                            <Trash2 className="size-4" />
-                            <span className="sr-only">Remove plan</span>
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-lg border-slate-200 dark:border-border py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Details</CardTitle>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <Label className="mb-1">Sale Type</Label>
-                    <NativeSelect name="saleType" value={formData.saleType} onChange={handleChange} className="min-w-full">
-                      {SALE_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div>
-                    <Label className="mb-1">Sale Date *</Label>
-                    <Input
-                      type="date"
-                      name="saleDate"
-                      value={formData.saleDate}
-                      onChange={handleChange}
-                      max={todaySaleDateInput()}
-                      required
-                      className="h-11"
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1">Install Date</Label>
-                    <Input
-                      type="date"
-                      name="installDate"
-                      value={formData.installDate}
-                      onChange={handleChange}
-                      className="h-11"
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1">Product Sold *</Label>
-                    <Input
-                      type="text"
-                      name="productSold"
-                      value={formData.productSold}
-                      onChange={handleChange}
-                      placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice"
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1">Order Number or BTN</Label>
-                    <Input
-                      type="text"
-                      name="orderNumberOrBtn"
-                      value={formData.orderNumberOrBtn}
-                      onChange={handleChange}
-                      placeholder="Order # or billing phone number"
-                    />
-                    <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                      Required unless you upload a screenshot below.
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="mb-1">Screenshot (if no order # / BTN)</Label>
+          <section className="sales-line-panel">
+            <div className="sales-line-panel-head">
+              <h2>Sale details</h2>
+            </div>
+            <div className="sales-line-panel-body">
+              <div className="sales-line-field-grid">
+                <div>
+                  <label className="sales-line-field-label" htmlFor="saleType">Sale type</label>
+                  <select id="saleType" className="sales-line-select" name="saleType" value={formData.saleType} onChange={handleChange}>
+                    {SALE_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="sales-line-field-label" htmlFor="saleDate">Sale date <span className="req">*</span></label>
+                  <input id="saleDate" className="sales-line-input" type="date" name="saleDate" value={formData.saleDate} onChange={handleChange} max={todaySaleDateInput()} required />
+                </div>
+                <div>
+                  <label className="sales-line-field-label" htmlFor="installDate">Install date</label>
+                  <input id="installDate" className="sales-line-input" type="date" name="installDate" value={formData.installDate} onChange={handleChange} />
+                </div>
+                <div>
+                  <label className="sales-line-field-label" htmlFor="productSold">Product sold <span className="req">*</span></label>
+                  <input id="productSold" className="sales-line-input" type="text" name="productSold" value={formData.productSold} onChange={handleChange} placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice" />
+                </div>
+                <div>
+                  <label className="sales-line-field-label" htmlFor="orderNumberOrBtn">Order number or BTN</label>
+                  <input id="orderNumberOrBtn" className="sales-line-input" type="text" name="orderNumberOrBtn" value={formData.orderNumberOrBtn} onChange={handleChange} placeholder="Order # or billing phone number" />
+                  <p className="sales-line-field-hint">Required unless you upload a screenshot below.</p>
+                </div>
+                <div>
+                  <label className="sales-line-field-label">Screenshot (if no order # / BTN)</label>
+                  <div className="sales-line-upload-frame">
                     <FileUpload
                       itemId="sale-proof"
                       slot={proofUploadId}
@@ -484,63 +440,42 @@ export default function EditSalePage() {
                       onUploaded={(path) => setFormData((p) => ({ ...p, proofScreenshotPath: path }))}
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <Label className="mb-1">Notes</Label>
-                    <Input type="text" name="notes" value={formData.notes} onChange={handleChange} placeholder="Additional context for review" />
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {products.length > 0 && (
-              <Card className="rounded-lg border-[#0A1F44]/10 bg-[#0A1F44] py-0 text-white shadow-sm">
-                <CardHeader>
-                  <CardTitle>Sale Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div>
-                      <p className="text-xs uppercase text-white/60">Monthly Value</p>
-                      <p className="text-xl font-semibold">${calculateTotalValue().toFixed(2)}/mo</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-white/60">Plans Selected</p>
-                      <p className="text-xl font-semibold">{products.length}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-white/60">Points</p>
-                      <p className="text-xl font-semibold text-[#8dc63f]">+{calculateTotalPoints()} pts</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="flex justify-end gap-4">
-              <Button asChild variant="outline">
-                <Link href={`/portal/sales/${saleId}`}>Cancel</Link>
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving || products.length === 0 || !formData.customerAddress.trim()}
-                className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-              >
-                {saving ? (
-                  <>
-                    <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-white" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Check className="size-4" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
+                <div className="span-2">
+                  <label className="sales-line-field-label" htmlFor="notes">Notes</label>
+                  <input id="notes" className="sales-line-input" type="text" name="notes" value={formData.notes} onChange={handleChange} placeholder="Additional context for review" />
+                </div>
+              </div>
             </div>
-          </form>
-        </div>
-      </PortalShell>
+          </section>
+
+          {products.length > 0 && (
+            <section className="sales-line-panel">
+              <div className="sales-line-panel-head">
+                <h2>Sale summary</h2>
+              </div>
+              <div className="sales-line-panel-body">
+                <div className="sales-line-summary">
+                  <div><small>Monthly value</small><strong>${calculateTotalValue().toFixed(2)}/mo</strong></div>
+                  <div><small>Plans selected</small><strong>{products.length}</strong></div>
+                  <div><small>Points</small><strong>+{calculateTotalPoints()} pts</strong></div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <div className="sales-line-form-actions">
+            <Link className="sales-line-btn" href={`/portal/sales/${saleId}`}>Cancel</Link>
+            <button
+              type="submit"
+              className="sales-line-btn primary"
+              disabled={saving || products.length === 0 || !formData.customerAddress.trim()}
+            >
+              {saving ? 'Saving...' : <><Check className="sales-line-icon" aria-hidden="true" />Save changes</>}
+            </button>
+          </div>
+        </form>
+      </SalesLineShell>
     </ProtectedRoute>
   );
 }

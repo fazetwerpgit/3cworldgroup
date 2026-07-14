@@ -431,7 +431,34 @@ Recruiting card 0; confirm strip verified via page.route mock, no
 real account touched) + fresh Opus review PASS zero blockers
 (minors all cosmetic/accepted: dead tone-blue fallbacks, mobile
 column de-emphasis consistent with ops-line rule). COMMITTED LOCAL
-this commit → recruiting gap CLOSED, all 12 rounds done.
+this commit → recruiting gap CLOSED (commit d05ad46).
+SECOND GAP found by my full-page audit, user approved fixing 2026-07-14:
+the 3 SALES SUB-PAGES still on old design — /portal/sales/new (wraps
+SaleForm), /portal/sales/[id] (detail, 312 lines), /portal/sales/[id]/edit
+(546 lines). All other pages verified NEW or intentional redirects
+(links/pay-structure/shorts/approvals redirect; leaderboard untouched by
+design; signup = member-line via SignupForm component). Mini-round on the
+sales-line design system: extraction DONE (scratchpad
+sales-sub-extract-report.txt, hazards B-1..B-12; SaleDetailSheet already
+covers ~90% of detail read-only regions — reuse its block structure;
+SaleForm has single caller, safe to replace; NO sales-line form CSS
+exists yet). BINDING addendum written:
+docs/redesign/sales-subpages-goal-addendum.md (visual-only; both gates
+byte-preserved; NO status field anywhere; B-9 reconciled = HEAD baseline,
+edit page has no status dropdown; totalPoints/PUT-validation gaps left
+as-is; delete gets confirm-strip ONLY if currently un-confirmed).
+BUILT (Sonnet; SaleForm restyled in place — single caller; delete kept
+its existing Dialog confirm per ruling 8 = zero-delta option; B-6
+whole-dollar/'Mon D, YYYY' formatting adopted on detail) + my live
+verify (new/detail/edit dark+light 1440, 390 scrollWidth 375 — NOTE:
+measure AFTER a clean load, resize-without-reload reads 390; audit
+banner live on approved sales w/ real approver+date; delete Dialog
+copy preserved; no status field in edit DOM; empty-requestedBy 403 on
+detail load is PRE-EXISTING at HEAD, self-recovering — left alone) +
+fresh Opus review PASS zero blockers (minors M-1..M-3 all display-only
+and sanctioned). COMMITTED LOCAL this commit → ALL pages on the new
+design, campaign fully complete. AWAITING USER: "deploy" | B-7
+admin-access security fix | optional chat profile photos feature.
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared

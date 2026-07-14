@@ -5,12 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Check, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { NativeSelect } from '@/components/ui/native-select';
 import {
   SaleType,
   SaleProduct,
@@ -167,327 +161,210 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   const availablePlans = selectedCompany ? getPlansByCompany(selectedCompany) : [];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="sales-line-form">
       {(formError || error) && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {formError || error}
-        </div>
+        <div className="sales-line-error" role="alert">{formError || error}</div>
       )}
 
-      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-        <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Address</CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-        <div>
-          <Label className="mb-1">
-            Installation Address *
-          </Label>
-          <Input
+      <section className="sales-line-panel">
+        <div className="sales-line-panel-head">
+          <h2>Customer address</h2>
+        </div>
+        <div className="sales-line-panel-body">
+          <label className="sales-line-field-label" htmlFor="customerAddress">
+            Installation address <span className="req">*</span>
+          </label>
+          <input
+            id="customerAddress"
+            className="sales-line-input"
             type="text"
             name="customerAddress"
             value={formData.customerAddress}
             onChange={handleChange}
             required
-            className="h-11"
             placeholder="123 Main St, City, State 12345"
           />
-          <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">Enter the full address where service will be installed</p>
+          <p className="sales-line-field-hint">Enter the full address where service will be installed</p>
         </div>
-        </CardContent>
-      </Card>
+      </section>
 
-      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-        <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44] dark:text-foreground">Customer Information <span className="text-sm font-normal text-slate-400">(Optional)</span></CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <Label className="mb-1">
-              Customer Name
-            </Label>
-            <Input
-              type="text"
-              name="customerName"
-              value={formData.customerName}
-              onChange={handleChange}
-              placeholder="John Smith"
-            />
-          </div>
-          <div>
-            <Label className="mb-1">
-              Phone Number
-            </Label>
-            <Input
-              type="tel"
-              name="customerPhone"
-              value={formData.customerPhone}
-              onChange={handleChange}
-              placeholder="(555) 123-4567"
-            />
-          </div>
-          <div>
-            <Label className="mb-1">
-              Email
-            </Label>
-            <Input
-              type="email"
-              name="customerEmail"
-              value={formData.customerEmail}
-              onChange={handleChange}
-              placeholder="customer@email.com"
-            />
+      <section className="sales-line-panel">
+        <div className="sales-line-panel-head">
+          <h2>Customer information</h2>
+        </div>
+        <div className="sales-line-panel-body">
+          <div className="sales-line-field-grid cols-3">
+            <div>
+              <label className="sales-line-field-label" htmlFor="customerName">Customer name</label>
+              <input id="customerName" className="sales-line-input" type="text" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="John Smith" />
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="customerPhone">Phone number</label>
+              <input id="customerPhone" className="sales-line-input" type="tel" name="customerPhone" value={formData.customerPhone} onChange={handleChange} placeholder="(555) 123-4567" />
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="customerEmail">Email</label>
+              <input id="customerEmail" className="sales-line-input" type="email" name="customerEmail" value={formData.customerEmail} onChange={handleChange} placeholder="customer@email.com" />
+            </div>
           </div>
         </div>
-        </CardContent>
-      </Card>
+      </section>
 
-      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-        <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44] dark:text-foreground">Select Plan</CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-
-        <div className="mb-6">
-          <Label className="mb-3">Choose Provider</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <section className="sales-line-panel">
+        <div className="sales-line-panel-head">
+          <h2>Select plan</h2>
+        </div>
+        <div className="sales-line-panel-body">
+          <label className="sales-line-field-label">Choose provider</label>
+          <div className="sales-line-provider-grid">
             {FIBER_COMPANIES.map((company) => (
               <button
                 key={company.value}
                 type="button"
                 onClick={() => handleCompanyChange(company.value)}
-                className={`rounded-lg border p-4 text-left transition-colors ${
-                  selectedCompany === company.value
-                    ? 'border-[#8dc63f] bg-[#8dc63f]/5 shadow-[inset_0_0_0_1px_#8dc63f]'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:border-border dark:hover:border-white/25 dark:hover:bg-muted'
-                }`}
+                className={`sales-line-pick ${selectedCompany === company.value ? 'selected' : ''}`}
               >
-                <span className={`font-semibold ${selectedCompany === company.value ? 'text-[#5a8f1f]' : 'text-slate-950 dark:text-foreground'}`}>
-                  {company.label}
-                </span>
+                <span>{company.label}</span>
               </button>
             ))}
           </div>
-        </div>
 
-        {selectedCompany && (
-          <div className="mb-6">
-            <Label className="mb-3">Choose Plan</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {availablePlans.map((plan) => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => addPlan(plan.id)}
-                  disabled={products.some(p => p.productId === plan.id)}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
-                    products.some(p => p.productId === plan.id)
-                      ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed dark:border-border dark:bg-muted'
-                      : 'border-gray-200 hover:border-[#8dc63f] hover:bg-[#8dc63f]/5 dark:border-border'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="font-semibold text-slate-950 dark:text-foreground block">{plan.name}</span>
-                      <span className="text-sm text-slate-500 dark:text-muted-foreground">{plan.speed}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-[#0A1F44] dark:text-foreground">${plan.price.toFixed(2)}</span>
-                      <span className="text-xs text-gray-500 dark:text-muted-foreground block">/month</span>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center gap-1">
-                    <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
-                      +{plan.points} pts
-                    </Badge>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {products.length > 0 && (
-          <div>
-            <Label className="mb-3">Selected Plans</Label>
-            <div className="space-y-2">
-              {products.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-border dark:bg-muted">
-                  <div>
-                    <span className="font-medium text-slate-950 dark:text-foreground">{product.productName}</span>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm text-gray-500 dark:text-muted-foreground">${product.unitPrice.toFixed(2)}/mo</span>
-                      <Badge variant="outline" className="border-[#8dc63f]/20 bg-[#8dc63f]/10 text-[#5a8f1f]">
-                        +{product.points} pts
-                      </Badge>
-                    </div>
-                  </div>
-                  <Button
+          {selectedCompany && (
+            <div style={{ marginTop: 16 }}>
+              <label className="sales-line-field-label">Choose plan</label>
+              <div className="sales-line-plan-grid">
+                {availablePlans.map((plan) => (
+                  <button
+                    key={plan.id}
                     type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => removeProduct(index)}
-                    className="text-red-600 hover:bg-red-50 hover:text-red-800"
+                    onClick={() => addPlan(plan.id)}
+                    disabled={products.some(p => p.productId === plan.id)}
+                    className="sales-line-pick sales-line-plan-pick"
                   >
-                    <Trash2 className="size-4" />
-                    <span className="sr-only">Remove plan</span>
-                  </Button>
-                </div>
-              ))}
+                    <div className="sales-line-plan-pick-copy">
+                      <strong>{plan.name}</strong>
+                      <small>{plan.speed}</small>
+                    </div>
+                    <div className="sales-line-plan-pick-price">
+                      <b>${plan.price.toFixed(2)}/mo</b>
+                      <em>+{plan.points} pts</em>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {products.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <label className="sales-line-field-label">Selected plans</label>
+              <div className="sales-line-selected-plans">
+                {products.map((product, index) => (
+                  <div key={index} className="sales-line-selected-plan-row">
+                    <div>
+                      <strong>{product.productName}</strong>
+                      <span>${product.unitPrice.toFixed(2)}/mo · +{product.points} pts</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="sales-line-remove-plan"
+                      onClick={() => removeProduct(index)}
+                      aria-label="Remove plan"
+                    >
+                      <Trash2 className="sales-line-icon" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sales-line-panel">
+        <div className="sales-line-panel-head">
+          <h2>Sale details</h2>
+        </div>
+        <div className="sales-line-panel-body">
+          <div className="sales-line-field-grid">
+            <div>
+              <label className="sales-line-field-label" htmlFor="saleType">Sale type</label>
+              <select id="saleType" className="sales-line-select" name="saleType" value={formData.saleType} onChange={handleChange}>
+                {SALE_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="saleDate">Sale date <span className="req">*</span></label>
+              <input id="saleDate" className="sales-line-input" type="date" name="saleDate" value={formData.saleDate} onChange={handleChange} max={todaySaleDateInput()} required />
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="installDate">Install date <span className="req">*</span></label>
+              <input id="installDate" className="sales-line-input" type="date" name="installDate" value={formData.installDate} onChange={handleChange} required />
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="productSold">Product sold <span className="req">*</span></label>
+              <input id="productSold" className="sales-line-input" type="text" name="productSold" value={formData.productSold} onChange={handleChange} placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice" />
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="orderNumberOrBtn">Order number or BTN</label>
+              <input id="orderNumberOrBtn" className="sales-line-input" type="text" name="orderNumberOrBtn" value={formData.orderNumberOrBtn} onChange={handleChange} placeholder="Order # or billing phone number" />
+              <p className="sales-line-field-hint">Required unless you upload a screenshot below.</p>
+            </div>
+            <div>
+              <label className="sales-line-field-label">Screenshot (if no order # / BTN)</label>
+              <div className="sales-line-upload-frame">
+                <FileUpload
+                  itemId="sale-proof"
+                  slot={proofUploadId}
+                  accept="image/*,application/pdf"
+                  allowedTypes={FORM_ATTACHMENT_TYPES}
+                  uploadUrl="/api/portal/forms/upload"
+                  extraFields={{ formType: 'sale-proof' }}
+                  existingPath={formData.proofScreenshotPath || undefined}
+                  getHeaders={async (): Promise<HeadersInit> => {
+                    const t = await auth?.currentUser?.getIdToken();
+                    return t ? { Authorization: `Bearer ${t}` } : {};
+                  }}
+                  onUploaded={(path) => setFormData((p) => ({ ...p, proofScreenshotPath: path }))}
+                />
+              </div>
+            </div>
+            <div className="span-2">
+              <label className="sales-line-field-label" htmlFor="notes">Notes</label>
+              <input id="notes" className="sales-line-input" type="text" name="notes" value={formData.notes} onChange={handleChange} placeholder="Additional context for review" />
             </div>
           </div>
-        )}
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-lg border-slate-200 py-0 shadow-sm">
-        <CardHeader className="border-b border-slate-100 p-5">
-          <CardTitle className="text-[#0A1F44] dark:text-foreground">Sale Details</CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label className="mb-1">Sale Type</Label>
-            <NativeSelect
-              name="saleType"
-              value={formData.saleType}
-              onChange={handleChange}
-              className="w-full"
-            >
-              {SALE_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <Label className="mb-1">Sale Date *</Label>
-            <Input
-              type="date"
-              name="saleDate"
-              value={formData.saleDate}
-              onChange={handleChange}
-              max={todaySaleDateInput()}
-              required
-              className="h-11"
-            />
-          </div>
-          <div>
-            <Label className="mb-1">Install Date *</Label>
-            <Input
-              type="date"
-              name="installDate"
-              value={formData.installDate}
-              onChange={handleChange}
-              required
-              className="h-11"
-            />
-          </div>
-          <div>
-            <Label className="mb-1">Product Sold *</Label>
-            <Input
-              type="text"
-              name="productSold"
-              value={formData.productSold}
-              onChange={handleChange}
-              placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice"
-            />
-          </div>
-          <div>
-            <Label className="mb-1">Order Number or BTN</Label>
-            <Input
-              type="text"
-              name="orderNumberOrBtn"
-              value={formData.orderNumberOrBtn}
-              onChange={handleChange}
-              placeholder="Order # or billing phone number"
-            />
-            <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-              Required unless you upload a screenshot below.
-            </p>
-          </div>
-          <div>
-            <Label className="mb-1">Screenshot (if no order # / BTN)</Label>
-            <FileUpload
-              itemId="sale-proof"
-              slot={proofUploadId}
-              accept="image/*,application/pdf"
-              allowedTypes={FORM_ATTACHMENT_TYPES}
-              uploadUrl="/api/portal/forms/upload"
-              extraFields={{ formType: 'sale-proof' }}
-              existingPath={formData.proofScreenshotPath || undefined}
-              getHeaders={async (): Promise<HeadersInit> => {
-                const t = await auth?.currentUser?.getIdToken();
-                return t ? { Authorization: `Bearer ${t}` } : {};
-              }}
-              onUploaded={(path) => setFormData((p) => ({ ...p, proofScreenshotPath: path }))}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <Label className="mb-1">Notes</Label>
-            <Input
-              type="text"
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Additional context for review"
-            />
-          </div>
         </div>
-        </CardContent>
-      </Card>
+      </section>
 
       {products.length > 0 && (
-        <Card className="rounded-lg border-[#0A1F44]/10 bg-[#0A1F44] py-0 text-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Sale Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <p className="text-xs uppercase text-white/60">Monthly Value</p>
-              <p className="text-xl font-semibold">${calculateTotalValue().toFixed(2)}/mo</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-white/60">Plans Selected</p>
-              <p className="text-xl font-semibold">{products.length}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-white/60">Points</p>
-              <p className="text-xl font-semibold text-[#8dc63f]">+{calculateTotalPoints()} pts</p>
+        <section className="sales-line-panel">
+          <div className="sales-line-panel-head">
+            <h2>Sale summary</h2>
+          </div>
+          <div className="sales-line-panel-body">
+            <div className="sales-line-summary">
+              <div><small>Monthly value</small><strong>${calculateTotalValue().toFixed(2)}/mo</strong></div>
+              <div><small>Plans selected</small><strong>{products.length}</strong></div>
+              <div><small>Points</small><strong>+{calculateTotalPoints()} pts</strong></div>
             </div>
           </div>
-          </CardContent>
-        </Card>
+        </section>
       )}
 
-      <div className="flex justify-end gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-        >
+      <div className="sales-line-form-actions">
+        <button type="button" className="sales-line-btn" onClick={() => router.back()}>
           Cancel
-        </Button>
-        <Button
+        </button>
+        <button
           type="submit"
+          className="sales-line-btn primary"
           disabled={loading || products.length === 0 || !formData.customerAddress.trim()}
-          className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
         >
-          {loading ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Check className="size-4" />
-              Submit Sale
-            </>
-          )}
-        </Button>
+          {loading ? 'Submitting...' : <><Check className="sales-line-icon" aria-hidden="true" />Submit sale</>}
+        </button>
       </div>
     </form>
   );
