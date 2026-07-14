@@ -12,7 +12,6 @@ import {
   ClipboardCheck,
   GraduationCap,
   LayoutDashboard,
-  Link2,
   Mail,
   MessageSquare,
   MessagesSquare,
@@ -96,9 +95,8 @@ export const portalNavGroups: PortalNavGroup[] = [
   {
     label: 'Resources',
     items: [
+      { label: 'Resources', href: '/portal/resources', icon: WalletCards },
       { label: 'University', href: '/portal/training', icon: GraduationCap, permissions: ['training:read'] },
-      { label: 'Links', href: '/portal/links', icon: Link2, permissions: ['links:read'] },
-      { label: 'Pay Structure', href: '/portal/pay-structure', icon: WalletCards },
     ],
   },
   {

@@ -291,8 +291,48 @@ Turbopack cache served stale CSS through TWO restarts; rule was
 absent from served CSS, found via styleSheets scan); D2 manager-
 interview dup empty-state → emptyMessage prop, dup block removed.
 All gates PASS. FORMS COMMITTED LOCAL (this commit) — NOT pushed.
-NOW: RESOURCES impl launching (contract final). While it runs: MEMBER
-pages extraction prep (pipeline pattern).
+FORMS COMMITTED 85b716f. ⚠ CODEX USAGE LIMIT HIT 2026-07-13 ~02:00
+(resets Aug 12 2026): Resources codex impl DIED mid-run (left only
+untracked src/components/resources/ResourcesLine.tsx, 334 lines, no
+other edits) and ops extraction died at start. EXECUTOR SWITCHED TO
+SONNET AGENTS until reset (reviewers stay Opus; memory
+project-codex-usage-exhausted). RESOURCES BUILT via Sonnet agent (7 files: new hub page +
+ResourcesLine.tsx rewrite + training page rewrite + links/
+pay-structure→redirects + CommandPalette Resources group 3→2 +
+globals.css resources-line-*; all gates PASS; builder's judgment call
+APPROVED: new presentational card components over forcing props into
+ResourceGrid/ResourceCard, same useTraining data). MY VERIFY PASS
+after ANOTHER stale-CSS cold restart (2nd occurrence: appended CSS
+block absent from served sheets until .next delete + cold start —
+ALWAYS styleSheets-scan before judging new CSS): weights 950/900,
+redirects correct, scrollWidth 375, honest empty states (DB has zero
+training resources/shorts — real). Shots res-impl-1440-{hub,uni}.png
++ res-impl-390-hub.png. OPUS ROUND-1 verdict: PASS, ZERO defects (pay lane real
+admin edit verified live, real quickLinks/categories, honest
+empties, nav flip clean, additions-only CSS). RESOURCES COMMITTED
+LOCAL (this commit). MEMBER BUILD LAUNCHING (Sonnet, contract final).
+OPS CONTRACT FINAL: docs/redesign/ops-the-line-goal.md w/ my 6
+rulings (client-side aggregation; TWO real status states only — NO
+ephemeral In-progress; real-evidence-only widgets; clearable stage
+strip; Recruiting card→invite queue count; per-queue real toolbars).
+ADMIN MGMT EXTRACTION RUNNING (Sonnet → scratchpad
+admin-extract-report.txt). OPS CONTRACT DRAFTED in parallel (extraction report at scratchpad
+ops-extract-report.txt; pre-ruled: option-3 .line chrome uniform, new
+OpsQueueList swaps all 6 ReviewList consumers atomically, NO decrypt
+UI in queues ever, real modals stay modals, Recruiting Command Center
+out of scope). MEMBER PAGES PREPPED IN PARALLEL:
+extraction DONE (scratchpad logs/codex-member-extract.log), CONTRACT
+FINAL docs/redesign/member-the-line-goal.md with my 3 rulings
+(onboarding = hybrid: mockup's full board default + focused panels
+for data-entry row actions, zero gating/write-path changes; signup
+confirm-password + strength meter ship CLIENT-SIDE ONLY; mockup's own
+editorial font stack kept + old-style-figure numeral rule still
+applies). No nav/route changes this round; pill nav = prototype
+chrome, does not ship; AuthShell restyle must be SCOPED (login/
+pending-approval share it, out of scope). Member impl starts when
+Resources commits. Next prep target: OPS QUEUES extraction (mockups =
+MIX: ops home + onboarding review from ops-round1/option-1-the-desk,
+review queue + pipeline from option-3-the-line-ops).
 PIPELINE PARALLELISM NOW STANDARD (user asked for >1 codex agent):
 while page N implements, page N+1 runs extraction + contract draft
 (read-only, safe). NEVER two implementers at once (globals.css is
