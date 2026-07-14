@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import ReviewList from '@/components/forms/ReviewList';
+import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -54,17 +54,51 @@ export default function BugReportsReviewPage() {
     if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
+  const queueRows: OpsQueueRowVM[] = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        status: row.status === 'handled' ? 'handled' : 'new',
+        person: opsFormatValue(row.repName),
+        personSub: opsFormatValue(row.repEmail),
+        subject: opsFormatValue(row.summary),
+        subjectSub: opsFormatValue(row.area),
+        secondary: opsFormatValue(row.pageUrl),
+        secondarySub: 'Bug report',
+        evidenceKind: 'none',
+        detailFields: [
+          { label: 'Area', value: opsFormatValue(row.area) },
+          { label: 'Details', value: opsFormatValue(row.details) },
+          { label: 'Page', value: opsFormatValue(row.pageUrl) },
+          { label: 'Submitted', value: opsFormatValue(row.createdAt) },
+        ],
+        searchText: [row.repName, row.summary, row.area].map(opsFormatValue).join(' ').toLowerCase(),
+      })),
+    [rows]
+  );
+
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <ReviewList
-        title="Bug Reports"
-        columns={COLUMNS}
-        rows={rows}
-        onMarkHandled={markHandled}
-        loading={loading}
-        error={error}
-        downloadFilename="bug-reports.csv"
-      />
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <OpsQueueList
+            kicker="02 / The Line / evidence relay"
+            heroWord="Call"
+            heroRest="the proof."
+            intro="Reproduce, triage, and send the right signal to product."
+            itemsLabel="items need action"
+            rows={queueRows}
+            loading={loading}
+            error={error}
+            downloadFilename="bug-reports.csv"
+            csvColumns={COLUMNS}
+            csvRows={rows}
+            onMarkHandled={markHandled}
+            emptyStateTitle="Nothing to review"
+            emptyStateBody="No bug reports need review right now."
+          />
+        </div>
+      </div>
     </ProtectedRoute>
   );
 }

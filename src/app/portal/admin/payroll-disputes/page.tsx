@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import ReviewList from '@/components/forms/ReviewList';
-import { Button } from '@/components/ui/button';
+import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -55,43 +54,70 @@ export default function PayrollDisputesReviewPage() {
     if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  const viewScreenshot = async (path: string) => {
-    const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
-    const json = await res.json();
-    if (json.url) window.open(json.url, '_blank', 'noopener,noreferrer');
-  };
+  const viewScreenshot = useCallback(
+    async (path: string) => {
+      const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
+      const json = await res.json();
+      if (json.url) window.open(json.url, '_blank', 'noopener,noreferrer');
+    },
+    [authedFetch]
+  );
 
-  // Decorate rows with a screenshot action via an extra column rendered by ReviewList?
-  // ReviewList only renders text columns + Mark handled. To add "View screenshot",
-  // pass a synthetic column whose value is a clickable hint, and render the button
-  // by wrapping: simplest is to add a 'screenshot' column showing 'View' and handle
-  // the click below the list. Implement a thin wrapper instead:
+  const campaigns = useMemo(
+    () => Array.from(new Set(rows.map((r) => opsFormatValue(r.campaign)).filter((c) => c !== '—'))).sort(),
+    [rows]
+  );
+
+  const queueRows: OpsQueueRowVM[] = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        status: row.status === 'handled' ? 'handled' : 'new',
+        person: opsFormatValue(row.repName),
+        personSub: opsFormatValue(row.contractorName),
+        subject: opsFormatValue(row.typeOfOrder),
+        subjectSub: opsFormatValue(row.dateOfInstall),
+        secondary: opsFormatValue(row.campaign),
+        secondarySub: 'Payroll dispute',
+        evidenceKind: row.orderScreenshotPath ? 'files' : 'none',
+        evidenceItems: row.orderScreenshotPath
+          ? [{ label: 'screenshot', onClick: () => viewScreenshot(row.orderScreenshotPath as string) }]
+          : undefined,
+        detailFields: [
+          { label: 'Contractor', value: opsFormatValue(row.contractorName) },
+          { label: 'Contractor email', value: opsFormatValue(row.contractorEmail) },
+          { label: 'Campaign', value: opsFormatValue(row.campaign) },
+          { label: 'Install date', value: opsFormatValue(row.dateOfInstall) },
+        ],
+        searchText: [row.repName, row.contractorName, row.typeOfOrder].map(opsFormatValue).join(' ').toLowerCase(),
+        filterValue: opsFormatValue(row.campaign),
+      })),
+    [rows, viewScreenshot]
+  );
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="space-y-4">
-        <ReviewList
-          title="Payroll Disputes"
-          columns={COLUMNS}
-          rows={rows}
-          onMarkHandled={markHandled}
-          loading={loading}
-          error={error}
-          downloadFilename="payroll-disputes.csv"
-        />
-        {rows.some((r) => r.orderScreenshotPath) && (
-          <div className="mx-auto max-w-[1500px] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">Screenshots</p>
-            {rows.filter((r) => r.orderScreenshotPath).map((r) => (
-              <div key={r.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-700 dark:text-muted-foreground">{String(r.contractorName ?? r.id)}</span>
-                <Button type="button" variant="outline" onClick={() => viewScreenshot(r.orderScreenshotPath as string)}>
-                  View screenshot
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <OpsQueueList
+            kicker="02 / The Line / evidence relay"
+            heroWord="Call"
+            heroRest="the proof."
+            intro="A single row keeps the person, campaign, age, status, and evidence in view. Expand only when the decision needs the full case."
+            itemsLabel="items need action"
+            rows={queueRows}
+            loading={loading}
+            error={error}
+            downloadFilename="payroll-disputes.csv"
+            csvColumns={COLUMNS}
+            csvRows={rows}
+            filterLabel="Campaign"
+            filterOptions={campaigns}
+            onMarkHandled={markHandled}
+            emptyStateTitle="Nothing to review"
+            emptyStateBody="No payroll disputes need review right now."
+          />
+        </div>
       </div>
     </ProtectedRoute>
   );

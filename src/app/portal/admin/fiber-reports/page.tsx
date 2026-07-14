@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import ReviewList from '@/components/forms/ReviewList';
+import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -58,17 +58,51 @@ export default function FiberReportsReviewPage() {
     if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
+  const queueRows: OpsQueueRowVM[] = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        status: row.status === 'handled' ? 'handled' : 'new',
+        person: opsFormatValue(row.repName),
+        personSub: opsFormatValue(row.companySold),
+        subject: opsFormatValue(row.orderNumber),
+        subjectSub: opsFormatValue(row.dateKnocked),
+        secondary: `Pack ${opsFormatValue(row.packNumber)}`,
+        secondarySub: `${opsFormatValue(row.numberOfSales)} sales`,
+        evidenceKind: 'none',
+        detailFields: [
+          { label: 'Reps', value: opsFormatValue(row.numberOfReps) },
+          { label: 'Doors knocked', value: opsFormatValue(row.doorsKnocked) },
+          { label: 'Contacts', value: opsFormatValue(row.customerContacts) },
+          { label: 'Submitted', value: opsFormatValue(row.createdAt) },
+        ],
+        searchText: [row.repName, row.companySold, row.orderNumber].map(opsFormatValue).join(' ').toLowerCase(),
+      })),
+    [rows]
+  );
+
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <ReviewList
-        title="Fiber Reports"
-        columns={COLUMNS}
-        rows={rows}
-        onMarkHandled={markHandled}
-        loading={loading}
-        error={error}
-        downloadFilename="fiber-reports.csv"
-      />
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <OpsQueueList
+            kicker="02 / The Line / evidence relay"
+            heroWord="Call"
+            heroRest="the proof."
+            intro="Fiber field reports awaiting review before commission can move."
+            itemsLabel="items need action"
+            rows={queueRows}
+            loading={loading}
+            error={error}
+            downloadFilename="fiber-reports.csv"
+            csvColumns={COLUMNS}
+            csvRows={rows}
+            onMarkHandled={markHandled}
+            emptyStateTitle="Nothing to review"
+            emptyStateBody="No fiber reports need review right now."
+          />
+        </div>
+      </div>
     </ProtectedRoute>
   );
 }

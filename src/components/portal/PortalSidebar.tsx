@@ -13,8 +13,10 @@ import {
 } from '@/components/portal/CommandPalette';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 
+const EXACT_MATCH_ROUTES = new Set(['/portal/dashboard', '/portal/admin']);
+
 function isItemActive(pathname: string, href: string) {
-  return href === '/portal/dashboard' ? pathname === href : pathname.startsWith(href);
+  return EXACT_MATCH_ROUTES.has(href) ? pathname === href : pathname.startsWith(href);
 }
 
 function NavLink({

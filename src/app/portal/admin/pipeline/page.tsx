@@ -1,13 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   PipelineRep,
@@ -26,28 +21,6 @@ interface ChannelRow extends Channel {
   reference: string | null;
 }
 
-const STAGE_BADGE: Record<PipelineStage, string> = {
-  processing: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  need_logins: 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300',
-  cleared_to_sell: 'border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
-  active: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
-  decommissioned: 'border-slate-200 dark:border-border bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground',
-};
-
-const STAGE_CARD_ACCENT: Record<PipelineStage, string> = {
-  processing: 'text-amber-700 dark:text-amber-300',
-  need_logins: 'text-blue-700 dark:text-blue-300',
-  cleared_to_sell: 'text-indigo-700 dark:text-indigo-300',
-  active: 'text-[#4f7f1e] dark:text-green-300',
-  decommissioned: 'text-slate-600 dark:text-muted-foreground',
-};
-
-const CHANNEL_STATUS_BADGE: Record<ChannelOnboardingStatus, string> = {
-  not_started: 'border-slate-200 dark:border-border bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground',
-  submitted: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  cleared: 'border-[#8dc63f]/40 bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300',
-};
-
 export default function PipelinePage() {
   const { user } = useAuth();
   const [reps, setReps] = useState<PipelineRep[]>([]);
@@ -56,13 +29,14 @@ export default function PipelinePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [stageFilter, setStageFilter] = useState<PipelineStage | ''>('');
+  const [managerFilter, setManagerFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [channelsModal, setChannelsModal] = useState<PipelineRep | null>(null);
   const [channelRows, setChannelRows] = useState<ChannelRow[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [decommissionModal, setDecommissionModal] = useState<PipelineRep | null>(null);
-  const [decommissionReason, setDecommissionReason] =
-    useState<DecommissionReason>('non_activity');
+  const [decommissionReason, setDecommissionReason] = useState<DecommissionReason>('non_activity');
   const [decommissionNotes, setDecommissionNotes] = useState('');
 
   const flash = (msg: string) => {
@@ -85,18 +59,14 @@ export default function PipelinePage() {
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchPipeline();
-  }, [fetchPipeline]);
+  useEffect(() => { fetchPipeline(); }, [fetchPipeline]);
 
   const openChannels = async (rep: PipelineRep) => {
     setChannelsModal(rep);
     setChannelsLoading(true);
     try {
       if (!user) return;
-      const response = await fetch(
-        `/api/portal/pipeline/channels?userId=${rep.uid}&requestedBy=${user.uid}`
-      );
+      const response = await fetch(`/api/portal/pipeline/channels?userId=${rep.uid}&requestedBy=${user.uid}`);
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load channels');
       setChannelRows(json.channels);
@@ -108,10 +78,7 @@ export default function PipelinePage() {
     }
   };
 
-  const setChannelStatus = async (
-    channelId: string,
-    status: ChannelOnboardingStatus
-  ) => {
+  const setChannelStatus = async (channelId: string, status: ChannelOnboardingStatus) => {
     if (!channelsModal || !user) return;
     setBusy(true);
     setError('');
@@ -119,18 +86,11 @@ export default function PipelinePage() {
       const response = await fetch('/api/portal/pipeline/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: channelsModal.uid,
-          channelId,
-          status,
-          requestedBy: user.uid,
-        }),
+        body: JSON.stringify({ userId: channelsModal.uid, channelId, status, requestedBy: user.uid }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to update channel');
-      setChannelRows((prev) =>
-        prev.map((c) => (c.id === channelId ? { ...c, status } : c))
-      );
+      setChannelRows((prev) => prev.map((c) => (c.id === channelId ? { ...c, status } : c)));
       await fetchPipeline();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update channel');
@@ -147,11 +107,7 @@ export default function PipelinePage() {
       const response = await fetch('/api/portal/pipeline/field-train', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: rep.uid,
-          requestedBy: user.uid,
-          requestedByName: user.displayName || user.email,
-        }),
+        body: JSON.stringify({ userId: rep.uid, requestedBy: user.uid, requestedByName: user.displayName || user.email }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to send request');
@@ -214,365 +170,289 @@ export default function PipelinePage() {
     }
   };
 
-  const visibleReps = stageFilter
-    ? reps.filter((r) => r.stage === stageFilter)
-    : reps;
+  const managers = useMemo(
+    () => Array.from(new Set(reps.map((r) => r.managerName).filter((m): m is string => Boolean(m)))),
+    [reps]
+  );
+
+  const visibleReps = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return reps.filter((r) => {
+      if (stageFilter && r.stage !== stageFilter) return false;
+      if (managerFilter !== 'all' && r.managerName !== managerFilter) return false;
+      if (q && ![r.displayName, r.managerName].filter(Boolean).join(' ').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [reps, stageFilter, managerFilter, search]);
+
+  const heroCount = stageFilter ? (counts[stageFilter] ?? 0) : reps.filter((r) => r.stage !== 'decommissioned' && r.stage !== 'active').length;
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="mx-auto max-w-[1500px] space-y-5">
-        <PortalPageHeader
-          compact
-          eyebrow="Administration"
-          title="Recruiting Pipeline"
-          description="Track each field rep from onboarding paperwork to channel credentials, active sales, and decommissioning."
-        />
-
-        {error && (
-          <div className="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-            {error}
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <div className="ops-line-ticker">
+            <b>ON AIR</b>
+            <span>Ops signal / recruiting pipeline · stage board</span>
+            <strong>QUEUE LIVE</strong>
           </div>
-        )}
-        {success && (
-          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e] dark:text-green-300">
-            {success}
-          </div>
-        )}
 
-        <div className="portal-enter portal-enter-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {PIPELINE_STAGE_ORDER.map((stage) => {
-            const cfg = PipelineStageConfig[stage];
-            const selected = stageFilter === stage;
-            return (
-              <button
-                key={stage}
-                onClick={() => setStageFilter(selected ? '' : stage)}
-                className={`cursor-pointer rounded-lg border bg-white dark:bg-card p-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:hover:border-border dark:hover:bg-muted ${
-                  selected
-                    ? 'border-[#8dc63f] ring-2 ring-[#8dc63f]/20'
-                    : 'border-slate-200 dark:border-border'
-                }`}
-              >
-                <p className={`text-2xl font-semibold ${STAGE_CARD_ACCENT[stage]}`}>
-                  {counts[stage] ?? 0}
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-950 dark:text-foreground">{cfg.name}</p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">{cfg.description}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        {loading ? (
-          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
-            <CardContent className="py-8">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading pipeline...</p>
-            </CardContent>
-          </Card>
-        ) : visibleReps.length === 0 ? (
-          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
-            <CardContent className="py-12">
-              <p className="font-medium text-slate-950 dark:text-foreground">
-                {stageFilter
-                  ? `No reps in "${PipelineStageConfig[stageFilter].name}"`
-                  : 'No field reps yet'}
+          <div className="ops-line-hero">
+            <div>
+              <p className="ops-line-kicker">04 / The Line / stage board</p>
+              <h1><span>Move</span><br />the line.</h1>
+              <p className="ops-line-intro">
+                Stage counts stay visible; reps stay scannable. Track each field rep from onboarding paperwork to
+                channel credentials, active sales, and decommissioning.
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">
+            </div>
+            <div className="ops-line-hero-count">
+              <strong className="ops-line-display portal-metallic-num">{heroCount}</strong>
+              <small>reps need action</small>
+            </div>
+          </div>
+
+          {error && <div className="ops-line-error-banner">{error}</div>}
+          {success && (
+            <div className="ops-line-error-banner" style={{ borderColor: 'var(--ops-line-lime)', color: 'var(--ops-line-lime)', background: 'var(--ops-line-lime-soft)' }}>
+              {success}
+            </div>
+          )}
+
+          <div className="ops-line-stage-strip" aria-label="Pipeline stage filter">
+            {PIPELINE_STAGE_ORDER.map((stage) => {
+              const cfg = PipelineStageConfig[stage];
+              const selected = stageFilter === stage;
+              return (
+                <button
+                  key={stage}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setStageFilter(selected ? '' : stage)}
+                  title={cfg.description}
+                >
+                  <span>{cfg.name}</span>
+                  <b>{counts[stage] ?? 0}</b>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="ops-line-toolbar" style={{ marginTop: 13 }}>
+            <input
+              type="search"
+              className="ops-line-search"
+              placeholder="Search reps or managers"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search reps or managers"
+            />
+            <div className="ops-line-pill-row" role="group" aria-label="Manager filter">
+              <button type="button" aria-pressed={managerFilter === 'all'} onClick={() => setManagerFilter('all')}>
+                All managers
+              </button>
+              {managers.map((m) => (
+                <button key={m} type="button" aria-pressed={managerFilter === m} onClick={() => setManagerFilter(m)}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="ops-line-state-card" style={{ marginTop: 13 }}>Loading pipeline…</div>
+          ) : visibleReps.length === 0 ? (
+            <div className="ops-line-state-card" style={{ marginTop: 13 }}>
+              <p style={{ fontWeight: 900, marginBottom: 4 }}>
+                {stageFilter ? `No reps in "${PipelineStageConfig[stageFilter].name}"` : 'No field reps yet'}
+              </p>
+              <p>
                 {stageFilter
-                  ? 'Click the card again to clear the filter.'
+                  ? 'Click the stage again to clear the filter.'
                   : 'Create field users in User Management to start the pipeline.'}
               </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="portal-enter portal-enter-3 overflow-hidden rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-left">
-                    {[
-                      'Rep',
-                      'Stage',
-                      'Onboarding',
-                      'Channels',
-                      'Sales',
-                      'Manager',
-                      'Actions',
-                    ].map((heading) => (
-                      <th
-                        key={heading}
-                        className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground ${
-                          heading === 'Actions' ? 'text-right' : ''
-                        }`}
-                      >
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleReps.map((rep) => (
-                    <tr
-                      key={rep.uid}
-                      className="border-b border-slate-100 dark:border-border transition-colors hover:bg-slate-50 dark:hover:bg-muted"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-slate-950 dark:text-foreground">{rep.displayName}</p>
-                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
-                          {RoleDisplayNames[rep.fieldRole]}
-                          {rep.isIBO && (
-                            <span className="ml-1.5 font-medium text-[#4f7f1e] dark:text-green-300">
-                              IBO
-                            </span>
-                          )}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className={STAGE_BADGE[rep.stage]}>
-                          {PipelineStageConfig[rep.stage].name}
-                        </Badge>
-                        {rep.decommission && (
-                          <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                            {DecommissionReasonLabels[rep.decommission.reason]}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 rounded-full bg-slate-200 dark:bg-muted">
-                            <div
-                              className="h-1.5 rounded-full bg-[#8dc63f]"
-                              style={{
-                                width: `${
-                                  rep.onboarding.total > 0
-                                    ? (rep.onboarding.approved / rep.onboarding.total) *
-                                      100
-                                    : 0
-                                }%`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-xs text-slate-600 dark:text-muted-foreground">
-                            {rep.onboarding.approved}/{rep.onboarding.total}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-muted-foreground">
-                        {rep.channelsCleared} cleared
-                        {rep.channelsSubmitted > 0 && (
-                          <span className="text-amber-700 dark:text-amber-300">
-                            {' '}
-                            - {rep.channelsSubmitted} pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-muted-foreground">{rep.approvedSales}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-muted-foreground">
-                        {rep.managerName ?? '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          {rep.stage !== 'decommissioned' ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => requestFieldTraining(rep)}
-                                disabled={busy}
-                                title="Message manager to field train"
-                              >
-                                Field Train
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openChannels(rep)}
-                                disabled={busy}
-                              >
-                                Channels
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setDecommissionModal(rep)}
-                                disabled={busy}
-                                className="border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-300"
-                              >
-                                Decommission
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => reinstate(rep)}
-                              disabled={busy}
-                              className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-                            >
-                              Reinstate
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          </Card>
-        )}
-
-        {channelsModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">
-                  Channel Credentials - {channelsModal.displayName}
-                </h3>
-                <p className="text-sm text-slate-500 dark:text-muted-foreground">
-                  Xfinity is credentialed directly; all other channels go through DSI.
-                  Credentials live with the vendor; only status is tracked here.
-                </p>
-              </CardHeader>
-              <CardContent className="p-5">
-                {channelsLoading ? (
-                  <div className="py-8 text-center">
-                    <div className="mx-auto h-6 w-6 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {channelRows.map((channel) => (
-                      <div
-                        key={channel.id}
-                        className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border p-3"
-                      >
-                        <div>
-                          <p className="font-medium text-slate-950 dark:text-foreground">{channel.name}</p>
-                          <p className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-muted-foreground">
-                            {channel.credentialingPath === 'direct' ? 'Direct' : 'via DSI'}
-                            <Badge
-                              variant="outline"
-                              className={CHANNEL_STATUS_BADGE[channel.status]}
-                            >
-                              {channel.status.replace('_', ' ')}
-                            </Badge>
-                          </p>
-                        </div>
-                        <NativeSelect
-                          value={channel.status}
-                          onChange={(e) =>
-                            setChannelStatus(
-                              channel.id,
-                              e.target.value as ChannelOnboardingStatus
-                            )
-                          }
-                          disabled={busy}
-                          className="w-36"
-                        >
-                          <NativeSelectOption value="not_started">
-                            Not Started
-                          </NativeSelectOption>
-                          <NativeSelectOption value="submitted">
-                            Submitted
-                          </NativeSelectOption>
-                          <NativeSelectOption value="cleared">
-                            Cleared
-                          </NativeSelectOption>
-                        </NativeSelect>
+          ) : (
+            <div className="ops-line-list" style={{ marginTop: 13 }}>
+              {visibleReps.map((rep) => (
+                <article key={rep.uid} className="ops-line-row ops-line-rep-row">
+                  <div className="ops-line-rep-grid">
+                    <div className="ops-line-rep-title">
+                      <span className="ops-line-avatar">{rep.displayName?.charAt(0).toUpperCase() || 'R'}</span>
+                      <div>
+                        <strong>
+                          {rep.displayName}
+                          {rep.isIBO && <span className="ops-line-ibo">IBO</span>}
+                        </strong>
+                        <small>{RoleDisplayNames[rep.fieldRole]}</small>
                       </div>
-                    ))}
+                    </div>
+                    <div className="ops-line-rep-cell">
+                      <span className="meta">Manager</span>
+                      <strong>{rep.managerName ?? '—'}</strong>
+                    </div>
+                    <div className="ops-line-rep-cell">
+                      <span className="meta">Progress</span>
+                      <div className="ops-line-progress-label">
+                        <span>Onboarding</span>
+                        <b>{rep.onboarding.approved}/{rep.onboarding.total}</b>
+                      </div>
+                      <div className="ops-line-progress-bar">
+                        <i style={{ width: `${rep.onboarding.total > 0 ? (rep.onboarding.approved / rep.onboarding.total) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                    <div className="ops-line-rep-cell">
+                      <span className="meta">Channels</span>
+                      <div className="ops-line-channels">
+                        <span className="ops-line-channel" data-state={rep.channelsCleared > 0 ? 'cleared' : 'not_started'}>
+                          {rep.channelsCleared} cleared
+                        </span>
+                        {rep.channelsSubmitted > 0 && (
+                          <span className="ops-line-channel" data-state="submitted">
+                            {rep.channelsSubmitted} pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="ops-line-rep-cell">
+                      <span className="meta">Approved sales</span>
+                      <strong>{rep.approvedSales}</strong>
+                    </div>
+                    <div className="ops-line-rep-actions">
+                      {rep.stage !== 'decommissioned' ? (
+                        <>
+                          <button type="button" className="ops-line-action" disabled={busy} onClick={() => requestFieldTraining(rep)}>
+                            Field train
+                          </button>
+                          <button type="button" className="ops-line-action" disabled={busy} onClick={() => openChannels(rep)}>
+                            Channels
+                          </button>
+                          <button
+                            type="button"
+                            className="ops-line-action reject"
+                            disabled={busy}
+                            onClick={() => setDecommissionModal(rep)}
+                          >
+                            Decommission
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="ops-line-action reinstate"
+                          disabled={busy}
+                          onClick={() => reinstate(rep)}
+                        >
+                          Reinstate
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setChannelsModal(null);
-                    setChannelRows([]);
-                  }}
-                  className="mt-4 w-full"
-                >
-                  Close
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
-        {decommissionModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">
-                  Decommission {decommissionModal.displayName}
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-muted-foreground">
-                  This deactivates the account and records the reason. The account
-                  and sales history are preserved and can be reinstated.
-                </p>
-              </CardHeader>
-              <CardContent className="p-5">
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
-                  Reason
-                </label>
-                <NativeSelect
-                  value={decommissionReason}
-                  onChange={(e) =>
-                    setDecommissionReason(e.target.value as DecommissionReason)
-                  }
-                  className="mb-3 w-full"
-                >
-                  {(
-                    Object.entries(DecommissionReasonLabels) as [
-                      DecommissionReason,
-                      string,
-                    ][]
-                  ).map(([value, label]) => (
-                    <NativeSelectOption key={value} value={value}>
-                      {label}
-                    </NativeSelectOption>
+      {channelsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="ops-line" style={{ margin: 0, padding: 0, width: '100%', maxWidth: 480 }}>
+            <div className="ops-line-reference-card" style={{ background: 'var(--ops-line-panel)', maxHeight: '80vh', overflowY: 'auto' }}>
+              <h3 style={{ fontWeight: 900, fontSize: 16, color: 'var(--ops-line-ink)' }}>
+                Channel credentials — {channelsModal.displayName}
+              </h3>
+              <p style={{ fontSize: 11, color: 'var(--ops-line-muted)', marginTop: 4, marginBottom: 12 }}>
+                Xfinity is credentialed directly; all other channels go through DSI.
+              </p>
+              {channelsLoading ? (
+                <p className="ops-line-kicker">Loading…</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {channelRows.map((channel) => (
+                    <div key={channel.id} className="ops-line-detail-fields" style={{ margin: 0, gridTemplateColumns: '1fr auto', alignItems: 'center' }}>
+                      <div>
+                        <span>{channel.credentialingPath === 'direct' ? 'Direct' : 'via DSI'}</span>
+                        <b>{channel.name}</b>
+                      </div>
+                      <NativeSelect
+                        value={channel.status}
+                        disabled={busy}
+                        onChange={(e) => setChannelStatus(channel.id, e.target.value as ChannelOnboardingStatus)}
+                        className="w-36"
+                      >
+                        <NativeSelectOption value="not_started">Not Started</NativeSelectOption>
+                        <NativeSelectOption value="submitted">Submitted</NativeSelectOption>
+                        <NativeSelectOption value="cleared">Cleared</NativeSelectOption>
+                      </NativeSelect>
+                    </div>
                   ))}
-                </NativeSelect>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-muted-foreground">
-                  Notes (optional)
-                </label>
-                <Textarea
+                </div>
+              )}
+              <button
+                type="button"
+                className="ops-line-action"
+                style={{ marginTop: 14, width: '100%' }}
+                onClick={() => { setChannelsModal(null); setChannelRows([]); }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {decommissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="ops-line" style={{ margin: 0, padding: 0, width: '100%', maxWidth: 480 }}>
+            <div className="ops-line-decom-panel" style={{ marginTop: 0, border: '1px solid var(--ops-line-red)', background: 'var(--ops-line-panel)' }}>
+              <h4 style={{ gridColumn: '1 / -1' }}>Decommission {decommissionModal.displayName}</h4>
+              <p style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--ops-line-muted)', margin: 0 }}>
+                This deactivates the account and records the reason. The account and sales history are preserved and
+                can be reinstated.
+              </p>
+              <div>
+                <p className="ops-line-kicker" style={{ marginBottom: 6 }}>Reason</p>
+                <div className="ops-line-choice">
+                  {(Object.entries(DecommissionReasonLabels) as [DecommissionReason, string][]).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={decommissionReason === value}
+                      onClick={() => setDecommissionReason(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="ops-line-kicker" style={{ marginBottom: 6 }}>Notes (optional)</p>
+                <textarea
+                  className="ops-line-notes"
                   value={decommissionNotes}
                   onChange={(e) => setDecommissionNotes(e.target.value)}
                   placeholder="Context for the audit record..."
                   rows={3}
                 />
-                <div className="mt-4 flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setDecommissionModal(null);
-                      setDecommissionNotes('');
-                      setDecommissionReason('non_activity');
-                    }}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={decommission}
-                    disabled={busy}
-                    className="flex-1 bg-red-600 text-white hover:bg-red-700"
-                  >
-                    {busy ? 'Working...' : 'Confirm'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="ops-line-action"
+                  style={{ flex: 1 }}
+                  onClick={() => { setDecommissionModal(null); setDecommissionNotes(''); setDecommissionReason('non_activity'); }}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="ops-line-action reject" style={{ flex: 1 }} disabled={busy} onClick={decommission}>
+                  {busy ? 'Working…' : 'Confirm'}
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }

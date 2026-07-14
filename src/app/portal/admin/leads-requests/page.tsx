@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import ReviewList from '@/components/forms/ReviewList';
-import { Button } from '@/components/ui/button';
+import OpsQueueList, { OpsQueueEvidenceItem, OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -26,10 +25,6 @@ const COLUMNS = [
   { key: 'reason', label: 'Reason' },
   { key: 'createdAt', label: 'Submitted' },
 ];
-
-function hasAttachment(row: Row) {
-  return Boolean(row.hostileUploadPath || row.blindKnockUploadPath || row.lassoUploadPath);
-}
 
 export default function LeadsRequestsReviewPage() {
   const { user } = useAuth();
@@ -67,49 +62,87 @@ export default function LeadsRequestsReviewPage() {
     if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  const viewAttachment = async (path: string) => {
-    const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
-    const json = await res.json();
-    if (json.url) window.open(json.url, '_blank', 'noopener,noreferrer');
-  };
+  const viewAttachment = useCallback(
+    async (path: string) => {
+      const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
+      const json = await res.json();
+      if (json.url) window.open(json.url, '_blank', 'noopener,noreferrer');
+    },
+    [authedFetch]
+  );
+
+  const campaigns = useMemo(
+    () => Array.from(new Set(rows.map((r) => opsFormatValue(r.campaign)).filter((c) => c !== '—'))).sort(),
+    [rows]
+  );
+
+  const queueRows: OpsQueueRowVM[] = useMemo(
+    () =>
+      rows.map((row) => {
+        const evidenceItems: OpsQueueEvidenceItem[] = [];
+        if (row.hostileUploadPath) {
+          evidenceItems.push({ label: 'hostile', onClick: () => viewAttachment(row.hostileUploadPath as string) });
+        }
+        if (row.blindKnockUploadPath) {
+          evidenceItems.push({
+            label: 'blind-knock',
+            onClick: () => viewAttachment(row.blindKnockUploadPath as string),
+          });
+        }
+        if (row.lassoUploadPath) {
+          evidenceItems.push({ label: 'lasso', onClick: () => viewAttachment(row.lassoUploadPath as string) });
+        }
+        return {
+          id: row.id,
+          status: row.status === 'handled' ? 'handled' : 'new',
+          person: opsFormatValue(row.repName),
+          personSub: opsFormatValue(row.repFirstName),
+          subject: opsFormatValue(row.category),
+          subjectSub: opsFormatValue(row.location),
+          secondary: opsFormatValue(row.campaign),
+          secondarySub: opsFormatValue(row.managerName),
+          evidenceKind: evidenceItems.length > 0 ? 'files' : 'none',
+          evidenceItems,
+          detailFields: [
+            { label: 'Manager', value: opsFormatValue(row.managerName) },
+            { label: 'Rep', value: opsFormatValue(row.repFirstName) },
+            { label: 'Location', value: opsFormatValue(row.location) },
+            { label: 'Category', value: opsFormatValue(row.category) },
+            { label: 'Reason', value: opsFormatValue(row.reason) },
+          ],
+          searchText: [row.repName, row.repFirstName, row.campaign, row.location]
+            .map(opsFormatValue)
+            .join(' ')
+            .toLowerCase(),
+          filterValue: opsFormatValue(row.campaign),
+        };
+      }),
+    [rows, viewAttachment]
+  );
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="space-y-4">
-        <ReviewList
-          title="Leads Requests"
-          columns={COLUMNS}
-          rows={rows}
-          onMarkHandled={markHandled}
-          loading={loading}
-          error={error}
-          downloadFilename="leads-requests.csv"
-        />
-        {rows.some(hasAttachment) && (
-          <div className="mx-auto max-w-[1500px] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">Attachments</p>
-            {rows.filter(hasAttachment).map((r) => (
-              <div key={r.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-700 dark:text-muted-foreground">{String(r.repFirstName ?? r.id)}</span>
-                {r.hostileUploadPath && (
-                  <Button type="button" variant="outline" onClick={() => viewAttachment(r.hostileUploadPath as string)}>
-                    View hostile
-                  </Button>
-                )}
-                {r.blindKnockUploadPath && (
-                  <Button type="button" variant="outline" onClick={() => viewAttachment(r.blindKnockUploadPath as string)}>
-                    View blind-knock
-                  </Button>
-                )}
-                {r.lassoUploadPath && (
-                  <Button type="button" variant="outline" onClick={() => viewAttachment(r.lassoUploadPath as string)}>
-                    View lasso
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <OpsQueueList
+            kicker="02 / The Line / evidence relay"
+            heroWord="Call"
+            heroRest="the proof."
+            intro="Route fresh lead asks to the right manager — up to three field-proof uploads per request."
+            itemsLabel="items need action"
+            rows={queueRows}
+            loading={loading}
+            error={error}
+            downloadFilename="leads-requests.csv"
+            csvColumns={COLUMNS}
+            csvRows={rows}
+            filterLabel="Campaign"
+            filterOptions={campaigns}
+            onMarkHandled={markHandled}
+            emptyStateTitle="Nothing to review"
+            emptyStateBody="No leads requests need review right now."
+          />
+        </div>
       </div>
     </ProtectedRoute>
   );

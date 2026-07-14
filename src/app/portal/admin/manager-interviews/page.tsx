@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import ReviewList from '@/components/forms/ReviewList';
+import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -59,35 +59,62 @@ export default function ManagerInterviewsReviewPage() {
     if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
+  const providers = useMemo(
+    () => Array.from(new Set(rows.map((r) => opsFormatValue(r.provider)).filter((c) => c !== '—'))).sort(),
+    [rows]
+  );
+
+  const queueRows: OpsQueueRowVM[] = useMemo(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        status: row.status === 'handled' ? 'handled' : 'new',
+        person: opsFormatValue(row.repName),
+        personSub: opsFormatValue(row.hiringManager),
+        subject: opsFormatValue(row.jobPosition),
+        subjectSub: `${opsFormatValue(row.candidateFirstName)} ${opsFormatValue(row.candidateLastName)}`.trim(),
+        secondary: opsFormatValue(row.provider),
+        secondarySub: opsFormatValue(row.market),
+        evidenceKind: row.signatureDataUrl ? 'signature' : 'none',
+        signatureUrl: row.signatureDataUrl,
+        detailFields: [
+          { label: 'Hiring manager', value: opsFormatValue(row.hiringManager) },
+          { label: 'Did show', value: opsFormatValue(row.didShow) },
+          { label: 'Extend offer', value: opsFormatValue(row.extendOffer) },
+          { label: 'Rating', value: opsFormatValue(row.rating) },
+        ],
+        searchText: [row.repName, row.candidateFirstName, row.candidateLastName, row.provider]
+          .map(opsFormatValue)
+          .join(' ')
+          .toLowerCase(),
+        filterValue: opsFormatValue(row.provider),
+      })),
+    [rows]
+  );
+
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="space-y-4">
-        <ReviewList
-          title="Manager Interviews"
-          columns={COLUMNS}
-          rows={rows}
-          onMarkHandled={markHandled}
-          loading={loading}
-          error={error}
-          downloadFilename="manager-interviews.csv"
-        />
-        {rows.some((r) => r.signatureDataUrl) && (
-          <div className="mx-auto max-w-[1500px] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">Signatures</p>
-            {rows.filter((r) => r.signatureDataUrl).map((r) => (
-              <div key={r.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-700 dark:text-muted-foreground">
-                  {String(r.candidateFirstName ?? r.id)} {String(r.candidateLastName ?? '')}
-                </span>
-                <img
-                  src={r.signatureDataUrl as string}
-                  alt="Signature"
-                  className="h-24 rounded border border-slate-200 bg-white dark:border-border dark:bg-card"
-                />
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <OpsQueueList
+            kicker="02 / The Line / evidence relay"
+            heroWord="Call"
+            heroRest="the proof."
+            intro="Keep interview notes and next steps moving together — signature confirms the final step."
+            itemsLabel="items need action"
+            rows={queueRows}
+            loading={loading}
+            error={error}
+            downloadFilename="manager-interviews.csv"
+            csvColumns={COLUMNS}
+            csvRows={rows}
+            filterLabel="Provider"
+            filterOptions={providers}
+            onMarkHandled={markHandled}
+            emptyStateTitle="Nothing to review"
+            emptyStateBody="No manager interviews need review right now."
+          />
+        </div>
       </div>
     </ProtectedRoute>
   );

@@ -329,7 +329,52 @@ Submission) showed "Upload" → referenceKind==='manual' returns
 "Submit" (B-18). Both re-verified live. Cosmetics accepted: note
 style lime vs dashed; board grid 96/120 deliberate. NOTE: anonymous
 signup renders LIGHT (public page, no 3c-theme) — coherent, ruled OK.
-All gates PASS. MEMBER COMMITTED LOCAL (this commit).
+All gates PASS. MEMBER COMMITTED 217822e.
+OPS QUEUES BUILT via Sonnet (13 files: NEW OpsQueueList replaces
+DELETED ReviewList across all 6 queues; onboarding/pipeline rewrites;
+NEW /portal/admin Ops home w/ client-side aggregation + per-card
+failure isolation; CommandPalette +Ops Home; PortalSidebar
+/portal/admin added to exact-match set [necessary fix — prefix match
+would highlight on every admin subpage]; globals.css ops-line-*).
+Builder judgment calls: single Resolve action (only 2 real states);
+evidence = file-chip links (preserves original); additive pipeline
+search+manager filter; Decommission NativeSelect→segmented (same
+enum/payload); negative-margin full-bleed wrapper. All gates PASS.
+MY verify PASS: home 17 real open items + 9 real cards (honest All
+clear zeros), onboarding 7 real submissions (NOTE raw-uid person
+label when displayName missing — reviewer to rule), pipeline 10 real
+need-logins reps + stage strip, payroll empty honest; weights 900,
+numerals whole, scrollWidth 375 both breakpoints; CSS served fresh
+(styleSheets scan 169 rules — no stale restart needed this time).
+Shots ops-impl-{1440,390}-*.png. OPUS ROUND-1: FAIL — B1
+leads-requests dropped real Reason column (COLUMNS+CSV+detail) — a
+regression my own verify missed (empty queue = nothing rendered);
+B2 Ops home missing 3 of 5 contract blocks (home-strip/section-head/
+quiet-rail; CSS existed, page never used it) + wrong card order +
+no per-card state pills; M1 hero copy must be contract-exact ("Hold /
+the line.", "broadcast floor", "items waiting"); M2 backed-up =
+age>~2d not raw count; M4 unicode glyphs→lucide; M3 my ruling: raw-uid
+person label → "Unnamed rep · last6" fallback (display-only;
+preserved behavior but reads broken). FIX ROUND 1 dispatched to
+ops-builder (full itemized message). Clean per reviewer: all 6 queue
+API/CSV/roles (minus B1), onboarding 3 branches + reject modal +
+ActionQueue, pipeline all endpoints + modals + clearable strip, nav,
+hard rules, no decrypt reachable. FIX ROUND 1 DONE (all 6 items; gates clean). MY re-verify: home now
+contract-exact (strip 17/2-of-9/1-backed, HOLD THE LINE, card order,
+pills, quiet rail; shot ops-fix1-1440-home.png); M3 fallback needed MY
+extra fix — API returns uid AS userName so `userName ||` never fired;
+added hasRealName (name!==uid) → "Unnamed rep · iceHV2" verified live;
+tsc+eslint clean. OPUS ROUND 2: PASS, zero
+defects (all 6 fixes confirmed, strip numbers recomputed real, no
+regressions, light coherent, 390 clean on all 9 pages + home). I also
+applied its non-blocking polish note (detail-panel Person field →
+repLabel fallback, onboarding/page.tsx:304; gates re-run PASS). OPS
+COMMITTED LOCAL (this commit). NOW: ADMIN MGMT build (FINAL round)
+launching per docs/redesign/admin-the-line-goal.md. On PASS: commit local → ADMIN MGMT build (final
+round, contract already FINAL incl. my open-call ruling: squared
+cards + non-Archivo H1 ship as spec'd scoped to admin-line-*; lime
+reuses existing hex; settings page HONEST-INERT for dead controls;
+B-7 security hole surfaced to user, fix awaiting their word).
 OPS CONTRACT FINAL: docs/redesign/ops-the-line-goal.md w/ my 6
 rulings (client-side aggregation; TWO real status states only — NO
 ephemeral In-progress; real-evidence-only widgets; clearable stage

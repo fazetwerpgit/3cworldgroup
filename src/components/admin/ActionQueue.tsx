@@ -2,10 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { AlertTaskKind, AlertTaskStatus } from '@/types/alerts';
 
@@ -131,111 +128,65 @@ export default function ActionQueue() {
   if (!loading && tasks.length === 0 && !error) return null;
 
   return (
-    <section className="portal-enter portal-enter-2 space-y-3">
-      <Card className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-        <CardHeader className="border-b border-slate-100 p-5 dark:border-border">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-950 dark:text-foreground">
-                Needs attention
-              </h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
-                Open and claimed manager tasks from onboarding alerts.
-              </p>
-            </div>
-            <Badge variant={tasks.length > 0 ? 'warning' : 'outline'} className="rounded-md px-3 py-1">
-              {tasks.length} task{tasks.length === 1 ? '' : 's'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 p-5">
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-              {error}
-            </div>
-          )}
+    <aside className="ops-line-activation-rail">
+      <div className="ops-line-activation-head">
+        <div>
+          <p className="ops-line-kicker">Activation ready</p>
+          <h3>{tasks.length === 0 ? 'All items approved' : 'Needs attention'}</h3>
+        </div>
+        <span className="ops-line-kicker">
+          {tasks.length} task{tasks.length === 1 ? '' : 's'} ready
+        </span>
+      </div>
 
-          {loading && tasks.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 dark:border-border dark:bg-muted dark:text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading action queue...
+      {error && <div className="ops-line-error-banner">{error}</div>}
+
+      {loading && tasks.length === 0 ? (
+        <div className="ops-line-activation-person">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="ops-line-kicker">Loading action queue…</span>
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="ops-line-activation-person">
+          <span className="ops-line-kicker">No manager tasks are waiting right now.</span>
+        </div>
+      ) : (
+        tasks.map((task) => (
+          <div key={task.id} className="ops-line-activation-person">
+            <div className="ops-line-person">
+              <span className="ops-line-avatar">{task.subjectName?.charAt(0)?.toUpperCase() || '?'}</span>
+              <div>
+                <strong>{task.subjectName}</strong>
+                <small>
+                  {task.message}
+                  {task.status === 'claimed' &&
+                    ` · claimed by ${task.claimedByName || task.claimedBy || 'another manager'}`}
+                </small>
+              </div>
             </div>
-          ) : tasks.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 dark:border-border dark:bg-muted dark:text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              No manager tasks are waiting right now.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {tasks.map((task) => (
-                <li
-                  key={task.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-border dark:bg-muted"
+            <div className="ops-line-claim">
+              <Link href={task.link} className="ops-line-action">
+                View
+              </Link>
+              {task.status === 'open' && (
+                <button type="button" disabled={busy === task.id} onClick={() => void claim(task.id)}>
+                  {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "I've got it"}
+                </button>
+              )}
+              {task.kind === 'activation_ready' && (
+                <button
+                  type="button"
+                  className="ops-line-primary"
+                  disabled={busy === task.id}
+                  onClick={() => void activate(task)}
                 >
-                  <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-slate-950 dark:text-foreground">
-                          {task.title}
-                        </p>
-                        <Badge
-                          variant={task.status === 'open' ? 'warning' : 'outline'}
-                          className="rounded-md"
-                        >
-                          {task.status}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
-                        {task.message}
-                      </p>
-                      {task.status === 'claimed' && (
-                        <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground">
-                          Claimed by {task.claimedByName || task.claimedBy || 'another manager'}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={task.link}>View</Link>
-                      </Button>
-                      {task.status === 'open' && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={busy === task.id}
-                          onClick={() => void claim(task.id)}
-                        >
-                          {busy === task.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            "I've got it"
-                          )}
-                        </Button>
-                      )}
-                      {task.kind === 'activation_ready' && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={busy === task.id}
-                          onClick={() => void activate(task)}
-                        >
-                          {busy === task.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            'Activate'
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-    </section>
+                  {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
+                </button>
+              )}
+            </div>
+          </div>
+        ))
+      )}
+    </aside>
   );
 }

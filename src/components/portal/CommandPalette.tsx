@@ -10,6 +10,7 @@ import {
   CalendarClock,
   CheckSquare,
   ClipboardCheck,
+  Gauge,
   GraduationCap,
   LayoutDashboard,
   Mail,
@@ -103,6 +104,7 @@ export const portalNavGroups: PortalNavGroup[] = [
     label: 'Operations',
     roles: managerRoles,
     items: [
+      { label: 'Ops Home', href: '/portal/admin', icon: Gauge, roles: platformRoles },
       { label: 'Onboarding Review', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
       { label: 'University Content', href: '/portal/admin/university', icon: BookOpen, roles: platformRoles },
       { label: 'Fiber Reports', href: '/portal/admin/fiber-reports', icon: BarChart3, roles: platformRoles },

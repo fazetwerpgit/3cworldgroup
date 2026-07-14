@@ -1,14 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Check, Lock, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Lock } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
 
@@ -28,6 +23,31 @@ interface Submission {
   submittedAt: string | null;
 }
 
+/** Display-only fallback for submissions missing a resolved userName — never touches
+    the write path. The API falls back to the uid itself when no displayName exists,
+    so "name equals uid" also counts as unnamed. */
+function hasRealName(userName: string, userId: string): boolean {
+  return Boolean(userName) && userName !== userId;
+}
+
+function repLabel(userName: string, userId: string): string {
+  return hasRealName(userName, userId) ? userName : `Unnamed rep · ${userId.slice(-6)}`;
+}
+
+function repKey(userName: string, userId: string): string {
+  return hasRealName(userName, userId) ? userName : userId;
+}
+
+function waitLabel(submittedAt: string | null): string {
+  if (!submittedAt) return 'unknown wait';
+  const ms = Date.now() - new Date(submittedAt).getTime();
+  if (Number.isNaN(ms) || ms < 0) return 'unknown wait';
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  if (hours < 24) return `${hours || 1} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'}`;
+}
+
 export default function OnboardingReviewPage() {
   const { user } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -36,17 +56,17 @@ export default function OnboardingReviewPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectModal, setRejectModal] = useState<Submission | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [personFilter, setPersonFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState<OnboardingCategory | 'all'>('all');
+  const [atRiskOnly, setAtRiskOnly] = useState(false);
 
   const fetchQueue = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(
-        `/api/portal/onboarding/review?requestedBy=${user.uid}`
-      );
+      const response = await fetch(`/api/portal/onboarding/review?requestedBy=${user.uid}`);
       const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error || 'Failed to load review queue');
-      }
+      if (!response.ok) throw new Error(json.error || 'Failed to load review queue');
       setSubmissions(json.submissions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load review queue');
@@ -55,19 +75,12 @@ export default function OnboardingReviewPage() {
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchQueue();
-  }, [fetchQueue]);
+  useEffect(() => { fetchQueue(); }, [fetchQueue]);
 
-  const review = async (
-    submission: Submission,
-    status: 'approved' | 'rejected',
-    reason?: string
-  ) => {
+  const review = async (submission: Submission, status: 'approved' | 'rejected', reason?: string) => {
     if (!user) return;
     setProcessingId(submission.id);
     setError('');
-
     try {
       const response = await fetch('/api/portal/onboarding/review', {
         method: 'POST',
@@ -81,12 +94,8 @@ export default function OnboardingReviewPage() {
           rejectionReason: reason,
         }),
       });
-
       const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error || 'Failed to review submission');
-      }
-
+      if (!response.ok) throw new Error(json.error || 'Failed to review submission');
       setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
       setRejectModal(null);
       setRejectionReason('');
@@ -100,262 +109,275 @@ export default function OnboardingReviewPage() {
   const formatDate = (date: string | null) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });
   };
 
+  const people = useMemo(() => {
+    const seen = new Map<string, string>();
+    submissions.forEach((s) => {
+      const key = repKey(s.userName, s.userId);
+      if (!seen.has(key)) seen.set(key, repLabel(s.userName, s.userId));
+    });
+    return Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
+  }, [submissions]);
+  const categories = useMemo(
+    () => Array.from(new Set(submissions.map((s) => s.category))),
+    [submissions]
+  );
+
+  const filtered = useMemo(
+    () =>
+      submissions.filter(
+        (s) =>
+          (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
+          (categoryFilter === 'all' || s.category === categoryFilter) &&
+          (!atRiskOnly || s.atRisk)
+      ),
+    [submissions, personFilter, categoryFilter, atRiskOnly]
+  );
+
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="mx-auto max-w-[1500px] space-y-5">
-        <PortalPageHeader
-          compact
-          eyebrow="Review queue"
-          title="Onboarding Review"
-          description="Review submitted onboarding items before reps move forward in the website-driven onboarding flow."
-          actions={
-            <Badge
-              variant="outline"
-              className={`w-fit rounded-md px-3 py-1 ${
-                submissions.length > 0
-                  ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300'
-                  : 'border-slate-200 bg-slate-50 text-slate-600'
-              }`}
-            >
-              {submissions.length} pending
-            </Badge>
-          }
-        />
-
-        {error && (
-          <div className="portal-enter portal-enter-2 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-            {error}
+      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
+        <div className="ops-line">
+          <div className="ops-line-ticker">
+            <b>ON AIR</b>
+            <span>Ops signal / onboarding review · people on deck</span>
+            <strong>QUEUE LIVE</strong>
           </div>
-        )}
 
-        <ActionQueue />
-
-        {loading ? (
-          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
-            <CardContent className="py-8">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading submissions...</p>
-            </CardContent>
-          </Card>
-        ) : submissions.length === 0 ? (
-          <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
-            <CardContent className="py-12">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#8dc63f]/10 text-[#4f7f1e] dark:text-green-300">
-                <Check className="h-6 w-6" />
-              </div>
-              <h3 className="font-semibold text-slate-950 dark:text-foreground">Review queue is clear</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-muted-foreground">
-                No onboarding submissions need review right now.
+          <div className="ops-line-hero">
+            <div>
+              <p className="ops-line-kicker">03 / The Line / people on deck</p>
+              <h1><span>Clear</span><br />the people.</h1>
+              <p className="ops-line-intro">
+                Keep one queue model for every document. Filters make the work narrow; the activation rail makes the
+                handoff obvious.
               </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="portal-enter portal-enter-2 space-y-3">
-            {submissions.map((submission) => (
-              <Card
-                key={submission.id}
-                className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm transition-colors hover:border-slate-300 dark:hover:border-white/25"
-              >
-                <CardContent className="p-5">
-                  <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0A1F44] text-sm font-semibold text-white">
-                          {submission.userName?.charAt(0).toUpperCase() || 'U'}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 flex-wrap items-center gap-2">
-                            <h3 className="truncate font-semibold text-slate-950 dark:text-foreground">
-                              {submission.userName}
-                            </h3>
-                            {submission.atRisk && (
-                              <Badge variant="destructive" className="rounded-md px-2 py-0.5">
-                                At risk
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="truncate text-xs text-slate-500 dark:text-muted-foreground">
-                            {submission.userEmail}
-                          </p>
-                        </div>
-                      </div>
+            </div>
+            <div className="ops-line-hero-count">
+              <strong className="ops-line-display portal-metallic-num">{submissions.length}</strong>
+              <small>submissions waiting</small>
+            </div>
+          </div>
 
-                      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
-                            Item
-                          </p>
-                          <p className="mt-1 flex items-center gap-2 font-medium text-slate-950 dark:text-foreground">
-                            {submission.itemLabel}
-                            {submission.sensitive && (
-                              <Lock className="h-3.5 w-3.5 text-slate-400 dark:text-muted-foreground" />
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
-                            Category
-                          </p>
-                          <p className="mt-1 font-medium text-slate-950 dark:text-foreground">
-                            {OnboardingCategoryLabels[submission.category] ??
-                              submission.category}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">
-                            Submitted
-                          </p>
-                          <p className="mt-1 font-medium text-slate-950 dark:text-foreground">
-                            {formatDate(submission.submittedAt)}
-                          </p>
-                        </div>
-                      </div>
+          <div className="ops-line-onboarding-filters">
+            <span className="ops-line-kicker">Person</span>
+            <div className="ops-line-pill-row" role="group" aria-label="Person filter">
+              <button type="button" aria-pressed={personFilter === 'all'} onClick={() => setPersonFilter('all')}>
+                All people
+              </button>
+              {people.map((p) => (
+                <button key={p.key} type="button" aria-pressed={personFilter === p.key} onClick={() => setPersonFilter(p.key)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <span className="ops-line-kicker">Category</span>
+            <div className="ops-line-pill-row" role="group" aria-label="Category filter">
+              <button type="button" aria-pressed={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')}>
+                All
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={categoryFilter === c}
+                  onClick={() => setCategoryFilter(c)}
+                >
+                  {OnboardingCategoryLabels[c] ?? c}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="ops-line-at-risk"
+              aria-pressed={atRiskOnly}
+              onClick={() => setAtRiskOnly((v) => !v)}
+            >
+              At-risk only
+            </button>
+          </div>
 
-                      {submission.referenceKind === 'storage' ? (
-                        submission.files.length > 0 ? (
-                          <div className="mt-4 flex flex-wrap gap-3">
-                            {submission.files.map((file) => (
-                              <a
-                                key={`${submission.id}-${file.name}`}
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                              >
-                                {file.contentType.startsWith('image/') ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={file.url}
-                                    alt={file.name}
-                                    className="h-24 w-36 rounded-md border border-slate-200 dark:border-border object-cover"
-                                  />
-                                ) : (
-                                  <span className="flex h-24 w-36 items-center justify-center rounded-md border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted text-xs font-medium text-slate-600 dark:text-muted-foreground">
-                                    {file.name}
-                                  </span>
-                                )}
-                              </a>
-                            ))}
-                            <p className="w-full text-xs text-slate-400 dark:text-muted-foreground">Links expire in 15 minutes.</p>
-                          </div>
-                        ) : (
-                          <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-xs text-slate-500 dark:text-muted-foreground">
-                            No files found at {submission.reference ?? 'this reference'}.
-                          </div>
-                        )
-                      ) : submission.referenceKind === 'esign' ? (
-                        <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-sm text-slate-700 dark:text-muted-foreground">
-                          <div className="mb-2 flex items-center gap-2">
-                            <Badge variant="outline" className="border-[#0A1F44]/30 bg-[#0A1F44]/5 dark:bg-slate-800 text-[#0A1F44] dark:text-foreground">
-                              E-signature
-                            </Badge>
-                          </div>
-                          {submission.reference ? (
-                            <>
-                              <span className="font-medium text-slate-950 dark:text-foreground">Reference:</span>{' '}
-                              {submission.reference}
-                            </>
+          {error && <div className="ops-line-error-banner">{error}</div>}
+
+          {loading ? (
+            <div className="ops-line-state-card">Loading submissions…</div>
+          ) : filtered.length === 0 ? (
+            <div className="ops-line-state-card">
+              <p style={{ fontWeight: 900, marginBottom: 4 }}>
+                {submissions.length === 0 ? 'Review queue is clear' : 'No submissions match this view.'}
+              </p>
+              <p>
+                {submissions.length === 0
+                  ? 'No onboarding submissions need review right now.'
+                  : 'Clear filters to return to FIFO.'}
+              </p>
+            </div>
+          ) : (
+            <div className="ops-line-list">
+              {filtered.map((submission) => {
+                const expanded = expandedId === submission.id;
+                return (
+                  <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
+                    <button
+                      type="button"
+                      className="ops-line-row-main onboard"
+                      onClick={() => setExpandedId(expanded ? null : submission.id)}
+                      aria-expanded={expanded}
+                    >
+                      <span className="ops-line-person ops-line-cell">
+                        <span className="ops-line-avatar">
+                          {repLabel(submission.userName, submission.userId).charAt(0).toUpperCase()}
+                        </span>
+                        <span>
+                          <strong>
+                            {repLabel(submission.userName, submission.userId)}
+                            {submission.atRisk && ' · AT RISK'}
+                          </strong>
+                          <small>{submission.itemLabel}</small>
+                        </span>
+                      </span>
+                      <span className="ops-line-cell">
+                        <strong>{OnboardingCategoryLabels[submission.category] ?? submission.category}</strong>
+                        <small>{waitLabel(submission.submittedAt)} waiting</small>
+                      </span>
+                      <span className="ops-line-cell">
+                        <strong className="ops-line-sensitive">
+                          {submission.sensitive && <Lock className="h-3 w-3" aria-hidden="true" />}
+                          {submission.sensitive ? 'Sensitive item' : 'Standard review'}
+                        </strong>
+                        <small>FIFO position</small>
+                      </span>
+                      <span className="ops-line-evidence-group">
+                        <span className="ops-line-file-chip">
+                          {submission.referenceKind === 'storage'
+                            ? `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`
+                            : submission.referenceKind === 'esign'
+                              ? 'e-signature'
+                              : 'reference'}
+                        </span>
+                      </span>
+                      <span className="ops-line-status-chip">waiting</span>
+                      <span className="ops-line-chevron">{expanded ? '−' : '+'}</span>
+                    </button>
+
+                    {expanded && (
+                      <div className="ops-line-detail-panel onboard">
+                        <div className="ops-line-reference-card">
+                          <p className="ops-line-kicker">Reference / preview</p>
+                          {submission.referenceKind === 'storage' ? (
+                            submission.files.length > 0 ? (
+                              <>
+                                <div className="ops-line-evidence-group" style={{ marginTop: 12 }}>
+                                  {submission.files.map((file) => (
+                                    <a
+                                      key={`${submission.id}-${file.name}`}
+                                      href={file.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="ops-line-file-chip"
+                                    >
+                                      {file.name}
+                                    </a>
+                                  ))}
+                                </div>
+                                <p style={{ marginTop: 10, fontSize: 10, color: 'var(--ops-line-muted)' }}>
+                                  Links expire in 15 minutes.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="quote">No files found at {submission.reference ?? 'this reference'}.</p>
+                            )
+                          ) : submission.referenceKind === 'esign' ? (
+                            <p className="quote">
+                              {submission.reference ? `E-signature reference: ${submission.reference}` : 'No confirmation entered.'}
+                            </p>
                           ) : (
-                            <span className="text-slate-400 dark:text-muted-foreground">No confirmation entered.</span>
+                            <p className="quote">{submission.reference ?? 'No reference on file.'}</p>
                           )}
                         </div>
-                      ) : (
-                        submission.reference && (
-                          <div className="mt-4 rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-3 text-sm text-slate-700 dark:text-muted-foreground">
-                            <span className="font-medium text-slate-950 dark:text-foreground">Reference:</span>{' '}
-                            {submission.reference}
+                        <div className="ops-line-detail-copy">
+                          <h3>{submission.itemLabel}</h3>
+                          <div className="ops-line-detail-fields">
+                            <div><span>Person</span><b>{repLabel(submission.userName, submission.userId)}</b></div>
+                            <div><span>Category</span><b>{OnboardingCategoryLabels[submission.category] ?? submission.category}</b></div>
+                            <div><span>Waiting</span><b>{waitLabel(submission.submittedAt)}</b></div>
+                            <div><span>Access</span><b>{submission.sensitive ? 'Sensitive / locked' : 'Standard'}</b></div>
                           </div>
-                        )
-                      )}
-                    </div>
+                          <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>
+                            Submitted {formatDate(submission.submittedAt)} · {submission.userEmail}
+                          </p>
+                          <div className="ops-line-detail-actions">
+                            <button
+                              type="button"
+                              className="ops-line-action resolve"
+                              disabled={processingId === submission.id}
+                              onClick={() => review(submission, 'approved')}
+                            >
+                              {processingId === submission.id ? 'Working…' : 'Approve'}
+                            </button>
+                            <button
+                              type="button"
+                              className="ops-line-action reject"
+                              disabled={processingId === submission.id}
+                              onClick={() => setRejectModal(submission)}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
 
-                    <div className="flex items-center gap-2 lg:w-32 lg:flex-col">
-                      <Button
-                        type="button"
-                        onClick={() => review(submission, 'approved')}
-                        disabled={processingId === submission.id}
-                        className="flex-1 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e] lg:w-full"
-                      >
-                        {processingId === submission.id ? (
-                          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
-                        ) : (
-                          <>
-                            <Check className="h-4 w-4" />
-                            Approve
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setRejectModal(submission)}
-                        disabled={processingId === submission.id}
-                        className="flex-1 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-800 dark:hover:text-red-300 lg:w-full"
-                      >
-                        <X className="h-4 w-4" />
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {rejectModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <Card className="w-full max-w-md rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-lg">
-              <CardHeader className="border-b border-slate-100 dark:border-border p-5">
-                <h3 className="text-lg font-semibold text-slate-950 dark:text-foreground">
-                  Reject {rejectModal.itemLabel}
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-muted-foreground">
-                  Provide a reason for rejection. This will be shared with{' '}
-                  {rejectModal.userName}.
-                </p>
-              </CardHeader>
-              <CardContent className="p-5">
-                <Textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Enter rejection reason..."
-                  rows={3}
-                />
-                <div className="mt-4 flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setRejectModal(null);
-                      setRejectionReason('');
-                    }}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => review(rejectModal, 'rejected', rejectionReason)}
-                    disabled={processingId === rejectModal.id || !rejectionReason.trim()}
-                    className="flex-1 bg-red-600 text-white hover:bg-red-700"
-                  >
-                    {processingId === rejectModal.id ? 'Rejecting...' : 'Confirm Reject'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+          <ActionQueue />
+        </div>
       </div>
+
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="ops-line w-full max-w-md" style={{ margin: 0, padding: 0 }}>
+            <div className="ops-line-reference-card" style={{ background: 'var(--ops-line-panel)' }}>
+              <h3 style={{ fontWeight: 900, fontSize: 16, color: 'var(--ops-line-ink)', marginBottom: 6 }}>
+                Reject {rejectModal.itemLabel}
+              </h3>
+              <p style={{ fontSize: 12, color: 'var(--ops-line-muted)', marginBottom: 10 }}>
+                Provide a reason for rejection. This will be shared with {rejectModal.userName}.
+              </p>
+              <textarea
+                className="ops-line-notes"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter rejection reason..."
+                rows={3}
+              />
+              <div className="ops-line-detail-actions" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="ops-line-action"
+                  onClick={() => { setRejectModal(null); setRejectionReason(''); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="ops-line-action reject"
+                  disabled={processingId === rejectModal.id || !rejectionReason.trim()}
+                  onClick={() => review(rejectModal, 'rejected', rejectionReason)}
+                >
+                  {processingId === rejectModal.id ? 'Rejecting…' : 'Confirm reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }
