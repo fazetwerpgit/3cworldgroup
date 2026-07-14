@@ -457,8 +457,27 @@ copy preserved; no status field in edit DOM; empty-requestedBy 403 on
 detail load is PRE-EXISTING at HEAD, self-recovering — left alone) +
 fresh Opus review PASS zero blockers (minors M-1..M-3 all display-only
 and sanctioned). COMMITTED LOCAL this commit → ALL pages on the new
-design, campaign fully complete. AWAITING USER: "deploy" | B-7
-admin-access security fix | optional chat profile photos feature.
+design, campaign fully complete.
+USER SAID "fix the 2 issues" 2026-07-14 = (1) B-7 security hole +
+(2) chat profile photos. B-7 FIXED + COMMITTED 019e2df (platform-role
+grants admin-only, server-enforced in users PUT/DELETE + create-user
+POST + UserForm hides platform segments for non-admin; ops field-role
+workflow untouched; live-probed: ops self-escalation 403, ops edit of
+admin 403, role unchanged). CHAT PHOTOS build RUNNING (Sonnet:
+sign-in avatarUrl sync from Google photoURL — server-derived, never
+client-trusted; authors map in chat messages GET; ChatAvatar photo
+prop w/ initials fallback; chat page + MobileThread wired) → my
+verify → fresh Opus review (server change + user-facing) → commit.
+CHAT PHOTOS DONE + COMMITTED 72e1c5e (sync-avatar route: verified-token
+uid + adminAuth photoURL, https+googleusercontent allowlist per Opus
+M-1, merge-write avatarUrl only, fail-soft; members endpoint carries
+avatarUrl; ChatAvatar photo w/ initials fallback; desktop + mobile +
+members sheet; live-verified incl. blocked-image fallback + mocked-feed
+photo path; Opus PASS). BOTH "fix the 2 issues" items CLOSED.
+NOTHING LEFT IN FLIGHT. AWAITING USER: "deploy" — pushes the entire
+redesign + chat fixes + recruiting + sales sub-pages + security fix +
+chat photos to prod. NOTE: photos appear per-user after their NEXT
+sign-in (sync runs at login).
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
