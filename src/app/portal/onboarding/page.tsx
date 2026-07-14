@@ -1,21 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, ClipboardCheck } from 'lucide-react';
+import { AlertCircle, ClipboardCheck } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { MemberLineShell, MemberLineMasthead, MemberLineSectionIndex } from '@/components/member/MemberLine';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FieldRoles, OnboardingItem, OnboardingStatus } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
-import OnboardingWizard, { type WizardItem } from '@/components/onboarding/OnboardingWizard';
+import MemberLineOnboardingBoard from '@/components/onboarding/MemberLineOnboardingBoard';
+import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 
 interface ChecklistItem extends OnboardingItem {
@@ -39,6 +36,7 @@ export default function OnboardingPage() {
   const [data, setData] = useState<ChecklistResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [submitModal, setSubmitModal] = useState<WizardItem | null>(null);
   const [reference, setReference] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +101,7 @@ export default function OnboardingPage() {
       setSubmitModal(null);
       setReference('');
       setDlSlots({ front: '', back: '' });
+      setOpenItemId(null);
       await fetchChecklist();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
@@ -110,20 +109,6 @@ export default function OnboardingPage() {
       setSubmitting(false);
     }
   };
-
-  const formatDate = (date: string | null) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const progressPct =
-    data && data.progress.total > 0
-      ? Math.round((data.progress.approved / data.progress.total) * 100)
-      : 0;
 
   const getDraftReference = (item: WizardItem) =>
     submitModal?.id === item.id ? reference : item.reference ?? '';
@@ -135,57 +120,38 @@ export default function OnboardingPage() {
       setDlSlots({ front: '', back: '' });
       return;
     }
-
     setReference(nextReference);
   };
 
   const renderItemAction = (item: WizardItem) => {
-    if (item.status === 'approved') {
-      return (
-        <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <CheckCircle2 className="size-4 text-primary" />
-            Approved
-          </div>
-          {item.reviewedAt && (
-            <p className="mt-1">
-              Completed {formatDate(item.reviewedAt)}
-              {item.reviewerName ? ` by ${item.reviewerName}` : ''}.
-            </p>
-          )}
-        </div>
-      );
-    }
-
     if (item.status === 'submitted') {
       return (
-        <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+        <div className="member-line-note">
           This item has been submitted and is waiting for manager review.
         </div>
       );
     }
 
     const draftReference = getDraftReference(item);
-    const buttonLabel = item.status === 'rejected' ? 'Resubmit for Review' : 'Submit for Review';
+    const buttonLabel = item.status === 'rejected' ? 'Resubmit for review' : 'Submit for review';
 
     if (isStorageItem(item.id)) {
       return (
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2 font-medium text-foreground">
-              <ClipboardCheck className="size-4 text-primary" />
-              Upload the requested file, then submit it for review.
-            </div>
+        <div className="grid gap-3">
+          <div className="member-line-note">
+            <ClipboardCheck className="mr-1.5 inline size-3.5" />
+            Upload the requested file, then submit it for review.
             {item.sensitive && (
-              <p className="mt-1">
+              <>
+                <br />
                 Do not enter card numbers, SSNs, or account numbers. The app stores a secure
                 reference only.
-              </p>
+              </>
             )}
           </div>
 
           {item.id === 'dl_photos' ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <FileUpload
                 itemId="dl_photos"
                 slot="front"
@@ -239,23 +205,21 @@ export default function OnboardingPage() {
     }
 
     return (
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            {item.sensitive
-              ? 'Do not enter card numbers, SSNs, or account numbers. Provide a confirmation number, document name, or reviewer note only.'
-              : 'Add an optional note, document name, or confirmation number for the reviewer.'}
-          </p>
-          <Input
-            value={draftReference}
-            onFocus={() => {
-              if (submitModal?.id !== item.id) startSubmission(item);
-            }}
-            onChange={(event) => startSubmission(item, event.target.value)}
-            placeholder="Reference or note (optional)"
-            maxLength={500}
-          />
-        </div>
+      <div className="grid gap-3">
+        <p className="member-line-sub">
+          {item.sensitive
+            ? 'Do not enter card numbers, SSNs, or account numbers. Provide a confirmation number, document name, or reviewer note only.'
+            : 'Add an optional note, document name, or confirmation number for the reviewer.'}
+        </p>
+        <Input
+          value={draftReference}
+          onFocus={() => {
+            if (submitModal?.id !== item.id) startSubmission(item);
+          }}
+          onChange={(event) => startSubmission(item, event.target.value)}
+          placeholder="Reference or note (optional)"
+          maxLength={500}
+        />
         <Button
           type="button"
           onClick={() => handleSubmit(item, draftReference)}
@@ -268,68 +232,94 @@ export default function OnboardingPage() {
     );
   };
 
+  const total = data?.progress.total ?? 0;
+  const approved = data?.progress.approved ?? 0;
+  const remaining = total - approved;
+  const reviewCount = data?.items.filter((i) => i.status === 'submitted').length ?? 0;
+  const attentionCount = data?.items.filter((i) => i.status === 'rejected').length ?? 0;
+  const todoCount = data?.items.filter((i) => i.status === 'not_started').length ?? 0;
+
   return (
     <ProtectedRoute roles={Object.values(FieldRoles)}>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1500px] space-y-5">
-              <PortalPageHeader
-                eyebrow="Field readiness"
-                title="My Onboarding"
-                description={`Complete each clearance item before moving into active selling.${
-                  data?.isIBO ? ' IBO business items are included.' : ''
-                }`}
-                stats={
-                  <div className="grid min-w-[220px] gap-2 rounded-lg border border-white/15 bg-white/5 p-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-white/70">Approved</span>
-                      <span className="font-semibold text-white">
-                        {data ? `${data.progress.approved}/${data.progress.total}` : '--'}
-                      </span>
-                    </div>
-                    <Progress value={progressPct} className="h-2 bg-white/15" />
-                    <p className="text-xs text-white/60">
-                      {data?.progress.complete ? 'Clearance complete' : `${progressPct}% ready`}
-                    </p>
-                  </div>
-                }
-              />
+      <MemberLineShell>
+        <MemberLineMasthead
+          kicker="onboarding broadcast / live board"
+          headingLead={`${remaining} line${remaining === 1 ? '' : 's'} open.`}
+          headingRest={`${approved} ${approved === 1 ? 'is' : 'are'} clear.`}
+          intro={`The full ${total || ''}-item board stays in frame. Read the state, take the next action, move the signal forward.${
+            data?.isIBO ? ' IBO business items are included.' : ''
+          }`}
+          numeral={remaining}
+          numeralAriaLabel={`${remaining} items left`}
+          tools={
+            <>
+              <span className="member-line-chip lime">
+                {approved} approved / {total} total
+              </span>
+              <span className="member-line-chip">
+                {reviewCount} review / {attentionCount} attention / {todoCount} to do
+              </span>
+            </>
+          }
+        />
 
-              {error && (
-                <Alert className="border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300">
-                  <AlertCircle className="size-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+        {error && (
+          <div className="member-line-note warn" style={{ marginTop: 16 }}>
+            <AlertCircle className="mr-1.5 inline size-3.5" />
+            {error}
+          </div>
+        )}
 
-              {loading ? (
-                <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
-                  <CardContent className="space-y-4 p-5">
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                  </CardContent>
-                </Card>
-              ) : data ? (
-                <OnboardingWizard
-                  items={data.items}
-                  progress={data.progress}
-                  renderItemAction={renderItemAction}
-                />
-              ) : (
-                <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 shadow-sm">
-                  <CardContent className="p-5 text-sm text-muted-foreground">
-                    No onboarding checklist is available.
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </main>
-        </div>
-      </div>
+        <MemberLineSectionIndex index="01" label="live onboarding board" />
+
+        {loading ? (
+          <div className="member-line-panel grid gap-3">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : data ? (
+          <div className="member-line-arena">
+            <MemberLineOnboardingBoard
+              memberLabel={user?.displayName || 'Member'}
+              items={data.items}
+              progress={data.progress}
+              renderItemAction={renderItemAction}
+              openItemId={openItemId}
+              onOpenItem={setOpenItemId}
+            />
+            <aside className="member-line-stack">
+              <section className="member-line-panel">
+                <p className="member-line-eyebrow">02 / action type</p>
+                <h2 style={{ margin: '8px 0 14px', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 22 }}>
+                  Upload or e-sign.
+                </h2>
+                <div className="member-line-note">
+                  <strong style={{ color: 'var(--member-line-lime)' }}>UPLOAD</strong>
+                  <br />
+                  PNG / JPG / PDF · 4 MB max. License has front + back slots.
+                </div>
+                <div className="member-line-note warn" style={{ marginTop: 10 }}>
+                  <strong style={{ color: 'var(--member-line-gold)' }}>E-SIGN</strong>
+                  <br />
+                  Check your email for the signing link — this completes automatically after you sign.
+                </div>
+              </section>
+              <section className="member-line-panel">
+                <p className="member-line-eyebrow">03 / sensitive items</p>
+                <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 22 }}>
+                  Keep raw data off-air.
+                </h2>
+                <p className="member-line-sub">Never type raw SSN or card numbers here.</p>
+              </section>
+            </aside>
+          </div>
+        ) : (
+          <Alert className="border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300">
+            <AlertDescription>No onboarding checklist is available.</AlertDescription>
+          </Alert>
+        )}
+      </MemberLineShell>
     </ProtectedRoute>
   );
 }

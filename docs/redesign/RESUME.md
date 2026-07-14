@@ -310,13 +310,53 @@ training resources/shorts — real). Shots res-impl-1440-{hub,uni}.png
 + res-impl-390-hub.png. OPUS ROUND-1 verdict: PASS, ZERO defects (pay lane real
 admin edit verified live, real quickLinks/categories, honest
 empties, nav flip clean, additions-only CSS). RESOURCES COMMITTED
-LOCAL (this commit). MEMBER BUILD LAUNCHING (Sonnet, contract final).
+LOCAL 3297695. MEMBER BUILT via Sonnet (10 files: settings/onboarding
+rewrites + new MemberLineOnboardingBoard [hybrid board+sheets, wizard
+left unused not deleted] + SignupForm own split canvas [AuthShell
+untouched, still login/pending] + signupValidation confirm+strength
+additions [27/27 tests pass] + 4 portal cards restyled as rows + new
+MemberLine.tsx + globals.css member-line-*). MY verify: found+fixed
+blank locked-email (fallback auth.currentUser.email — older user docs
+lack email field); onboarding gate verified (admin redirected =
+preserved); board verified via TEMP harness /dev-member-onboarding
+(DELETED before commit); signup verified signed-out via fresh
+browser context (newContext in browser_run_code_unsafe). OPUS ROUND-1:
+FAIL w/ 2 minors, both fixed by me: D1 mobile 132px dead padding
+(mockup's fixed pill-nav clearance; →28px; needed THIRD stale-CSS
+cold restart — .next delete; playbook is now: ALWAYS styleSheets-scan
+after ANY globals.css edit) + D2 manual-reference row (Onboarding
+Submission) showed "Upload" → referenceKind==='manual' returns
+"Submit" (B-18). Both re-verified live. Cosmetics accepted: note
+style lime vs dashed; board grid 96/120 deliberate. NOTE: anonymous
+signup renders LIGHT (public page, no 3c-theme) — coherent, ruled OK.
+All gates PASS. MEMBER COMMITTED LOCAL (this commit).
 OPS CONTRACT FINAL: docs/redesign/ops-the-line-goal.md w/ my 6
 rulings (client-side aggregation; TWO real status states only — NO
 ephemeral In-progress; real-evidence-only widgets; clearable stage
 strip; Recruiting card→invite queue count; per-queue real toolbars).
-ADMIN MGMT EXTRACTION RUNNING (Sonnet → scratchpad
-admin-extract-report.txt). OPS CONTRACT DRAFTED in parallel (extraction report at scratchpad
+ADMIN MGMT EXTRACTION DONE (scratchpad admin-extract-report.txt, 12
+hazards). ADMIN CONTRACT FINAL 2026-07-13
+(docs/redesign/admin-the-line-goal.md; Sonnet drafted, I resolved the
+single open call: squared cards + non-Archivo H1 SHIP AS SPEC'D —
+approved design, scoped to admin-line-* only; lime hex must reuse the
+shipped dark pages' value, never a second #a3e635; new shared
+AdminCatalogList carries the catalog pattern to email-templates/
+chat-channels/form-options/university, zero new API routes). My
+pre-rulings BINDING:
+(1) fake settings page (handleSave sleeps 1s, toggles/Reset no
+handlers) ships HONEST-INERT — disabled controls + "Not wired up yet"
+note, NO fake Saved tick, real persistence = follow-up scope; (2)
+SECURITY B-7 (ops-role users can reach /portal/admin/users/[id] by URL
+and the unrestricted role dropdown would let them grant admin incl.
+self) NOT fixed this round but must not widen — SURFACED TO USER
+2026-07-13 as separate security-fix candidate, awaiting their word;
+(3) per-page gates preserved as-is (no unification, B-6); (4)
+email-templates delete gets confirm-strip + all delete-confirms
+standardize on it; (5) manager name-search picker on existing GET
+/api/portal/auth/users; (6) SSN/DL two-step reveal reuses existing
+audit-logged flow exactly; (7) People pending strip = real pending
+signups; catalog pattern adopted by chat-channels/form-options/
+university this round. OPS CONTRACT DRAFTED in parallel (extraction report at scratchpad
 ops-extract-report.txt; pre-ruled: option-3 .line chrome uniform, new
 OpsQueueList swaps all 6 ReviewList consumers atomically, NO decrypt
 UI in queues ever, real modals stay modals, Recruiting Command Center

@@ -2,15 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { MemberLineShell, MemberLineMasthead, MemberLineSectionIndex, MemberLineLock } from '@/components/member/MemberLine';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
+
+// Structural fact, not a live metric: Settings always has exactly these 5
+// real panels (identity, bug report, password, app+appearance, sensitive
+// boundary) — same reasoning as Resources' static lane count.
+const SETTINGS_GROUP_COUNT = 5;
+
+function getInitials(displayName?: string, email?: string) {
+  const name = (displayName || '').trim();
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return (email || 'U').charAt(0).toUpperCase();
+}
 
 export default function SettingsPage() {
   const { user, resetPassword, changePassword, refreshUser } = useAuth();
@@ -26,8 +40,8 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Profile editing state
-  const [isEditing, setIsEditing] = useState(false);
+  // Profile editing state — always-editable inputs on this canvas (mockup has
+  // no separate edit mode), saved on demand via "Save member lines".
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
@@ -41,11 +55,9 @@ export default function SettingsPage() {
 
   const handlePasswordReset = async () => {
     if (!user?.email) return;
-
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
       await resetPassword(user.email);
       setResetSent(true);
@@ -61,19 +73,16 @@ export default function SettingsPage() {
     setError('');
     setSuccess('');
 
-    // Validate passwords
     if (newPassword.length < 6) {
       setError('New password must be at least 6 characters.');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match.');
       return;
     }
 
     setChangingPassword(true);
-
     try {
       await changePassword(currentPassword, newPassword);
       setSuccess('Password changed successfully!');
@@ -101,29 +110,18 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     if (!user) return;
-
     setSaving(true);
     setError('');
     setSuccess('');
-
     try {
       const response = await fetch('/api/portal/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          displayName,
-          phone,
-        }),
+        body: JSON.stringify({ userId: user.uid, displayName, phone }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-
+      if (!response.ok) throw new Error('Failed to update profile');
       await refreshUser();
-      setIsEditing(false);
-      setSuccess('Profile updated successfully!');
+      setSuccess('Member lines saved.');
       setTimeout(() => setSuccess(''), 3000);
     } catch {
       setError('Failed to update profile. Please try again.');
@@ -132,400 +130,277 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setDisplayName(user?.displayName || '');
-    setPhone(user?.phone || '');
-  };
-
-  // Effective role handles legacy docs that resolve to fieldRole-only;
-  // labels come from the shared RoleDisplayNames map.
   const effectiveRole = getEffectiveRole(user);
   const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
-
-  const getRoleBadgeColor = (role: string) => {
-    const colors: Record<string, string> = {
-      admin: 'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300',
-      operations: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300',
-      l1_manager: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-      l2_manager: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-      ibo_level_1: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-      ibo_level_2: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-      ibo_level_3: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-      ibo_level_4: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-      entry_rep: 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-muted-foreground',
-    };
-    return colors[role] || 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-muted-foreground';
-  };
+  const initials = getInitials(user?.displayName, user?.email);
 
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
+
+  const formatShortDate = (date: Date | string | undefined) => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+  };
+
+  const addressLine = [user?.city, user?.state].filter(Boolean).join(', ') + (user?.zip ? ` ${user.zip}` : '');
+  const fullAddress = user?.address ? `${user.address}${addressLine ? `, ${addressLine}` : ''}` : addressLine || 'Not on file';
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1100px] space-y-5">
-              <PortalPageHeader
-                eyebrow="Your account"
-                title="Account Settings"
-                description="Manage your profile, password, and account details used inside the employee portal."
-              />
+      <MemberLineShell>
+        <MemberLineMasthead
+          kicker="member broadcast / settings"
+          headingLead="Set the signal."
+          headingRest="Stay on the line."
+          intro="A broadcast-ready member record: the open lines are yours to tune, the locked lines stay with the account."
+          numeral={SETTINGS_GROUP_COUNT}
+          numeralAriaLabel={`${SETTINGS_GROUP_COUNT} settings groups`}
+          tools={
+            <>
+              <button
+                type="button"
+                className="member-line-chip lime"
+                onClick={() => document.getElementById('report-bug')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                Report a bug
+              </button>
+              <span className="member-line-chip">
+                {initials} / {roleLabel} / {user?.status === 'active' ? 'active' : 'inactive'}
+              </span>
+            </>
+          }
+        />
 
-              {/* Success/Error Messages */}
-              {success && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-border bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {success}
-                </div>
-              )}
-              {error && (
-                <div className="rounded-lg border border-red-200 dark:border-border bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-                  {error}
-                </div>
-              )}
+        {(success || error) && (
+          <div className="member-line-tools" style={{ marginTop: 16 }}>
+            {success && <div className="member-line-note">{success}</div>}
+            {error && <div className="member-line-note warn">{error}</div>}
+          </div>
+        )}
 
-              {/* Profile Information */}
-              <div className="portal-enter portal-enter-2 rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">
-                    Profile Information
-                  </h2>
-                  {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-200 dark:border-border px-3 py-1.5 text-sm font-medium text-[#5a8f1f] transition-colors hover:bg-slate-50 hover:text-[#4a7c19] dark:hover:bg-muted"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                      Edit
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleCancelEdit}
-                        className="text-sm font-medium text-slate-500 dark:text-muted-foreground hover:text-slate-700 dark:hover:text-foreground"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSaveProfile}
-                        disabled={saving}
-                        className="rounded-md bg-[#8dc63f] px-3 py-1 text-sm font-medium text-[#0A1F44] hover:bg-[#7ab82e] disabled:opacity-50"
-                      >
-                        {saving ? 'Saving...' : 'Save'}
-                      </button>
+        <MemberLineSectionIndex index="01" label="who you are" />
+
+        <div className="member-line-arena">
+          <div className="member-line-stack">
+            {/* Member identity panel */}
+            <section className="member-line-panel">
+              <div className="member-line-panel-head">
+                <div>
+                  <p className="member-line-eyebrow">01 / who you are</p>
+                  <h2>Member identity</h2>
+                  <p className="member-line-sub">
+                    {user?.displayName || 'Member'} · employee ID {user?.uid?.slice(-6).toUpperCase()}
+                  </p>
+                </div>
+                <span className="member-line-meta">open lines / locked lines</span>
+              </div>
+
+              <div className="member-line-profile-grid">
+                <div className="member-line-field">
+                  <label htmlFor="line-name">Display name / open</label>
+                  <input
+                    id="line-name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                  />
+                </div>
+                <div className="member-line-field">
+                  <label htmlFor="line-phone">Phone / open</label>
+                  <input
+                    id="line-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+                <div className="member-line-field locked">
+                  <label htmlFor="line-email">
+                    Email / locked <MemberLineLock />
+                  </label>
+                  {/* Some older user docs lack an email field — fall back to the auth account's. */}
+                  <input id="line-email" value={user?.email || auth?.currentUser?.email || ''} readOnly />
+                </div>
+                <div className="member-line-field locked">
+                  <label htmlFor="line-role">
+                    Role / locked <MemberLineLock />
+                  </label>
+                  <input id="line-role" value={roleLabel} readOnly />
+                </div>
+                <div className="member-line-field locked">
+                  <label htmlFor="line-status">
+                    Status / locked <MemberLineLock />
+                  </label>
+                  <input id="line-status" value={user?.status === 'active' ? 'Active' : 'Inactive'} readOnly />
+                </div>
+                <div className="member-line-field locked">
+                  <label htmlFor="line-hire">
+                    Hire date / locked <MemberLineLock />
+                  </label>
+                  <input id="line-hire" value={formatDate(user?.hireDate)} readOnly />
+                </div>
+                <div className="member-line-field locked full">
+                  <label htmlFor="line-address">
+                    Address / locked <MemberLineLock />
+                  </label>
+                  <input id="line-address" value={fullAddress} readOnly />
+                </div>
+              </div>
+
+              <div className="member-line-stats">
+                <div className="member-line-stat">
+                  <strong>{formatShortDate(user?.createdAt)}</strong>
+                  <small>Member since</small>
+                </div>
+                <div className="member-line-stat">
+                  <strong>{user?.territoryId || '—'}</strong>
+                  <small>Territory</small>
+                </div>
+                <div className="member-line-stat">
+                  <strong>{user?.uid?.slice(-6).toUpperCase() || '—'}</strong>
+                  <small>Employee ID / last 6</small>
+                </div>
+                <div className="member-line-stat">
+                  <strong>{user?.status === 'active' ? 'Yes' : 'No'}</strong>
+                  <small>Active yes / no</small>
+                </div>
+              </div>
+
+              <div className="member-line-actions">
+                <button
+                  type="button"
+                  className="member-line-button primary small"
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving…' : 'Save member lines'}
+                </button>
+                <span className="member-line-status-text">
+                  Contact your admin for role, territory, or address changes.
+                </span>
+              </div>
+            </section>
+
+            <ReportBugCard />
+          </div>
+
+          <aside className="member-line-stack">
+            {/* Change password panel */}
+            <section className="member-line-panel">
+              <div className="member-line-panel-head">
+                <div>
+                  <p className="member-line-eyebrow">03 / security channel</p>
+                  <h2>Change password</h2>
+                  <p className="member-line-sub">Collapsed until you call it up.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="member-line-button small"
+                onClick={() => setShowPasswordForm((v) => !v)}
+              >
+                Change password
+              </button>
+              <div className={`member-line-collapsed ${showPasswordForm ? 'open' : ''}`}>
+                <form onSubmit={handleChangePassword}>
+                  <div className="member-line-profile-grid" style={{ marginTop: 14 }}>
+                    <div className="member-line-field full">
+                      <label htmlFor="line-current">Current password</label>
+                      <input
+                        id="line-current"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        required
+                      />
                     </div>
+                    <div className="member-line-field">
+                      <label htmlFor="line-new">New password</label>
+                      <input
+                        id="line-new"
+                        type="password"
+                        minLength={6}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="member-line-field">
+                      <label htmlFor="line-confirm">Confirm password</label>
+                      <input
+                        id="line-confirm"
+                        type="password"
+                        minLength={6}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="member-line-actions">
+                    <button type="submit" className="member-line-button primary small" disabled={changingPassword}>
+                      {changingPassword ? 'Updating…' : 'Update password'}
+                    </button>
+                    <button
+                      type="button"
+                      className="member-line-button small"
+                      onClick={() => {
+                        setShowPasswordForm(false);
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setError('');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+                <div className="member-line-actions" style={{ marginTop: 6 }}>
+                  {resetSent ? (
+                    <span className="member-line-status-text">Reset email sent!</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="member-line-button small"
+                      onClick={handlePasswordReset}
+                      disabled={loading}
+                    >
+                      {loading ? 'Sending…' : 'Email me a reset link instead'}
+                    </button>
                   )}
                 </div>
+              </div>
+            </section>
 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-[#0A1F44] shadow-sm ring-2 ring-[#8dc63f]/60">
-                      <span className="text-3xl font-bold text-white">
-                        {user?.displayName?.charAt(0).toUpperCase() ||
-                          user?.email?.charAt(0).toUpperCase() ||
-                          'U'}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
-                            placeholder="Your name"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
-                          />
-                          <p className="text-sm text-gray-500 dark:text-muted-foreground">{user?.email}</p>
-                        </div>
-                      ) : (
-                        <>
-                          <h3 className="text-xl font-semibold text-gray-900 dark:text-foreground">
-                            {user?.displayName || 'Set your name'}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-muted-foreground">{user?.email}</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 border-t border-slate-100 dark:border-border pt-4 md:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
-                        Role
-                      </label>
-                      <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getRoleBadgeColor(effectiveRole || '')}`}>
-                        {roleLabel}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
-                        Status
-                      </label>
-                      <span
-                        className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
-                          user?.status === 'active'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
-                            : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
-                        }`}
-                      >
-                        {user?.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
-                        Phone
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="(555) 123-4567"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
-                        />
-                      ) : (
-                        <p className="text-gray-900 dark:text-foreground">{user?.phone || 'Not set'}</p>
-                      )}
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
-                        Address
-                      </label>
-                      {user?.address || user?.city || user?.state || user?.zip ? (
-                        <div className="text-gray-900 dark:text-foreground">
-                          {user?.address && <p>{user.address}</p>}
-                          <p>
-                            {[user?.city, user?.state].filter(Boolean).join(', ')}
-                            {user?.zip ? ` ${user.zip}` : ''}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-gray-400 dark:text-muted-foreground italic">Not on file</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 dark:text-muted-foreground mb-1">
-                        Hire Date
-                      </label>
-                      <p className="text-gray-900 dark:text-foreground">
-                        {formatDate(user?.hireDate)}
-                      </p>
-                    </div>
-                  </div>
+            {/* App + appearance panel */}
+            <section className="member-line-panel">
+              <div className="member-line-panel-head">
+                <div>
+                  <p className="member-line-eyebrow">04 / device channel</p>
+                  <h2>App + appearance</h2>
                 </div>
               </div>
-
-              {/* Security */}
-              <div className="portal-enter portal-enter-3 rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground mb-4">
-                  Security
-                </h2>
-                <div className="space-y-4">
-                  {/* Change Password */}
-                  <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-[#0A1F44] rounded-lg">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-slate-950 dark:text-foreground">Change Password</h3>
-                          <p className="text-sm text-slate-500 dark:text-muted-foreground">
-                            Update your password directly
-                          </p>
-                        </div>
-                      </div>
-                      {!showPasswordForm && (
-                        <button
-                          onClick={() => setShowPasswordForm(true)}
-                          className="rounded-md bg-[#8dc63f] px-4 py-2 text-sm font-medium text-[#0A1F44] transition-colors hover:bg-[#7ab82e]"
-                        >
-                          Change Password
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Password Change Form */}
-                    {showPasswordForm && (
-                      <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-muted-foreground mb-1">
-                            Current Password
-                          </label>
-                          <input
-                            type="password"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            required
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
-                            placeholder="Enter current password"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-muted-foreground mb-1">
-                            New Password
-                          </label>
-                          <input
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            required
-                            minLength={6}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
-                            placeholder="Enter new password (min 6 characters)"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-muted-foreground mb-1">
-                            Confirm New Password
-                          </label>
-                          <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg focus:ring-2 focus:ring-[#8dc63f] focus:border-transparent outline-none bg-white dark:bg-card text-gray-900 dark:text-foreground"
-                            placeholder="Confirm new password"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2 pt-2">
-                          <button
-                            type="submit"
-                            disabled={changingPassword}
-                            className="rounded-md bg-[#8dc63f] px-4 py-2 text-sm font-medium text-[#0A1F44] transition-colors hover:bg-[#7ab82e] disabled:opacity-50"
-                          >
-                            {changingPassword ? 'Changing...' : 'Update Password'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowPasswordForm(false);
-                              setCurrentPassword('');
-                              setNewPassword('');
-                              setConfirmPassword('');
-                              setError('');
-                            }}
-                            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-muted-foreground hover:text-slate-800 dark:hover:text-foreground"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    )}
-                  </div>
-
-                  {/* Reset Password via Email */}
-                  <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-muted p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-400 dark:bg-muted rounded-lg">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-slate-950 dark:text-foreground">Reset via Email</h3>
-                        <p className="text-sm text-slate-500 dark:text-muted-foreground">
-                          Forgot your password? Get a reset link
-                        </p>
-                      </div>
-                    </div>
-                    {resetSent ? (
-                      <span className="flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-300">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Email sent!
-                      </span>
-                    ) : (
-                      <button
-                        onClick={handlePasswordReset}
-                        disabled={loading}
-                        className="rounded-md border border-slate-300 dark:border-border px-4 py-2 text-sm font-medium text-slate-700 dark:text-muted-foreground transition-colors hover:bg-slate-100 dark:hover:bg-muted disabled:opacity-50"
-                      >
-                        {loading ? 'Sending...' : 'Send Reset Link'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Account Info */}
-              <div className="rounded-lg border border-[#0A1F44]/15 bg-[#0A1F44] p-6 text-white">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-lg bg-white/10 p-2">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Need to change your role or other details?</h3>
-                    <p className="text-white/70 text-sm">
-                      Contact your administrator or operations team for changes to your role,
-                      territory, or other account-level settings.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Install as an app (PWA) */}
               <InstallAppCard />
-
-              {/* Push notifications opt-in (hidden until VAPID key configured) */}
               <PushNotificationsCard />
-
-              {/* Appearance / dark mode */}
               <ThemeToggleCard />
+            </section>
 
-              {/* Report a Bug — available to every role */}
-              <ReportBugCard />
-
-              {/* Account Stats */}
-              <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground mb-4">
-                  Account Details
-                </h2>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
-                    <p className="text-2xl font-bold text-[#0A1F44] dark:text-foreground">{formatDate(user?.createdAt).split(',')[0]}</p>
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Member Since</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
-                    <p className="text-2xl font-bold text-[#0A1F44] dark:text-foreground">{user?.territoryId || '--'}</p>
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Territory</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
-                    <p className="text-2xl font-bold text-[#8dc63f]">{user?.uid?.slice(-6).toUpperCase()}</p>
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Employee ID</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 dark:bg-muted p-4 text-center">
-                    <p className="text-2xl font-bold text-[#0A1F44] dark:text-foreground">
-                      {user?.status === 'active' ? 'Yes' : 'No'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Account Active</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </main>
+            {/* Sensitive-data boundary panel */}
+            <section className="member-line-panel">
+              <p className="member-line-eyebrow">05 / hard boundary</p>
+              <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 22 }}>
+                Never broadcast raw sensitive data.
+              </h2>
+              <p className="member-line-sub">
+                No raw SSN, card numbers, or bank-account numbers in member settings.
+              </p>
+            </section>
+          </aside>
         </div>
-      </div>
+      </MemberLineShell>
     </ProtectedRoute>
   );
 }

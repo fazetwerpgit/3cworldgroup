@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, Check, Smartphone } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 // Chrome/Edge/Android fire `beforeinstallprompt`; we stash it and trigger on click.
 interface BeforeInstallPromptEvent extends Event {
@@ -66,59 +64,44 @@ export default function InstallAppCard() {
   };
 
   const manualSteps = isIOS ? (
-    <p className="text-sm text-slate-600 dark:text-muted-foreground">
-      On iPhone/iPad: open this site in <span className="font-medium">Safari</span>, tap the{' '}
-      <span className="font-medium">Share</span> button (square with an arrow), then{' '}
-      <span className="font-medium">Add to Home Screen</span>.
+    <p className="member-line-sub">
+      On iPhone/iPad: open this site in <strong>Safari</strong>, tap the <strong>Share</strong>{' '}
+      button (square with an arrow), then <strong>Add to Home Screen</strong>.
     </p>
   ) : (
-    <p className="text-sm text-slate-500 dark:text-muted-foreground">
-      Manual install: browser menu (⋮) →{' '}
-      <span className="font-medium text-slate-700 dark:text-foreground">Add to Home screen</span>{' '}
-      (or <span className="font-medium text-slate-700 dark:text-foreground">Install app</span>).
-      Chrome and Edge also show an install icon in the address bar.
+    <p className="member-line-sub">
+      Manual install: browser menu (⋮) → <strong>Add to Home screen</strong> (or{' '}
+      <strong>Install app</strong>). Chrome and Edge also show an install icon in the address bar.
     </p>
   );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-border dark:bg-card">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44] dark:border-border dark:bg-muted dark:text-foreground">
-          <Smartphone className="size-5" />
+    <div>
+      <div className="member-line-toggle-row">
+        <div>
+          <strong>Install the member app</strong>
+          <small>One device, quick access.</small>
         </div>
-        <div className="flex-1">
-          <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">Install the App</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
-            Add 3C Console to your phone&apos;s home screen for a full-screen, app-like experience.
-          </p>
-
-          <div className="mt-4">
-            {installed ? (
-              <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
-                <Check className="size-4" />
-                Installed — you&apos;re running the app.
-              </div>
-            ) : deferred ? (
-              <div className="space-y-3">
-                <Button type="button" onClick={install} className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                  <Download className="size-4" />
-                  Install app
-                </Button>
-                {manualSteps}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {promptFailed && (
-                  <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                    The one-tap install didn&apos;t start — use the manual steps below:
-                  </p>
-                )}
-                {manualSteps}
-              </div>
-            )}
-          </div>
-        </div>
+        {installed ? (
+          <span className="member-line-chip lime">Installed</span>
+        ) : deferred ? (
+          <button type="button" className="member-line-button small" onClick={install}>
+            Install app
+          </button>
+        ) : (
+          <span className="member-line-status-text">Available to install</span>
+        )}
       </div>
+      {!installed && (
+        <div style={{ paddingBottom: 13 }}>
+          {promptFailed && (
+            <p className="member-line-sub" style={{ color: 'var(--member-line-gold)' }}>
+              The one-tap install didn&apos;t start — use the manual steps below:
+            </p>
+          )}
+          {manualSteps}
+        </div>
+      )}
     </div>
   );
 }

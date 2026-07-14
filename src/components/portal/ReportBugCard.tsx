@@ -3,11 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Bug, CheckCircle2, Send } from 'lucide-react';
 import { auth } from '@/lib/firebase/config';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 
 const AREAS = ['Forms', 'Sales', 'Onboarding', 'Chat', 'Leaderboard', 'Other'];
 
@@ -55,72 +52,88 @@ export default function ReportBugCard() {
   };
 
   return (
-    <div id="report-bug" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-border dark:bg-card">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[#0A1F44] dark:border-border dark:bg-muted dark:text-foreground">
-            <Bug className="size-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-[#0A1F44] dark:text-foreground">Report a Bug</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
-              Found something broken? Let us know and it goes straight to the team.
-            </p>
-          </div>
+    <section id="report-bug" className="member-line-panel member-line-bug">
+      <div className="member-line-panel-head">
+        <div>
+          <p className="member-line-eyebrow">02 / call the desk</p>
+          <h2>Report a bug</h2>
+          <p className="member-line-sub">The current page URL attaches automatically.</p>
         </div>
-        {!open && !done && (
-          <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-            Report a bug
-          </Button>
-        )}
+        <span className="member-line-meta">quick access</span>
       </div>
 
       {done ? (
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
+        <div className="member-line-note flex items-center gap-2">
           <CheckCircle2 className="size-4" />
           Thanks — your report was sent to the team.
         </div>
       ) : (
-        open && (
-          <form onSubmit={submit} className="mt-4 space-y-4">
-            {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
-            )}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <Label>Area</Label>
-                <NativeSelect value={area} onChange={(e) => setArea(e.target.value)} className="w-full">
+        <form onSubmit={submit}>
+          {error && <div className="member-line-note warn mb-3">{error}</div>}
+          {!open ? (
+            <button type="button" className="member-line-button primary small" onClick={() => setOpen(true)}>
+              <Bug className="mr-1.5 inline size-3.5" />
+              Report a bug
+            </button>
+          ) : (
+            <>
+              <div className="member-line-field">
+                <label>Area / choose one</label>
+                <div className="member-line-segmented" role="group" aria-label="Bug area">
                   {AREAS.map((a) => (
-                    <NativeSelectOption key={a} value={a}>{a}</NativeSelectOption>
+                    <button
+                      key={a}
+                      type="button"
+                      aria-pressed={area === a}
+                      onClick={() => setArea(a)}
+                    >
+                      {a}
+                    </button>
                   ))}
-                </NativeSelect>
+                </div>
               </div>
-              <div>
-                <Label>Short summary</Label>
-                <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What went wrong?" required />
+              <div className="member-line-field" style={{ marginTop: 13 }}>
+                <label htmlFor="member-bug-summary">Short summary / required</label>
+                <Input
+                  id="member-bug-summary"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="What went wrong?"
+                  required
+                />
               </div>
-            </div>
-            <div>
-              <Label>Details (optional)</Label>
-              <Textarea
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                placeholder="What were you doing? What did you expect to happen?"
-                rows={4}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <Button type="submit" disabled={saving || !summary} className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                <Send className="size-4" />
-                {saving ? 'Sending…' : 'Send report'}
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )
+              <div className="member-line-field" style={{ marginTop: 12 }}>
+                <label htmlFor="member-bug-details">Details / optional</label>
+                <Textarea
+                  id="member-bug-details"
+                  value={details}
+                  onChange={(e) => setDetails(e.target.value)}
+                  placeholder="What were you doing? What did you expect to happen?"
+                  rows={4}
+                />
+              </div>
+              <div className="member-line-actions">
+                <button
+                  type="submit"
+                  className="member-line-button primary small"
+                  disabled={saving || !summary}
+                >
+                  <Send className="mr-1.5 inline size-3.5" />
+                  {saving ? 'Sending…' : 'Send report'}
+                </button>
+                <button
+                  type="button"
+                  className="member-line-button small"
+                  onClick={() => setOpen(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </form>
       )}
-    </div>
+    </section>
   );
 }
