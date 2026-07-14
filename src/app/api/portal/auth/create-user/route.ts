@@ -37,6 +37,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
+    // Platform-role boundary: only an admin may create an admin/operations
+    // account. Otherwise an operations caller could mint a fresh admin.
+    if (role && !gate.requester.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an admin can create admin or operations accounts' },
+        { status: 403 }
+      );
+    }
+
     // Validate required fields - exactly one of role (platform) or
     // fieldRole (field sales) must be provided
     if (!email || !password || !displayName || (!role && !fieldRole)) {

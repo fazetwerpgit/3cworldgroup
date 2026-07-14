@@ -115,6 +115,23 @@ export async function PUT(
     const existingRole = doc.get('role') as PlatformRole | undefined;
     const existingDisplayName = doc.get('displayName') as string | undefined;
 
+    // Platform-role boundary: only an admin may grant admin/operations, and
+    // only an admin may edit a user who already holds a platform role.
+    // Without this, an operations caller could escalate anyone (including
+    // themselves) to admin, or rewrite an admin's record.
+    if (role !== undefined && !gate.requester.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an admin can assign platform roles' },
+        { status: 403 }
+      );
+    }
+    if ((existingRole === 'admin' || existingRole === 'operations') && !gate.requester.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an admin can edit an admin or operations account' },
+        { status: 403 }
+      );
+    }
+
     // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
     const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
     const validFieldRoles: FieldRole[] = Object.values(FieldRoles);
@@ -320,6 +337,16 @@ export async function DELETE(
 
     if (!doc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Only an admin may delete an admin/operations account — an operations
+    // caller must not be able to remove an admin.
+    const targetRole = doc.get('role') as PlatformRole | undefined;
+    if ((targetRole === 'admin' || targetRole === 'operations') && !gate.requester.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an admin can delete an admin or operations account' },
+        { status: 403 }
+      );
     }
 
     // Delete user from Firebase Auth

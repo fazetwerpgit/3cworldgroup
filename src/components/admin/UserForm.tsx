@@ -307,16 +307,21 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         <div className="admin-line-field" style={{ marginTop: 12 }}>
           <label>Role / choose one</label>
           <div className="admin-line-segmented" role="group" aria-label="Role">
-            {roleSegments.map((seg) => (
-              <button
-                key={seg.value}
-                type="button"
-                aria-pressed={formData.role === seg.value}
-                onClick={() => handleChange('role', seg.value, false)}
-              >
-                {seg.label}
-              </button>
-            ))}
+            {/* Platform roles (Administrator/Operations) are admin-grantable
+                only — the server enforces this; hiding them here keeps the UI
+                from offering choices that would 403. */}
+            {roleSegments
+              .filter((seg) => currentUser?.role === 'admin' || !isPlatformRole(seg.value))
+              .map((seg) => (
+                <button
+                  key={seg.value}
+                  type="button"
+                  aria-pressed={formData.role === seg.value}
+                  onClick={() => handleChange('role', seg.value, false)}
+                >
+                  {seg.label}
+                </button>
+              ))}
           </div>
         </div>
 
