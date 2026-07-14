@@ -236,11 +236,32 @@ I fixed directly (page.tsx kicker → 01–NN), verified live, tsc+
 eslint+build+diff-check ALL PASS. All other 10 checklist items PASS
 1:1. CHAT COMMITTED LOCAL (this commit) — NOT pushed; deploy word
 still pending from user for shell+dashboard+sales+chat together.
-NEXT: CALLS implementation round (approved mockup
-design-mockups/calls-round2/hybrid-the-line-calls.html) — detached
-Codex extraction → Sonnet contract draft (bake in numeral rule +
-font-weight rule + no-leading-zeros) → my finalization → Codex
-implement → verify loop.
+CALLS ROUND IN FLIGHT: extraction DONE (scratchpad
+logs/codex-calls-extract.log, UTF-16). CONTRACT FINAL:
+docs/redesign/calls-the-line-goal.md — my 4 rulings appended
+(Orchestrator rulings section, binding): no role switch/chip at all;
+SHIP past/on-air/DONE computation (America/Chicago, client-only,
+midnight reset); ADOPT single-selected-day filtering (default today);
+REQUIRED_CALLS untouched + modal gets mockup's 3 quick-fill starters
+w/ real enums + BLANK meet link. Mockup uses 760/430 breakpoints (not
+720/460). CODEX IMPL DONE (2 files only: calls/page.tsx + globals.css
+calls-line-*; all gates PASS; NOTE --full-auto denied by permission
+classifier — use -s workspace-write). MY VERIFY PASS: real DB has
+ZERO calls → honest empty state correct (dashed panel + REQUIRED_CALLS
+admin checklist); populated state verified via page.route mock w/ real
+field shapes; headings all computed 900; hero .portal-metallic-num
+whole 1440+390; clock numerals whole at 390; scrollWidth 375;
+countdown live (IN 3H 31M); mockup status logic IS binary
+past=COMPLETED else ON AIR (a future call showing ON AIR is 1:1, not
+a bug). Shots calls-impl-1440-{top,empty,mock-top,mock-hero}.png +
+calls-impl-390-mock-{top,cards}.png. OPUS ROUND-1 verdict: PASS, zero
+defects; one optional parity note (broadcast strip time lacked mockup's
+CT suffix) → I applied `CT` suffix at page.tsx:386, tsc/eslint/diff
+PASS, build rerun. CALLS COMMITTED LOCAL (pending this build) — NOT
+pushed. NEXT PAGE: FORMS hub + 5 forms (approved mockup
+design-mockups/forms-round2/the-line-forms-final.html; flips nav
+transitional items per shell-the-rail-goal.md — forms group collapses
+to single Forms hub link + bottom-bar slot 4 becomes Forms).
 USER FEEDBACK on Sales (2026-07-13): "15 sales on the board" looked
 un-level/funky. ROOT CAUSE (systemic!): Tailwind preflight resets
 h1-h6 font-weight to 400; mockups rely on browser-default bold — thin
