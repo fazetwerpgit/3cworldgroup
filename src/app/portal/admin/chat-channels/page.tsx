@@ -1,16 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { ChatChannelAudience } from '@/types';
+import {
+  AdminCatalogCard,
+  AdminCatalogList,
+  AdminConfirmStrip,
+} from '@/components/admin/AdminCatalogList';
 
 type ManagedChannel = {
   id: string;
@@ -41,6 +40,7 @@ export default function AdminChatChannelsPage() {
   const { user } = useAuth();
   const [channels, setChannels] = useState<ManagedChannel[]>([]);
   const [draft, setDraft] = useState<ChannelDraft>(emptyDraft);
+  const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<ChannelDraft>(emptyDraft);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -49,6 +49,7 @@ export default function AdminChatChannelsPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
 
   const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
     const token = await auth?.currentUser?.getIdToken();
@@ -73,7 +74,9 @@ export default function AdminChatChannelsPage() {
     }
   }, [user, authedFetch]);
 
-  useEffect(() => { loadChannels(); }, [loadChannels]);
+  useEffect(() => {
+    loadChannels();
+  }, [loadChannels]);
 
   const showSuccess = (message: string) => {
     setSuccess(message);
@@ -93,6 +96,7 @@ export default function AdminChatChannelsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to create channel');
       setDraft(emptyDraft);
+      setCreating(false);
       await loadChannels();
       showSuccess('Channel created. Members were added automatically by role.');
     } catch (err) {
@@ -105,12 +109,7 @@ export default function AdminChatChannelsPage() {
   const beginEdit = (channel: ManagedChannel) => {
     setEditingId(channel.id);
     setConfirmDeleteId(null);
-    setEditDraft({
-      name: channel.name,
-      description: channel.description,
-      audience: channel.audience,
-    });
-    setSuccess('');
+    setEditDraft({ name: channel.name, description: channel.description, audience: channel.audience });
   };
 
   const saveChannel = async (id: string) => {
@@ -178,225 +177,156 @@ export default function AdminChatChannelsPage() {
     }
   };
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return channels;
+    return channels.filter((c) => c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q));
+  }, [channels, query]);
+
   return (
     <ProtectedRoute roles={['admin']}>
-      <div className="mx-auto max-w-[1200px] space-y-5">
-        <PortalPageHeader
-          compact
-          eyebrow="Administration"
-          title="Team Chat Channels"
-          description="Create, rename, and remove channels. Members are added automatically by role."
-        />
-
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="rounded-lg border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-4 py-3 text-sm text-[#4f7f1e] dark:text-[#b9e78a]">
-            {success}
-          </div>
-        )}
-
-        <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-          <CardHeader className="border-b border-slate-200 px-5 py-4 dark:border-border">
-            <div>
-              <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
-                Create channel
-              </h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                New channels appear live after role-based members are saved.
-              </p>
+      <AdminCatalogList
+        kicker="catalog / chat channels"
+        heroAccent="Keep every record"
+        heroPlain="ready to reuse."
+        intro="Create, rename, and remove channels. Members are added automatically by role."
+        heroCount={channels.length}
+        heroCountLabel="channels on file"
+        search={{ value: query, onChange: setQuery, placeholder: 'Search channels', ariaLabel: 'Search channels' }}
+        toolbarExtra={
+          <button type="button" className="admin-line-primary" onClick={() => setCreating((v) => !v)}>
+            {creating ? 'Cancel' : 'New channel'}
+          </button>
+        }
+        loading={loading}
+        loadingLabel="Loading chat channels…"
+        error={error || null}
+        success={success || null}
+        isEmpty={filtered.length === 0}
+        isFilteredEmpty={channels.length > 0}
+        emptyTrue={{ title: 'No channels yet.', body: 'Create one to get started.' }}
+        emptyFiltered={{
+          title: 'No channels match.',
+          body: 'Try a broader search.',
+          action: (
+            <div className="admin-line-starter">
+              <button type="button" onClick={() => setQuery('')}>Clear search</button>
             </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 p-5 md:grid-cols-[1fr_1.4fr_220px_auto] md:items-end">
-            <div className="space-y-2">
-              <Label htmlFor="channel-name" className="text-slate-700 dark:text-muted-foreground">Name</Label>
-              <Input
-                id="channel-name"
-                value={draft.name}
-                onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
-                maxLength={60}
-                placeholder="Announcements"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="channel-description" className="text-slate-700 dark:text-muted-foreground">Description</Label>
-              <Input
-                id="channel-description"
-                value={draft.description}
-                onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
-                maxLength={200}
-                placeholder="What this channel is for"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="channel-audience" className="text-slate-700 dark:text-muted-foreground">Audience</Label>
-              <NativeSelect
-                id="channel-audience"
-                className="w-full"
-                value={draft.audience}
-                onChange={(e) => setDraft((prev) => ({ ...prev, audience: e.target.value as ChatChannelAudience }))}
-              >
-                {Object.entries(audienceCopy).map(([value, label]) => (
-                  <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
-            <Button
-              type="button"
-              onClick={createChannel}
-              disabled={saving}
-              className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-            >
-              {saving ? 'Creating...' : 'Create'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {loading ? (
-          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-            <CardContent className="py-10 text-center text-sm text-slate-600 dark:text-muted-foreground">
-              Loading chat channels...
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-            <CardHeader className="border-b border-slate-200 px-5 py-4 dark:border-border">
+          ),
+        }}
+      >
+        {creating && (
+          <div className="admin-line-editor">
+            <div className="admin-line-panel-head">
               <div>
-                <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
-                  Existing channels
+                <div className="admin-line-eyebrow">edit in place</div>
+                <h2 style={{ margin: '5px 0 0', fontSize: 19, fontWeight: 900, letterSpacing: '-.05em', textTransform: 'uppercase' }}>
+                  New channel.
                 </h2>
-                <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                  {channels.length} channel{channels.length === 1 ? '' : 's'} configured
-                </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3 p-5">
-              {channels.length === 0 ? (
-                <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:border-border dark:bg-muted dark:text-muted-foreground">
-                  No channels yet. Create one above.
-                </p>
-              ) : (
-                channels.map((channel) => (
-                  <div key={channel.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-border dark:bg-muted">
-                    {editingId === channel.id ? (
-                      <div className="grid gap-3 md:grid-cols-[1fr_1.4fr_200px_auto_auto] md:items-end">
-                        <div className="space-y-2">
-                          <Label htmlFor={`edit-name-${channel.id}`} className="text-slate-700 dark:text-muted-foreground">Name</Label>
-                          <Input
-                            id={`edit-name-${channel.id}`}
-                            value={editDraft.name}
-                            onChange={(e) => setEditDraft((prev) => ({ ...prev, name: e.target.value }))}
-                            maxLength={60}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`edit-description-${channel.id}`} className="text-slate-700 dark:text-muted-foreground">Description</Label>
-                          <Input
-                            id={`edit-description-${channel.id}`}
-                            value={editDraft.description}
-                            onChange={(e) => setEditDraft((prev) => ({ ...prev, description: e.target.value }))}
-                            maxLength={200}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`edit-audience-${channel.id}`} className="text-slate-700 dark:text-muted-foreground">Audience</Label>
-                          <NativeSelect
-                            id={`edit-audience-${channel.id}`}
-                            className="w-full"
-                            value={editDraft.audience}
-                            onChange={(e) => setEditDraft((prev) => ({ ...prev, audience: e.target.value as ChatChannelAudience }))}
-                          >
-                            {Object.entries(audienceCopy).map(([value, label]) => (
-                              <NativeSelectOption key={value} value={value}>{label}</NativeSelectOption>
-                            ))}
-                          </NativeSelect>
-                        </div>
-                        <Button
-                          type="button"
-                          onClick={() => saveChannel(channel.id)}
-                          disabled={savingId === channel.id}
-                          className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-                        >
-                          {savingId === channel.id ? 'Saving...' : 'Save'}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => setEditingId(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-950 dark:text-foreground">
-                              {channel.name}
-                            </h3>
-                            {!channel.active && (
-                              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-background dark:text-muted-foreground">
-                                Archived
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
-                            {channel.description || 'No description'}
-                          </p>
-                          <p className="mt-2 text-xs text-slate-500 dark:text-muted-foreground">
-                            {audienceCopy[channel.audience]} · {channel.memberCount} member{channel.memberCount === 1 ? '' : 's'} · #{channel.id}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="outline" onClick={() => beginEdit(channel)}>
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => archiveChannel(channel)}
-                            disabled={savingId === channel.id}
-                          >
-                            {channel.active ? 'Archive' : 'Restore'}
-                          </Button>
-                          {confirmDeleteId === channel.id ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => deleteChannel(channel.id)}
-                                disabled={savingId === channel.id}
-                                className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/15"
-                              >
-                                {savingId === channel.id ? 'Deleting...' : 'Confirm delete'}
-                              </Button>
-                              <Button type="button" variant="outline" onClick={() => setConfirmDeleteId(null)}>
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setConfirmDeleteId(channel.id);
-                                setEditingId(null);
-                              }}
-                              className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/15"
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+            </div>
+            <div className="admin-line-editor-grid" style={{ marginTop: 13 }}>
+              <div className="admin-line-field">
+                <label htmlFor="channel-name">Name</label>
+                <input id="channel-name" maxLength={60} value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} placeholder="Announcements" />
+              </div>
+              <div className="admin-line-field">
+                <label>Audience / choose one</label>
+                <div className="admin-line-segmented" role="group" aria-label="Audience">
+                  {(Object.keys(audienceCopy) as ChatChannelAudience[]).map((a) => (
+                    <button key={a} type="button" aria-pressed={draft.audience === a} onClick={() => setDraft((p) => ({ ...p, audience: a }))}>
+                      {audienceCopy[a]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="admin-line-field full">
+                <label htmlFor="channel-description">Description</label>
+                <input id="channel-description" maxLength={200} value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} placeholder="What this channel is for" />
+              </div>
+            </div>
+            <div className="admin-line-editor-actions">
+              <button type="button" className="admin-line-primary" onClick={createChannel} disabled={saving || !draft.name.trim()}>
+                {saving ? 'Creating…' : 'Create'}
+              </button>
+              <button type="button" className="admin-line-clear-button" onClick={() => { setCreating(false); setDraft(emptyDraft); }} disabled={saving}>
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
-      </div>
+
+        {filtered.map((channel) => (
+          <AdminCatalogCard
+            key={channel.id}
+            eyebrow="chat channels"
+            title={channel.name}
+            statusLabel={channel.active ? undefined : 'Archived'}
+            statusTone="muted"
+            preview={channel.description || 'No description'}
+            metaLeft={`${audienceCopy[channel.audience]} · ${channel.memberCount} member${channel.memberCount === 1 ? '' : 's'}`}
+            metaRight={`#${channel.id}`}
+            extra={
+              editingId === channel.id ? (
+                <div className="admin-line-editor-grid" style={{ marginTop: 8 }}>
+                  <div className="admin-line-field">
+                    <label htmlFor={`edit-name-${channel.id}`}>Name</label>
+                    <input id={`edit-name-${channel.id}`} maxLength={60} value={editDraft.name} onChange={(e) => setEditDraft((p) => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="admin-line-field">
+                    <label>Audience</label>
+                    <div className="admin-line-segmented" role="group" aria-label="Audience">
+                      {(Object.keys(audienceCopy) as ChatChannelAudience[]).map((a) => (
+                        <button key={a} type="button" aria-pressed={editDraft.audience === a} onClick={() => setEditDraft((p) => ({ ...p, audience: a }))}>
+                          {audienceCopy[a]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="admin-line-field full">
+                    <label htmlFor={`edit-description-${channel.id}`}>Description</label>
+                    <input id={`edit-description-${channel.id}`} maxLength={200} value={editDraft.description} onChange={(e) => setEditDraft((p) => ({ ...p, description: e.target.value }))} />
+                  </div>
+                </div>
+              ) : undefined
+            }
+            actions={
+              editingId === channel.id ? (
+                <>
+                  <button type="button" className="admin-line-primary" onClick={() => saveChannel(channel.id)} disabled={savingId === channel.id}>
+                    {savingId === channel.id ? 'Saving…' : 'Save'}
+                  </button>
+                  <button type="button" className="admin-line-action" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="admin-line-action" onClick={() => beginEdit(channel)}>
+                    Edit
+                  </button>
+                  <button type="button" className="admin-line-action" onClick={() => archiveChannel(channel)} disabled={savingId === channel.id}>
+                    {channel.active ? 'Archive' : 'Restore'}
+                  </button>
+                  <button type="button" className="admin-line-action delete" onClick={() => setConfirmDeleteId(channel.id)} disabled={savingId === channel.id}>
+                    Delete
+                  </button>
+                </>
+              )
+            }
+            confirmStrip={
+              confirmDeleteId === channel.id ? (
+                <AdminConfirmStrip
+                  label={`Delete ${channel.name}?`}
+                  confirming={savingId === channel.id}
+                  onCancel={() => setConfirmDeleteId(null)}
+                  onConfirm={() => deleteChannel(channel.id)}
+                />
+              ) : undefined
+            }
+          />
+        ))}
+      </AdminCatalogList>
     </ProtectedRoute>
   );
 }

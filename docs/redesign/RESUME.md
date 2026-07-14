@@ -369,8 +369,56 @@ defects (all 6 fixes confirmed, strip numbers recomputed real, no
 regressions, light coherent, 390 clean on all 9 pages + home). I also
 applied its non-blocking polish note (detail-panel Person field →
 repLabel fallback, onboarding/page.tsx:304; gates re-run PASS). OPS
-COMMITTED LOCAL (this commit). NOW: ADMIN MGMT build (FINAL round)
-launching per docs/redesign/admin-the-line-goal.md. On PASS: commit local → ADMIN MGMT build (final
+COMMITTED LOCAL (this commit). OPS COMMITTED 07cf4f5.
+ADMIN MGMT BUILT via Sonnet (all 8 routes + NEW AdminCatalogList/
+Card/ConfirmStrip + UserTable rewrite + UserForm segmented+manager
+name-search picker + settings HONEST-INERT [28 disabled controls,
+10 "Not wired up yet", hero admits nothing writes yet] + 4 catalog
+adoptions w/ auth patterns preserved + globals.css admin-line-*).
+Builder judgment calls: approved-sales via existing leaderboard
+endpoint limit=1000 (repurposed, real data); client-side search
+built new (contract wrongly said existed); Field-rep bucket =
+not-admin/not-ops client-side; pending strip from own fetch not
+dashboard hook; no fake Creating-new toggle; delete double-confirm
+→ single confirm-strip (mockup-spec'd). MY verify: FOURTH stale-CSS
+cold restart needed; found+fixed 401 on both leaderboard-count
+fetches (missing Bearer token — added getIdToken headers in
+users/page.tsx + users/[id]/page.tsx, gates clean); People 13 real
+members + real sales counts, Person real record + segmented pickers,
+settings honest-inert verified (no Saved tick), numerals whole,
+scrollW 375. Shots admin-impl-1440-{people,person,settings}.png.
+OPUS ROUND 1: FAIL — D1 blocker: role
+segments reduced 14→5 (contract's "5-option role set" was a DRAFTING
+ERROR; entry_rep=Account Executive is the dominant role, showed no
+pressed segment + unassignable) — MY RULING: restore ALL 14 as
+wrapping segments w/ RoleDisplayNames; D2 blocker: manager picker
+checked u.role only, l1/l2 live in fieldRole → use getEffectiveRole;
+D3 Accept lost its confirm modal → AdminConfirmStrip; D4 unify sales
+count "0" both views; D5 role chip via RoleDisplayNames; D6 accepted.
+CLEAN per reviewer: zero server changes, vault reskin conservative
+(extra confirm BEFORE audited call), honest-inert verified live (28
+disabled, no fake Saved), B-7 not widened, catalog auth duality
+preserved, squared corners no leak, all hard rules. FIX ROUND 1 DONE (5 files;
+13 real roles restored as wrapping segments [HEAD union is 13 not 14],
+picker getEffectiveRole fix, Accept confirm-strip w/ new
+confirmingLabel prop, "0" convention, RoleDisplayNames chip; gates
+clean). MY re-verify: 13 segments + "Account Executive" pressed for
+entry_rep user, Connor Crouse · L1 Manager in picker, 390 wrap clean
+no overflow. Shot admin-fix1-390-person.png. OPUS ROUND 2: PASS,
+zero blockers (all 5 fixes verified live+source; 13 roles = correct
+HEAD union; accept-bypass mapping preserved; zero API/server edits;
+squared corners contained; both themes coherent). I applied its one
+non-blocking observation: new-user default role reverted to HEAD's
+entry_rep (builder had changed it to onboarding-gated
+entry_level_rep; one-line fix, gates re-run PASS). ADMIN COMMITTED
+LOCAL (this commit) → ALL 11 ROUNDS DONE, entire portal redesign
+built + reviewed + committed locally. AWAITING USER: (1) "deploy"
+word pushes everything to prod; (2) B-7 security fix (ops-role can
+reach /portal/admin/users/[id] by URL and grant any role incl.
+admin — recommend fixing as separate item) still awaiting user's
+go-ahead. Dev server on :3000 for user check. NOTE stale-CSS
+playbook fired 4x this campaign — always styleSheets-scan after
+globals.css edits before judging. On PASS: commit local → ADMIN MGMT build (final
 round, contract already FINAL incl. my open-call ruling: squared
 cards + non-Archivo H1 ship as spec'd scoped to admin-line-*; lime
 reuses existing hex; settings page HONEST-INERT for dead controls;

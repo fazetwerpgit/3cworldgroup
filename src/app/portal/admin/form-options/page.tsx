@@ -2,11 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import FormAlertsCard from '@/components/portal/FormAlertsCard';
@@ -16,6 +11,7 @@ import {
   FORM_OPTION_LABELS,
   OptionKey,
 } from '@/lib/forms/formOptionsRegistry';
+import { AdminCatalogCard, AdminCatalogList } from '@/components/admin/AdminCatalogList';
 
 export default function AdminFormOptionsPage() {
   const { user } = useAuth();
@@ -53,13 +49,12 @@ export default function AdminFormOptionsPage() {
     }
   }, [user, authedFetch]);
 
-  useEffect(() => { loadOptions(); }, [loadOptions]);
+  useEffect(() => {
+    loadOptions();
+  }, [loadOptions]);
 
   const removeValue = (key: OptionKey, index: number) => {
-    setOptions((prev) => ({
-      ...prev,
-      [key]: prev[key].filter((_, i) => i !== index),
-    }));
+    setOptions((prev) => ({ ...prev, [key]: prev[key].filter((_, i) => i !== index) }));
     setSuccessKey(null);
   };
 
@@ -97,126 +92,88 @@ export default function AdminFormOptionsPage() {
 
   return (
     <ProtectedRoute roles={['admin']}>
-      <div className="mx-auto max-w-[1200px] space-y-5">
-        <PortalPageHeader
-          compact
-          eyebrow="Administration"
-          title="Form Options"
-          description="Edit dropdown lists used by portal forms. Saved changes are used by reps and server-side validation."
-        />
-
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
-          </div>
-        )}
-
-        <div className="portal-enter portal-enter-2">
-          <FormAlertsCard />
-        </div>
-
-        {loading ? (
-          <Card className="portal-enter portal-enter-3 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-            <CardContent className="py-10 text-center text-sm text-slate-600 dark:text-muted-foreground">
-              Loading form options...
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="portal-enter portal-enter-3 grid gap-4 lg:grid-cols-2">
-            {EDITABLE_OPTION_KEYS.map((key) => (
-              <Card key={key} className="rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-                <CardHeader className="border-b border-slate-200 px-5 py-4 dark:border-border">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-slate-950 dark:text-foreground">
-                        {FORM_OPTION_LABELS[key]}
-                      </h2>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                        {options[key].length} option{options[key].length === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={() => saveValues(key)}
-                      disabled={savingKey === key}
-                      className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-                    >
-                      {savingKey === key ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4 p-5">
-                  {successKey === key && (
-                    <div className="rounded-md border border-[#8dc63f]/40 bg-[#8dc63f]/10 px-3 py-2 text-sm text-[#4f7f1e] dark:text-green-300 dark:text-[#b9e78a]">
-                      Saved updated options.
-                    </div>
+      <AdminCatalogList
+        kicker="catalog / form options"
+        heroAccent="Keep every record"
+        heroPlain="ready to reuse."
+        intro="Edit dropdown lists used by portal forms. Saved changes are used by reps and server-side validation."
+        heroCount={EDITABLE_OPTION_KEYS.length}
+        heroCountLabel="option lists on file"
+        loading={loading}
+        loadingLabel="Loading form options…"
+        error={error || null}
+        success={null}
+        isEmpty={false}
+        isFilteredEmpty={false}
+        emptyTrue={{ title: 'No lists.', body: '' }}
+        emptyFiltered={{ title: 'No lists match.', body: '' }}
+      >
+        {EDITABLE_OPTION_KEYS.map((key) => (
+          <AdminCatalogCard
+            key={key}
+            eyebrow="form options"
+            title={FORM_OPTION_LABELS[key]}
+            statusLabel={successKey === key ? 'saved' : undefined}
+            statusTone="lime"
+            metaLeft={`${options[key].length} option${options[key].length === 1 ? '' : 's'}`}
+            extra={
+              <div style={{ marginTop: 10 }}>
+                <div className="admin-line-value-chips" style={{ marginBottom: 10 }}>
+                  {options[key].length === 0 ? (
+                    <span className="admin-line-meta">No options yet.</span>
+                  ) : (
+                    options[key].map((value, index) => (
+                      <span key={`${value}-${index}`} className="admin-line-value-chip" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {value}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${value}`}
+                          onClick={() => removeValue(key, index)}
+                          style={{ border: 0, background: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 900 }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
                   )}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    className="admin-line-search"
+                    style={{ flex: '1 1 auto' }}
+                    value={drafts[key]}
+                    onChange={(e) => setDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addValue(key);
+                      }
+                    }}
+                    placeholder="Type a value"
+                  />
+                  <button type="button" className="admin-line-action" onClick={() => addValue(key)}>
+                    Add value
+                  </button>
+                </div>
+              </div>
+            }
+            actions={
+              <button type="button" className="admin-line-primary" onClick={() => saveValues(key)} disabled={savingKey === key}>
+                {savingKey === key ? 'Saving…' : 'Save inline'}
+              </button>
+            }
+          />
+        ))}
+      </AdminCatalogList>
 
-                  <div className="space-y-2">
-                    {options[key].length === 0 ? (
-                      <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:border-border dark:bg-muted dark:text-muted-foreground">
-                        No options. Add one below.
-                      </p>
-                    ) : (
-                      options[key].map((value, index) => (
-                        <div key={`${value}-${index}`} className="flex items-center gap-2">
-                          <Input
-                            value={value}
-                            onChange={(e) => {
-                              const next = [...options[key]];
-                              next[index] = e.target.value;
-                              setOptions((prev) => ({ ...prev, [key]: next }));
-                              setSuccessKey(null);
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removeValue(key, index)}
-                            aria-label={`Remove ${value}`}
-                            className="shrink-0"
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="border-t border-slate-200 pt-4 dark:border-border">
-                    <Label htmlFor={`add-${key}`} className="mb-2 text-slate-700 dark:text-muted-foreground">
-                      Add option
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id={`add-${key}`}
-                        value={drafts[key]}
-                        onChange={(e) => setDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addValue(key);
-                          }
-                        }}
-                        placeholder="Type a value"
-                      />
-                      <Button type="button" variant="outline" onClick={() => addValue(key)}>
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        <Card className="rounded-lg border-slate-200 bg-slate-50 py-0 shadow-sm dark:border-border dark:bg-muted">
-          <CardContent className="p-5 text-sm text-slate-600 dark:text-muted-foreground">
-            Leads categories and reasons cannot be edited here because they control which fields appear on the Leads Request form.
-          </CardContent>
-        </Card>
+      <div className="admin-line-main">
+        <div className="admin-line" style={{ paddingTop: 0 }}>
+          <FormAlertsCard />
+          <p className="admin-line-sub" style={{ marginTop: 12 }}>
+            Leads categories and reasons cannot be edited here because they control which fields
+            appear on the Leads Request form.
+          </p>
+        </div>
       </div>
     </ProtectedRoute>
   );

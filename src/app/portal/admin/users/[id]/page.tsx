@@ -1,26 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { Lock } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { UserForm } from '@/components/admin/UserForm';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { User } from '@/types';
+import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function EditUserPage() {
   const params = useParams();
+  const router = useRouter();
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [salesCount, setSalesCount] = useState(0);
   const [sensitive, setSensitive] = useState<{ ssnLast4: string | null; dlLast4: string | null } | null>(null);
   const [revealed, setRevealed] = useState<{ ssn: string | null; dlNumber: string | null } | null>(null);
+  const [revealOpen, setRevealOpen] = useState(false);
+  const [revealLogged, setRevealLogged] = useState(false);
 
   const userId = params.id as string;
 
@@ -32,11 +32,7 @@ export default function EditUserPage() {
           `/api/portal/auth/users/${userId}?requestedBy=${currentUser.uid}`
         );
         const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch user');
-        }
-
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch user');
         setUser(data.user);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch user');
@@ -44,14 +40,36 @@ export default function EditUserPage() {
         setLoading(false);
       }
     }
-
-    if (userId) {
-      fetchUser();
-    }
+    if (userId) fetchUser();
   }, [userId, currentUser]);
 
-  // Fetch the masked last-4 (admin only). Sends a REAL Firebase ID token, not a
-  // UID — the server verifies it before returning anything.
+  // Real approved-sales count for this specific person, same existing
+  // leaderboard endpoint used on the People view — no new route. Absence
+  // from the board means zero approved sales, so it renders as "0", never "—".
+  useEffect(() => {
+    if (!currentUser || !userId) return;
+    let active = true;
+    (async () => {
+      try {
+        const token = await auth?.currentUser?.getIdToken();
+        const res = await fetch('/api/portal/leaderboard?period=all&metric=totalSales&limit=1000', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const data = await res.json();
+        if (!active || !res.ok) return;
+        const entry = (data.leaderboard || []).find((e: { salesRepId: string }) => e.salesRepId === userId);
+        setSalesCount(entry ? entry.totalSales : 0);
+      } catch {
+        if (active) setSalesCount(0);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUser, userId]);
+
+  // Real masked last-4 (admin only). Sends a REAL Firebase ID token — the
+  // server verifies it before returning anything. Unchanged from today.
   useEffect(() => {
     if (currentUser?.role !== 'admin' || !userId) return;
     let active = true;
@@ -79,65 +97,144 @@ export default function EditUserPage() {
     });
     const d = await r.json();
     setRevealed({ ssn: d.ssn, dlNumber: d.dlNumber });
+    setRevealLogged(true);
   };
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="mx-auto max-w-[1100px] space-y-5">
-        <Button asChild variant="ghost" className="text-slate-600 dark:text-muted-foreground hover:text-slate-950 dark:hover:text-foreground">
-          <Link href="/portal/admin/users">
-            <ArrowLeft className="h-4 w-4" />
-            Back to users
-          </Link>
-        </Button>
-
-        {loading && (
-          <Card className="rounded-lg border-slate-200 dark:border-border bg-white dark:bg-card py-0 text-center shadow-sm">
-            <CardContent className="py-8">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-[#8dc63f]" />
-              <p className="mt-4 text-sm text-slate-500 dark:text-muted-foreground">Loading user...</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {error && (
-          <div className="rounded-lg border border-red-200 dark:border-border bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-            {error}
-          </div>
-        )}
-
-        {user && (
-          <>
-            <PortalPageHeader
-              compact
-              eyebrow="Administration"
-              title="Edit User"
-              description={`Update ${user.displayName}'s account information, permissions, and reporting assignment.`}
-            />
-            <div className="portal-enter portal-enter-2">
-              <UserForm user={user} isEdit />
-              {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
-                <section className="rounded-lg border border-amber-200 dark:border-border bg-amber-50 dark:bg-amber-500/15 p-5">
-                  <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-300">Sensitive (admin only)</h2>
-                  <p className="mt-2 text-sm text-slate-700 dark:text-muted-foreground">
-                    SSN: {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
-                  </p>
-                  <p className="text-sm text-slate-700 dark:text-muted-foreground">
-                    DL #: {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
-                  </p>
-                  {!revealed && (
-                    <button
-                      onClick={doReveal}
-                      className="mt-3 rounded-md border border-amber-300 dark:border-amber-500/30 px-3 py-1 text-sm font-medium text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20"
-                    >
-                      Reveal
-                    </button>
-                  )}
-                </section>
-              )}
+      <div className="admin-line-main">
+        <div className="admin-line">
+          {loading && (
+            <div className="admin-line-empty-state" style={{ display: 'block' }}>
+              <strong>Loading record…</strong>
             </div>
-          </>
-        )}
+          )}
+
+          {error && (
+            <div className="admin-line-empty-state" style={{ display: 'block', borderColor: 'var(--admin-line-red)', color: 'var(--admin-line-red)' }}>
+              {error}
+            </div>
+          )}
+
+          {user && (
+            <>
+              <header className="admin-line-hero">
+                <div>
+                  <div className="admin-line-kicker">person record / approved sales</div>
+                  <h1>
+                    <span className="accent">{user.displayName || user.email}.</span>
+                    <span className="plain">Make the record useful.</span>
+                  </h1>
+                  <p className="admin-line-intro">
+                    The same record surface serves editing and creating. Keep identity clear, role
+                    decisions explicit, and sensitive records behind a visible boundary.
+                  </p>
+                  <div className="admin-line-quick-rail">
+                    <span className="admin-line-role">
+                      {(() => {
+                        const effective = getEffectiveRole(user);
+                        return effective ? RoleDisplayNames[effective as UserRole] : '—';
+                      })()}
+                    </span>
+                    <span className={`admin-line-status ${user.status || 'active'}`}>
+                      {(user.status || 'active').replace(/^./, (c) => c.toUpperCase())}
+                    </span>
+                    <span className="admin-line-chip">
+                      employee / {user.uid.slice(0, 8).toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                <div className="admin-line-hero-count">
+                  <span className="admin-line-display portal-metallic-num">{salesCount}</span>
+                  <small>approved sales</small>
+                </div>
+              </header>
+
+              <button
+                type="button"
+                className="admin-line-clear-button"
+                style={{ marginTop: 14 }}
+                onClick={() => router.push('/portal/admin/users')}
+              >
+                ← Back to roster
+              </button>
+
+              <div className="admin-line-person-layout">
+                <main className="admin-line-panel">
+                  <UserForm user={user} isEdit />
+
+                  {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
+                    <div className="admin-line-form-section admin-line-vault">
+                      <div className="admin-line-eyebrow">03 / sensitive records</div>
+                      <h3>Vaulted, not casual.</h3>
+                      <p className="admin-line-sub">
+                        Admin-only reference values remain masked until someone names the risk.
+                      </p>
+                      <div className="admin-line-vault-grid">
+                        <div className="admin-line-vault-item">
+                          <strong>{revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}</strong>
+                          <small>
+                            Social security number <Lock className="admin-line-lock" />
+                          </small>
+                        </div>
+                        <div className="admin-line-vault-item">
+                          <strong>{revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}</strong>
+                          <small>
+                            Driver license reference <Lock className="admin-line-lock" />
+                          </small>
+                        </div>
+                      </div>
+                      {!revealed && (
+                        <div className="admin-line-vault-actions">
+                          <button
+                            type="button"
+                            className="admin-line-action"
+                            onClick={() => setRevealOpen(true)}
+                          >
+                            Reveal for this session
+                          </button>
+                          <span className="admin-line-meta">audit trail records the reveal</span>
+                        </div>
+                      )}
+                      {revealOpen && !revealed && (
+                        <div className="admin-line-reveal-confirm" style={{ display: 'block' }}>
+                          Confirm reveal? This is a one-session view of sensitive records.{' '}
+                          <button type="button" className="admin-line-action" onClick={doReveal}>
+                            Continue
+                          </button>
+                        </div>
+                      )}
+                      {revealLogged && (
+                        <div className="admin-line-reveal-confirm" style={{ display: 'block' }}>
+                          Reveal logged for this session.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </main>
+                <aside className="admin-line-panel">
+                  <div className="admin-line-eyebrow">record posture</div>
+                  <h2 style={{ margin: '7px 0 0', fontSize: 20, fontWeight: 900, letterSpacing: '-.06em', textTransform: 'uppercase' }}>
+                    One person, one decision.
+                  </h2>
+                  <p className="admin-line-sub">
+                    Role chips, status chips, and a named manager keep the record legible to the next
+                    admin.
+                  </p>
+                  <div className="admin-line-quick-rail">
+                    <span className="admin-line-chip lime">{salesCount} sales</span>
+                  </div>
+                  <div className="admin-line-form-section">
+                    <div className="admin-line-eyebrow">saved lines</div>
+                    <p className="admin-line-sub">
+                      Profile edits save inline. Dirty fields pull the save bar into view.
+                    </p>
+                  </div>
+                </aside>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </ProtectedRoute>
   );
