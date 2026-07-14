@@ -13117,3 +13117,12 @@ body.portal-scope {
     animation: none !important;
   }
 }
+
+/* Chat-line addendum — avatar photos */
+.chat-line-avatar {
+  overflow: hidden;
+}
+
+.chat-line-avatar-photo {
+  border-radius: inherit;
+}

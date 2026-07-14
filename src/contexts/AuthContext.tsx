@@ -42,6 +42,24 @@ type FetchUserDataResult =
 const missingProfileMessage = 'User profile not found. Please contact an administrator.';
 const profileLoadErrorMessage = 'We could not load your profile. Please try signing in again.';
 
+// Best-effort, fire-and-forget: copies a Google SSO photoURL onto the caller's
+// own users doc via a server route that verifies the ID token and derives both
+// the target uid and the photo server-side (never trusts client input). Only
+// called when the client already sees a mismatch, so this is cheap on repeat
+// logins. Any failure is swallowed — a sync hiccup must never block sign-in.
+function syncAvatarFromAuth(firebaseUser: FirebaseUser) {
+  if (!firebaseUser.photoURL) return;
+  void firebaseUser
+    .getIdToken()
+    .then((token) =>
+      fetch('/api/portal/auth/sync-avatar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    )
+    .catch(() => {});
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -114,6 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = userDataResult.user;
           if (userData.status === 'active') {
             setState({ user: userData, loading: false, error: null, pendingApproval: false });
+            // Only fires when the client already sees the Auth photo differs from
+            // the stored one, so a normal login makes zero extra calls once synced.
+            if (firebaseUser.photoURL && firebaseUser.photoURL !== userData.avatarUrl) {
+              syncAvatarFromAuth(firebaseUser);
+            }
           } else if (isAwaitingRoleAssignment(userData)) {
             if (auth) await firebaseSignOut(auth);
             setState({ user: null, loading: false, error: null, pendingApproval: true });

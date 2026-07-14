@@ -14,6 +14,7 @@ interface ChannelMember {
   name: string;
   role: string;
   isExtra: boolean;
+  avatarUrl?: string;
 }
 
 interface AddableUser {
@@ -29,6 +30,11 @@ function memberName(data: FirebaseFirestore.DocumentData): string {
   const email = typeof data.email === 'string' ? data.email : '';
   const localPart = email.split('@')[0]?.trim();
   return localPart || '3C User';
+}
+
+/** Only a well-formed string survives — never leak a malformed avatarUrl field. */
+function memberAvatarUrl(data: FirebaseFirestore.DocumentData): string | undefined {
+  return typeof data.avatarUrl === 'string' && data.avatarUrl ? data.avatarUrl : undefined;
 }
 
 /** The display-relevant role label (e.g. "L1 Manager"), or empty when unknown. */
@@ -89,6 +95,7 @@ export async function GET(
             name: memberName(userData),
             role: memberRole(userData),
             isExtra: extraSet.has(doc.id),
+            avatarUrl: memberAvatarUrl(userData),
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));

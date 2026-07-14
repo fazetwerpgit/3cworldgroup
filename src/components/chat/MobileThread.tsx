@@ -50,6 +50,9 @@ interface MobileThreadProps {
   channel?: ChatChannel & { memberIds?: string[] };
   channelId: string;
   messages: ThreadMessage[];
+  // uid -> photo URL, resolved server-side from the active channel's members
+  // (already-visible data — the same population whose names are shown per message).
+  authorAvatars: Record<string, string>;
   loading: boolean;
   error?: string;
   currentUserId?: string;
@@ -193,6 +196,7 @@ export function MobileThread({
   channel,
   channelId,
   messages,
+  authorAvatars,
   loading,
   error,
   currentUserId,
@@ -502,6 +506,7 @@ export function MobileThread({
                           <ChatAvatar
                             authorId={message.authorId}
                             authorName={message.authorName}
+                            avatarUrl={authorAvatars[message.authorId]}
                             size="md"
                             className="chat-line-avatar"
                           />
