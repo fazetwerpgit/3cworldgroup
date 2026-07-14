@@ -12304,3 +12304,280 @@ body.portal-scope {
     transition: none !important;
   }
 }
+
+/* Ops-line addendum — recruiting command center (form + two-action queue)
+   Extends the ops-line-* namespace above (frozen) to /portal/admin/recruiting.
+   Reuses existing ops-line tokens/panels/list/status-chip primitives; adds
+   only what that page's anatomy needs and nothing already-shipped has: a
+   4-cell stat strip, form fields, an application row, a two-action recruit
+   row, status-chip tone modifiers, and the reject confirm-strip. Nested
+   under .ops-line, so the frozen reduced-motion exemption above already
+   covers every element added here — no separate block needed. */
+
+.ops-line-recruiting-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 18px;
+  border: 1px solid var(--ops-line-line);
+  background: var(--ops-line-line);
+}
+
+.ops-line-recruiting-strip .ops-line-strip-cell {
+  background: color-mix(in srgb, var(--ops-line-panel) 92%, transparent);
+}
+
+.ops-line-status-chip.tone-blue {
+  border-color: color-mix(in srgb, var(--ops-line-blue) 55%, transparent);
+  color: var(--ops-line-blue);
+}
+
+.ops-line-status-chip.tone-amber {
+  border-color: color-mix(in srgb, var(--ops-line-amber) 55%, transparent);
+  color: var(--ops-line-amber);
+}
+
+.ops-line-status-chip.tone-lime {
+  border-color: color-mix(in srgb, var(--ops-line-lime) 55%, transparent);
+  color: var(--ops-line-lime);
+}
+
+.ops-line-status-chip.tone-red {
+  border-color: color-mix(in srgb, var(--ops-line-red) 55%, transparent);
+  color: var(--ops-line-red);
+}
+
+.ops-line-status-chip.tone-muted {
+  border-color: var(--ops-line-line);
+  color: var(--ops-line-soft);
+}
+
+.ops-line-recruiting-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.ops-line-form-card,
+.ops-line-applications-card,
+.ops-line-queue-card-wide {
+  min-width: 0;
+  border: 1px solid var(--ops-line-line);
+  background: color-mix(in srgb, var(--ops-line-panel) 88%, transparent);
+  padding: 18px;
+}
+
+.ops-line-form-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--ops-line-lime);
+}
+
+.ops-line-form-head h3 {
+  font: 900 12px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ops-line-ink);
+}
+
+.ops-line-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ops-line-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.ops-line-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ops-line-field label {
+  font: 900 8px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ops-line-muted);
+}
+
+.ops-line-input,
+.ops-line-select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--ops-line-line);
+  background: color-mix(in srgb, var(--ops-line-bg) 60%, transparent);
+  color: var(--ops-line-ink);
+  padding: 9px 10px;
+  font-size: 12px;
+  outline: 0;
+}
+
+.ops-line-input:focus,
+.ops-line-select:focus {
+  border-color: var(--ops-line-lime);
+}
+
+.ops-line-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--ops-line-line);
+  color: var(--ops-line-ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ops-line-checkbox-row input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--ops-line-lime);
+}
+
+.ops-line-invite-ready {
+  margin-top: 16px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--ops-line-lime) 45%, transparent);
+  background: var(--ops-line-lime-soft);
+}
+
+.ops-line-invite-ready-title {
+  font: 900 10px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ops-line-lime);
+}
+
+.ops-line-invite-ready-url {
+  margin-top: 6px;
+  word-break: break-all;
+  color: var(--ops-line-ink);
+  font-size: 11px;
+}
+
+.ops-line-invite-ready-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ops-line-app-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(100px, 0.8fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+}
+
+.ops-line-recruit-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto auto;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+}
+
+.ops-line-no-action {
+  color: var(--ops-line-soft);
+  font: 900 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ops-line-confirm-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 9px 14px 13px;
+  border-top: 1px solid color-mix(in srgb, var(--ops-line-red) 50%, transparent);
+  color: var(--ops-line-red);
+  font: 900 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ops-line-confirm-strip button {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.ops-line-confirm-strip button.yes {
+  background: var(--ops-line-red);
+  color: #2a0606;
+}
+
+@media (min-width: 960px) {
+  .ops-line-recruiting-grid {
+    grid-template-columns: 400px 1fr;
+  }
+
+  .ops-line-queue-card-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .ops-line-recruit-row {
+    grid-template-columns: minmax(140px, 1fr) minmax(100px, 0.8fr) auto auto;
+  }
+
+  .ops-line-recruit-row > .ops-line-cell:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-line-recruiting-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ops-line-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-line-app-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 6px;
+  }
+
+  .ops-line-app-row > .ops-line-cell:nth-child(2),
+  .ops-line-app-row > .ops-line-cell:nth-child(3) {
+    display: none;
+  }
+
+  .ops-line-recruit-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 8px;
+  }
+
+  .ops-line-recruit-row > .ops-line-cell:nth-child(2),
+  .ops-line-recruit-row > .ops-line-cell:nth-child(3) {
+    display: none;
+  }
+
+  .ops-line-recruit-row > .ops-line-detail-actions,
+  .ops-line-recruit-row > .ops-line-no-action {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 460px) {
+  .ops-line-recruiting-strip {
+    grid-template-columns: 1fr;
+  }
+}

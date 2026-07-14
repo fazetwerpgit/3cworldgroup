@@ -423,7 +423,15 @@ except ONE sanctioned change: Reject gains the shipped confirm-strip
 pattern; hero numeral = submitted invite count matching Ops home card;
 statusTone split into two typed maps; no resend feature; new
 ops-line-form-* CSS appended at END of globals.css, frozen ops-line
-block untouched). Sonnet build → my verify → fresh Opus review → commit.
+block untouched). BUILT (Sonnet) + my live verify (dark 1440/390
+scrollWidth 375, light coherent via localStorage 3c-theme=light —
+NOTE: class-stripping .dark off body is NOT a valid light test, the
+ThemeContext wrapper div also carries .dark; hero 0 == Ops home
+Recruiting card 0; confirm strip verified via page.route mock, no
+real account touched) + fresh Opus review PASS zero blockers
+(minors all cosmetic/accepted: dead tone-blue fallbacks, mobile
+column de-emphasis consistent with ops-line rule). COMMITTED LOCAL
+this commit → recruiting gap CLOSED, all 12 rounds done.
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
