@@ -2,19 +2,23 @@
 
 import { useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import {
+  FormsLineAlert,
+  FormsLineChoicePicker,
+  FormsLineControl,
+  FormsLineActions,
+  FormsLineFormHeader,
+  FormsLineIdentity,
+  FormsLineRail,
+  FormsLineSection,
+  FormsLineShell,
+  FormsLineSuccess,
+} from '@/components/forms/FormsLine';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
 import { US_STATES } from '@/lib/validation/address';
+import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 const EMPTY = {
   customerName: '', customerPhone: '', customerEmail: '',
@@ -27,7 +31,7 @@ export default function ExpediteOrderPage() {
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
+  const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
 
   const submit = async (e: React.FormEvent) => {
@@ -45,7 +49,7 @@ export default function ExpediteOrderPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
-      setDone(true);
+      setReferenceId(json.id);
       setForm(EMPTY);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
@@ -54,69 +58,79 @@ export default function ExpediteOrderPage() {
     }
   };
 
+  const displayName = user?.displayName || user?.email || 'current user';
+  const role = getEffectiveRole(user);
+  const roleLabel = role ? RoleDisplayNames[role] : 'Portal user';
+
   return (
     <ProtectedRoute>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1100px] space-y-5">
-              <PortalPageHeader
-                eyebrow="Field forms"
-                title="Expedite Internet Order"
-                description="Request a faster install date for a customer's internet order."
-              />
-              {done && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
-                  Expedite request submitted.
-                </div>
+      <FormsLineShell>
+        <section className="forms-line-fill" aria-labelledby="expedite-order-title">
+          <FormsLineFormHeader title="Expedite Order" lane="02" />
+          {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
+          <div className="forms-line-fill-body">
+            <div>
+              <form onSubmit={submit}>
+                <FormsLineSection
+                  index={1}
+                  title="Who you are"
+                  identity={<FormsLineIdentity name={displayName} role={roleLabel} />}
+                >
+                  <FormsLineControl id="customer-name" label="Customer name" required>
+                    <input id="customer-name" value={form.customerName} onChange={(e) => setForm((p) => ({ ...p, customerName: e.target.value }))} required />
+                  </FormsLineControl>
+                  <FormsLineControl id="customer-phone" label="Customer phone" required>
+                    <input id="customer-phone" type="tel" value={form.customerPhone} onChange={(e) => setForm((p) => ({ ...p, customerPhone: e.target.value }))} required />
+                  </FormsLineControl>
+                  <FormsLineControl id="customer-email" label="Customer email" className="forms-line-field-full">
+                    <input id="customer-email" value={form.customerEmail} onChange={(e) => setForm((p) => ({ ...p, customerEmail: e.target.value }))} />
+                  </FormsLineControl>
+                </FormsLineSection>
+                <FormsLineSection index={2} title="Where it goes">
+                  <FormsLineControl id="address" label="Street address" className="forms-line-field-full">
+                    <input id="address" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
+                  </FormsLineControl>
+                  <FormsLineControl id="city" label="City">
+                    <input id="city" value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} />
+                  </FormsLineControl>
+                  <FormsLineControl id="state" label="State">
+                    <select id="state" value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value }))}>
+                      <option value="">Select state</option>
+                      {US_STATES.map((state) => <option key={state.code} value={state.code}>{state.name}</option>)}
+                    </select>
+                  </FormsLineControl>
+                  <FormsLineControl id="zip" label="ZIP">
+                    <input id="zip" inputMode="numeric" placeholder="12345" value={form.zip} onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value }))} />
+                  </FormsLineControl>
+                  <FormsLineControl id="order-number" label="Order number" required>
+                    <input id="order-number" value={form.orderNumber} onChange={(e) => setForm((p) => ({ ...p, orderNumber: e.target.value }))} required />
+                  </FormsLineControl>
+                  <FormsLineControl id="expedite-dates" label="Desired expedite dates" required className="forms-line-field-full">
+                    <textarea id="expedite-dates" maxLength={300} value={form.expediteDates} onChange={(e) => setForm((p) => ({ ...p, expediteDates: e.target.value }))} required />
+                  </FormsLineControl>
+                  <FormsLineChoicePicker
+                    name="reason"
+                    label="Reason for expedite"
+                    value={form.reason}
+                    options={options.expediteReasons}
+                    onChange={(reason) => setForm((p) => ({ ...p, reason }))}
+                    required
+                  />
+                </FormsLineSection>
+                <FormsLineActions verb="order" saving={saving} />
+              </form>
+              {referenceId && (
+                <FormsLineSuccess
+                  title="Request received"
+                  referenceId={referenceId}
+                  message="The expedite request is in the review queue. The owner can follow up through the portal record."
+                />
               )}
-              {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
-              )}
-              <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-                <CardContent className="p-5 sm:p-6">
-                  <p className="mb-4 text-xs text-slate-500 dark:text-muted-foreground">Submitting as {user?.displayName || user?.email}.</p>
-                  <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><Label>Customer Name</Label><Input value={form.customerName} onChange={(e) => setForm((p) => ({ ...p, customerName: e.target.value }))} required /></div>
-                    <div><Label>Customer Phone</Label><Input value={form.customerPhone} onChange={(e) => setForm((p) => ({ ...p, customerPhone: e.target.value }))} required /></div>
-                    <div className="sm:col-span-2"><Label>Customer Email</Label><Input value={form.customerEmail} onChange={(e) => setForm((p) => ({ ...p, customerEmail: e.target.value }))} /></div>
-                    <div className="sm:col-span-2"><Label>Street Address</Label><Input value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} /></div>
-                    <div><Label>City</Label><Input value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} /></div>
-                    <div>
-                      <Label>State</Label>
-                      <NativeSelect value={form.state} onChange={(e) => setForm((p) => ({ ...p, state: e.target.value }))} className="w-full">
-                        <NativeSelectOption value="">Select state</NativeSelectOption>
-                        {US_STATES.map((st) => (
-                          <NativeSelectOption key={st.code} value={st.code}>{st.name}</NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </div>
-                    <div><Label>ZIP</Label><Input value={form.zip} onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value }))} placeholder="12345" /></div>
-                    <div><Label>Order Number</Label><Input value={form.orderNumber} onChange={(e) => setForm((p) => ({ ...p, orderNumber: e.target.value }))} required /></div>
-                    <div className="sm:col-span-2"><Label>Desired expedite dates</Label><Textarea value={form.expediteDates} onChange={(e) => setForm((p) => ({ ...p, expediteDates: e.target.value }))} required /></div>
-                    <div className="sm:col-span-2">
-                      <Label>Reason for expedite</Label>
-                      <NativeSelect value={form.reason} onChange={(e) => setForm((p) => ({ ...p, reason: e.target.value }))} className="w-full" required>
-                        <NativeSelectOption value="">Select reason</NativeSelectOption>
-                        {options.expediteReasons.map((r) => (
-                          <NativeSelectOption key={r} value={r}>{r}</NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <Button type="submit" disabled={saving} className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                        {saving ? 'Submitting…' : 'Submit Request'}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
             </div>
-          </main>
-        </div>
-      </div>
+            <FormsLineRail status="Ready for order review" note="A clear timeline gives the install owner a clean handoff." />
+          </div>
+        </section>
+      </FormsLineShell>
     </ProtectedRoute>
   );
 }

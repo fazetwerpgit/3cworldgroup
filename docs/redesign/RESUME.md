@@ -257,11 +257,55 @@ a bug). Shots calls-impl-1440-{top,empty,mock-top,mock-hero}.png +
 calls-impl-390-mock-{top,cards}.png. OPUS ROUND-1 verdict: PASS, zero
 defects; one optional parity note (broadcast strip time lacked mockup's
 CT suffix) → I applied `CT` suffix at page.tsx:386, tsc/eslint/diff
-PASS, build rerun. CALLS COMMITTED LOCAL (pending this build) — NOT
-pushed. NEXT PAGE: FORMS hub + 5 forms (approved mockup
-design-mockups/forms-round2/the-line-forms-final.html; flips nav
-transitional items per shell-the-rail-goal.md — forms group collapses
-to single Forms hub link + bottom-bar slot 4 becomes Forms).
+PASS, build rerun. CALLS COMMITTED 3ab4259 (local, NOT pushed).
+FORMS ROUND IN FLIGHT: extraction DONE (scratchpad
+logs/codex-forms-extract.log, UTF-16). CONTRACT FINAL:
+docs/redesign/forms-the-line-goal.md — my 6 rulings appended (binding):
+segmented picker on every closed-enum field, two-level ONLY on Leads
+Request category→reason; section count flexes per form (pattern
+uniform); Manager Interview hub row HIDDEN for unauthorized (mirror
+portalNavGroups filtering); success shows REAL Firestore doc id (no
+fake PAY-2048); gm_in_training mismatch untouched; hub route
+/portal/forms binding. Nav flips scoped to nav config only (sidebar 5
+links → 1 Forms link; bottom slot 4 Leaderboard → Forms). CODEX IMPL
+DONE (files: new /portal/forms hub page + new
+src/components/forms/FormsLine.tsx + 5 form pages + globals.css
+forms-line-* + CommandPalette Forms group→single link; Codex gates
+PASS). Codex could NOT do the bottom-bar flip (mobileSlotItems lives
+in MobileBottomNav.tsx, contract wrongly said CommandPalette) — I
+flipped it directly (slot 4 Leaderboard→Forms, ReceiptText icon,
+sanctioned by shell contract transitional note; tsc/eslint/build
+PASS). MY VERIFY PASS: hub 1:1-close 1440+390 (hero 5 whole, weights
+900/950, scrollWidth 375), payroll = real carrier enums single-level
+picker, leads = pickers + right rail, bottom bar
+Dashboard/Sales/Chat/FORMS/More, sidebar Forms=1 link (the 5 plural
+Operations links are admin queue pages — different, correct). Noted
+cosmetic: CENTURYLINK/QUANTUM chip wraps mid-word at 1440. Shots
+forms-impl-1440-{hub,payroll,leads}.png + forms-impl-390-hub.png.
+OPUS ROUND-1 verdict: PASS, zero blockers, zero behavioral
+regressions (source-verified payloads/uploads/gates/success-doc-id;
+globals.css purely additive). 2 low cosmetic fixed by me: D1 chip
+mid-word wrap → ZWSP after "/" in FormsLine option labels +
+overflow-wrap break-word (NOTE: needed .next delete + cold start —
+Turbopack cache served stale CSS through TWO restarts; rule was
+absent from served CSS, found via styleSheets scan); D2 manager-
+interview dup empty-state → emptyMessage prop, dup block removed.
+All gates PASS. FORMS COMMITTED LOCAL (this commit) — NOT pushed.
+NOW: RESOURCES impl launching (contract final). While it runs: MEMBER
+pages extraction prep (pipeline pattern).
+PIPELINE PARALLELISM NOW STANDARD (user asked for >1 codex agent):
+while page N implements, page N+1 runs extraction + contract draft
+(read-only, safe). NEVER two implementers at once (globals.css is
+shared — write collisions). RESOURCES ALREADY PREPPED: extraction DONE
+(scratchpad logs/codex-resources-extract.log), CONTRACT FINAL
+docs/redesign/resources-the-line-goal.md with my 4 rulings (route (c):
+/portal/resources new, training stays University canonical,
+links+pay-structure redirect to hub, shorts redirect unchanged; Shorts
+lane ships w/ honest empty state; University full restyle THIS round,
+detail page out; pay switch NOT interactive — real permission model).
+Resources impl starts the moment Forms commits. Next prep target while
+Resources implements: MEMBER pages extraction (mockup
+member-round1/option-3-the-line-member.html).
 USER FEEDBACK on Sales (2026-07-13): "15 sales on the board" looked
 un-level/funky. ROOT CAUSE (systemic!): Tailwind preflight resets
 h1-h6 font-weight to 400; mockups rely on browser-default bold — thin

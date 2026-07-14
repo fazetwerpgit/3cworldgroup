@@ -2,19 +2,24 @@
 
 import { useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import {
+  FormsLineAlert,
+  FormsLineChoicePicker,
+  FormsLineControl,
+  FormsLineActions,
+  FormsLineFormHeader,
+  FormsLineIdentity,
+  FormsLineRail,
+  FormsLineSection,
+  FormsLineShell,
+  FormsLineSuccess,
+} from '@/components/forms/FormsLine';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
+import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 const EMPTY = {
   contractorName: '', contractorEmail: '', campaign: '',
@@ -26,7 +31,7 @@ export default function PayrollDisputePage() {
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
+  const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
 
   const submit = async (e: React.FormEvent) => {
@@ -44,7 +49,7 @@ export default function PayrollDisputePage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
-      setDone(true);
+      setReferenceId(json.id);
       setForm(EMPTY);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
@@ -53,46 +58,50 @@ export default function PayrollDisputePage() {
     }
   };
 
+  const displayName = user?.displayName || user?.email || 'current user';
+  const role = getEffectiveRole(user);
+  const roleLabel = role ? RoleDisplayNames[role] : 'Portal user';
+
   return (
     <ProtectedRoute>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 overflow-auto p-4 sm:p-6">
-            <div className="mx-auto max-w-[1100px] space-y-5">
-              <PortalPageHeader
-                eyebrow="Field forms"
-                title="Payroll Dispute"
-                description="Flag a missing or incorrect payroll entry for review."
-              />
-              {done && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
-                  Dispute submitted.
-                </div>
-              )}
-              {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">{error}</div>
-              )}
-              <Card className="portal-enter portal-enter-2 rounded-lg border-slate-200 bg-white py-0 shadow-sm dark:border-border dark:bg-card">
-                <CardContent className="p-5 sm:p-6">
-                  <p className="mb-4 text-xs text-slate-500 dark:text-muted-foreground">Submitting as {user?.displayName || user?.email}.</p>
-                  <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><Label>Contractor Name</Label><Input value={form.contractorName} onChange={(e) => setForm((p) => ({ ...p, contractorName: e.target.value }))} required /></div>
-                    <div><Label>Contractor Email</Label><Input value={form.contractorEmail} onChange={(e) => setForm((p) => ({ ...p, contractorEmail: e.target.value }))} required /></div>
-                    <div>
-                      <Label>Campaign</Label>
-                      <NativeSelect value={form.campaign} onChange={(e) => setForm((p) => ({ ...p, campaign: e.target.value }))} className="w-full" required>
-                        <NativeSelectOption value="">Select campaign</NativeSelectOption>
-                        {options.payrollCampaigns.map((c) => (
-                          <NativeSelectOption key={c} value={c}>{c}</NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </div>
-                    <div><Label>Type of Order</Label><Input value={form.typeOfOrder} onChange={(e) => setForm((p) => ({ ...p, typeOfOrder: e.target.value }))} required /></div>
-                    <div><Label>Date of Install</Label><Input value={form.dateOfInstall} onChange={(e) => setForm((p) => ({ ...p, dateOfInstall: e.target.value }))} placeholder="MM/DD/YYYY" required /></div>
-                    <div className="sm:col-span-2">
-                      <Label>Screenshot of Order</Label>
+      <FormsLineShell>
+        <section className="forms-line-fill" aria-labelledby="payroll-dispute-title">
+          <FormsLineFormHeader title="Payroll Dispute" lane="03" />
+          {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
+          <div className="forms-line-fill-body">
+            <div>
+              <form onSubmit={submit}>
+                <FormsLineSection
+                  index={1}
+                  title="Who you are"
+                  identity={<FormsLineIdentity name={displayName} role={roleLabel} />}
+                >
+                  <FormsLineControl id="contractor-name" label="Contractor name" required>
+                    <input id="contractor-name" autoComplete="name" value={form.contractorName} onChange={(e) => setForm((p) => ({ ...p, contractorName: e.target.value }))} required />
+                  </FormsLineControl>
+                  <FormsLineControl id="contractor-email" label="Contractor email" required>
+                    <input id="contractor-email" autoComplete="email" value={form.contractorEmail} onChange={(e) => setForm((p) => ({ ...p, contractorEmail: e.target.value }))} required />
+                  </FormsLineControl>
+                </FormsLineSection>
+                <FormsLineSection index={2} title="What happened">
+                  <FormsLineChoicePicker
+                    name="campaign"
+                    label="Campaign"
+                    value={form.campaign}
+                    options={options.payrollCampaigns}
+                    onChange={(campaign) => setForm((p) => ({ ...p, campaign }))}
+                    required
+                  />
+                  <FormsLineControl id="type-of-order" label="Type of order" required>
+                    <input id="type-of-order" value={form.typeOfOrder} onChange={(e) => setForm((p) => ({ ...p, typeOfOrder: e.target.value }))} required />
+                  </FormsLineControl>
+                  <FormsLineControl id="date-of-install" label="Date of install" required>
+                    <input id="date-of-install" placeholder="MM/DD/YYYY" value={form.dateOfInstall} onChange={(e) => setForm((p) => ({ ...p, dateOfInstall: e.target.value }))} required />
+                  </FormsLineControl>
+                </FormsLineSection>
+                <FormsLineSection index={3} title="Proof">
+                  <FormsLineControl id="payroll-proof" label="Screenshot or proof" className="forms-line-field-full">
+                    <div className="forms-line-upload">
                       <FileUpload
                         itemId="payroll-dispute"
                         accept="image/*,application/pdf"
@@ -100,24 +109,29 @@ export default function PayrollDisputePage() {
                         uploadUrl="/api/portal/forms/upload"
                         extraFields={{ formType: 'payroll-dispute' }}
                         getHeaders={async (): Promise<HeadersInit> => {
-                          const t = await auth?.currentUser?.getIdToken();
-                          return t ? { Authorization: `Bearer ${t}` } : {};
+                          const token = await auth?.currentUser?.getIdToken();
+                          return token ? { Authorization: `Bearer ${token}` } : {};
                         }}
                         onUploaded={(path) => setForm((p) => ({ ...p, orderScreenshotPath: path }))}
                       />
+                      <p className="forms-line-proof-hint"><strong>Good proof:</strong> order ID, campaign, and pay line visible in one frame. PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
                     </div>
-                    <div className="sm:col-span-2">
-                      <Button type="submit" disabled={saving} className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-                        {saving ? 'Submitting…' : 'Submit Dispute'}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
+                  </FormsLineControl>
+                </FormsLineSection>
+                <FormsLineActions verb="dispute" saving={saving} />
+              </form>
+              {referenceId && (
+                <FormsLineSuccess
+                  title="Dispute received"
+                  referenceId={referenceId}
+                  message="We received the dispute and its supporting details. The payroll owner can follow up through the portal record."
+                />
+              )}
             </div>
-          </main>
-        </div>
-      </div>
+            <FormsLineRail status="Ready for payroll review" note="One clear proof frame keeps the handoff moving." />
+          </div>
+        </section>
+      </FormsLineShell>
     </ProtectedRoute>
   );
 }

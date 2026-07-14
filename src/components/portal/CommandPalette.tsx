@@ -90,11 +90,7 @@ export const portalNavGroups: PortalNavGroup[] = [
   {
     label: 'Forms',
     items: [
-      { label: 'Fiber Report', href: '/portal/fiber-report', icon: BarChart3 },
-      { label: 'Expedite Order', href: '/portal/expedite-order', icon: Zap },
-      { label: 'Payroll Dispute', href: '/portal/payroll-dispute', icon: ReceiptText },
-      { label: 'Leads Request', href: '/portal/leads-request', icon: Users },
-      { label: 'Manager Interview', href: '/portal/manager-interview', icon: CheckSquare, roles: managerRoles },
+      { label: 'Forms', href: '/portal/forms', icon: ReceiptText },
     ],
   },
   {
