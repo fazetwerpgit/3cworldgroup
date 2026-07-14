@@ -4408,8 +4408,7 @@ body.portal-scope {
   place-items: start center;
 }
 
-.chat-line-avatar,
-.chat-line-avatar-spacer {
+.chat-line-avatar {
   display: grid;
   place-items: center;
   width: 31px !important;
@@ -4421,6 +4420,15 @@ body.portal-scope {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 9px !important;
   font-weight: 900;
+}
+
+/* Spacer only reserves the column width on grouped messages — it must stay
+   invisible, never render as an empty avatar circle. */
+.chat-line-avatar-spacer {
+  width: 31px !important;
+  height: 31px !important;
+  border: none;
+  background: transparent;
 }
 
 .chat-line-avatar:not(.chat-line-avatar-own) {
@@ -4929,9 +4937,30 @@ body.portal-scope {
   border-radius: 3px;
 }
 
+/* The members sheet portals to <body>, OUTSIDE .chat-line-page, so the
+   chat tokens don't inherit — they must be re-declared here or every
+   var() below resolves empty and the sheet renders transparent. */
 .chat-line-info-sheet {
+  --chat-line-stage: #f3f5f7;
+  --chat-line-panel: #ffffff;
+  --chat-line-ink: #10213d;
+  --chat-line-muted: #68768a;
+  --chat-line-lime: #8dc63f;
+  --chat-line-line: rgba(10, 31, 68, 0.14);
+  --chat-line-soft: rgba(10, 31, 68, 0.07);
+  --chat-line-danger: #b94b4b;
   background: var(--chat-line-panel);
   color: var(--chat-line-ink);
+}
+
+.dark .chat-line-info-sheet {
+  --chat-line-stage: #030916;
+  --chat-line-panel: #0a1f44;
+  --chat-line-ink: #f5f7fa;
+  --chat-line-muted: #9caabd;
+  --chat-line-line: rgba(231, 237, 244, 0.14);
+  --chat-line-soft: rgba(231, 237, 244, 0.07);
+  --chat-line-danger: #ef8e8e;
 }
 
 .chat-line-info-header {

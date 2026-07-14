@@ -412,7 +412,29 @@ non-blocking observation: new-user default role reverted to HEAD's
 entry_rep (builder had changed it to onboarding-gated
 entry_level_rep; one-line fix, gates re-run PASS). ADMIN COMMITTED
 LOCAL (this commit) → ALL 11 ROUNDS DONE, entire portal redesign
-built + reviewed + committed locally. AWAITING USER: (1) "deploy"
+built + reviewed + committed locally. USER CAUGHT A GAP 2026-07-14:
+Recruiting Command Center (/portal/admin/recruiting, 589 lines) was
+ruled out of ops-round scope and never rebuilt — now getting its own
+mini-round on the EXISTING ops-line design system (no new mockup;
+one-queue-design rule). Extraction DONE (scratchpad
+recruiting-extract-report.txt, 11 hazards B-1..B-11). BINDING addendum
+written: docs/redesign/recruiting-the-line-goal-addendum.md (visual-only
+except ONE sanctioned change: Reject gains the shipped confirm-strip
+pattern; hero numeral = submitted invite count matching Ops home card;
+statusTone split into two typed maps; no resend feature; new
+ops-line-form-* CSS appended at END of globals.css, frozen ops-line
+block untouched). Sonnet build → my verify → fresh Opus review → commit.
+CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
+info-sheet was transparent — Sheet portals to <body> outside
+.chat-line-page so --chat-line-* vars resolved empty → re-declared
+tokens on .chat-line-info-sheet + .dark variant (light verified via var
+resolution; computed bg lags due to Sheet's 500ms transition, cascade
+correct); (2) grouped messages showed empty lime circles — spacer
+shared the avatar rule → split .chat-line-avatar-spacer to
+width/height only. "Profile pictures not showing" = the spacer bug;
+NO user has avatarUrl in Firestore, photos never rendered anywhere.
+Google SSO photos exist on the auth side — real chat photos offered
+to user as optional follow-up feature (needs login sync + API field). AWAITING USER: (1) "deploy"
 word pushes everything to prod; (2) B-7 security fix (ops-role can
 reach /portal/admin/users/[id] by URL and grant any role incl.
 admin — recommend fixing as separate item) still awaiting user's
