@@ -492,6 +492,27 @@ DEPLOYED 2026-07-14: user said "Deploy" → pushed master (through
 f80bf5b) → Vercel build Ready, prod 200. ENTIRE REDESIGN CAMPAIGN IS
 LIVE. Campaign CLOSED. Only optional leftover: admin settings real
 persistence (honest-inert "Not wired up yet" shipped).
+iOS BOTTOM-BAR BUG user-reported 2026-07-14 post-deploy ("bottom bar
+doesn't stay on bottom when I scroll" on phone): backdrop-filter on
+position:fixed bars breaks re-pinning in iOS Safari (desktop engine
+unaffected — that's why verify missed it). FIXED + COMMITTED 75b55b3
+(blur dropped on .portal-mobile-nav + .portal-shell-header, alpha
+.97/.95→.98, translateZ(0) layer promotion; build green; verified
+served CSS + pinned rect at 390). AWAITING "deploy" to push the fix.
+3 MORE user asks 2026-07-14 DONE + COMMITTED 5344717 (Opus PASS, all
+gates green, browser-verified 390+1440): (1) bottom bar = Dashboard/
+Sales/Leaderboard/Team Chat/More — Leaderboard replaced Forms slot per
+user; Forms in More sheet; (2) leaderboard page main sat under fixed
+header (only non-.portal-canvas page) → Week/Month/Points controls
+untappable on phone AND desktop; new .portal-main-offset class added
+to the 72/62px rules + leaderboard main; (3) chat member counts:
+company said 27, real = 10 — memberIds holds deleted/deactivated uids;
+members route filters status!=='active' (docs w/o status kept), client
+fetches members per visible channel (keyed on id-set string so message
+traffic never refetches; useChatChannels sorts by static order field),
+counts used in channel list + head meta + MobileThread. Stale-CSS
+fired 6TH time (touch didn't help; cold restart devserver3.log did).
+AWAITING "deploy" — pushes iOS bar fix (75b55b3) + this (5344717).
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
