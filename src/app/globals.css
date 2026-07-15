@@ -4477,6 +4477,13 @@ body.portal-scope {
   font-weight: 900;
 }
 
+/* The DEV rainbow name IS the feature: its gradient paints via
+   background-clip:text, which requires transparent text color — the
+   author-color rule above must not repaint it solid. */
+.chat-line-message-top .chat-dev-name {
+  color: transparent;
+}
+
 .chat-line-role {
   padding: 2px 5px;
   border: 1px solid var(--chat-line-line);
