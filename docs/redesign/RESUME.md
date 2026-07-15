@@ -474,10 +474,15 @@ M-1, merge-write avatarUrl only, fail-soft; members endpoint carries
 avatarUrl; ChatAvatar photo w/ initials fallback; desktop + mobile +
 members sheet; live-verified incl. blocked-image fallback + mocked-feed
 photo path; Opus PASS). BOTH "fix the 2 issues" items CLOSED.
+DEV RAINBOW NAME restored (user asked 2026-07-14; commit ac4c277 —
+chat-line author-color rule had repainted .chat-dev-name solid; fixed
+with a color:transparent re-assert in the chat-line section;
+live-verified animated gradient + DEV badge; stale-CSS playbook fired
+a 5TH time on this fix — cold restart required, devserver2.log).
 NOTHING LEFT IN FLIGHT. AWAITING USER: "deploy" — pushes the entire
 redesign + chat fixes + recruiting + sales sub-pages + security fix +
-chat photos to prod. NOTE: photos appear per-user after their NEXT
-sign-in (sync runs at login).
+chat photos + rainbow fix to prod. NOTE: photos appear per-user after
+their NEXT sign-in (sync runs at login).
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
