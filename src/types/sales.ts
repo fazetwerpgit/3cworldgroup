@@ -114,7 +114,10 @@ export const FIBER_PLANS: FiberPlan[] = [
   // TFiber (T-Mobile Fiber) Plans — AutoPay pricing per t-mobile.com/home-internet/fiber/plans
   // (2026 lineup: 300 Mbps replaced the old 500 Mbps tier; +$10/mo without AutoPay).
   // Existing sales are unaffected: each sale snapshots name/price/points at submission.
-  { id: 'tfiber-300', company: 'tfiber', name: 'TFiber 300', speed: '300 Mbps', price: 45.00, points: 5 },
+  { id: 'tfiber-300', company: 'tfiber', name: 'TFiber 300', speed: '300 Mbps', price: 45.00, points: 3 },
+  // Kept although absent from T-Mobile's current public lineup — the team
+  // still sells it on and off (price set by Jacob, 2026-07-14).
+  { id: 'tfiber-500', company: 'tfiber', name: 'TFiber 500', speed: '500 Mbps', price: 50.00, points: 5 },
   { id: 'tfiber-1gig', company: 'tfiber', name: 'TFiber 1 Gig', speed: '1 Gbps', price: 60.00, points: 8 },
   { id: 'tfiber-2gig', company: 'tfiber', name: 'TFiber 2 Gig', speed: '2 Gbps', price: 70.00, points: 10 },
 
