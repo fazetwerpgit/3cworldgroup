@@ -7,16 +7,17 @@ Updated: 2026-07-14 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-1. ALL CHAT WORK COMMITTED (a8cbf18, 2026-07-14) after 4 review rounds
-   ending in Opus PASS: chat scroll fix (dynamic window 75-600,
-   eviction guard, loadOlder paging, anchoring, tail-advancement pill,
-   channel-switch ref resets) + All Company sales tape (user picked
-   option 1 The Tape, only in all-company channel; live-verified with
-   real data: 22 sales / $1,805/mo / last Cooper O'Tool; new GET
-   /api/portal/sales/company-stats; flex-column container fix).
-   Gates green (tsc/eslint/346 tests/build). AWAITING user's word
-   "deploy" to push: a82bab8 + a98ed84 + 42ab000 + a8cbf18 (+ this
-   docs commit).
+1. EVERYTHING DEPLOYED 2026-07-14: chat scroll fix + All Company tape
+   + weekly challenge admin + rep in-review section (9b5e1df batch),
+   then T-Mobile price fix (430a335). TFiber catalog now 300/$45,
+   1Gig/$60, 2Gig/$70 (AutoPay prices per t-mobile.com). Firestore
+   sales data CORRECTED via one-time admin script (deleted after):
+   19 sales updated (7x 1gig 75->60, 12x 2gig 90->70), totalValue
+   recomputed, priceCorrectionAt/Note stamped; tape verified
+   $1,805 -> $1,460 (exact -345 match).
+   OPEN QUESTION for user: 1 remaining sale HFagDwnRa6AFo9NiPoQm
+   "TFiber 500 (500 Mbps) $60" — tier no longer exists; remap to
+   TFiber 300 $45 or leave as-is? Awaiting his call.
 3. iPhone bottom bar: prod CSS verified correct; awaiting user retest
    after a genuinely fresh Safari open. If STILL drifting: rebuild
    pinning as non-scrolling app shell with inner scroll container.
