@@ -13653,3 +13653,35 @@ body.portal-scope {
     justify-content: space-between;
   }
 }
+
+/* ============ Mobile app-shell scroll lock (iOS stuck-bar fix) ============ */
+/* iOS Safari can desync position:fixed bars from the viewport after the app
+   is backgrounded and resumed while the BODY is the scroller. Lock the body
+   and move scrolling into <main>: the layout viewport then never scrolls, so
+   WebKit has nothing to mis-anchor the fixed header/bottom bar against.
+   Scoped to body[data-portal-bottom-nav] (tagged by MobileBottomNav) so only
+   portal pages with the bar are affected; desktop (>1023px) is untouched.
+   The translateZ(0)/no-backdrop-filter rules on .portal-mobile-nav and
+   .portal-shell-header remain load-bearing — keep them. */
+@media (max-width: 1023px) {
+  body[data-portal-bottom-nav] {
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body[data-portal-bottom-nav] .portal-canvas {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body[data-portal-bottom-nav] .portal-canvas > .flex > main,
+  body[data-portal-bottom-nav] .portal-main-offset {
+    height: calc(100dvh - 62px);
+    margin-top: 62px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}

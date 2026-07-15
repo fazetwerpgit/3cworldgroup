@@ -63,12 +63,21 @@ Updated: 2026-07-14 (update at EVERY milestone).
    300/$45/3pts, 500/$50/5pts, 1Gig/$60/8pts, 2Gig/$70/10pts.
    NOTHING IN FLIGHT — next work comes from the user. Still open from
    before: user's iPhone bottom-bar retest after a fresh Safari open.
-3. iPhone bottom bar: CONFIRMED STILL BROKEN 2026-07-15 — Jacob: gets
-   stuck after leaving the app open and coming back (background/resume,
-   not stale CSS). Proceed with the decided fix: non-scrolling app
-   shell (100dvh frame, bar in-frame) with inner scroll container on
-   mobile. Do AFTER the sales-visibility fix ships. Test: chat page
-   (own scroll logic), keyboard/input focus, scroll restoration.
+3. iPhone bottom bar APP-SHELL FIX BUILT 2026-07-15 (commit pending
+   push): CSS-only block at globals.css EOF — under 1023px and
+   body[data-portal-bottom-nav], body+canvas locked to 100dvh
+   overflow:hidden, main becomes the scroller (calc(100dvh - 62px),
+   overscroll contain). Fixed bars can no longer desync on iOS
+   background/resume because the layout viewport never scrolls.
+   Verified 390: dashboard/sales/leaderboard/forms/calls/resources/
+   admin-settings all scroll in main w/ bottom content clearing the
+   bar; chat thread intact (own scroller); nav MORE sheet fine;
+   desktop 1440 body-scroll unchanged. Gates green. Scout notes:
+   body-overflow toggles in CommandPalette/MobileBottomNav/ChatLightbox
+   now no-ops on mobile (left in place, still needed on desktop);
+   keep translateZ(0)/no-backdrop-filter on both bars (load-bearing).
+   REAL confirmation must come from Jacob's iPhone after deploy
+   (background the app, return, check bar).
 
 ## STATE
 
