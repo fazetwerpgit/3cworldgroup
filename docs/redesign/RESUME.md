@@ -483,6 +483,11 @@ NOTHING LEFT IN FLIGHT. AWAITING USER: "deploy" — pushes the entire
 redesign + chat fixes + recruiting + sales sub-pages + security fix +
 chat photos + rainbow fix to prod. NOTE: photos appear per-user after
 their NEXT sign-in (sync runs at login).
+FULL UNIT SUITE run 2026-07-14 after user asked "Is it all tested":
+`npm test` (vitest) — 53 files / 346 tests, ALL PASS. Told user tested
+= manual browser verify per change + Opus adversarial reviews + prod
+builds + unit suite. e2e (playwright, hits real Firebase) NOT run —
+offered only if asked.
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
