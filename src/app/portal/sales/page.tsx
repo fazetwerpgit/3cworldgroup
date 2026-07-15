@@ -24,6 +24,64 @@ function sumValue(sales: Sale[]) {
   return sales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
 }
 
+function formatSubmittedDate(value: Date | string | undefined) {
+  if (!value) return 'N/A';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatMonthlyValue(value: number) {
+  return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function daysWaiting(value: Date | string | undefined) {
+  if (!value) return 0;
+  return Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000));
+}
+
+function InReviewSection({ sales }: { sales: Sale[] }) {
+  const ordered = useMemo(
+    () => [...sales].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [sales]
+  );
+
+  return (
+    <section className="sales-line-inreview" aria-label="Submitted, in review">
+      <div className="sales-line-inreview-head">
+        <div>
+          <p className="sales-line-eyebrow">Submitted / in review</p>
+          <h2>Waiting on a decision</h2>
+        </div>
+        <p className="sales-line-inreview-count">{ordered.length} pending</p>
+      </div>
+
+      {ordered.length ? (
+        <div className="sales-line-inreview-list">
+          {ordered.map((sale) => {
+            const waiting = daysWaiting(sale.createdAt);
+            return (
+              <Link
+                className="sales-line-inreview-row"
+                key={sale.id}
+                href={`/portal/sales/${sale.id}`}
+              >
+                <div className="sales-line-inreview-primary">
+                  <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
+                  {sale.productSold && <span>{sale.productSold}</span>}
+                </div>
+                <span className="sales-line-inreview-value portal-metallic-num">{formatMonthlyValue(sale.totalValue || 0)}<small>/mo</small></span>
+                <span className="sales-line-inreview-date">{formatSubmittedDate(sale.createdAt)}</span>
+                <span className="sales-line-inreview-wait">{waiting === 0 ? 'Today' : `${waiting}d waiting`}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="sales-line-inreview-empty">Nothing waiting on review. Everything you&apos;ve sent in has been decided.</p>
+      )}
+    </section>
+  );
+}
+
 function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
 
@@ -189,6 +247,8 @@ function SalesContent() {
               </header>
 
               {error && <div className="sales-line-error" role="alert">{error}</div>}
+
+              {!canApprove && !loading && <InReviewSection sales={pendingSales} />}
 
               <SalesTable
                 sales={sales}

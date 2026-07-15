@@ -1,10 +1,153 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 
 const InertNote = () => <span className="admin-line-inert-note">Not wired up yet</span>;
+
+const WEEKLY_CHALLENGE_PRESETS = [
+  { value: 3, descriptor: 'Warm-up' },
+  { value: 5, descriptor: 'Steady' },
+  { value: 7, descriptor: 'Standard' },
+  { value: 10, descriptor: 'Hard' },
+  { value: 15, descriptor: 'Beast mode' },
+];
+
+function WeeklyChallengeCard() {
+  const [target, setTarget] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await auth?.currentUser?.getIdToken();
+        const response = await fetch('/api/portal/settings/weekly-challenge', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load weekly challenge');
+        if (!cancelled) setTarget(data.targetSales);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load weekly challenge');
+          setTarget(7);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isPreset = target !== null && WEEKLY_CHALLENGE_PRESETS.some((p) => p.value === target);
+
+  const handleCustomChange = (raw: string) => {
+    setError(null);
+    if (raw === '') {
+      setTarget(null);
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed)) return;
+    setTarget(Math.min(99, Math.max(1, parsed)));
+  };
+
+  const handleSave = async () => {
+    if (target === null || target < 1 || target > 99) {
+      setError('Enter a value between 1 and 99');
+      return;
+    }
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const token = await auth?.currentUser?.getIdToken();
+      const response = await fetch('/api/portal/settings/weekly-challenge', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ targetSales: target }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to save weekly challenge');
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save weekly challenge');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="admin-line-settings-card">
+      <div className="admin-line-eyebrow">01 / weekly challenge</div>
+      <h2>Set the bar for the week.</h2>
+      <div className="admin-line-field">
+        <label>Target sales</label>
+        {loading ? (
+          <span className="admin-line-inert-note">Loading current target…</span>
+        ) : (
+          <>
+            <div className="admin-line-multi-toggle">
+              {WEEKLY_CHALLENGE_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  aria-pressed={target === preset.value}
+                  onClick={() => {
+                    setTarget(preset.value);
+                    setSaved(false);
+                    setError(null);
+                  }}
+                >
+                  {preset.value} sales
+                  <span className="admin-line-preset-descriptor">{preset.descriptor}</span>
+                </button>
+              ))}
+            </div>
+            <div className="admin-line-weekly-custom">
+              <label htmlFor="weekly-challenge-custom">Custom</label>
+              <input
+                id="weekly-challenge-custom"
+                type="number"
+                min={1}
+                max={99}
+                value={!isPreset && target !== null ? target : ''}
+                placeholder={isPreset ? String(target) : '—'}
+                className={!isPreset ? 'admin-line-weekly-custom-active' : ''}
+                onChange={(e) => {
+                  handleCustomChange(e.target.value);
+                  setSaved(false);
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+      <p className="admin-line-weekly-preview">
+        Reps will see: <strong>&ldquo;Close {target ?? '—'} sales by Sunday&rdquo;</strong>
+      </p>
+      <div className="admin-line-save-line">
+        <button type="button" className="admin-line-primary" disabled={saving || loading} onClick={handleSave}>
+          {saving ? 'Saving…' : 'Save weekly challenge'}
+        </button>
+        {saved && <span className="saved">Saved — live on the leaderboard now</span>}
+        {error && <span className="admin-line-weekly-error">{error}</span>}
+      </div>
+    </section>
+  );
+}
 
 export default function AdminSettingsPage() {
   const { isRole } = useAuth();
@@ -38,20 +181,22 @@ export default function AdminSettingsPage() {
               <span className="plain">without hiding the risk.</span>
             </h1>
             <p className="admin-line-intro">
-              These sections mirror the real settings this portal will eventually persist. None of
-              them write anywhere yet — every control below is disabled on purpose rather than
-              faking a save.
+              The weekly challenge section below is live — it reads and saves for real. The
+              remaining sections mirror settings this portal will eventually persist; every control
+              in them is disabled on purpose rather than faking a save.
             </p>
           </div>
           <div className="admin-line-hero-count">
-            <span className="admin-line-display portal-metallic-num">3</span>
+            <span className="admin-line-display portal-metallic-num">4</span>
             <small>sections to tune</small>
           </div>
         </header>
 
         <div className="admin-line-settings-grid">
+          <WeeklyChallengeCard />
+
           <section className="admin-line-settings-card">
-            <div className="admin-line-eyebrow">01 / company</div>
+            <div className="admin-line-eyebrow">02 / company</div>
             <h2>Company identity.</h2>
             <div className="admin-line-field">
               <label htmlFor="company-name">Company name</label>
@@ -83,7 +228,7 @@ export default function AdminSettingsPage() {
           </section>
 
           <section className="admin-line-settings-card">
-            <div className="admin-line-eyebrow">02 / sales &amp; points</div>
+            <div className="admin-line-eyebrow">03 / sales &amp; points</div>
             <h2>Scoring boundaries.</h2>
             <div className="admin-line-toggle-row">
               <div>
@@ -123,7 +268,7 @@ export default function AdminSettingsPage() {
           </section>
 
           <section className="admin-line-settings-card">
-            <div className="admin-line-eyebrow">03 / alerts</div>
+            <div className="admin-line-eyebrow">04 / alerts</div>
             <h2>Notification lines.</h2>
             {[
               { label: 'New sale', sub: 'Tell the admin desk when a sale arrives.', on: true },

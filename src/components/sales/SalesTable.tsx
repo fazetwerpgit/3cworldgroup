@@ -190,13 +190,16 @@ export function SalesTable({
 
   return (
     <>
+      {/* Reps get the richer "Submitted / in review" section on the page above
+          instead of this queue — rendering both would duplicate the list. */}
+      {canApprove && (
       <section className="sales-line-flow">
         <div className="sales-line-section-head">
           <div>
-            <p className="sales-line-eyebrow">{canApprove ? 'Priority ordered / manager queue' : 'Your sales / pending status'}</p>
-            <h2>{canApprove ? 'Needs your attention' : 'Your pending'}</h2>
+            <p className="sales-line-eyebrow">Priority ordered / manager queue</p>
+            <h2>Needs your attention</h2>
           </div>
-          <p>{pendingSales.length} pending · {canApprove ? 'oldest first' : 'awaiting review'}</p>
+          <p>{pendingSales.length} pending · oldest first</p>
         </div>
 
         <div className="sales-line-priority-list">
@@ -218,8 +221,9 @@ export function SalesTable({
             </div>
           )) : <div className="sales-line-empty-priority">No pending sales in your book.</div>}
         </div>
-        <p className="sales-line-flow-note">{canApprove ? 'Click any row to open the review sheet. Approve or reject without leaving the flow.' : 'Your pending sales stay visible here. Review actions are manager-only.'}</p>
+        <p className="sales-line-flow-note">Click any row to open the review sheet. Approve or reject without leaving the flow.</p>
       </section>
+      )}
 
       <section className="sales-line-ledger">
         <div className="sales-line-ledger-head">

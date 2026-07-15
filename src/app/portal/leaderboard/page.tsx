@@ -9,6 +9,7 @@ import { LeaderboardTable, type LeaderboardEntry } from '@/components/leaderboar
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase/config';
 
 type Period = 'week' | 'month' | 'year' | 'all';
 type Metric = 'totalPoints' | 'totalSales';
@@ -90,9 +91,9 @@ function ArenaMast({
   );
 }
 
-function WeeklyChallenge({ sales, loading }: { sales: number | null; loading: boolean }) {
+function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loading: boolean; target: number }) {
   const [now, setNow] = useState(() => new Date());
-  const complete = sales !== null && sales >= WEEKLY_CHALLENGE.targetSales;
+  const complete = sales !== null && sales >= target;
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60_000);
@@ -104,11 +105,11 @@ function WeeklyChallenge({ sales, loading }: { sales: number | null; loading: bo
       <div>
         <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em]">Weekly challenge</span>
         <span className="mt-2 block font-['Consolas'] text-[11px] font-black whitespace-nowrap sm:text-[12px]">
-          {loading || sales === null ? `-- / ${WEEKLY_CHALLENGE.targetSales} · Loading` : `${Math.min(sales, WEEKLY_CHALLENGE.targetSales)} / ${WEEKLY_CHALLENGE.targetSales} · ${countdownToSunday(now)}`}
+          {loading || sales === null ? `-- / ${target} · Loading` : `${Math.min(sales, target)} / ${target} · ${countdownToSunday(now)}`}
         </span>
       </div>
       <strong className="font-['Trebuchet_MS'] text-[15px] font-black sm:text-[18px]">
-        {complete ? `Challenge complete · ${WEEKLY_CHALLENGE.targetSales} of ${WEEKLY_CHALLENGE.targetSales}` : `Close ${WEEKLY_CHALLENGE.targetSales} sales by Sunday`}
+        {complete ? `Challenge complete · ${target} of ${target}` : `Close ${target} sales by Sunday`}
       </strong>
     </div>
   );
@@ -170,6 +171,7 @@ export default function LeaderboardPage() {
   const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard } = useLeaderboard();
   const [period, setPeriod] = useState<Period>('month');
   const [metric, setMetric] = useState<Metric>('totalPoints');
+  const [challengeTarget, setChallengeTarget] = useState<number>(WEEKLY_CHALLENGE.targetSales);
 
   useEffect(() => {
     if (!user) return;
@@ -180,6 +182,29 @@ export default function LeaderboardPage() {
     if (!user) return;
     fetchWeeklyLeaderboard('week', 'totalSales', 1);
   }, [user, fetchWeeklyLeaderboard]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await auth?.currentUser?.getIdToken();
+        const response = await fetch('/api/portal/settings/weekly-challenge', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && typeof data.targetSales === 'number') {
+          setChallengeTarget(data.targetSales);
+        }
+      } catch {
+        // Keep the WEEKLY_CHALLENGE fallback silently.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const userRank = currentUser;
   const weeklyStanding = weeklyCurrentUser;
@@ -207,7 +232,7 @@ export default function LeaderboardPage() {
                 </div>
                 <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
               </header>
-              <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} />
+              <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} target={challengeTarget} />
 
               {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
