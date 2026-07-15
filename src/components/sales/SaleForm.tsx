@@ -5,18 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Check, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
-import {
-  SaleType,
-  SaleProduct,
-  SALE_TYPES,
-  FIBER_COMPANIES,
-  getPlansByCompany,
-  getPlanById
-} from '@/types';
+import { FiberPlan, SaleType, SaleProduct, SALE_TYPES } from '@/types';
+import { PlanPicker } from '@/components/sales/PlanPicker';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
-import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
 interface SaleFormProps {
@@ -34,14 +27,11 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     customerEmail: '',
     customerAddress: '',
     saleType: 'new_service' as SaleType,
-    saleDate: todaySaleDateInput(),
     installDate: '',
     notes: '',
     orderNumberOrBtn: '',
     proofScreenshotPath: '',
-    productSold: '',
   });
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [formError, setFormError] = useState('');
   const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
@@ -53,16 +43,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCompanyChange = (company: string) => {
-    setSelectedCompany(company);
-  };
-
-  const addPlan = (planId: string) => {
-    const plan = getPlanById(planId);
-    if (!plan) return;
-
+  const addPlan = (plan: FiberPlan) => {
     // Check if plan already added
-    if (products.some(p => p.productId === planId)) {
+    if (products.some(p => p.productId === plan.id)) {
       setFormError('This plan is already added');
       return;
     }
@@ -108,21 +91,6 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       return;
     }
 
-    if (!formData.productSold.trim()) {
-      setFormError('Please enter the product sold');
-      return;
-    }
-
-    if (!formData.saleDate) {
-      setFormError('Please select the sale date');
-      return;
-    }
-
-    if (formData.saleDate > todaySaleDateInput()) {
-      setFormError('Sale date cannot be in the future');
-      return;
-    }
-
     if (!formData.installDate) {
       setFormError('Please select the install date');
       return;
@@ -138,8 +106,11 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       return;
     }
 
+    const productSold = products.map((p) => p.productName).join(', ');
+
     const saleData = {
       ...formData,
+      productSold,
       salesRepId: user.uid,
       salesRepName: user.displayName || user.email || '',
       managerId: user.reportsToId,
@@ -158,7 +129,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     }
   };
 
-  const availablePlans = selectedCompany ? getPlansByCompany(selectedCompany) : [];
+  const productSoldPreview = products.map((p) => p.productName).join(', ');
 
   return (
     <form onSubmit={handleSubmit} className="sales-line-form">
@@ -215,45 +186,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
           <h2>Select plan</h2>
         </div>
         <div className="sales-line-panel-body">
-          <label className="sales-line-field-label">Choose provider</label>
-          <div className="sales-line-provider-grid">
-            {FIBER_COMPANIES.map((company) => (
-              <button
-                key={company.value}
-                type="button"
-                onClick={() => handleCompanyChange(company.value)}
-                className={`sales-line-pick ${selectedCompany === company.value ? 'selected' : ''}`}
-              >
-                <span>{company.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {selectedCompany && (
-            <div style={{ marginTop: 16 }}>
-              <label className="sales-line-field-label">Choose plan</label>
-              <div className="sales-line-plan-grid">
-                {availablePlans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    onClick={() => addPlan(plan.id)}
-                    disabled={products.some(p => p.productId === plan.id)}
-                    className="sales-line-pick sales-line-plan-pick"
-                  >
-                    <div className="sales-line-plan-pick-copy">
-                      <strong>{plan.name}</strong>
-                      <small>{plan.speed}</small>
-                    </div>
-                    <div className="sales-line-plan-pick-price">
-                      <b>${plan.price.toFixed(2)}/mo</b>
-                      <em>+{plan.points} pts</em>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <PlanPicker products={products} onAdd={addPlan} />
 
           {products.length > 0 && (
             <div style={{ marginTop: 16 }}>
@@ -296,16 +229,8 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
               </select>
             </div>
             <div>
-              <label className="sales-line-field-label" htmlFor="saleDate">Sale date <span className="req">*</span></label>
-              <input id="saleDate" className="sales-line-input" type="date" name="saleDate" value={formData.saleDate} onChange={handleChange} max={todaySaleDateInput()} required />
-            </div>
-            <div>
               <label className="sales-line-field-label" htmlFor="installDate">Install date <span className="req">*</span></label>
               <input id="installDate" className="sales-line-input" type="date" name="installDate" value={formData.installDate} onChange={handleChange} required />
-            </div>
-            <div>
-              <label className="sales-line-field-label" htmlFor="productSold">Product sold <span className="req">*</span></label>
-              <input id="productSold" className="sales-line-input" type="text" name="productSold" value={formData.productSold} onChange={handleChange} placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice" />
             </div>
             <div>
               <label className="sales-line-field-label" htmlFor="orderNumberOrBtn">Order number or BTN</label>
@@ -340,18 +265,16 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       </section>
 
       {products.length > 0 && (
-        <section className="sales-line-panel">
-          <div className="sales-line-panel-head">
-            <h2>Sale summary</h2>
+        <div className="sales-line-summary-bar">
+          <div className="sales-line-summary-stats">
+            <div><small>Monthly value</small><strong>${calculateTotalValue().toFixed(2)}/mo</strong></div>
+            <div><small>Plans</small><strong>{products.length}</strong></div>
+            <div><small>Points</small><strong>+{calculateTotalPoints()}</strong></div>
           </div>
-          <div className="sales-line-panel-body">
-            <div className="sales-line-summary">
-              <div><small>Monthly value</small><strong>${calculateTotalValue().toFixed(2)}/mo</strong></div>
-              <div><small>Plans selected</small><strong>{products.length}</strong></div>
-              <div><small>Points</small><strong>+{calculateTotalPoints()} pts</strong></div>
-            </div>
+          <div className="sales-line-auto-product">
+            <b>Product sold (auto):</b> <span className="val">{productSoldPreview || '—'}</span>
           </div>
-        </section>
+        </div>
       )}
 
       <div className="sales-line-form-actions">

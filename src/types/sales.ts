@@ -8,6 +8,7 @@ export interface FiberPlan {
   speed: string;
   price: number;
   points: number; // Points earned for selling this plan
+  category?: 'internet' | 'extra'; // undefined = internet
 }
 
 export interface SaleProduct {
@@ -138,11 +139,11 @@ export const FIBER_PLANS: FiberPlan[] = [
   { id: 'xfinity-500', company: 'xfinity', name: 'Xfinity 500', speed: '500 Mbps', price: 55.00, points: 5 },
   { id: 'xfinity-1gig', company: 'xfinity', name: 'Xfinity 1 Gig', speed: '1 Gbps', price: 70.00, points: 8 },
   { id: 'xfinity-2gig', company: 'xfinity', name: 'Xfinity 2 Gig', speed: '2 Gbps', price: 100.00, points: 10 },
-  { id: 'xfinity-eero-secure', company: 'xfinity', name: 'EERO Secure', speed: 'Add-on', price: 10.00, points: 2 },
-  { id: 'xfinity-wireless-byod', company: 'xfinity', name: 'Wireless BYOD', speed: 'Mobile line', price: 45.00, points: 4 },
-  { id: 'xfinity-wireless-standard', company: 'xfinity', name: 'Wireless Standard', speed: 'Mobile line', price: 45.00, points: 5 },
-  { id: 'xfinity-tv', company: 'xfinity', name: 'Xfinity TV', speed: 'TV service', price: 60.00, points: 5 },
-  { id: 'xfinity-home-phone', company: 'xfinity', name: 'Home Phone', speed: 'Voice line', price: 30.00, points: 3 },
+  { id: 'xfinity-eero-secure', company: 'xfinity', name: 'EERO Secure', speed: 'Add-on', price: 10.00, points: 2, category: 'extra' },
+  { id: 'xfinity-wireless-byod', company: 'xfinity', name: 'Wireless BYOD', speed: 'Mobile line', price: 45.00, points: 4, category: 'extra' },
+  { id: 'xfinity-wireless-standard', company: 'xfinity', name: 'Wireless Standard', speed: 'Mobile line', price: 45.00, points: 5, category: 'extra' },
+  { id: 'xfinity-tv', company: 'xfinity', name: 'Xfinity TV', speed: 'TV service', price: 60.00, points: 5, category: 'extra' },
+  { id: 'xfinity-home-phone', company: 'xfinity', name: 'Home Phone', speed: 'Voice line', price: 30.00, points: 3, category: 'extra' },
 ];
 
 // Helper to get plans by company

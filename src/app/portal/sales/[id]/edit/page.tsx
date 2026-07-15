@@ -11,13 +11,12 @@ import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Sale,
+  FiberPlan,
   SaleType,
   SaleProduct,
   SALE_TYPES,
-  FIBER_COMPANIES,
-  getPlansByCompany,
-  getPlanById,
 } from '@/types';
+import { PlanPicker } from '@/components/sales/PlanPicker';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
@@ -74,10 +73,8 @@ export default function EditSalePage() {
     notes: '',
     orderNumberOrBtn: '',
     proofScreenshotPath: '',
-    productSold: '',
   });
   const [products, setProducts] = useState<SaleProduct[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
@@ -105,12 +102,8 @@ export default function EditSalePage() {
           notes: saleData.notes || '',
           orderNumberOrBtn: saleData.orderNumberOrBtn || '',
           proofScreenshotPath: saleData.proofScreenshotPath || '',
-          productSold: saleData.productSold || '',
         });
         setProducts(saleData.products || []);
-        if (saleData.products?.length > 0) {
-          setSelectedCompany(saleData.products[0].company);
-        }
       }
     }
     if (saleId) {
@@ -125,11 +118,8 @@ export default function EditSalePage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const addPlan = (planId: string) => {
-    const plan = getPlanById(planId);
-    if (!plan) return;
-
-    if (products.some((p) => p.productId === planId)) {
+  const addPlan = (plan: FiberPlan) => {
+    if (products.some((p) => p.productId === plan.id)) {
       setFormError('This plan is already added');
       return;
     }
@@ -170,11 +160,6 @@ export default function EditSalePage() {
       return;
     }
 
-    if (!formData.productSold.trim()) {
-      setFormError('Please enter the product sold');
-      return;
-    }
-
     if (!formData.saleDate) {
       setFormError('Please select the sale date');
       return;
@@ -197,6 +182,7 @@ export default function EditSalePage() {
       installDate?: string;
     } = {
       ...formData,
+      productSold: products.map((p) => p.productName).join(', '),
       products,
       totalValue: calculateTotalValue(),
       totalPoints: calculateTotalPoints(),
@@ -208,8 +194,6 @@ export default function EditSalePage() {
     }
     setSaving(false);
   };
-
-  const availablePlans = selectedCompany ? getPlansByCompany(selectedCompany) : [];
 
   if (!isAdmin) {
     return (
@@ -327,48 +311,7 @@ export default function EditSalePage() {
               <h2>Select plan</h2>
             </div>
             <div className="sales-line-panel-body">
-              <label className="sales-line-field-label">Choose provider</label>
-              <div className="sales-line-provider-grid">
-                {FIBER_COMPANIES.map((company) => (
-                  <button
-                    key={company.value}
-                    type="button"
-                    onClick={() => setSelectedCompany(company.value)}
-                    className={`sales-line-pick ${selectedCompany === company.value ? 'selected' : ''}`}
-                  >
-                    <span>{company.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {selectedCompany && (
-                <div style={{ marginTop: 16 }}>
-                  <label className="sales-line-field-label">Choose plan</label>
-                  <div className="sales-line-plan-grid">
-                    {availablePlans.map((plan) => {
-                      const added = products.some((p) => p.productId === plan.id);
-                      return (
-                        <button
-                          key={plan.id}
-                          type="button"
-                          onClick={() => addPlan(plan.id)}
-                          disabled={added}
-                          className="sales-line-pick sales-line-plan-pick"
-                        >
-                          <div className="sales-line-plan-pick-copy">
-                            <strong>{plan.name}</strong>
-                            <small>{plan.speed}</small>
-                          </div>
-                          <div className="sales-line-plan-pick-price">
-                            <b>${plan.price.toFixed(2)}/mo</b>
-                            <em>+{plan.points} pts</em>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <PlanPicker products={products} onAdd={addPlan} />
 
               {products.length > 0 && (
                 <div style={{ marginTop: 16 }}>
@@ -412,10 +355,6 @@ export default function EditSalePage() {
                 <div>
                   <label className="sales-line-field-label" htmlFor="installDate">Install date</label>
                   <input id="installDate" className="sales-line-input" type="date" name="installDate" value={formData.installDate} onChange={handleChange} />
-                </div>
-                <div>
-                  <label className="sales-line-field-label" htmlFor="productSold">Product sold <span className="req">*</span></label>
-                  <input id="productSold" className="sales-line-input" type="text" name="productSold" value={formData.productSold} onChange={handleChange} placeholder="e.g. AT&T Fiber 1 Gig, DirecTV Choice" />
                 </div>
                 <div>
                   <label className="sales-line-field-label" htmlFor="orderNumberOrBtn">Order number or BTN</label>

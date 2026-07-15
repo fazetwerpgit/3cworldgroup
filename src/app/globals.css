@@ -13436,3 +13436,220 @@ body.portal-scope {
     flex-direction: column;
   }
 }
+
+/* Sales-line addendum — dense-row plan picker + summary bar (Log a Sale cleanup) */
+.sales-line-chip-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.sales-line-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--panel2) 40%, transparent);
+  color: var(--ink);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.sales-line-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--lime) 55%, transparent);
+}
+
+.sales-line-chip.selected {
+  border-color: var(--lime);
+  background: color-mix(in srgb, var(--lime) 10%, transparent);
+  color: var(--lime);
+}
+
+.sales-line-plan-picker {
+  margin-top: 14px;
+}
+
+.sales-line-plan-picker-empty {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sales-line-subgroup-label {
+  margin: 14px 0 6px;
+  color: var(--muted);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sales-line-subgroup-label:first-of-type {
+  margin-top: 8px;
+}
+
+.sales-line-row-list {
+  display: grid;
+  gap: 5px;
+}
+
+.sales-line-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid var(--soft);
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--panel2) 30%, transparent);
+}
+
+.sales-line-plan-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sales-line-plan-row-speed {
+  color: var(--muted);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sales-line-plan-row-price {
+  flex: none;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.sales-line-plan-row-pts {
+  flex: none;
+  color: var(--lime);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.sales-line-plan-row-add {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lime);
+}
+
+.sales-line-plan-row-add:hover:not(:disabled) {
+  border-color: var(--lime);
+}
+
+.sales-line-plan-row.added {
+  opacity: 0.5;
+}
+
+.sales-line-plan-row.added .sales-line-plan-row-add {
+  border-color: var(--lime);
+  background: color-mix(in srgb, var(--lime) 15%, transparent);
+  cursor: default;
+}
+
+.sales-line-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  padding: 12px 16px;
+}
+
+.sales-line-summary-stats {
+  display: flex;
+  gap: 22px;
+}
+
+.sales-line-summary-stats div small {
+  display: block;
+  color: var(--muted);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sales-line-summary-stats div strong {
+  display: block;
+  margin-top: 3px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.sales-line-auto-product {
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.sales-line-auto-product b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.sales-line-auto-product .val {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .sales-line-chip-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-line-plan-row {
+    flex-wrap: wrap;
+  }
+
+  .sales-line-plan-row-name {
+    flex-basis: 100%;
+  }
+
+  .sales-line-plan-row-speed {
+    order: 3;
+    flex-basis: 100%;
+    margin-top: -2px;
+  }
+
+  .sales-line-summary-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sales-line-summary-stats {
+    justify-content: space-between;
+  }
+}
