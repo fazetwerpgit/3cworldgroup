@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
 import { ArrowDown, Check, ChevronLeft, Clock, ImagePlus, Loader2, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { GROW_STEP, MAX_WINDOW } from '@/hooks/chat/useMessages';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
@@ -53,6 +54,26 @@ interface MobileThreadProps {
   memberCount?: number;
   channelId: string;
   messages: ThreadMessage[];
+  // Bumped once per COMMITTED useMessages snapshot (not on echo updates or on
+  // the eviction-guard's skipped snapshots) — keys the scroll-anchor effect so
+  // a pending anchor is always cleared after the next real snapshot, and an
+  // echo append never triggers a head-growth adjustment. See onLoadOlder.
+  snapshotVersion: number;
+  // useMessages' current window limit and the limit the last COMMITTED
+  // snapshot actually ran under. Together they let the anchor-race guard tell
+  // a real post-growth snapshot apart from one the OLD (pre-growth) listener
+  // fires in between calling onLoadOlder and the resubscribe landing.
+  windowSize: number;
+  lastSnapshotWindow: number;
+  // True while useMessages' sliding window hasn't reached the channel's start;
+  // drives both the "earlier messages" pager copy and whether scrolling near
+  // the top requests more history.
+  hasMore: boolean;
+  onLoadOlder: () => void;
+  // Pre-formatted "COMPANY LINE · …" tape copy, already gated to the All
+  // Company channel by the page (empty string elsewhere) — rendered as-is,
+  // never fabricated here.
+  companyTapeText: string;
   // uid -> photo URL, resolved server-side from the active channel's members
   // (already-visible data — the same population whose names are shown per message).
   authorAvatars: Record<string, string>;
@@ -200,6 +221,12 @@ export function MobileThread({
   memberCount,
   channelId,
   messages,
+  snapshotVersion,
+  windowSize,
+  lastSnapshotWindow,
+  hasMore,
+  onLoadOlder,
+  companyTapeText,
   authorAvatars,
   loading,
   error,
@@ -306,6 +333,11 @@ export function MobileThread({
   // adjusted during render (React's "info from previous renders" pattern —
   // avoids a cascading setState inside an effect).
   const [prevLen, setPrevLen] = useState(messages.length);
+  // The previous render's last (newest) message id — the unseen-count math
+  // below locates it in the new array to count only messages appended AFTER
+  // it, so a loadOlder prepend of older history (which doesn't move the tail)
+  // never gets mistaken for new arrivals.
+  const [prevNewestId, setPrevNewestId] = useState<string | undefined>(messages[messages.length - 1]?.id);
   const [prevChannel, setPrevChannel] = useState(channelId);
   const contextRef = useRef('');
   const signalRef = useRef(scrollToBottomSignal);
@@ -313,13 +345,37 @@ export function MobileThread({
   if (channelId !== prevChannel) {
     setPrevChannel(channelId);
     setPrevLen(messages.length);
+    setPrevNewestId(messages[messages.length - 1]?.id);
     setNewCount(0);
-  } else if (messages.length !== prevLen) {
-    const grew = messages.length - prevLen;
+  } else if (
+    messages.length !== prevLen ||
+    // Also run on a tail-id-only change (own echo reconciling to its delivered
+    // doc id at unchanged length) so prevNewestId never goes stale — a stale
+    // pending-… id would make the next real arrival unfindable and undercount.
+    messages[messages.length - 1]?.id !== prevNewestId
+  ) {
     setPrevLen(messages.length);
+    const previousNewestId = prevNewestId;
+    const newest = messages[messages.length - 1];
+    setPrevNewestId(newest?.id);
+    // Count only messages appended AFTER the previous newest one — a loadOlder
+    // prepend adds older history at the FRONT and leaves the tail untouched,
+    // so it must never inflate this. Locate the previous newest id from the
+    // end: still last element → 0 (pure prepend); not found at all (e.g. it
+    // was deleted) → fall back to 0 rather than a fabricated count.
+    let grew = 0;
+    if (previousNewestId) {
+      let foundIndex = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].id === previousNewestId) {
+          foundIndex = i;
+          break;
+        }
+      }
+      grew = foundIndex === -1 ? 0 : messages.length - (foundIndex + 1);
+    }
     // Own sends force-scroll to the bottom anyway — don't flash the pill when
     // the newest arrival is the reader's own message (or echo).
-    const newest = messages[messages.length - 1];
     const ownArrival = !!newest && newest.authorId === currentUserId;
     if (grew > 0 && !pinned && !ownArrival) setNewCount((count) => count + grew);
   }
@@ -365,6 +421,66 @@ export function MobileThread({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
+  // "Load older" trigger: scrolling near the top of the thread requests more
+  // history (see useMessages' sliding window). olderPendingRef guards against
+  // spamming onLoadOlder while a growth is already in flight; anchorRef
+  // captures the pre-growth scroll geometry so the prepend can be re-anchored
+  // (Safari doesn't do this natively via overflow-anchor). minWindow records
+  // the windowSize this growth needs to have landed under — see the layout
+  // effect below, which won't consume the anchor until a snapshot actually
+  // came from a query with at least that limit (guards against the OLD
+  // listener firing one more unrelated snapshot between onLoadOlder() and the
+  // resubscribe, which would otherwise consume+clear the anchor early and
+  // leave the real prepend unanchored).
+  const olderPendingRef = useRef(false);
+  const anchorRef = useRef<{ scrollHeight: number; scrollTop: number; minWindow: number } | null>(null);
+
+  // Defensive parity with the desktop pane: MobileThread normally unmounts on
+  // the way back to the channel list, but if a channel ever changes under a
+  // mounted thread, an in-flight growth's anchor would target a minWindow the
+  // reset window can no longer reach — abandon it.
+  useEffect(() => {
+    olderPendingRef.current = false;
+    anchorRef.current = null;
+  }, [channelId]);
+
+  const handleScroll = () => {
+    clearLongPress();
+    const el = scrollRef.current;
+    if (!el || !hasMore || olderPendingRef.current) return;
+    if (el.scrollTop > 200) return;
+    anchorRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop, minWindow: Math.min(windowSize + GROW_STEP, MAX_WINDOW) };
+    olderPendingRef.current = true;
+    onLoadOlder();
+  };
+
+  // Runs before paint after every COMMITTED useMessages snapshot (keyed on
+  // snapshotVersion — a growth that leaves the message count unchanged still
+  // bumps this, so a pending anchor/pending-flag never leaks past one render).
+  // If a load-older growth is pending, restore the reader's visual anchor —
+  // never when pinned to bottom, which is the auto-scroll effect's territory.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    // The snapshot that just committed may still be from the OLD (pre-growth)
+    // listener — don't consume the anchor until one lands from a query whose
+    // limit actually covers the requested growth.
+    if (lastSnapshotWindow < anchor.minWindow) return;
+    anchorRef.current = null;
+    olderPendingRef.current = false;
+    if (!el || pinnedRef.current) return;
+    const newScrollHeight = el.scrollHeight;
+    // `.chat-line-thread-messages` inherits scroll-behavior: smooth from the
+    // global html rule, which would animate a plain scrollTop assignment —
+    // visibly glide instead of snapping, and re-fire handleScroll mid-animation
+    // while scrollTop still reads <200. Toggle to 'auto' for the instant jump.
+    const previousBehavior = el.style.scrollBehavior;
+    el.style.scrollBehavior = 'auto';
+    el.scrollTop = anchor.scrollTop + (newScrollHeight - anchor.scrollHeight);
+    el.style.scrollBehavior = previousBehavior;
+  }, [snapshotVersion, lastSnapshotWindow]);
+
   return (
     <div className="chat-line-thread chat-slide-in flex h-[calc(100dvh-4rem-env(safe-area-inset-top))] flex-col bg-slate-50 dark:bg-muted/40">
       {/* Compact top bar with back arrow (≥40px target). */}
@@ -395,6 +511,15 @@ export function MobileThread({
         </div>
       </div>
 
+      {companyTapeText && (
+        <div className="chat-line-tape chat-line-tape-mobile" role="status" aria-label="Company sales line">
+          <div className="chat-line-tape-track">
+            <div className="chat-line-tape-seg"><span>{companyTapeText}</span></div>
+            <div className="chat-line-tape-seg" aria-hidden="true"><span>{companyTapeText}</span></div>
+          </div>
+        </div>
+      )}
+
       <div className="chat-line-thread-pinned-band">
         <span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span>
         <span className="chat-line-pinned-copy">
@@ -410,8 +535,11 @@ export function MobileThread({
           grouped bubbles can tighten up (see mt-* below). The relative wrapper
           hosts the floating jump-to-latest pill so it clears the composer. */}
       <div className="chat-line-thread-stage relative flex flex-1 flex-col overflow-hidden">
-        <div ref={scrollRef} onScroll={clearLongPress} className="chat-line-thread-messages flex flex-1 flex-col overflow-auto p-3">
+        <div ref={scrollRef} onScroll={handleScroll} className="chat-line-thread-messages flex flex-1 flex-col overflow-auto p-3">
         <div aria-hidden="true" className="mt-auto" />
+        {!loading && messages.length > 0 && hasMore && (
+          <div className="chat-line-history-pager">Earlier messages load as you scroll</div>
+        )}
         {loading ? (
           <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
         ) : messages.length === 0 ? (

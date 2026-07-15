@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import type { ChatAttachment, ChatReplySnippet } from '@/types';
@@ -90,10 +90,60 @@ function toReplyTo(value: unknown): ChatReplySnippet | undefined {
   };
 }
 
+const INITIAL_WINDOW = 75;
+// Exported so consumers can compute "has my loadOlder growth actually landed
+// yet" (see the anchor-race guard in page.tsx / MobileThread.tsx) without
+// duplicating the step size.
+export const GROW_STEP = 75;
+const EVICTION_GROW_STEP = 25;
+// Exported alongside GROW_STEP: anchor targets must clamp to the cap, or a
+// window already within GROW_STEP of the cap (reachable via +25 eviction
+// growths) would wait forever for a size the query can never reach.
+export const MAX_WINDOW = 600;
+
 export function useMessages(channelId: string | null) {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
+  const [hasMore, setHasMore] = useState(false);
+  // Bumped once per COMMITTED snapshot (never on the eviction-guard skip path).
+  // Consumers key their scroll-anchor effects on this instead of message count,
+  // since a growth that doesn't change the visible count (e.g. the eviction
+  // guard silently widening the window) would otherwise leave a captured anchor
+  // uncleared, which then misfires on the next unrelated message.
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
+  // The windowSize a committed snapshot was actually produced under. A UI
+  // consumer that captured a scroll anchor before calling loadOlder() can
+  // compare this against the window it expects (current + GROW_STEP) to tell
+  // a real growth apart from an unrelated snapshot from the OLD listener that
+  // fires (and bumps snapshotVersion) before the resubscribe lands — see the
+  // anchor-race guard in page.tsx / MobileThread.tsx.
+  const [lastSnapshotWindow, setLastSnapshotWindow] = useState(0);
+
+  // Oldest createdAt (ms) of the RAW window (before the deletedAt filter) as of
+  // the last committed snapshot. Used to detect the sliding window evicting
+  // history out from under someone scrolled up (see the eviction guard below).
+  // Deliberately tracks the raw floor, not the filtered one, so a soft-deleted
+  // message at the old edge (which stays in the raw window) doesn't register as
+  // an eviction. Reset on channel switch.
+  const oldestDeliveredRef = useRef<number | null>(null);
+
+  // Channel-switch state reset, done during render (React's "info from
+  // previous renders" pattern) rather than in an effect, so it never causes a
+  // second cascading render. The ref reset (a side effect, not render output)
+  // stays in its own effect below.
+  const [prevChannelId, setPrevChannelId] = useState(channelId);
+  if (channelId !== prevChannelId) {
+    setPrevChannelId(channelId);
+    setWindowSize(INITIAL_WINDOW);
+    setHasMore(false);
+    setLastSnapshotWindow(0);
+  }
+
+  useEffect(() => {
+    oldestDeliveredRef.current = null;
+  }, [channelId]);
 
   useEffect(() => {
     if (!db || !channelId) {
@@ -109,15 +159,16 @@ export function useMessages(channelId: string | null) {
     const q = query(
       collection(db, 'chatChannels', channelId, 'messages'),
       orderBy('createdAt', 'desc'),
-      limit(75)
+      limit(windowSize)
     );
 
     return onSnapshot(
       q,
       (snapshot) => {
         const uid = auth?.currentUser?.uid;
-        const next = snapshot.docs
-          .filter((doc) => !doc.data().deletedAt)
+        const rawDocs = snapshot.docs;
+        const docs = rawDocs.filter((doc) => !doc.data().deletedAt);
+        const next = docs
           .map((doc) => {
             const data = doc.data();
             const reactions = toStringMap(data.reactions);
@@ -145,7 +196,30 @@ export function useMessages(channelId: string | null) {
           })
           .reverse();
 
+        // Raw (unfiltered) oldest doc — desc order, so the last raw doc is the
+        // oldest in the window regardless of soft-deletes. Comparing THIS
+        // (rather than the filtered list's oldest) means a deletion of the
+        // oldest-visible message can't be mistaken for the window sliding.
+        const rawOldest = rawDocs.length > 0 ? toDate(rawDocs[rawDocs.length - 1].data().createdAt)?.getTime() ?? null : null;
+        const prevOldest = oldestDeliveredRef.current;
+        const evicted = prevOldest !== null && rawOldest !== null && rawOldest > prevOldest;
+
+        // The window slid and dropped messages the reader already saw. Grow the
+        // window and skip committing this snapshot — the resubscribe fires a
+        // fresh snapshot covering the wider range, so the reader's view never
+        // visibly loses history. Repeats (growing by another step each time)
+        // until the previously-delivered floor is covered, capped at MAX_WINDOW.
+        if (evicted && windowSize < MAX_WINDOW) {
+          setWindowSize((size) => Math.min(MAX_WINDOW, size + EVICTION_GROW_STEP));
+          setLoading(false);
+          return;
+        }
+
+        oldestDeliveredRef.current = rawOldest ?? prevOldest;
         setMessages(next);
+        setHasMore(rawDocs.length >= windowSize && windowSize < MAX_WINDOW);
+        setLastSnapshotWindow(windowSize);
+        setSnapshotVersion((version) => version + 1);
         setLoading(false);
       },
       (err) => {
@@ -154,7 +228,13 @@ export function useMessages(channelId: string | null) {
         setLoading(false);
       }
     );
-  }, [channelId]);
+  }, [channelId, windowSize]);
 
-  return { messages, loading, error };
+  // Grows the window by GROW_STEP (capped at MAX_WINDOW) so the next snapshot
+  // pulls in older history. A no-op once the cap is hit or nothing more exists.
+  const loadOlder = useCallback(() => {
+    setWindowSize((size) => (size >= MAX_WINDOW ? size : Math.min(MAX_WINDOW, size + GROW_STEP)));
+  }, []);
+
+  return { messages, loading, error, hasMore, loadOlder, windowSize, snapshotVersion, lastSnapshotWindow };
 }

@@ -13343,3 +13343,96 @@ body.portal-scope {
   .sales-line-inreview-date { grid-area: date; text-align: left; }
   .sales-line-inreview-wait { grid-area: wait; }
 }
+
+/* Chat-line addendum — history pager */
+.chat-line-history-pager {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 6px 0 14px;
+  color: var(--chat-line-ink);
+  opacity: 0.42;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.chat-line-thread-messages .chat-line-history-pager {
+  padding: 0 0 10px;
+}
+
+/* Chat-line addendum — company tape */
+.chat-line-tape {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--chat-line-line);
+  background: linear-gradient(90deg, rgba(141, 198, 63, 0.14), rgba(10, 31, 68, 0.5) 45%, rgba(217, 165, 32, 0.1));
+  padding: 8px 0;
+}
+
+.chat-line-tape-track {
+  display: flex;
+  width: max-content;
+  animation: chat-line-tape-scroll 32s linear infinite;
+}
+
+.chat-line-tape-seg {
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(16px, 4vw, 48px);
+  color: var(--chat-line-ink);
+  font: 900 10px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chat-line-tape-seg span {
+  color: var(--chat-line-lime);
+}
+
+@keyframes chat-line-tape-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.chat-line-tape:hover .chat-line-tape-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-line-tape-track {
+    animation: none;
+  }
+
+  /* The duplicate segment exists only to make the marquee loop seamless;
+     static mode must read once, start to finish, with no mid-phrase freeze. */
+  .chat-line-tape-track .chat-line-tape-seg[aria-hidden="true"] {
+    display: none;
+  }
+}
+
+.chat-line-tape-mobile .chat-line-tape-seg {
+  padding: 0 16px;
+  font-size: 9px;
+}
+
+/* The Line chat containers are fixed 4-row grids (header / pinned / stage /
+   composer); the optional company tape adds a 5th child, which shifts every
+   grid row and overlaps the pinned band. Flex column lays out 4 or 5 children
+   correctly, so the tape can come and go without a template change. */
+.chat-line-conversation {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-line-message-stage {
+  flex: 1 1 0;
+}
+
+@media (max-width: 720px) {
+  .chat-line-thread {
+    display: flex;
+    flex-direction: column;
+  }
+}

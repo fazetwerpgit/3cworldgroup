@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowDown, Check, Clock, ImagePlus, Loader2, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
-import { useMessages } from '@/hooks/chat/useMessages';
+import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
 import { getAuthorColor, getInitials, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { auth } from '@/lib/firebase/config';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
@@ -153,13 +153,89 @@ export default function TeamChatPage() {
   const desktopPinnedRef = useRef(true);
   const [desktopNewCount, setDesktopNewCount] = useState(0);
   const [desktopPrevLen, setDesktopPrevLen] = useState(0);
+  // The previous render's last (newest) message id — the unseen-count math
+  // below locates it in the new array to count only messages appended AFTER
+  // it, so a loadOlder prepend of older history (which doesn't move the tail)
+  // never gets mistaken for new arrivals.
+  const [desktopPrevNewestId, setDesktopPrevNewestId] = useState<string | undefined>(undefined);
   const [desktopPrevChannel, setDesktopPrevChannel] = useState('');
   const desktopSignalRef = useRef(0);
 
   const { channels, loading: loadingChannels, error: channelsError } = useChatChannels();
-  const { messages, loading: loadingMessages, error: messagesError } = useMessages(
-    activeChannelId || null
-  );
+  const {
+    messages,
+    loading: loadingMessages,
+    error: messagesError,
+    hasMore: hasMoreMessages,
+    loadOlder: loadOlderMessages,
+    windowSize: messagesWindowSize,
+    snapshotVersion,
+    lastSnapshotWindow,
+  } = useMessages(activeChannelId || null);
+
+  // Desktop "load older" trigger: scrolling near the top of the scroller grows
+  // the window (see useMessages). desktopOlderPendingRef guards against
+  // spamming loadOlder while a growth is already in flight; desktopAnchorRef
+  // captures the pre-growth scroll geometry so the prepend can be anchored
+  // (Safari doesn't do this natively via overflow-anchor). minWindow records
+  // the windowSize this growth needs to have landed under — see the layout
+  // effect below, which won't consume the anchor until a snapshot actually
+  // came from a query with at least that limit (guards against the OLD
+  // listener firing one more unrelated snapshot between loadOlder() and the
+  // resubscribe, which would otherwise consume+clear the anchor early and
+  // leave the real prepend unanchored).
+  const desktopOlderPendingRef = useRef(false);
+  const desktopAnchorRef = useRef<{ scrollHeight: number; scrollTop: number; minWindow: number } | null>(null);
+
+  // Channel switch abandons any in-flight growth: the new channel restarts at
+  // the initial window, so a leftover anchor's minWindow could never be met
+  // and the stuck pending flag would silently disable load-older everywhere
+  // (the desktop pane persists across rail switches, unlike MobileThread).
+  useEffect(() => {
+    desktopOlderPendingRef.current = false;
+    desktopAnchorRef.current = null;
+  }, [activeChannelId]);
+
+  const handleDesktopScroll = useCallback(() => {
+    const el = desktopScrollRef.current;
+    if (!el || !hasMoreMessages || desktopOlderPendingRef.current) return;
+    if (el.scrollTop > 200) return;
+    desktopAnchorRef.current = {
+      scrollHeight: el.scrollHeight,
+      scrollTop: el.scrollTop,
+      minWindow: Math.min(messagesWindowSize + GROW_STEP, MAX_WINDOW),
+    };
+    desktopOlderPendingRef.current = true;
+    loadOlderMessages();
+  }, [hasMoreMessages, loadOlderMessages, messagesWindowSize]);
+
+  // Runs before paint after every COMMITTED snapshot (keyed on snapshotVersion,
+  // not message count — a growth that leaves the count unchanged still bumps
+  // this, so a pending anchor/pending-flag never leaks past one render and
+  // misfires on a later, unrelated message). If a load-older growth is
+  // pending, restore the reader's visual anchor (never when pinned to bottom —
+  // that path belongs to the auto-scroll effect below, not this one).
+  useLayoutEffect(() => {
+    const el = desktopScrollRef.current;
+    const anchor = desktopAnchorRef.current;
+    if (!anchor) return;
+    // The snapshot that just committed may still be from the OLD (pre-growth)
+    // listener — don't consume the anchor until one lands from a query whose
+    // limit actually covers the requested growth.
+    if (lastSnapshotWindow < anchor.minWindow) return;
+    desktopAnchorRef.current = null;
+    desktopOlderPendingRef.current = false;
+    if (!el || desktopPinnedRef.current) return;
+    const newScrollHeight = el.scrollHeight;
+    // `.chat-line-messages` has scroll-behavior: smooth (globals.css), which
+    // would animate a plain scrollTop assignment — visibly glide instead of
+    // snapping, and while animating scrollTop briefly reads <200 and re-fires
+    // handleDesktopScroll. Toggle to 'auto' for the instant jump, then restore.
+    const previousBehavior = el.style.scrollBehavior;
+    el.style.scrollBehavior = 'auto';
+    el.scrollTop = anchor.scrollTop + (newScrollHeight - anchor.scrollHeight);
+    el.style.scrollBehavior = previousBehavior;
+  }, [snapshotVersion, lastSnapshotWindow]);
 
   const activeChannel = useMemo(
     () => channels.find((channel) => channel.id === activeChannelId),
@@ -339,6 +415,52 @@ export default function TeamChatPage() {
     });
   }, []);
 
+  // Company sales tape (All Company channel only): fetched once on mount, not
+  // per channel switch — the numbers don't depend on which channel is active,
+  // only whether the tape renders does. Stays null (tape hidden) on any
+  // fetch/parse error so it never shows fabricated numbers.
+  const [companyStats, setCompanyStats] = useState<{
+    mtdCount: number;
+    mtdMonthlyValue: number;
+    lastSale: { repName: string } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    // Wait for the signed-in user: on first mount auth?.currentUser is still
+    // null, so an immediate fetch would carry an empty Bearer token and 401,
+    // and (fetching only once) the tape would never appear.
+    if (!user) return;
+    let cancelled = false;
+    authedFetch('/api/portal/sales/company-stats')
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('company-stats fetch failed'))))
+      .then((json) => {
+        if (!cancelled) setCompanyStats(json);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanyStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authedFetch, user]);
+
+  // "COMPANY LINE · N SALES THIS MONTH · $X/MO ON THE BOARD · LAST: REPNAME" —
+  // uppercase, dot-separated (mockup: design-mockups/chat-ticker-round1/
+  // option-1-the-tape.html). The LAST segment is dropped entirely when there's
+  // no approved sale yet, rather than showing a fabricated name.
+  const companyTapeText = useMemo(() => {
+    if (!companyStats) return '';
+    const segments = [
+      'COMPANY LINE',
+      `${companyStats.mtdCount} SALE${companyStats.mtdCount === 1 ? '' : 'S'} THIS MONTH`,
+      `$${companyStats.mtdMonthlyValue.toLocaleString('en-US')}/MO ON THE BOARD`,
+    ];
+    if (companyStats.lastSale) {
+      segments.push(`LAST: ${companyStats.lastSale.repName.toUpperCase()}`);
+    }
+    return segments.join(' · ');
+  }, [companyStats]);
+
   // Cheap bootstrap call: keeps server-side membership current for this caller, then
   // Firestore rules allow the realtime channel/message listeners to read member docs.
   useEffect(() => {
@@ -467,13 +589,37 @@ export default function TeamChatPage() {
   if (activeChannelId !== desktopPrevChannel) {
     setDesktopPrevChannel(activeChannelId);
     setDesktopPrevLen(threadMessages.length);
+    setDesktopPrevNewestId(threadMessages[threadMessages.length - 1]?.id);
     setDesktopNewCount(0);
-  } else if (threadMessages.length !== desktopPrevLen) {
-    const grew = threadMessages.length - desktopPrevLen;
+  } else if (
+    threadMessages.length !== desktopPrevLen ||
+    // Also run on a tail-id-only change (own echo reconciling to its delivered
+    // doc id at unchanged length) so prevNewestId never goes stale — a stale
+    // pending-… id would make the next real arrival unfindable and undercount.
+    threadMessages[threadMessages.length - 1]?.id !== desktopPrevNewestId
+  ) {
     setDesktopPrevLen(threadMessages.length);
+    const previousNewestId = desktopPrevNewestId;
+    const newest = threadMessages[threadMessages.length - 1];
+    setDesktopPrevNewestId(newest?.id);
+    // Count only messages appended AFTER the previous newest one — a loadOlder
+    // prepend adds older history at the FRONT and leaves the tail untouched,
+    // so it must never inflate this. Locate the previous newest id from the
+    // end: still last element → 0 (pure prepend); not found at all (e.g. it
+    // was deleted) → fall back to 0 rather than a fabricated count.
+    let grew = 0;
+    if (previousNewestId) {
+      let foundIndex = -1;
+      for (let i = threadMessages.length - 1; i >= 0; i--) {
+        if (threadMessages[i].id === previousNewestId) {
+          foundIndex = i;
+          break;
+        }
+      }
+      grew = foundIndex === -1 ? 0 : threadMessages.length - (foundIndex + 1);
+    }
     // Own sends force-scroll to the bottom anyway — don't flash the pill when
     // the newest arrival is the reader's own message (or echo).
-    const newest = threadMessages[threadMessages.length - 1];
     const ownArrival = !!newest && newest.authorId === user?.uid;
     if (grew > 0 && !desktopPinned && !ownArrival) setDesktopNewCount((count) => count + grew);
   }
@@ -917,10 +1063,21 @@ export default function TeamChatPage() {
                     </div>
                     <div className="chat-line-head-meta"><span className="chat-line-live">LIVE</span><span>{activeChannel ? `${memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0} members` : '— members'}</span></div>
                   </header>
+                  {activeChannel?.id === 'all-company' && companyTapeText && (
+                    <div className="chat-line-tape" role="status" aria-label="Company sales line">
+                      <div className="chat-line-tape-track">
+                        <div className="chat-line-tape-seg"><span>{companyTapeText}</span></div>
+                        <div className="chat-line-tape-seg" aria-hidden="true"><span>{companyTapeText}</span></div>
+                      </div>
+                    </div>
+                  )}
                   <div className="chat-line-pinned-band"><span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span><span className="chat-line-pinned-copy">{pinnedCopy || 'No pinned message yet'}{pinnedAuthor && <em> · {pinnedAuthor}</em>}</span><span className="chat-line-pinned-time">{pinnedTime}</span></div>
                   <div className="chat-line-message-stage">
-                    <div ref={desktopScrollRef} className="chat-line-messages">
+                    <div ref={desktopScrollRef} onScroll={handleDesktopScroll} className="chat-line-messages">
                       <div aria-hidden="true" className="chat-line-scroll-spacer" />
+                      {!loadingMessages && threadMessages.length > 0 && hasMoreMessages && (
+                        <div className="chat-line-history-pager">Earlier messages load as you scroll</div>
+                      )}
                       {loadingMessages ? <div className="chat-line-message-skeletons" aria-hidden="true">{[0, 1, 2, 3, 4].map((row) => <span key={row} />)}</div> : threadMessages.length === 0 ? <div className="chat-line-empty-message"><strong>No messages yet</strong><span>Start with a short update, question, or field note.</span></div> : displayMessages.map((message, index) => {
                         const previousMessage = displayMessages[index - 1];
                         const showDayDivider = !previousMessage || getLocalDayKey(previousMessage.createdAt) !== getLocalDayKey(message.createdAt);
@@ -977,7 +1134,7 @@ export default function TeamChatPage() {
                 </section>
               </div>
               <div className="chat-line-mobile">
-                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} authorAvatars={authorAvatars} loading={loadingMessages} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
+                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} snapshotVersion={snapshotVersion} windowSize={messagesWindowSize} lastSnapshotWindow={lastSnapshotWindow} hasMore={hasMoreMessages} onLoadOlder={loadOlderMessages} companyTapeText={activeChannelId === 'all-company' ? companyTapeText : ''} authorAvatars={authorAvatars} loading={loadingMessages} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
               </div>
               <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
               <ChatLightbox image={lightbox} onClose={closeLightbox} />
