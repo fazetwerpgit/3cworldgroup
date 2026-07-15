@@ -1608,12 +1608,14 @@ body.portal-scope {
   gap: 18px;
   padding: 0 20px;
   border-bottom: 1px solid var(--rail-line);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.98);
+  /* Same iOS Safari constraint as .portal-mobile-nav: backdrop-filter on a
+     fixed bar breaks re-pinning during scroll on iPhone. */
+  transform: translateZ(0);
 }
 
 .dark .portal-shell-header {
-  background: rgba(3, 9, 22, 0.95);
+  background: rgba(3, 9, 22, 0.98);
 }
 
 .portal-brand {
@@ -2350,8 +2352,13 @@ body.portal-scope {
     height: calc(68px + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
     border-top: 1px solid var(--rail-line);
-    background: rgba(3, 9, 22, 0.97);
-    backdrop-filter: blur(16px);
+    background: rgba(3, 9, 22, 0.98);
+    /* No backdrop-filter here: iOS Safari fails to re-pin a fixed element
+       that carries one, so the bar rode along with the scroll on iPhone.
+       The near-opaque background makes the blur invisible anyway.
+       translateZ(0) keeps the bar on its own compositing layer so WebKit
+       repaints it every scroll frame. */
+    transform: translateZ(0);
   }
 
   .portal-mobile-nav ul {
