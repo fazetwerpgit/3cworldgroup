@@ -488,6 +488,10 @@ FULL UNIT SUITE run 2026-07-14 after user asked "Is it all tested":
 = manual browser verify per change + Opus adversarial reviews + prod
 builds + unit suite. e2e (playwright, hits real Firebase) NOT run —
 offered only if asked.
+DEPLOYED 2026-07-14: user said "Deploy" → pushed master (through
+f80bf5b) → Vercel build Ready, prod 200. ENTIRE REDESIGN CAMPAIGN IS
+LIVE. Campaign CLOSED. Only optional leftover: admin settings real
+persistence (honest-inert "Not wired up yet" shipped).
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
