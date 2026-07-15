@@ -512,7 +512,10 @@ fetches members per visible channel (keyed on id-set string so message
 traffic never refetches; useChatChannels sorts by static order field),
 counts used in channel list + head meta + MobileThread. Stale-CSS
 fired 6TH time (touch didn't help; cold restart devserver3.log did).
-AWAITING "deploy" — pushes iOS bar fix (75b55b3) + this (5344717).
+DEPLOYED 2026-07-14 (2nd deploy): user said "Deploy" → pushed through
+80cec33, Vercel Ready, prod 200. iOS bar fix + leaderboard tab +
+leaderboard header overlap + accurate member counts ALL LIVE.
+NOTHING IN FLIGHT.
 CHAT BUGS user-reported 2026-07-14 BOTH FIXED + COMMITTED: (1) members
 info-sheet was transparent — Sheet portals to <body> outside
 .chat-line-page so --chat-line-* vars resolved empty → re-declared
