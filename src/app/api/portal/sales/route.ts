@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') as SaleStatus | null;
-    const salesRepId = requester.isManagerOrAbove
+    const salesRepId = requester.isManagement
       ? searchParams.get('salesRepId')
       : gate.uid;
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -241,19 +241,29 @@ export async function POST(request: NextRequest) {
       salesRepId,
       'sale_submitted',
       'Sale Submitted! 📋',
-      'Your sale has been submitted and is pending approval from your manager.',
+      'Your sale has been submitted and is pending review.',
       `/portal/sales/${docRef.id}`
     );
 
-    // Notify manager if one is assigned
-    if (managerId) {
-      await createNotification(
-        managerId,
-        'sale_pending',
-        'New Sale Needs Approval',
-        `${salesRepName || 'A team member'} submitted a new sale for review.`,
-        '/portal/sales?status=pending'
+    // Notify all admin/operations users (sales review is platform-only now).
+    try {
+      const reviewersSnap = await adminDb
+        .collection('users')
+        .where('role', 'in', ['admin', 'operations'])
+        .get();
+      await Promise.all(
+        reviewersSnap.docs.map((reviewerDoc) =>
+          createNotification(
+            reviewerDoc.id,
+            'sale_pending',
+            'New Sale Needs Approval',
+            `${salesRepName || 'A team member'} submitted a new sale for review.`,
+            '/portal/sales?status=pending'
+          )
+        )
       );
+    } catch (error) {
+      console.error('Error notifying reviewers of new sale:', error);
     }
 
     return NextResponse.json({

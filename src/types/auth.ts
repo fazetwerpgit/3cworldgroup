@@ -80,10 +80,10 @@ const FIELD_REP_PERMISSIONS = [
   'sales:read', 'sales:write',
 ];
 
-// Field manager permissions: rep + approvals and user visibility
+// Field manager permissions: rep + user visibility (sales approval and
+// cross-rep sales visibility are platform-only; see admin/operations below).
 const FIELD_MANAGER_PERMISSIONS = [
   ...FIELD_REP_PERMISSIONS,
-  'sales:approve',
   'users:read',
   'recruiting:read',
   'recruiting:write',

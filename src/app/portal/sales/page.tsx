@@ -148,7 +148,7 @@ function SalesContent() {
       : '';
 
   const canApprove = hasPermission('sales:approve');
-  const canViewAll = hasPermission('sales:read');
+  const canViewAll = hasPermission('sales:approve');
   const now = useMemo(() => new Date(), []);
   const currentMonth = monthKey(now);
   const mtdSales = sales.filter((sale) => monthKey(sale.saleDate) === currentMonth);

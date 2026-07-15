@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
     const requester = await getRequester(gate.uid);
-    if (!requester?.isManagerOrAbove) {
+    if (!requester?.isManagement) {
       return NextResponse.json(
         { error: 'Forbidden: approval requires manager access' },
         { status: 403 }

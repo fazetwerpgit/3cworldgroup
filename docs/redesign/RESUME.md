@@ -26,8 +26,20 @@ Updated: 2026-07-14 (update at EVERY milestone).
    page loads existing sale fine). Opus PASS (3 MINORs accepted:
    edit-save recomputes productSold by design; dupe-guard double-click
    is pre-existing; getPlanById now unconsumed but kept).
-   COMMITTED LOCAL — WAITING ON JACOB'S "deploy" TO PUSH.
+   DEPLOYED (cdbe1f7 pushed 2026-07-15 on Jacob's "Deploy").
    NOTE: catalog is 21 plans (not 22 as the plan doc says).
+2. SALES VISIBILITY FIX (in flight): Jacob's decision — everyone sees
+   ONLY their own sales under the Sales tab; only admin+operations see
+   all and approve. Root cause: isManagerOrAbove (incl. all IBO levels)
+   had view-all + approve. Sonnet building: drop sales:approve from
+   FIELD_MANAGER_PERMISSIONS, GET sales scope isManagement, approve
+   route isManagement, POST notifies admin/ops users (not managerId),
+   canViewAll=hasPermission('sales:approve') in sales/page.tsx (no
+   test changes needed). ALL GATES GREEN, my admin-view verify OK,
+   Opus PASS (leak hunt clear on every route; 1 MINOR accepted: old
+   sale_pending notifications in field-manager inboxes now land on
+   their own pending list — cosmetic). COMMITTED LOCAL — WAITING ON
+   JACOB'S WORD TO PUSH.
 2. EVERYTHING ELSE DEPLOYED 2026-07-14: chat scroll fix + All Company tape
    + weekly challenge admin + rep in-review section (9b5e1df batch),
    then T-Mobile price fix (430a335). TFiber catalog now 300/$45,
@@ -42,9 +54,12 @@ Updated: 2026-07-14 (update at EVERY milestone).
    300/$45/3pts, 500/$50/5pts, 1Gig/$60/8pts, 2Gig/$70/10pts.
    NOTHING IN FLIGHT — next work comes from the user. Still open from
    before: user's iPhone bottom-bar retest after a fresh Safari open.
-3. iPhone bottom bar: prod CSS verified correct; awaiting user retest
-   after a genuinely fresh Safari open. If STILL drifting: rebuild
-   pinning as non-scrolling app shell with inner scroll container.
+3. iPhone bottom bar: CONFIRMED STILL BROKEN 2026-07-15 — Jacob: gets
+   stuck after leaving the app open and coming back (background/resume,
+   not stale CSS). Proceed with the decided fix: non-scrolling app
+   shell (100dvh frame, bar in-frame) with inner scroll container on
+   mobile. Do AFTER the sales-visibility fix ships. Test: chat page
+   (own scroll logic), keyboard/input focus, scroll restoration.
 
 ## STATE
 
