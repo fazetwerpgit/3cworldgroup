@@ -3,106 +3,97 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-07-14 (update at EVERY milestone).
+Updated: 2026-07-15 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-1. LOG-A-SALE FORM CLEANUP (in flight, plan approved at
-   ~/.claude/plans/frolicking-frolicking-hammock.md): Jacob wants the
-   plan picker faster for reps ("seems like a lot"). Decisions: remove
-   the Product-sold text box (auto-fill from picked plans), 3 mockups
-   first. PICK = MOCKUP 3 (company chips + dense rows, Internet vs
-   Extras groups) AND he added: REMOVE the Sale date field (server
-   already defaults saleDate to now; productSold stays required
-   server-side, client computes it from picked plans — no API change).
-   BUILD DONE + VERIFIED + OPUS PASS 2026-07-15: PlanPicker.tsx shared
-   component (chips + dense rows, Internet/Extras split for Xfinity),
-   SaleForm.tsx (productSold input + saleDate field removed; productSold
-   computed at submit from products; slim summary bar), edit page same
-   picker (saleDate kept there for corrections), category:'extra' on 5
-   xfinity plans, additive sales-line CSS at EOF. All 4 gates green
-   (tsc/eslint/346 tests/build). Playwright-verified on :3000 desktop
-   1440 + mobile 390 (Xfinity $160/2 plans/+15pts math correct; edit
-   page loads existing sale fine). Opus PASS (3 MINORs accepted:
-   edit-save recomputes productSold by design; dupe-guard double-click
-   is pre-existing; getPlanById now unconsumed but kept).
-   DEPLOYED (cdbe1f7 pushed 2026-07-15 on Jacob's "Deploy").
-   NOTE: catalog is 21 plans (not 22 as the plan doc says).
-2. SALES VISIBILITY FIX (in flight): Jacob's decision — everyone sees
-   ONLY their own sales under the Sales tab; only admin+operations see
-   all and approve. Root cause: isManagerOrAbove (incl. all IBO levels)
-   had view-all + approve. Sonnet building: drop sales:approve from
-   FIELD_MANAGER_PERMISSIONS, GET sales scope isManagement, approve
-   route isManagement, POST notifies admin/ops users (not managerId),
-   canViewAll=hasPermission('sales:approve') in sales/page.tsx (no
-   test changes needed). ALL GATES GREEN, my admin-view verify OK,
-   Opus PASS (leak hunt clear on every route; 1 MINOR accepted: old
-   sale_pending notifications in field-manager inboxes now land on
-   their own pending list — cosmetic). COMMITTED LOCAL — WAITING ON
-   JACOB'S WORD TO PUSH.
-3. LEADERBOARD WEEKLY-CHALLENGE RESTYLE (Jacob: "sticks out like a
-   sore thumb"): lime slab re-skinned to the Arena panel idiom
-   (navy gradient, white frame, gold label, slim progress bar) —
-   mirrors the Your Standing card exactly. Class-only change in
-   leaderboard/page.tsx WeeklyChallenge; gates green; my before/after
-   screenshot verify 1440+390; Opus skipped deliberately (no logic
-   beyond a width %); COMMITTED LOCAL with the visibility fix,
-   awaiting the same push. NOTE: this touches presentation AROUND the
-   frozen Spotlight Arena visuals, not the arena itself.
-2. EVERYTHING ELSE DEPLOYED 2026-07-14: chat scroll fix + All Company tape
-   + weekly challenge admin + rep in-review section (9b5e1df batch),
-   then T-Mobile price fix (430a335). TFiber catalog now 300/$45,
-   1Gig/$60, 2Gig/$70 (AutoPay prices per t-mobile.com). Firestore
-   sales data CORRECTED via one-time admin script (deleted after):
-   19 sales updated (7x 1gig 75->60, 12x 2gig 90->70), totalValue
-   recomputed, priceCorrectionAt/Note stamped; tape verified
-   $1,805 -> $1,460 (exact -345 match).
-   RESOLVED: TFiber 500 restored to the catalog at $50/5pts (5ccb186,
-   pushed) — team still sells it intermittently; the one historical
-   500 sale stays at its recorded $60. TFiber lineup now:
-   300/$45/3pts, 500/$50/5pts, 1Gig/$60/8pts, 2Gig/$70/10pts.
-   NOTHING IN FLIGHT — next work comes from the user. Still open from
-   before: user's iPhone bottom-bar retest after a fresh Safari open.
-3. iPhone bottom bar APP-SHELL FIX BUILT 2026-07-15 (commit pending
-   push): CSS-only block at globals.css EOF — under 1023px and
-   body[data-portal-bottom-nav], body+canvas locked to 100dvh
-   overflow:hidden, main becomes the scroller (calc(100dvh - 62px),
-   overscroll contain). Fixed bars can no longer desync on iOS
-   background/resume because the layout viewport never scrolls.
-   Verified 390: dashboard/sales/leaderboard/forms/calls/resources/
-   admin-settings all scroll in main w/ bottom content clearing the
-   bar; chat thread intact (own scroller); nav MORE sheet fine;
-   desktop 1440 body-scroll unchanged. Gates green. Scout notes:
-   body-overflow toggles in CommandPalette/MobileBottomNav/ChatLightbox
-   now no-ops on mobile (left in place, still needed on desktop);
-   keep translateZ(0)/no-backdrop-filter on both bars (load-bearing).
-   REAL confirmation must come from Jacob's iPhone after deploy
-   (background the app, return, check bar).
+NOTHING IN FLIGHT — next work comes from Jacob. Two things are
+awaiting HIS verification on his iPhone (do not chase, he'll report):
+1. Bottom bar: open portal, background the app 1-2 min, return,
+   scroll — bar must stay pinned. If it STILL drifts, get exact
+   repro steps; the app-shell lock (see below) should have killed the
+   whole failure class, so a recurrence means something else.
+2. Sales visibility: managers/IBOs now see only their own sales —
+   INTENTIONAL; if reported as a bug, explain, don't revert.
 
-## STATE
+## SHIPPED 2026-07-15 (all Vercel Ready in Production)
 
-- Redesign campaign CLOSED, live in prod since 2026-07-14. Anchor:
-  docs/redesign/ANCHOR.md.
-- Committed LOCAL, NOT pushed (deploy ONLY on user's word "deploy"):
-  a82bab8 (challenge target 7), a98ed84 (docs), 42ab000 (admin
-  weekly-challenge control + rep submitted/in-review section — Opus
-  PASS), a8cbf18 (chat scroll fix + company sales tape — Opus PASS
-  after 4 rounds).
-- Weekly challenge: settings/weeklyChallenge Firestore doc, GET/PUT
-  /api/portal/settings/weekly-challenge; verified live round-trip.
-- Chat member counts fixed (server filters non-active users) — deployed.
+- cdbe1f7 Log-a-sale form cleanup (Jacob picked mockup 3 "Dense Rows,
+  Grouped" + asked to drop Sale date):
+  - NEW src/components/sales/PlanPicker.tsx — shared picker: company
+    chips + one-line plan rows; Xfinity splits Internet vs Extras via
+    new optional FiberPlan.category ('extra' on its 5 non-internet
+    plans, src/types/sales.ts).
+  - SaleForm.tsx: Product-sold input REMOVED (computed at submit as
+    products.map(p=>p.productName).join(', ') — server still requires
+    non-empty, always satisfied since products>=1 is validated);
+    Sale-date field REMOVED (not sent; server defaults to now).
+    Slim summary bar (value/plans/points + auto product line).
+  - Edit page ([id]/edit): same PlanPicker; productSold recomputed on
+    save; Sale date KEPT there for corrections.
+- ead505a Sales visibility: GET /api/portal/sales + approve route now
+  gate on requester.isManagement (admin/operations) instead of
+  isManagerOrAbove; 'sales:approve' removed from
+  FIELD_MANAGER_PERMISSIONS (types/auth.ts) — flips all client UI;
+  canViewAll on sales page = hasPermission('sales:approve');
+  new-sale notifications go to all admin/ops users, not managerId.
+  Opus leak-hunt PASS on every route. Accepted MINOR: pre-existing
+  sale_pending notifications deep-link field managers to their own
+  pending list (cosmetic dead end).
+- 1b68da2 Leaderboard weekly-challenge band re-skinned from lime slab
+  to Arena panel idiom (navy gradient, white frame, gold label, slim
+  progress bar) in leaderboard/page.tsx WeeklyChallenge. Spotlight
+  Arena core visuals untouched (still frozen).
+- 094603a iPhone bottom-bar fix: mobile app-shell scroll lock, CSS
+  block at globals.css EOF — under 1023px + body[data-portal-bottom-nav],
+  body/canvas locked to 100dvh overflow:hidden, <main> is the sole
+  scroller (calc(100dvh - 62px), overscroll contain). Verified at 390:
+  all sections scroll in main, bottom content clears the bar, chat
+  thread (own scroller) fine, MORE sheet fine; desktop untouched.
+  Body-overflow toggles in CommandPalette/MobileBottomNav/ChatLightbox
+  are now no-ops on mobile (left in place — still needed on desktop).
+  translateZ(0)/no-backdrop-filter on both bars remain LOAD-BEARING.
+
+## OPEN / BACKLOG
+
+- Jacob's iPhone retests above (bar + a rep's-eye sales check).
+- Sales carrier proof: client still owes carrier→field mapping
+  (order#/BTN combined field is interim).
+- Leaderboard bonus points still excluded pending client decision.
+- Optional: admin-settings persistence leftover from redesign.
+- types/sales.ts still carries TODO "rework as per-channel products"
+  (admin-managed catalog) — explicitly out of scope so far.
+
+## FACTS THAT SAVE TIME
+
+- Catalog is 21 plans (4 TFiber / 5 AT&T / 4 Frontier / 8 Xfinity).
+  TFiber: 300/$45/3, 500/$50/5, 1Gig/$60/8, 2Gig/$70/10.
+- Sales SNAPSHOT product name/price/points at submission — catalog
+  edits never touch existing sale docs.
+- getPlanById in types/sales.ts currently has zero consumers (kept).
+- Mockup sources (opt3 won) in this session's scratchpad
+  sale-opt1/2/3.html; Artifacts published for all three.
+- Dev server on :3000 was stopped at session end — restart with
+  `npm run dev` (background). Stale-CSS playbook: if computed styles
+  look wrong, kill :3000, rm -rf .next, cold restart (fired again
+  this session — 8th time).
+- Root repo has ~200 untracked verification PNGs — harmless, ignore.
 
 ## STANDING RULES
 
-- User non-technical: plain language, business decisions his, technical
-  calls mine. No emojis. Send mockups as Artifacts (attachments fail).
+- User non-technical: plain language, business decisions his,
+  technical calls mine. No emojis. Mockups as Artifacts (attachment
+  batches fail for him), strip doctype/html/head/body wrappers.
 - Subagents NEVER on Fable — always explicit model: sonnet builds,
   opus reviews. Codex dead until Aug 12 2026.
-- Pipeline per change: sonnet build from binding spec → gates → my
-  browser verify (Playwright MCP, Jacob admin session on :3000 — never
-  log that session out) → fresh Opus adversarial review → commit LOCAL.
-  Push ONLY on the user's explicit word "deploy".
+- Pipeline per change: sonnet build from binding spec → gates
+  (npx tsc --noEmit / eslint / npm test 346 / npm run build) → my
+  browser verify (Playwright MCP, Jacob's admin session on :3000 —
+  NEVER log it out, irreplaceable Google SSO) → fresh Opus adversarial
+  review → commit LOCAL → push ONLY on Jacob's explicit "deploy"
+  (push = Vercel auto-deploy). Class-only re-skins may skip Opus if
+  disclosed.
 - Leaderboard Spotlight Arena visuals frozen (prop threading OK).
-- Honest empty states; never fabricate data in the portal.
-- Jacob's OS reports reduce-motion; dev server CSS can go stale —
-  cold-restart :3000 + delete .next if computed styles look wrong.
+- Honest empty states; never fabricate portal data.
+- Jacob's OS reports reduce-motion — designs must look complete with
+  zero animation.
