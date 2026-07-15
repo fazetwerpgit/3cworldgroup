@@ -48,6 +48,9 @@ interface MobileThreadProps {
   pinnedMessage: ThreadMessage | null;
   channelNumber: number;
   channel?: ChatChannel & { memberIds?: string[] };
+  // Resolved active-account head-count from the members endpoint; the raw
+  // memberIds array over-counts (deleted/deactivated uids linger in it).
+  memberCount?: number;
   channelId: string;
   messages: ThreadMessage[];
   // uid -> photo URL, resolved server-side from the active channel's members
@@ -194,6 +197,7 @@ export function MobileThread({
   pinnedMessage,
   channelNumber,
   channel,
+  memberCount,
   channelId,
   messages,
   authorAvatars,
@@ -387,7 +391,7 @@ export function MobileThread({
         </button>
         <div className="chat-line-thread-meta">
           <span className="chat-line-live">LIVE</span>
-          <span>{channel ? `${channel.memberIds?.length ?? 0} members` : '— members'}</span>
+          <span>{channel ? `${memberCount ?? channel.memberIds?.length ?? 0} members` : '— members'}</span>
         </div>
       </div>
 

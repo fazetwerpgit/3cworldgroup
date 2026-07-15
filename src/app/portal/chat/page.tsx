@@ -356,41 +356,51 @@ export default function TeamChatPage() {
   }, [authedFetch, user]);
 
   // Author photo lookup for the message list: messages themselves carry no
-  // avatarUrl (Firestore doc is unchanged), so we resolve photos from the
-  // active channel's member list (already-visible data — same population whose
+  // avatarUrl (Firestore doc is unchanged), so we resolve photos from each
+  // channel's member list (already-visible data — same population whose
   // names are shown on every message). Merged across channels rather than reset,
   // so switching channels never flashes photos back to initials for a uid we've
   // already resolved.
   const [authorAvatars, setAuthorAvatars] = useState<Record<string, string>>({});
+  // Resolved head-count per channel (active accounts only). The channel doc's
+  // raw memberIds array can hold deleted/deactivated uids, so it over-counts;
+  // whenever the members endpoint has answered for a channel, its count wins.
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
+  // Keyed by the id set (not the channels array identity) so channel-doc updates
+  // from message traffic don't refetch member lists on every new message.
+  const channelIdsKey = channels.map((channel) => channel.id).join(',');
   useEffect(() => {
-    if (!user || !activeChannelId) return;
+    if (!user || !channelIdsKey) return;
     const controller = new AbortController();
     let mounted = true;
-    authedFetch(`/api/portal/chat/channels/${activeChannelId}/members`, {
-      signal: controller.signal,
-    })
-      .then((res) => res.json())
-      .then((json) => {
-        if (!mounted || !Array.isArray(json.members)) return;
-        const found: Record<string, string> = {};
-        for (const member of json.members) {
-          if (member && typeof member.uid === 'string' && typeof member.avatarUrl === 'string' && member.avatarUrl) {
-            found[member.uid] = member.avatarUrl;
-          }
-        }
-        if (Object.keys(found).length > 0) {
-          setAuthorAvatars((prev) => ({ ...prev, ...found }));
-        }
+    for (const channelId of channelIdsKey.split(',')) {
+      authedFetch(`/api/portal/chat/channels/${channelId}/members`, {
+        signal: controller.signal,
       })
-      .catch((err) => {
-        if (!mounted || isAbortError(err, controller.signal)) return;
-        console.error('Error loading channel member photos:', err);
-      });
+        .then((res) => res.json())
+        .then((json) => {
+          if (!mounted || !Array.isArray(json.members)) return;
+          setMemberCounts((prev) => ({ ...prev, [channelId]: json.members.length }));
+          const found: Record<string, string> = {};
+          for (const member of json.members) {
+            if (member && typeof member.uid === 'string' && typeof member.avatarUrl === 'string' && member.avatarUrl) {
+              found[member.uid] = member.avatarUrl;
+            }
+          }
+          if (Object.keys(found).length > 0) {
+            setAuthorAvatars((prev) => ({ ...prev, ...found }));
+          }
+        })
+        .catch((err) => {
+          if (!mounted || isAbortError(err, controller.signal)) return;
+          console.error('Error loading channel member photos:', err);
+        });
+    }
     return () => {
       mounted = false;
       controller.abort();
     };
-  }, [authedFetch, user, activeChannelId]);
+  }, [authedFetch, user, channelIdsKey]);
 
   // Probe the GIF feature once per session so we only render the GIF button when
   // a Tenor key is configured server-side (proxy returns { enabled: false }
@@ -886,7 +896,7 @@ export default function TeamChatPage() {
                   <h1 className="chat-line-rail-title">The line<br />chat</h1>
                   <div className="chat-line-channel-list">
                     {loadingChannels ? [0, 1, 2, 3].map((row) => <div className="chat-line-channel-skeleton" key={row} aria-hidden="true"><span /><span /><span /></div>) : channels.length === 0 ? <p className="chat-line-empty">No live channels yet. Ask an admin to sync chat channels.</p> : channels.map((channel, index) => {
-                      const memberCount = channel.memberIds?.length ?? 0;
+                      const memberCount = memberCounts[channel.id] ?? channel.memberIds?.length ?? 0;
                       return <button key={channel.id} type="button" onClick={() => setActiveChannelId(channel.id)} className={`chat-line-channel ${channel.id === activeChannelId ? 'is-active' : ''}`}>
                         <span className="chat-line-channel-number">{String(index + 1).padStart(2, '0')}</span>
                         <span className="chat-line-channel-tick" />
@@ -905,7 +915,7 @@ export default function TeamChatPage() {
                         <p className="chat-line-head-description">{activeChannel?.description ?? 'Choose a channel to view messages.'}</p>
                       </button>
                     </div>
-                    <div className="chat-line-head-meta"><span className="chat-line-live">LIVE</span><span>{activeChannel ? `${activeChannel.memberIds?.length ?? 0} members` : '— members'}</span></div>
+                    <div className="chat-line-head-meta"><span className="chat-line-live">LIVE</span><span>{activeChannel ? `${memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0} members` : '— members'}</span></div>
                   </header>
                   <div className="chat-line-pinned-band"><span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span><span className="chat-line-pinned-copy">{pinnedCopy || 'No pinned message yet'}{pinnedAuthor && <em> · {pinnedAuthor}</em>}</span><span className="chat-line-pinned-time">{pinnedTime}</span></div>
                   <div className="chat-line-message-stage">
@@ -967,7 +977,7 @@ export default function TeamChatPage() {
                 </section>
               </div>
               <div className="chat-line-mobile">
-                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} channelId={activeChannelId} messages={displayMessages} authorAvatars={authorAvatars} loading={loadingMessages} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
+                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} authorAvatars={authorAvatars} loading={loadingMessages} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
               </div>
               <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
               <ChatLightbox image={lightbox} onClose={closeLightbox} />

@@ -194,7 +194,7 @@ export default function LeaderboardPage() {
         <PortalHeader />
         <div className="flex">
           <PortalSidebar />
-          <main className="relative flex-1 overflow-auto bg-[#f7f8f5] dark:bg-[#030916]">
+          <main className="portal-main-offset relative flex-1 overflow-auto bg-[#f7f8f5] dark:bg-[#030916]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%)] dark:bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%),#030916]" aria-hidden="true" />
             <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_42%,transparent_35%,rgba(0,0,0,0.46)_100%)] opacity-70 mix-blend-multiply dark:block" aria-hidden="true" />
             <div className="relative z-10 mx-auto w-full max-w-[1500px] px-[clamp(14px,3.6vw,56px)] pb-8 pt-[19px]">

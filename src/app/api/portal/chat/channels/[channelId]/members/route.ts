@@ -88,6 +88,13 @@ export async function GET(
       const docs = await adminDb.getAll(...refs);
       members = docs
         .filter((doc) => doc.exists)
+        // memberIds can hold uids of deactivated accounts; those aren't
+        // people in the room, so they must not show up (or be counted).
+        // Docs without a status field predate the field and stay included.
+        .filter((doc) => {
+          const status = (doc.data() ?? {}).status;
+          return typeof status !== 'string' || status === 'active';
+        })
         .map((doc) => {
           const userData = doc.data() ?? {};
           return {

@@ -9,7 +9,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquare,
-  ReceiptText,
+  Trophy,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,8 +29,8 @@ function isItemActive(pathname: string, href: string) {
 const mobileSlotItems: PortalNavItem[] = [
   { label: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
   { label: 'Sales', href: '/portal/sales', icon: BadgeDollarSign, permissions: ['sales:read'] },
+  { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
   { label: 'Team Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
-  { label: 'Forms', href: '/portal/forms', icon: ReceiptText },
 ];
 
 function NavGroups({
