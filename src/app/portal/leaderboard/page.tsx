@@ -101,11 +101,17 @@ function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loa
   }, []);
 
   return (
-    <div className="relative grid gap-3 border-b-[5px] border-[#0A1F44] bg-[#8dc63f] px-[19px] py-4 text-[#0A1F44] shadow-[0_14px_34px_rgba(141,198,63,0.11)] dark:border-[#e7edf4] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
+    <div className="relative grid gap-3 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] py-4 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
       <div>
-        <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em]">Weekly challenge</span>
-        <span className="mt-2 block font-['Consolas'] text-[11px] font-black whitespace-nowrap sm:text-[12px]">
+        <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em] text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</span>
+        <span className="mt-2 block font-['Consolas'] text-[11px] font-black whitespace-nowrap text-white/85 sm:text-[12px]">
           {loading || sales === null ? `-- / ${target} · Loading` : `${Math.min(sales, target)} / ${target} · ${countdownToSunday(now)}`}
+        </span>
+        <span className="mt-2 block h-[3px] w-full bg-white/15" aria-hidden="true">
+          <span
+            className="block h-full bg-[#8dc63f] dark:bg-[#d9a520]"
+            style={{ width: `${loading || sales === null ? 0 : Math.min(sales / target, 1) * 100}%` }}
+          />
         </span>
       </div>
       <strong className="font-['Trebuchet_MS'] text-[15px] font-black sm:text-[18px]">

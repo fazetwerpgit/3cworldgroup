@@ -40,6 +40,15 @@ Updated: 2026-07-14 (update at EVERY milestone).
    sale_pending notifications in field-manager inboxes now land on
    their own pending list — cosmetic). COMMITTED LOCAL — WAITING ON
    JACOB'S WORD TO PUSH.
+3. LEADERBOARD WEEKLY-CHALLENGE RESTYLE (Jacob: "sticks out like a
+   sore thumb"): lime slab re-skinned to the Arena panel idiom
+   (navy gradient, white frame, gold label, slim progress bar) —
+   mirrors the Your Standing card exactly. Class-only change in
+   leaderboard/page.tsx WeeklyChallenge; gates green; my before/after
+   screenshot verify 1440+390; Opus skipped deliberately (no logic
+   beyond a width %); COMMITTED LOCAL with the visibility fix,
+   awaiting the same push. NOTE: this touches presentation AROUND the
+   frozen Spotlight Arena visuals, not the arena itself.
 2. EVERYTHING ELSE DEPLOYED 2026-07-14: chat scroll fix + All Company tape
    + weekly challenge admin + rep in-review section (9b5e1df batch),
    then T-Mobile price fix (430a335). TFiber catalog now 300/$45,
