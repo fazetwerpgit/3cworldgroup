@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 type Period = 'week' | 'month' | 'year' | 'all';
 type Metric = 'totalPoints' | 'totalSales';
 
-export const WEEKLY_CHALLENGE = { targetSales: 3 } as const;
+export const WEEKLY_CHALLENGE = { targetSales: 7 } as const;
 
 const periodOptions: { value: Period; label: string }[] = [
   { value: 'week', label: 'This Week' },
