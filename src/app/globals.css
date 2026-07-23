@@ -1586,6 +1586,15 @@ button:focus-visible {
 /* PORTAL SHELL - THE RAIL                                                     */
 /* ========================================================================== */
 
+/* iPhone status-bar clearance: with viewport-fit=cover (and especially the
+   installed home-screen app) the page extends under the status bar, so the
+   fixed header must grow by the top safe-area inset and every element that
+   sits below the header must offset by the same amount. 0px everywhere else.
+   Defined on :root because the app-shell lock rules target <body> directly. */
+:root {
+  --portal-safe-top: env(safe-area-inset-top, 0px);
+}
+
 .portal-scope,
 body.portal-scope {
   --rail-stage: #030916;
@@ -1603,10 +1612,10 @@ body.portal-scope {
   z-index: 40;
   inset: 0 0 auto;
   display: flex;
-  height: 72px;
+  height: calc(72px + var(--portal-safe-top));
   align-items: center;
   gap: 18px;
-  padding: 0 20px;
+  padding: var(--portal-safe-top) 20px 0;
   border-bottom: 1px solid var(--rail-line);
   background: rgba(255, 255, 255, 0.98);
   /* Same iOS Safari constraint as .portal-mobile-nav: backdrop-filter on a
@@ -2034,7 +2043,7 @@ body.portal-scope {
 .portal-rail-sidebar {
   position: fixed;
   z-index: 30;
-  top: 72px;
+  top: calc(72px + var(--portal-safe-top));
   bottom: 0;
   left: 0;
   display: flex;
@@ -2271,7 +2280,7 @@ body.portal-scope {
 .portal-canvas > .flex > main,
 .portal-main-offset {
   min-width: 0;
-  margin-top: 72px;
+  margin-top: calc(72px + var(--portal-safe-top));
 }
 
 .portal-mobile-nav,
@@ -2287,9 +2296,9 @@ body.portal-scope {
 
 @media (max-width: 1023px) {
   .portal-shell-header {
-    height: 62px;
+    height: calc(62px + var(--portal-safe-top));
     gap: 9px;
-    padding: 0 12px;
+    padding: var(--portal-safe-top) 12px 0;
   }
 
   .portal-brand {
@@ -2341,7 +2350,7 @@ body.portal-scope {
 
   .portal-canvas > .flex > main,
   .portal-main-offset {
-    margin-top: 62px;
+    margin-top: calc(62px + var(--portal-safe-top));
   }
 
   .portal-mobile-nav {
@@ -5050,11 +5059,11 @@ body.portal-scope {
 
   .chat-line-mobile {
     display: block;
-    min-height: calc(100dvh - 62px - 48px);
+    min-height: calc(100dvh - 62px - 48px - var(--portal-safe-top));
   }
 
   .chat-line-mobile-channel-screen {
-    min-height: calc(100dvh - 62px - 48px);
+    min-height: calc(100dvh - 62px - 48px - var(--portal-safe-top));
     padding: 28px 14px max(28px, env(safe-area-inset-bottom));
     background: radial-gradient(circle at 70% 0, rgba(21, 60, 116, 0.2), transparent 35%);
   }
@@ -5189,7 +5198,7 @@ body.portal-scope {
 
   .chat-line-thread {
     display: grid;
-    height: calc(100dvh - 62px - 48px);
+    height: calc(100dvh - 62px - 48px - var(--portal-safe-top));
     grid-template-rows: auto auto minmax(0, 1fr) auto;
     background: var(--chat-line-stage);
     color: var(--chat-line-ink);
@@ -13678,8 +13687,8 @@ body.portal-scope {
 
   body[data-portal-bottom-nav] .portal-canvas > .flex > main,
   body[data-portal-bottom-nav] .portal-main-offset {
-    height: calc(100dvh - 62px);
-    margin-top: 62px;
+    height: calc(100dvh - 62px - var(--portal-safe-top));
+    margin-top: calc(62px + var(--portal-safe-top));
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
