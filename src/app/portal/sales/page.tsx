@@ -69,7 +69,7 @@ function InReviewSection({ sales }: { sales: Sale[] }) {
                   {sale.productSold && <span>{sale.productSold}</span>}
                 </div>
                 <span className="sales-line-inreview-value portal-metallic-num">{formatMonthlyValue(sale.totalValue || 0)}<small>/mo</small></span>
-                <span className="sales-line-inreview-date">{formatSubmittedDate(sale.createdAt)}</span>
+                <span className="sales-line-inreview-date">{sale.installDate ? `Install ${formatSubmittedDate(sale.installDate)}` : 'Install —'}</span>
                 <span className="sales-line-inreview-wait">{waiting === 0 ? 'Today' : `${waiting}d waiting`}</span>
               </Link>
             );

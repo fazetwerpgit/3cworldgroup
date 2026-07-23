@@ -162,6 +162,14 @@ export function SaleDetailSheet({
           </section>
 
           <section className="sales-line-sheet-block">
+            <span className="sales-line-sheet-label">Dates</span>
+            <div className="sales-line-sheet-dates">
+              <span>Sold <b>{formatDate(sale.saleDate)}</b></span>
+              <span>Install <b>{formatDate(sale.installDate)}</b></span>
+            </div>
+          </section>
+
+          <section className="sales-line-sheet-block">
             <span className="sales-line-sheet-label">Plans sold</span>
             <div className="sales-line-plans">
               {sale.products?.map((product, productIndex) => (

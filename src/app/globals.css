@@ -3205,6 +3205,18 @@ body.portal-scope {
   font-size: 10px;
 }
 
+.sales-line-date-cell strong {
+  display: block;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+}
+.sales-line-date-cell span {
+  display: block;
+  margin-top: 2px;
+  font-size: 8px;
+}
+
 .sales-line-money {
   text-align: right;
   font-size: 12px;
@@ -3403,6 +3415,19 @@ body.portal-scope {
   border-top: 1px solid rgba(231, 237, 244, 0.14);
   margin-top: 20px;
   padding-top: 15px;
+}
+
+.sales-line-sheet-dates {
+  display: flex;
+  gap: 18px;
+  color: #9caabd;
+  font-size: 11px;
+}
+
+.sales-line-sheet-dates b {
+  margin-left: 4px;
+  color: #f4f7fa;
+  font-weight: 800;
 }
 
 .sales-line-customer-detail {
