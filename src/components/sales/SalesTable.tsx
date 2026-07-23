@@ -262,7 +262,7 @@ export function SalesTable({
               >
                 <div className="sales-line-customer-cell"><strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong><span>{productSummary(sale)}</span></div>
                 <div className="sales-line-rep-cell"><span className="sales-line-avatar">{repInitials(sale.salesRepName)}</span>{sale.salesRepName}</div>
-                <div className="sales-line-date-cell"><strong>{sale.installDate ? formatDate(sale.installDate) : '—'}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
+                <div className="sales-line-date-cell"><strong>Install {sale.installDate ? formatDate(sale.installDate) : '—'}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
                 <div className="sales-line-money">{formatMoney(sale.totalValue || 0)}<small>/mo</small></div>
                 <div className="sales-line-money">{typeof sale.commission === 'number' ? formatMoney(sale.commission) : '—'}</div>
                 <div className="sales-line-status-cell"><StatusBadge status={sale.status} />{sale.status === 'pending' && <span className={`sales-line-stale ${ageTone(sale)}`}>{ageLabel(sale)}</span>}</div>
