@@ -186,7 +186,9 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    fetchWeeklyLeaderboard('week', 'totalSales', 1);
+    // 'submitted' scope: the challenge counts sales as reps log them,
+    // not only after admin approval.
+    fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
   }, [user, fetchWeeklyLeaderboard]);
 
   useEffect(() => {

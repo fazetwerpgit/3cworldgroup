@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get('period') || 'month';
     const metric = searchParams.get('metric') || 'totalPoints';
     const limit = parseInt(searchParams.get('limit') || '10');
+    // 'submitted' also counts pending sales — the weekly challenge tracks
+    // sales as reps log them, without waiting on admin approval. Rankings
+    // and points stay approved-only (the default).
+    const scope = searchParams.get('scope') === 'submitted' ? 'submitted' : 'approved';
 
     // Calculate date range
     const now = new Date();
@@ -54,7 +58,7 @@ export async function GET(request: NextRequest) {
     // Limit to prevent memory issues with large datasets
     const salesSnapshot = await adminDb
       .collection('sales')
-      .where('status', '==', 'approved')
+      .where('status', scope === 'submitted' ? 'in' : '==', scope === 'submitted' ? ['pending', 'approved'] : 'approved')
       .limit(5000)
       .get();
 

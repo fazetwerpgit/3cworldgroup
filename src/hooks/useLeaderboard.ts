@@ -28,7 +28,8 @@ export function useLeaderboard() {
   const fetchLeaderboard = useCallback(async (
     period: Period = 'month',
     metric: Metric = 'totalPoints',
-    limit: number = 10
+    limit: number = 10,
+    scope: 'approved' | 'submitted' = 'approved'
   ) => {
     setLoading(true);
     setError(null);
@@ -38,6 +39,7 @@ export function useLeaderboard() {
       params.append('period', period);
       params.append('metric', metric);
       params.append('limit', limit.toString());
+      if (scope === 'submitted') params.append('scope', scope);
 
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(`/api/portal/leaderboard?${params.toString()}`, {
