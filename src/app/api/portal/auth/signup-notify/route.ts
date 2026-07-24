@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
+import { looksLikeBotSignup } from '@/lib/auth/botDetection';
 
 export async function POST(request: Request) {
   let uid: string | undefined;
@@ -25,7 +26,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const name = (snap.get('displayName') as string | undefined) ?? (snap.get('email') as string | undefined) ?? uid;
+    const email = (snap.get('email') as string | undefined) ?? '';
+    const displayName = (snap.get('displayName') as string | undefined) ?? '';
+    if (looksLikeBotSignup(email, displayName)) {
+      await adminDb.doc(`users/${uid}`).update({ suspectedBot: true, updatedAt: new Date() });
+      return NextResponse.json({ ok: true });
+    }
+
+    const name = displayName || email || uid;
     await createAlertTask({
       kind: 'pending_assignment',
       subjectUserId: uid,

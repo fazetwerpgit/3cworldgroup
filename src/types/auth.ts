@@ -203,6 +203,9 @@ export interface User {
   displayName: string;
   role?: PlatformRole;       // Back-office users only
   fieldRole?: FieldRole;     // Field sales users only
+  // Set by signup-notify's bot heuristic; the admin pending queue hides these
+  // from the "needs a decision" list (they remain findable via status filters).
+  suspectedBot?: boolean;
   // IBO fields link the user to an IBO business entity for LLC/document
   // ownership. They are independent of ibo_level_* field roles, which are sales
   // role / pay tier / team-lead levels.

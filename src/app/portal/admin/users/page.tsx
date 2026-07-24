@@ -113,7 +113,10 @@ export default function UsersPage() {
 
   // Same real data this page already fetched — the "needs a decision" strip
   // is not a new query, per orchestrator ruling.
-  const pendingUsers = useMemo(() => users.filter((u) => u.status === 'pending'), [users]);
+  const pendingUsers = useMemo(
+    () => users.filter((u) => u.status === 'pending' && !u.suspectedBot),
+    [users]
+  );
 
   const handleStatusChange = async (userId: string, status: 'active' | 'inactive') => {
     try {

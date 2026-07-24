@@ -8,6 +8,7 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateSignup, passwordStrength, PASSWORD_STRENGTH_LABEL } from '@/lib/auth/signupValidation';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
+import { looksLikeBotSignup } from '@/lib/auth/botDetection';
 
 // Real 3-step structural fact describing the account flow (verify -> manager
 // approves -> role assigned + onboarding starts) — not measured data, same
@@ -40,6 +41,10 @@ export function SignupForm() {
     const check = validateSignup(email, password, displayName, confirmPassword);
     if (!check.ok) {
       setError(check.error);
+      return;
+    }
+    if (looksLikeBotSignup(email, displayName)) {
+      setError('This doesn\'t look like a real name and email. Use your everyday email address, or ask your manager to set up your account.');
       return;
     }
     setError('');

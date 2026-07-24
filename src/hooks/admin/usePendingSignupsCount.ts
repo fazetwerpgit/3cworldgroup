@@ -22,7 +22,7 @@ export function usePendingSignupsCount(enabled: boolean): number {
     const pendingQuery = query(collection(db, 'users'), where('status', '==', 'pending'));
     const unsubscribe = onSnapshot(
       pendingQuery,
-      (snapshot) => setCount(snapshot.docs.filter((doc) => !doc.get('fieldRole')).length),
+      (snapshot) => setCount(snapshot.docs.filter((doc) => !doc.get('fieldRole') && !doc.get('suspectedBot')).length),
       (err) => {
         // Fail closed: no badge is better than a stale/wrong one.
         console.error('Error listening to pending signups:', err);

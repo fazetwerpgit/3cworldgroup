@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         displayName: data.displayName,
         ...resolveRoles(data.role, data.fieldRole),
         isIBO: data.isIBO ?? false,
+        suspectedBot: data.suspectedBot,
         // TODO: migrate Firestore managerId -> reportsToId
         reportsToId: data.reportsToId ?? data.managerId,
         territoryId: data.territoryId,
