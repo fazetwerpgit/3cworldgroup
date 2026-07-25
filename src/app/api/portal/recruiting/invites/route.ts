@@ -8,6 +8,7 @@ import {
   OnboardingInvite,
   resolveRoles,
 } from '@/types';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { inviteEmail } from '@/lib/email/templates';
@@ -83,10 +84,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
-    const userId = request.nextUrl.searchParams.get('userId');
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+    const userId = gate.uid;
 
     const requester = await getRequester(userId);
     if (!requester?.canManage) {
@@ -126,8 +128,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    const requestedBy = gate.uid;
+
     const body = await request.json();
-    const requestedBy = clean(body.requestedBy);
     const candidateName = clean(body.candidateName);
     const candidateEmail = clean(body.candidateEmail, 180).toLowerCase();
     const candidatePhone = clean(body.candidatePhone, 80);
@@ -136,9 +143,9 @@ export async function POST(request: NextRequest) {
     const intendedFieldRole = clean(body.intendedFieldRole, 40) as FieldRole;
     const isIBO = body.isIBO === true;
 
-    if (!requestedBy || !candidateName || !candidateEmail || !candidatePhone) {
+    if (!candidateName || !candidateEmail || !candidatePhone) {
       return NextResponse.json(
-        { error: 'Manager, candidate name, email, and phone are required' },
+        { error: 'Candidate name, email, and phone are required' },
         { status: 400 }
       );
     }

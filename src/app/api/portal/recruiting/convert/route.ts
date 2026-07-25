@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { IBO_FIELD_ROLES, resolveRoles } from '@/types';
@@ -32,16 +33,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    const requestedBy = gate.uid;
+
     const body = await request.json();
-    const requestedBy = typeof body.requestedBy === 'string' ? body.requestedBy : '';
     const inviteId = typeof body.inviteId === 'string' ? body.inviteId : '';
     const action = body.action === 'rejected' ? 'rejected' : 'approved';
 
-    if (!requestedBy || !inviteId) {
-      return NextResponse.json(
-        { error: 'requestedBy and inviteId are required' },
-        { status: 400 }
-      );
+    if (!inviteId) {
+      return NextResponse.json({ error: 'inviteId is required' }, { status: 400 });
     }
 
     const requester = await getRequester(requestedBy);
