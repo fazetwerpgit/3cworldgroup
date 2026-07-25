@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { resolveRoles } from '@/types';
-
-async function isManagement(userId: string): Promise<boolean> {
-  const doc = await adminDb!.collection('users').doc(userId).get();
-  if (!doc.exists) return false;
-  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
-  return role === 'admin' || role === 'operations';
-}
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 
 // POST /api/portal/pipeline/field-train - "Message manager to field train".
 // Sends an in-app notification to the rep's manager (reportsToId, legacy
@@ -21,19 +14,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { userId, requestedBy, requestedByName, note } = body;
-
-    if (!userId || !requestedBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: userId, requestedBy' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    if (!(await isManagement(requestedBy))) {
+
+    const body = await request.json();
+    // userId is the TARGET rep to be field trained, not the caller.
+    const { userId, note } = body;
+
+    if (!userId) {
       return NextResponse.json(
-        { error: 'Only operations or admin can request field training' },
-        { status: 403 }
+        { error: 'Missing required field: userId' },
+        { status: 400 }
       );
     }
 
@@ -68,9 +61,9 @@ export async function POST(request: NextRequest) {
       title: 'Field Training Requested',
       message:
         `${repName} is ready for field training.` +
-        (note ? ` Note from ${requestedByName || 'operations'}: ${String(note).trim().slice(0, 500)}` : ''),
+        (note ? ` Note from ${gate.name}: ${String(note).trim().slice(0, 500)}` : ''),
       link: '/portal/admin/pipeline',
-      metadata: { repId: userId, requestedBy },
+      metadata: { repId: userId, requestedBy: gate.uid },
       read: false,
       createdAt: now,
     });

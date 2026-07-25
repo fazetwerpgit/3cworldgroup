@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { EmailTemplateCategory, resolveRoles } from '@/types';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { EmailTemplateCategory } from '@/types';
 
 const VALID_CATEGORIES: EmailTemplateCategory[] = [
   'recruiting',
@@ -9,14 +10,7 @@ const VALID_CATEGORIES: EmailTemplateCategory[] = [
   'general',
 ];
 
-async function isManagement(userId: string): Promise<boolean> {
-  const doc = await adminDb!.collection('users').doc(userId).get();
-  if (!doc.exists) return false;
-  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
-  return role === 'admin' || role === 'operations';
-}
-
-// GET /api/portal/email-templates?userId=xxx - Management-only template
+// GET /api/portal/email-templates - Management-only template
 // library. Templates are copy-paste material for management's own email
 // client; the app stores and organizes them, it does not send email.
 export async function GET(request: NextRequest) {
@@ -28,15 +22,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = request.nextUrl.searchParams.get('userId');
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-    if (!(await isManagement(userId))) {
-      return NextResponse.json(
-        { error: 'Only management can access email templates' },
-        { status: 403 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const snapshot = await adminDb.collection('emailTemplates').get();
@@ -76,23 +64,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { id, name, category, subject, body: templateBody, createdBy, createdByName } = body;
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
 
-    if (!name || !subject || !templateBody || !createdBy) {
+    const body = await request.json();
+    const { id, name, category, subject, body: templateBody } = body;
+
+    if (!name || !subject || !templateBody) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, subject, body, createdBy' },
+        { error: 'Missing required fields: name, subject, body' },
         { status: 400 }
       );
     }
     if (category && !VALID_CATEGORIES.includes(category)) {
       return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
-    }
-    if (!(await isManagement(createdBy))) {
-      return NextResponse.json(
-        { error: 'Only management can edit email templates' },
-        { status: 403 }
-      );
     }
 
     const now = new Date();
@@ -115,8 +102,8 @@ export async function POST(request: NextRequest) {
 
     const docRef = await adminDb.collection('emailTemplates').add({
       ...payload,
-      createdBy,
-      createdByName: createdByName || '',
+      createdBy: gate.uid,
+      createdByName: gate.name,
       createdAt: now,
     });
     return NextResponse.json({ success: true, id: docRef.id });
@@ -139,18 +126,17 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { templateId, requestedBy } = body;
-    if (!templateId || !requestedBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: templateId, requestedBy' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    if (!(await isManagement(requestedBy))) {
+
+    const body = await request.json();
+    const { templateId } = body;
+    if (!templateId) {
       return NextResponse.json(
-        { error: 'Only management can edit email templates' },
-        { status: 403 }
+        { error: 'Missing required field: templateId' },
+        { status: 400 }
       );
     }
 

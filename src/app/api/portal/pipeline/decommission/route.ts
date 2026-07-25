@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
-import { DecommissionReason, DecommissionReasonLabels, resolveRoles } from '@/types';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { DecommissionReason, DecommissionReasonLabels } from '@/types';
 
 const VALID_REASONS: DecommissionReason[] = ['non_activity', 'wrongdoing', 'manager_fire'];
-
-async function isManagement(userId: string): Promise<boolean> {
-  const doc = await adminDb!.collection('users').doc(userId).get();
-  if (!doc.exists) return false;
-  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
-  return role === 'admin' || role === 'operations';
-}
 
 // POST /api/portal/pipeline/decommission - Deactivate a rep with an audit
 // trail. Sets status 'inactive' (AuthContext blocks non-active sign-ins) and
@@ -25,19 +19,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { userId, reason, notes, decommissionedBy, decommissionedByName } = body;
-
-    if (!userId || !reason || !decommissionedBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: userId, reason, decommissionedBy' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    if (!(await isManagement(decommissionedBy))) {
+
+    const body = await request.json();
+    // userId is the TARGET rep being deactivated, not the caller.
+    const { userId, reason, notes } = body;
+
+    if (!userId || !reason) {
       return NextResponse.json(
-        { error: 'Only operations or admin can decommission reps' },
-        { status: 403 }
+        { error: 'Missing required fields: userId, reason' },
+        { status: 400 }
       );
     }
 
@@ -76,8 +70,8 @@ export async function POST(request: NextRequest) {
       decommission: {
         reason,
         notes: typeof notes === 'string' ? notes.trim().slice(0, 1000) : '',
-        decommissionedBy,
-        decommissionedByName: decommissionedByName || '',
+        decommissionedBy: gate.uid,
+        decommissionedByName: gate.name,
         decommissionedAt: now,
       },
       updatedAt: now,
@@ -107,18 +101,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { userId, requestedBy } = body;
-    if (!userId || !requestedBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: userId, requestedBy' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    if (!(await isManagement(requestedBy))) {
+
+    const body = await request.json();
+    // userId is the TARGET rep being reinstated, not the caller.
+    const { userId } = body;
+    if (!userId) {
       return NextResponse.json(
-        { error: 'Only operations or admin can reinstate reps' },
-        { status: 403 }
+        { error: 'Missing required field: userId' },
+        { status: 400 }
       );
     }
 

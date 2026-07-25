@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import {
   resolveRoles,
   getOnboardingItemsForUser,
@@ -7,13 +8,6 @@ import {
   PipelineStage,
   PIPELINE_STAGE_ORDER,
 } from '@/types';
-
-async function isManagement(userId: string): Promise<boolean> {
-  const doc = await adminDb!.collection('users').doc(userId).get();
-  if (!doc.exists) return false;
-  const { role } = resolveRoles(doc.data()?.role, doc.data()?.fieldRole);
-  return role === 'admin' || role === 'operations';
-}
 
 // GET /api/portal/pipeline - Recruiting pipeline overview.
 // Aggregates every field rep's onboarding progress, channel clearances and
@@ -28,15 +22,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = request.nextUrl.searchParams.get('userId');
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-    if (!(await isManagement(userId))) {
-      return NextResponse.json(
-        { error: 'Only operations or admin can access the recruiting pipeline' },
-        { status: 403 }
-      );
+    // The pipeline exposes the full field roster and HR data — management only,
+    // verified from the token.
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     // Whole-collection reads, aggregated in memory (team-sized data set -
