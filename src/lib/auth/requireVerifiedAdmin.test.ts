@@ -17,6 +17,7 @@ import {
   requireVerifiedSelfOrManagement,
   requireVerifiedFieldManagerOrManagement,
   requireVerifiedAdmin,
+  requireVerifiedRequester,
 } from './requireVerifiedAdmin';
 
 // A request carrying a Bearer token, unless a raw header is supplied.
@@ -77,6 +78,36 @@ describe('requireVerifiedUser — token handling', () => {
       expect(res.status).toBe(403);
       expect(res.error).toBe('User not found');
     }
+  });
+
+  // The mock stands in for the real Admin SDK regardless of what string it's handed,
+  // so a passing suite proves nothing about the 'Bearer ' slice unless something
+  // actually inspects the argument. These pin the exact value that crosses the boundary.
+  it('forwards the Admin SDK exactly the bare token — no Bearer prefix, no leading space', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep' });
+    await requireVerifiedUser(req('Bearer good-token'));
+    expect(verifyIdToken).toHaveBeenCalledTimes(1);
+    expect(verifyIdToken).toHaveBeenCalledWith('good-token');
+  });
+
+  it('rejects a Bearer header with no token after it, and never calls the Admin SDK', async () => {
+    const res = await requireVerifiedUser(req('Bearer'));
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.status).toBe(401);
+      expect(res.error).toBe('Missing authentication token');
+    }
+    expect(verifyIdToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a header with no "Bearer " prefix at all, and never calls the Admin SDK', async () => {
+    const res = await requireVerifiedUser(req('good-token'));
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.status).toBe(401);
+      expect(res.error).toBe('Missing authentication token');
+    }
+    expect(verifyIdToken).not.toHaveBeenCalled();
   });
 });
 
@@ -326,5 +357,89 @@ describe('requireVerifiedFieldManagerOrManagement', () => {
     const res = await requireVerifiedFieldManagerOrManagement(req());
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe('Forbidden: manager access required');
+  });
+});
+
+// requireVerifiedRequester backs sales GET, sales/[id] GET+PUT, sales/stats GET, and
+// notifications PUT. Unlike the hard-gates above it never 403s on role — it hands the
+// route a resolved isManagement / isAdmin / isManagerOrAbove triple and lets the route
+// decide how much to scope the query. Nothing else in this file pins down that triple.
+describe('requireVerifiedRequester', () => {
+  it('reports the full triple true for an admin', async () => {
+    userDoc({ status: 'active', role: 'admin', displayName: 'Boss', email: 'boss@x.com' });
+    const res = await requireVerifiedRequester(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.isManagement).toBe(true);
+      expect(res.isAdmin).toBe(true);
+      expect(res.isManagerOrAbove).toBe(true);
+    }
+  });
+
+  it('reports isManagement and isManagerOrAbove true, isAdmin false for operations', async () => {
+    userDoc({ status: 'active', role: 'operations', displayName: 'Ops', email: 'ops@x.com' });
+    const res = await requireVerifiedRequester(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.isManagement).toBe(true);
+      expect(res.isAdmin).toBe(false);
+      expect(res.isManagerOrAbove).toBe(true);
+    }
+  });
+
+  it('reports the full triple false for a plain rep', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep', displayName: 'Rep', email: 'rep@x.com' });
+    const res = await requireVerifiedRequester(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.isManagement).toBe(false);
+      expect(res.isAdmin).toBe(false);
+      expect(res.isManagerOrAbove).toBe(false);
+    }
+  });
+
+  it('reports isManagement false but isManagerOrAbove true for a management field role', async () => {
+    userDoc({ status: 'active', fieldRole: 'l1_manager', displayName: 'Field Mgr', email: 'fm@x.com' });
+    const res = await requireVerifiedRequester(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.isManagement).toBe(false);
+      expect(res.isAdmin).toBe(false);
+      expect(res.isManagerOrAbove).toBe(true);
+    }
+  });
+});
+
+// *** The load-bearing distinction behind src/app/api/portal/sales/route.ts:61 ***
+//
+//   const salesRepId = gate.isManagement ? searchParams.get('salesRepId') : gate.uid;
+//
+// isManagement is admin/operations only. A management FIELD role (l1_manager through
+// ibo_level_4, i.e. MANAGEMENT_FIELD_ROLES) makes isManagerOrAbove true but must NEVER
+// make isManagement true. isManagerOrAbove is the more natural-sounding name for that
+// route's check, so a future refactor could plausibly swap it in — and if it did, any
+// l1_manager could pass ?salesRepId= and read another rep's customer PII, with every
+// other test in this file still green (the plain-triple test above doesn't exercise a
+// management field role against requireVerifiedSelfOrManagement). These two tests exist
+// to go red on exactly that swap. Do not delete them as redundant.
+describe('requireVerifiedRequester / requireVerifiedSelfOrManagement — management field role is not isManagement', () => {
+  it('a management field role is isManagerOrAbove but NOT isManagement', async () => {
+    userDoc({ status: 'active', fieldRole: 'l1_manager' });
+    const res = await requireVerifiedRequester(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.isManagement).toBe(false);
+      expect(res.isManagerOrAbove).toBe(true);
+    }
+  });
+
+  it('requireVerifiedSelfOrManagement still confines a management field role to their own data', async () => {
+    userDoc({ status: 'active', fieldRole: 'l1_manager' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'some-other-uid');
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.status).toBe(403);
+      expect(res.error).toBe('Forbidden: you can only access your own data');
+    }
   });
 });
