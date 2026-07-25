@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireManagement, requireSelfOrManagement } from '@/lib/auth/requireManagement';
+import {
+  requireVerifiedManagement,
+  requireVerifiedRequester,
+  requireVerifiedSelfOrManagement,
+} from '@/lib/auth/requireVerifiedAdmin';
 
 // GET /api/portal/notifications - Get user notifications
 export async function GET(request: NextRequest) {
@@ -25,10 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // A user may read their own notifications; management may read anyone's.
-    const gate = await requireSelfOrManagement(
-      searchParams.get('requestedBy'),
-      userId
-    );
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -115,6 +116,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Routes create notifications internally via their own helpers; this public
+    // endpoint is an admin/announcement tool. Gate it so a caller can't spoof
+    // notifications (e.g. fake "Sale Approved") to arbitrary users.
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const body = await request.json();
     const { userId, type, title, message, link, metadata } = body;
 
@@ -123,14 +132,6 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields' },
         { status: 400 }
       );
-    }
-
-    // Routes create notifications internally via their own helpers; this public
-    // endpoint is an admin/announcement tool. Gate it so a caller can't spoof
-    // notifications (e.g. fake "Sale Approved") to arbitrary users.
-    const gate = await requireManagement(body.requestedBy);
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const notification = {
@@ -173,11 +174,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { notificationIds, userId, markAllRead, requestedBy } = body;
-
-    // Resolve the caller once; both branches scope writes to the caller's own
-    // notifications (management may act on anyone's).
-    const caller = requestedBy ?? userId;
+    const { notificationIds, userId, markAllRead } = body;
 
     // Commit doc refs in chunks to respect Firestore's 500-op batch limit.
     const commitInChunks = async (refs: FirebaseFirestore.DocumentReference[]) => {
@@ -191,7 +188,7 @@ export async function PUT(request: NextRequest) {
     };
 
     if (markAllRead && userId) {
-      const gate = await requireSelfOrManagement(caller, userId);
+      const gate = await requireVerifiedSelfOrManagement(request, userId);
       if (!gate.ok) {
         return NextResponse.json({ error: gate.error }, { status: gate.status });
       }
@@ -211,7 +208,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (notificationIds && Array.isArray(notificationIds)) {
-      const requester = await requireSelfOrManagement(caller, caller);
+      const requester = await requireVerifiedRequester(request);
       if (!requester.ok) {
         return NextResponse.json({ error: requester.error }, { status: requester.status });
       }
@@ -227,8 +224,7 @@ export async function PUT(request: NextRequest) {
         .filter(
           (doc) =>
             doc.exists &&
-            (requester.requester.isManagement ||
-              doc.data()?.userId === requester.requester.uid)
+            (requester.isManagement || doc.data()?.userId === requester.uid)
         )
         .map((doc) => doc.ref);
 
@@ -264,7 +260,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, requestedBy } = body;
+    const { userId } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -272,7 +268,7 @@ export async function DELETE(request: NextRequest) {
 
     // Same gate as mark-all-read: a user may clear their own bell; management
     // may clear anyone's.
-    const gate = await requireSelfOrManagement(requestedBy ?? userId, userId);
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
