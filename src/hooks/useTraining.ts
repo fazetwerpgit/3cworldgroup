@@ -45,7 +45,9 @@ export function useTraining() {
       if (filters?.type) params.append('type', filters.type);
       if (filters?.required) params.append('required', 'true');
 
-      const response = await fetch(`/api/portal/training?${params.toString()}`);
+      const response = await fetch(`/api/portal/training?${params.toString()}`, {
+        headers: await authHeaders(),
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -66,7 +68,9 @@ export function useTraining() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/portal/training/${id}`);
+      const response = await fetch(`/api/portal/training/${id}`, {
+        headers: await authHeaders(),
+      });
       const data = await response.json();
 
       if (!response.ok) {

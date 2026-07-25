@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedManagement, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 
 // GET /api/portal/training/[id] - Get a single training resource
 export async function GET(
@@ -18,6 +18,14 @@ export async function GET(
       );
     }
 
+    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
+    // role and must be able to open their assigned training before activation.
+    // Single token round-trip: isManagement decides publication access below.
+    const gate = await requireVerifiedRequester(request, { allowOnboarding: true });
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const doc = await adminDb.collection('training').doc(id).get();
 
     if (!doc.exists) {
@@ -25,6 +33,13 @@ export async function GET(
     }
 
     const data = doc.data();
+
+    // Unpublished drafts are management-only. 404 (not 403) so a non-management
+    // caller can't distinguish "draft exists" from "no such id".
+    if (!data?.isPublished && !gate.isManagement) {
+      return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
+    }
+
     const resource: TrainingResource = {
       id: doc.id,
       ...data,

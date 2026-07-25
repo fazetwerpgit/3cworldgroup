@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedManagement, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { deriveResourceType } from '@/lib/training/fileKind';
 
 // GET /api/portal/training - Get training resources
@@ -14,14 +14,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
+    // role and must be able to do their assigned training before activation.
+    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const category = searchParams.get('category');
     const type = searchParams.get('type');
     const isRequired = searchParams.get('required');
 
-    // Unpublished drafts are management-only. The published-only listing below
-    // stays open by design (reps and the public read it), so the gate is
-    // deliberately conditional on `all=true`.
+    // Unpublished drafts are management-only, on top of the any-verified-user
+    // gate above. The gate is conditional on `all=true`.
     const includeAll = searchParams.get('all') === 'true';
     if (includeAll) {
       const gate = await requireVerifiedManagement(request);
