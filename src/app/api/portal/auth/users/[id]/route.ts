@@ -9,7 +9,7 @@ import {
   roleRequiresOnboarding,
   resolveRoles,
 } from '@/types';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
@@ -36,9 +36,7 @@ export async function GET(
     }
 
     // A user's directory record (incl. PII) is management-only.
-    const gate = await requireManagement(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -96,14 +94,14 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
-    const { requestedBy, displayName, role, fieldRole, managerId, territoryId, phone, status, address, city, state, zip } = body;
-
     // Only admin/operations may edit users (incl. changing roles/status).
-    const gate = await requireManagement(requestedBy);
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+
+    const body = await request.json();
+    const { displayName, role, fieldRole, managerId, territoryId, phone, status, address, city, state, zip } = body;
 
     const docRef = adminDb.collection('users').doc(id);
     const doc = await docRef.get();
@@ -119,13 +117,13 @@ export async function PUT(
     // only an admin may edit a user who already holds a platform role.
     // Without this, an operations caller could escalate anyone (including
     // themselves) to admin, or rewrite an admin's record.
-    if (role !== undefined && !gate.requester.isAdmin) {
+    if (role !== undefined && !gate.isAdmin) {
       return NextResponse.json(
         { error: 'Forbidden: only an admin can assign platform roles' },
         { status: 403 }
       );
     }
-    if ((existingRole === 'admin' || existingRole === 'operations') && !gate.requester.isAdmin) {
+    if ((existingRole === 'admin' || existingRole === 'operations') && !gate.isAdmin) {
       return NextResponse.json(
         { error: 'Forbidden: only an admin can edit an admin or operations account' },
         { status: 403 }
@@ -318,14 +316,12 @@ export async function DELETE(
     }
 
     // Only admin/operations may delete users.
-    const gate = await requireManagement(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
     // Don't let a caller delete their own account out from under themselves.
-    if (gate.requester.uid === id) {
+    if (gate.uid === id) {
       return NextResponse.json(
         { error: 'You cannot delete your own account' },
         { status: 400 }
@@ -342,7 +338,7 @@ export async function DELETE(
     // Only an admin may delete an admin/operations account — an operations
     // caller must not be able to remove an admin.
     const targetRole = doc.get('role') as PlatformRole | undefined;
-    if ((targetRole === 'admin' || targetRole === 'operations') && !gate.requester.isAdmin) {
+    if ((targetRole === 'admin' || targetRole === 'operations') && !gate.isAdmin) {
       return NextResponse.json(
         { error: 'Forbidden: only an admin can delete an admin or operations account' },
         { status: 403 }

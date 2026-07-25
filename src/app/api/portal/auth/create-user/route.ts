@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { PlatformRole, FieldRole, FieldRoles } from '@/types';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
 
 // POST /api/portal/auth/create-user - Create a new user (management only)
@@ -14,9 +14,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Only admin/operations may create users (and assign roles).
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const body = await request.json();
     const {
-      requestedBy,
       email,
       password,
       displayName,
@@ -31,15 +36,9 @@ export async function POST(request: NextRequest) {
       zip,
     } = body;
 
-    // Only admin/operations may create users (and assign roles).
-    const gate = await requireManagement(requestedBy);
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.error }, { status: gate.status });
-    }
-
     // Platform-role boundary: only an admin may create an admin/operations
     // account. Otherwise an operations caller could mint a fresh admin.
-    if (role && !gate.requester.isAdmin) {
+    if (role && !gate.isAdmin) {
       return NextResponse.json(
         { error: 'Forbidden: only an admin can create admin or operations accounts' },
         { status: 403 }
