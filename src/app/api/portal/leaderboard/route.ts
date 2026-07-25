@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import {
   computeHistory,
   dayKey,
   type HistoryEnrichment,
   type SaleRecord,
 } from '@/lib/leaderboard/history';
+
+// How many ranked rows a non-management caller may pull in one request. The
+// most any rep-facing view asks for is 100 (dashboard); the mini widget asks 5.
+const NON_MANAGEMENT_LIMIT_CAP = 100;
 
 // GET /api/portal/leaderboard - Get leaderboard data (points-based)
 export async function GET(request: NextRequest) {
@@ -16,7 +20,7 @@ export async function GET(request: NextRequest) {
     // the leaderboard. Roster data, shown to a hired employee mid-onboarding —
     // allowOnboarding admits pending-WITH-a-field-role only, never an unapproved
     // self-signup, never a deactivated account.
-    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    const gate = await requireVerifiedRequester(request, { allowOnboarding: true });
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     if (!adminDb) {
@@ -29,7 +33,17 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const period = searchParams.get('period') || 'month';
     const metric = searchParams.get('metric') || 'totalPoints';
-    const limit = parseInt(searchParams.get('limit') || '10');
+    // `limit` is caller-controlled and each row carries a real uid and name, so
+    // an unbounded limit is a roster-enumeration primitive — the same shape that
+    // made the requireManagement hole a two-request exploit. Only the two admin
+    // pages legitimately ask for the whole company (limit=1000, to join sale
+    // counts onto the user table); every rep-facing caller asks for 5 or 100.
+    // Cap non-management callers at 100 rather than dropping allowOnboarding,
+    // which would blank the dashboard for every new hire.
+    const requestedLimit = parseInt(searchParams.get('limit') || '10');
+    const limit = gate.isManagement
+      ? requestedLimit
+      : Math.min(requestedLimit, NON_MANAGEMENT_LIMIT_CAP);
     // 'submitted' also counts pending sales — the weekly challenge tracks
     // sales as reps log them, without waiting on admin approval. Rankings
     // and points stay approved-only (the default).
