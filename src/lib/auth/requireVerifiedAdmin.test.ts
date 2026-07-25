@@ -14,6 +14,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 import {
   requireVerifiedUser,
   requireVerifiedManagement,
+  requireVerifiedSelfOrManagement,
   requireVerifiedFieldManagerOrManagement,
   requireVerifiedAdmin,
 } from './requireVerifiedAdmin';
@@ -212,16 +213,91 @@ describe('requireVerifiedAdmin', () => {
 });
 
 describe('requireVerifiedManagement', () => {
-  it('accepts active operations', async () => {
+  it('accepts active operations and reports isAdmin false', async () => {
     userDoc({ status: 'active', role: 'operations', displayName: 'Ops' });
     const res = await requireVerifiedManagement(req());
     expect(res.ok).toBe(true);
-    if (res.ok) expect(res.name).toBe('Ops');
+    if (res.ok) {
+      expect(res.name).toBe('Ops');
+      expect(res.isAdmin).toBe(false);
+    }
+  });
+
+  it('reports isAdmin true for an admin', async () => {
+    userDoc({ status: 'active', role: 'admin', displayName: 'Boss' });
+    const res = await requireVerifiedManagement(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.isAdmin).toBe(true);
   });
 
   it('rejects deactivated operations who kept their role', async () => {
     userDoc({ status: 'inactive', role: 'operations', displayName: 'Ex Ops' });
     const res = await requireVerifiedManagement(req());
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Account is not active');
+  });
+});
+
+// The helper the rep-facing onboarding routes use — the one place where the
+// status gate and the self/management boundary have to hold at the same time.
+describe('requireVerifiedSelfOrManagement', () => {
+  it('accepts an active user acting on their own data', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep', displayName: 'Rep' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'u1');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.isManagement).toBe(false);
+  });
+
+  it('rejects an active user reaching for someone else’s data', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'someone-else');
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.status).toBe(403);
+      expect(res.error).toBe('Forbidden: you can only access your own data');
+    }
+  });
+
+  it('accepts management acting on another user and flags isManagement', async () => {
+    userDoc({ status: 'active', role: 'operations', displayName: 'Ops' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'someone-else');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.isManagement).toBe(true);
+  });
+
+  it('rejects a mid-onboarding rep on their own data without the opt-in', async () => {
+    userDoc({ status: 'pending', fieldRole: 'entry_rep' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'u1');
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Account is pending approval');
+  });
+
+  it('accepts a mid-onboarding rep on their own data with allowOnboarding', async () => {
+    userDoc({ status: 'pending', fieldRole: 'entry_rep', displayName: 'New Rep' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'u1', { allowOnboarding: true });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.isManagement).toBe(false);
+  });
+
+  it('still confines a mid-onboarding rep to their own data under allowOnboarding', async () => {
+    userDoc({ status: 'pending', fieldRole: 'entry_rep' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'someone-else', {
+      allowOnboarding: true,
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Forbidden: you can only access your own data');
+  });
+
+  it('rejects an unapproved self-signup on its own data under allowOnboarding', async () => {
+    userDoc({ status: 'pending', email: 'bot@x.com' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'u1', { allowOnboarding: true });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe('Account is pending approval');
+  });
+
+  it('rejects a decommissioned rep on their own data even under allowOnboarding', async () => {
+    userDoc({ status: 'inactive', fieldRole: 'entry_rep' });
+    const res = await requireVerifiedSelfOrManagement(req(), 'u1', { allowOnboarding: true });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe('Account is not active');
   });
