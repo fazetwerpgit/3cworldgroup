@@ -120,11 +120,18 @@ export async function requireVerifiedManagement(
 // that managers may also act on for oversight. `targetUserId` is DATA (which
 // user the route acts on), never identity: identity comes only from the token.
 // `isManagement` is returned so a route can widen its scope for managers.
+// Takes VerifiedCallerOptions because the onboarding flow needs it: a hired rep
+// submitting their own onboarding documents is BY DEFINITION still 'pending'
+// (api/public/onboarding/[token] creates them pending with a field role, and
+// lib/onboarding/activation.ts only flips them to 'active' once every item is
+// approved). Without the passthrough this helper would 403 every new hire out of
+// the flow it exists to serve.
 export async function requireVerifiedSelfOrManagement(
   request: NextRequest,
-  targetUserId: string | null | undefined
+  targetUserId: string | null | undefined,
+  options?: VerifiedCallerOptions
 ): Promise<{ ok: true; uid: string; name: string; isManagement: boolean } | { ok: false; error: string; status: number }> {
-  const c = await verifyCaller(request);
+  const c = await verifyCaller(request, options);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
   const isManagement = role === 'admin' || role === 'operations';
