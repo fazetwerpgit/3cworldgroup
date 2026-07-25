@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 
 // PUT /api/portal/profile - Update user profile
 export async function PUT(request: NextRequest) {
@@ -11,15 +12,16 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { userId, displayName, phone } = body;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+    // Profile edits are always self-service — the target is the verified caller,
+    // never a client-supplied userId.
+    const userId = gate.uid;
+
+    const body = await request.json();
+    const { displayName, phone } = body;
 
     // Only allow updating specific fields
     const updates: Record<string, unknown> = {

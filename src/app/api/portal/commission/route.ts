@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import {
+  requireVerifiedAdmin,
+  requireVerifiedUser,
+} from '@/lib/auth/requireVerifiedAdmin';
+import {
   CommissionConfig,
   DEFAULT_COMMISSION,
   FieldRole,
@@ -43,7 +47,7 @@ async function loadTiers(): Promise<{
   };
 }
 
-// GET /api/portal/commission?userId=xxx - Pay structure, visibility-scoped.
+// GET /api/portal/commission - Pay structure, visibility-scoped.
 // Field users get ONLY their own tier (L2 > L1 > Entry - nobody sees a
 // higher tier's numbers). Platform users (admin/operations) get all tiers.
 export async function GET(request: NextRequest) {
@@ -55,10 +59,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = request.nextUrl.searchParams.get('userId');
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+    // Pay tiers are visibility-scoped to the caller's own role.
+    const userId = gate.uid;
 
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {
@@ -109,23 +115,19 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { tiers, updatedBy, updatedByName } = body;
-
-    if (!Array.isArray(tiers) || !updatedBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: tiers (array), updatedBy' },
-        { status: 400 }
-      );
+    // Only admins may edit rates — verified from the token, not a body field.
+    const gate = await requireVerifiedAdmin(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    // Only admins may edit rates
-    const editorDoc = await adminDb.collection('users').doc(updatedBy).get();
-    const editor = editorDoc.exists ? resolveRoles(editorDoc.data()?.role, editorDoc.data()?.fieldRole) : null;
-    if (editor?.role !== 'admin') {
+    const body = await request.json();
+    const { tiers } = body;
+
+    if (!Array.isArray(tiers)) {
       return NextResponse.json(
-        { error: 'Only admins can edit the pay structure' },
-        { status: 403 }
+        { error: 'Missing required fields: tiers (array)' },
+        { status: 400 }
       );
     }
 
@@ -170,8 +172,8 @@ export async function PUT(request: NextRequest) {
 
     await adminDb.collection('config').doc('commission').set({
       tiers: cleaned,
-      updatedBy,
-      updatedByName: updatedByName || '',
+      updatedBy: gate.uid,
+      updatedByName: gate.name,
       updatedAt: new Date(),
     });
 

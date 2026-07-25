@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import {
+  requireVerifiedManagement,
+  requireVerifiedUser,
+} from '@/lib/auth/requireVerifiedAdmin';
+import {
   CALL_DAY_ORDER,
   CallAudience,
   CallDay,
@@ -17,7 +21,7 @@ function canManage(role?: string): boolean {
   return role === 'admin' || role === 'operations';
 }
 
-// GET /api/portal/calls?userId=xxx - The recurring call schedule, scoped
+// GET /api/portal/calls - The recurring call schedule, scoped
 // by audience: entry reps see 'all' calls; managers and platform users
 // also see 'managers' calls. Sorted by day order then time.
 export async function GET(request: NextRequest) {
@@ -29,10 +33,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = request.nextUrl.searchParams.get('userId');
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const gate = await requireVerifiedUser(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+    // Audience scoping keys off the caller's own role.
+    const userId = gate.uid;
 
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {
@@ -95,24 +101,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { title, description, day, time, timezone, meetLink, audience, createdBy, createdByName } = body;
-
-    if (!title || !day || !time || !meetLink || !createdBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: title, day, time, meetLink, createdBy' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    const creatorDoc = await adminDb.collection('users').doc(createdBy).get();
-    const creator = creatorDoc.exists
-      ? resolveRoles(creatorDoc.data()?.role, creatorDoc.data()?.fieldRole)
-      : null;
-    if (!canManage(creator?.role)) {
+    const body = await request.json();
+    const { title, description, day, time, timezone, meetLink, audience } = body;
+
+    if (!title || !day || !time || !meetLink) {
       return NextResponse.json(
-        { error: 'Only operations or admin can manage the call schedule' },
-        { status: 403 }
+        { error: 'Missing required fields: title, day, time, meetLink' },
+        { status: 400 }
       );
     }
 
@@ -145,8 +145,8 @@ export async function POST(request: NextRequest) {
       meetLink: String(meetLink).trim(),
       audience: audience ?? 'all',
       active: true,
-      createdBy,
-      createdByName: createdByName || '',
+      createdBy: gate.uid,
+      createdByName: gate.name,
       createdAt: now,
       updatedAt: now,
     });
@@ -172,23 +172,17 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { callId, requestedBy } = body;
-    if (!callId || !requestedBy) {
-      return NextResponse.json(
-        { error: 'Missing required fields: callId, requestedBy' },
-        { status: 400 }
-      );
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    const requesterDoc = await adminDb.collection('users').doc(requestedBy).get();
-    const requester = requesterDoc.exists
-      ? resolveRoles(requesterDoc.data()?.role, requesterDoc.data()?.fieldRole)
-      : null;
-    if (!canManage(requester?.role)) {
+    const body = await request.json();
+    const { callId } = body;
+    if (!callId) {
       return NextResponse.json(
-        { error: 'Only operations or admin can manage the call schedule' },
-        { status: 403 }
+        { error: 'Missing required field: callId' },
+        { status: 400 }
       );
     }
 
