@@ -7,66 +7,78 @@ Updated: 2026-07-25 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-**JACOB: review and merge `security/close-open-routes`, then deploy the
-Firestore rules yourself.** The overnight security work is COMPLETE — 42
-commits, all gates green, adversarially reviewed. Nothing was pushed and
-nothing was deployed, per your instructions.
+NOTHING IN FLIGHT. The security hardening SHIPPED to production on
+2026-07-25 (46 commits, merged to master, pushed, Vercel deployed).
+Firestore rules were deployed separately by Jacob and smoke-tested via
+chat. Ask Jacob what he wants next.
 
-Read first: `docs/security/2026-07-25-findings.md` (what was wrong and what
-changed). Then `docs/security/2026-07-25-verification-checklist.md` — the
-click-through only you can do, because no agent had a login and creating one
-against the live Firebase project was refused as an unattended production
-change.
+WHAT SHIPPED — two critical holes, both closed:
+1. The management auth helper never verified a token; it trusted a
+   client-supplied uid and looked up THAT user's role. 18 routes gated on
+   it. Combined with the chat members endpoint handing out a labelled
+   uid->role directory, any employee could become a full admin in two
+   requests. Module deleted, all 18 migrated to token-verified helpers.
+2. Decommissioning only set a Firestore flag — the Firebase auth account
+   still worked forever, and a fired ADMIN kept admin. Both paths now
+   disable the account and revoke refresh tokens.
+Plus: 11 fully ungated routes closed, account-status enforced at the API
+layer, and firestore.rules locked down for sales/training/userProgress/
+leaderboard.
 
-Then, and only after you have read the rules diff:
-`docs/security/firestore-rules-deploy.md` → `firebase deploy --only
-firestore:rules --project cworldgroup-cca68`. The rules are written and
-committed but NOT deployed.
+VERIFIED AGAINST PRODUCTION with four disposable accounts (created, tested,
+destroyed, swept clean — zero residue):
+- uid-as-authority (?requestedBy=, ?userId=) -> 403 everywhere
+- inactive account with a VALID token -> 403 everywhere
+- unapproved self-signup (pending, no field role) -> 403 everywhere
+- pending-with-field-role new hire -> 200 on bell/training/dashboard, and
+  Mark Complete writes AND persists
+- pending->active boundary flips forms/options, company-stats and
+  weekly-challenge from 403 to 200 exactly as designed
+Jacob then confirmed in-browser: user management, dashboard and chat all
+load.
 
-THE HEADLINE: any employee could become a full admin in two requests. The
-management auth helper never verified a token — it took a client-supplied
-uid and looked up that user's role. The chat members endpoint handed out a
-labelled uid→role directory, so picking an admin took one request and being
-them took the second. Separately, decommissioned employees kept full API
-access indefinitely: their Firebase account was never disabled, so a fired
-admin was still an admin.
+STILL NOT VERIFIED (low risk, would fail LOUDLY not silently):
+- approving a sale end to end; the form review queues (payroll disputes
+  etc.). Same gate as user management, which works.
+- the leaderboard 100-row cap for non-management never engaged — only 6
+  ranked reps exist, so 1000 and 100 return the same thing.
+- production Firestore has ZERO training resources, so the training list
+  legitimately renders empty for everyone.
 
-MOST IMPORTANT THING TO CHECK IN THE BROWSER: a **pending** rep (hired,
-mid-onboarding, not yet activated). That account state is where every
-regression risk in this diff lives, and the failures are SILENT — an empty
-notification bell, a progress ring stuck at 0%, a Mark Complete button that
-reports success and does nothing. Two such regressions were caught and fixed
-by the adversarial review after the implementation work "finished"; they are
-the reason the checklist exists.
+KNOWN PRE-EXISTING, NOT FROM THIS WORK — do not misattribute:
+- useLeaderboard.ts:44 and useFormOptions.ts:13 read auth.currentUser
+  directly with no user guard, so a hard refresh can race auth. The
+  race-safe helper is src/lib/firebase/getIdToken.ts (added 7f72e65).
+  useLeaderboard fails LOUD (console 401); useFormOptions fails SILENT
+  (early return, empty dropdowns, no request at all).
+- admin/page.tsx:25 declares authedFetch(url) with NO init param, so
+  using it for a POST silently drops the method and body. 3 call sites
+  depend on it being GET-only.
+- 26 eslint errors in marketing pages + two chat hooks.
 
-KNOWN-GOOD BASELINE IF SOMETHING LOOKS BROKEN: a hard-refresh 401 on the
-leaderboard, or empty dropdowns on a form, are **pre-existing on master** and
-not from this branch. See finding #8 in the findings doc before blaming the
-security work.
+SUGGESTED NEXT SECURITY WORK (nothing started): rate limiting (login,
+signup and /api/public/applications accept unlimited requests and the
+public form has no captcha/honeypot — "x" passes as an email), then
+security headers/CSP (no middleware.ts exists at all). Full list under
+"Still open" in docs/security/2026-07-25-findings.md.
 
-STANDING RULES THAT WERE IN FORCE (kept, in case work resumes):
-- NEVER push to master, NEVER let Vercel deploy. Branch only.
-- firestore.rules: written and committed, NEVER deployed by an agent.
-- NEVER authenticate against production Firebase — no disposable admin
-  accounts, no minting custom tokens for real employees. This was requested
-  by a subagent to finish browser verification and refused: impersonating a
-  real person's production account, or leaving a live privileged account
-  behind if cleanup silently fails, costs far more than the ten minutes of
-  manual clicking it would have saved.
-- Adversarial review by Opus agents that wrote none of the code.
+KEY DOCS: docs/security/2026-07-25-findings.md (what was wrong, what
+changed, what is still open), docs/security/firestore-rules-deploy.md,
+scripts/audit-open-routes.mjs (derives its probe list from the real route
+table — run it after adding any route).
 
 METHOD NOTE WORTH KEEPING: grepping route files for auth-helper names was
-wrong in BOTH directions — it flagged six properly-gated routes as open, and
-counted eighteen unauthenticated ones as safe. Only following the call chain
-and probing a running server produced correct answers. Related: a green
-`scripts/audit-open-routes.mjs` proves the *listed* routes are gated and
-nothing more — `/api/portal/training` was open to the internet while the
-script reported "0 of 17 clean", and both statements were true.
+wrong in BOTH directions — it flagged six properly-gated routes as open and
+counted eighteen unauthenticated ones as safe. Only following the call
+chain and probing a running server produced correct answers. Likewise a
+green audit script proves the LISTED routes are gated and nothing more:
+/api/portal/training was open to the internet while the old script
+reported "0 of 17 clean", and both statements were true.
 
-WHAT IS STILL OPEN (deliberately, none blocking the merge): no rate limiting
-anywhere, no security headers or CSP, no Firestore rules tests or emulator,
-and the items listed under "Still open" in the findings doc. Suggested order
-if you want a next session: rate limiting, then headers/CSP.
+ONE OPEN ITEM DELIBERATELY DEFERRED: onboarding/upload parses the
+multipart body before its auth gate (the target userId lives in the form
+data). Pre-existing, low severity, free DoS amplifier for an
+unauthenticated caller.
 
 ## SHIPPED 2026-07-15 (all Vercel Ready in Production)
 
