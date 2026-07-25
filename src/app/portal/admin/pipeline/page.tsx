@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   PipelineRep,
   PipelineStage,
@@ -19,6 +20,16 @@ import {
 interface ChannelRow extends Channel {
   status: ChannelOnboardingStatus;
   reference: string | null;
+}
+
+// These routes verify the caller from the ID token — the acting identity is
+// never sent in the query string or body.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
 }
 
 export default function PipelinePage() {
@@ -47,7 +58,7 @@ export default function PipelinePage() {
   const fetchPipeline = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(`/api/portal/pipeline?userId=${user.uid}`);
+      const response = await fetch('/api/portal/pipeline', { headers: await authHeaders() });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pipeline');
       setReps(json.reps);
@@ -66,7 +77,9 @@ export default function PipelinePage() {
     setChannelsLoading(true);
     try {
       if (!user) return;
-      const response = await fetch(`/api/portal/pipeline/channels?userId=${rep.uid}&requestedBy=${user.uid}`);
+      const response = await fetch(`/api/portal/pipeline/channels?userId=${rep.uid}`, {
+        headers: await authHeaders(),
+      });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load channels');
       setChannelRows(json.channels);
@@ -85,8 +98,8 @@ export default function PipelinePage() {
     try {
       const response = await fetch('/api/portal/pipeline/channels', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: channelsModal.uid, channelId, status, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ userId: channelsModal.uid, channelId, status }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to update channel');
@@ -106,8 +119,8 @@ export default function PipelinePage() {
     try {
       const response = await fetch('/api/portal/pipeline/field-train', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: rep.uid, requestedBy: user.uid, requestedByName: user.displayName || user.email }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ userId: rep.uid }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to send request');
@@ -126,13 +139,11 @@ export default function PipelinePage() {
     try {
       const response = await fetch('/api/portal/pipeline/decommission', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
           userId: decommissionModal.uid,
           reason: decommissionReason,
           notes: decommissionNotes,
-          decommissionedBy: user.uid,
-          decommissionedByName: user.displayName || user.email,
         }),
       });
       const json = await response.json();
@@ -156,8 +167,8 @@ export default function PipelinePage() {
     try {
       const response = await fetch('/api/portal/pipeline/decommission', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: rep.uid, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ userId: rep.uid }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to reinstate');

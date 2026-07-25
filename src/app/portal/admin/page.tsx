@@ -117,7 +117,7 @@ export default function OpsHomePage() {
       const href = '/portal/admin/pipeline';
       const description = 'Field reps moving through onboarding to active sales.';
       try {
-        const res = await fetch(`/api/portal/pipeline?userId=${user.uid}`);
+        const res = await authedFetch('/api/portal/pipeline');
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'failed');
         const counts: Record<string, number> = json.counts || {};
@@ -134,7 +134,7 @@ export default function OpsHomePage() {
       const href = '/portal/admin/recruiting';
       const description = 'Candidate invites that have submitted paperwork.';
       try {
-        const res = await fetch(`/api/portal/recruiting/invites?userId=${user.uid}`);
+        const res = await authedFetch('/api/portal/recruiting/invites');
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'failed');
         const invites: { status?: string; submittedAt?: string | null }[] = Array.isArray(json.invites) ? json.invites : [];

@@ -18,6 +18,7 @@ import {
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   ratesArePending,
   CommissionConfig,
@@ -277,7 +278,11 @@ export function ResourcesLinePayLane() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/portal/commission?userId=${user.uid}`);
+      // Tiers are scoped to the caller's own role, resolved from this token.
+      const token = await getIdToken();
+      const response = await fetch('/api/portal/commission', {
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+      });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pay structure');
       setData(json);
@@ -305,14 +310,14 @@ export function ResourcesLinePayLane() {
     setSaving(true);
     setError('');
     try {
+      const token = await getIdToken();
       const response = await fetch('/api/portal/commission', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tiers: draft,
-          updatedBy: user.uid,
-          updatedByName: user.displayName || user.email,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token ?? ''}`,
+        },
+        body: JSON.stringify({ tiers: draft }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to save');

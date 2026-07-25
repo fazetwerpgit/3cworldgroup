@@ -114,10 +114,16 @@ export default function SettingsPage() {
     setError('');
     setSuccess('');
     try {
+      // The route derives the target user from this token — profile edits are
+      // always self-service.
+      const token = await auth?.currentUser?.getIdToken();
       const response = await fetch('/api/portal/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, displayName, phone }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token ?? ''}`,
+        },
+        body: JSON.stringify({ displayName, phone }),
       });
       if (!response.ok) throw new Error('Failed to update profile');
       await refreshUser();

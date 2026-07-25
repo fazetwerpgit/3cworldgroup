@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   AdminCatalogCard,
   AdminCatalogList,
@@ -52,6 +53,16 @@ function tokenCount(body: string) {
   return (body.match(/\{\{[a-z_]+\}\}/g) || []).length;
 }
 
+// The template routes verify management from the ID token — the acting
+// identity is never sent in the query string or body.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
+
 export default function EmailTemplatesPage() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<TemplateEntry[]>([]);
@@ -70,7 +81,7 @@ export default function EmailTemplatesPage() {
   const fetchTemplates = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(`/api/portal/email-templates?userId=${user.uid}`);
+      const response = await fetch('/api/portal/email-templates', { headers: await authHeaders() });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load templates');
       setTemplates(json.templates);
@@ -97,15 +108,13 @@ export default function EmailTemplatesPage() {
     try {
       const response = await fetch('/api/portal/email-templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
           ...(form.id ? { id: form.id } : {}),
           name: form.name,
           category: form.category,
           subject: form.subject,
           body: form.body,
-          createdBy: user.uid,
-          createdByName: user.displayName || user.email,
         }),
       });
       const json = await response.json();
@@ -128,8 +137,8 @@ export default function EmailTemplatesPage() {
     try {
       const response = await fetch('/api/portal/email-templates', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: template.id, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ templateId: template.id }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to delete template');

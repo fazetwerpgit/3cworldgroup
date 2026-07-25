@@ -14,6 +14,7 @@ import {
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   ApplicationRecord,
   ApplicationStatus,
@@ -22,6 +23,16 @@ import {
   RecruitingStatusLabels,
   RoleDisplayNames,
 } from '@/types';
+
+// The recruiting routes verify the caller from the ID token — the acting
+// identity is never sent in the query string or body.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 interface InviteView {
   id: string;
@@ -125,7 +136,7 @@ export default function RecruitingCommandCenterPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/api/portal/recruiting/invites?userId=${user.uid}`);
+      const response = await fetch('/api/portal/recruiting/invites', { headers: await authHeaders() });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load recruiting data');
       setInvites(json.invites);
@@ -167,11 +178,8 @@ export default function RecruitingCommandCenterPage() {
     try {
       const response = await fetch('/api/portal/recruiting/invites', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          requestedBy: user.uid,
-        }),
+        headers: await authHeaders(true),
+        body: JSON.stringify(form),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to create invite');
@@ -202,12 +210,8 @@ export default function RecruitingCommandCenterPage() {
     try {
       const response = await fetch('/api/portal/recruiting/convert', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestedBy: user.uid,
-          inviteId,
-          action,
-        }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ inviteId, action }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to update recruit');

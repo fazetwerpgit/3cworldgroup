@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -148,6 +149,16 @@ const CENTRAL_FORMATTER = new Intl.DateTimeFormat('en-US', {
   hour12: false,
 });
 
+// The calls route verifies the caller from the ID token — audience scoping and
+// the createdBy stamp both come from it, never from client input.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
+
 function formatTime(time: string): string {
   const [h, m] = time.split(':').map(Number);
   const suffix = h >= 12 ? 'PM' : 'AM';
@@ -236,7 +247,7 @@ export default function CallsSchedulePage() {
   const fetchCalls = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(`/api/portal/calls?userId=${user.uid}`);
+      const response = await fetch('/api/portal/calls', { headers: await authHeaders() });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load call schedule');
       setData(json);
@@ -271,12 +282,8 @@ export default function CallsSchedulePage() {
     try {
       const response = await fetch('/api/portal/calls', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          createdBy: user.uid,
-          createdByName: user.displayName || user.email,
-        }),
+        headers: await authHeaders(true),
+        body: JSON.stringify(form),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to add call');
@@ -297,8 +304,8 @@ export default function CallsSchedulePage() {
     try {
       const response = await fetch('/api/portal/calls', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callId: call.id, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ callId: call.id }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to remove call');
