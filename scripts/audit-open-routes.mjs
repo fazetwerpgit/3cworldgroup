@@ -49,6 +49,8 @@ const PROBES = [
   ['GET', '/api/portal/forms/leads-request/review', null],
   ['GET', '/api/portal/forms/manager-interview/review', null],
   ['GET', '/api/portal/forms/expedite-order/review', null],
+  ['GET', '/api/portal/training', null],
+  ['GET', '/api/portal/training/probe-nonexistent-id', null],
 ];
 
 // Routes that are public BY DESIGN. Listed so the report distinguishes
