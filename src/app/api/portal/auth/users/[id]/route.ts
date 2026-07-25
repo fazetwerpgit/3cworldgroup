@@ -211,6 +211,32 @@ export async function PUT(
 
     await docRef.update(updateData);
 
+    // Flipping the Firestore flag does not end the session: the account's refresh
+    // token keeps minting valid ID tokens, so the API status gate would be the
+    // only thing standing between a deactivated admin and their old admin access.
+    // Disable the auth account (blocks new sign-ins and refreshes immediately)
+    // and revoke issued refresh tokens. Re-enabling on 'active' is required, not
+    // symmetry: without it a reinstated user — including one disabled by
+    // pipeline/decommission — could never sign in again whatever their doc says.
+    // 'pending' is deliberately not disabled: an unapproved self-signup must
+    // still be able to sign in to reach the pending screen.
+    // Best-effort: the profile update is already committed above, so a Firebase
+    // Auth failure must not fail the request - but it must be loud.
+    if (adminAuth && updateData.status === 'inactive') {
+      try {
+        await adminAuth.updateUser(id, { disabled: true });
+        await adminAuth.revokeRefreshTokens(id);
+      } catch (err) {
+        console.error('[users] Failed to disable auth account', id, err);
+      }
+    } else if (adminAuth && updateData.status === 'active') {
+      try {
+        await adminAuth.updateUser(id, { disabled: false });
+      } catch (err) {
+        console.error('[users] Failed to re-enable auth account', id, err);
+      }
+    }
+
     // Re-stamp denormalized chat author fields on this user's OLD messages so
     // they don't keep showing a stale name/role forever. Only when something
     // actually changed to a new value; a backfill failure must never roll
