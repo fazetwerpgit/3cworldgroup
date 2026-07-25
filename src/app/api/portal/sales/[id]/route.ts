@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Sale } from '@/types';
-import { getRequester, requireAdmin } from '@/lib/auth/requireManagement';
+import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
@@ -19,6 +19,14 @@ export async function GET(
       );
     }
 
+    // A sale row carries customer PII; only its owning rep or management may read
+    // it. Gate before the lookup so an unauthorised caller cannot use the 404 to
+    // probe which sale ids exist.
+    const requester = await requireVerifiedRequester(request);
+    if (!requester.ok) {
+      return NextResponse.json({ error: requester.error }, { status: requester.status });
+    }
+
     const doc = await adminDb.collection('sales').doc(id).get();
 
     if (!doc.exists) {
@@ -27,13 +35,8 @@ export async function GET(
 
     const data = doc.data();
 
-    // A sale row carries customer PII; only its owning rep or management may read it.
-    const requester = await getRequester(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
-    if (!requester) {
-      return NextResponse.json({ error: 'Caller not found' }, { status: 403 });
-    }
+    // Ownership compares the sale's stored rep against the TOKEN uid — never a
+    // client-supplied field.
     if (!requester.isManagement && data?.salesRepId !== requester.uid) {
       return NextResponse.json(
         { error: 'Forbidden: you can only view your own sales' },
@@ -76,6 +79,13 @@ export async function PUT(
       );
     }
 
+    // Only the owning rep or management may edit a sale. Gate before the body is
+    // read so no client-supplied field can influence who the caller is.
+    const requester = await requireVerifiedRequester(request);
+    if (!requester.ok) {
+      return NextResponse.json({ error: requester.error }, { status: requester.status });
+    }
+
     const body = await request.json();
     const docRef = adminDb.collection('sales').doc(id);
     const doc = await docRef.get();
@@ -84,11 +94,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
     }
 
-    // Only the owning rep or management may edit a sale.
-    const requester = await getRequester(body.requestedBy);
-    if (!requester) {
-      return NextResponse.json({ error: 'Caller not found' }, { status: 403 });
-    }
+    // Ownership compares the sale's STORED salesRepId against the token uid.
     const existing = doc.data();
     if (!requester.isManagement && existing?.salesRepId !== requester.uid) {
       return NextResponse.json(
@@ -175,9 +181,7 @@ export async function DELETE(
     }
 
     // Deleting a sale is destructive and admin-only.
-    const gate = await requireAdmin(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
+    const gate = await requireVerifiedAdmin(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
