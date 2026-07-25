@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { auth } from '@/lib/firebase/config';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCountUp } from '@/hooks/useCountUp';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { isAbortError } from '@/lib/fetch/isAbortError';
@@ -342,16 +342,22 @@ export default function DashboardPage() {
       setLeaderboardLoading(true);
 
       try {
+        // salesRepId is the TARGET filter — omitted for approvers, who get the
+        // org-wide numbers. The route checks it against the token uid for
+        // everyone else.
+        const token = await getIdToken();
         const statsRes = await fetch(
-          `/api/portal/sales/stats?${hasPermission('sales:approve') ? '' : `salesRepId=${user.uid}&`}period=month&requestedBy=${user.uid}`,
-          { signal: controller.signal }
+          `/api/portal/sales/stats?${hasPermission('sales:approve') ? '' : `salesRepId=${user.uid}&`}period=month`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            signal: controller.signal,
+          }
         );
         if (statsRes.ok) {
           const data = await statsRes.json();
           if (mounted) setStats(data.stats);
         }
 
-        const token = await auth?.currentUser?.getIdToken();
         const leaderboardRes = await fetch(
           '/api/portal/leaderboard?period=month&metric=totalPoints&limit=100',
           {

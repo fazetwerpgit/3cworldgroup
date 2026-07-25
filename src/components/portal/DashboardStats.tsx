@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Award, BarChart3, CheckCircle2, Clock3, TrendingDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { auth } from '@/lib/firebase/config';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -57,16 +57,21 @@ export function DashboardStats() {
       if (!user) return;
 
       try {
+        // salesRepId is the TARGET rep — the stats route checks it against the
+        // token uid for anyone who is not management.
+        const token = await getIdToken();
         const statsRes = await fetch(
-          `/api/portal/sales/stats?salesRepId=${user.uid}&period=month&requestedBy=${user.uid}`,
-          { signal: controller.signal }
+          `/api/portal/sales/stats?salesRepId=${user.uid}&period=month`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            signal: controller.signal,
+          }
         );
         if (statsRes.ok) {
           const data = await statsRes.json();
           setStats(data.stats);
         }
 
-        const token = await auth?.currentUser?.getIdToken();
         const leaderboardRes = await fetch(
           '/api/portal/leaderboard?period=month&metric=totalPoints&limit=100',
           {

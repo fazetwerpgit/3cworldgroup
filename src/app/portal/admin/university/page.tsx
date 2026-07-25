@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useTrainingUpload } from '@/hooks/useTrainingUpload';
 import { TRAINING_CATEGORIES, TrainingResource } from '@/types';
 import {
@@ -16,6 +17,17 @@ const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
 );
 
 const CATEGORY_OPTIONS = [{ value: 'all', label: 'All' }, ...TRAINING_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))];
+
+// The training write routes, and the all=true listing that returns unpublished
+// content, verify management from the ID token. The [id] in each URL is the
+// TARGET resource.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 type PendingUpload = {
   storagePath: string;
@@ -54,8 +66,9 @@ function AdminUniversity() {
     setLoading(true);
     setErr('');
     try {
-      const params = new URLSearchParams({ all: 'true', requestedBy: user.uid });
-      const res = await fetch(`/api/portal/training?${params.toString()}`);
+      const res = await fetch('/api/portal/training?all=true', {
+        headers: await authHeaders(),
+      });
       const data = await res.json();
       if (res.ok) setItems(data.resources || []);
       else setErr(data.error || 'Failed to load content');
@@ -91,9 +104,8 @@ function AdminUniversity() {
     try {
       const res = await fetch('/api/portal/training', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
-          requestedBy: user.uid,
           title: title.trim(),
           category: addCategory,
           description: description.trim(),
@@ -126,16 +138,18 @@ function AdminUniversity() {
     if (!user) return;
     await fetch(`/api/portal/training/${item.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestedBy: user.uid, isPublished: !item.isPublished }),
+      headers: await authHeaders(true),
+      body: JSON.stringify({ isPublished: !item.isPublished }),
     });
     await load();
   };
 
   const remove = async (item: TrainingResource) => {
     if (!user) return;
-    const params = new URLSearchParams({ requestedBy: user.uid });
-    await fetch(`/api/portal/training/${item.id}?${params.toString()}`, { method: 'DELETE' });
+    await fetch(`/api/portal/training/${item.id}`, {
+      method: 'DELETE',
+      headers: await authHeaders(),
+    });
     setConfirmDeleteId(null);
     await load();
   };
@@ -150,8 +164,8 @@ function AdminUniversity() {
     if (!user || !editTitle.trim()) return;
     await fetch(`/api/portal/training/${item.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestedBy: user.uid, title: editTitle.trim(), description: editDesc.trim() }),
+      headers: await authHeaders(true),
+      body: JSON.stringify({ title: editTitle.trim(), description: editDesc.trim() }),
     });
     setEditingId(null);
     await load();
