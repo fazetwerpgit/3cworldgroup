@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { deriveResourceType } from '@/lib/training/fileKind';
 
 // GET /api/portal/training - Get training resources
@@ -19,9 +19,12 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const isRequired = searchParams.get('required');
 
+    // Unpublished drafts are management-only. The published-only listing below
+    // stays open by design (reps and the public read it), so the gate is
+    // deliberately conditional on `all=true`.
     const includeAll = searchParams.get('all') === 'true';
     if (includeAll) {
-      const gate = await requireManagement(searchParams.get('requestedBy'));
+      const gate = await requireVerifiedManagement(request);
       if (!gate.ok) {
         return NextResponse.json({ error: gate.error }, { status: gate.status });
       }
@@ -78,9 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Only admin/operations may create training content — gate before the body
+    // is read.
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const body = await request.json();
     const {
-      requestedBy,
       title,
       description,
       type,
@@ -97,12 +106,6 @@ export async function POST(request: NextRequest) {
       mimeType,
       fileSize,
     } = body;
-
-    // Only admin/operations may create training content.
-    const gate = await requireManagement(requestedBy);
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.error }, { status: gate.status });
-    }
 
     // Server derives type from MIME for uploaded files; legacy link resources
     // still pass an explicit type.

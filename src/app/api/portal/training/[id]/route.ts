@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 
 // GET /api/portal/training/[id] - Get a single training resource
 export async function GET(
@@ -57,13 +57,14 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
-
-    // Only admin/operations may edit training content.
-    const gate = await requireManagement(body.requestedBy);
+    // Only admin/operations may edit training content — gate before the body is
+    // read.
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+
+    const body = await request.json();
 
     const docRef = adminDb.collection('training').doc(id);
     const doc = await docRef.get();
@@ -72,7 +73,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
     }
 
-    // Don't allow updating certain fields (including the caller id field)
+    // Don't allow updating certain fields. `requestedBy` is no longer read as
+    // identity, but updateData is built by spreading the whole body — keep
+    // stripping it so an old client cannot persist it onto the training doc.
     const { id: _, createdAt, requestedBy: _requestedBy, ...updateData } = body;
 
     await docRef.update({
@@ -106,9 +109,7 @@ export async function DELETE(
     }
 
     // Only admin/operations may delete training content.
-    const gate = await requireManagement(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

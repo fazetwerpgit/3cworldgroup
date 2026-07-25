@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireSelfOrManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 
 // GET /api/portal/training/progress - Get user's training progress
 export async function GET(request: NextRequest) {
@@ -23,10 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     // A user may read their own progress; management may read anyone's.
-    const gate = await requireSelfOrManagement(
-      searchParams.get('requestedBy'),
-      userId
-    );
+    // `userId` is the TARGET (whose progress) — identity comes from the token.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -78,7 +76,10 @@ export async function POST(request: NextRequest) {
     }
 
     // A user may write their own progress; management may write anyone's.
-    const gate = await requireSelfOrManagement(body.requestedBy, userId);
+    // `userId` is the TARGET row being written; the caller is the token. The
+    // gate runs after the body parse only because the target comes from it —
+    // it reads headers only, and still precedes every Firestore access.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
