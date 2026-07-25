@@ -9,7 +9,10 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 
 export async function POST(request: NextRequest) {
   try {
-    const gate = await requireVerifiedUser(request);
+    // A hired rep mid-onboarding is signed in and needs push, or they miss the
+    // "your onboarding item was rejected" notification. Admits pending-with-a-
+    // field-role only, never an unapproved self-signup, never a deactivated account.
+    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
@@ -30,7 +33,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const gate = await requireVerifiedUser(request);
+    // Mirrors POST: a rep who could register a token must be able to remove it.
+    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
