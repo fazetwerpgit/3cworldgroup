@@ -4,12 +4,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole, isPlatformRole } from '@/types';
 import type { FieldRole, PlatformRole } from '@/types';
 
 interface UserFormProps {
   user?: User;
   isEdit?: boolean;
+}
+
+// The user-management routes verify the caller from the ID token and check
+// management/admin role against it. The [id] in the URL and managerId in the
+// body are TARGETS — who is being edited, and who they report to.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
 }
 
 // Full real assignable role set from HEAD's RoleDisplayNames — every
@@ -91,7 +103,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/portal/auth/users?requestedBy=${currentUser.uid}`);
+        const res = await fetch('/api/portal/auth/users', { headers: await authHeaders() });
         const data = await res.json();
         if (!active || !res.ok) return;
         // L1/L2 managers are stored under fieldRole, not role — check the
@@ -143,9 +155,8 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
       if (isEdit && user) {
         const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await authHeaders(true),
           body: JSON.stringify({
-            requestedBy: currentUser?.uid,
             displayName: formData.displayName,
             ...rolePayload,
             phone: formData.phone,
@@ -168,9 +179,8 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
 
         const response = await fetch('/api/portal/auth/create-user', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await authHeaders(true),
           body: JSON.stringify({
-            requestedBy: currentUser?.uid,
             email: formData.email,
             password: formData.password,
             displayName: formData.displayName,

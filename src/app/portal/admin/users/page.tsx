@@ -7,9 +7,21 @@ import { UserTable } from '@/components/admin/UserTable';
 import { AdminConfirmStrip } from '@/components/admin/AdminCatalogList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
 
 const FIELD_ROLE_OPTIONS = Object.values(FieldRoles) as FieldRole[];
+
+// The user-management routes verify the caller from the ID token. The userId in
+// each URL is the TARGET being read, edited or deleted — management acting on
+// another account is the whole point of these endpoints.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 type RoleBucket = 'all' | 'admin' | 'operations' | 'field rep';
 type StatusBucket = 'all' | 'pending' | 'active' | 'inactive';
@@ -53,9 +65,7 @@ export default function UsersPage() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams();
-      params.append('requestedBy', currentUser.uid);
-      const response = await fetch(`/api/portal/auth/users?${params.toString()}`);
+      const response = await fetch('/api/portal/auth/users', { headers: await authHeaders() });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
       setUsers(data.users);
@@ -122,8 +132,8 @@ export default function UsersPage() {
     try {
       const response = await fetch(`/api/portal/auth/users/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, requestedBy: currentUser?.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ status }),
       });
       if (!response.ok) {
         const data = await response.json();
@@ -143,10 +153,9 @@ export default function UsersPage() {
     try {
       const response = await fetch(`/api/portal/auth/users/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
           status: 'active',
-          requestedBy: currentUser?.uid,
           ...(target.fieldRole === 'entry_level_rep' ? { fieldRole: 'entry_rep' } : {}),
         }),
       });
@@ -168,8 +177,8 @@ export default function UsersPage() {
     try {
       const response = await fetch(`/api/portal/auth/users/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldRole: approveFieldRole, requestedBy: currentUser?.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ fieldRole: approveFieldRole }),
       });
       if (!response.ok) {
         const data = await response.json();
@@ -188,10 +197,10 @@ export default function UsersPage() {
     setDeleting(true);
     setError('');
     try {
-      const response = await fetch(
-        `/api/portal/auth/users/${userId}?requestedBy=${currentUser?.uid ?? ''}`,
-        { method: 'DELETE' }
-      );
+      const response = await fetch(`/api/portal/auth/users/${userId}`, {
+        method: 'DELETE',
+        headers: await authHeaders(),
+      });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to delete user');

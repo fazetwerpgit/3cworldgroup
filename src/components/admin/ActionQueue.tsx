@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { AlertTaskKind, AlertTaskStatus } from '@/types/alerts';
 
 interface AlertTaskRow {
@@ -24,6 +25,16 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   return response.json().catch(() => ({}));
 }
 
+// The alerts and activate routes verify the caller from the ID token — the
+// claimer stamped on a task and the management check both come from it.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
+
 function formatMissingItems(missing: unknown): string {
   return Array.isArray(missing) && missing.length > 0
     ? missing.map(String).join(', ')
@@ -40,9 +51,9 @@ export default function ActionQueue() {
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(
-        `/api/portal/alerts?requestedBy=${encodeURIComponent(user.uid)}`
-      );
+      const response = await fetch('/api/portal/alerts', {
+        headers: await authHeaders(),
+      });
       const json = await readJson(response);
       if (!response.ok) {
         throw new Error(
@@ -71,8 +82,8 @@ export default function ActionQueue() {
     try {
       const response = await fetch('/api/portal/alerts/claim', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestedBy: user.uid, taskId }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ taskId }),
       });
       const json = await readJson(response);
       if (!response.ok) {
@@ -100,8 +111,9 @@ export default function ActionQueue() {
     try {
       const response = await fetch('/api/portal/onboarding/activate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestedBy: user.uid, userId: task.subjectUserId }),
+        headers: await authHeaders(true),
+        // userId is the TARGET rep being activated, not the caller.
+        body: JSON.stringify({ userId: task.subjectUserId }),
       });
       const json = await readJson(response);
       if (!response.ok) {

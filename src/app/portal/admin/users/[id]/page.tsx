@@ -7,6 +7,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserForm } from '@/components/admin/UserForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
 
 export default function EditUserPage() {
@@ -28,9 +29,12 @@ export default function EditUserPage() {
     async function fetchUser() {
       if (!currentUser) return;
       try {
-        const response = await fetch(
-          `/api/portal/auth/users/${userId}?requestedBy=${currentUser.uid}`
-        );
+        // The route verifies the caller from the token; userId is the TARGET
+        // account being opened.
+        const token = await getIdToken();
+        const response = await fetch(`/api/portal/auth/users/${userId}`, {
+          headers: { Authorization: `Bearer ${token ?? ''}` },
+        });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Failed to fetch user');
         setUser(data.user);
