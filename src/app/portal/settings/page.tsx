@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { MemberLineShell, MemberLineMasthead, MemberLineSectionIndex, MemberLineLock } from '@/components/member/MemberLine';
 import ReportBugCard from '@/components/portal/ReportBugCard';
@@ -116,7 +117,7 @@ export default function SettingsPage() {
     try {
       // The route derives the target user from this token — profile edits are
       // always self-service.
-      const token = await auth?.currentUser?.getIdToken();
+      const token = await getIdToken();
       const response = await fetch('/api/portal/profile', {
         method: 'PUT',
         headers: {
