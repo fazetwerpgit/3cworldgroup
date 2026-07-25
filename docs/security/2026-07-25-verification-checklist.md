@@ -7,13 +7,28 @@ Agents had no login, and were explicitly refused permission to create a
 disposable admin account or sign in as a real employee against the live
 Firebase project. So every item below is NOT VERIFIED — not "probably fine".
 
-What WAS verified without credentials: typecheck, lint, 416 tests, all 11
-touched pages compile and render with a clean console, and all 27 gated
-method+path combos return 401 rather than 404 — confirming no URL was
-malformed while stripping identity query params.
+What WAS verified without credentials: typecheck, **425 tests**, eslint clean on
+all 56 changed files, all 11 touched pages compile and render with a clean
+console, and every gated method+path combo returns 401 rather than 404 —
+confirming no URL was malformed while stripping identity query params.
 
-Three failures below are SILENT — no error banner, just wrong or missing
+The route table was then enumerated rather than trusted to a hand-written list:
+**109 route+method pairs across 69 files, 0 ungated.** All 40 GETs probed with
+no credentials, zero 200s. The 69 mutating pairs were **never probed** — doing so
+means sending a body to a production-backed server — so they are source-read
+only: unconfirmed, not cleared.
+
+Several failures below are SILENT — no error banner, just wrong or missing
 data. They are marked. Read those before you start.
+
+**The highest-value account to test is a `pending`, mid-onboarding rep.** Every
+regression this branch introduced landed on that state, and both were silent. Two
+of them were found only by the adversarial review, after the implementation work
+reported itself finished.
+
+**Known-good baseline:** a hard-refresh 401 on the leaderboard, or silently empty
+dropdowns on a form, are **pre-existing on master** — not from this branch. See
+finding #8 in `2026-07-25-findings.md` before blaming the security work.
 
 ## MORNING CHECKLIST — every flow that is NOT VERIFIED
 
