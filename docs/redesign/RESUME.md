@@ -7,146 +7,66 @@ Updated: 2026-07-25 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-IN FLIGHT — SECURITY HARDENING, branch `security/close-open-routes`,
-running unattended overnight 2026-07-25. Jacob approved scope option 1
-("close the open doors") + explicitly authorized spawning many Opus
-agents. Threats he named: outside attackers/bots + accidental data
-exposure between employees.
+**JACOB: review and merge `security/close-open-routes`, then deploy the
+Firestore rules yourself.** The overnight security work is COMPLETE — 42
+commits, all gates green, adversarially reviewed. Nothing was pushed and
+nothing was deployed, per your instructions.
 
-Spec: docs/superpowers/specs/2026-07-25-portal-security-hardening-design.md
+Read first: `docs/security/2026-07-25-findings.md` (what was wrong and what
+changed). Then `docs/security/2026-07-25-verification-checklist.md` — the
+click-through only you can do, because no agent had a login and creating one
+against the live Firebase project was refused as an unattended production
+change.
 
-STANDING RULES FOR THIS WORK (Jacob's explicit choices — do not deviate):
-- NEVER push to master and NEVER let Vercel deploy. Branch only.
-  Jacob reviews and merges in the morning.
-- firestore.rules: WRITE and commit the tightened rules, DO NOT run
-  `firebase deploy --only firestore:rules`. Document the command for him.
-- Every affected page must be browser-verified on :3005. A 401 to a page
-  that never learned to send a token is the likely regression and
-  typecheck will not catch it.
-- Adversarial review by Opus agents that did NOT write the code.
+Then, and only after you have read the rules diff:
+`docs/security/firestore-rules-deploy.md` → `firebase deploy --only
+firestore:rules --project cworldgroup-cca68`. The rules are written and
+committed but NOT deployed.
 
-FINDINGS (revised twice — the initial grep-based audit was wrong in BOTH
-directions; live probe + reading call chains is the only trustworthy method):
+THE HEADLINE: any employee could become a full admin in two requests. The
+management auth helper never verified a token — it took a client-supplied
+uid and looked up that user's role. The chat members endpoint handed out a
+labelled uid→role directory, so picking an admin took one request and being
+them took the second. Separately, decommissioned employees kept full API
+access indefinitely: their Firebase account was never disabled, so a fired
+admin was still an admin.
 
-1. CRITICAL — src/lib/auth/requireManagement.ts does not authenticate at
-   all. getRequester/requireManagement/requireAdmin/requireSelfOrManagement
-   all take a userId STRING, no token. Its own docstring lines 6-10 admit
-   it. 18 routes gate on it incl. sales/approve, auth/create-user,
-   auth/users/[id], onboarding/*, training/*. Anyone knowing an admin uid
-   passes ?requestedBy= and IS that admin. Escalation chain (being
-   verified): rules let any user read their own user doc -> contains
-   reportsToId = manager's uid -> if manager is admin/ops, instant
-   escalation. My first audit counted these 18 as GATED. They are not.
-2. CRITICAL — decommission does not revoke access.
-   pipeline/decommission/route.ts:74-84 sets Firestore status:'inactive'
-   only. No adminAuth disable, no revokeRefreshTokens, role NOT cleared.
-   Comment line 16 says AuthContext blocks sign-in — that is React, not a
-   security boundary. Ex-employee keeps minting tokens forever; a
-   decommissioned ADMIN still passes requireVerifiedAdmin.
-3. HIGH — verifyCaller (requireVerifiedAdmin.ts:24-29) checks only that the
-   user doc EXISTS, never status=='active'. Pending self-signups pass
-   requireVerifiedUser. NOTE requireVerifiedAdmin at :90 DUPLICATES
-   verifyCaller's body, so fixing verifyCaller alone misses it.
-4. HIGH — 11 routes genuinely unauthenticated (profile, commission x2,
-   calls, pipeline x4, email-templates, recruiting x2). Confirmed by probe.
-5. FALSE ALARMS, retracted: the 6 forms/*/review routes ARE gated
-   (requireVerifiedManagement via lib/forms/reviewQuery.ts). Onboarding
-   tokens are STRONG (256-bit randomBytes, SHA-256 hashed, 14d expiry,
-   single-use). Upload route has MIME allowlist + 4MB cap + server-derived
-   paths. None need work.
+MOST IMPORTANT THING TO CHECK IN THE BROWSER: a **pending** rep (hired,
+mid-onboarding, not yet activated). That account state is where every
+regression risk in this diff lives, and the failures are SILENT — an empty
+notification bell, a progress ring stuck at 0%, a Mark Complete button that
+reports success and does nothing. Two such regressions were caught and fixed
+by the adversarial review after the implementation work "finished"; they are
+the reason the checklist exists.
 
-DONE: 57f5f9d firestore.rules locked (sales/training/userProgress/
-leaderboard -> read,write:if false). NOT DEPLOYED — deploy guide at
-docs/security/firestore-rules-deploy.md. Evidence: only 6 files import
-firebase/firestore repo-wide, none touch those 4 collections.
-Also 0622f0d scripts/audit-open-routes.mjs = the regression test; every
-row must read GUARDED before this work is done.
+KNOWN-GOOD BASELINE IF SOMETHING LOOKS BROKEN: a hard-refresh 401 on the
+leaderboard, or empty dropdowns on a form, are **pre-existing on master** and
+not from this branch. See finding #8 in the findings doc before blaming the
+security work.
 
-Recon reports (read these before redoing any analysis) live in the session
-scratchpad: recon-core.md recon-forms.md recon-rules.md recon-pending.md
-plan-migration.md impl-*.md
+STANDING RULES THAT WERE IN FORCE (kept, in case work resumes):
+- NEVER push to master, NEVER let Vercel deploy. Branch only.
+- firestore.rules: written and committed, NEVER deployed by an agent.
+- NEVER authenticate against production Firebase — no disposable admin
+  accounts, no minting custom tokens for real employees. This was requested
+  by a subagent to finish browser verification and refused: impersonating a
+  real person's production account, or leaving a live privileged account
+  behind if cleanup silently fails, costs far more than the ten minutes of
+  manual clicking it would have saved.
+- Adversarial review by Opus agents that wrote none of the code.
 
-Task list (TaskList tool) tracks all 10 items.
+METHOD NOTE WORTH KEEPING: grepping route files for auth-helper names was
+wrong in BOTH directions — it flagged six properly-gated routes as open, and
+counted eighteen unauthenticated ones as safe. Only following the call chain
+and probing a running server produced correct answers. Related: a green
+`scripts/audit-open-routes.mjs` proves the *listed* routes are gated and
+nothing more — `/api/portal/training` was open to the internet while the
+script reported "0 of 17 clean", and both statements were true.
 
----
-
-PREVIOUS (done, deployed): Jacob said "deploy" 2026-07-24; b961f22 +
-c2e2c43 PUSHED (Vercel auto-deploy):
-1. b961f22 fix(leaderboard): weekly challenge counts SUBMITTED sales
-   (pending+approved) — root cause: challenge read leaderboard API
-   which counted approved-only; reps' fresh sales are pending so the
-   bar never moved. API gains scope=submitted param; ONLY the
-   weekly-challenge fetch uses it (rankings/points stay approved-only,
-   all other callers verified untouched). Opus review PASS (note:
-   pre-existing .limit(5000) no-orderBy truncation risk, accepted).
-2. c2e2c43 bot-signup detection (Jacob 2026-07-24: "random bot
-   accounts" sign up; rejected invite codes — "you can tell what bot
-   emails are"). NEW src/lib/auth/botDetection.ts
-   looksLikeBotSignup(email,displayName) score>=2 heuristic +
-   botDetection.test.ts battery; SignupForm blocks flagged signups
-   pre-signUp with friendly error (browser-verified on :3005, no
-   Firebase call); signup-notify marks suspectedBot:true + skips
-   admin alert; admin pending queue filters !suspectedBot (User type
-   + users GET pass the field). First Opus review FAILed on
-   Hirschsprung-surname false positive → fixed: consonant-run +
-   vowel-ratio signals capped at 1 combined for digit-free local
-   parts (run>=9 keeps +2). Opus re-review PASS; its one new MINOR
-   (usePendingSignupsCount hook — sidebar badge / dashboard banner —
-   still counted bots) fixed in the same commit. Gates green:
-   tsc / eslint / 384 tests / build.
-
-Dev server running on :3005 (background, this session).
-
-Previously deployed 2026-07-24: e17873b fix(sales): ledger date cell
-now reads "Install {date}" (bold line prefixed — Jacob 2026-07-23:
-bare dates didn't say what they were; column header is hidden on
-mobile so rows needed inline labels). One-word JSX change in
-SalesTable.tsx:265; legacy sales show "Install —". Gates: tsc / 346
-tests / build pass; compiled-CSS harness verified 1440 + 390 (no
-overflow, single line). Opus review SKIPPED (one-word label,
-disclosed).
-
-Previously: Jacob said "deploy" 2026-07-23; ad5c944
-feat(sales): install date surfaced across rep sales views PUSHED
-(Vercel auto-deploy). His ask: reps must see install dates at a
-glance in the list — no clicking in — to line installs up with pay.
-Change: SalesTable ledger date cell stacks bold install date
-over "Sold {date}" (header "Install / Sold", legacy sales show "—");
-in-review cards show "Install {date}" instead of submitted date (the
-"Xd waiting" chip keeps submission recency); SaleDetailSheet gains a
-Dates block (Sold / Install, sheet's own dark palette #9caabd/#f4f7fa
-— page vars are illegible on the navy sheet). installDate already
-existed end-to-end (form required, API returns it) — display only.
-Row child count/order unchanged (mobile nth-child CSS depends on it).
-Gates: tsc / eslint / 346 tests / build pass; harness-verified 1440 +
-390; Opus adversarial review PASS (one cosmetic note: chip shows year,
-table doesn't — accepted).
-
-Also still awaiting his iPhone retest of the top bar from the earlier
-push (relaunch installed app fresh, tap profile top-right — do not
-chase). Origin remote is SSH (HTTPS had no credentials).
-
-Shipped in that push:
-- 1f1022a fix(shell): top safe-area inset on portal header — Jacob
-  reported (2026-07-23) top bar sits too high on iPhone, profile
-  button top-right untappable. Root cause: standalone PWA +
-  viewport-fit=cover extends page under the iOS status bar; fixed
-  .portal-shell-header had no top inset. Fix: :root --portal-safe-top:
-  env(safe-area-inset-top,0px); header height/padding grow by it, and
-  every below-header offset follows (main margin/height incl. app-shell
-  lock block, rail sidebar top, chat-line mobile heights).
-  MobileThread.tsx already subtracted the inset — untouched. Verified
-  via compiled-CSS harness at 390x844: zero-inset geometry identical to
-  before; 59px-inset sim → header 121px, button at y≈69, tappable, main
-  offsets match. Gates: tsc / 346 tests / build all pass. Opus review
-  SKIPPED (CSS-only, disclosed). After deploy Jacob must retest on the
-  installed app (relaunch it fresh).
-- bdef582 chore: package-lock re-sync (node_modules was missing;
-  npm ci failed out-of-sync, npm install regenerated).
-
-Bottom-bar iOS fix: Jacob CONFIRMED good 2026-07-23.
-Sales visibility: managers/IBOs see only their own sales —
-INTENTIONAL; if reported as a bug, explain, don't revert.
+WHAT IS STILL OPEN (deliberately, none blocking the merge): no rate limiting
+anywhere, no security headers or CSP, no Firestore rules tests or emulator,
+and the items listed under "Still open" in the findings doc. Suggested order
+if you want a next session: rate limiting, then headers/CSP.
 
 ## SHIPPED 2026-07-15 (all Vercel Ready in Production)
 
