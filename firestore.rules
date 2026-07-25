@@ -49,10 +49,16 @@ service cloud.firestore {
         request.resource.data.lastReadAt is timestamp;
     }
 
+    // Sales are created, updated and deleted exclusively server-side
+    // (/api/portal/sales, /api/portal/sales/[id], /api/portal/sales/approve) so
+    // that totalPoints is calculated by the server and cannot be chosen by the
+    // submitter. Previously `isApproved()` on every operation, which let any
+    // approved rep addDoc a sale with totalPoints: 99999 — or deleteDoc a
+    // colleague's sale — straight from the browser console.
+    // No client-SDK code path reads or writes this collection: the portal
+    // sales list, dashboard stats and pipeline all fetch() API routes.
     match /sales/{saleId} {
-      allow read: if isApproved();
-      allow create: if isApproved();
-      allow update, delete: if isApproved();
+      allow read, write: if false;
     }
 
     // Notifications are created/updated exclusively server-side (Admin SDK via
@@ -63,18 +69,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Admin-managed content, served through /api/portal/training. Previously
+    // any approved rep could delete every training resource from the console.
     match /training/{docId} {
-      allow read: if isApproved();
-      allow write: if isApproved();
+      allow read, write: if false;
     }
 
+    // Written server-side only (/api/portal/training/progress). Auto-ID'd docs
+    // carry userId as a FIELD, not in the path, so a per-user client rule in
+    // the style of chatReads is not expressible here — the strongest possible
+    // would be request.resource.data.userId == request.auth.uid, which would
+    // not stop a rep marking every module complete. Server-only is correct.
     match /userProgress/{docId} {
-      allow read, write: if isApproved();
+      allow read, write: if false;
     }
 
+    // Unused collection. Standings are computed from `sales` in
+    // /api/portal/leaderboard — nothing in the repo reads or writes this.
     match /leaderboard/{docId} {
-      allow read: if isApproved();
-      allow write: if isApproved();
+      allow read, write: if false;
     }
 
     match /userOnboarding/{docId} {
