@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const gate = await requireVerifiedUser(request);
+    // Mid-onboarding reps attend these calls, so this admits pending accounts
+    // that have a field role — i.e. hired but not activated yet. An unapproved
+    // self-signup has no field role and is still rejected.
+    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

@@ -12,7 +12,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const gate = await requireVerifiedUser(request);
+    // Admits pending accounts that have a field role — a hired rep filling out
+    // onboarding must be able to set their own name and phone. An unapproved
+    // self-signup has no field role and is still rejected.
+    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
