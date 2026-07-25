@@ -182,7 +182,7 @@ function SalesContent() {
     reason?: string
   ) => {
     if (!user) return false;
-    return approveSale(saleId, status, user.uid, user.displayName || user.email || '', reason);
+    return approveSale(saleId, status, reason);
   };
 
   const managerCopy = canApprove;

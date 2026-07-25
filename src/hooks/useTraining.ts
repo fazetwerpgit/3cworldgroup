@@ -2,6 +2,17 @@
 
 import { useState, useCallback } from 'react';
 import { TrainingResource, TrainingCategory, ResourceType } from '@/types';
+import { getIdToken } from '@/lib/firebase/getIdToken';
+
+// training/progress verifies the caller from the ID token and allows self or
+// management. userId stays as the TARGET row being read/written.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 interface TrainingFilters {
   category?: TrainingCategory;
@@ -76,7 +87,8 @@ export function useTraining() {
   const fetchProgress = useCallback(async (userId: string) => {
     try {
       const response = await fetch(
-        `/api/portal/training/progress?userId=${userId}&requestedBy=${userId}`
+        `/api/portal/training/progress?userId=${userId}`,
+        { headers: await authHeaders() }
       );
       const data = await response.json();
 
@@ -99,9 +111,8 @@ export function useTraining() {
     try {
       const response = await fetch('/api/portal/training/progress', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
-          requestedBy: userId,
           userId,
           resourceId,
           completed,

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
 
@@ -26,7 +25,6 @@ interface SalesStats {
 }
 
 export function useSales() {
-  const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [stats, setStats] = useState<SalesStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,9 +67,11 @@ export function useSales() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/portal/sales/${id}?requestedBy=${user?.uid ?? ''}`
-      );
+      // The route compares the sale's stored salesRepId against the token uid.
+      const token = await getIdToken();
+      const response = await fetch(`/api/portal/sales/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -86,7 +86,7 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   const createSale = useCallback(async (saleData: CreateSaleData): Promise<Sale | null> => {
     setLoading(true);
@@ -128,10 +128,14 @@ export function useSales() {
     setError(null);
 
     try {
+      const token = await getIdToken();
       const response = await fetch(`/api/portal/sales/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...updates, requestedBy: user?.uid }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(updates),
       });
       const data = await response.json();
 
@@ -147,17 +151,18 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   const deleteSale = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/portal/sales/${id}?requestedBy=${user?.uid ?? ''}`,
-        { method: 'DELETE' }
-      );
+      const token = await getIdToken();
+      const response = await fetch(`/api/portal/sales/${id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -173,13 +178,11 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   const approveSale = useCallback(async (
     saleId: string,
     status: 'approved' | 'rejected',
-    approverId: string,
-    approverName?: string,
     rejectionReason?: string
   ): Promise<boolean> => {
     setLoading(true);
@@ -187,7 +190,7 @@ export function useSales() {
 
     try {
       // The approve endpoint verifies the caller's token and stamps the
-      // approver from it; approverId/Name in the body are legacy-ignored.
+      // approver from it — the client never names the approver.
       const token = await getIdToken();
       const response = await fetch('/api/portal/sales/approve', {
         method: 'POST',
@@ -198,8 +201,6 @@ export function useSales() {
         body: JSON.stringify({
           saleId,
           status,
-          approverId,
-          approverName,
           rejectionReason,
         }),
       });
@@ -234,10 +235,14 @@ export function useSales() {
     try {
       const params = new URLSearchParams();
       if (period) params.append('period', period);
+      // salesRepId is the TARGET filter; management may pass any rep, everyone
+      // else is checked against the token uid server-side.
       if (salesRepId) params.append('salesRepId', salesRepId);
-      if (user?.uid) params.append('requestedBy', user.uid);
 
-      const response = await fetch(`/api/portal/sales/stats?${params.toString()}`);
+      const token = await getIdToken();
+      const response = await fetch(`/api/portal/sales/stats?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -251,7 +256,7 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   return {
     sales,

@@ -4,6 +4,18 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Notification } from '@/types/notifications';
 import { isAbortError } from '@/lib/fetch/isAbortError';
+import { getIdToken } from '@/lib/firebase/getIdToken';
+
+// The notifications route verifies the caller from the ID token. userId stays on
+// the wire as the TARGET bell being read/cleared — the route allows self or
+// management — but the acting identity is never client-supplied.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 export function useNotifications() {
   const { user } = useAuth();
@@ -27,8 +39,8 @@ export function useNotifications() {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/portal/notifications?userId=${user.uid}&limit=${limit}&requestedBy=${user.uid}`,
-        { signal: controller.signal }
+        `/api/portal/notifications?userId=${user.uid}&limit=${limit}`,
+        { signal: controller.signal, headers: await authHeaders() }
       );
       if (response.ok) {
         const data = await response.json();
@@ -61,8 +73,8 @@ export function useNotifications() {
     try {
       const response = await fetch('/api/portal/notifications', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notificationIds: idsToMark, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ notificationIds: idsToMark }),
       });
 
       if (response.ok) {
@@ -91,8 +103,8 @@ export function useNotifications() {
     try {
       const response = await fetch('/api/portal/notifications', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, markAllRead: true, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ userId: user.uid, markAllRead: true }),
       });
 
       if (response.ok) {
@@ -110,8 +122,8 @@ export function useNotifications() {
     try {
       const response = await fetch('/api/portal/notifications', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, requestedBy: user.uid }),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ userId: user.uid }),
       });
 
       if (response.ok) {
