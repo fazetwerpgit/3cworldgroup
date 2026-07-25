@@ -15,7 +15,9 @@ export async function GET(request: NextRequest) {
     // Scope: a rep may only request their own stats; management may request
     // any rep's or org-wide (no salesRepId). `salesRepId` is TARGET data — a
     // non-management caller must pass their own uid, checked against the token.
-    const requester = await requireVerifiedRequester(request);
+    // Dashboard stat tiles for a pending rep — scoped to their own uid for
+    // non-management, so the figures are their own (zero) either way.
+    const requester = await requireVerifiedRequester(request, { allowOnboarding: true });
     if (!requester.ok) {
       return NextResponse.json({ error: requester.error }, { status: requester.status });
     }

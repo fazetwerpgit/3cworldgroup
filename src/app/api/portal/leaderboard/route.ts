@@ -12,7 +12,11 @@ import {
 export async function GET(request: NextRequest) {
   try {
     // Require a verified login — the standings are internal team data.
-    const gate = await requireVerifiedUser(request);
+    // /portal/dashboard is where a signed-in pending rep lands, and it renders
+    // the leaderboard. Roster data, shown to a hired employee mid-onboarding —
+    // allowOnboarding admits pending-WITH-a-field-role only, never an unapproved
+    // self-signup, never a deactivated account.
+    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     if (!adminDb) {

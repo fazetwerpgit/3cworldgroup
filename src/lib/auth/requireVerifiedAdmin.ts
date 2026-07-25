@@ -195,7 +195,8 @@ export async function requireVerifiedAdmin(
 // rather than to hard-gate the request (e.g. "a rep sees only their own sales,
 // management sees anyone's").
 export async function requireVerifiedRequester(
-  request: NextRequest
+  request: NextRequest,
+  options?: VerifiedCallerOptions
 ): Promise<
   | {
       ok: true;
@@ -213,7 +214,7 @@ export async function requireVerifiedRequester(
     }
   | { ok: false; error: string; status: number }
 > {
-  const c = await verifyCaller(request);
+  const c = await verifyCaller(request, options);
   if (!c.ok) return c;
   const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
   const isManagement = role === 'admin' || role === 'operations';
