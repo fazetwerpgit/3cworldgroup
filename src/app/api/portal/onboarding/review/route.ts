@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { appBaseUrl, itemRejectedEmail } from '@/lib/email/templates';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
@@ -51,9 +51,7 @@ export async function GET(request: NextRequest) {
     }
 
     // The review queue exposes other users' submissions; management only.
-    const gate = await requireManagement(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -132,20 +130,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { userId, itemId, status, reviewerId, reviewerName, rejectionReason } = body;
-
-    if (!userId || !itemId || !status || !reviewerId) {
-      return NextResponse.json(
-        { error: 'Missing required fields: userId, itemId, status, reviewerId' },
-        { status: 400 }
-      );
-    }
-
-    // Only admin/operations may approve/reject onboarding submissions.
-    const gate = await requireManagement(reviewerId);
+    // Only admin/operations may approve/reject onboarding submissions. Gate
+    // before reading the body: the reviewer is whoever holds the token, never a
+    // reviewerId the client names.
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
+    const body = await request.json();
+    // userId is the TARGET rep whose item is under review — data, not identity.
+    const { userId, itemId, status, rejectionReason } = body;
+
+    if (!userId || !itemId || !status) {
+      return NextResponse.json(
+        { error: 'Missing required fields: userId, itemId, status' },
+        { status: 400 }
+      );
     }
 
     if (!['approved', 'rejected'].includes(status)) {
@@ -188,8 +189,8 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     await docRef.update({
       status,
-      reviewedBy: reviewerId,
-      reviewerName: reviewerName || '',
+      reviewedBy: gate.uid,
+      reviewerName: gate.name,
       reviewedAt: now,
       rejectionReason: status === 'rejected' ? rejectionReason.trim() : null,
       updatedAt: now,

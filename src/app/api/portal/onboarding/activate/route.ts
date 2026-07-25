@@ -1,33 +1,33 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { activationEmail } from '@/lib/email/templates';
 import { adminDb } from '@/lib/firebase/admin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { getActivationReadiness } from '@/lib/onboarding/activation';
 import { roleRequiresOnboarding } from '@/types/auth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { requestedBy?: unknown; userId?: unknown };
-    const requestedBy = typeof body.requestedBy === 'string' ? body.requestedBy : '';
-    const userId = typeof body.userId === 'string' ? body.userId : '';
-
-    if (!requestedBy || !userId) {
-      return NextResponse.json(
-        { error: 'requestedBy and userId are required' },
-        { status: 400 }
-      );
-    }
-
     if (!adminDb) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
-    const gate = await requireManagement(requestedBy);
+    // Activating a rep is management-only. Gate before reading the body: the
+    // activator is whoever holds the token, never a requestedBy the client names.
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
+    const body = (await request.json()) as { userId?: unknown };
+    // The TARGET rep being activated — data, and required: without it the route
+    // would have no one to activate.
+    const userId = typeof body.userId === 'string' ? body.userId : '';
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
     const readiness = await getActivationReadiness(userId);
