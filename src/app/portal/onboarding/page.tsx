@@ -5,6 +5,7 @@ import { AlertCircle, ClipboardCheck } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { MemberLineShell, MemberLineMasthead, MemberLineSectionIndex } from '@/components/member/MemberLine';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,17 @@ interface ChecklistResponse {
   fieldRole: string | null;
   isIBO: boolean;
   progress: { approved: number; total: number; complete: boolean };
+}
+
+// The onboarding routes verify the caller from the ID token and allow self or
+// management. userId stays on the wire as the TARGET — whose checklist is read,
+// whose item is submitted, whose storage folder is written.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
 }
 
 export default function OnboardingPage() {
@@ -59,9 +71,9 @@ export default function OnboardingPage() {
   const fetchChecklist = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(
-        `/api/portal/onboarding?userId=${user.uid}&requestedBy=${user.uid}`
-      );
+      const response = await fetch(`/api/portal/onboarding?userId=${user.uid}`, {
+        headers: await authHeaders(),
+      });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load checklist');
       setData(json);
@@ -76,6 +88,10 @@ export default function OnboardingPage() {
     fetchChecklist();
   }, [fetchChecklist]);
 
+  // The upload is multipart — send only Authorization and let fetch set the
+  // Content-Type boundary itself.
+  const uploadHeaders = useCallback(async () => authHeaders(), []);
+
   const handleSubmit = async (
     item: WizardItem | null = submitModal,
     submittedReference = reference
@@ -87,12 +103,11 @@ export default function OnboardingPage() {
     try {
       const response = await fetch('/api/portal/onboarding/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
           userId: user.uid,
           itemId: item.id,
           reference: submittedReference,
-          requestedBy: user.uid,
         }),
       });
       const json = await response.json();
@@ -159,7 +174,8 @@ export default function OnboardingPage() {
                 accept="image/*"
                 allowedTypes={IMAGE_TYPES}
                 uploadUrl="/api/portal/onboarding/upload"
-                extraFields={{ userId: user?.uid ?? '', requestedBy: user?.uid ?? '' }}
+                extraFields={{ userId: user?.uid ?? '' }}
+                getHeaders={uploadHeaders}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
                   if (isNewSubmission) setSubmitModal(item);
@@ -173,7 +189,8 @@ export default function OnboardingPage() {
                 accept="image/*"
                 allowedTypes={IMAGE_TYPES}
                 uploadUrl="/api/portal/onboarding/upload"
-                extraFields={{ userId: user?.uid ?? '', requestedBy: user?.uid ?? '' }}
+                extraFields={{ userId: user?.uid ?? '' }}
+                getHeaders={uploadHeaders}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
                   if (isNewSubmission) setSubmitModal(item);
@@ -187,7 +204,8 @@ export default function OnboardingPage() {
               accept="image/*,application/pdf"
               allowedTypes={DOC_TYPES}
               uploadUrl="/api/portal/onboarding/upload"
-              extraFields={{ userId: user?.uid ?? '', requestedBy: user?.uid ?? '' }}
+              extraFields={{ userId: user?.uid ?? '' }}
+              getHeaders={uploadHeaders}
               onUploaded={(path) => startSubmission(item, path)}
             />
           )}

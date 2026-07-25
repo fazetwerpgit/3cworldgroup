@@ -5,7 +5,19 @@ import { Lock } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
+
+// The review route verifies the reviewer from the ID token and stamps their uid
+// and name onto the submission — the rep sees that name, so it must not be
+// client-supplied. userId in the body is the TARGET rep being reviewed.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 interface Submission {
   id: string;
@@ -64,7 +76,9 @@ export default function OnboardingReviewPage() {
   const fetchQueue = useCallback(async () => {
     if (!user) return;
     try {
-      const response = await fetch(`/api/portal/onboarding/review?requestedBy=${user.uid}`);
+      const response = await fetch('/api/portal/onboarding/review', {
+        headers: await authHeaders(),
+      });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load review queue');
       setSubmissions(json.submissions);
@@ -84,13 +98,11 @@ export default function OnboardingReviewPage() {
     try {
       const response = await fetch('/api/portal/onboarding/review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(true),
         body: JSON.stringify({
           userId: submission.userId,
           itemId: submission.itemId,
           status,
-          reviewerId: user.uid,
-          reviewerName: user.displayName || user.email,
           rejectionReason: reason,
         }),
       });

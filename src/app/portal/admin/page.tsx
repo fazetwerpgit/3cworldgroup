@@ -93,7 +93,7 @@ export default function OpsHomePage() {
       const href = '/portal/admin/onboarding';
       const description = 'New onboarding uploads waiting on manager sign-off.';
       try {
-        const res = await fetch(`/api/portal/onboarding/review?requestedBy=${user.uid}`);
+        const res = await authedFetch('/api/portal/onboarding/review');
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'failed');
         const rows: { submittedAt?: string | null }[] = Array.isArray(json.submissions) ? json.submissions : [];
