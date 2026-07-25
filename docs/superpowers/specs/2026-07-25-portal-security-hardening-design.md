@@ -6,21 +6,42 @@ Status: approved (Jacob, 2026-07-25) — implementation running unattended overn
 
 ## Problem
 
-An audit of `src/app/api` found 22 route files with no authentication of any
-kind. They accept an identity claim (`userId`, `updatedBy`, `decommissionedBy`,
-`requestedBy`) from the request body or query string and trust it. Anyone who
-can reach the domain can call them.
+11 route files under `src/app/api` perform no authentication. They accept an
+identity claim (`userId`, `updatedBy`, `decommissionedBy`, `requestedBy`) from
+the request body or query string and trust it. Anyone who can reach the domain
+can call them.
 
-Verified examples:
+Confirmed by live probe against a running server with no credentials
+(`scripts/audit-open-routes.mjs`). A handler-level response — `400 "userId is
+required"`, `404 "User not found"` — proves the handler ran and no gate
+preceded it. A protected route returns 401 before reaching handler code.
 
-| Route | Exposure |
-|---|---|
-| `PUT /api/portal/profile` (`src/app/api/portal/profile/route.ts:5`) | Edits any user's profile; `userId` read from body at line 15 |
-| `GET /api/portal/commission` (`src/app/api/portal/commission/route.ts:49`) | Returns commission structure for any `userId` passed at line 58 |
-| `PUT /api/portal/commission` (line 103) | Rewrites the commission tier table; `updatedBy` from body |
-| `POST/DELETE /api/portal/pipeline/decommission` | Decommissions or deletes a user |
-| 6 × `forms/*/review` | Lists and approves/denies submissions, incl. payroll disputes (PII) |
-| `portal/calls`, `portal/pipeline`, `portal/email-templates`, `recruiting/*` | Read/write recruiting and pipeline data |
+| Route | Probe result | Exposure |
+|---|---|---|
+| `PUT /api/portal/profile` (`profile/route.ts:5`) | 500 | Edits any user's profile; `userId` from body, line 15 |
+| `GET /api/portal/commission` (`commission/route.ts:49`) | 404 | Returns commission structure for any `userId`, line 58 |
+| `PUT /api/portal/commission` (line 103) | 500 | Rewrites the commission tier table; `updatedBy` from body |
+| `POST`/`DELETE /api/portal/pipeline/decommission` | 500 | Decommissions or deletes a user |
+| `GET /api/portal/calls` | 400 | `userId is required` — handler reached |
+| `GET /api/portal/pipeline`, `/pipeline/channels` | 400 | Same |
+| `POST /api/portal/pipeline/field-train` | 500 | Identity from body |
+| `GET /api/portal/email-templates` | 400 | Handler reached |
+| `GET /api/portal/recruiting/invites` | 400 | Handler reached |
+| `POST /api/portal/recruiting/convert` | 500 | Identity from body |
+
+### Correction to the first pass of this audit
+
+An earlier draft claimed 22 open routes including the six `forms/*/review`
+endpoints and their payroll-dispute PII. **That was wrong.** Those six return
+401; they gate via `@/lib/forms/reviewQuery`
+(`src/app/api/portal/forms/payroll-dispute/review/route.ts:2`). The initial
+count came from grepping route files for auth-helper *names*, which produces a
+false positive for every route that gates through a shared helper — the same
+reason the chat routes (`getVerifiedChatUser`) were miscounted.
+
+Lesson carried into this work: **static grep identifies candidates, the live
+probe establishes fact.** No route is claimed open or closed in the final
+report without a probe result behind it.
 
 Separately, `firestore.rules:52-75` grants any *approved* signed-in user direct
 client-SDK write access to `sales`, `training`, `userProgress`, and
