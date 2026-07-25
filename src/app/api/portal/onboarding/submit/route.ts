@@ -6,10 +6,7 @@ import {
   getOnboardingItemsForUser,
   looksLikeRawSensitiveData,
 } from '@/types';
-import {
-  requireVerifiedManagement,
-  requireVerifiedUser,
-} from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 
@@ -26,26 +23,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // A user may submit their own onboarding; management may submit on behalf.
-    // Authenticate from the token before reading the body.
-    //
-    // The self path uses requireVerifiedUser with { allowOnboarding: true }
-    // rather than requireVerifiedSelfOrManagement, which is active-only. A rep
-    // submitting their own onboarding documents is by definition not yet active:
-    // the invite flow creates them status 'pending' with a field role
-    // (api/public/onboarding/[token]/route.ts:227) and they only flip to active
-    // once every item is approved (lib/onboarding/activation.ts). Without the
-    // opt-in no new hire could ever submit anything. It admits
-    // pending-with-a-field-role only — never an unapproved self-signup, never a
-    // deactivated account.
-    const self = await requireVerifiedUser(request, { allowOnboarding: true });
-    if (!self.ok) {
-      return NextResponse.json({ error: self.error }, { status: self.status });
-    }
-
     const body = await request.json();
     // userId is the TARGET (whose checklist item), not the caller: it keys the
-    // doc id below and scopes the storage-reference check.
+    // doc id below and scopes the storage-reference check. The gate runs after
+    // the body read only because the target lives in it — identity still comes
+    // solely from the Authorization header.
     const { userId, itemId, reference } = body;
 
     if (!userId || !itemId) {
@@ -55,15 +37,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Submitting on someone else's behalf is management-only.
-    if (self.uid !== userId) {
-      const management = await requireVerifiedManagement(request);
-      if (!management.ok) {
-        return NextResponse.json(
-          { error: management.error },
-          { status: management.status }
-        );
-      }
+    // A user may submit their own onboarding; management may submit on behalf.
+    // allowOnboarding because a rep submitting their own onboarding documents is
+    // BY DEFINITION not yet active: the invite flow creates them status 'pending'
+    // with a field role (api/public/onboarding/[token]/route.ts:227) and they
+    // only flip to active once every item is approved
+    // (lib/onboarding/activation.ts). Without the opt-in no new hire could ever
+    // submit anything. It admits pending-WITH-a-field-role only: an unapproved
+    // self-signup has no field role and is still rejected, as is any deactivated
+    // account. Do not widen it to "allow pending" — that would readmit bot
+    // signups.
+    const gate = await requireVerifiedSelfOrManagement(request, userId, {
+      allowOnboarding: true,
+    });
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const item = ONBOARDING_ITEMS.find((i) => i.id === itemId);

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOnboardingBucket } from '@/lib/firebase/admin';
-import {
-  requireVerifiedManagement,
-  requireVerifiedUser,
-} from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateUpload, buildFolderPath } from '@/lib/onboarding/uploads';
 
 // POST /api/portal/onboarding/upload - Authenticated rep (or management acting
@@ -11,26 +8,11 @@ import { validateUpload, buildFolderPath } from '@/lib/onboarding/uploads';
 // via the Admin SDK and returns the folder path to store as the item reference.
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate from the Authorization header before parsing the multipart
-    // body, so an unauthenticated caller cannot push a large file into memory
-    // ahead of the size cap in validateUpload.
-    //
-    // The self path uses requireVerifiedUser with { allowOnboarding: true }
-    // rather than requireVerifiedSelfOrManagement, which is active-only. A rep
-    // uploading their onboarding documents is by definition not yet active:
-    // the invite flow creates them status 'pending' with a field role
-    // (api/public/onboarding/[token]/route.ts:227) and they only flip to active
-    // once every item is approved (lib/onboarding/activation.ts). It admits
-    // pending-with-a-field-role only — never an unapproved self-signup, never a
-    // deactivated account.
-    const self = await requireVerifiedUser(request, { allowOnboarding: true });
-    if (!self.ok) {
-      return NextResponse.json({ error: self.error }, { status: self.status });
-    }
-
     const form = await request.formData();
     // userId is the TARGET (whose folder), not the caller — it builds the
-    // storage path below.
+    // storage path below. The gate runs after the multipart read only because
+    // the target lives in it; identity still comes solely from the
+    // Authorization header, which is unaffected by the body encoding.
     const userId = String(form.get('userId') ?? '');
     const itemId = String(form.get('itemId') ?? '');
     const slot = form.get('slot') ? String(form.get('slot')) : null;
@@ -43,15 +25,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Uploading into someone else's folder is management-only.
-    if (self.uid !== userId) {
-      const management = await requireVerifiedManagement(request);
-      if (!management.ok) {
-        return NextResponse.json(
-          { error: management.error },
-          { status: management.status }
-        );
-      }
+    // A rep may upload into their own folder; management may upload on behalf.
+    // allowOnboarding because a rep uploading their onboarding documents is BY
+    // DEFINITION not yet active: the invite flow creates them status 'pending'
+    // with a field role (api/public/onboarding/[token]/route.ts:227) and they
+    // only flip to active once every item is approved
+    // (lib/onboarding/activation.ts). It admits pending-WITH-a-field-role only:
+    // an unapproved self-signup has no field role and is still rejected, as is
+    // any deactivated account. Do not widen it to "allow pending" — that would
+    // readmit bot signups.
+    const gate = await requireVerifiedSelfOrManagement(request, userId, {
+      allowOnboarding: true,
+    });
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const check = validateUpload({ itemId, slot, mime: file.type, size: file.size });

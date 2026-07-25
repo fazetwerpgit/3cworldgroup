@@ -5,10 +5,7 @@ import {
   resolveRoles,
   OnboardingStatus,
 } from '@/types';
-import {
-  requireVerifiedManagement,
-  requireVerifiedUser,
-} from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 
 // GET /api/portal/onboarding?userId=xxx - Merged onboarding checklist for a user.
 // Returns the items that apply to the user's fieldRole/isIBO, each merged with
@@ -22,23 +19,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // A user may read their own checklist; management may read anyone's. The
-    // caller is authenticated from the token before anything else; `userId` below
-    // is the TARGET (whose checklist), never the identity.
-    //
-    // The self path uses requireVerifiedUser with { allowOnboarding: true }
-    // rather than requireVerifiedSelfOrManagement, which is active-only: a hired
-    // rep is status 'pending' with a field role for the whole onboarding flow
-    // (created pending at api/public/onboarding/[token]/route.ts:227, flipped to
-    // active only once every item is approved — lib/onboarding/activation.ts),
-    // so the active-only helper would lock every new hire out of their own
-    // checklist. The opt-in admits pending-with-a-field-role only: never an
-    // unapproved self-signup, never a deactivated account.
-    const self = await requireVerifiedUser(request, { allowOnboarding: true });
-    if (!self.ok) {
-      return NextResponse.json({ error: self.error }, { status: self.status });
-    }
-
+    // TARGET: whose checklist is read. Identity comes only from the token below.
     const userId = request.nextUrl.searchParams.get('userId');
     if (!userId) {
       return NextResponse.json(
@@ -47,15 +28,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Reading someone else's checklist is management-only.
-    if (self.uid !== userId) {
-      const management = await requireVerifiedManagement(request);
-      if (!management.ok) {
-        return NextResponse.json(
-          { error: management.error },
-          { status: management.status }
-        );
-      }
+    // A user may read their own checklist; management may read anyone's.
+    // allowOnboarding because the reader is normally a hired rep still working
+    // through this very checklist, i.e. status 'pending' with a field role
+    // (created pending at api/public/onboarding/[token]/route.ts:227, flipped to
+    // active only once every item is approved — lib/onboarding/activation.ts).
+    // It admits pending-WITH-a-field-role only: an unapproved self-signup has no
+    // field role and is still rejected, as is any deactivated account. Do not
+    // widen it to "allow pending" — that would readmit bot signups.
+    const gate = await requireVerifiedSelfOrManagement(request, userId, {
+      allowOnboarding: true,
+    });
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
     const userDoc = await adminDb.collection('users').doc(userId).get();
