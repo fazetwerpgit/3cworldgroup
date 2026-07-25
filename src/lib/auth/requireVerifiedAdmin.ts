@@ -2,10 +2,52 @@ import { NextRequest } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { MANAGEMENT_FIELD_ROLES, resolveRoles } from '@/types';
 
+// Per-route relaxations of the account-status gate. Deny-by-default: a route that
+// passes nothing gets active-only, so admitting a non-active caller is always a
+// visible, deliberate choice at the call site.
+export type VerifiedCallerOptions = {
+  // Admit a rep who is mid-onboarding — status 'pending' WITH an assigned field
+  // role, i.e. invited and hired but not activated yet (see the invite flow in
+  // api/public/onboarding/[token]). Never admits an unapproved self-signup
+  // (pending with no field role) and never admits a deactivated account.
+  // Use only where the portal shell a pending rep already sees needs it.
+  allowOnboarding?: boolean;
+};
+
+// Account-status gate. A valid Firebase ID token proves who the caller is, not
+// that they are still allowed in: a self-signup writes its own 'pending' user doc
+// (firestore.rules permits it so the pending screen works) and a decommissioned
+// rep keeps a working refresh token after their status flips to 'inactive'.
+//
+// The two non-active cases are deliberately kept on separate branches:
+//   'inactive' → access was revoked (decommission / User Management). No route may
+//                admit it, opt-in or not.
+//   'pending'  → either an unapproved self-signup (no field role, never admitted)
+//                or a hired rep mid-onboarding, which a route may opt into.
+// Anything else (missing status, an unrecognised value) is treated as not active;
+// AuthContext already refuses to sign such a doc in, so this adds no new lockout.
+function checkStatus(
+  data: FirebaseFirestore.DocumentData,
+  allowOnboarding: boolean
+): { ok: true } | { ok: false; error: string; status: number } {
+  if (data.status === 'active') {
+    return { ok: true };
+  }
+  if (data.status === 'pending') {
+    const { fieldRole } = resolveRoles(data.role, data.fieldRole);
+    if (allowOnboarding && fieldRole) {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Account is pending approval', status: 403 };
+  }
+  return { ok: false, error: 'Account is not active', status: 403 };
+}
+
 // Verifies a real Firebase ID token and returns the caller's uid + user doc data.
 // Shared by the verified-auth helpers below. Expects: Authorization: Bearer <idToken>.
 async function verifyCaller(
-  request: NextRequest
+  request: NextRequest,
+  { allowOnboarding = false }: VerifiedCallerOptions = {}
 ): Promise<{ ok: true; uid: string; data: FirebaseFirestore.DocumentData } | { ok: false; error: string; status: number }> {
   if (!adminAuth || !adminDb) {
     return { ok: false, error: 'Auth not configured', status: 500 };
@@ -26,16 +68,22 @@ async function verifyCaller(
   if (!snap.exists) {
     return { ok: false, error: 'User not found', status: 403 };
   }
-  return { ok: true, uid, data: snap.data() ?? {} };
+  const data = snap.data() ?? {};
+  // Status before role: a decommissioned admin must read as revoked, not as a
+  // role failure, and must never reach a route because their role survived.
+  const status = checkStatus(data, allowOnboarding);
+  if (!status.ok) return status;
+  return { ok: true, uid, data };
 }
 
 // Verifies a real token and confirms the caller is any active user (for rep
 // self-submit). Returns the verified uid + name/email — the route stamps from this,
 // never from client input.
 export async function requireVerifiedUser(
-  request: NextRequest
+  request: NextRequest,
+  options?: VerifiedCallerOptions
 ): Promise<{ ok: true; uid: string; name: string; email: string } | { ok: false; error: string; status: number }> {
-  const c = await verifyCaller(request);
+  const c = await verifyCaller(request, options);
   if (!c.ok) return c;
   return {
     ok: true,
@@ -87,36 +135,17 @@ export async function requireVerifiedFieldManagerOrManagement(
 // Verifies a real Firebase ID token (not a client-supplied UID) and confirms the
 // caller is an admin. Use for sensitive operations (SSN/DL# reveal) where the
 // trust-the-UID pattern is not acceptable. Expects: Authorization: Bearer <idToken>.
+// Shares verifyCaller with the helpers above: this function used to inline its own
+// copy of the token/doc lookup, which meant a gate added to verifyCaller silently
+// skipped the most privileged helper in the file.
 export async function requireVerifiedAdmin(
   request: NextRequest
 ): Promise<{ ok: true; uid: string; name: string } | { ok: false; error: string; status: number }> {
-  if (!adminAuth || !adminDb) {
-    return { ok: false, error: 'Auth not configured', status: 500 };
-  }
-
-  const header = request.headers.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!token) {
-    return { ok: false, error: 'Missing authentication token', status: 401 };
-  }
-
-  let uid: string;
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    uid = decoded.uid;
-  } catch {
-    return { ok: false, error: 'Invalid authentication token', status: 401 };
-  }
-
-  const snap = await adminDb.collection('users').doc(uid).get();
-  if (!snap.exists) {
-    return { ok: false, error: 'User not found', status: 403 };
-  }
-  const data = snap.data();
-  const { role } = resolveRoles(data?.role, data?.fieldRole);
+  const c = await verifyCaller(request);
+  if (!c.ok) return c;
+  const { role } = resolveRoles(c.data.role, c.data.fieldRole);
   if (role !== 'admin') {
     return { ok: false, error: 'Forbidden: admin access required', status: 403 };
   }
-
-  return { ok: true, uid, name: data?.displayName || data?.email || 'Admin' };
+  return { ok: true, uid: c.uid, name: c.data.displayName || c.data.email || 'Admin' };
 }
