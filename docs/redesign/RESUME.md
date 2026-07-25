@@ -25,15 +25,48 @@ STANDING RULES FOR THIS WORK (Jacob's explicit choices — do not deviate):
   typecheck will not catch it.
 - Adversarial review by Opus agents that did NOT write the code.
 
-WHAT IS BEING FIXED: 22 API routes under src/app/api have zero auth and
-trust a client-supplied userId (worst: PUT /api/portal/profile,
-GET+PUT /api/portal/commission, pipeline/decommission, 6x
-forms/*/review incl. payroll-dispute PII). Plus firestore.rules:52-75
-lets any approved user create/update/delete any sale from the browser
-console with forged totalPoints.
+FINDINGS (revised twice — the initial grep-based audit was wrong in BOTH
+directions; live probe + reading call chains is the only trustworthy method):
 
-Task list (TaskList tool) tracks the 7 steps. Recon agents recon-core /
-recon-forms / recon-rules produce the implementation specs first.
+1. CRITICAL — src/lib/auth/requireManagement.ts does not authenticate at
+   all. getRequester/requireManagement/requireAdmin/requireSelfOrManagement
+   all take a userId STRING, no token. Its own docstring lines 6-10 admit
+   it. 18 routes gate on it incl. sales/approve, auth/create-user,
+   auth/users/[id], onboarding/*, training/*. Anyone knowing an admin uid
+   passes ?requestedBy= and IS that admin. Escalation chain (being
+   verified): rules let any user read their own user doc -> contains
+   reportsToId = manager's uid -> if manager is admin/ops, instant
+   escalation. My first audit counted these 18 as GATED. They are not.
+2. CRITICAL — decommission does not revoke access.
+   pipeline/decommission/route.ts:74-84 sets Firestore status:'inactive'
+   only. No adminAuth disable, no revokeRefreshTokens, role NOT cleared.
+   Comment line 16 says AuthContext blocks sign-in — that is React, not a
+   security boundary. Ex-employee keeps minting tokens forever; a
+   decommissioned ADMIN still passes requireVerifiedAdmin.
+3. HIGH — verifyCaller (requireVerifiedAdmin.ts:24-29) checks only that the
+   user doc EXISTS, never status=='active'. Pending self-signups pass
+   requireVerifiedUser. NOTE requireVerifiedAdmin at :90 DUPLICATES
+   verifyCaller's body, so fixing verifyCaller alone misses it.
+4. HIGH — 11 routes genuinely unauthenticated (profile, commission x2,
+   calls, pipeline x4, email-templates, recruiting x2). Confirmed by probe.
+5. FALSE ALARMS, retracted: the 6 forms/*/review routes ARE gated
+   (requireVerifiedManagement via lib/forms/reviewQuery.ts). Onboarding
+   tokens are STRONG (256-bit randomBytes, SHA-256 hashed, 14d expiry,
+   single-use). Upload route has MIME allowlist + 4MB cap + server-derived
+   paths. None need work.
+
+DONE: 57f5f9d firestore.rules locked (sales/training/userProgress/
+leaderboard -> read,write:if false). NOT DEPLOYED — deploy guide at
+docs/security/firestore-rules-deploy.md. Evidence: only 6 files import
+firebase/firestore repo-wide, none touch those 4 collections.
+Also 0622f0d scripts/audit-open-routes.mjs = the regression test; every
+row must read GUARDED before this work is done.
+
+Recon reports (read these before redoing any analysis) live in the session
+scratchpad: recon-core.md recon-forms.md recon-rules.md recon-pending.md
+plan-migration.md impl-*.md
+
+Task list (TaskList tool) tracks all 10 items.
 
 ---
 
