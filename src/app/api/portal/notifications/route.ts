@@ -29,7 +29,11 @@ export async function GET(request: NextRequest) {
     }
 
     // A user may read their own notifications; management may read anyone's.
-    const gate = await requireVerifiedSelfOrManagement(request, userId);
+    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
+    // role and the portal shell they already see renders this bell on every
+    // page — without it, onboarding alerts (item rejected, doc approved) are
+    // sent to exactly the person who can't read them.
+    const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -188,7 +192,8 @@ export async function PUT(request: NextRequest) {
     };
 
     if (markAllRead && userId) {
-      const gate = await requireVerifiedSelfOrManagement(request, userId);
+      // allowOnboarding: same bell, same pending-with-a-field-role rep as GET above.
+      const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
       if (!gate.ok) {
         return NextResponse.json({ error: gate.error }, { status: gate.status });
       }
@@ -208,7 +213,9 @@ export async function PUT(request: NextRequest) {
     }
 
     if (notificationIds && Array.isArray(notificationIds)) {
-      const requester = await requireVerifiedRequester(request);
+      // allowOnboarding: same bell, same pending-with-a-field-role rep as GET
+      // above; ownedRefs below still restricts this to the caller's own docs.
+      const requester = await requireVerifiedRequester(request, { allowOnboarding: true });
       if (!requester.ok) {
         return NextResponse.json({ error: requester.error }, { status: requester.status });
       }
@@ -267,8 +274,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Same gate as mark-all-read: a user may clear their own bell; management
-    // may clear anyone's.
-    const gate = await requireVerifiedSelfOrManagement(request, userId);
+    // may clear anyone's. allowOnboarding: same pending-with-a-field-role rep.
+    const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
