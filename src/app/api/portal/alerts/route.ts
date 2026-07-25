@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 
 function serializeDate(value: unknown): string | null {
@@ -18,9 +18,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const gate = await requireManagement(
-      request.nextUrl.searchParams.get('requestedBy')
-    );
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

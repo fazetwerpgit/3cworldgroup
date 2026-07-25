@@ -1,28 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { claimAlertTask } from '@/lib/alerts/alertTasks';
-import { requireManagement } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as {
-      requestedBy?: string;
-      taskId?: string;
-    };
-    const { requestedBy, taskId } = body;
-
-    if (!requestedBy || !taskId) {
-      return NextResponse.json(
-        { error: 'requestedBy and taskId are required' },
-        { status: 400 }
-      );
-    }
-
-    const gate = await requireManagement(requestedBy);
+    // The claimer is stamped onto the task, so identity comes from the verified
+    // token — never from the request body.
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    const result = await claimAlertTask(taskId, requestedBy, gate.requester.name);
+    const body = (await request.json()) as { taskId?: string };
+    const { taskId } = body;
+
+    if (!taskId) {
+      return NextResponse.json(
+        { error: 'taskId is required' },
+        { status: 400 }
+      );
+    }
+
+    const result = await claimAlertTask(taskId, gate.uid, gate.name);
     if (result === 'not_found') {
       return NextResponse.json({ error: 'not found' }, { status: 404 });
     }
