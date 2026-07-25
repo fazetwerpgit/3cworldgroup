@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { getRequester } from '@/lib/auth/requireManagement';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { SaleStatus } from '@/types';
 
 // Helper function to create a notification
@@ -41,22 +40,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Approving/rejecting a sale is a money decision — require a verified
-    // manager+ login and stamp the approver from the VERIFIED identity, never
-    // from client-supplied fields.
-    const gate = await requireVerifiedUser(request);
+    // Approving/rejecting a sale is a money decision — it is the step that turns
+    // a pending sale into awarded points. Require a verified admin/operations
+    // login and stamp the approver from the VERIFIED identity, never from
+    // client-supplied fields (the client still sends approverId/approverName;
+    // they are ignored here).
+    const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    const requester = await getRequester(gate.uid);
-    if (!requester?.isManagement) {
-      return NextResponse.json(
-        { error: 'Forbidden: approval requires manager access' },
-        { status: 403 }
-      );
-    }
     const approverId = gate.uid;
-    const approverName = requester.name;
+    const approverName = gate.name;
 
     const body = await request.json();
     const { saleId, status, rejectionReason } = body;
