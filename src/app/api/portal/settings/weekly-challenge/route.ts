@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { requireVerifiedAdmin, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 
 const DEFAULT_TARGET_SALES = 7;
 
-function getBearerToken(request: NextRequest): string {
-  const header = request.headers.get('authorization') || '';
-  return header.startsWith('Bearer ') ? header.slice(7) : '';
-}
-
-async function verifyCaller(request: NextRequest): Promise<{ uid: string } | null> {
-  if (!adminAuth) return null;
-  const token = getBearerToken(request);
-  if (!token) return null;
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    return { uid: decoded.uid };
-  } catch {
-    return null;
-  }
-}
-
-// GET /api/portal/settings/weekly-challenge — any signed-in portal user.
+// GET /api/portal/settings/weekly-challenge — any signed-in, active portal user.
 // Never 500s on a missing/malformed doc; falls back to the code default so
 // the leaderboard banner always has something to render.
 export async function GET(request: NextRequest) {
@@ -29,9 +13,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ targetSales: DEFAULT_TARGET_SALES });
   }
 
-  const caller = await verifyCaller(request);
-  if (!caller) {
-    return NextResponse.json({ error: 'Missing or invalid authentication token' }, { status: 401 });
+  const caller = await requireVerifiedUser(request);
+  if (!caller.ok) {
+    return NextResponse.json({ error: caller.error }, { status: caller.status });
   }
 
   try {
@@ -54,14 +38,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Server is not configured' }, { status: 500 });
   }
 
-  const caller = await verifyCaller(request);
-  if (!caller) {
-    return NextResponse.json({ error: 'Missing or invalid authentication token' }, { status: 401 });
-  }
-
-  const callerDoc = await adminDb.collection('users').doc(caller.uid).get();
-  if (!callerDoc.exists || callerDoc.data()?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden: admin access required' }, { status: 403 });
+  const caller = await requireVerifiedAdmin(request);
+  if (!caller.ok) {
+    return NextResponse.json({ error: caller.error }, { status: caller.status });
   }
 
   let body: unknown;

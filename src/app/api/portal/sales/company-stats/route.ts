@@ -1,22 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-
-function getBearerToken(request: NextRequest): string {
-  const header = request.headers.get('authorization') || '';
-  return header.startsWith('Bearer ') ? header.slice(7) : '';
-}
-
-async function verifyCaller(request: NextRequest): Promise<{ uid: string } | null> {
-  if (!adminAuth) return null;
-  const token = getBearerToken(request);
-  if (!token) return null;
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    return { uid: decoded.uid };
-  } catch {
-    return null;
-  }
-}
+import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 
 interface CompanyStats {
   mtdCount: number;
@@ -28,10 +12,10 @@ interface CompanyStats {
 
 const EMPTY_STATS: CompanyStats = { mtdCount: 0, mtdMonthlyValue: 0, lastSale: null };
 
-// GET /api/portal/sales/company-stats — any signed-in portal user. Powers the
-// "company tape" ticker in the All Company chat channel. Team scale is small,
-// so approved sales are pulled and reduced in memory rather than via a
-// compound Firestore query. Never 500s on an empty/malformed collection —
+// GET /api/portal/sales/company-stats — any signed-in, active portal user.
+// Powers the "company tape" ticker in the All Company chat channel. Team scale
+// is small, so approved sales are pulled and reduced in memory rather than via
+// a compound Firestore query. Never 500s on an empty/malformed collection —
 // falls back to zeros/null so the caller can hide the tape rather than ever
 // render a fabricated number.
 export async function GET(request: NextRequest) {
@@ -39,9 +23,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(EMPTY_STATS);
   }
 
-  const caller = await verifyCaller(request);
-  if (!caller) {
-    return NextResponse.json({ error: 'Missing or invalid authentication token' }, { status: 401 });
+  const caller = await requireVerifiedUser(request);
+  if (!caller.ok) {
+    return NextResponse.json({ error: caller.error }, { status: caller.status });
   }
 
   try {
