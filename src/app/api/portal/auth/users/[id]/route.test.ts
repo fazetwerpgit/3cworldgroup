@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
+vi.mock('next/server', async () => {
+  const actual = await vi.importActual<typeof import('next/server')>('next/server');
+  return {
+    ...actual,
+    after: vi.fn((callback: () => unknown) => {
+      void callback();
+    }),
+  };
+});
+
 const firestore = vi.hoisted(() => {
   const users = new Map<string, Record<string, unknown>>();
   const updates: Array<{ userId: string; data: Record<string, unknown> }> = [];
@@ -58,6 +68,7 @@ vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: vi.fn(async () => un
 vi.mock('@/lib/users/restampDisplayName', () => ({ restampDisplayName: vi.fn(async () => undefined) }));
 
 import { PUT } from './route';
+import { after } from 'next/server';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
@@ -96,6 +107,7 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(firestore.updates[0]?.data).toMatchObject({ fieldRole: 'l1_manager' });
     expect(firestore.updates[0]?.data).not.toHaveProperty('status');
     expect(mockResolveAlertTasks).toHaveBeenCalledWith('pending-user', ['pending_assignment']);
+    expect(after).toHaveBeenCalledOnce();
   });
 
   it('still activates a pending general manager immediately', async () => {

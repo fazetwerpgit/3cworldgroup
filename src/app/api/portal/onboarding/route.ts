@@ -52,13 +52,11 @@ export async function GET(request: NextRequest) {
 
     // Retry delivery after the response. sendPendingEsignDocs is failure-contained
     // and throttled, so a provider outage cannot delay or fail this checklist read.
-    if (userData?.status !== 'active') {
-      after(() =>
-        sendPendingEsignDocs(userId).catch((error) => {
-          console.error('[onboarding] esign auto-send failed', error);
-        })
-      );
-    }
+    after(() =>
+      sendPendingEsignDocs(userId).catch((error) => {
+        console.error('[onboarding] esign auto-send failed', error);
+      })
+    );
 
     const isIBO = userData?.isIBO ?? false;
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO);

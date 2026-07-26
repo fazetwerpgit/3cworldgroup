@@ -442,11 +442,7 @@ export default function PublicOnboardingPage() {
                           : 'Confirm completion or add a short reference.'}
                       </p>
                     </div>
-                    {isEsignItem(item.id) ? (
-                      <Badge variant="outline" className="border-slate-200 text-slate-500">
-                        By email
-                      </Badge>
-                    ) : references[item.id]?.trim() ? (
+                    {references[item.id]?.trim() ? (
                       <Badge className="bg-[#8dc63f]/15 text-[#4f7f1e] hover:bg-[#8dc63f]/15">
                         Complete
                       </Badge>

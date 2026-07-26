@@ -1,25 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { docGetMock, docUpdateMock, gateMock } = vi.hoisted(() => ({
+const { docGetMock, docUpdateMock, gateMock, queryGetMock, getAllMock } = vi.hoisted(() => ({
   docGetMock: vi.fn(),
   docUpdateMock: vi.fn(),
   gateMock: vi.fn(),
+  queryGetMock: vi.fn(),
+  getAllMock: vi.fn(),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: vi.fn((name: string) => ({
       doc: vi.fn(() => ({ get: docGetMock, update: docUpdateMock })),
-      where: vi.fn(() => ({ get: vi.fn() })),
+      where: vi.fn(() => ({ get: queryGetMock })),
       ...(name === 'users' ? {} : {}),
     })),
+    getAll: getAllMock,
   },
   getOnboardingBucket: vi.fn(),
+}));
+vi.mock('firebase-admin/firestore', () => ({
+  FieldValue: { delete: vi.fn(() => '__FIELD_VALUE_DELETE__') },
 }));
 vi.mock('@/types', () => ({
   ONBOARDING_ITEMS: [
     { id: 'contract', label: 'Contract', category: 'paperwork', sensitive: false, referenceKind: 'esign' },
+    { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', sensitive: false, referenceKind: 'manual' },
   ],
 }));
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: vi.fn(() => false) }));
@@ -31,14 +38,14 @@ vi.mock('@/lib/email/templates', () => ({
 }));
 vi.mock('@/lib/onboarding/activation', () => ({ maybeFlagActivationReady: vi.fn(async () => undefined) }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
-function request(status: 'approved' | 'rejected') {
+function postRequest(itemId: string, status: 'approved' | 'rejected') {
   return new NextRequest('http://localhost/api/portal/onboarding/review', {
     method: 'POST',
     body: JSON.stringify({
       userId: 'user-1',
-      itemId: 'contract',
+      itemId,
       status,
       ...(status === 'rejected' ? { rejectionReason: 'Please use the provider envelope.' } : {}),
     }),
@@ -48,6 +55,8 @@ function request(status: 'approved' | 'rejected') {
 beforeEach(() => {
   vi.clearAllMocks();
   gateMock.mockResolvedValue({ ok: true, uid: 'manager-1', name: 'Manager', isAdmin: true });
+  queryGetMock.mockResolvedValue({ docs: [] });
+  getAllMock.mockResolvedValue([]);
   docGetMock.mockResolvedValue({
     exists: true,
     data: () => ({ status: 'submitted' }),
@@ -58,7 +67,7 @@ beforeEach(() => {
 
 describe('POST /api/portal/onboarding/review', () => {
   it('refuses approval for an e-sign item', async () => {
-    const response = await POST(request('approved'));
+    const response = await POST(postRequest('contract', 'approved'));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
@@ -68,9 +77,55 @@ describe('POST /api/portal/onboarding/review', () => {
   });
 
   it('still allows rejection for an e-sign item', async () => {
-    const response = await POST(request('rejected'));
+    const response = await POST(postRequest('contract', 'rejected'));
 
     expect(response.status).toBe(200);
-    expect(docUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'rejected' }));
+    expect(docUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'rejected',
+      esignEnvelopeId: '__FIELD_VALUE_DELETE__',
+      esignDispatch: '__FIELD_VALUE_DELETE__',
+    }));
+  });
+
+  it('rejecting a non-e-sign item does not clear e-sign fields', async () => {
+    const response = await POST(postRequest('onboarding_submission', 'rejected'));
+
+    expect(response.status).toBe(200);
+    const update = docUpdateMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(update).toMatchObject({ status: 'rejected' });
+    expect(update).not.toHaveProperty('esignEnvelopeId');
+    expect(update).not.toHaveProperty('esignDispatch');
+  });
+});
+
+describe('GET /api/portal/onboarding/review', () => {
+  it('excludes submitted e-sign items while retaining submitted non-e-sign items', async () => {
+    queryGetMock.mockResolvedValue({
+      docs: [
+        {
+          id: 'user-1_contract',
+          data: () => ({ userId: 'user-1', itemId: 'contract', submittedAt: { toDate: () => new Date('2026-07-26') } }),
+        },
+        {
+          id: 'user-2_onboarding_submission',
+          data: () => ({ userId: 'user-2', itemId: 'onboarding_submission', submittedAt: { toDate: () => new Date('2026-07-27') } }),
+        },
+      ],
+    });
+    getAllMock
+      .mockResolvedValueOnce([
+        { exists: true, id: 'user-2', data: () => ({ displayName: 'Rep', email: 'rep@example.com' }), get: () => false },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const response = await GET(new NextRequest('http://localhost/api/portal/onboarding/review'));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      submissions: [expect.objectContaining({
+        id: 'user-2_onboarding_submission',
+        itemId: 'onboarding_submission',
+      })],
+    });
   });
 });

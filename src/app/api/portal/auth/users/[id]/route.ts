@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
@@ -302,8 +302,10 @@ export async function PUT(
         console.error('[users] checklist kickoff notification failed:', error);
       }
 
-      void sendPendingEsignDocs(id).catch((err) =>
-        console.error('[users] esign kickoff failed', err)
+      after(() =>
+        sendPendingEsignDocs(id).catch((err) =>
+          console.error('[users] esign kickoff failed', err)
+        )
       );
     }
 

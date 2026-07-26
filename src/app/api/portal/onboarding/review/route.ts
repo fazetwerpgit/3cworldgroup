@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
@@ -61,9 +62,10 @@ export async function GET(request: NextRequest) {
       .collection('userOnboarding')
       .where('status', '==', 'submitted')
       .get();
+    const reviewableDocs = snapshot.docs.filter((doc) => !isEsignItem(doc.data().itemId));
 
     // Collect unique user ids to join display names in one batch
-    const userIds = [...new Set(snapshot.docs.map((d) => d.data().userId as string))];
+    const userIds = [...new Set(reviewableDocs.map((d) => d.data().userId as string))];
     const userMap = new Map<string, { displayName?: string; email?: string; atRisk: boolean }>();
     if (userIds.length > 0) {
       const userDocs = await adminDb.getAll(
@@ -82,7 +84,7 @@ export async function GET(request: NextRequest) {
     }
 
     const submissions = await Promise.all(
-      snapshot.docs.map(async (doc) => {
+      reviewableDocs.map(async (doc) => {
         const data = doc.data();
         const item = ONBOARDING_ITEMS.find((i) => i.id === data.itemId);
         const user = userMap.get(data.userId);
@@ -201,6 +203,12 @@ export async function POST(request: NextRequest) {
       reviewerName: gate.name,
       reviewedAt: now,
       rejectionReason: status === 'rejected' ? rejectionReason.trim() : null,
+      ...(status === 'rejected' && isEsignItem(itemId)
+        ? {
+            esignEnvelopeId: FieldValue.delete(),
+            esignDispatch: FieldValue.delete(),
+          }
+        : {}),
       updatedAt: now,
     });
 
