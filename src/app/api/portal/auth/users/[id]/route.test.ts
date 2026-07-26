@@ -60,14 +60,15 @@ vi.mock('@/lib/users/restampDisplayName', () => ({ restampDisplayName: vi.fn(asy
 import { PUT } from './route';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
+import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockResolveAlertTasks = resolveAlertTasks as unknown as ReturnType<typeof vi.fn>;
 
-function request(fieldRole: string) {
+function request(body: Record<string, unknown>) {
   return new NextRequest('http://localhost/api/portal/auth/users/pending-user', {
     method: 'PUT',
-    body: JSON.stringify({ fieldRole }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -89,7 +90,7 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
       displayName: 'Pending Manager',
     });
 
-    const response = await PUT(request('l1_manager'), params());
+    const response = await PUT(request({ fieldRole: 'l1_manager' }), params());
 
     expect(response.status).toBe(200);
     expect(firestore.updates[0]?.data).toMatchObject({ fieldRole: 'l1_manager' });
@@ -103,7 +104,7 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
       displayName: 'Pending General Manager',
     });
 
-    const response = await PUT(request('general_manager'), params());
+    const response = await PUT(request({ fieldRole: 'general_manager' }), params());
 
     expect(response.status).toBe(200);
     expect(firestore.updates[0]?.data).toMatchObject({
@@ -119,10 +120,46 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
       displayName: 'Pending Manager',
     });
 
-    const response = await PUT(request('l1_manager'), params());
+    const response = await PUT(request({ fieldRole: 'l1_manager' }), params());
 
     expect(response.status).toBe(200);
     expect(mockResolveAlertTasks).not.toHaveBeenCalled();
     expect(firestore.updates[0]?.data).not.toHaveProperty('status');
+  });
+
+  it('does not kick off onboarding when Accept sets active and entry rep together', async () => {
+    firestore.users.set('pending-user', {
+      status: 'pending',
+      fieldRole: 'entry_level_rep',
+      displayName: 'Pending Rep',
+    });
+
+    const response = await PUT(
+      request({ status: 'active', fieldRole: 'entry_rep' }),
+      params()
+    );
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({
+      status: 'active',
+      fieldRole: 'entry_rep',
+    });
+    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+    expect(sendPendingEsignDocs).not.toHaveBeenCalled();
+  });
+
+  it('does not kick off onboarding when an active user is promoted', async () => {
+    firestore.users.set('pending-user', {
+      status: 'active',
+      fieldRole: 'entry_rep',
+      displayName: 'Active Rep',
+    });
+
+    const response = await PUT(request({ fieldRole: 'l1_manager' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({ fieldRole: 'l1_manager' });
+    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+    expect(sendPendingEsignDocs).not.toHaveBeenCalled();
   });
 });

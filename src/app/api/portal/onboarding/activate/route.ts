@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
-import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
-import { activationEmail } from '@/lib/email/templates';
 import { adminDb } from '@/lib/firebase/admin';
-import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
-import { getActivationReadiness } from '@/lib/onboarding/activation';
-import { graduatedFieldRole, roleRequiresOnboarding, type FieldRole } from '@/types/auth';
+import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,41 +33,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userRef = adminDb.doc(`users/${userId}`);
-    const userSnap = await userRef.get();
-    if (!userSnap.exists) {
+    const activation = await activateUser(userId);
+    if (!activation) {
       return NextResponse.json({ error: 'user not found' }, { status: 404 });
     }
 
-    if (userSnap.get('status') === 'active') {
-      return NextResponse.json({ ok: true, alreadyActive: true });
-    }
-
-    const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
-    const now = new Date();
-    await userRef.update({
-      status: 'active',
-      ...(fieldRole && roleRequiresOnboarding(fieldRole)
-        ? { fieldRole: graduatedFieldRole(fieldRole) }
-        : {}),
-      hireDate: now,
-      atRisk: FieldValue.delete(),
-      updatedAt: now,
-    });
-
-    await resolveAlertTasks(userId);
-
-    const name = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
-    await dispatchToUser({
-      userId,
-      type: 'rep_activated',
-      title: 'Welcome aboard - you are active',
-      message: 'Your onboarding is complete.',
-      link: '/portal',
-      email: activationEmail({ name }),
-    });
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ...(activation.alreadyActive ? { alreadyActive: true } : {}) });
   } catch (error) {
     console.error('Error activating rep:', error);
     return NextResponse.json({ error: 'Failed to activate rep' }, { status: 500 });

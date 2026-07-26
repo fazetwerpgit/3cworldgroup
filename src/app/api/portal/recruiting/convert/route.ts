@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
-import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
+import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
 import { IBO_FIELD_ROLES, resolveRoles } from '@/types';
 
 async function getRequester(userId: string) {
@@ -104,6 +103,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, status: 'rejected' });
     }
 
+    const readiness = await getActivationReadiness(invite.convertedUserId);
+    if (!readiness.ready) {
+      return NextResponse.json(
+        { error: 'not ready', missing: readiness.missing },
+        { status: 409 }
+      );
+    }
+
+    const activation = await activateUser(invite.convertedUserId);
+    if (!activation) {
+      return NextResponse.json({ error: 'user not found' }, { status: 404 });
+    }
+
     await Promise.all([
       inviteRef.set(
         {
@@ -143,17 +155,6 @@ export async function POST(request: NextRequest) {
         { merge: true }
       );
     }
-
-    await dispatchToUser({
-      userId: invite.convertedUserId,
-      type: 'onboarding_approved',
-      title: 'Application approved',
-      message: 'Your application was approved. Finish your remaining onboarding steps to go active.',
-      link: '/portal/onboarding',
-    });
-    void maybeFlagActivationReady(invite.convertedUserId).catch((error) => {
-      console.error('Failed to flag activation readiness after recruit conversion:', error);
-    });
 
     return NextResponse.json({ success: true, status: 'converted' });
   } catch (error) {

@@ -35,6 +35,7 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(),
 }));
 vi.mock('@/lib/onboarding/activation', () => ({
+  activateUser: vi.fn(),
   getActivationReadiness: vi.fn(),
 }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: vi.fn(async () => undefined) }));
@@ -43,10 +44,11 @@ vi.mock('@/lib/email/templates', () => ({ activationEmail: vi.fn(() => ({ subjec
 
 import { POST } from './route';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
-import { getActivationReadiness } from '@/lib/onboarding/activation';
+import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockReadiness = getActivationReadiness as unknown as ReturnType<typeof vi.fn>;
+const mockActivateUser = activateUser as unknown as ReturnType<typeof vi.fn>;
 
 function req(userId: string) {
   return new NextRequest('http://localhost/api/portal/onboarding/activate', {
@@ -60,8 +62,21 @@ beforeEach(() => {
   firestore.updates.length = 0;
   mockGate.mockReset();
   mockReadiness.mockReset();
+  mockActivateUser.mockReset();
   mockGate.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
   mockReadiness.mockResolvedValue({ ready: true, missing: [] });
+  mockActivateUser.mockImplementation(async (userId: string) => {
+    const data = firestore.users.get(userId);
+    if (!data) return null;
+    if (data.status === 'active') return { alreadyActive: true };
+    const update = {
+      status: 'active',
+      ...(data.fieldRole ? { fieldRole: data.fieldRole } : {}),
+    };
+    firestore.updates.push({ userId, data: update });
+    firestore.users.set(userId, { ...data, ...update });
+    return { alreadyActive: false };
+  });
 });
 
 describe('POST /api/portal/onboarding/activate', () => {

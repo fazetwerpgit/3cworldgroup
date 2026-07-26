@@ -195,7 +195,10 @@ export async function PUT(
       updateData.zip = addressCheck.clean.zip ?? FieldValue.delete();
     if (status !== undefined) updateData.status = status;
     const shouldKickoffChecklist =
-      roleRequiresOnboarding(fieldRole) && existingFieldRole !== fieldRole;
+      roleRequiresOnboarding(fieldRole) &&
+      existingFieldRole !== fieldRole &&
+      status === undefined &&
+      doc.get('status') === 'pending';
     const assigningRole = role !== undefined || fieldRole !== undefined;
     // For field-role assignments this now covers exactly the three
     // non-invitable roles (general_manager, gm_in_training, office_manager),

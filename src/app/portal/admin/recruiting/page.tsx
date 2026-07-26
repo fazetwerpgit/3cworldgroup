@@ -24,6 +24,7 @@ import {
   RecruitingStatusLabels,
   RoleDisplayNames,
 } from '@/types';
+import { ONBOARDING_ITEMS } from '@/types/onboarding';
 
 // The recruiting routes verify the caller from the ID token — the acting
 // identity is never sent in the query string or body.
@@ -93,7 +94,10 @@ const inviteStatusTone: Record<OnboardingInviteStatus, string> = {
 
 function formatMissingItems(missing: unknown): string {
   return Array.isArray(missing) && missing.length > 0
-    ? missing.map(String).join(', ')
+    ? missing
+        .map(String)
+        .map((id) => ONBOARDING_ITEMS.find((item) => item.id === id)?.label ?? id)
+        .join(', ')
     : '';
 }
 
@@ -201,40 +205,25 @@ export default function RecruitingCommandCenterPage() {
     setError('');
     setSuccess('');
     try {
-      if (action === 'approved') {
-        if (!invite.convertedUserId) {
-          throw new Error('This recruit has no portal account to activate.');
-        }
-        const activationResponse = await fetch('/api/portal/onboarding/activate', {
-          method: 'POST',
-          headers: await authHeaders(true),
-          body: JSON.stringify({ userId: invite.convertedUserId }),
-        });
-        const activationJson = await activationResponse.json().catch(() => ({}));
-        if (!activationResponse.ok) {
-          if (activationResponse.status === 409) {
-            const missing = formatMissingItems(activationJson.missing);
-            throw new Error(
-              missing
-                ? `Cannot activate yet. Missing: ${missing}`
-                : 'Cannot activate yet. Required onboarding items are missing.'
-            );
-          }
-          throw new Error(
-            typeof activationJson.error === 'string'
-              ? activationJson.error
-              : 'Failed to activate recruit'
-          );
-        }
-      }
-
       const response = await fetch('/api/portal/recruiting/convert', {
         method: 'POST',
         headers: await authHeaders(true),
         body: JSON.stringify({ inviteId: invite.id, action }),
       });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to update recruit');
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409) {
+          const missing = formatMissingItems(json.missing);
+          throw new Error(
+            missing
+              ? `Cannot activate yet. Missing: ${missing}`
+              : 'Cannot activate yet. Required onboarding items are missing.'
+          );
+        }
+        throw new Error(
+          typeof json.error === 'string' ? json.error : 'Failed to update recruit'
+        );
+      }
       setSuccess(action === 'approved' ? 'Recruit activated.' : 'Recruit rejected.');
       setRejectConfirmId(null);
       await fetchRecruiting();

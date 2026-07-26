@@ -1,6 +1,8 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
+import { activationEmail } from '@/lib/email/templates';
 import {
   getOnboardingItemsForUser,
   type OnboardingItem,
@@ -48,6 +50,44 @@ export async function getActivationReadiness(userId: string): Promise<Activation
 
   const applicable = getOnboardingItemsForUser(fieldRole, !!userSnap.get('isIBO'));
   return computeReadiness(applicable, await loadStatuses(userId));
+}
+
+/** Activate a ready user and send the single active-account notification. */
+export async function activateUser(
+  userId: string
+): Promise<{ alreadyActive: boolean } | null> {
+  if (!adminDb) throw new Error('Database not configured');
+
+  const userRef = adminDb.doc(`users/${userId}`);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) return null;
+  if (userSnap.get('status') === 'active') return { alreadyActive: true };
+
+  const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
+  const now = new Date();
+  await userRef.update({
+    status: 'active',
+    ...(fieldRole && roleRequiresOnboarding(fieldRole)
+      ? { fieldRole: graduatedFieldRole(fieldRole) }
+      : {}),
+    hireDate: now,
+    atRisk: FieldValue.delete(),
+    updatedAt: now,
+  });
+
+  await resolveAlertTasks(userId);
+
+  const name = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
+  await dispatchToUser({
+    userId,
+    type: 'rep_activated',
+    title: 'Welcome aboard - you are active',
+    message: 'Your onboarding is complete.',
+    link: '/portal',
+    email: activationEmail({ name }),
+  });
+
+  return { alreadyActive: false };
 }
 
 /** Call after any approval path. Completes the gate when a pending user goes all-green. */
