@@ -639,7 +639,15 @@ In `PortalSidebar.tsx`, `MobileBottomNav.tsx` and `CommandPalette.tsx`, when `is
 
 In `CommandPalette.tsx` line ~87, the "My Onboarding" entry is gated on `roles: ['entry_level_rep']`. Replace that with a check that the user's field role requires onboarding, so all eight roles see their own checklist link.
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 6: Hide the chat ticker for an unfinished hire**
+
+`/portal/chat` is an allowed page, but it calls `GET /api/portal/sales/company-stats`, which is NOT allowlisted and will return 403 for a hire mid-onboarding.
+
+That is deliberate, not an oversight: the client excluded Dashboard and Leaderboard specifically so company sales figures are not visible to someone whose background check has not cleared, and the ticker shows the same class of data. Allowlisting it would contradict that decision.
+
+So the ticker must be **hidden**, not left to fail. When `isOnboardingUser(user)` is true, do not render the ticker and do not issue the request. A 403 in the console on an allowed page is a bug report waiting to happen.
+
+- [ ] **Step 7: Run tests**
 
 Run: `npx vitest run src/components/portal/` then `npm test`
 Expected: PASS.
@@ -766,9 +774,15 @@ The **Accept** button on the users page is KEPT. It is an explicit, confirm-guar
 
 `shouldKickoffChecklist` (line 197) currently fires only when the assigned role is `entry_level_rep`. Widen it to any role for which `roleRequiresOnboarding` is true, preserving the existing "not already that role" guard so re-saving a user does not re-kick their checklist.
 
-- [ ] **Step 2: Remove the dead activation branch**
+- [ ] **Step 2: Keep the immediate-activation branch, narrowed to non-invitable roles**
 
-`shouldActivateImmediately` (lines 198-205) is now false for all eight invitable roles, because its `!roleRequiresOnboarding(fieldRole)` term can no longer be true for them. Delete the constant, its branch, and any now-unreachable "your account is active" dispatch on that path. Do not leave a dead condition that reads as meaningful.
+**Do NOT delete `shouldActivateImmediately` (lines 198-205).** An earlier draft of this plan said to; that was wrong and would have re-created the exact trap this project exists to fix.
+
+Its `!roleRequiresOnboarding(fieldRole)` term is now false for all eight invitable roles, so the branch stops firing for field hires — which is the change the client asked for. But it is still true for the three non-invitable roles (`general_manager`, `gm_in_training`, `office_manager`), which are internal/office positions, are not recruiting invite targets, and have no checklist. If the branch were deleted, assigning one of those roles to a pending user would strand them at `status: 'pending'` forever with an empty checklist and no path to activation — the same permanent limbo the seven broken invite roles are in today.
+
+So: leave the constant and its branch in place, and add a comment stating that it now covers exactly the three non-invitable roles and why. Verify with a test that assigning `general_manager` to a pending user still activates them immediately, and that assigning `l1_manager` does not.
+
+Related, and the reason this matters beyond this file: `checkStatus` in `src/lib/auth/requireVerifiedAdmin.ts` admits `pending` plus **any truthy** field role, while `isOnboardingUser` admits `pending` plus a role that **requires onboarding**. Those two sets differ by exactly these three roles. Task 3 must not narrow the server gate in a way that locks out a pending internal hire — if Task 3 already shipped, re-read its diff against this note before marking Task 7 complete.
 
 - [ ] **Step 3: Update the Accept dialog copy**
 
