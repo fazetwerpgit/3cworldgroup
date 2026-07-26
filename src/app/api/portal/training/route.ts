@@ -14,9 +14,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
-    // role and must be able to do their assigned training before activation.
-    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    // The shared API allowlist admits a rep mid-onboarding to assigned training.
+    const gate = await requireVerifiedUser(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

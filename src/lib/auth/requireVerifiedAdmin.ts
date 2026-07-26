@@ -1,18 +1,10 @@
 import { NextRequest } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { isOnboardingAllowedApi } from '@/lib/auth/onboardingAccess';
 import { MANAGEMENT_FIELD_ROLES, resolveRoles, PlatformRole, FieldRole } from '@/types';
 
-// Per-route relaxations of the account-status gate. Deny-by-default: a route that
-// passes nothing gets active-only, so admitting a non-active caller is always a
-// visible, deliberate choice at the call site.
-export type VerifiedCallerOptions = {
-  // Admit a rep who is mid-onboarding — status 'pending' WITH an assigned field
-  // role, i.e. invited and hired but not activated yet (see the invite flow in
-  // api/public/onboarding/[token]). Never admits an unapproved self-signup
-  // (pending with no field role) and never admits a deactivated account.
-  // Use only where the portal shell a pending rep already sees needs it.
-  allowOnboarding?: boolean;
-};
+// The onboarding-stage status relaxation is derived from the shared API
+// allowlist in onboardingAccess.ts, so route declarations cannot drift from it.
 
 // Account-status gate. A valid Firebase ID token proves who the caller is, not
 // that they are still allowed in: a self-signup writes its own 'pending' user doc
@@ -23,19 +15,19 @@ export type VerifiedCallerOptions = {
 //   'inactive' → access was revoked (decommission / User Management). No route may
 //                admit it, opt-in or not.
 //   'pending'  → either an unapproved self-signup (no field role, never admitted)
-//                or a hired rep mid-onboarding, which a route may opt into.
+//                or a hired rep mid-onboarding on a path in the shared allowlist.
 // Anything else (missing status, an unrecognised value) is treated as not active;
 // AuthContext already refuses to sign such a doc in, so this adds no new lockout.
 function checkStatus(
   data: FirebaseFirestore.DocumentData,
-  allowOnboarding: boolean
+  onboardingPathAllowed: boolean
 ): { ok: true } | { ok: false; error: string; status: number } {
   if (data.status === 'active') {
     return { ok: true };
   }
   if (data.status === 'pending') {
     const { fieldRole } = resolveRoles(data.role, data.fieldRole);
-    if (allowOnboarding && fieldRole) {
+    if (onboardingPathAllowed && fieldRole) {
       return { ok: true };
     }
     return { ok: false, error: 'Account is pending approval', status: 403 };
@@ -46,8 +38,7 @@ function checkStatus(
 // Verifies a real Firebase ID token and returns the caller's uid + user doc data.
 // Shared by the verified-auth helpers below. Expects: Authorization: Bearer <idToken>.
 async function verifyCaller(
-  request: NextRequest,
-  { allowOnboarding = false }: VerifiedCallerOptions = {}
+  request: NextRequest
 ): Promise<{ ok: true; uid: string; data: FirebaseFirestore.DocumentData } | { ok: false; error: string; status: number }> {
   if (!adminAuth || !adminDb) {
     return { ok: false, error: 'Auth not configured', status: 500 };
@@ -71,7 +62,7 @@ async function verifyCaller(
   const data = snap.data() ?? {};
   // Status before role: a decommissioned admin must read as revoked, not as a
   // role failure, and must never reach a route because their role survived.
-  const status = checkStatus(data, allowOnboarding);
+  const status = checkStatus(data, isOnboardingAllowedApi(request.nextUrl.pathname));
   if (!status.ok) return status;
   return { ok: true, uid, data };
 }
@@ -80,10 +71,9 @@ async function verifyCaller(
 // self-submit). Returns the verified uid + name/email — the route stamps from this,
 // never from client input.
 export async function requireVerifiedUser(
-  request: NextRequest,
-  options?: VerifiedCallerOptions
+  request: NextRequest
 ): Promise<{ ok: true; uid: string; name: string; email: string } | { ok: false; error: string; status: number }> {
-  const c = await verifyCaller(request, options);
+  const c = await verifyCaller(request);
   if (!c.ok) return c;
   return {
     ok: true,
@@ -120,18 +110,11 @@ export async function requireVerifiedManagement(
 // that managers may also act on for oversight. `targetUserId` is DATA (which
 // user the route acts on), never identity: identity comes only from the token.
 // `isManagement` is returned so a route can widen its scope for managers.
-// Takes VerifiedCallerOptions because the onboarding flow needs it: a hired rep
-// submitting their own onboarding documents is BY DEFINITION still 'pending'
-// (api/public/onboarding/[token] creates them pending with a field role, and
-// lib/onboarding/activation.ts only flips them to 'active' once every item is
-// approved). Without the passthrough this helper would 403 every new hire out of
-// the flow it exists to serve.
 export async function requireVerifiedSelfOrManagement(
   request: NextRequest,
-  targetUserId: string | null | undefined,
-  options?: VerifiedCallerOptions
+  targetUserId: string | null | undefined
 ): Promise<{ ok: true; uid: string; name: string; isManagement: boolean } | { ok: false; error: string; status: number }> {
-  const c = await verifyCaller(request, options);
+  const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
   const isManagement = role === 'admin' || role === 'operations';
@@ -195,8 +178,7 @@ export async function requireVerifiedAdmin(
 // rather than to hard-gate the request (e.g. "a rep sees only their own sales,
 // management sees anyone's").
 export async function requireVerifiedRequester(
-  request: NextRequest,
-  options?: VerifiedCallerOptions
+  request: NextRequest
 ): Promise<
   | {
       ok: true;
@@ -214,7 +196,7 @@ export async function requireVerifiedRequester(
     }
   | { ok: false; error: string; status: number }
 > {
-  const c = await verifyCaller(request, options);
+  const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
   const isManagement = role === 'admin' || role === 'operations';

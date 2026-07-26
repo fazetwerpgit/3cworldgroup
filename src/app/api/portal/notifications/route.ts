@@ -29,11 +29,9 @@ export async function GET(request: NextRequest) {
     }
 
     // A user may read their own notifications; management may read anyone's.
-    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
-    // role and the portal shell they already see renders this bell on every
-    // page — without it, onboarding alerts (item rejected, doc approved) are
-    // sent to exactly the person who can't read them.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
+    // The shared API allowlist keeps the onboarding bell available to a hired
+    // rep while the self/management check preserves record ownership.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -192,8 +190,8 @@ export async function PUT(request: NextRequest) {
     };
 
     if (markAllRead && userId) {
-      // allowOnboarding: same bell, same pending-with-a-field-role rep as GET above.
-      const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
+      // Same bell and ownership boundary as GET above.
+      const gate = await requireVerifiedSelfOrManagement(request, userId);
       if (!gate.ok) {
         return NextResponse.json({ error: gate.error }, { status: gate.status });
       }
@@ -213,9 +211,9 @@ export async function PUT(request: NextRequest) {
     }
 
     if (notificationIds && Array.isArray(notificationIds)) {
-      // allowOnboarding: same bell, same pending-with-a-field-role rep as GET
-      // above; ownedRefs below still restricts this to the caller's own docs.
-      const requester = await requireVerifiedRequester(request, { allowOnboarding: true });
+      // The shared API allowlist admits the onboarding bell; ownedRefs below
+      // still restricts this operation to the caller's own docs.
+      const requester = await requireVerifiedRequester(request);
       if (!requester.ok) {
         return NextResponse.json({ error: requester.error }, { status: requester.status });
       }
@@ -274,8 +272,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Same gate as mark-all-read: a user may clear their own bell; management
-    // may clear anyone's. allowOnboarding: same pending-with-a-field-role rep.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
+    // may clear anyone's. The shared API allowlist admits hired reps here.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

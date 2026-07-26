@@ -24,10 +24,9 @@ export async function GET(request: NextRequest) {
 
     // A user may read their own progress; management may read anyone's.
     // `userId` is the TARGET (whose progress) — identity comes from the token.
-    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
-    // role and, per c2972a1, can already open the training list/detail routes —
-    // this one has to match or their progress reads 403 into an empty {}.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
+    // The shared API allowlist admits the onboarding-stage read, while the
+    // self/management check preserves record ownership.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -82,10 +81,9 @@ export async function POST(request: NextRequest) {
     // `userId` is the TARGET row being written; the caller is the token. The
     // gate runs after the body parse only because the target comes from it —
     // it reads headers only, and still precedes every Firestore access.
-    // allowOnboarding: same pending-with-a-field-role rep as GET above — they
-    // can open their assigned training before activation, so Mark Complete
-    // must actually persist instead of silently no-oping.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, { allowOnboarding: true });
+    // Same shared API allowlist and ownership boundary as GET above, so Mark
+    // Complete persists for a hired rep before activation.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

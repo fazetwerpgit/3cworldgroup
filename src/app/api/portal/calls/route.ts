@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Mid-onboarding reps attend these calls, so this admits pending accounts
-    // that have a field role — i.e. hired but not activated yet. An unapproved
-    // self-signup has no field role and is still rejected.
-    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    // Mid-onboarding reps attend these calls; the shared API allowlist admits
+    // their pending accounts while the status gate still rejects self-signups
+    // without a field role and deactivated accounts.
+    const gate = await requireVerifiedUser(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

@@ -28,17 +28,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // A user may read their own checklist; management may read anyone's.
-    // allowOnboarding because the reader is normally a hired rep still working
-    // through this very checklist, i.e. status 'pending' with a field role
-    // (created pending at api/public/onboarding/[token]/route.ts:227, flipped to
-    // active only once every item is approved — lib/onboarding/activation.ts).
-    // It admits pending-WITH-a-field-role only: an unapproved self-signup has no
-    // field role and is still rejected, as is any deactivated account. Do not
-    // widen it to "allow pending" — that would readmit bot signups.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, {
-      allowOnboarding: true,
-    });
+    // A user may read their own checklist; management may read anyone's. The
+    // shared API allowlist admits a hired rep still working through this
+    // checklist, while the self/management check preserves record ownership.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

@@ -26,17 +26,9 @@ export async function POST(request: NextRequest) {
     }
 
     // A rep may upload into their own folder; management may upload on behalf.
-    // allowOnboarding because a rep uploading their onboarding documents is BY
-    // DEFINITION not yet active: the invite flow creates them status 'pending'
-    // with a field role (api/public/onboarding/[token]/route.ts:227) and they
-    // only flip to active once every item is approved
-    // (lib/onboarding/activation.ts). It admits pending-WITH-a-field-role only:
-    // an unapproved self-signup has no field role and is still rejected, as is
-    // any deactivated account. Do not widen it to "allow pending" — that would
-    // readmit bot signups.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, {
-      allowOnboarding: true,
-    });
+    // The shared API allowlist admits the onboarding-stage status, while this
+    // self/management check keeps the target folder scoped to the caller.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

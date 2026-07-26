@@ -38,18 +38,9 @@ export async function POST(request: NextRequest) {
     }
 
     // A user may submit their own onboarding; management may submit on behalf.
-    // allowOnboarding because a rep submitting their own onboarding documents is
-    // BY DEFINITION not yet active: the invite flow creates them status 'pending'
-    // with a field role (api/public/onboarding/[token]/route.ts:227) and they
-    // only flip to active once every item is approved
-    // (lib/onboarding/activation.ts). Without the opt-in no new hire could ever
-    // submit anything. It admits pending-WITH-a-field-role only: an unapproved
-    // self-signup has no field role and is still rejected, as is any deactivated
-    // account. Do not widen it to "allow pending" — that would readmit bot
-    // signups.
-    const gate = await requireVerifiedSelfOrManagement(request, userId, {
-      allowOnboarding: true,
-    });
+    // The shared API allowlist admits the onboarding-stage status, while this
+    // self/management check keeps the target record scoped to the caller.
+    const gate = await requireVerifiedSelfOrManagement(request, userId);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

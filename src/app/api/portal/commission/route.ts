@@ -59,11 +59,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Admits pending accounts that have a field role — a hired rep is about to
-    // start selling on these rates and gets their own tier only (scope 'own'
-    // below). An unapproved self-signup has no field role, so it is rejected
-    // here and would fall to the 'no role assigned' 400 regardless.
-    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    // A mid-onboarding rep can read the rates needed to start selling and gets
+    // their own tier only (scope 'own' below). The shared API allowlist admits
+    // that read while the status gate rejects unapproved self-signups.
+    const gate = await requireVerifiedUser(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

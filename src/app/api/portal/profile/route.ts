@@ -12,10 +12,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Admits pending accounts that have a field role — a hired rep filling out
-    // onboarding must be able to set their own name and phone. An unapproved
-    // self-signup has no field role and is still rejected.
-    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    // A hired rep filling out onboarding must be able to set their own name and
+    // phone; the shared API allowlist admits that pending stage.
+    const gate = await requireVerifiedUser(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

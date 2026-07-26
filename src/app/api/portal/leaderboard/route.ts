@@ -15,12 +15,9 @@ const NON_MANAGEMENT_LIMIT_CAP = 100;
 // GET /api/portal/leaderboard - Get leaderboard data (points-based)
 export async function GET(request: NextRequest) {
   try {
-    // Require a verified login — the standings are internal team data.
-    // /portal/dashboard is where a signed-in pending rep lands, and it renders
-    // the leaderboard. Roster data, shown to a hired employee mid-onboarding —
-    // allowOnboarding admits pending-WITH-a-field-role only, never an unapproved
-    // self-signup, never a deactivated account.
-    const gate = await requireVerifiedRequester(request, { allowOnboarding: true });
+    // Require a verified active login — a pending hire lands on
+    // /portal/onboarding and cannot open the dashboard or its leaderboard.
+    const gate = await requireVerifiedRequester(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     if (!adminDb) {
@@ -38,8 +35,7 @@ export async function GET(request: NextRequest) {
     // made the requireManagement hole a two-request exploit. Only the two admin
     // pages legitimately ask for the whole company (limit=1000, to join sale
     // counts onto the user table); every rep-facing caller asks for 5 or 100.
-    // Cap non-management callers at 100 rather than dropping allowOnboarding,
-    // which would blank the dashboard for every new hire.
+    // Cap non-management callers at 100 to keep the rep-facing view bounded.
     const requestedLimit = parseInt(searchParams.get('limit') || '10');
     const limit = gate.isManagement
       ? requestedLimit

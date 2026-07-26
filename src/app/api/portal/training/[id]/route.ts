@@ -18,10 +18,9 @@ export async function GET(
       );
     }
 
-    // allowOnboarding: a rep mid-onboarding is status 'pending' with a field
-    // role and must be able to open their assigned training before activation.
+    // The shared API allowlist admits a mid-onboarding rep to assigned training.
     // Single token round-trip: isManagement decides publication access below.
-    const gate = await requireVerifiedRequester(request, { allowOnboarding: true });
+    const gate = await requireVerifiedRequester(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

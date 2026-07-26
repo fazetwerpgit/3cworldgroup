@@ -21,8 +21,11 @@ import {
 } from './requireVerifiedAdmin';
 
 // A request carrying a Bearer token, unless a raw header is supplied.
-function req(authorization: string | null = 'Bearer good-token') {
-  return new NextRequest('http://localhost/api/portal/forms/fiber-report', {
+function req(
+  authorization: string | null = 'Bearer good-token',
+  pathname = '/api/portal/forms/fiber-report'
+) {
+  return new NextRequest(`http://localhost${pathname}`, {
     headers: authorization ? { authorization } : {},
   });
 }
@@ -133,23 +136,23 @@ describe('requireVerifiedUser — account status', () => {
     }
   });
 
-  it('rejects a mid-onboarding rep (pending with a field role) by default', async () => {
+  it('rejects a mid-onboarding rep on a path outside the allowlist', async () => {
     userDoc({ status: 'pending', fieldRole: 'entry_rep', email: 'new@x.com' });
-    const res = await requireVerifiedUser(req());
+    const res = await requireVerifiedUser(req('Bearer good-token', '/api/portal/sales'));
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(403);
   });
 
-  it('accepts a mid-onboarding rep when the route opts in with allowOnboarding', async () => {
+  it('admits a pending hire on an allowlisted path', async () => {
     userDoc({ status: 'pending', fieldRole: 'entry_rep', displayName: 'New Rep', email: 'new@x.com' });
-    const res = await requireVerifiedUser(req(), { allowOnboarding: true });
+    const res = await requireVerifiedUser(req('Bearer good-token', '/api/portal/training'));
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.name).toBe('New Rep');
   });
 
-  it('still rejects an unapproved self-signup under allowOnboarding', async () => {
+  it('refuses a pending self-signup with no field role on an allowlisted path', async () => {
     userDoc({ status: 'pending', email: 'bot@x.com' });
-    const res = await requireVerifiedUser(req(), { allowOnboarding: true });
+    const res = await requireVerifiedUser(req('Bearer good-token', '/api/portal/training'));
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.status).toBe(403);
@@ -159,7 +162,7 @@ describe('requireVerifiedUser — account status', () => {
 
   it('still rejects a pending doc whose fieldRole is not a real role value', async () => {
     userDoc({ status: 'pending', fieldRole: 'ceo', email: 'bot@x.com' });
-    const res = await requireVerifiedUser(req(), { allowOnboarding: true });
+    const res = await requireVerifiedUser(req('Bearer good-token', '/api/portal/training'));
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(403);
   });
@@ -174,9 +177,9 @@ describe('requireVerifiedUser — account status', () => {
     }
   });
 
-  it('rejects a decommissioned rep even on a route that allows onboarding', async () => {
+  it('refuses a deactivated account on an allowlisted path', async () => {
     userDoc({ status: 'inactive', fieldRole: 'entry_rep', email: 'gone@x.com' });
-    const res = await requireVerifiedUser(req(), { allowOnboarding: true });
+    const res = await requireVerifiedUser(req('Bearer good-token', '/api/portal/training'));
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.status).toBe(403);
@@ -303,32 +306,42 @@ describe('requireVerifiedSelfOrManagement', () => {
     if (!res.ok) expect(res.error).toBe('Account is pending approval');
   });
 
-  it('accepts a mid-onboarding rep on their own data with allowOnboarding', async () => {
+  it('accepts a mid-onboarding rep on their own data on an allowlisted path', async () => {
     userDoc({ status: 'pending', fieldRole: 'entry_rep', displayName: 'New Rep' });
-    const res = await requireVerifiedSelfOrManagement(req(), 'u1', { allowOnboarding: true });
+    const res = await requireVerifiedSelfOrManagement(
+      req('Bearer good-token', '/api/portal/training/progress'),
+      'u1'
+    );
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.isManagement).toBe(false);
   });
 
-  it('still confines a mid-onboarding rep to their own data under allowOnboarding', async () => {
+  it('still confines a mid-onboarding rep to their own data on an allowlisted path', async () => {
     userDoc({ status: 'pending', fieldRole: 'entry_rep' });
-    const res = await requireVerifiedSelfOrManagement(req(), 'someone-else', {
-      allowOnboarding: true,
-    });
+    const res = await requireVerifiedSelfOrManagement(
+      req('Bearer good-token', '/api/portal/training/progress'),
+      'someone-else'
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe('Forbidden: you can only access your own data');
   });
 
-  it('rejects an unapproved self-signup on its own data under allowOnboarding', async () => {
+  it('rejects an unapproved self-signup on its own data on an allowlisted path', async () => {
     userDoc({ status: 'pending', email: 'bot@x.com' });
-    const res = await requireVerifiedSelfOrManagement(req(), 'u1', { allowOnboarding: true });
+    const res = await requireVerifiedSelfOrManagement(
+      req('Bearer good-token', '/api/portal/training/progress'),
+      'u1'
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe('Account is pending approval');
   });
 
-  it('rejects a decommissioned rep on their own data even under allowOnboarding', async () => {
+  it('rejects a decommissioned rep on their own data on an allowlisted path', async () => {
     userDoc({ status: 'inactive', fieldRole: 'entry_rep' });
-    const res = await requireVerifiedSelfOrManagement(req(), 'u1', { allowOnboarding: true });
+    const res = await requireVerifiedSelfOrManagement(
+      req('Bearer good-token', '/api/portal/training/progress'),
+      'u1'
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe('Account is not active');
   });

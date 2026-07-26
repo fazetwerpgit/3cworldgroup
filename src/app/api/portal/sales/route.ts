@@ -44,12 +44,10 @@ export async function GET(request: NextRequest) {
     // Sales rows carry customer PII — require a verified login, and scope
     // non-management callers to their own sales server-side (never trust the
     // client's filter for that).
-    // Dashboard read for a pending rep. The query below forces salesRepId to the
-    // token uid for non-management, so a mid-onboarding rep gets [] either way —
-    // the only difference is an empty widget instead of an error banner. The POST
-    // on this route deliberately does NOT opt in: writing to the ledger and the
-    // approval queue is not something an unactivated account should do.
-    const gate = await requireVerifiedRequester(request, { allowOnboarding: true });
+    // This route remains active-only: the shared API allowlist intentionally
+    // excludes pending hires because the ledger and approval queue are not
+    // available to an unactivated account.
+    const gate = await requireVerifiedRequester(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

@@ -246,9 +246,11 @@ describe('page and api allowlists agree', () => {
 // These are intentional descendants of an allowlisted prefix. Each route has
 // its own requester/channel-access or management gate in the route file.
 const ALLOWED_SUBPATHS = [
-  // onboarding/submit has requireVerifiedSelfOrManagement(..., { allowOnboarding: true }).
+  // onboarding/submit uses requireVerifiedSelfOrManagement to keep the target
+  // onboarding record scoped to the caller; management may act on behalf.
   '/api/portal/onboarding/submit',
-  // onboarding/upload has requireVerifiedSelfOrManagement(..., { allowOnboarding: true }).
+  // onboarding/upload uses requireVerifiedSelfOrManagement to keep the target
+  // storage folder scoped to the caller; management may act on behalf.
   '/api/portal/onboarding/upload',
   // onboarding/review has requireVerifiedManagement on GET and POST.
   '/api/portal/onboarding/review',
@@ -258,9 +260,11 @@ const ALLOWED_SUBPATHS = [
   '/api/portal/chat/channels/x/media',
   // chat channel members has getVerifiedChatUser plus userCanAccessChannelDoc.
   '/api/portal/chat/channels/x/members',
-  // training detail has requireVerifiedRequester(..., { allowOnboarding: true }).
+  // training detail uses requireVerifiedRequester to verify the caller before
+  // applying the route's management/publication scope.
   '/api/portal/training/x',
-  // training progress has requireVerifiedSelfOrManagement(..., { allowOnboarding: true }).
+  // training progress uses requireVerifiedSelfOrManagement to keep the target
+  // progress record scoped to the caller; management may act on behalf.
   '/api/portal/training/progress',
 ] as const satisfies readonly string[];
 

@@ -10,9 +10,8 @@ export async function POST(request: NextRequest) {
     // The heartbeat is mounted in PortalHeader, so it fires on every page a
     // mid-onboarding rep already sees. Without the opt-in it 403s every 60s per
     // pending rep — log noise that would mask real auth failures, for no gain.
-    // Reversible product call: drop the option if unactivated reps should not
-    // appear in "who's active".
-    const gate = await requireVerifiedUser(request, { allowOnboarding: true });
+    // The shared API allowlist keeps this heartbeat available during onboarding.
+    const gate = await requireVerifiedUser(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
