@@ -35,7 +35,7 @@ describe('checklist role filtering', () => {
   });
 
   it('returns no checklist for roles that do not require onboarding', () => {
-    expect(getOnboardingItemsForUser('entry_rep', false)).toEqual([]);
+    expect(getOnboardingItemsForUser('general_manager', false)).toEqual([]);
     expect(getOnboardingItemsForUser('general_manager', false)).toEqual([]);
   });
 });

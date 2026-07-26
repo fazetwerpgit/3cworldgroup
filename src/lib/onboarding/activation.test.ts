@@ -19,7 +19,7 @@ const { store, db, dispatchMock, resolveMock } = vi.hoisted(() => {
         get: async () => {
           const docs = [...store.entries()]
             .filter(([path, data]) => path.startsWith(`${name}/`) && data.userId === value)
-            .map(([path, data]) => ({
+            .map(([, data]) => ({
               get: (field: string) => data[field],
             }));
           return { forEach: (callback: (doc: { get: (field: string) => unknown }) => void) => docs.forEach(callback) };
@@ -74,7 +74,7 @@ describe('computeReadiness', () => {
   });
 
   it('reports non-onboarding roles as not ready without checklist items', async () => {
-    store.set('users/non-onboarding', { status: 'pending', fieldRole: 'entry_rep' });
+    store.set('users/non-onboarding', { status: 'pending', fieldRole: 'general_manager' });
     await expect(getActivationReadiness('non-onboarding')).resolves.toEqual({
       ready: false,
       missing: [],

@@ -155,9 +155,34 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
 const FIELD_ROLE_VALUES: readonly string[] = Object.values(FieldRoles);
 
-/** Only entry-level reps must complete the onboarding checklist. */
+// The field roles the recruiting invite form offers. Every one of them goes
+// through the onboarding checklist and activates into the role it was invited
+// as. Sourced here rather than in the recruiting page so the invite form and
+// the onboarding predicate can never disagree — an earlier version offered
+// eight roles while only one of them actually onboarded, which stranded the
+// other seven at status 'pending' with an empty checklist and no way out.
+// The internal/office roles general_manager, gm_in_training, and office_manager
+// are intentionally not recruit-invite targets.
+export const INVITABLE_FIELD_ROLES: readonly FieldRole[] = [
+  'entry_level_rep',
+  'entry_rep',
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+];
+
 export function roleRequiresOnboarding(fieldRole?: FieldRole): boolean {
-  return fieldRole === 'entry_level_rep';
+  if (!fieldRole) return false;
+  return INVITABLE_FIELD_ROLES.includes(fieldRole);
+}
+
+// What a hire becomes when their last checklist item is approved. Entry Level
+// Rep graduates to Account Executive; every other role activates as invited.
+export function graduatedFieldRole(fieldRole: FieldRole): FieldRole {
+  return fieldRole === 'entry_level_rep' ? 'entry_rep' : fieldRole;
 }
 
 // Defensive mapping for raw role data read from Firestore.

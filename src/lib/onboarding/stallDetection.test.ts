@@ -41,7 +41,9 @@ const { store, db, dispatchMock } = vi.hoisted(() => {
     })),
   };
 
-  const dispatchMock = vi.fn(async (_input: { userId: string; title: string }) => undefined);
+  const dispatchMock = vi.fn(async (input: { userId: string; title: string }) => {
+    void input;
+  });
   return { store, db, dispatchMock };
 });
 
@@ -84,7 +86,7 @@ describe('runOnboardingNudges', () => {
   it('skips pending users whose role does not require onboarding', async () => {
     store.set('users/account-executive', {
       status: 'pending',
-      fieldRole: 'entry_rep',
+      fieldRole: 'general_manager',
       createdAt: idleFor(8 * 24),
     });
 

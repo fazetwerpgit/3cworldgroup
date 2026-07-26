@@ -15,6 +15,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { INVITABLE_FIELD_ROLES } from '@/types/auth';
 import {
   ApplicationRecord,
   ApplicationStatus,
@@ -68,20 +69,6 @@ const APPLICATION_COLUMNS = [
   { key: 'email', label: 'Email' },
   { key: 'status', label: 'Status' },
   { key: 'createdAt', label: 'Submitted' },
-];
-
-/** Client-form offers a fixed 8-role subset (excludes general_manager/gm_in_training/
- * office_manager, which aren't recruit-invite targets) — labels sourced from the shared
- * RoleDisplayNames map instead of hand-typed strings (B-6). */
-const ROLE_OPTIONS: FieldRole[] = [
-  'entry_level_rep',
-  'entry_rep',
-  'l1_manager',
-  'l2_manager',
-  'ibo_level_1',
-  'ibo_level_2',
-  'ibo_level_3',
-  'ibo_level_4',
 ];
 
 /** Split from the previously-conflated single lookup (B-4) — ApplicationStatus and
@@ -383,7 +370,7 @@ export default function RecruitingCommandCenterPage() {
                       setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
                     }
                   >
-                    {ROLE_OPTIONS.map((role) => (
+                    {INVITABLE_FIELD_ROLES.map((role) => (
                       <option key={role} value={role}>
                         {RoleDisplayNames[role]}
                       </option>
