@@ -724,6 +724,86 @@ git commit -m "feat(rules): let an unfinished hire use team chat (NOT DEPLOYED)"
 
 ---
 
+### Task 5b: Keep the hire in chat, and stop the rules drifting from the code
+
+Added after Task 5's review. Task 5 opened chat for a hire, but the reviewer traced two
+gaps that leave the feature half-working and the rules stating a different policy from
+the TypeScript.
+
+**Files:**
+- Modify: `firestore.rules` (the `isOnboardingMember()` helper only)
+- Modify: `src/lib/chat/channels.ts:90,142`
+- Test: `src/lib/chat/access.test.ts`, `src/lib/chat/channels.test.ts`
+
+**Interfaces:**
+- Consumes: `roleRequiresOnboarding` and `INVITABLE_FIELD_ROLES` from `src/types/auth.ts` (Task 2); `isOnboardingUser` from `src/lib/auth/onboardingAccess.ts` (Task 1)
+- Produces: nothing new — this task only aligns existing behaviour
+
+- [ ] **Step 1: Make the rules predicate name the same eight roles the TypeScript does**
+
+`firestore.rules` `isOnboardingMember()` currently tests `fieldRole != null`. That is
+wider than `isOnboardingUser`, which requires one of the eight invitable roles. The two
+disagree on exactly `general_manager`, `gm_in_training` and `office_manager`: a pending
+user holding one of those is refused by every chat API but admitted by the rules.
+
+Not currently exploitable — `status` and `fieldRole` are Admin-SDK-only writes
+(`firestore.rules` `allow update, delete: if false`), a self-signup cannot set a
+`fieldRole` at all, and `memberIds` is server-controlled — but the rules must not state a
+policy the code does not implement.
+
+Replace the `fieldRole` line with an explicit list, and use `.get()` so an absent key
+returns `null` instead of raising an evaluation error:
+
+```
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('fieldRole', null) in
+          ['entry_level_rep', 'entry_rep', 'l1_manager', 'l2_manager',
+           'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'];
+```
+
+Add a comment above it: this list must stay in step with `INVITABLE_FIELD_ROLES` in
+`src/types/auth.ts`, which the rules language cannot import.
+
+- [ ] **Step 2: Pin the divergent shape with a test**
+
+`src/lib/chat/access.test.ts` has no case for the shape where the two predicates
+disagreed. Add one asserting a `{ status: 'pending', fieldRole: 'general_manager' }`
+caller is refused with 403 — the same result as today, now protected against a future
+edit that swaps in a looser predicate.
+
+- [ ] **Step 3: Stop channel sync pruning a hire out of a channel**
+
+`getMemberIdsForAudience` (`src/lib/chat/channels.ts:90`) filters `status === 'active'`,
+and `syncChatChannels` (`:142`) rebuilds `memberIds` from it. A hire is only ever added
+by the mount-time bootstrap in `src/app/portal/chat/page.tsx` calling
+`ensureChatChannelMember`. So when an admin syncs channels or edits an audience while
+the hire has chat open, the hire is removed from `memberIds`, and their live
+`onSnapshot` listeners begin returning permission-denied — messages simply stop
+arriving, with nothing surfaced to them — until they reload the page.
+
+Widen the audience filter to include a pending user for whom
+`roleRequiresOnboarding(fieldRole)` is true. Use the shared predicate; do not inline a
+role list.
+
+- [ ] **Step 4: Test the pruning fix**
+
+Write a failing test first: a channel audience containing one active rep and one pending
+hire with an onboarding field role yields BOTH uids from `getMemberIdsForAudience`; a
+pending self-signup with no field role and an `inactive` user are both still excluded.
+Run it, watch it fail, then make it pass.
+
+- [ ] **Step 5: Gates and commit**
+
+```bash
+npx vitest run src/lib/chat/
+npx tsc --noEmit
+git add firestore.rules src/lib/chat/channels.ts src/lib/chat/access.test.ts src/lib/chat/channels.test.ts
+git commit -m "fix(chat): keep a hire in channel membership, align rules with code"
+```
+
+**Do not deploy the rules.**
+
+---
+
 ### Task 6: Graduate into the invited role
 
 **Files:**
