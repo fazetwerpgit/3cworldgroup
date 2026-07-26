@@ -32,7 +32,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { Sale, UserRole } from '@/types';
-import { roleRequiresOnboarding } from '@/types/auth';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -159,13 +158,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Same gate PortalSidebar uses: role restriction wins, then permissions.
   const canAccess = useCallback(
     (item: PortalNavItem) => {
-      if (item.onboardingOnly && !roleRequiresOnboarding(user?.fieldRole)) return false;
+      if (item.onboardingOnly && !isOnboardingUser(user)) return false;
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
       if (onboardingUser && !isOnboardingAllowedPage(item.href)) return false;
       if (!item.permissions || item.permissions.length === 0) return true;
       return item.permissions.some((p) => hasPermission(p));
     },
-    [isRole, hasPermission, onboardingUser, user?.fieldRole]
+    [isRole, hasPermission, onboardingUser, user]
   );
 
   const pageDestinations = useMemo(() => {

@@ -15,7 +15,6 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
-import { roleRequiresOnboarding } from '@/types/auth';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
 import {
@@ -137,7 +136,7 @@ export function MobileBottomNav({
   }, [close, isOpen]);
 
   const canAccess = (item: PortalNavItem) => {
-    if (item.onboardingOnly && !roleRequiresOnboarding(user?.fieldRole)) return false;
+    if (item.onboardingOnly && !isOnboardingUser(user)) return false;
     if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
     if (isOnboardingUser(user) && !isOnboardingAllowedPage(item.href)) return false;
     if (!item.permissions || item.permissions.length === 0) return true;

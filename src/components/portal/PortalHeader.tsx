@@ -24,6 +24,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { NotificationType } from '@/types/notifications';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
+import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 
 function getInitials(name?: string | null, email?: string | null) {
   const value = name?.trim() || email?.split('@')[0] || 'User';
@@ -67,6 +68,7 @@ export function PortalHeader() {
   const effectiveRole = getEffectiveRole(user);
   const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
+  const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
 
   const handleSignOut = async () => {
     try {
@@ -119,7 +121,7 @@ export function PortalHeader() {
   return (
     <>
       <header className="portal-shell-header">
-        <Link href="/portal/dashboard" className="portal-brand">
+        <Link href={brandHref} className="portal-brand">
           <Image
             src="/logo.png"
             alt="3C World Group"
