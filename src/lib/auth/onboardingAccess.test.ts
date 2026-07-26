@@ -1,3 +1,6 @@
+import { readdirSync } from 'node:fs';
+import { dirname, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ONBOARDING_ALLOWED_APIS,
@@ -36,6 +39,30 @@ describe('isOnboardingAllowedPage', () => {
   it('ignores a trailing slash', () => {
     expect(isOnboardingAllowedPage('/portal/chat/')).toBe(true);
   });
+
+  it('normalizes query strings, fragments, repeated slashes, and case', () => {
+    expect(isOnboardingAllowedPage('/PORTAL//CHAT////?tab=general#messages')).toBe(true);
+    expect(isOnboardingAllowedPage('/portal/chat#messages?tab=general')).toBe(true);
+  });
+
+  it('fails closed for non-string and empty pathnames', () => {
+    expect(isOnboardingAllowedPage(null)).toBe(false);
+    expect(isOnboardingAllowedPage(undefined)).toBe(false);
+    expect(isOnboardingAllowedPage('')).toBe(false);
+    expect(isOnboardingAllowedPage('api/portal/chat')).toBe(false);
+  });
+
+  it('fails closed for traversal and encoded path shapes', () => {
+    for (const pathname of [
+      '/api/portal/chat/channels/../sales',
+      '/api/portal/chat/channels/../../sales/stats',
+      '/portal/settings/../../admin',
+      '/api/portal/chat/channels/%6Danage',
+      '/api/portal/chat/channels/MANAGE',
+    ]) {
+      expect(isOnboardingAllowedPage(pathname), pathname).toBe(false);
+    }
+  });
 });
 
 describe('isOnboardingAllowedApi', () => {
@@ -52,6 +79,18 @@ describe('isOnboardingAllowedApi', () => {
     expect(isOnboardingAllowedApi('/api/portal/training/res-1')).toBe(true);
   });
 
+  it('normalizes query strings, fragments, repeated slashes, and case', () => {
+    expect(isOnboardingAllowedApi('/API//PORTAL//TRAINING////?view=all#progress')).toBe(true);
+    expect(isOnboardingAllowedApi('/api/portal/training#progress?view=all')).toBe(true);
+  });
+
+  it('fails closed for non-string, empty, and relative pathnames', () => {
+    expect(isOnboardingAllowedApi(null)).toBe(false);
+    expect(isOnboardingAllowedApi(undefined)).toBe(false);
+    expect(isOnboardingAllowedApi('')).toBe(false);
+    expect(isOnboardingAllowedApi('api/portal/training')).toBe(false);
+  });
+
   it('blocks the three routes that must close', () => {
     expect(isOnboardingAllowedApi('/api/portal/leaderboard')).toBe(false);
     expect(isOnboardingAllowedApi('/api/portal/sales')).toBe(false);
@@ -66,6 +105,29 @@ describe('isOnboardingAllowedApi', () => {
     expect(isOnboardingAllowedApi('/api/portal/chat/channels/sync')).toBe(false);
     expect(isOnboardingAllowedApi('/api/portal/chat/channels/c1/members')).toBe(true);
     expect(isOnboardingAllowedApi('/api/portal/chat/channels/c1/members/manage')).toBe(false);
+  });
+
+  it('denies every non-canonical shape of the channel membership admin route', () => {
+    for (const pathname of [
+      '/api/portal/chat/channels/c1/members/manage//',
+      '/api/portal/chat/channels/c1//members/manage',
+      '/api/portal/chat/channels//manage',
+      '/api/portal/chat/channels/c1/members/manage/extra',
+    ]) {
+      expect(isOnboardingAllowedApi(pathname), pathname).toBe(false);
+    }
+  });
+
+  it('fails closed for traversal, encoded, and case-variant path shapes', () => {
+    for (const pathname of [
+      '/api/portal/chat/channels/../sales',
+      '/api/portal/chat/channels/../../sales/stats',
+      '/portal/settings/../../admin',
+      '/api/portal/chat/channels/%6Danage',
+      '/api/portal/chat/channels/MANAGE',
+    ]) {
+      expect(isOnboardingAllowedApi(pathname), pathname).toBe(false);
+    }
   });
 
   it('blocks admin apis', () => {
@@ -92,6 +154,12 @@ describe('isOnboardingUser', () => {
     expect(isOnboardingUser({ status: 'inactive', fieldRole: 'entry_level_rep' })).toBe(false);
   });
 
+  it('is false for internal and office roles even while pending', () => {
+    expect(isOnboardingUser({ status: 'pending', fieldRole: 'general_manager' })).toBe(false);
+    expect(isOnboardingUser({ status: 'pending', fieldRole: 'gm_in_training' })).toBe(false);
+    expect(isOnboardingUser({ status: 'pending', fieldRole: 'office_manager' })).toBe(false);
+  });
+
   it('is false for null or undefined', () => {
     expect(isOnboardingUser(null)).toBe(false);
     expect(isOnboardingUser(undefined)).toBe(false);
@@ -115,6 +183,9 @@ describe('page and api allowlists agree', () => {
   it('covers every allowed page in the dependency map', () => {
     for (const page of ONBOARDING_ALLOWED_PAGES) {
       expect(Object.keys(PAGE_API_DEPENDENCIES)).toContain(page);
+    }
+    for (const page of Object.keys(PAGE_API_DEPENDENCIES)) {
+      expect(ONBOARDING_ALLOWED_PAGES).toContain(page);
     }
   });
 
@@ -140,6 +211,60 @@ describe('page and api allowlists agree', () => {
         (dep) => dep === api || dep.startsWith(`${api}/`)
       );
       expect(justified, `${api} is allowlisted but no allowed page uses it`).toBe(true);
+    }
+  });
+});
+
+// These are intentional descendants of an allowlisted prefix. Each route has
+// its own requester/channel-access or management gate in the route file.
+const ALLOWED_SUBPATHS = [
+  // onboarding/submit has requireVerifiedSelfOrManagement(..., { allowOnboarding: true }).
+  '/api/portal/onboarding/submit',
+  // onboarding/upload has requireVerifiedSelfOrManagement(..., { allowOnboarding: true }).
+  '/api/portal/onboarding/upload',
+  // onboarding/review has requireVerifiedManagement on GET and POST.
+  '/api/portal/onboarding/review',
+  // onboarding/activate has requireVerifiedManagement before activation.
+  '/api/portal/onboarding/activate',
+  // chat channel media has getVerifiedChatUser plus userCanAccessChannelDoc.
+  '/api/portal/chat/channels/x/media',
+  // chat channel members has getVerifiedChatUser plus userCanAccessChannelDoc.
+  '/api/portal/chat/channels/x/members',
+  // training detail has requireVerifiedRequester(..., { allowOnboarding: true }).
+  '/api/portal/training/x',
+  // training progress has requireVerifiedSelfOrManagement(..., { allowOnboarding: true }).
+  '/api/portal/training/progress',
+] as const satisfies readonly string[];
+
+const API_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../app/api');
+const PORTAL_API_ROOT = resolve(API_ROOT, 'portal');
+
+function discoverApiRoutePaths(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) return discoverApiRoutePaths(resolve(directory, entry.name));
+    if (!entry.isFile() || entry.name !== 'route.ts') return [];
+
+    const routeDirectory = relative(API_ROOT, directory).split(sep).filter(Boolean);
+    const concreteSegments = routeDirectory.map((segment) =>
+      /^\[[^/]+\]$/.test(segment) ? 'x' : segment
+    );
+    return [`/${['api', ...concreteSegments].join('/')}`];
+  });
+}
+
+describe('API route tree classification', () => {
+  it('classifies every route that an allowed prefix would reach', () => {
+    const explicitPaths = new Set<string>([
+      ...ONBOARDING_ALLOWED_APIS,
+      ...ALLOWED_SUBPATHS,
+    ]);
+
+    for (const routePath of discoverApiRoutePaths(PORTAL_API_ROOT).sort()) {
+      if (!isOnboardingAllowedApi(routePath)) continue;
+      expect(
+        explicitPaths.has(routePath),
+        `${routePath} is a new route under an allowed prefix; classify it in src/lib/auth/onboardingAccess.ts before it can ship.`
+      ).toBe(true);
     }
   });
 });

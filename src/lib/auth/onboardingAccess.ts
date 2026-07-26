@@ -11,19 +11,19 @@ import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 // rep does not already hold, so an admin-only method on a listed path stays
 // closed to a hire through its own role check.
 
-export const ONBOARDING_ALLOWED_PAGES: readonly string[] = [
+export const ONBOARDING_ALLOWED_PAGES = [
   '/portal/onboarding',
   '/portal/chat',
   '/portal/training',
   '/portal/resources',
   '/portal/calls',
   '/portal/settings',
-];
+] as const satisfies readonly string[];
 
 // Chat is enumerated route by route rather than as a prefix: creating channels,
 // syncing them and managing membership are administration and keep their own
 // management gates.
-export const ONBOARDING_ALLOWED_APIS: readonly string[] = [
+export const ONBOARDING_ALLOWED_APIS = [
   '/api/portal/onboarding',
   '/api/portal/training',
   '/api/portal/commission',
@@ -38,7 +38,7 @@ export const ONBOARDING_ALLOWED_APIS: readonly string[] = [
   '/api/portal/chat/messages',
   '/api/portal/chat/messages/pin',
   '/api/portal/chat/reactions',
-];
+] as const satisfies readonly string[];
 
 // Listed prefixes that must NOT match, even though a listed prefix covers them.
 // `/api/portal/chat/channels` legitimately covers `/…/channels/{id}/members`,
@@ -50,14 +50,22 @@ const DENIED_API_PATHS: readonly string[] = [
 
 // Denied when the path matches this shape: /api/portal/chat/channels/<id>/members/manage
 const DENIED_API_PATTERNS: readonly RegExp[] = [
-  /^\/api\/portal\/chat\/channels\/[^/]+\/members\/manage$/,
+  /^\/api\/portal\/chat\/channels\/[^/]+\/members\/manage(?:\/|$)/,
 ];
 
-function normalize(pathname: string): string {
-  const [withoutQuery] = pathname.split('?');
-  return withoutQuery.length > 1 && withoutQuery.endsWith('/')
-    ? withoutQuery.slice(0, -1)
-    : withoutQuery;
+const INVALID_PATH = '\u0000';
+
+function normalize(pathname: unknown): string {
+  if (typeof pathname !== 'string' || pathname.includes('%')) return INVALID_PATH;
+
+  const withoutQueryOrFragment = pathname.split(/[?#]/, 1)[0];
+  const collapsed = withoutQueryOrFragment.replace(/\/{2,}/g, '/');
+  const segments = collapsed.split('/');
+  if (segments.some((segment) => segment === '.' || segment === '..')) return INVALID_PATH;
+
+  const withoutTrailingSlashes = collapsed.replace(/\/{1,}$/, '');
+  const path = withoutTrailingSlashes || '/';
+  return path.toLowerCase();
 }
 
 // Segment-aware prefix match. `/portal/training` must cover
@@ -66,12 +74,12 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-export function isOnboardingAllowedPage(pathname: string): boolean {
+export function isOnboardingAllowedPage(pathname: unknown): boolean {
   const path = normalize(pathname);
   return ONBOARDING_ALLOWED_PAGES.some((prefix) => matchesPrefix(path, prefix));
 }
 
-export function isOnboardingAllowedApi(pathname: string): boolean {
+export function isOnboardingAllowedApi(pathname: unknown): boolean {
   const path = normalize(pathname);
   if (DENIED_API_PATHS.some((denied) => matchesPrefix(path, denied))) return false;
   if (DENIED_API_PATTERNS.some((pattern) => pattern.test(path))) return false;
