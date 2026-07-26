@@ -5,6 +5,7 @@ import { createNotification } from '@/lib/notifications/createNotification';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
+import { isEsignItem } from '@/lib/onboarding/esign';
 
 const ALERT_KIND = 'esign_mismatch' as const;
 
@@ -27,6 +28,13 @@ export async function POST(request: Request) {
   const item = ONBOARDING_ITEMS.find((candidate) => candidate.id === itemId);
   if (!item) {
     console.error('[esign webhook] completed event has unknown itemId', {
+      envelopeId: event.envelopeId,
+      itemId,
+    });
+    return NextResponse.json({ ok: true });
+  }
+  if (!isEsignItem(itemId)) {
+    console.error('[esign webhook] completed event is not an e-sign item', {
       envelopeId: event.envelopeId,
       itemId,
     });
@@ -73,7 +81,7 @@ export async function POST(request: Request) {
           subjectUserId: userId,
           subjectName,
           title: 'E-signature identity mismatch needs attention',
-          message: `A completed e-signature event for ${item.label} did not match the envelope recorded for this rep. Reconcile the provider envelope before activation.`,
+          message: `A completed e-signature event for ${item.label} did not match the envelope recorded for this rep. Reconcile the provider envelope ${event.envelopeId} before activation.`,
           link: '/portal/admin/onboarding',
         });
       } catch (error) {

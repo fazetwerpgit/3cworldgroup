@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const {
   docGetMock,
   docSetMock,
+  userDocGetMock,
   parseWebhookMock,
   createNotificationMock,
   maybeFlagActivationReadyMock,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
   docGetMock: vi.fn(),
   docSetMock: vi.fn(),
+  userDocGetMock: vi.fn(),
   parseWebhookMock: vi.fn(),
   createNotificationMock: vi.fn(),
   maybeFlagActivationReadyMock: vi.fn(),
@@ -22,7 +24,13 @@ const {
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { doc: vi.fn(() => ({ get: docGetMock, set: docSetMock })) },
+  adminDb: {
+    doc: vi.fn((path: string) =>
+      path.startsWith('users/')
+        ? { get: userDocGetMock }
+        : { get: docGetMock, set: docSetMock }
+    ),
+  },
 }));
 vi.mock('@/lib/esign/provider', () => ({
   getEsignProvider: vi.fn(() => ({ parseWebhook: parseWebhookMock })),
@@ -32,7 +40,10 @@ vi.mock('@/lib/notifications/createNotification', () => ({
 }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ createAlertTask: createAlertTaskMock }));
 vi.mock('@/types/onboarding', () => ({
-  ONBOARDING_ITEMS: [{ id: 'contract', label: 'Contract' }],
+  ONBOARDING_ITEMS: [
+    { id: 'contract', label: 'Contract', referenceKind: 'esign' },
+    { id: 'onboarding_submission', label: 'Onboarding Submission', referenceKind: 'manual' },
+  ],
 }));
 vi.mock('@/lib/onboarding/activation', () => ({
   maybeFlagActivationReady: maybeFlagActivationReadyMock,
@@ -40,10 +51,10 @@ vi.mock('@/lib/onboarding/activation', () => ({
 
 import { POST } from './route';
 
-const completedEvent = (envelopeId: string) => ({
+const completedEvent = (envelopeId: string, itemId = 'contract') => ({
   envelopeId,
   status: 'completed' as const,
-  metadata: { userId: 'user-1', itemId: 'contract' },
+  metadata: { userId: 'user-1', itemId },
 });
 
 const onboardingDoc = (envelopeId: string | undefined, supersededEnvelopeIds: string[] = []) => ({
@@ -53,6 +64,11 @@ const onboardingDoc = (envelopeId: string | undefined, supersededEnvelopeIds: st
       : field === 'supersededEnvelopeIds'
         ? supersededEnvelopeIds
         : undefined,
+});
+
+const userDoc = (displayName?: string, email?: string) => ({
+  get: (field: string) =>
+    field === 'displayName' ? displayName : field === 'email' ? email : undefined,
 });
 
 function webhookRequest() {
@@ -69,6 +85,7 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(consoleWarnMock);
   parseWebhookMock.mockResolvedValue(completedEvent('env_current'));
   docGetMock.mockResolvedValue(onboardingDoc('env_current'));
+  userDocGetMock.mockResolvedValue(userDoc('Rep One', 'rep@example.com'));
   docSetMock.mockResolvedValue(undefined);
   createNotificationMock.mockResolvedValue(undefined);
   maybeFlagActivationReadyMock.mockResolvedValue(undefined);
@@ -112,7 +129,7 @@ describe('POST /api/webhooks/esign', () => {
     expect(createAlertTaskMock).not.toHaveBeenCalled();
   });
 
-  it('raises one deduplicated ops alert for an unknown envelope mismatch', async () => {
+  it('raises one ops alert for an unknown envelope mismatch', async () => {
     parseWebhookMock.mockResolvedValue(completedEvent('env_unknown'));
     docGetMock.mockResolvedValue(onboardingDoc('env_current', ['env_old']));
 
@@ -131,7 +148,55 @@ describe('POST /api/webhooks/esign', () => {
       // Must NOT be review_needed: alert tasks dedupe on (kind, subjectUserId)
       // and a successful dispatch resolves every open review_needed for the rep,
       // either of which would make this alert disappear.
-      expect.objectContaining({ kind: 'esign_mismatch', subjectUserId: 'user-1' })
+      expect.objectContaining({
+        kind: 'esign_mismatch',
+        subjectUserId: 'user-1',
+        subjectName: 'Rep One',
+        message: expect.stringContaining('env_unknown'),
+      })
+    );
+  });
+
+  it('uses the rep email when the users document has no display name', async () => {
+    parseWebhookMock.mockResolvedValue(completedEvent('env_unknown'));
+    docGetMock.mockResolvedValue(onboardingDoc('env_current'));
+    userDocGetMock.mockResolvedValue(userDoc(undefined, 'rep@example.com'));
+
+    await POST(webhookRequest());
+
+    expect(createAlertTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ subjectName: 'rep@example.com' })
+    );
+  });
+
+  it('falls back to the uid and still raises the alert when the users read fails', async () => {
+    parseWebhookMock.mockResolvedValue(completedEvent('env_unknown'));
+    docGetMock.mockResolvedValue(onboardingDoc('env_current'));
+    userDocGetMock.mockRejectedValueOnce(new Error('users read failed'));
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(createAlertTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ subjectName: 'user-1' })
+    );
+    expect(createAlertTaskMock).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a completed event naming a non-e-sign item without reading or alerting', async () => {
+    parseWebhookMock.mockResolvedValue(completedEvent('env_unknown', 'onboarding_submission'));
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(docGetMock).not.toHaveBeenCalled();
+    expect(userDocGetMock).not.toHaveBeenCalled();
+    expect(docSetMock).not.toHaveBeenCalled();
+    expect(createAlertTaskMock).not.toHaveBeenCalled();
+    expect(consoleErrorMock).toHaveBeenCalledWith(
+      '[esign webhook] completed event is not an e-sign item',
+      { envelopeId: 'env_unknown', itemId: 'onboarding_submission' }
     );
   });
 

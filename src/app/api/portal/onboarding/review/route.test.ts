@@ -43,6 +43,13 @@ vi.mock('@/lib/onboarding/activation', () => ({ maybeFlagActivationReady: vi.fn(
 
 import { GET, POST } from './route';
 
+const onboardingDoc = (esignEnvelopeId?: string) => ({
+  exists: true,
+  data: () => ({ status: 'submitted' }),
+  get: (field: string) =>
+    field === 'displayName' ? 'Rep' : field === 'esignEnvelopeId' ? esignEnvelopeId : undefined,
+});
+
 function postRequest(itemId: string, status: 'approved' | 'rejected') {
   return new NextRequest('http://localhost/api/portal/onboarding/review', {
     method: 'POST',
@@ -60,12 +67,7 @@ beforeEach(() => {
   gateMock.mockResolvedValue({ ok: true, uid: 'manager-1', name: 'Manager', isAdmin: true });
   queryGetMock.mockResolvedValue({ docs: [] });
   getAllMock.mockResolvedValue([]);
-  docGetMock.mockResolvedValue({
-    exists: true,
-    data: () => ({ status: 'submitted' }),
-    get: (field: string) =>
-      field === 'displayName' ? 'Rep' : field === 'esignEnvelopeId' ? 'env_current' : undefined,
-  });
+  docGetMock.mockResolvedValue(onboardingDoc('env_current'));
   docUpdateMock.mockResolvedValue(undefined);
 });
 
@@ -90,6 +92,20 @@ describe('POST /api/portal/onboarding/review', () => {
       esignEnvelopeId: '__FIELD_VALUE_DELETE__',
       esignDispatch: '__FIELD_VALUE_DELETE__',
     }));
+  });
+
+  it('rejects an e-sign item without an envelope without adding a superseded id', async () => {
+    docGetMock.mockResolvedValue(onboardingDoc());
+
+    const response = await POST(postRequest('contract', 'rejected'));
+
+    expect(response.status).toBe(200);
+    const update = docUpdateMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(update).not.toHaveProperty('supersededEnvelopeIds');
+    expect(update).toMatchObject({
+      esignEnvelopeId: '__FIELD_VALUE_DELETE__',
+      esignDispatch: '__FIELD_VALUE_DELETE__',
+    });
   });
 
   it('rejecting a non-e-sign item does not clear e-sign fields', async () => {
