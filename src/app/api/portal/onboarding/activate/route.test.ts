@@ -65,39 +65,49 @@ beforeEach(() => {
   mockActivateUser.mockReset();
   mockGate.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
   mockReadiness.mockResolvedValue({ ready: true, missing: [] });
-  mockActivateUser.mockImplementation(async (userId: string) => {
-    const data = firestore.users.get(userId);
-    if (!data) return null;
-    if (data.status === 'active') return { alreadyActive: true };
-    const update = {
-      status: 'active',
-      ...(data.fieldRole ? { fieldRole: data.fieldRole } : {}),
-    };
-    firestore.updates.push({ userId, data: update });
-    firestore.users.set(userId, { ...data, ...update });
-    return { alreadyActive: false };
-  });
 });
 
 describe('POST /api/portal/onboarding/activate', () => {
   it('activates an invited L1 manager without demoting the field role', async () => {
     firestore.users.set('l1-manager', { status: 'pending', fieldRole: 'l1_manager', displayName: 'Manager' });
+    mockActivateUser.mockResolvedValue({ alreadyActive: false });
 
     const res = await POST(req('l1-manager'));
 
     expect(res.status).toBe(200);
-    expect(firestore.updates[0]?.data).toMatchObject({ status: 'active', fieldRole: 'l1_manager' });
+    await expect(res.json()).resolves.toEqual({ ok: true });
+    expect(mockActivateUser).toHaveBeenCalledWith('l1-manager');
   });
 
   it('does not add a field role when the target has none', async () => {
     firestore.users.set('no-field-role', { status: 'pending', displayName: 'Pending User' });
+    mockActivateUser.mockResolvedValue({ alreadyActive: false });
 
     const res = await POST(req('no-field-role'));
 
     expect(res.status).toBe(200);
-    expect(firestore.updates[0]?.data).toMatchObject({ status: 'active' });
-    expect(firestore.updates[0]?.data).not.toHaveProperty('fieldRole');
-    expect(firestore.users.get('no-field-role')).not.toHaveProperty('fieldRole');
+    await expect(res.json()).resolves.toEqual({ ok: true });
+    expect(mockActivateUser).toHaveBeenCalledWith('no-field-role');
+  });
+
+  it('returns alreadyActive when the helper reports an already-active user', async () => {
+    mockActivateUser.mockResolvedValue({ alreadyActive: true });
+
+    const res = await POST(req('already-active'));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true, alreadyActive: true });
+    expect(mockActivateUser).toHaveBeenCalledWith('already-active');
+  });
+
+  it('returns 404 when the helper cannot find the target user', async () => {
+    mockActivateUser.mockResolvedValue(null);
+
+    const res = await POST(req('missing-user'));
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'user not found' });
+    expect(mockActivateUser).toHaveBeenCalledWith('missing-user');
   });
 
   it('preserves the readiness response and does not activate an incomplete hire', async () => {

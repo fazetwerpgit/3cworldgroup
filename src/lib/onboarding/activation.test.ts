@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getOnboardingItemsForUser, type OnboardingStatus } from '@/types/onboarding';
 import { graduatedFieldRole, type FieldRole } from '@/types/auth';
 
-const { store, db, dispatchMock, resolveMock } = vi.hoisted(() => {
+const { store, updates, db, dispatchMock, resolveMock } = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>();
+  const updates: Array<{ path: string; data: Record<string, unknown> }> = [];
   const get = (path: string) => ({
     exists: store.has(path),
     get: (field: string) => store.get(path)?.[field],
@@ -12,6 +13,7 @@ const { store, db, dispatchMock, resolveMock } = vi.hoisted(() => {
     doc: vi.fn((path: string) => ({
       get: async () => get(path),
       update: async (data: Record<string, unknown>) => {
+        updates.push({ path, data });
         store.set(path, { ...(store.get(path) ?? {}), ...data });
       },
     })),
@@ -30,6 +32,7 @@ const { store, db, dispatchMock, resolveMock } = vi.hoisted(() => {
   };
   return {
     store,
+    updates,
     db,
     dispatchMock: vi.fn(async () => undefined),
     resolveMock: vi.fn(async () => undefined),
@@ -37,15 +40,80 @@ const { store, db, dispatchMock, resolveMock } = vi.hoisted(() => {
 });
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: db }));
+vi.mock('firebase-admin/firestore', () => ({
+  FieldValue: { delete: vi.fn(() => '__DELETE__') },
+}));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: resolveMock }));
 
-import { computeReadiness, getActivationReadiness, maybeFlagActivationReady } from './activation';
+import {
+  activateUser,
+  computeReadiness,
+  getActivationReadiness,
+  maybeFlagActivationReady,
+} from './activation';
 
 beforeEach(() => {
   store.clear();
+  updates.length = 0;
   dispatchMock.mockReset();
   resolveMock.mockReset();
+});
+
+describe('activateUser', () => {
+  it('activates an invited l1_manager without demoting the field role', async () => {
+    store.set('users/l1-manager', {
+      status: 'pending',
+      fieldRole: 'l1_manager',
+      atRisk: true,
+    });
+
+    await expect(activateUser('l1-manager')).resolves.toEqual({ alreadyActive: false });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.data).toMatchObject({
+      status: 'active',
+      fieldRole: 'l1_manager',
+      atRisk: '__DELETE__',
+    });
+    expect(updates[0]?.data.hireDate).toBeInstanceOf(Date);
+  });
+
+  it('graduates an entry_level_rep to entry_rep', async () => {
+    store.set('users/entry-level-rep', {
+      status: 'pending',
+      fieldRole: 'entry_level_rep',
+    });
+
+    await activateUser('entry-level-rep');
+
+    expect(updates[0]?.data).toMatchObject({
+      status: 'active',
+      fieldRole: 'entry_rep',
+    });
+  });
+
+  it('does not add a field role when the target has none', async () => {
+    store.set('users/no-field-role', { status: 'pending' });
+
+    await activateUser('no-field-role');
+
+    expect(updates[0]?.data).not.toHaveProperty('fieldRole');
+  });
+
+  it('returns alreadyActive without writing for an already-active user', async () => {
+    store.set('users/already-active', { status: 'active', fieldRole: 'entry_rep' });
+
+    await expect(activateUser('already-active')).resolves.toEqual({ alreadyActive: true });
+
+    expect(updates).toHaveLength(0);
+  });
+
+  it('returns null when the user document is missing', async () => {
+    await expect(activateUser('missing-user')).resolves.toBeNull();
+
+    expect(updates).toHaveLength(0);
+  });
 });
 
 describe('computeReadiness', () => {
