@@ -916,14 +916,44 @@ Add tests: throws in production, passes in development, passes in production whe
 
 `src/app/api/portal/onboarding/upload/route.ts` parses the multipart body before its auth gate, because the target userId lives in the form data. Take the identity from the verified token and gate first, then parse. A stranger must not be able to make the server buffer a large upload. Confirm the route still works for its legitimate caller — the two-sided driver's-licence upload passes a `getHeaders` prop through `src/components/onboarding/FileUpload.tsx`.
 
-- [ ] **Step 4: Full gates**
+- [ ] **Step 4: Close the invite API's role hole**
+
+`src/app/api/portal/recruiting/invites/route.ts:16` declares
+`const VALID_FIELD_ROLES: FieldRole[] = Object.values(FieldRoles)` and validates the
+requested role against it at line ~152. The recruiting *page* now offers only the eight
+invitable roles, but the page is not the authority — a direct POST with
+`intendedFieldRole: 'general_manager'` still passes validation, creates a `pending` user
+with zero checklist items, and strands them permanently. That is the exact bug this
+whole project exists to fix, reachable through the front door.
+
+Replace `VALID_FIELD_ROLES` with the `INVITABLE_FIELD_ROLES` export from
+`src/types/auth.ts`. Add a test asserting a non-invitable role is rejected with a 400.
+
+- [ ] **Step 5: Add the missing positive checklist tests**
+
+`src/types/onboarding.test.ts` covers `entry_level_rep` and the three excluded roles, but
+nothing asserts that the seven newly-onboarding roles actually receive a packet. The
+central claim of this whole plan — "these roles now get a checklist" — is currently
+unverified: the suite would stay green if `getOnboardingItemsForUser` returned `[]` for
+all seven. Add:
+
+- `l1_manager`, `isIBO: false` → 8 items
+- `ibo_level_1`, `isIBO: true` → 11 items
+- `ibo_level_1`, `isIBO: false` → 8 items (the IBO-only trio is gated on the flag, not the role)
+
+Also add a test asserting `BASE_VETTING_ROLES` and `INVITABLE_FIELD_ROLES` contain the
+same set. They are now identical, which makes the `appliesToRoles` filter on the three
+vetting items a permanent no-op — harmless today, but two lists that must stay in
+lockstep with nothing enforcing it.
+
+- [ ] **Step 6: Full gates**
 
 Run: `npx tsc --noEmit` — expected: no errors.
 Run: `npm test` — expected: all pass. Report the count.
 Run: `npm run build` — expected: success.
 Run: `npx eslint` on every file changed across all nine tasks — expected: clean on those files. The repo's 26 pre-existing errors elsewhere are out of scope and must not be reported as fixed or as absent.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
