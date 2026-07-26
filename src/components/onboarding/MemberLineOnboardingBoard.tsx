@@ -25,10 +25,10 @@ const STATUS_CLASS: Record<OnboardingStatus, string> = {
 
 function nextActionLabel(item: WizardItem) {
   if (item.status === 'approved') return 'View';
-  if (item.status === 'rejected') return 'Resubmit';
   if (isEsignItem(item.id)) {
     return item.esignDispatch?.state === 'failed' ? 'Preparing' : 'Check email';
   }
+  if (item.status === 'rejected') return 'Resubmit';
   if (item.status === 'submitted') return 'In review';
   // Manual-reference items (e.g. Onboarding Submission) are not uploads (B-18).
   if (item.referenceKind === 'manual') return 'Submit';

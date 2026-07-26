@@ -127,6 +127,30 @@ describe('sendPendingEsignDocs', () => {
     expect(sent).toEqual(['contract']);
   });
 
+  it('resends a rejected esign item when it has no envelope or dispatch state', async () => {
+    for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+    store.set('userOnboarding/u1_contract', { status: 'rejected' });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual(['contract']);
+    expect(createEnvelopeMock).toHaveBeenCalledWith(expect.objectContaining({ itemId: 'contract' }));
+  });
+
+  it('does not resend a rejected esign item that still has an envelope', async () => {
+    for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+    store.set('userOnboarding/u1_contract', { status: 'rejected', esignEnvelopeId: 'env_old' });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+  });
+
   it('continues when one envelope creation fails', async () => {
     createEnvelopeMock.mockRejectedValueOnce(new Error('signwell 500'));
     const sent = await sendPendingEsignDocs('u1');

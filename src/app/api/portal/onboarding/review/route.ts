@@ -63,9 +63,11 @@ export async function GET(request: NextRequest) {
       .where('status', '==', 'submitted')
       .get();
     const reviewableDocs = snapshot.docs.filter((doc) => !isEsignItem(doc.data().itemId));
+    const esignDocs = snapshot.docs.filter((doc) => isEsignItem(doc.data().itemId));
+    const allDocs = [...reviewableDocs, ...esignDocs];
 
     // Collect unique user ids to join display names in one batch
-    const userIds = [...new Set(reviewableDocs.map((d) => d.data().userId as string))];
+    const userIds = [...new Set(allDocs.map((d) => d.data().userId as string))];
     const userMap = new Map<string, { displayName?: string; email?: string; atRisk: boolean }>();
     if (userIds.length > 0) {
       const userDocs = await adminDb.getAll(
@@ -83,37 +85,40 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const submissions = await Promise.all(
-      reviewableDocs.map(async (doc) => {
-        const data = doc.data();
-        const item = ONBOARDING_ITEMS.find((i) => i.id === data.itemId);
-        const user = userMap.get(data.userId);
-        const storage = isStorageItem(data.itemId);
-        return {
-          id: doc.id,
-          userId: data.userId,
-          itemId: data.itemId,
-          itemLabel: item?.label ?? data.itemId,
-          category: item?.category ?? 'paperwork',
-          sensitive: item?.sensitive ?? false,
-          referenceKind: item?.referenceKind ?? 'manual',
-          reference: data.reference ?? null,
-          files: storage ? await signFolderFiles(data.reference ?? null) : [],
-          userName: user?.displayName ?? user?.email ?? data.userId,
-          userEmail: user?.email ?? '',
-          atRisk: !!user?.atRisk,
-          submittedAt: data.submittedAt?.toDate() ?? null,
-        };
-      })
-    );
+    const toSubmission = async (doc: (typeof snapshot.docs)[number]) => {
+      const data = doc.data();
+      const item = ONBOARDING_ITEMS.find((i) => i.id === data.itemId);
+      const user = userMap.get(data.userId);
+      const storage = isStorageItem(data.itemId);
+      return {
+        id: doc.id,
+        userId: data.userId,
+        itemId: data.itemId,
+        itemLabel: item?.label ?? data.itemId,
+        category: item?.category ?? 'paperwork',
+        sensitive: item?.sensitive ?? false,
+        referenceKind: item?.referenceKind ?? 'manual',
+        reference: data.reference ?? null,
+        files: storage ? await signFolderFiles(data.reference ?? null) : [],
+        userName: user?.displayName ?? user?.email ?? data.userId,
+        userEmail: user?.email ?? '',
+        atRisk: !!user?.atRisk,
+        submittedAt: data.submittedAt?.toDate() ?? null,
+      };
+    };
 
-    submissions.sort((a, b) => {
+    const submissions = await Promise.all(reviewableDocs.map(toSubmission));
+    const esignPending = await Promise.all(esignDocs.map(toSubmission));
+
+    const sortOldestFirst = (a: typeof submissions[number], b: typeof submissions[number]) => {
       const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
       const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
       return ta - tb; // oldest first - FIFO review queue
-    });
+    };
+    submissions.sort(sortOldestFirst);
+    esignPending.sort(sortOldestFirst);
 
-    return NextResponse.json({ submissions });
+    return NextResponse.json({ submissions, esignPending });
   } catch (error) {
     console.error('Error fetching review queue:', error);
     return NextResponse.json(

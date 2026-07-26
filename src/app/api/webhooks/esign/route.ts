@@ -30,12 +30,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  const onboardingRef = adminDb.doc(`userOnboarding/${userId}_${itemId}`);
+  const onboardingSnap = await onboardingRef.get();
+  const currentEnvelopeId = onboardingSnap.get('esignEnvelopeId') as string | undefined;
+  if (event.envelopeId !== currentEnvelopeId) {
+    console.error('[esign webhook] stale envelope ignored', {
+      userId,
+      itemId,
+      eventEnvelopeId: event.envelopeId,
+      currentEnvelopeId: currentEnvelopeId ?? null,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   const now = new Date();
-  await adminDb.doc(`userOnboarding/${userId}_${itemId}`).set(
+  await onboardingRef.set(
     {
       userId,
       itemId,
       status: 'approved',
+      rejectionReason: null,
       reviewedBy: 'system',
       reviewerName: 'E-sign (auto)',
       reviewedAt: now,

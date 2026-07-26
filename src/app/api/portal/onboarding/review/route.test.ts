@@ -126,6 +126,10 @@ describe('GET /api/portal/onboarding/review', () => {
         id: 'user-2_onboarding_submission',
         itemId: 'onboarding_submission',
       })],
+      esignPending: [expect.objectContaining({
+        id: 'user-1_contract',
+        itemId: 'contract',
+      })],
     });
   });
 });

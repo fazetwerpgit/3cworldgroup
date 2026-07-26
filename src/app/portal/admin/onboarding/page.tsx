@@ -63,6 +63,7 @@ function waitLabel(submittedAt: string | null): string {
 export default function OnboardingReviewPage() {
   const { user } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [esignPending, setEsignPending] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -81,7 +82,8 @@ export default function OnboardingReviewPage() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load review queue');
-      setSubmissions(json.submissions);
+      setSubmissions(Array.isArray(json.submissions) ? json.submissions : []);
+      setEsignPending(Array.isArray(json.esignPending) ? json.esignPending : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load review queue');
     } finally {
@@ -109,6 +111,7 @@ export default function OnboardingReviewPage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to review submission');
       setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
+      setEsignPending((prev) => prev.filter((s) => s.id !== submission.id));
       setRejectModal(null);
       setRejectionReason('');
     } catch (err) {
@@ -266,9 +269,7 @@ export default function OnboardingReviewPage() {
                         <span className="ops-line-file-chip">
                           {submission.referenceKind === 'storage'
                             ? `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`
-                            : submission.referenceKind === 'esign'
-                              ? 'e-signature'
-                              : 'reference'}
+                            : 'reference'}
                         </span>
                       </span>
                       <span className="ops-line-status-chip">waiting</span>
@@ -302,10 +303,6 @@ export default function OnboardingReviewPage() {
                             ) : (
                               <p className="quote">No files found at {submission.reference ?? 'this reference'}.</p>
                             )
-                          ) : submission.referenceKind === 'esign' ? (
-                            <p className="quote">
-                              {submission.reference ? `E-signature reference: ${submission.reference}` : 'No confirmation entered.'}
-                            </p>
                           ) : (
                             <p className="quote">{submission.reference ?? 'No reference on file.'}</p>
                           )}
@@ -346,6 +343,105 @@ export default function OnboardingReviewPage() {
                 );
               })}
             </div>
+          )}
+
+          {!loading && esignPending.length > 0 && (
+            <section style={{ marginTop: 28 }} aria-labelledby="esign-pending-heading">
+              <div className="ops-line-hero" style={{ marginBottom: 12 }}>
+                <div>
+                  <p className="ops-line-kicker">Signature lane</p>
+                  <h2 id="esign-pending-heading" style={{ fontSize: 24, fontWeight: 900 }}>
+                    Out for signature
+                  </h2>
+                  <p className="ops-line-intro">
+                    These documents are with the rep. Reject an envelope only when ops needs a fresh one sent.
+                  </p>
+                </div>
+                <div className="ops-line-hero-count">
+                  <strong className="ops-line-display portal-metallic-num">{esignPending.length}</strong>
+                  <small>out for signature</small>
+                </div>
+              </div>
+              <div className="ops-line-list">
+                {esignPending.map((submission) => {
+                  const expanded = expandedId === submission.id;
+                  return (
+                    <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
+                      <button
+                        type="button"
+                        className="ops-line-row-main onboard"
+                        onClick={() => setExpandedId(expanded ? null : submission.id)}
+                        aria-expanded={expanded}
+                      >
+                        <span className="ops-line-person ops-line-cell">
+                          <span className="ops-line-avatar">
+                            {repLabel(submission.userName, submission.userId).charAt(0).toUpperCase()}
+                          </span>
+                          <span>
+                            <strong>
+                              {repLabel(submission.userName, submission.userId)}
+                              {submission.atRisk && ' · AT RISK'}
+                            </strong>
+                            <small>{submission.itemLabel}</small>
+                          </span>
+                        </span>
+                        <span className="ops-line-cell">
+                          <strong>{OnboardingCategoryLabels[submission.category] ?? submission.category}</strong>
+                          <small>{waitLabel(submission.submittedAt)} out</small>
+                        </span>
+                        <span className="ops-line-cell">
+                          <strong className="ops-line-sensitive">
+                            {submission.sensitive && <Lock className="h-3 w-3" aria-hidden="true" />}
+                            {submission.sensitive ? 'Sensitive item' : 'E-signature'}
+                          </strong>
+                          <small>provider-managed</small>
+                        </span>
+                        <span className="ops-line-evidence-group">
+                          <span className="ops-line-file-chip">e-signature</span>
+                        </span>
+                        <span className="ops-line-status-chip">out for signature</span>
+                        <span className="ops-line-chevron">{expanded ? '−' : '+'}</span>
+                      </button>
+
+                      {expanded && (
+                        <div className="ops-line-detail-panel onboard">
+                          <div className="ops-line-reference-card">
+                            <p className="ops-line-kicker">Reference / preview</p>
+                            <p className="quote">
+                              {submission.reference
+                                ? `E-signature reference: ${submission.reference}`
+                                : 'No envelope reference on file.'}
+                            </p>
+                          </div>
+                          <div className="ops-line-detail-copy">
+                            <h3>{submission.itemLabel}</h3>
+                            <div className="ops-line-detail-fields">
+                              <div><span>Person</span><b>{repLabel(submission.userName, submission.userId)}</b></div>
+                              <div><span>Category</span><b>{OnboardingCategoryLabels[submission.category] ?? submission.category}</b></div>
+                              <div><span>Out for</span><b>{waitLabel(submission.submittedAt)}</b></div>
+                              <div><span>Access</span><b>Provider-managed</b></div>
+                            </div>
+                            <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>
+                              Dispatched {formatDate(submission.submittedAt)} · {submission.userEmail}
+                            </p>
+                            <div className="ops-line-detail-actions">
+                              <button
+                                type="button"
+                                className="ops-line-action reject"
+                                disabled={processingId === submission.id}
+                                onClick={() => setRejectModal(submission)}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           <ActionQueue />
