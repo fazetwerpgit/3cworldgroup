@@ -1,81 +1,236 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
+import { createAlertTask, resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { esignSentEmail } from '@/lib/email/templates';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
+import { isEsignItem } from '@/lib/onboarding/esign';
 import type { FieldRole } from '@/types/auth';
 import { getEsignProvider } from './provider';
-import type { EsignDocKey } from './provider';
+import type { EsignDocKey, EsignProvider } from './provider';
 
-const ESIGN_DOC_KEYS = new Set<string>(['contract', 'direct_deposit', 'pay_structure', 'fcra_auth']);
+const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_ERROR_LENGTH = 500;
+const ALERT_KIND = 'review_needed' as const;
+
+interface EsignDispatchState {
+  state?: string;
+  attempts?: number;
+  lastAttemptAt?: unknown;
+}
+
+interface PendingItem {
+  item: ReturnType<typeof getOnboardingItemsForUser>[number];
+  ref: ReturnType<NonNullable<typeof adminDb>['doc']>;
+  snap: Awaited<ReturnType<ReturnType<NonNullable<typeof adminDb>['doc']>['get']>>;
+}
+
+function asDate(value: unknown): Date | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+  const maybeTimestamp = value as { toDate?: () => Date };
+  return typeof maybeTimestamp.toDate === 'function' ? maybeTimestamp.toDate() : undefined;
+}
+
+function dispatchState(snap: { get: (field: string) => unknown }): EsignDispatchState {
+  const value = snap.get('esignDispatch');
+  return value && typeof value === 'object' ? (value as EsignDispatchState) : {};
+}
+
+function previousAttempts(state: EsignDispatchState): number {
+  return typeof state.attempts === 'number' && Number.isFinite(state.attempts)
+    ? state.attempts
+    : 0;
+}
+
+function isThrottled(state: EsignDispatchState, now: Date): boolean {
+  const lastAttemptAt = asDate(state.lastAttemptAt);
+  return !!lastAttemptAt && now.getTime() - lastAttemptAt.getTime() < MIN_RETRY_INTERVAL_MS;
+}
+
+async function recordFailure(
+  pending: PendingItem,
+  userId: string,
+  error: unknown
+): Promise<{ previousAttempts: number; attempts: number } | null> {
+  try {
+    const state = dispatchState(pending.snap);
+    const before = previousAttempts(state);
+    const attempts = before + 1;
+    await pending.ref.set(
+      {
+        userId,
+        itemId: pending.item.id,
+        esignDispatch: {
+          state: 'failed',
+          attempts,
+          lastError: String(error).slice(0, MAX_ERROR_LENGTH),
+          lastAttemptAt: new Date(),
+        },
+      },
+      { merge: true }
+    );
+    return { previousAttempts: before, attempts };
+  } catch (recordError) {
+    console.error(`[esign] failed to record dispatch failure for ${userId}/${pending.item.id}`, recordError);
+    return null;
+  }
+}
+
+async function raiseDispatchAlert(userId: string, signerName: string): Promise<void> {
+  try {
+    await createAlertTask({
+      kind: ALERT_KIND,
+      subjectUserId: userId,
+      subjectName: signerName,
+      title: 'E-signature delivery needs attention',
+      message: `${signerName} has a document that could not be sent for signature after repeated attempts.`,
+      link: '/portal/admin/onboarding',
+    });
+  } catch (error) {
+    console.error(`[esign] failed to raise dispatch alert for ${userId}`, error);
+  }
+}
+
+async function resolveDispatchAlert(userId: string): Promise<void> {
+  try {
+    await resolveAlertTasks(userId, [ALERT_KIND]);
+  } catch (error) {
+    console.error(`[esign] failed to resolve dispatch alert for ${userId}`, error);
+  }
+}
+
+async function sendOne(
+  provider: EsignProvider,
+  pending: PendingItem,
+  userId: string,
+  signerName: string,
+  signerEmail: string
+): Promise<{ sent: boolean; failed?: { previousAttempts: number; attempts: number } }> {
+  try {
+    const { envelopeId } = await provider.createEnvelope({
+      docKey: pending.item.id as EsignDocKey,
+      userId,
+      itemId: pending.item.id,
+      signerName,
+      signerEmail,
+    });
+    const now = new Date();
+    const hadFailedDispatch = dispatchState(pending.snap).state === 'failed';
+    await pending.ref.set(
+      {
+        userId,
+        itemId: pending.item.id,
+        status: 'submitted',
+        reference: `esign:${envelopeId}`,
+        esignEnvelopeId: envelopeId,
+        esignDispatch: FieldValue.delete(),
+        submittedAt: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    if (hadFailedDispatch) await resolveDispatchAlert(userId);
+    return { sent: true };
+  } catch (error) {
+    console.error(`[esign] envelope creation failed for ${userId}/${pending.item.id}`, error);
+    return { sent: false, failed: (await recordFailure(pending, userId, error)) ?? undefined };
+  }
+}
 
 /**
- * Creates e-sign envelopes for every applicable e-sign item the user has not
- * been sent yet. Idempotent: items with an esignEnvelopeId are skipped.
+ * Creates or retries e-sign envelopes for applicable items. This function is
+ * deliberately failure-contained: callers receive whatever was sent, while
+ * provider and persistence failures are recorded/logged and never re-thrown.
  */
 export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
   if (!adminDb) return [];
 
-  const userSnap = await adminDb.doc(`users/${userId}`).get();
-  if (!userSnap.exists) return [];
-
-  const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
-  if (!fieldRole) return [];
-
-  const signerName = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
-  const signerEmail = userSnap.get('email') as string | undefined;
-  if (!signerEmail) return [];
-
-  const items = getOnboardingItemsForUser(fieldRole, !!userSnap.get('isIBO')).filter(
-    (item) => item.referenceKind === 'esign' && ESIGN_DOC_KEYS.has(item.id)
-  );
-  const provider = getEsignProvider();
   const sent: string[] = [];
-  const sentLabels: string[] = [];
+  try {
+    const userSnap = await adminDb.doc(`users/${userId}`).get();
+    if (!userSnap.exists) return sent;
 
-  for (const item of items) {
-    const ref = adminDb.doc(`userOnboarding/${userId}_${item.id}`);
-    const snap = await ref.get();
-    const status = (snap.get('status') as string | undefined) ?? 'not_started';
-    if (snap.get('esignEnvelopeId')) continue;
-    if (!['not_started', 'submitted', 'rejected'].includes(status)) continue;
+    const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
+    if (!fieldRole) return sent;
 
-    try {
-      const { envelopeId } = await provider.createEnvelope({
-        docKey: item.id as EsignDocKey,
-        userId,
-        itemId: item.id,
-        signerName,
-        signerEmail,
-      });
-      const now = new Date();
-      await ref.set(
-        {
-          userId,
-          itemId: item.id,
-          status: 'submitted',
-          reference: `esign:${envelopeId}`,
-          esignEnvelopeId: envelopeId,
-          submittedAt: now,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
-      sent.push(item.id);
-      sentLabels.push(item.label);
-    } catch (error) {
-      console.error(`[esign] envelope creation failed for ${userId}/${item.id}`, error);
+    const signerName = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
+    const signerEmail = userSnap.get('email') as string | undefined;
+    if (!signerEmail) return sent;
+
+    const items = getOnboardingItemsForUser(fieldRole, !!userSnap.get('isIBO')).filter((item) =>
+      isEsignItem(item.id)
+    );
+    const now = new Date();
+    const pending: PendingItem[] = [];
+
+    for (const item of items) {
+      try {
+        const ref = adminDb.doc(`userOnboarding/${userId}_${item.id}`);
+        const snap = await ref.get();
+        const state = dispatchState(snap);
+        const status = (snap.get('status') as string | undefined) ?? 'not_started';
+        if (snap.get('esignEnvelopeId')) continue;
+        if (!['not_started', 'submitted', 'rejected'].includes(status)) continue;
+        if (isThrottled(state, now)) continue;
+        pending.push({ item, ref, snap });
+      } catch (error) {
+        console.error(`[esign] failed to inspect ${userId}/${item.id}`, error);
+      }
     }
-  }
 
-  if (sent.length > 0) {
-    await dispatchToUser({
-      userId,
-      type: 'system',
-      title: 'Documents sent for signature',
-      message: `Check your email: ${sentLabels.join(', ')}`,
-      link: '/portal/onboarding',
-      email: esignSentEmail({ name: signerName, docLabels: sentLabels }),
-    });
+    if (pending.length === 0) return sent;
+
+    let provider: EsignProvider;
+    try {
+      provider = getEsignProvider();
+    } catch (error) {
+      console.error(`[esign] provider construction failed for ${userId}`, error);
+      let alertRaised = false;
+      for (const item of pending) {
+        const failure = await recordFailure(item, userId, error);
+        if (!alertRaised && failure && failure.previousAttempts < 3 && failure.attempts >= 3) {
+          alertRaised = true;
+          await raiseDispatchAlert(userId, signerName);
+        }
+      }
+      return sent;
+    }
+
+    let alertRaised = false;
+    const sentLabels: string[] = [];
+    for (const item of pending) {
+      const result = await sendOne(provider, item, userId, signerName, signerEmail);
+      if (result.sent) {
+        sent.push(item.item.id);
+        sentLabels.push(item.item.label);
+      } else if (
+        !alertRaised &&
+        result.failed &&
+        result.failed.previousAttempts < 3 &&
+        result.failed.attempts >= 3
+      ) {
+        alertRaised = true;
+        await raiseDispatchAlert(userId, signerName);
+      }
+    }
+
+    if (sentLabels.length > 0) {
+      try {
+        await dispatchToUser({
+          userId,
+          type: 'system',
+          title: 'Documents sent for signature',
+          message: `Check your email: ${sentLabels.join(', ')}`,
+          link: '/portal/onboarding',
+          email: esignSentEmail({ name: signerName, docLabels: sentLabels }),
+        });
+      } catch (error) {
+        console.error(`[esign] failed to notify ${userId} about sent documents`, error);
+      }
+    }
+  } catch (error) {
+    console.error(`[esign] pending document send failed for ${userId}`, error);
   }
 
   return sent;

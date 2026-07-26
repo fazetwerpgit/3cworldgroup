@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
+import { ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
 import type { OnboardingItem, OnboardingStatus } from '@/types/onboarding';
 import { OnboardingCategoryLabels } from '@/types/onboarding';
 
@@ -17,6 +17,7 @@ export interface WizardItem extends OnboardingItem {
   reviewerName: string | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
+  esignDispatch?: { state?: string; attempts?: number; lastError?: string } | null;
 }
 
 interface Props {
@@ -149,7 +150,9 @@ export default function OnboardingWizard({ items, progress, renderItemAction }: 
 
               {isEsignItem(active.id) && active.status !== 'approved' ? (
                 <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
-                  {ESIGN_HELPER_TEXT}
+                  {active.esignDispatch?.state === 'failed'
+                    ? ESIGN_FAILURE_HELPER_TEXT
+                    : ESIGN_HELPER_TEXT}
                 </div>
               ) : (
                 renderItemAction(active)

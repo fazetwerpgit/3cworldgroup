@@ -23,6 +23,7 @@ interface ChecklistItem extends OnboardingItem {
   reviewerName: string | null;
   submittedAt: string | null;
   reviewedAt: string | null;
+  esignDispatch: { state?: string; attempts?: number; lastError?: string } | null;
 }
 
 interface ChecklistResponse {

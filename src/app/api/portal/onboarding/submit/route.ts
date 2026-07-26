@@ -9,6 +9,7 @@ import {
 import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
+import { isEsignItem } from '@/lib/onboarding/esign';
 
 // POST /api/portal/onboarding/submit - Rep submits an onboarding item for review.
 // Sensitive items (W-9, direct deposit, chargeback card) accept a reference
@@ -49,6 +50,16 @@ export async function POST(request: NextRequest) {
     if (!item) {
       return NextResponse.json(
         { error: 'Unknown onboarding item' },
+        { status: 400 }
+      );
+    }
+
+    if (isEsignItem(itemId)) {
+      return NextResponse.json(
+        {
+          error:
+            'E-signature items are completed by the e-sign provider and do not accept typed references',
+        },
         { status: 400 }
       );
     }

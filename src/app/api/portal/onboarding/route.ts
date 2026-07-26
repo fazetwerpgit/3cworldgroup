@@ -6,6 +6,7 @@ import {
   OnboardingStatus,
 } from '@/types';
 import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 
 // GET /api/portal/onboarding?userId=xxx - Merged onboarding checklist for a user.
 // Returns the items that apply to the user's fieldRole/isIBO, each merged with
@@ -49,6 +50,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: [], fieldRole: null, isIBO: false });
     }
 
+    // Retry delivery in the background. sendPendingEsignDocs is failure-contained
+    // and throttled, so a provider outage cannot delay or fail this checklist read.
+    void sendPendingEsignDocs(userId);
+
     const isIBO = userData?.isIBO ?? false;
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO);
 
@@ -68,6 +73,7 @@ export async function GET(request: NextRequest) {
         reviewerName: progress?.reviewerName ?? null,
         submittedAt: progress?.submittedAt?.toDate() ?? null,
         reviewedAt: progress?.reviewedAt?.toDate() ?? null,
+        esignDispatch: progress?.esignDispatch ?? null,
       };
     });
 

@@ -11,3 +11,5 @@ export function isEsignItem(itemId: string): boolean {
 
 // Single source for the rep-facing instruction on esign items.
 export const ESIGN_HELPER_TEXT = "We've emailed you this document for e-signature. Check your inbox - it completes here automatically once signed.";
+
+export const ESIGN_FAILURE_HELPER_TEXT = 'Preparing your document — check back shortly.';

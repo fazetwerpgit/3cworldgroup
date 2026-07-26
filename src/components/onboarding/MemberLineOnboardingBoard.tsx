@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
+import {
+  ESIGN_FAILURE_HELPER_TEXT,
+  ESIGN_HELPER_TEXT,
+  isEsignItem,
+} from '@/lib/onboarding/esign';
 import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
 import type { OnboardingStatus } from '@/types/onboarding';
 
@@ -22,7 +26,9 @@ const STATUS_CLASS: Record<OnboardingStatus, string> = {
 function nextActionLabel(item: WizardItem) {
   if (item.status === 'approved') return 'View';
   if (item.status === 'rejected') return 'Resubmit';
-  if (isEsignItem(item.id)) return 'Check email';
+  if (isEsignItem(item.id)) {
+    return item.esignDispatch?.state === 'failed' ? 'Preparing' : 'Check email';
+  }
   if (item.status === 'submitted') return 'In review';
   // Manual-reference items (e.g. Onboarding Submission) are not uploads (B-18).
   if (item.referenceKind === 'manual') return 'Submit';
@@ -146,7 +152,9 @@ export default function MemberLineOnboardingBoard({
 
 function rowDescription(item: WizardItem) {
   if (item.status === 'rejected' && item.rejectionReason) return item.rejectionReason;
-  if (isEsignItem(item.id) && item.status !== 'approved') return ESIGN_HELPER_TEXT;
+  if (isEsignItem(item.id) && item.status !== 'approved') {
+    return item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT;
+  }
   if (item.status === 'approved') return 'Complete.';
   return 'Open the item for the next step.';
 }
@@ -178,7 +186,9 @@ function MemberLineOnboardingSheetBody({
       )}
 
       {isEsignItem(item.id) ? (
-        <div className="member-line-note warn">{ESIGN_HELPER_TEXT}</div>
+        <div className="member-line-note warn">
+          {item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT}
+        </div>
       ) : (
         renderItemAction(item)
       )}
