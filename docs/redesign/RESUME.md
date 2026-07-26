@@ -7,7 +7,38 @@ Updated: 2026-07-25 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-NOTHING IN FLIGHT. The security hardening SHIPPED to production on
+ONBOARDING COMPLETION — design APPROVED, spec committed LOCAL at ac90ca8:
+docs/superpowers/specs/2026-07-25-onboarding-completion-design.md.
+Next: implement it via superpowers:subagent-driven-development, opus 5 for
+review/verify agents and Codex gpt-5.6-luna for build agents.
+
+HARD CONSTRAINT FROM JACOB: **DO NOT DEPLOY.** Local commits only. No
+git push (push = Vercel production deploy). No firebase deploy — the
+firestore.rules chat change is written and committed but NOT deployed.
+He is building this ahead of actually needing it.
+
+The spec supersedes docs/superpowers/specs/2026-07-09-entry-level-rep-
+onboarding-gate-design.md on two points that were themselves client-
+approved (all 8 invitable roles now require onboarding; assigning a role
+to a pending user no longer auto-activates). Jacob was shown the conflict
+and chose the new behaviour. The Accept button on the users page SURVIVES
+as an explicit confirm-guarded override.
+
+Three problems it fixes: (1) nothing confines a pending hire — they see
+nearly the whole portal; (2) 7 of the 8 roles the recruiting invite form
+offers strand the candidate permanently, because roleRequiresOnboarding()
+is true only for entry_level_rep and five systems quit early on it;
+(3) a failed e-sign send degrades silently into a free-text box.
+
+CANNOT BE VERIFIED in this environment, must be reported as such: no
+SignWell API key (so no real envelope end-to-end), and firestore.rules
+are not deployed (so chat access for a pending hire is untested).
+
+CORRECTION TO A NOTE BELOW: Codex is NOT dead. codex-cli 0.145.0 runs
+fine with -m gpt-5.6-luna (verified 2026-07-25). Ignore the "Codex dead
+until Aug 12 2026" line in STANDING RULES.
+
+PREVIOUSLY SHIPPED — security hardening went to production on
 2026-07-25 (46 commits, merged to master, pushed, Vercel deployed).
 Firestore rules were deployed separately by Jacob and smoke-tested via
 chat. Ask Jacob what he wants next.
