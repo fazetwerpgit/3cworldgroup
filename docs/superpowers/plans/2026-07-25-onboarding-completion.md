@@ -1126,7 +1126,9 @@ array. Delete the branch.
 
 Carried from Task 6's review — a loose end that Task 6's own fix created.
 
-`src/lib/onboarding/activation.ts:80` hardcodes the activation notification title
+`src/lib/onboarding/activation.ts` (in `maybeFlagActivationReady`, around line 120 after
+Task 7's extraction — find it by the quoted string, not the line number) hardcodes the
+activation notification title
 `"Onboarding complete — you're now an Account Executive"`. That sentence was true while
 everyone activated as an entry rep. Now that a hire activates as the role they were
 invited as, it is false for seven of the eight roles: an invited L1 manager approves
@@ -1134,8 +1136,12 @@ their last item, gets a bell alert calling them an Account Executive, and their 
 reads L1 Manager.
 
 Use `RoleDisplayNames[graduatedFieldRole(fieldRole)]` for the role name in that title.
-The manual route's copy (`activate/route.ts:69`) and `activationEmail` are role-neutral
-and must stay as they are.
+
+There are now TWO dispatches in this file and only one is wrong. `activateUser`'s
+"Welcome aboard - you are active" title is role-neutral and correct — do NOT touch it.
+The one to change is the "Account Executive" title inside `maybeFlagActivationReady`.
+The manual route's copy (`activate/route.ts`) and `activationEmail` are also role-neutral
+and stay as they are.
 
 Add a test asserting an invited `l1_manager`'s notification title names L1 Manager, not
 Account Executive.
