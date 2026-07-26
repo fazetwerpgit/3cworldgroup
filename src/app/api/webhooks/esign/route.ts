@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getEsignProvider } from '@/lib/esign/provider';
 import { createNotification } from '@/lib/notifications/createNotification';
+import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
+
+const ALERT_KIND = 'esign_mismatch' as const;
 
 export async function POST(request: Request) {
   const raw = await request.text();
@@ -34,12 +37,53 @@ export async function POST(request: Request) {
   const onboardingSnap = await onboardingRef.get();
   const currentEnvelopeId = onboardingSnap.get('esignEnvelopeId') as string | undefined;
   if (event.envelopeId !== currentEnvelopeId) {
-    console.error('[esign webhook] stale envelope ignored', {
-      userId,
-      itemId,
-      eventEnvelopeId: event.envelopeId,
-      currentEnvelopeId: currentEnvelopeId ?? null,
-    });
+    const supersededEnvelopeIds = onboardingSnap.get('supersededEnvelopeIds');
+    const isSuperseded =
+      Array.isArray(supersededEnvelopeIds) && supersededEnvelopeIds.includes(event.envelopeId);
+    if (isSuperseded) {
+      console.warn('[esign webhook] superseded envelope ignored', {
+        userId,
+        itemId,
+        eventEnvelopeId: event.envelopeId,
+        currentEnvelopeId: currentEnvelopeId ?? null,
+      });
+    } else {
+      console.error('[esign webhook] unknown envelope mismatch', {
+        userId,
+        itemId,
+        eventEnvelopeId: event.envelopeId,
+        currentEnvelopeId: currentEnvelopeId ?? null,
+      });
+      // Ops reads this task in a queue of people, so resolve a real name — but
+      // never at the cost of the alert itself, so this is its own try and the
+      // uid is an acceptable fallback.
+      let subjectName = userId;
+      try {
+        const userSnap = await adminDb.doc(`users/${userId}`).get();
+        subjectName =
+          (userSnap.get('displayName') as string | undefined) ||
+          (userSnap.get('email') as string | undefined) ||
+          userId;
+      } catch (error) {
+        console.error('[esign webhook] failed to resolve rep name for alert', { userId, error });
+      }
+      try {
+        await createAlertTask({
+          kind: ALERT_KIND,
+          subjectUserId: userId,
+          subjectName,
+          title: 'E-signature identity mismatch needs attention',
+          message: `A completed e-signature event for ${item.label} did not match the envelope recorded for this rep. Reconcile the provider envelope before activation.`,
+          link: '/portal/admin/onboarding',
+        });
+      } catch (error) {
+        console.error('[esign webhook] failed to raise envelope mismatch alert', {
+          userId,
+          itemId,
+          error,
+        });
+      }
+    }
     return NextResponse.json({ ok: true });
   }
 

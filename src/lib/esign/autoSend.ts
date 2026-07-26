@@ -107,35 +107,52 @@ async function sendOne(
   signerName: string,
   signerEmail: string
 ): Promise<{ sent: boolean; failed?: { previousAttempts: number; attempts: number } }> {
+  let envelopeId: string;
   try {
-    const { envelopeId } = await provider.createEnvelope({
+    ({ envelopeId } = await provider.createEnvelope({
       docKey: pending.item.id as EsignDocKey,
       userId,
       itemId: pending.item.id,
       signerName,
       signerEmail,
-    });
-    const now = new Date();
-    const hadFailedDispatch = dispatchState(pending.snap).state === 'failed';
-    await pending.ref.set(
-      {
-        userId,
-        itemId: pending.item.id,
-        status: 'submitted',
-        reference: `esign:${envelopeId}`,
-        esignEnvelopeId: envelopeId,
-        esignDispatch: FieldValue.delete(),
-        submittedAt: now,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
-    if (hadFailedDispatch) await resolveDispatchAlert(userId);
-    return { sent: true };
+    }));
   } catch (error) {
     console.error(`[esign] envelope creation failed for ${userId}/${pending.item.id}`, error);
     return { sent: false, failed: (await recordFailure(pending, userId, error)) ?? undefined };
   }
+
+  const now = new Date();
+  const hadFailedDispatch = dispatchState(pending.snap).state === 'failed';
+  const persistence = {
+    userId,
+    itemId: pending.item.id,
+    status: 'submitted',
+    reference: `esign:${envelopeId}`,
+    esignEnvelopeId: envelopeId,
+    esignDispatch: FieldValue.delete(),
+    submittedAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    await pending.ref.set(persistence, { merge: true });
+  } catch (firstError) {
+    try {
+      await pending.ref.set(persistence, { merge: true });
+    } catch (error) {
+      console.error(`[esign] envelope was created but its record failed to persist for ${userId}/${pending.item.id}`, {
+        envelopeId,
+        userId,
+        itemId: pending.item.id,
+        error,
+        firstError,
+      });
+      return { sent: false, failed: (await recordFailure(pending, userId, error)) ?? undefined };
+    }
+  }
+
+  if (hadFailedDispatch) await resolveDispatchAlert(userId);
+  return { sent: true };
 }
 
 /**

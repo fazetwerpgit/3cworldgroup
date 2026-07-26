@@ -130,15 +130,15 @@ export default function OnboardingReviewPage() {
 
   const people = useMemo(() => {
     const seen = new Map<string, string>();
-    submissions.forEach((s) => {
+    [...submissions, ...esignPending].forEach((s) => {
       const key = repKey(s.userName, s.userId);
       if (!seen.has(key)) seen.set(key, repLabel(s.userName, s.userId));
     });
     return Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
-  }, [submissions]);
+  }, [submissions, esignPending]);
   const categories = useMemo(
-    () => Array.from(new Set(submissions.map((s) => s.category))),
-    [submissions]
+    () => Array.from(new Set([...submissions, ...esignPending].map((s) => s.category))),
+    [submissions, esignPending]
   );
 
   const filtered = useMemo(
@@ -150,6 +150,16 @@ export default function OnboardingReviewPage() {
           (!atRiskOnly || s.atRisk)
       ),
     [submissions, personFilter, categoryFilter, atRiskOnly]
+  );
+  const filteredEsignPending = useMemo(
+    () =>
+      esignPending.filter(
+        (s) =>
+          (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
+          (categoryFilter === 'all' || s.category === categoryFilter) &&
+          (!atRiskOnly || s.atRisk)
+      ),
+    [esignPending, personFilter, categoryFilter, atRiskOnly]
   );
 
   return (
@@ -345,9 +355,9 @@ export default function OnboardingReviewPage() {
             </div>
           )}
 
-          {!loading && esignPending.length > 0 && (
+          {!loading && filteredEsignPending.length > 0 && (
             <section style={{ marginTop: 28 }} aria-labelledby="esign-pending-heading">
-              <div className="ops-line-hero" style={{ marginBottom: 12 }}>
+              <div className="ops-line-hero ops-line-hero-subsection" style={{ marginBottom: 12 }}>
                 <div>
                   <p className="ops-line-kicker">Signature lane</p>
                   <h2 id="esign-pending-heading" style={{ fontSize: 24, fontWeight: 900 }}>
@@ -358,12 +368,12 @@ export default function OnboardingReviewPage() {
                   </p>
                 </div>
                 <div className="ops-line-hero-count">
-                  <strong className="ops-line-display portal-metallic-num">{esignPending.length}</strong>
+                  <strong className="ops-line-display portal-metallic-num">{filteredEsignPending.length}</strong>
                   <small>out for signature</small>
                 </div>
               </div>
               <div className="ops-line-list">
-                {esignPending.map((submission) => {
+                {filteredEsignPending.map((submission) => {
                   const expanded = expandedId === submission.id;
                   return (
                     <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>

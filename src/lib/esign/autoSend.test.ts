@@ -9,25 +9,28 @@ const {
   createAlertTaskMock,
   resolveAlertTasksMock,
   writes,
+  setMock,
+  consoleErrorMock,
   DELETE_SENTINEL,
 } = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>();
   const writes: Array<{ path: string; data: Record<string, unknown> }> = [];
   const DELETE_SENTINEL = '__FIELD_VALUE_DELETE__';
+  const setMock = vi.fn(async (path: string, data: Record<string, unknown>) => {
+    writes.push({ path, data });
+    const next = { ...(store.get(path) ?? {}), ...data };
+    Object.entries(data).forEach(([key, value]) => {
+      if (value === DELETE_SENTINEL) delete next[key];
+    });
+    store.set(path, next);
+  });
   const docMock = vi.fn((path: string) => ({
     get: async () => ({
       exists: store.has(path),
       get: (f: string) => store.get(path)?.[f],
       data: () => store.get(path),
     }),
-    set: async (data: Record<string, unknown>) => {
-      writes.push({ path, data });
-      const next = { ...(store.get(path) ?? {}), ...data };
-      Object.entries(data).forEach(([key, value]) => {
-        if (value === DELETE_SENTINEL) delete next[key];
-      });
-      store.set(path, next);
-    },
+    set: (data: Record<string, unknown>) => setMock(path, data),
   }));
   const createEnvelopeMock = vi.fn(async (request: { itemId: string }) => {
     if (!request.itemId) throw new Error('item id required');
@@ -48,6 +51,8 @@ const {
     createAlertTaskMock: vi.fn(async () => 'alert_1'),
     resolveAlertTasksMock: vi.fn(async () => undefined),
     writes,
+    setMock,
+    consoleErrorMock: vi.fn(),
     DELETE_SENTINEL,
   };
 });
@@ -72,6 +77,15 @@ import { sendPendingEsignDocs } from './autoSend';
 beforeEach(() => {
   store.clear();
   writes.length = 0;
+  setMock.mockReset();
+  setMock.mockImplementation(async (path: string, data: Record<string, unknown>) => {
+    writes.push({ path, data });
+    const next = { ...(store.get(path) ?? {}), ...data };
+    Object.entries(data).forEach(([key, value]) => {
+      if (value === DELETE_SENTINEL) delete next[key];
+    });
+    store.set(path, next);
+  });
   createEnvelopeMock.mockReset();
   createEnvelopeMock.mockResolvedValue({ envelopeId: 'env_1' });
   getEsignProviderMock.mockReset();
@@ -85,6 +99,8 @@ beforeEach(() => {
   resolveAlertTasksMock.mockReset();
   resolveAlertTasksMock.mockResolvedValue(undefined);
   dispatchMock.mockClear();
+  consoleErrorMock.mockImplementation(() => undefined);
+  vi.spyOn(console, 'error').mockImplementation(consoleErrorMock);
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
   store.set('users/u1', {
@@ -98,6 +114,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('sendPendingEsignDocs', () => {
@@ -155,6 +172,46 @@ describe('sendPendingEsignDocs', () => {
     createEnvelopeMock.mockRejectedValueOnce(new Error('signwell 500'));
     const sent = await sendPendingEsignDocs('u1');
     expect(sent.length).toBe(3);
+  });
+
+  it('retries a failed persistence write once after the envelope is created', async () => {
+    for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+    setMock.mockRejectedValueOnce(new Error('temporary firestore failure'));
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual(['contract']);
+    expect(setMock).toHaveBeenCalledTimes(2);
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({
+      status: 'submitted',
+      esignEnvelopeId: 'env_1',
+    });
+  });
+
+  it('records a post-send persistence failure with the created envelope details', async () => {
+    for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+    setMock
+      .mockRejectedValueOnce(new Error('temporary firestore failure'))
+      .mockRejectedValueOnce(new Error('permanent firestore failure'));
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).toHaveBeenCalledOnce();
+    expect(setMock).toHaveBeenCalledTimes(3);
+    expect(store.get('userOnboarding/u1_contract')?.esignDispatch).toMatchObject({
+      state: 'failed',
+      attempts: 1,
+      lastError: 'Error: permanent firestore failure',
+    });
+    expect(consoleErrorMock).toHaveBeenCalledWith(
+      '[esign] envelope was created but its record failed to persist for u1/contract',
+      expect.objectContaining({ envelopeId: 'env_1', userId: 'u1', itemId: 'contract' })
+    );
   });
 
   it('records a failed dispatch while allowing the other items to send', async () => {

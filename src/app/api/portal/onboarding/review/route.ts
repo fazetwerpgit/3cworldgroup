@@ -64,10 +64,9 @@ export async function GET(request: NextRequest) {
       .get();
     const reviewableDocs = snapshot.docs.filter((doc) => !isEsignItem(doc.data().itemId));
     const esignDocs = snapshot.docs.filter((doc) => isEsignItem(doc.data().itemId));
-    const allDocs = [...reviewableDocs, ...esignDocs];
 
     // Collect unique user ids to join display names in one batch
-    const userIds = [...new Set(allDocs.map((d) => d.data().userId as string))];
+    const userIds = [...new Set(snapshot.docs.map((d) => d.data().userId as string))];
     const userMap = new Map<string, { displayName?: string; email?: string; atRisk: boolean }>();
     if (userIds.length > 0) {
       const userDocs = await adminDb.getAll(
@@ -202,14 +201,21 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
+    const isRejectedEsign = status === 'rejected' && isEsignItem(itemId);
+    const currentEnvelopeId = isRejectedEsign
+      ? (doc.get('esignEnvelopeId') as string | undefined)
+      : undefined;
     await docRef.update({
       status,
       reviewedBy: gate.uid,
       reviewerName: gate.name,
       reviewedAt: now,
       rejectionReason: status === 'rejected' ? rejectionReason.trim() : null,
-      ...(status === 'rejected' && isEsignItem(itemId)
+      ...(isRejectedEsign
         ? {
+            ...(currentEnvelopeId
+              ? { supersededEnvelopeIds: FieldValue.arrayUnion(currentEnvelopeId) }
+              : {}),
             esignEnvelopeId: FieldValue.delete(),
             esignDispatch: FieldValue.delete(),
           }

@@ -21,7 +21,10 @@ vi.mock('@/lib/firebase/admin', () => ({
   getOnboardingBucket: vi.fn(),
 }));
 vi.mock('firebase-admin/firestore', () => ({
-  FieldValue: { delete: vi.fn(() => '__FIELD_VALUE_DELETE__') },
+  FieldValue: {
+    delete: vi.fn(() => '__FIELD_VALUE_DELETE__'),
+    arrayUnion: vi.fn((value: string) => `__FIELD_VALUE_ARRAY_UNION__:${value}`),
+  },
 }));
 vi.mock('@/types', () => ({
   ONBOARDING_ITEMS: [
@@ -60,7 +63,8 @@ beforeEach(() => {
   docGetMock.mockResolvedValue({
     exists: true,
     data: () => ({ status: 'submitted' }),
-    get: () => 'Rep',
+    get: (field: string) =>
+      field === 'displayName' ? 'Rep' : field === 'esignEnvelopeId' ? 'env_current' : undefined,
   });
   docUpdateMock.mockResolvedValue(undefined);
 });
@@ -82,6 +86,7 @@ describe('POST /api/portal/onboarding/review', () => {
     expect(response.status).toBe(200);
     expect(docUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
       status: 'rejected',
+      supersededEnvelopeIds: '__FIELD_VALUE_ARRAY_UNION__:env_current',
       esignEnvelopeId: '__FIELD_VALUE_DELETE__',
       esignDispatch: '__FIELD_VALUE_DELETE__',
     }));
