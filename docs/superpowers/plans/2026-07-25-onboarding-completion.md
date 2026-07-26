@@ -802,6 +802,44 @@ git commit -m "fix(chat): keep a hire in channel membership, align rules with co
 
 **Do not deploy the rules.**
 
+- [ ] **Step 6: Give a force-activated hire their checklist link back**
+
+Carried from Task 4's re-review. Unrelated to chat — bundled here because it is three
+identical one-line edits plus one test.
+
+Task 4 changed the "My Onboarding" nav gate from a role test to
+`isOnboardingUser(user)`, which requires `status: 'pending'`. That correctly hid the link
+from graduates and from active managers. It also hid it from a shape the design
+explicitly supports: an admin using the confirm-guarded Accept override to activate a
+hire early, before their paperwork is finished. That user is `active` + `entry_level_rep`
+with an incomplete checklist and, after Task 4, no link to it anywhere in the portal —
+rail, sheet, palette and brand all omit it. Only a typed URL reaches `/portal/onboarding`.
+
+`entry_level_rep` means "has not graduated" — graduation rewrites the role to
+`entry_rep`. So an active `entry_level_rep` is by definition someone with unfinished
+onboarding, and should still be able to reach it.
+
+In all three `canAccess` functions — `PortalSidebar.tsx:123`, `MobileBottomNav.tsx:139`,
+`CommandPalette.tsx:151` — change:
+
+```ts
+    if (item.onboardingOnly && !isOnboardingUser(user)) return false;
+```
+
+to:
+
+```ts
+    if (item.onboardingOnly && !isOnboardingUser(user) && !isRole('entry_level_rep')) return false;
+```
+
+This keeps Task 4's correction intact: the graduate is `entry_rep`, and active managers
+and IBOs are untouched.
+
+Add to `src/components/portal/PortalChrome.test.tsx`: an `active` + `entry_level_rep`
+user DOES see the "My Onboarding" link. Do not touch the existing cases asserting the
+graduate (`active` + `entry_rep`) and the active `l1_manager` do NOT see it — those
+protect Task 4's fix and must keep passing.
+
 ---
 
 ### Task 6: Graduate into the invited role
