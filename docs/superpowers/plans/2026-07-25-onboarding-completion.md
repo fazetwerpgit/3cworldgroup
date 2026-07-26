@@ -309,7 +309,7 @@ Expected: PASS, all tests. If the third assertion fails, either the API does not
 Run: `npx tsc --noEmit` — expected: no errors.
 Run: `npx eslint src/lib/auth/onboardingAccess.ts src/lib/auth/onboardingAccess.test.ts` — expected: clean.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add src/lib/auth/onboardingAccess.ts src/lib/auth/onboardingAccess.test.ts
@@ -1122,14 +1122,40 @@ Pending onboarding extras are now kept too. Rewrite it to match.
 `Array.isArray(value)` branch during an abandoned `in`-query approach. Nothing passes an
 array. Delete the branch.
 
-- [ ] **Step 9: Full gates**
+- [ ] **Step 9: Tell a graduating hire the right role**
+
+Carried from Task 6's review — a loose end that Task 6's own fix created.
+
+`src/lib/onboarding/activation.ts:80` hardcodes the activation notification title
+`"Onboarding complete — you're now an Account Executive"`. That sentence was true while
+everyone activated as an entry rep. Now that a hire activates as the role they were
+invited as, it is false for seven of the eight roles: an invited L1 manager approves
+their last item, gets a bell alert calling them an Account Executive, and their profile
+reads L1 Manager.
+
+Use `RoleDisplayNames[graduatedFieldRole(fieldRole)]` for the role name in that title.
+The manual route's copy (`activate/route.ts:69`) and `activationEmail` are role-neutral
+and must stay as they are.
+
+Add a test asserting an invited `l1_manager`'s notification title names L1 Manager, not
+Account Executive.
+
+- [ ] **Step 10: Stop hand-copying the graduation mapping**
+
+`src/app/portal/admin/users/page.tsx:159` — the Accept button inlines
+`target.fieldRole === 'entry_level_rep' ? { fieldRole: 'entry_rep' } : {}`. That is
+semantically identical to `graduatedFieldRole` today, so there is no bug to fix — but it
+is a hand-copied duplicate of a mapping that now lives in one place, and it will drift
+the next time that mapping changes. Import `graduatedFieldRole` and call it.
+
+- [ ] **Step 11: Full gates**
 
 Run: `npx tsc --noEmit` — expected: no errors.
 Run: `npm test` — expected: all pass. Report the count.
 Run: `npm run build` — expected: success.
 Run: `npx eslint` on every file changed across all nine tasks — expected: clean on those files. The repo's 26 pre-existing errors elsewhere are out of scope and must not be reported as fixed or as absent.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add -A
