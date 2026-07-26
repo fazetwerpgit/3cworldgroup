@@ -8,7 +8,7 @@ import { AdminConfirmStrip } from '@/components/admin/AdminCatalogList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
+import { graduatedFieldRole, FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
 
 const FIELD_ROLE_OPTIONS = Object.values(FieldRoles) as FieldRole[];
 
@@ -341,7 +341,7 @@ export default function UsersPage() {
                     </div>
                     {confirmAcceptId === u.uid && (
                       <AdminConfirmStrip
-                        label={`Accept & activate ${name}?`}
+                        label={`Accept & activate ${name} as ${RoleDisplayNames[graduatedFieldRole(u.fieldRole!)]}. Any outstanding onboarding checklist items will be skipped.`}
                         confirming={accepting}
                         confirmingLabel="Accepting…"
                         onCancel={() => setConfirmAcceptId(null)}

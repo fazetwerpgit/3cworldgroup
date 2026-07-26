@@ -195,8 +195,13 @@ export async function PUT(
       updateData.zip = addressCheck.clean.zip ?? FieldValue.delete();
     if (status !== undefined) updateData.status = status;
     const shouldKickoffChecklist =
-      fieldRole === 'entry_level_rep' && existingFieldRole !== 'entry_level_rep';
+      roleRequiresOnboarding(fieldRole) && existingFieldRole !== fieldRole;
     const assigningRole = role !== undefined || fieldRole !== undefined;
+    // For field-role assignments this now covers exactly the three
+    // non-invitable roles (general_manager, gm_in_training, office_manager),
+    // which have no checklist and must not be left pending without an
+    // activation path. Platform-role assignments also retain their existing
+    // immediate activation behavior.
     const shouldActivateImmediately =
       assigningRole &&
       status === undefined &&

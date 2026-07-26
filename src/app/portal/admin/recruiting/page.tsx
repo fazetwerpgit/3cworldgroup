@@ -91,6 +91,12 @@ const inviteStatusTone: Record<OnboardingInviteStatus, string> = {
   converted: 'tone-lime',
 };
 
+function formatMissingItems(missing: unknown): string {
+  return Array.isArray(missing) && missing.length > 0
+    ? missing.map(String).join(', ')
+    : '';
+}
+
 export default function RecruitingCommandCenterPage() {
   const { user, hasPermission, isRole } = useAuth();
   const [invites, setInvites] = useState<InviteView[]>([]);
@@ -189,16 +195,43 @@ export default function RecruitingCommandCenterPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const convertInvite = async (inviteId: string, action: 'approved' | 'rejected') => {
+  const convertInvite = async (invite: InviteView, action: 'approved' | 'rejected') => {
     if (!user) return;
-    setProcessingId(inviteId);
+    setProcessingId(invite.id);
     setError('');
     setSuccess('');
     try {
+      if (action === 'approved') {
+        if (!invite.convertedUserId) {
+          throw new Error('This recruit has no portal account to activate.');
+        }
+        const activationResponse = await fetch('/api/portal/onboarding/activate', {
+          method: 'POST',
+          headers: await authHeaders(true),
+          body: JSON.stringify({ userId: invite.convertedUserId }),
+        });
+        const activationJson = await activationResponse.json().catch(() => ({}));
+        if (!activationResponse.ok) {
+          if (activationResponse.status === 409) {
+            const missing = formatMissingItems(activationJson.missing);
+            throw new Error(
+              missing
+                ? `Cannot activate yet. Missing: ${missing}`
+                : 'Cannot activate yet. Required onboarding items are missing.'
+            );
+          }
+          throw new Error(
+            typeof activationJson.error === 'string'
+              ? activationJson.error
+              : 'Failed to activate recruit'
+          );
+        }
+      }
+
       const response = await fetch('/api/portal/recruiting/convert', {
         method: 'POST',
         headers: await authHeaders(true),
-        body: JSON.stringify({ inviteId, action }),
+        body: JSON.stringify({ inviteId: invite.id, action }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to update recruit');
@@ -520,7 +553,7 @@ export default function RecruitingCommandCenterPage() {
                                 type="button"
                                 className="ops-line-action resolve"
                                 disabled={busy}
-                                onClick={() => convertInvite(invite.id, 'approved')}
+                                onClick={() => convertInvite(invite, 'approved')}
                               >
                                 <CheckCircle2 size={12} />
                                 Activate
@@ -549,7 +582,7 @@ export default function RecruitingCommandCenterPage() {
                               <button
                                 type="button"
                                 className="yes"
-                                onClick={() => convertInvite(invite.id, 'rejected')}
+                                onClick={() => convertInvite(invite, 'rejected')}
                                 disabled={busy}
                               >
                                 {busy ? 'Rejecting…' : 'Yes, reject'}
