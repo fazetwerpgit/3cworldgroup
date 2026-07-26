@@ -146,6 +146,12 @@ describe('Task 4 portal navigation gates', () => {
     expect(renderNavigationMarkup()).toContain('My Onboarding');
   });
 
+  it('shows My Onboarding for an active entry-level rep', () => {
+    setUser({ status: 'active', fieldRole: 'entry_level_rep' });
+
+    expect(renderNavigationMarkup()).toContain('My Onboarding');
+  });
+
   it('hides My Onboarding for an active graduated entry rep', () => {
     setUser({ status: 'active', fieldRole: 'entry_rep' });
 

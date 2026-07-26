@@ -33,7 +33,7 @@ const firestore = vi.hoisted(() => {
           where: vi.fn((field: string, _op: string, value: unknown) => ({
             get: vi.fn(async () => ({
               docs: [...users.entries()]
-                .filter(([, d]) => d[field] === value)
+                .filter(([, d]) => Array.isArray(value) ? value.includes(d[field]) : d[field] === value)
                 .map(([id, d]) => ({ id, data: (): DocData => d })),
             })),
           })),
@@ -67,7 +67,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: firestore.adminDb,
 }));
 
-import { createChannelId, syncChatChannels } from './channels';
+import { createChannelId, getMemberIdsForAudience, syncChatChannels } from './channels';
 import { canAccessChatChannel } from '@/types';
 import type { ChatChannel } from '@/types';
 
@@ -91,6 +91,17 @@ describe('createChannelId', () => {
 describe('syncChatChannels', () => {
   beforeEach(() => firestore.reset());
 
+  it('includes onboarding hires in audience membership but excludes self-signups and inactive users', async () => {
+    firestore.users.set('active-rep', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('pending-hire', { status: 'pending', fieldRole: 'entry_level_rep' });
+    firestore.users.set('pending-self-signup', { status: 'pending' });
+    firestore.users.set('inactive-rep', { status: 'inactive', fieldRole: 'entry_rep' });
+
+    const memberIds = await getMemberIdsForAudience('field');
+
+    expect(memberIds.sort()).toEqual(['active-rep', 'pending-hire']);
+  });
+
   it('unions audience-derived members with surviving extras, dropping deleted and deactivated extras', async () => {
     firestore.channelDocs.push({
       id: 'managers',
@@ -100,12 +111,14 @@ describe('syncChatChannels', () => {
         audience: 'managers',
         order: 4,
         active: true,
-        // rep-x manually added (active); deleted-y removed; inactive-z deactivated.
-        extraMemberIds: ['rep-x', 'deleted-y', 'inactive-z'],
+        // rep-x manually added (active), pending-hire manually added mid-onboarding;
+        // deleted-y removed; inactive-z deactivated.
+        extraMemberIds: ['rep-x', 'pending-hire', 'deleted-y', 'inactive-z'],
       },
     });
     firestore.users.set('mgr-1', { status: 'active', fieldRole: 'l1_manager' });
     firestore.users.set('rep-x', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('pending-hire', { status: 'pending', fieldRole: 'entry_level_rep' });
     firestore.users.set('inactive-z', { status: 'inactive', fieldRole: 'entry_rep' });
     // deleted-y intentionally absent from the users map.
 
@@ -114,8 +127,9 @@ describe('syncChatChannels', () => {
     expect(result.channelsSynced).toBe(1);
     expect(firestore.batchSets).toHaveLength(1);
     const memberIds = firestore.batchSets[0].data.memberIds as string[];
-    // Audience-derived manager kept, active manual rep kept; deleted + deactivated pruned.
-    expect([...memberIds].sort()).toEqual(['mgr-1', 'rep-x']);
+    // Audience-derived manager kept, active + onboarding manual members kept;
+    // deleted + deactivated pruned.
+    expect([...memberIds].sort()).toEqual(['mgr-1', 'pending-hire', 'rep-x']);
     // The manual-additions list itself is preserved (merge write leaves it in place).
   });
 });

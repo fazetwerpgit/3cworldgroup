@@ -24,7 +24,11 @@ service cloud.firestore {
     function isOnboardingMember() {
       return request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'pending' &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fieldRole != null;
+        // Keep this list in step with INVITABLE_FIELD_ROLES in src/types/auth.ts;
+        // the rules language cannot import TypeScript constants.
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('fieldRole', null) in
+          ['entry_level_rep', 'entry_rep', 'l1_manager', 'l2_manager',
+           'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'];
     }
 
     // A user may create ONLY their own profile, ONLY pending, ONLY these 4

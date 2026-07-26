@@ -51,6 +51,14 @@ describe('getVerifiedChatUser', () => {
     if (!res.ok) expect(res.status).toBe(403);
   });
 
+  it('rejects a pending internal manager role outside the onboarding invite list', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'Manager', email: 'm@x.com' });
+    userGet.mockResolvedValue({ data: () => ({ status: 'pending', fieldRole: 'general_manager' }) });
+    const res = await getVerifiedChatUser(req());
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(403);
+  });
+
   it('accepts a pending hire with an onboarding field role', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'New Hire', email: 'h@x.com' });
     userGet.mockResolvedValue({ data: () => ({ status: 'pending', fieldRole: 'entry_rep' }) });

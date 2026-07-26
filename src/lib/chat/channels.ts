@@ -1,6 +1,12 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
-import { CHAT_CHANNELS, canAccessChatChannel, ChatChannel, ChatChannelAudience } from '@/types';
+import {
+  CHAT_CHANNELS,
+  canAccessChatChannel,
+  ChatChannel,
+  ChatChannelAudience,
+  roleRequiresOnboarding,
+} from '@/types';
 import { resolveRoles, PlatformRole, FieldRole } from '@/types';
 
 export interface ChatChannelMembership {
@@ -86,10 +92,19 @@ export function userCanAccessChannelDoc(
   return readExtraMemberIds(data).includes(identity.uid);
 }
 
+function isEligibleChatMember(data: FirebaseFirestore.DocumentData): boolean {
+  const { fieldRole } = resolveRoles(data.role, data.fieldRole);
+  return data.status === 'active' ||
+    (data.status === 'pending' && roleRequiresOnboarding(fieldRole));
+}
+
 export async function getMemberIdsForAudience(audience: ChatChannelAudience): Promise<string[]> {
   if (!adminDb) throw new Error('Database not configured');
 
-  const usersSnap = await adminDb.collection('users').where('status', '==', 'active').get();
+  const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
+    adminDb.collection('users').where('status', '==', 'active').get(),
+    adminDb.collection('users').where('status', '==', 'pending').get(),
+  ]);
   const channel: ChatChannel = {
     id: 'membership-preview',
     name: 'Membership Preview',
@@ -99,7 +114,8 @@ export async function getMemberIdsForAudience(audience: ChatChannelAudience): Pr
     active: true,
   };
 
-  return usersSnap.docs
+  return [...activeUsersSnap.docs, ...pendingUsersSnap.docs]
+    .filter((doc) => isEligibleChatMember(doc.data()))
     .map((doc) => {
       const data = doc.data();
       const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);
@@ -135,7 +151,7 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
       const refs = extraMemberIds.map((id) => adminDb!.collection('users').doc(id));
       const extraDocs = await adminDb.getAll(...refs);
       existingExtras = extraDocs
-        .filter((d) => d.exists && d.data()?.status === 'active')
+        .filter((d) => d.exists && isEligibleChatMember(d.data() ?? {}))
         .map((d) => d.id);
     }
 

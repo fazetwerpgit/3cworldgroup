@@ -120,7 +120,7 @@ export function PortalSidebar() {
   }, [collapsed]);
 
   const canAccess = (item: PortalNavItem) => {
-    if (item.onboardingOnly && !isOnboardingUser(user)) return false;
+    if (item.onboardingOnly && !isOnboardingUser(user) && !isRole('entry_level_rep')) return false;
     if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
     if (isOnboardingUser(user) && !isOnboardingAllowedPage(item.href)) return false;
     if (!item.permissions || item.permissions.length === 0) return true;
