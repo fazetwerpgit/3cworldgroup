@@ -309,7 +309,7 @@ Expected: PASS, all tests. If the third assertion fails, either the API does not
 Run: `npx tsc --noEmit` — expected: no errors.
 Run: `npx eslint src/lib/auth/onboardingAccess.ts src/lib/auth/onboardingAccess.test.ts` — expected: clean.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/lib/auth/onboardingAccess.ts src/lib/auth/onboardingAccess.test.ts
@@ -1076,14 +1076,60 @@ same set. They are now identical, which makes the `appliesToRoles` filter on the
 vetting items a permanent no-op — harmless today, but two lists that must stay in
 lockstep with nothing enforcing it.
 
-- [ ] **Step 6: Full gates**
+- [ ] **Step 6: Finish applying the chat decision to the roster**
+
+Carried from Task 5b's review. Task 5b stopped a hire being pruned out of `memberIds`,
+but two sibling places still filter on `status === 'active'`, so the hire who can now
+post is invisible as a member:
+
+`src/app/api/portal/chat/channels/[channelId]/members/route.ts:94-97` keeps only active
+docs when building the member list, so the hire is missing from the roster and from
+`memberCount` for everyone — including themselves. Line 119, the admin "addable" picker,
+queries `status == 'active'`, so an admin cannot manually add a pending hire to a channel
+at all.
+
+Apply the same eligibility rule both places. Export the `isEligibleChatMember` helper
+from `src/lib/chat/channels.ts` and reuse it — do not write a fourth copy of the
+predicate. Add a test that a pending hire with an onboarding field role appears in the
+member list, and that a self-signup with no field role and an `inactive` user do not.
+
+- [ ] **Step 7: Hoist the user queries out of the channel sync loop**
+
+Also from Task 5b's review. `getMemberIdsForAudience` is called inside
+`syncChatChannels`'s per-channel loop, so a sync costs `channels × (|active| + |pending|)`
+document reads. Task 5b added the pending cohort to that scan, and the pending cohort is
+not self-limiting: signup is public, and commit `c2e2c43` deliberately leaves suspected
+bot accounts at `status: 'pending'`. Eight channels against five thousand accumulated
+spam accounts is forty thousand extra reads per admin "Sync" click, with a real risk of
+a function timeout.
+
+Fetch the active and pending cohorts ONCE in `syncChatChannels`, then compute every
+channel's audience from that single in-memory list. This also removes the pre-existing
+`channels × |active|` multiplier. Keep `getMemberIdsForAudience`'s current signature
+working for its other callers (`channels/manage` POST and PATCH) — add an optional
+pre-fetched-users parameter rather than changing the exported shape.
+
+Server-side filtering on `fieldRole` is not an option: `status ==` combined with
+`fieldRole in` needs a composite index.
+
+- [ ] **Step 8: Two small corrections from the same review**
+
+`src/lib/chat/channels.ts:144-147` — the comment still says extras "must resolve to an
+ACTIVE user doc" and that deactivated extras are pruned to "mirror the audience filter".
+Pending onboarding extras are now kept too. Rewrite it to match.
+
+`src/lib/chat/channels.test.ts:35` — the `where()` test double grew an
+`Array.isArray(value)` branch during an abandoned `in`-query approach. Nothing passes an
+array. Delete the branch.
+
+- [ ] **Step 9: Full gates**
 
 Run: `npx tsc --noEmit` — expected: no errors.
 Run: `npm test` — expected: all pass. Report the count.
 Run: `npm run build` — expected: success.
 Run: `npx eslint` on every file changed across all nine tasks — expected: clean on those files. The repo's 26 pre-existing errors elsewhere are out of scope and must not be reported as fixed or as absent.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add -A
