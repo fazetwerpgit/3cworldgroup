@@ -6,6 +6,7 @@ import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { appBaseUrl, itemRejectedEmail } from '@/lib/email/templates';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
+import { isEsignItem } from '@/lib/onboarding/esign';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -167,6 +168,13 @@ export async function POST(request: NextRequest) {
     if (!item) {
       return NextResponse.json(
         { error: 'Unknown onboarding item' },
+        { status: 400 }
+      );
+    }
+
+    if (status === 'approved' && isEsignItem(itemId)) {
+      return NextResponse.json(
+        { error: 'E-signature items are completed only by the e-sign provider' },
         { status: 400 }
       );
     }

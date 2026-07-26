@@ -142,10 +142,12 @@ export default function PublicOnboardingPage() {
     }
   };
 
-  const completed = data
-    ? data.items.filter((item) => references[item.id]?.trim()).length
-    : 0;
-  const total = data?.items.length ?? 0;
+  // E-signature items are dispatched by the provider and complete via its
+  // webhook, so they are not part of what the candidate fills in here and must
+  // not hold the progress bar below 100%.
+  const actionableItems = data ? data.items.filter((item) => !isEsignItem(item.id)) : [];
+  const completed = actionableItems.filter((item) => references[item.id]?.trim()).length;
+  const total = actionableItems.length;
   const roleLabel = data?.invite.intendedFieldRole
     ? RoleDisplayNames[data.invite.intendedFieldRole]
     : 'Field Representative';
@@ -440,7 +442,11 @@ export default function PublicOnboardingPage() {
                           : 'Confirm completion or add a short reference.'}
                       </p>
                     </div>
-                    {references[item.id]?.trim() ? (
+                    {isEsignItem(item.id) ? (
+                      <Badge variant="outline" className="border-slate-200 text-slate-500">
+                        By email
+                      </Badge>
+                    ) : references[item.id]?.trim() ? (
                       <Badge className="bg-[#8dc63f]/15 text-[#4f7f1e] hover:bg-[#8dc63f]/15">
                         Complete
                       </Badge>
@@ -487,12 +493,6 @@ export default function PublicOnboardingPage() {
                         E-signature
                       </Badge>
                       <p className="text-xs text-slate-500">{ESIGN_HELPER_TEXT}</p>
-                      <Textarea
-                        value={references[item.id] || ''}
-                        onChange={(event) => updateReference(item.id, event.target.value)}
-                        placeholder="E-signature confirmation"
-                        required
-                      />
                     </div>
                   ) : (
                     <Textarea

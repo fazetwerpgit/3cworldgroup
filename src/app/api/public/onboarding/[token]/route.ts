@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { hashInviteToken } from '@/lib/recruiting/tokens';
 import { getOnboardingItemsForUser, looksLikeRawSensitiveData, requiresHeavyVetting } from '@/types';
@@ -8,6 +8,7 @@ import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference'
 import { validateAddress } from '@/lib/validation/address';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { isEsignItem } from '@/lib/onboarding/esign';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -150,7 +151,9 @@ export async function POST(
 
     const heavyVetting = requiresHeavyVetting(data.intendedFieldRole);
     const items = getOnboardingItemsForUser(data.intendedFieldRole, data.isIBO ?? false);
-    const missing = items.filter((item) => !clean(references[item.id], 500));
+    const missing = items.filter(
+      (item) => !isEsignItem(item.id) && !clean(references[item.id], 500)
+    );
     if (missing.length > 0) {
       return NextResponse.json(
         { error: `Please complete every item before submitting: ${missing.map((i) => i.label).join(', ')}` },
@@ -160,7 +163,10 @@ export async function POST(
 
     // Sensitive items must carry a reference/vendor token, never raw PII.
     const rawSensitive = items.filter(
-      (item) => item.sensitive && looksLikeRawSensitiveData(clean(references[item.id], 500))
+      (item) =>
+        !isEsignItem(item.id) &&
+        item.sensitive &&
+        looksLikeRawSensitiveData(clean(references[item.id], 500))
     );
     if (rawSensitive.length > 0) {
       return NextResponse.json(
@@ -243,12 +249,16 @@ export async function POST(
       });
     }
 
-    const candidateItems = items.map((item) => ({
-      itemId: item.id,
-      label: item.label,
-      status: 'submitted',
-      reference: clean(references[item.id], 500),
-    }));
+    const candidateItems = items.map((item) =>
+      isEsignItem(item.id)
+        ? { itemId: item.id, label: item.label, status: 'not_started' as const }
+        : {
+            itemId: item.id,
+            label: item.label,
+            status: 'submitted' as const,
+            reference: clean(references[item.id], 500),
+          }
+    );
 
     batch.set(adminDb.collection('candidateOnboarding').doc(invite.id), {
       inviteId: invite.id,
@@ -265,6 +275,7 @@ export async function POST(
     });
 
     for (const candidateItem of candidateItems) {
+      if (isEsignItem(candidateItem.itemId)) continue;
       batch.set(
         adminDb.collection('userOnboarding').doc(`${userRecord.uid}_${candidateItem.itemId}`),
         {
@@ -322,8 +333,10 @@ export async function POST(
       throw commitError;
     }
 
-    void sendPendingEsignDocs(userRecord.uid).catch((err) =>
-      console.error('[onboarding] esign auto-send failed', err)
+    after(() =>
+      sendPendingEsignDocs(userRecord.uid).catch((err) =>
+        console.error('[onboarding] esign auto-send failed', err)
+      )
     );
 
     await adminDb.collection('notifications').add({

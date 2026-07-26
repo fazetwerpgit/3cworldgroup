@@ -17,7 +17,7 @@ export interface WizardItem extends OnboardingItem {
   reviewerName: string | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
-  esignDispatch?: { state?: string; attempts?: number; lastError?: string } | null;
+  esignDispatch?: { state?: string; attempts?: number } | null;
 }
 
 interface Props {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import {
   getOnboardingItemsForUser,
@@ -50,9 +50,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: [], fieldRole: null, isIBO: false });
     }
 
-    // Retry delivery in the background. sendPendingEsignDocs is failure-contained
+    // Retry delivery after the response. sendPendingEsignDocs is failure-contained
     // and throttled, so a provider outage cannot delay or fail this checklist read.
-    void sendPendingEsignDocs(userId);
+    if (userData?.status !== 'active') {
+      after(() =>
+        sendPendingEsignDocs(userId).catch((error) => {
+          console.error('[onboarding] esign auto-send failed', error);
+        })
+      );
+    }
 
     const isIBO = userData?.isIBO ?? false;
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO);
@@ -73,7 +79,12 @@ export async function GET(request: NextRequest) {
         reviewerName: progress?.reviewerName ?? null,
         submittedAt: progress?.submittedAt?.toDate() ?? null,
         reviewedAt: progress?.reviewedAt?.toDate() ?? null,
-        esignDispatch: progress?.esignDispatch ?? null,
+        esignDispatch: progress?.esignDispatch
+          ? {
+              state: progress.esignDispatch.state,
+              attempts: progress.esignDispatch.attempts,
+            }
+          : null,
       };
     });
 

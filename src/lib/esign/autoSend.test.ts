@@ -201,6 +201,21 @@ describe('sendPendingEsignDocs', () => {
     expect(createEnvelopeMock.mock.calls.some(([request]) => request.itemId === 'contract')).toBe(false);
   });
 
+  it('throttles a Firestore Timestamp-shaped last attempt', async () => {
+    store.set('userOnboarding/u1_contract', {
+      status: 'not_started',
+      esignDispatch: {
+        state: 'failed',
+        attempts: 1,
+        lastAttemptAt: { toDate: () => new Date(Date.now() - 1 * 60 * 1000) },
+      },
+    });
+
+    await sendPendingEsignDocs('u1');
+
+    expect(createEnvelopeMock.mock.calls.some(([request]) => request.itemId === 'contract')).toBe(false);
+  });
+
   it('retries an item whose last attempt was more than five minutes ago', async () => {
     store.set('userOnboarding/u1_contract', {
       status: 'not_started',
