@@ -43,22 +43,26 @@ export const ONBOARDING_ALLOWED_APIS = [
 // Listed prefixes that must NOT match, even though a listed prefix covers them.
 // `/api/portal/chat/channels` legitimately covers `/…/channels/{id}/members`,
 // so the administrative sub-routes are subtracted explicitly.
-const DENIED_API_PATHS: readonly string[] = [
+export const DENIED_API_PATHS: readonly string[] = [
   '/api/portal/chat/channels/manage',
   '/api/portal/chat/channels/sync',
 ];
 
 // Denied when the path matches this shape: /api/portal/chat/channels/<id>/members/manage
-const DENIED_API_PATTERNS: readonly RegExp[] = [
+export const DENIED_API_PATTERNS: readonly RegExp[] = [
   /^\/api\/portal\/chat\/channels\/[^/]+\/members\/manage(?:\/|$)/,
 ];
 
 const INVALID_PATH = '\u0000';
 
 function normalize(pathname: unknown): string {
-  if (typeof pathname !== 'string' || pathname.includes('%')) return INVALID_PATH;
+  if (typeof pathname !== 'string') return INVALID_PATH;
 
   const withoutQueryOrFragment = pathname.split(/[?#]/, 1)[0];
+  if (withoutQueryOrFragment.includes('%') || withoutQueryOrFragment.includes('\\')) {
+    return INVALID_PATH;
+  }
+
   const collapsed = withoutQueryOrFragment.replace(/\/{2,}/g, '/');
   const segments = collapsed.split('/');
   if (segments.some((segment) => segment === '.' || segment === '..')) return INVALID_PATH;
@@ -76,18 +80,21 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 
 export function isOnboardingAllowedPage(pathname: unknown): boolean {
   const path = normalize(pathname);
+  if (path === INVALID_PATH) return false;
   return ONBOARDING_ALLOWED_PAGES.some((prefix) => matchesPrefix(path, prefix));
 }
 
 export function isOnboardingAllowedApi(pathname: unknown): boolean {
   const path = normalize(pathname);
+  if (path === INVALID_PATH) return false;
   if (DENIED_API_PATHS.some((denied) => matchesPrefix(path, denied))) return false;
   if (DENIED_API_PATTERNS.some((pattern) => pattern.test(path))) return false;
   return ONBOARDING_ALLOWED_APIS.some((prefix) => matchesPrefix(path, prefix));
 }
 
-// The one definition of "still onboarding", shared by client guard and server
-// gate so the two can never disagree about who it applies to.
+// The one definition of "a hire who is mid-onboarding", shared by the client
+// guard and navigation filter. The internal roles general_manager,
+// gm_in_training, and office_manager are intentionally outside it.
 export function isOnboardingUser(
   user: { status?: string | null; fieldRole?: FieldRole | null } | null | undefined
 ): boolean {

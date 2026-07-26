@@ -3,6 +3,8 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  DENIED_API_PATHS,
+  DENIED_API_PATTERNS,
   ONBOARDING_ALLOWED_APIS,
   ONBOARDING_ALLOWED_PAGES,
   isOnboardingAllowedApi,
@@ -82,6 +84,12 @@ describe('isOnboardingAllowedApi', () => {
   it('normalizes query strings, fragments, repeated slashes, and case', () => {
     expect(isOnboardingAllowedApi('/API//PORTAL//TRAINING////?view=all#progress')).toBe(true);
     expect(isOnboardingAllowedApi('/api/portal/training#progress?view=all')).toBe(true);
+    expect(isOnboardingAllowedApi('/api/portal/chat/gifs?q=hi%20there')).toBe(true);
+  });
+
+  it('rejects encoded path segments while ignoring encoded query values', () => {
+    expect(isOnboardingAllowedApi('/api/portal/chat/g%69fs?q=hi%20there')).toBe(false);
+    expect(isOnboardingAllowedApi('/api/portal/chat/\\..\\..\\admin')).toBe(false);
   });
 
   it('fails closed for non-string, empty, and relative pathnames', () => {
@@ -133,6 +141,26 @@ describe('isOnboardingAllowedApi', () => {
   it('blocks admin apis', () => {
     expect(isOnboardingAllowedApi('/api/portal/auth/users')).toBe(false);
     expect(isOnboardingAllowedApi('/api/portal/forms')).toBe(false);
+  });
+});
+
+describe('onboarding path-list invariants', () => {
+  it('keeps every path entry lowercase because normalize lowercases its input', () => {
+    for (const entry of [...ONBOARDING_ALLOWED_PAGES, ...ONBOARDING_ALLOWED_APIS, ...DENIED_API_PATHS]) {
+      expect(
+        entry,
+        `${entry} must be lowercase; a capital letter would make the entry unmatchable because normalize lowercases its input`
+      ).toBe(entry.toLowerCase());
+    }
+  });
+
+  it('keeps denied regex sources free of uppercase ASCII letters because normalize lowercases its input', () => {
+    for (const pattern of DENIED_API_PATTERNS) {
+      expect(
+        pattern.source,
+        `${pattern} must contain no uppercase ASCII letters; a capital letter would make the entry unmatchable because normalize lowercases its input`
+      ).not.toMatch(/[A-Z]/);
+    }
   });
 });
 
@@ -239,18 +267,49 @@ const ALLOWED_SUBPATHS = [
 const API_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../app/api');
 const PORTAL_API_ROOT = resolve(API_ROOT, 'portal');
 
+function mapRouteSegment(segment: string): string | null {
+  if (/^\([^/]+\)$/.test(segment)) return null;
+  if (/^\[[^/]+\]$/.test(segment)) return 'x';
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(segment)) return segment;
+  throw new Error(`Unrecognized API route segment: ${segment}`);
+}
+
+function deriveApiRoutePath(routeDirectory: string[]): string {
+  const concreteSegments = routeDirectory.map(mapRouteSegment).filter((segment) => segment !== null);
+  return `/${['api', ...concreteSegments].join('/')}`;
+}
+
+function isApiRouteFile(filename: string): boolean {
+  return filename === 'route.ts' || filename === 'route.tsx' || filename === 'route.js';
+}
+
 function discoverApiRoutePaths(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory()) return discoverApiRoutePaths(resolve(directory, entry.name));
-    if (!entry.isFile() || entry.name !== 'route.ts') return [];
+    if (!entry.isFile() || !isApiRouteFile(entry.name)) return [];
 
     const routeDirectory = relative(API_ROOT, directory).split(sep).filter(Boolean);
-    const concreteSegments = routeDirectory.map((segment) =>
-      /^\[[^/]+\]$/.test(segment) ? 'x' : segment
-    );
-    return [`/${['api', ...concreteSegments].join('/')}`];
+    return [deriveApiRoutePath(routeDirectory)];
   });
 }
+
+describe('API route path mapping', () => {
+  it('drops route groups and collapses dynamic and catch-all segments', () => {
+    expect(deriveApiRoutePath(['portal', '(main)', 'chat', '[channelId]', '[...slug]', '[[...rest]]']))
+      .toBe('/api/portal/chat/x/x/x');
+  });
+
+  it('throws instead of passing through an unrecognized segment shape', () => {
+    expect(() => deriveApiRoutePath(['portal', '@slot'])).toThrow(
+      'Unrecognized API route segment: @slot'
+    );
+  });
+
+  it('recognizes all supported route file extensions', () => {
+    expect(['route.ts', 'route.tsx', 'route.js'].every(isApiRouteFile)).toBe(true);
+    expect(isApiRouteFile('route.test.ts')).toBe(false);
+  });
+});
 
 describe('API route tree classification', () => {
   it('classifies every route that an allowed prefix would reach', () => {

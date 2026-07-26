@@ -498,6 +498,8 @@ In `src/app/api/portal/leaderboard/route.ts` the comment above the gate (lines ~
 
 Do not touch the `requireVerifiedManagement` call in `notifications/route.ts` (~line 126).
 
+**Also update four stale comments.** `src/lib/auth/onboardingAccess.test.ts` has an `ALLOWED_SUBPATHS` array whose entries carry a justification comment naming each route's own auth gate. Four of them cite `{ allowOnboarding: true }`, which this task deletes — leaving them both factually wrong and circular ("allowed because the route opts into onboarding", when the route's opt-in now *is* this allowlist). The affected entries are `onboarding/submit`, `onboarding/upload`, `training/[id]` and `training/progress`. Rewrite each to cite the surviving, non-circular justification: the self-or-management / requester identity check that scopes the route to the caller's own record. The `onboarding/review` and `onboarding/activate` comments stay as they are — `requireVerifiedManagement` re-checks role independently of status, so relaxing status never opens them to a hire.
+
 - [ ] **Step 3: Update the helper's tests**
 
 `src/lib/auth/requireVerifiedAdmin.test.ts` has 41 tests, several of which pass `{ allowOnboarding: true }`. Those now drive the behaviour through the request pathname instead. For each such test, build the mock `NextRequest` with a `nextUrl.pathname` that is on the allowlist (e.g. `/api/portal/training`) to exercise the admitted case, and one that is not (e.g. `/api/portal/sales`) to exercise the refused case.
