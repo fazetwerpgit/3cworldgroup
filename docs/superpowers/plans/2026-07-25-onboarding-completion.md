@@ -669,10 +669,22 @@ git commit -m "feat(portal): confine unfinished hires to onboarding plus the wel
 
 ---
 
-### Task 5: Firestore rules admit a hire to chat
+### Task 5: Let a hire into chat
 
 **Files:**
+- Modify: `src/lib/chat/access.ts` (around line 34)
 - Modify: `firestore.rules`
+- Test: `src/lib/chat/access.test.ts` (create if absent)
+
+- [ ] **Step 0: Fix the server-side chat gate first — without this the rest is pointless**
+
+`src/lib/chat/access.ts:34` runs its own `if (data.status !== 'active') return 403` after the shared auth helper. It is described in its own comment as "the single gate for every chat route". So even though Task 3 allowlisted `/api/portal/chat/*`, every chat route still refuses a hire mid-onboarding, and widening `firestore.rules` alone would change nothing.
+
+Widen it to the same rule the rest of the system uses: admit `active`, and admit `pending` when the user holds a field role that requires onboarding. Keep refusing `inactive` and refusing a pending self-signup with no field role — the comment's original purpose (a deactivated user must never be re-added to a channel's `memberIds`) stays fully intact.
+
+Use `isOnboardingUser` from `src/lib/auth/onboardingAccess.ts` rather than writing a fourth copy of this predicate.
+
+Add tests: an active user passes; a pending hire with an onboarding field role passes; a pending self-signup with no field role gets 403; an `inactive` user with a retained role gets 403.
 
 **Context:** `isApproved()` requires `status == 'active'`, which is why a pending hire cannot use chat today. **This file is committed but NOT deployed** — deploying is the client's decision later.
 

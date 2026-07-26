@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
+import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
+import { roleRequiresOnboarding } from '@/types/auth';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
 import {
@@ -135,10 +137,16 @@ export function MobileBottomNav({
   }, [close, isOpen]);
 
   const canAccess = (item: PortalNavItem) => {
+    if (item.onboardingOnly && !roleRequiresOnboarding(user?.fieldRole)) return false;
     if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
+    if (isOnboardingUser(user) && !isOnboardingAllowedPage(item.href)) return false;
     if (!item.permissions || item.permissions.length === 0) return true;
     return item.permissions.some((permission) => hasPermission(permission));
   };
+
+  const visibleMobileSlotItems = isOnboardingUser(user)
+    ? mobileSlotItems.filter((item) => canAccess(item))
+    : mobileSlotItems;
 
   const visibleGroups = portalNavGroups.filter(
     (group) => (!group.roles || isRole(...group.roles)) && group.items.some(canAccess)
@@ -148,7 +156,7 @@ export function MobileBottomNav({
     <>
       <nav className="portal-mobile-nav" aria-label="Quick navigation" data-slot="mobile-bottom-nav">
         <ul>
-          {mobileSlotItems.map((item) => {
+          {visibleMobileSlotItems.map((item) => {
             if (!canAccess(item)) {
               return <li key={item.href} aria-hidden="true" />;
             }

@@ -26,6 +26,7 @@ import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
 import { getAuthorColor, getInitials, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { auth } from '@/lib/firebase/config';
+import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
 
 function getLocalDayKey(createdAt: Date | null) {
@@ -108,6 +109,7 @@ function DesktopAttachment({ message, onOpen }: { message: ThreadMessage; onOpen
 
 export default function TeamChatPage() {
   const { user, hasPermission, isRole } = useAuth();
+  const onboardingUser = isOnboardingUser(user);
   const [activeChannelId, setActiveChannelId] = useState('');
   // Channel-info Sheet (shared by desktop header title + mobile thread top bar).
   const [infoOpen, setInfoOpen] = useState(false);
@@ -429,7 +431,7 @@ export default function TeamChatPage() {
     // Wait for the signed-in user: on first mount auth?.currentUser is still
     // null, so an immediate fetch would carry an empty Bearer token and 401,
     // and (fetching only once) the tape would never appear.
-    if (!user) return;
+    if (!user || onboardingUser) return;
     let cancelled = false;
     authedFetch('/api/portal/sales/company-stats')
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error('company-stats fetch failed'))))
@@ -442,7 +444,7 @@ export default function TeamChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [authedFetch, user]);
+  }, [authedFetch, onboardingUser, user]);
 
   // "COMPANY LINE · N SALES THIS MONTH · $X/MO ON THE BOARD · LAST: REPNAME" —
   // uppercase, dot-separated (mockup: design-mockups/chat-ticker-round1/
@@ -1063,7 +1065,7 @@ export default function TeamChatPage() {
                     </div>
                     <div className="chat-line-head-meta"><span className="chat-line-live">LIVE</span><span>{activeChannel ? `${memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0} members` : '— members'}</span></div>
                   </header>
-                  {activeChannel?.id === 'all-company' && companyTapeText && (
+                  {!onboardingUser && activeChannel?.id === 'all-company' && companyTapeText && (
                     <div className="chat-line-tape" role="status" aria-label="Company sales line">
                       <div className="chat-line-tape-track">
                         <div className="chat-line-tape-seg"><span>{companyTapeText}</span></div>

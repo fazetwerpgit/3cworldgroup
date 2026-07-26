@@ -30,7 +30,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { Sale, UserRole } from '@/types';
+import { roleRequiresOnboarding } from '@/types/auth';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -43,6 +45,7 @@ export interface PortalNavItem {
   icon: LucideIcon;
   permissions?: string[];
   roles?: UserRole[];
+  onboardingOnly?: boolean;
 }
 
 export interface PortalNavGroup {
@@ -84,7 +87,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Team Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
       { label: 'Calls Schedule', href: '/portal/calls', icon: CalendarClock },
       { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
-      { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, roles: ['entry_level_rep'] },
+      { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, onboardingOnly: true },
     ],
   },
   {
@@ -147,6 +150,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
   const openRef = useRef(open);
+  const onboardingUser = isOnboardingUser(user);
 
   useEffect(() => {
     openRef.current = open;
@@ -155,11 +159,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Same gate PortalSidebar uses: role restriction wins, then permissions.
   const canAccess = useCallback(
     (item: PortalNavItem) => {
+      if (item.onboardingOnly && !roleRequiresOnboarding(user?.fieldRole)) return false;
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
+      if (onboardingUser && !isOnboardingAllowedPage(item.href)) return false;
       if (!item.permissions || item.permissions.length === 0) return true;
       return item.permissions.some((p) => hasPermission(p));
     },
-    [isRole, hasPermission]
+    [isRole, hasPermission, onboardingUser, user?.fieldRole]
   );
 
   const pageDestinations = useMemo(() => {
@@ -170,8 +176,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }, [canAccess, isRole]);
 
   const actions = useMemo(
-    () => actionDestinations.filter((a) => !a.permission || hasPermission(a.permission)),
-    [hasPermission]
+    () => actionDestinations.filter(
+      (a) => (!onboardingUser || isOnboardingAllowedPage(a.href)) && (!a.permission || hasPermission(a.permission))
+    ),
+    [hasPermission, onboardingUser]
   );
 
   // Global Ctrl+K / ⌘K toggle — lives here so it works on every portal page.
@@ -203,7 +211,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Fetch the sales list once, on first open, only when the user can read sales.
   // Mirrors useSales' fetchSales pattern (GET /api/portal/sales, read data.sales).
   useEffect(() => {
-    if (!open || salesFetched.current || !hasPermission('sales:read')) return;
+    if (!open || salesFetched.current || onboardingUser || !hasPermission('sales:read')) return;
     salesFetched.current = true;
     let cancelled = false;
     (async () => {
@@ -227,7 +235,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     return () => {
       cancelled = true;
     };
-  }, [open, hasPermission, user]);
+  }, [open, hasPermission, onboardingUser, user]);
 
   const q = query.trim().toLowerCase();
 
@@ -254,7 +262,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
     // Sales only surface with a real query (≥ 2 chars), matched on the
     // customer fields, capped at ~50 rows.
-    if (hasPermission('sales:read') && q.length >= 2) {
+    if (!onboardingUser && hasPermission('sales:read') && q.length >= 2) {
       const saleRows = sales
         .filter((s) => {
           const haystack = [s.customerName, s.customerAddress, s.customerPhone]
@@ -273,7 +281,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
 
     return result;
-  }, [pageDestinations, actions, sales, q, hasPermission]);
+  }, [pageDestinations, actions, sales, q, hasPermission, onboardingUser]);
 
   const flat = useMemo(() => sections.flatMap((s) => s.rows), [sections]);
 

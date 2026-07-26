@@ -2,6 +2,7 @@ import { Archivo } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import OnboardingGate from '@/components/portal/OnboardingGate';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 
 // Display face for portal brand moments (login, KPI headers) — exposed as
@@ -30,7 +31,9 @@ export default function PortalLayout({
           <ServiceWorkerRegistrar />
           {/* .portal-scope gates the portal reskin tokens/overrides in
               globals.css; display:contents keeps it out of the layout. */}
-          <div className={`portal-scope contents ${archivo.variable}`}>{children}</div>
+          <div className={`portal-scope contents ${archivo.variable}`}>
+            <OnboardingGate>{children}</OnboardingGate>
+          </div>
         </MobileMenuProvider>
       </AuthProvider>
     </ThemeProvider>

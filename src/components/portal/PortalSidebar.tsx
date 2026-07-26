@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeftToLine, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
+import { roleRequiresOnboarding } from '@/types/auth';
 import { MobileBottomNav } from '@/components/portal/MobileBottomNav';
 import {
   portalNavGroups,
@@ -100,7 +102,7 @@ function NavGroups({
 
 export function PortalSidebar() {
   const pathname = usePathname();
-  const { hasPermission, isRole } = useAuth();
+  const { hasPermission, isRole, user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -119,7 +121,9 @@ export function PortalSidebar() {
   }, [collapsed]);
 
   const canAccess = (item: PortalNavItem) => {
+    if (item.onboardingOnly && !roleRequiresOnboarding(user?.fieldRole)) return false;
     if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
+    if (isOnboardingUser(user) && !isOnboardingAllowedPage(item.href)) return false;
     if (!item.permissions || item.permissions.length === 0) return true;
     return item.permissions.some((permission) => hasPermission(permission));
   };

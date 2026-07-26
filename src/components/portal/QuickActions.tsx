@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowRight, BarChart3, CheckCircle2, GraduationCap, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 
 interface QuickAction {
   title: string;
@@ -45,9 +46,11 @@ const actions: QuickAction[] = [
 ];
 
 export function QuickActions() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const onboardingUser = isOnboardingUser(user);
 
   const visibleActions = actions.filter((action) => {
+    if (onboardingUser && !isOnboardingAllowedPage(action.href)) return false;
     if (!action.permissions || action.permissions.length === 0) return true;
     return action.permissions.some((p) => hasPermission(p));
   });
