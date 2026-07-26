@@ -6,7 +6,7 @@ import { activationEmail } from '@/lib/email/templates';
 import { adminDb } from '@/lib/firebase/admin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { getActivationReadiness } from '@/lib/onboarding/activation';
-import { roleRequiresOnboarding } from '@/types/auth';
+import { graduatedFieldRole, roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,11 +48,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, alreadyActive: true });
     }
 
+    const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
     const now = new Date();
     await userRef.update({
       status: 'active',
-      ...(roleRequiresOnboarding(userSnap.get('fieldRole'))
-        ? { fieldRole: 'entry_rep' }
+      ...(fieldRole && roleRequiresOnboarding(fieldRole)
+        ? { fieldRole: graduatedFieldRole(fieldRole) }
         : {}),
       hireDate: now,
       atRisk: FieldValue.delete(),

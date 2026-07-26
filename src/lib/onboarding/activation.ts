@@ -6,7 +6,7 @@ import {
   type OnboardingItem,
   type OnboardingStatus,
 } from '@/types/onboarding';
-import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
+import { graduatedFieldRole, roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 
 export interface ActivationReadiness {
   ready: boolean;
@@ -59,14 +59,14 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   if (!userSnap.exists || userSnap.get('status') !== 'pending') return;
 
   const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
-  if (!roleRequiresOnboarding(fieldRole)) return;
+  if (!fieldRole || !roleRequiresOnboarding(fieldRole)) return;
 
   const { ready } = await getActivationReadiness(userId);
   if (!ready) return;
 
   const now = new Date();
   await userRef.update({
-    fieldRole: 'entry_rep',
+    fieldRole: graduatedFieldRole(fieldRole),
     status: 'active',
     hireDate: now,
     atRisk: null,
