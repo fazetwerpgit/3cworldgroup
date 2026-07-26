@@ -16,6 +16,17 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
     }
 
+    // A hire who has been invited and holds a field role, but has not finished
+    // onboarding. Deliberately narrower than isApproved(): an unapproved
+    // self-signup has no fieldRole and a decommissioned account is 'inactive',
+    // so neither matches. Used ONLY for chat — the client chose to let a new
+    // hire talk to their team from day one.
+    function isOnboardingMember() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'pending' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fieldRole != null;
+    }
+
     // A user may create ONLY their own profile, ONLY pending, ONLY these 4
     // fields. No client update/delete — approval + edits go through the Admin
     // SDK. Self-read is allowed at any status so the pending screen can load.
@@ -41,10 +52,10 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'operations'];
     }
 
-    // Per-user chat read receipts (client-written). Approved users only.
+    // Per-user chat read receipts (client-written). Chat members only.
     match /users/{userId}/chatReads/{channelId} {
-      allow read: if isApproved() && request.auth.uid == userId;
-      allow write: if isApproved() && request.auth.uid == userId &&
+      allow read: if (isApproved() || isOnboardingMember()) && request.auth.uid == userId;
+      allow write: if (isApproved() || isOnboardingMember()) && request.auth.uid == userId &&
         request.resource.data.keys().hasOnly(['lastReadAt']) &&
         request.resource.data.lastReadAt is timestamp;
     }
@@ -146,18 +157,18 @@ service cloud.firestore {
     }
 
     match /chatChannels/{channelId} {
-      allow read: if isApproved() && request.auth.uid in resource.data.memberIds;
+      allow read: if (isApproved() || isOnboardingMember()) && request.auth.uid in resource.data.memberIds;
       allow write: if false;
     }
 
     match /chatChannels/{channelId}/messages/{messageId} {
-      allow read: if isApproved() &&
+      allow read: if (isApproved() || isOnboardingMember()) &&
         request.auth.uid in get(/databases/$(database)/documents/chatChannels/$(channelId)).data.memberIds;
       allow write: if false;
     }
 
     match /chatChannels/{channelId}/messages/{messageId}/reactions/{reactionId} {
-      allow read: if isApproved() &&
+      allow read: if (isApproved() || isOnboardingMember()) &&
         request.auth.uid in get(/databases/$(database)/documents/chatChannels/$(channelId)).data.memberIds;
       allow write: if false;
     }

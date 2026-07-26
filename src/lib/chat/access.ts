@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { getEffectiveRole, resolveRoles, PlatformRole, FieldRole } from '@/types';
 
 // The verified chat identity. Everything is derived from a real Firebase ID token
@@ -29,10 +30,10 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
   const snap = await adminDb.collection('users').doc(gate.uid).get();
   const data = snap.data() ?? {};
 
-  // Deactivated users have no chat access — even with a still-valid token and a
-  // retained role. This is the single gate for every chat route, so it also prevents
-  // an inactive user from being re-added to a channel's memberIds.
-  if (data.status !== 'active') {
+  // This is the single status gate for every chat route: active users and hires
+  // mid-onboarding may chat, while inactive users cannot be re-added to a
+  // channel's memberIds, even if they retain a role and valid token.
+  if (data.status !== 'active' && !isOnboardingUser(data)) {
     return { ok: false, error: 'Account is not active', status: 403 };
   }
 

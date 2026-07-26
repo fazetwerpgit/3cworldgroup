@@ -43,11 +43,23 @@ describe('getVerifiedChatUser', () => {
     if (!res.ok) expect(res.status).toBe(403);
   });
 
-  it('rejects a pending user', async () => {
+  it('rejects a pending self-signup with no field role', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'Pending', email: 'p@x.com' });
-    userGet.mockResolvedValue({ data: () => ({ status: 'pending', fieldRole: 'entry_rep' }) });
+    userGet.mockResolvedValue({ data: () => ({ status: 'pending' }) });
     const res = await getVerifiedChatUser(req());
     expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(403);
+  });
+
+  it('accepts a pending hire with an onboarding field role', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'New Hire', email: 'h@x.com' });
+    userGet.mockResolvedValue({ data: () => ({ status: 'pending', fieldRole: 'entry_rep' }) });
+    const res = await getVerifiedChatUser(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.user.uid).toBe('u1');
+      expect(res.user.fieldRole).toBe('entry_rep');
+    }
   });
 
   it('accepts an active user and resolves their role', async () => {
