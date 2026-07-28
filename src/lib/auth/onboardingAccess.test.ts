@@ -249,8 +249,8 @@ const ALLOWED_SUBPATHS = [
   // onboarding/submit uses requireVerifiedSelfOrManagement to keep the target
   // onboarding record scoped to the caller; management may act on behalf.
   '/api/portal/onboarding/submit',
-  // onboarding/upload uses requireVerifiedSelfOrManagement to keep the target
-  // storage folder scoped to the caller; management may act on behalf.
+  // onboarding/upload derives identity from the verified token and rejects a
+  // mismatched body userId with 400.
   '/api/portal/onboarding/upload',
   // onboarding/review has requireVerifiedManagement on GET and POST.
   '/api/portal/onboarding/review',

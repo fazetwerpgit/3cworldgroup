@@ -185,7 +185,7 @@ describe('computeReadiness', () => {
       expect.objectContaining({
         userId: 'ready-rep',
         type: 'rep_activated',
-        title: "Onboarding complete — you're now an Account Executive",
+        title: 'Onboarding complete — your new role: Account Executive',
       })
     );
   });
@@ -204,7 +204,7 @@ describe('computeReadiness', () => {
     expect(dispatchMock).toHaveBeenCalledWith(
       expect.objectContaining({
         userId,
-        title: "Onboarding complete — you're now a L1 Manager",
+        title: 'Onboarding complete — your new role: L1 Manager',
       })
     );
     expect(dispatchMock).not.toHaveBeenCalledWith(

@@ -204,3 +204,56 @@ src/types/onboarding.ts
   pending-hire chat access is unverified. No pending-hire browser account was
   available; redirect behavior remains unit-test covered. No browser/dev-server
   check was run.
+
+## Fix round 1
+
+### Finding 1 — activation role copy
+
+Removed the article heuristic from `maybeFlagActivationReady` and changed the
+activation title to `Onboarding complete — your new role: ${roleName}`. Updated
+the Account Executive and L1 Manager assertions. `activateUser`'s role-neutral
+Welcome aboard dispatch was unchanged.
+
+Bite-proof: temporarily changed the implementation back to the old article
+copy (`you're now a ...`); `npx vitest run src/lib/onboarding/activation.test.ts`
+failed 2 tests (Account Executive and L1 Manager). Restored the implementation;
+the covering suite passed.
+
+### Finding 2 — mismatched upload userId
+
+The upload route now rejects a present body `userId` that differs from the
+verified token UID with HTTP 400 before validation, storage, or persistence.
+Same-UID and absent values remain allowed. Added the side-effect assertions and
+updated the onboarding access comment.
+
+Bite-proof: temporarily removed the mismatch guard;
+`npx vitest run src/app/api/portal/onboarding/upload/route.test.ts -t "mismatched body userId"`
+failed with 500 instead of the expected 400 after reaching the unconfigured
+validation mock. Restored the guard; the covering suite passed.
+
+### Finding 3 — validateUpload arguments
+
+The happy-path upload test now asserts `validateUpload` receives itemId `w9`,
+slot `null`, MIME `image/jpeg`, and size `5`.
+
+Bite-proof: temporarily changed the route to pass `file.size + 1`;
+`npx vitest run src/app/api/portal/onboarding/upload/route.test.ts -t "uses the verified UID"`
+failed on the expected size mismatch. Restored the route; the covering suite
+passed.
+
+### Finding 4 — non-Vercel production SignWell guard
+
+Added coverage for unset `VERCEL_ENV`, `NODE_ENV=production`, and
+`SIGNWELL_TEST_MODE=true`, asserting the error names `SIGNWELL_TEST_MODE` and
+that `fetch` is not called.
+
+Bite-proof: temporarily removed the non-Vercel production condition;
+`npx vitest run src/lib/esign/signwell.test.ts -t "non-Vercel production"`
+failed because the promise resolved instead of rejecting. Restored the guard;
+the covering suite passed.
+
+### Commands and results
+
+- `npx vitest run src/lib/onboarding/activation.test.ts src/app/api/portal/onboarding/upload/route.test.ts src/lib/esign/signwell.test.ts src/lib/auth/onboardingAccess.test.ts` — passed, 4 files / 68 tests.
+- `npx tsc --noEmit` — passed.
+- `npm test` — passed, 67 files / 550 tests.

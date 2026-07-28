@@ -115,11 +115,10 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   await resolveAlertTasks(userId);
 
   const graduatedRoleName = RoleDisplayNames[graduatedFieldRole(fieldRole)];
-  const article = /^[AEIOU]/.test(graduatedRoleName) ? 'an' : 'a';
   await dispatchToUser({
     userId,
     type: 'rep_activated',
-    title: `Onboarding complete — you're now ${article} ${graduatedRoleName}`,
+    title: `Onboarding complete — your new role: ${graduatedRoleName}`,
     message: 'Your onboarding is complete and your account is active.',
     link: '/portal',
   });

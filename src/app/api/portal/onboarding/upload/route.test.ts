@@ -53,14 +53,32 @@ describe('POST /api/portal/onboarding/upload', () => {
     validateUploadMock.mockReturnValue({ ok: true, fileBase: 'photo', ext: 'jpg' });
     buildFolderPathMock.mockReturnValue('onboarding/users/verified-user/w9/');
 
-    const response = await POST(requestWithForm({ userId: 'attacker', itemId: 'w9' }));
+    const response = await POST(requestWithForm({ userId: 'verified-user', itemId: 'w9' }));
 
     expect(response.status).toBe(200);
+    expect(validateUploadMock).toHaveBeenCalledWith({
+      itemId: 'w9',
+      slot: null,
+      mime: 'image/jpeg',
+      size: 5,
+    });
     expect(buildFolderPathMock).toHaveBeenCalledWith(
       { kind: 'user', userId: 'verified-user' },
       'w9'
     );
     expect(bucketMock.file).toHaveBeenCalledWith('onboarding/users/verified-user/w9/photo.jpg');
     expect(saveMock).toHaveBeenCalled();
+  });
+
+  it('rejects a mismatched body userId without upload or persistence side effects', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
+
+    const response = await POST(requestWithForm({ userId: 'someone-else', itemId: 'w9' }));
+
+    expect(response.status).toBe(400);
+    expect(validateUploadMock).not.toHaveBeenCalled();
+    expect(buildFolderPathMock).not.toHaveBeenCalled();
+    expect(bucketMock.file).not.toHaveBeenCalled();
+    expect(saveMock).not.toHaveBeenCalled();
   });
 });

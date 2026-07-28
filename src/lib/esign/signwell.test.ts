@@ -85,6 +85,19 @@ describe('signwellProvider.createEnvelope', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('throws when test mode is requested in non-Vercel production', async () => {
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await expect(
+      signwellProvider.createEnvelope({
+        docKey: 'contract', userId: 'u1', itemId: 'contract',
+        signerName: 'S', signerEmail: 's@x.com',
+      })
+    ).rejects.toThrow(/SIGNWELL_TEST_MODE/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('passes in development when test mode is requested', async () => {
     vi.stubEnv('VERCEL_ENV', 'development');
 

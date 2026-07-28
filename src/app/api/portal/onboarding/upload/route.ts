@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
     const userId = gate.uid;
 
     const form = await request.formData();
+    const bodyUserId = form.get('userId');
+    if (bodyUserId !== null && String(bodyUserId) !== userId) {
+      return NextResponse.json({ error: 'userId does not match the verified user' }, { status: 400 });
+    }
     const itemId = String(form.get('itemId') ?? '');
     const slot = form.get('slot') ? String(form.get('slot')) : null;
     const file = form.get('file');
