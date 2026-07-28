@@ -156,7 +156,7 @@ export default function UsersPage() {
         headers: await authHeaders(true),
         body: JSON.stringify({
           status: 'active',
-          ...(target.fieldRole === 'entry_level_rep' ? { fieldRole: 'entry_rep' } : {}),
+          fieldRole: graduatedFieldRole(target.fieldRole),
         }),
       });
       if (!response.ok) {

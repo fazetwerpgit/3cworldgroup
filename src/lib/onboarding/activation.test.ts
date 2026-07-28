@@ -190,6 +190,28 @@ describe('computeReadiness', () => {
     );
   });
 
+  it('names an invited l1 manager in the activation notification', async () => {
+    const userId = 'ready-l1-manager';
+    store.set(`users/${userId}`, { status: 'pending', fieldRole: 'l1_manager' });
+    for (const item of getOnboardingItemsForUser('l1_manager', false)) {
+      store.set(`userOnboarding/${userId}_${item.id}`, {
+        userId, itemId: item.id, status: 'approved',
+      });
+    }
+
+    await maybeFlagActivationReady(userId);
+
+    expect(dispatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId,
+        title: "Onboarding complete — you're now a L1 Manager",
+      })
+    );
+    expect(dispatchMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringContaining('Account Executive') })
+    );
+  });
+
   it.each(invitableRoles)('activates an invited %s into its graduated role', async (invitedRole) => {
     const userId = `ready-${invitedRole}`;
     store.set(`users/${userId}`, {

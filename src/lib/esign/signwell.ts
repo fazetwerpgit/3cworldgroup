@@ -113,6 +113,14 @@ export const signwellProvider: EsignProvider = {
   id: 'signwell',
 
   async createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult> {
+    const testMode = process.env.SIGNWELL_TEST_MODE === 'true';
+    const isProduction =
+      process.env.VERCEL_ENV === 'production' ||
+      (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production');
+    if (testMode && isProduction) {
+      throw new Error('SIGNWELL_TEST_MODE cannot be enabled in production');
+    }
+
     const apiKey = requireApiKey();
     const config = DOCUMENTS[req.docKey];
     const fileBase64 = await readDocumentBase64(config.file);
@@ -124,7 +132,7 @@ export const signwellProvider: EsignProvider = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        test_mode: process.env.SIGNWELL_TEST_MODE === 'true',
+        test_mode: testMode,
         name: config.name,
         embedded_signing: false,
         metadata: { userId: req.userId, itemId: req.itemId },

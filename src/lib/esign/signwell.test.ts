@@ -72,6 +72,41 @@ describe('signwellProvider.createEnvelope', () => {
       })
     ).rejects.toThrow(/SIGNWELL_API_KEY/);
   });
+
+  it('throws when test mode is requested in production', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+
+    await expect(
+      signwellProvider.createEnvelope({
+        docKey: 'contract', userId: 'u1', itemId: 'contract',
+        signerName: 'S', signerEmail: 's@x.com',
+      })
+    ).rejects.toThrow(/SIGNWELL_TEST_MODE/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('passes in development when test mode is requested', async () => {
+    vi.stubEnv('VERCEL_ENV', 'development');
+
+    await expect(
+      signwellProvider.createEnvelope({
+        docKey: 'contract', userId: 'u1', itemId: 'contract',
+        signerName: 'S', signerEmail: 's@x.com',
+      })
+    ).resolves.toEqual({ envelopeId: 'doc_123' });
+  });
+
+  it.each(['', 'false'])('passes in production when SIGNWELL_TEST_MODE is %s', async (value) => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('SIGNWELL_TEST_MODE', value);
+
+    await expect(
+      signwellProvider.createEnvelope({
+        docKey: 'contract', userId: 'u1', itemId: 'contract',
+        signerName: 'S', signerEmail: 's@x.com',
+      })
+    ).resolves.toEqual({ envelopeId: 'doc_123' });
+  });
 });
 
 describe('signwellProvider.parseWebhook', () => {

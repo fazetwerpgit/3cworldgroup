@@ -50,9 +50,9 @@ export const ONBOARDING_ITEMS: OnboardingItem[] = [
   // vendor reference only, never the raw numbers.
   { id: 'background_check', label: 'Background / Drug Screen Authorization', category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'vendor', order: 3 },
   { id: 'dl_photos', label: "Driver's License Photos (Front & Back)", category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 4 },
-  { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 5 },
-  { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 6 },
-  { id: 'pay_structure', label: 'Compensation', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', signatureProvider: 'adobe_sign', order: 7 },
+  { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', order: 5 },
+  { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', order: 6 },
+  { id: 'pay_structure', label: 'Compensation', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', order: 7 },
   { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'manual', order: 8 },
   // IBO-only items (the IBO owner holds these; IBO Reps under an owner skip them)
   { id: 'llc_sos', label: 'LLC / Secretary of State', category: 'business', appliesToRoles: [], iboOnly: true, sensitive: false, referenceKind: 'storage', order: 9 },

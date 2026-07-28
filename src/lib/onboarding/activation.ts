@@ -8,7 +8,7 @@ import {
   type OnboardingItem,
   type OnboardingStatus,
 } from '@/types/onboarding';
-import { graduatedFieldRole, roleRequiresOnboarding, type FieldRole } from '@/types/auth';
+import { graduatedFieldRole, roleRequiresOnboarding, RoleDisplayNames, type FieldRole } from '@/types/auth';
 
 export interface ActivationReadiness {
   ready: boolean;
@@ -114,10 +114,12 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   });
   await resolveAlertTasks(userId);
 
+  const graduatedRoleName = RoleDisplayNames[graduatedFieldRole(fieldRole)];
+  const article = /^[AEIOU]/.test(graduatedRoleName) ? 'an' : 'a';
   await dispatchToUser({
     userId,
     type: 'rep_activated',
-    title: "Onboarding complete — you're now an Account Executive",
+    title: `Onboarding complete — you're now ${article} ${graduatedRoleName}`,
     message: 'Your onboarding is complete and your account is active.',
     link: '/portal',
   });

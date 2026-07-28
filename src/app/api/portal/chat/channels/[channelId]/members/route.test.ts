@@ -215,6 +215,32 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
     expect(json.addable).toEqual([]);
   });
 
+  it('includes a pending hire in the roster but excludes self-signups and inactive users', async () => {
+    mockGetUser.mockResolvedValue(REP);
+    firestore.users.set('pending-hire', {
+      status: 'pending', fieldRole: 'entry_level_rep', displayName: 'Pending Hire',
+    });
+    firestore.users.set('pending-self-signup', {
+      status: 'pending', displayName: 'Pending Self Signup',
+    });
+    firestore.users.set('inactive-rep', {
+      status: 'inactive', fieldRole: 'entry_rep', displayName: 'Inactive Rep',
+    });
+    firestore.channels.set('field', {
+      id: 'field', name: 'Field', description: 'Field', audience: 'field', order: 2,
+      active: true, memberIds: ['pending-hire', 'pending-self-signup', 'inactive-rep'],
+    });
+
+    const res = await GET(req('field'), ctx('field'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.members).toEqual([
+      { uid: 'pending-hire', name: 'Pending Hire', role: 'Entry Level Rep', isExtra: false },
+    ]);
+    expect(json.memberCount).toBe(1);
+  });
+
   it('flags manually-added members with isExtra and lists addable non-members for admins', async () => {
     mockGetUser.mockResolvedValue(ADMIN);
     firestore.users.set('admin-1', { status: 'active', role: 'admin', displayName: 'Admin One' });

@@ -3,8 +3,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import {
   ApplicationRecord,
   FieldRole,
-  FieldRoles,
   IBO_FIELD_ROLES,
+  INVITABLE_FIELD_ROLES,
   OnboardingInvite,
   resolveRoles,
 } from '@/types';
@@ -12,8 +12,6 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { inviteEmail } from '@/lib/email/templates';
-
-const VALID_FIELD_ROLES: FieldRole[] = Object.values(FieldRoles);
 
 function clean(value: unknown, max = 200) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -149,7 +147,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!VALID_FIELD_ROLES.includes(intendedFieldRole)) {
+    if (!INVITABLE_FIELD_ROLES.includes(intendedFieldRole)) {
       return NextResponse.json({ error: 'Invalid field role' }, { status: 400 });
     }
 

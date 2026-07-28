@@ -1,0 +1,66 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const gateMock = vi.hoisted(() => vi.fn());
+const validateUploadMock = vi.hoisted(() => vi.fn());
+const buildFolderPathMock = vi.hoisted(() => vi.fn());
+const saveMock = vi.hoisted(() => vi.fn(async () => undefined));
+const bucketMock = vi.hoisted(() => ({
+  file: vi.fn((path: string) => ({ path, save: saveMock })),
+}));
+
+vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: gateMock }));
+vi.mock('@/lib/onboarding/uploads', () => ({
+  validateUpload: validateUploadMock,
+  buildFolderPath: buildFolderPathMock,
+}));
+vi.mock('@/lib/firebase/admin', () => ({ getOnboardingBucket: vi.fn(() => bucketMock) }));
+
+import { POST } from './route';
+
+function requestWithForm(fields: Record<string, string>, file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.set(key, value);
+  form.set('file', file);
+  return new NextRequest('http://localhost/api/portal/onboarding/upload', {
+    method: 'POST',
+    body: form,
+  });
+}
+
+beforeEach(() => {
+  gateMock.mockReset();
+  validateUploadMock.mockReset();
+  buildFolderPathMock.mockReset();
+  saveMock.mockClear();
+  bucketMock.file.mockClear();
+});
+
+describe('POST /api/portal/onboarding/upload', () => {
+  it('rejects before reading the multipart body when verification fails', async () => {
+    gateMock.mockResolvedValue({ ok: false, error: 'Unauthorized', status: 401 });
+    const request = requestWithForm({ userId: 'attacker', itemId: 'w9' });
+    const formData = vi.spyOn(request, 'formData');
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    expect(formData).not.toHaveBeenCalled();
+  });
+
+  it('uses the verified UID for the folder instead of the body userId', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
+    validateUploadMock.mockReturnValue({ ok: true, fileBase: 'photo', ext: 'jpg' });
+    buildFolderPathMock.mockReturnValue('onboarding/users/verified-user/w9/');
+
+    const response = await POST(requestWithForm({ userId: 'attacker', itemId: 'w9' }));
+
+    expect(response.status).toBe(200);
+    expect(buildFolderPathMock).toHaveBeenCalledWith(
+      { kind: 'user', userId: 'verified-user' },
+      'w9'
+    );
+    expect(bucketMock.file).toHaveBeenCalledWith('onboarding/users/verified-user/w9/photo.jpg');
+    expect(saveMock).toHaveBeenCalled();
+  });
+});

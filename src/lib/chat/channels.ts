@@ -92,19 +92,31 @@ export function userCanAccessChannelDoc(
   return readExtraMemberIds(data).includes(identity.uid);
 }
 
-function isEligibleChatMember(data: FirebaseFirestore.DocumentData): boolean {
+export function isEligibleChatMember(data: FirebaseFirestore.DocumentData): boolean {
   const { fieldRole } = resolveRoles(data.role, data.fieldRole);
   return data.status === 'active' ||
     (data.status === 'pending' && roleRequiresOnboarding(fieldRole));
 }
 
-export async function getMemberIdsForAudience(audience: ChatChannelAudience): Promise<string[]> {
+interface ChatUserSnapshot {
+  id: string;
+  data(): FirebaseFirestore.DocumentData;
+}
+
+export async function getMemberIdsForAudience(
+  audience: ChatChannelAudience,
+  prefetchedUsers?: readonly ChatUserSnapshot[]
+): Promise<string[]> {
   if (!adminDb) throw new Error('Database not configured');
 
-  const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
-    adminDb.collection('users').where('status', '==', 'active').get(),
-    adminDb.collection('users').where('status', '==', 'pending').get(),
-  ]);
+  let users = prefetchedUsers;
+  if (!users) {
+    const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
+      adminDb.collection('users').where('status', '==', 'active').get(),
+      adminDb.collection('users').where('status', '==', 'pending').get(),
+    ]);
+    users = [...activeUsersSnap.docs, ...pendingUsersSnap.docs];
+  }
   const channel: ChatChannel = {
     id: 'membership-preview',
     name: 'Membership Preview',
@@ -114,7 +126,7 @@ export async function getMemberIdsForAudience(audience: ChatChannelAudience): Pr
     active: true,
   };
 
-  return [...activeUsersSnap.docs, ...pendingUsersSnap.docs]
+  return users
     .filter((doc) => isEligibleChatMember(doc.data()))
     .map((doc) => {
       const data = doc.data();
@@ -129,6 +141,11 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
   if (!adminDb) throw new Error('Database not configured');
 
   const channelsSnap = await adminDb.collection('chatChannels').get();
+  const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
+    adminDb.collection('users').where('status', '==', 'active').get(),
+    adminDb.collection('users').where('status', '==', 'pending').get(),
+  ]);
+  const users = [...activeUsersSnap.docs, ...pendingUsersSnap.docs];
   const batch = adminDb.batch();
   let channelsSynced = 0;
 
@@ -139,12 +156,12 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
     const channel = toChatChannel(doc.id, data);
     if (!channel) continue;
 
-    const audienceMemberIds = await getMemberIdsForAudience(channel.audience);
+    const audienceMemberIds = await getMemberIdsForAudience(channel.audience, users);
 
     // Manual additions must survive sync: keep extra members that still resolve to an
-    // ACTIVE user doc so the memberIds-based Firestore realtime rules keep letting them in.
-    // Deactivated extras are pruned from memberIds (they stay in extraMemberIds, so
-    // reactivation restores realtime access on the next sync) — mirrors the audience filter.
+    // eligible user doc so the memberIds-based Firestore realtime rules keep letting them in.
+    // Deactivated and otherwise ineligible extras are pruned from memberIds (they stay in
+    // extraMemberIds, so reactivation restores realtime access on the next sync).
     const extraMemberIds = readExtraMemberIds(data);
     let existingExtras: string[] = [];
     if (extraMemberIds.length > 0) {

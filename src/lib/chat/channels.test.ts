@@ -7,6 +7,7 @@ const firestore = vi.hoisted(() => {
   const channelDocs: Array<{ id: string; data: DocData }> = [];
   const users = new Map<string, DocData>();
   const batchSets: Array<{ ref: { __id: string }; data: DocData }> = [];
+  const userWhereCalls: Array<{ field: string; op: string; value: unknown }> = [];
 
   function userSnap(id: string) {
     const data = users.get(id);
@@ -30,13 +31,16 @@ const firestore = vi.hoisted(() => {
       }
       if (name === 'users') {
         return {
-          where: vi.fn((field: string, _op: string, value: unknown) => ({
+          where: vi.fn((field: string, op: string, value: unknown) => {
+            userWhereCalls.push({ field, op, value });
+            return {
             get: vi.fn(async () => ({
               docs: [...users.entries()]
-                .filter(([, d]) => Array.isArray(value) ? value.includes(d[field]) : d[field] === value)
+                .filter(([, d]) => d[field] === value)
                 .map(([id, d]) => ({ id, data: (): DocData => d })),
             })),
-          })),
+            };
+          }),
           doc: vi.fn((id: string) => ({ __id: id })),
         };
       }
@@ -55,12 +59,13 @@ const firestore = vi.hoisted(() => {
     channelDocs.length = 0;
     users.clear();
     batchSets.length = 0;
+    userWhereCalls.length = 0;
     adminDb.collection.mockClear();
     adminDb.getAll.mockClear();
     adminDb.batch.mockClear();
   }
 
-  return { adminDb, channelDocs, users, batchSets, reset };
+  return { adminDb, channelDocs, users, batchSets, userWhereCalls, reset };
 });
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -131,6 +136,22 @@ describe('syncChatChannels', () => {
     // deleted + deactivated pruned.
     expect([...memberIds].sort()).toEqual(['mgr-1', 'pending-hire', 'rep-x']);
     // The manual-additions list itself is preserved (merge write leaves it in place).
+  });
+
+  it('fetches active and pending cohorts once for all channels', async () => {
+    firestore.channelDocs.push(
+      { id: 'all-company', data: { id: 'all-company', name: 'All Company', audience: 'all', order: 1, active: true } },
+      { id: 'field', data: { id: 'field', name: 'Field', audience: 'field', order: 2, active: true } },
+    );
+    firestore.users.set('active-rep', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('pending-hire', { status: 'pending', fieldRole: 'entry_level_rep' });
+
+    await syncChatChannels();
+
+    expect(firestore.userWhereCalls).toEqual([
+      { field: 'status', op: '==', value: 'active' },
+      { field: 'status', op: '==', value: 'pending' },
+    ]);
   });
 });
 

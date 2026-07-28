@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getEffectiveRole, resolveRoles, RoleDisplayNames } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { readExtraMemberIds, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
+import {
+  isEligibleChatMember,
+  readExtraMemberIds,
+  toChatChannel,
+  userCanAccessChannelDoc,
+} from '@/lib/chat/channels';
 
 // Never resolve an unbounded member list — cap the fan-out of user reads.
 const MAX_MEMBERS = 200;
@@ -88,13 +93,7 @@ export async function GET(
       const docs = await adminDb.getAll(...refs);
       members = docs
         .filter((doc) => doc.exists)
-        // memberIds can hold uids of deactivated accounts; those aren't
-        // people in the room, so they must not show up (or be counted).
-        // Docs without a status field predate the field and stay included.
-        .filter((doc) => {
-          const status = (doc.data() ?? {}).status;
-          return typeof status !== 'string' || status === 'active';
-        })
+        .filter((doc) => isEligibleChatMember(doc.data() ?? {}))
         .map((doc) => {
           const userData = doc.data() ?? {};
           return {
@@ -116,8 +115,12 @@ export async function GET(
     }
 
     const memberIdSet = new Set(memberIds);
-    const usersSnap = await adminDb.collection('users').where('status', '==', 'active').get();
-    const addable: AddableUser[] = usersSnap.docs
+    const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
+      adminDb.collection('users').where('status', '==', 'active').get(),
+      adminDb.collection('users').where('status', '==', 'pending').get(),
+    ]);
+    const addable: AddableUser[] = [...activeUsersSnap.docs, ...pendingUsersSnap.docs]
+      .filter((doc) => isEligibleChatMember(doc.data() ?? {}))
       .filter((doc) => !memberIdSet.has(doc.id))
       .map((doc) => {
         const userData = doc.data() ?? {};

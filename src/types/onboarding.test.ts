@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  BASE_VETTING_ROLES,
   ONBOARDING_ITEMS,
   getOnboardingItemsForUser,
   requiresHeavyVetting,
 } from './onboarding';
+import { INVITABLE_FIELD_ROLES } from './auth';
 
 describe('checklist role filtering', () => {
   it('includes fcra_auth as a 4th esign item for base roles', () => {
@@ -37,5 +39,17 @@ describe('checklist role filtering', () => {
   it('returns no checklist for roles that do not require onboarding', () => {
     expect(getOnboardingItemsForUser('general_manager', false)).toEqual([]);
     expect(getOnboardingItemsForUser('general_manager', false)).toEqual([]);
+  });
+
+  it.each([
+    ['l1_manager', false, 8],
+    ['ibo_level_1', true, 11],
+    ['ibo_level_1', false, 8],
+  ] as const)('returns the expected packet for %s (isIBO=%s)', (role, isIBO, count) => {
+    expect(getOnboardingItemsForUser(role, isIBO)).toHaveLength(count);
+  });
+
+  it('keeps the base-vetting and invitable role sets in lockstep', () => {
+    expect([...BASE_VETTING_ROLES].sort()).toEqual([...INVITABLE_FIELD_ROLES].sort());
   });
 });
