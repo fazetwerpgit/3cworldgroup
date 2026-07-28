@@ -127,7 +127,7 @@ function renderNavigationMarkup() {
     <CommandPalette open onOpenChange={vi.fn()} />
   );
 
-  return `${sidebar}\n${mobile}\n${palette}`;
+  return { sidebar, mobile, palette };
 }
 
 describe('Task 4 portal navigation gates', () => {
@@ -143,25 +143,39 @@ describe('Task 4 portal navigation gates', () => {
   });
 
   it('shows My Onboarding for a pending entry-level rep', () => {
-    expect(renderNavigationMarkup()).toContain('My Onboarding');
+    const { sidebar, mobile, palette } = renderNavigationMarkup();
+
+    expect(sidebar).toContain('My Onboarding');
+    expect(palette).toContain('My Onboarding');
+    expect(mobile).toContain('More');
+    expect(mobile).toContain('My Onboarding');
   });
 
   it('shows My Onboarding for an active entry-level rep', () => {
     setUser({ status: 'active', fieldRole: 'entry_level_rep' });
 
-    expect(renderNavigationMarkup()).toContain('My Onboarding');
+    const { sidebar, palette } = renderNavigationMarkup();
+
+    expect(sidebar).toContain('My Onboarding');
+    expect(palette).toContain('My Onboarding');
   });
 
   it('hides My Onboarding for an active graduated entry rep', () => {
     setUser({ status: 'active', fieldRole: 'entry_rep' });
 
-    expect(renderNavigationMarkup()).not.toContain('My Onboarding');
+    const { sidebar, palette } = renderNavigationMarkup();
+
+    expect(sidebar).not.toContain('My Onboarding');
+    expect(palette).not.toContain('My Onboarding');
   });
 
   it('hides My Onboarding for an active l1 manager', () => {
     setUser({ status: 'active', fieldRole: 'l1_manager' });
 
-    expect(renderNavigationMarkup()).not.toContain('My Onboarding');
+    const { sidebar, palette } = renderNavigationMarkup();
+
+    expect(sidebar).not.toContain('My Onboarding');
+    expect(palette).not.toContain('My Onboarding');
   });
 });
 

@@ -97,6 +97,7 @@ beforeEach(() => {
   mockActivateUser.mockImplementation(async (userId: string) => {
     const user = firestore.users.get(userId);
     if (!user) return null;
+    if (user.status === 'active') return { alreadyActive: true };
     firestore.users.set(userId, { ...user, status: 'active' });
     return { alreadyActive: false };
   });
@@ -130,5 +131,54 @@ describe('POST /api/portal/recruiting/convert', () => {
     expect(firestore.users.get('recruit-1')).toMatchObject({ status: 'active' });
     expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'converted' });
     expect(firestore.candidateOnboarding.get('invite-1')).toMatchObject({ status: 'approved' });
+  });
+
+  it('converts an already-active recruit without applying the readiness gate', async () => {
+    seedRecruit();
+    firestore.users.set('recruit-1', {
+      ...firestore.users.get('recruit-1'),
+      status: 'active',
+    });
+    mockReadiness.mockResolvedValue({ ready: false, missing: ['w9'] });
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, status: 'converted' });
+    expect(mockReadiness).not.toHaveBeenCalled();
+    expect(mockActivateUser).toHaveBeenCalledWith('recruit-1');
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'converted' });
+  });
+
+  it('rejects a caller who cannot convert recruits', async () => {
+    seedRecruit();
+    firestore.users.set('ibo-owner', { fieldRole: 'entry_rep', displayName: 'Rep' });
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+
+    expect(response.status).toBe(403);
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'submitted' });
+  });
+
+  it('rejects a valid field converter who does not own the invite', async () => {
+    seedRecruit();
+    firestore.users.set('manager-1', { fieldRole: 'l1_manager', displayName: 'Manager' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'manager-1' });
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+
+    expect(response.status).toBe(403);
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'submitted' });
+  });
+
+  it('rejects a recruit end to end and deactivates the pending user', async () => {
+    seedRecruit();
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'rejected' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, status: 'rejected' });
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'rejected' });
+    expect(firestore.users.get('recruit-1')).toMatchObject({ status: 'inactive' });
   });
 });

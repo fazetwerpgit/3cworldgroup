@@ -7,6 +7,7 @@ const {
   createUserMock,
   deleteUserMock,
   sendPendingEsignDocsMock,
+  inviteData,
 } = vi.hoisted(() => ({
   inviteRef: { set: vi.fn() },
   batchSetMock: vi.fn(),
@@ -14,6 +15,17 @@ const {
   createUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
   sendPendingEsignDocsMock: vi.fn(),
+  inviteData: {
+    candidateName: 'Candidate',
+    candidateEmail: 'candidate@example.com',
+    candidatePhone: '555-0100',
+    intendedFieldRole: 'entry_level_rep',
+    isIBO: false,
+    ownerId: 'owner-1',
+    status: 'in_progress',
+    tokenHash: 'hashed-token-1',
+    expiresAt: undefined as { toDate: () => Date } | undefined,
+  },
 }));
 
 vi.mock('next/server', () => {
@@ -54,19 +66,13 @@ vi.mock('@/lib/firebase/admin', () => ({
     collection: vi.fn((name: string) => {
       if (name === 'onboardingInvites') {
         return {
-          where: () => ({
-            limit: () => ({
+          where: (_field: string, _operator: string, tokenHash: unknown) => ({
+            limit: (count: number) => ({
               get: async () => ({
-                empty: false,
-                docs: [{ id: 'invite-1', ref: inviteRef, data: () => ({
-                  candidateName: 'Candidate',
-                  candidateEmail: 'candidate@example.com',
-                  candidatePhone: '555-0100',
-                  intendedFieldRole: 'entry_level_rep',
-                  isIBO: false,
-                  ownerId: 'owner-1',
-                  status: 'in_progress',
-                }) }],
+                empty: tokenHash !== inviteData.tokenHash || count !== 1,
+                docs: tokenHash === inviteData.tokenHash && count === 1
+                  ? [{ id: 'invite-1', ref: inviteRef, data: () => inviteData }]
+                  : [],
               }),
             }),
           }),
@@ -81,7 +87,9 @@ vi.mock('@/lib/firebase/admin', () => ({
     batch: () => ({ set: batchSetMock, commit: batchCommitMock }),
   },
 }));
-vi.mock('@/lib/recruiting/tokens', () => ({ hashInviteToken: vi.fn(() => 'hashed-token') }));
+vi.mock('@/lib/recruiting/tokens', () => ({
+  hashInviteToken: vi.fn((token: string) => token === 'token-1' ? 'hashed-token-1' : `hash:${token}`),
+}));
 vi.mock('@/types', () => ({
   ONBOARDING_ITEMS: [
     { id: 'contract', label: 'Contract', sensitive: false, referenceKind: 'esign' },
@@ -110,7 +118,7 @@ vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignD
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 
-function request(references: Record<string, string>) {
+function request(references: Record<string, string>, password = 'password') {
   return new NextRequest('http://localhost/api/public/onboarding/token-1', {
     method: 'POST',
     body: JSON.stringify({
@@ -120,10 +128,14 @@ function request(references: Record<string, string>) {
       city: 'Dallas',
       state: 'TX',
       zip: '75001',
-      password: 'password',
+      password,
       references,
     }),
   });
+}
+
+function params(token = 'token-1') {
+  return { params: Promise.resolve({ token }) };
 }
 
 beforeEach(() => {
@@ -132,12 +144,23 @@ beforeEach(() => {
   deleteUserMock.mockResolvedValue(undefined);
   batchCommitMock.mockResolvedValue(undefined);
   sendPendingEsignDocsMock.mockResolvedValue([]);
+  Object.assign(inviteData, {
+    candidateName: 'Candidate',
+    candidateEmail: 'candidate@example.com',
+    candidatePhone: '555-0100',
+    intendedFieldRole: 'entry_level_rep',
+    isIBO: false,
+    ownerId: 'owner-1',
+    status: 'in_progress',
+    tokenHash: 'hashed-token-1',
+    expiresAt: undefined,
+  });
 });
 
 describe('POST /api/public/onboarding/[token]', () => {
   it('accepts a packet with no references for e-sign items', async () => {
     const response = await POST(request({ onboarding_submission: 'completed' }), {
-      params: Promise.resolve({ token: 'token-1' }),
+      ...params(),
     });
 
     expect(response.status).toBe(200);
@@ -145,7 +168,7 @@ describe('POST /api/public/onboarding/[token]', () => {
 
   it('still rejects a packet missing a non-e-sign item', async () => {
     const response = await POST(request({}), {
-      params: Promise.resolve({ token: 'token-1' }),
+      ...params(),
     });
 
     expect(response.status).toBe(400);
@@ -160,7 +183,7 @@ describe('POST /api/public/onboarding/[token]', () => {
       direct_deposit: 'typed bank confirmation',
       onboarding_submission: 'completed',
     }), {
-      params: Promise.resolve({ token: 'token-1' }),
+      ...params(),
     });
 
     expect(response.status).toBe(200);
@@ -179,5 +202,36 @@ describe('POST /api/public/onboarding/[token]', () => {
         reference: 'completed',
       },
     ]);
+  });
+
+  it('rejects a wrong invite token as not found', async () => {
+    const response = await POST(request({ onboarding_submission: 'completed' }), params('wrong-token'));
+
+    expect(response.status).toBe(404);
+  });
+
+  it('rejects an expired invite', async () => {
+    inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
+
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(410);
+  });
+
+  it('rejects an already-submitted invite', async () => {
+    inviteData.status = 'submitted';
+
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a password shorter than six characters', async () => {
+    const response = await POST(
+      request({ onboarding_submission: 'completed' }, 'short'),
+      params()
+    );
+
+    expect(response.status).toBe(400);
   });
 });

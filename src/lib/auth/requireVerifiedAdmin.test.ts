@@ -4,10 +4,18 @@ import { NextRequest } from 'next/server';
 // Mock the Admin SDK so we can drive the decoded token and the user doc directly.
 const verifyIdToken = vi.fn();
 const userGet = vi.fn();
+const userDocs = new Map<string, Record<string, unknown> | null>();
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: (token: string) => verifyIdToken(token) },
   adminDb: {
-    collection: () => ({ doc: () => ({ get: userGet }) }),
+    collection: vi.fn((name: string) => {
+      if (name !== 'users') throw new Error(`Unexpected collection: ${name}`);
+      return {
+        doc: vi.fn((uid: string) => ({
+          get: () => userGet(uid),
+        })),
+      };
+    }),
   },
 }));
 
@@ -32,12 +40,17 @@ function req(
 
 // The user doc the mocked Firestore returns for the token's uid.
 function userDoc(data: Record<string, unknown> | null) {
-  userGet.mockResolvedValue({ exists: data !== null, data: () => data ?? undefined });
+  userDocs.set('u1', data);
 }
 
 beforeEach(() => {
   verifyIdToken.mockReset();
   userGet.mockReset();
+  userDocs.clear();
+  userGet.mockImplementation(async (uid: string) => {
+    const data = userDocs.get(uid);
+    return { exists: data !== null && data !== undefined, data: () => data ?? undefined };
+  });
   verifyIdToken.mockResolvedValue({ uid: 'u1' });
 });
 
@@ -297,6 +310,21 @@ describe('requireVerifiedSelfOrManagement', () => {
     const res = await requireVerifiedSelfOrManagement(req(), 'someone-else');
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.isManagement).toBe(true);
+  });
+
+  it("uses the caller's document, not the target's, to decide management access", async () => {
+    userDocs.set('u1', { status: 'active', fieldRole: 'entry_rep' });
+    userDocs.set('target-user', { status: 'active', role: 'operations' });
+
+    const res = await requireVerifiedSelfOrManagement(req(), 'target-user');
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.status).toBe(403);
+      expect(res.error).toBe('Forbidden: you can only access your own data');
+    }
+    expect(userGet).toHaveBeenCalledWith('u1');
+    expect(userGet).not.toHaveBeenCalledWith('target-user');
   });
 
   it('rejects a mid-onboarding rep on their own data without the opt-in', async () => {

@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { docGetMock, docUpdateMock, gateMock, queryGetMock, getAllMock } = vi.hoisted(() => ({
+vi.mock('next/server', async () => {
+  const actual = await vi.importActual<typeof import('next/server')>('next/server');
+  return { ...actual, after: vi.fn((callback: () => unknown) => void callback()) };
+});
+
+const { docGetMock, docUpdateMock, docIdMock, gateMock, queryGetMock, getAllMock } = vi.hoisted(() => ({
   docGetMock: vi.fn(),
   docUpdateMock: vi.fn(),
+  docIdMock: vi.fn((id: string) => ({ id, get: docGetMock, update: docUpdateMock })),
   gateMock: vi.fn(),
   queryGetMock: vi.fn(),
   getAllMock: vi.fn(),
@@ -12,7 +18,7 @@ const { docGetMock, docUpdateMock, gateMock, queryGetMock, getAllMock } = vi.hoi
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: vi.fn((name: string) => ({
-      doc: vi.fn(() => ({ get: docGetMock, update: docUpdateMock })),
+      doc: docIdMock,
       where: vi.fn(() => ({ get: queryGetMock })),
       ...(name === 'users' ? {} : {}),
     })),
@@ -42,6 +48,7 @@ vi.mock('@/lib/email/templates', () => ({
 vi.mock('@/lib/onboarding/activation', () => ({ maybeFlagActivationReady: vi.fn(async () => undefined) }));
 
 import { GET, POST } from './route';
+import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 
 const onboardingDoc = (esignEnvelopeId?: string) => ({
   exists: true,
@@ -116,6 +123,15 @@ describe('POST /api/portal/onboarding/review', () => {
     expect(update).toMatchObject({ status: 'rejected' });
     expect(update).not.toHaveProperty('esignEnvelopeId');
     expect(update).not.toHaveProperty('esignDispatch');
+  });
+
+  it('approves a non-e-sign item, writes the target item document, and checks activation', async () => {
+    const response = await POST(postRequest('onboarding_submission', 'approved'));
+
+    expect(response.status).toBe(200);
+    expect(docIdMock).toHaveBeenCalledWith('user-1_onboarding_submission');
+    expect(docUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }));
+    expect(maybeFlagActivationReady).toHaveBeenCalledWith('user-1');
   });
 });
 

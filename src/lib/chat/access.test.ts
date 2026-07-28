@@ -7,9 +7,15 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 }));
 
 const userGet = vi.fn();
+const userDocs = new Map<string, Record<string, unknown>>();
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
-    collection: () => ({ doc: () => ({ get: userGet }) }),
+    collection: vi.fn((name: string) => {
+      if (name !== 'users') throw new Error(`Unexpected collection: ${name}`);
+      return {
+        doc: vi.fn((uid: string) => ({ get: () => userGet(uid) })),
+      };
+    }),
   },
 }));
 
@@ -25,7 +31,13 @@ function req() {
 beforeEach(() => {
   mockVerify.mockReset();
   userGet.mockReset();
+  userDocs.clear();
+  userGet.mockImplementation(async (uid: string) => ({ data: () => userDocs.get(uid) ?? {} }));
 });
+
+function userDoc(uid: string, data: Record<string, unknown>) {
+  userDocs.set(uid, data);
+}
 
 describe('getVerifiedChatUser', () => {
   it('rejects when the token is invalid', async () => {
@@ -37,7 +49,7 @@ describe('getVerifiedChatUser', () => {
 
   it('rejects an INACTIVE user even with a valid token and retained role', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'Del Rep', email: 'd@x.com' });
-    userGet.mockResolvedValue({ data: () => ({ status: 'inactive', fieldRole: 'l1_manager' }) });
+    userDoc('u1', { status: 'inactive', fieldRole: 'l1_manager' });
     const res = await getVerifiedChatUser(req());
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(403);
@@ -45,7 +57,7 @@ describe('getVerifiedChatUser', () => {
 
   it('rejects a pending self-signup with no field role', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'Pending', email: 'p@x.com' });
-    userGet.mockResolvedValue({ data: () => ({ status: 'pending' }) });
+    userDoc('u1', { status: 'pending' });
     const res = await getVerifiedChatUser(req());
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(403);
@@ -53,7 +65,7 @@ describe('getVerifiedChatUser', () => {
 
   it('rejects a pending internal manager role outside the onboarding invite list', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'Manager', email: 'm@x.com' });
-    userGet.mockResolvedValue({ data: () => ({ status: 'pending', fieldRole: 'general_manager' }) });
+    userDoc('u1', { status: 'pending', fieldRole: 'general_manager' });
     const res = await getVerifiedChatUser(req());
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(403);
@@ -61,7 +73,7 @@ describe('getVerifiedChatUser', () => {
 
   it('accepts a pending hire with an onboarding field role', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'New Hire', email: 'h@x.com' });
-    userGet.mockResolvedValue({ data: () => ({ status: 'pending', fieldRole: 'entry_rep' }) });
+    userDoc('u1', { status: 'pending', fieldRole: 'entry_rep' });
     const res = await getVerifiedChatUser(req());
     expect(res.ok).toBe(true);
     if (res.ok) {
@@ -72,7 +84,7 @@ describe('getVerifiedChatUser', () => {
 
   it('accepts an active user and resolves their role', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u1', name: 'Active Admin', email: 'a@x.com' });
-    userGet.mockResolvedValue({ data: () => ({ status: 'active', role: 'admin' }) });
+    userDoc('u1', { status: 'active', role: 'admin' });
     const res = await getVerifiedChatUser(req());
     expect(res.ok).toBe(true);
     if (res.ok) {

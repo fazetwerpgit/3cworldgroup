@@ -31,12 +31,17 @@ const firestore = vi.hoisted(() => {
             updates.push({ userId, data });
             users.set(userId, { ...(users.get(userId) ?? {}), ...data });
           }),
+          delete: vi.fn(async () => {
+            users.delete(userId);
+          }),
         }),
       };
     }),
   };
   const adminAuth = {
     updateUser: vi.fn(async () => undefined),
+    revokeRefreshTokens: vi.fn(async () => undefined),
+    deleteUser: vi.fn(async () => undefined),
   };
   return { adminAuth, adminDb, users, updates };
 });
@@ -67,7 +72,7 @@ vi.mock('@/lib/email/templates', () => ({
 vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: vi.fn(async () => undefined) }));
 vi.mock('@/lib/users/restampDisplayName', () => ({ restampDisplayName: vi.fn(async () => undefined) }));
 
-import { PUT } from './route';
+import { DELETE, PUT } from './route';
 import { after } from 'next/server';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
@@ -173,5 +178,37 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(firestore.updates[0]?.data).toMatchObject({ fieldRole: 'l1_manager' });
     expect(mockResolveAlertTasks).not.toHaveBeenCalled();
     expect(sendPendingEsignDocs).not.toHaveBeenCalled();
+  });
+
+  it('rejects an operations caller assigning a platform role', async () => {
+    firestore.users.set('pending-user', { status: 'pending', fieldRole: 'entry_rep' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    const response = await PUT(request({ role: 'admin' }), params());
+
+    expect(response.status).toBe(403);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
+  it('rejects an operations caller editing an existing platform-role account', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'admin' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    const response = await PUT(request({ displayName: 'Attempted rewrite' }), params());
+
+    expect(response.status).toBe(403);
+    expect(firestore.updates).toHaveLength(0);
+  });
+});
+
+describe('DELETE /api/portal/auth/users/[id]', () => {
+  it('rejects an operations caller deleting a platform-role account', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'operations' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(403);
+    expect(firestore.users.get('pending-user')).toBeDefined();
   });
 });

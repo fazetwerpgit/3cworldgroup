@@ -75,8 +75,20 @@ describe('activateUser', () => {
       status: 'active',
       fieldRole: 'l1_manager',
       atRisk: '__DELETE__',
+      hireDate: expect.any(Date),
+      updatedAt: expect.any(Date),
     });
-    expect(updates[0]?.data.hireDate).toBeInstanceOf(Date);
+    expect(dispatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'l1-manager',
+        type: 'rep_activated',
+        title: 'Onboarding complete — your new role: L1 Manager',
+        message: 'Your onboarding is complete.',
+        link: '/portal',
+        email: expect.anything(),
+      })
+    );
+    expect(resolveMock).toHaveBeenCalledWith('l1-manager');
   });
 
   it('graduates an entry_level_rep to entry_rep', async () => {
@@ -99,6 +111,14 @@ describe('activateUser', () => {
     await activateUser('no-field-role');
 
     expect(updates[0]?.data).not.toHaveProperty('fieldRole');
+    expect(dispatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'no-field-role',
+        type: 'rep_activated',
+        title: 'Welcome aboard - you are active',
+        email: expect.anything(),
+      })
+    );
   });
 
   it('returns alreadyActive without writing for an already-active user', async () => {
@@ -180,14 +200,45 @@ describe('computeReadiness', () => {
       fieldRole: 'entry_rep',
       status: 'active',
     });
+    expect(updates[0]?.data).toMatchObject({
+      fieldRole: 'entry_rep',
+      status: 'active',
+      hireDate: expect.any(Date),
+      atRisk: '__DELETE__',
+      updatedAt: expect.any(Date),
+    });
     expect(resolveMock).toHaveBeenCalledWith('ready-rep');
     expect(dispatchMock).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'ready-rep',
         type: 'rep_activated',
         title: 'Onboarding complete — your new role: Account Executive',
+        message: 'Your onboarding is complete.',
+        link: '/portal',
+        email: expect.anything(),
       })
     );
+  });
+
+  it('does not activate or dispatch while an item is still submitted', async () => {
+    const userId = 'not-ready-rep';
+    store.set(`users/${userId}`, {
+      status: 'pending',
+      fieldRole: 'entry_level_rep',
+    });
+    for (const item of items) {
+      store.set(`userOnboarding/${userId}_${item.id}`, {
+        userId,
+        itemId: item.id,
+        status: item.id === 'background_check' ? 'submitted' : 'approved',
+      });
+    }
+
+    await maybeFlagActivationReady(userId);
+
+    expect(updates).toHaveLength(0);
+    expect(store.get(`users/${userId}`)).toMatchObject({ status: 'pending' });
+    expect(dispatchMock).not.toHaveBeenCalled();
   });
 
   it('names an invited l1 manager in the activation notification', async () => {
