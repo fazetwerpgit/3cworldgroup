@@ -3,19 +3,77 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-07-25 (update at EVERY milestone).
+Updated: 2026-07-28 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-ONBOARDING COMPLETION — design APPROVED, spec committed LOCAL at ac90ca8:
-docs/superpowers/specs/2026-07-25-onboarding-completion-design.md.
-Next: implement it via superpowers:subagent-driven-development, opus 5 for
-review/verify agents and Codex gpt-5.6-luna for build agents.
+ONBOARDING COMPLETION — Tasks 1-8 DONE and reviewed. Branch
+`onboarding/completion`, HEAD 19daf11, working tree clean.
+
+**Start SDD Task 9.** Plan: docs/superpowers/plans/2026-07-25-onboarding-
+completion.md. Extract the brief with the superpowers script (do NOT make
+the implementer read the whole plan):
+
+    ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.1/skills/\
+      subagent-driven-development/scripts/task-brief \
+      docs/superpowers/plans/2026-07-25-onboarding-completion.md 9
+
+Task 9 is 12 steps (leftovers + final gates): dead metadata, guard test
+mode in prod, gate the upload route BEFORE parsing the multipart body,
+close the invite API role hole, positive checklist tests, finish the chat
+roster decision, hoist user queries out of the channel-sync loop, two
+review corrections, tell a graduating hire the right role, stop hand-
+copying the graduation mapping, full gates, commit.
+
+Task 9 Step 9 references the "Account Executive" title BY QUOTED STRING,
+not by line number — an earlier line number went stale after Task 7 moved
+the code, and a line-following implementer would have edited a different,
+correct dispatch. Do not "helpfully" convert it back to a line number.
+
+After Task 9: the final whole-branch review (most capable model, one fix
+subagent for ALL findings, not one per finding), then
+superpowers:finishing-a-development-branch.
+
+The durable ledger is `.superpowers/sdd/progress.md` (git-ignored). It is
+the recovery map — trust it and `git log` over recollection. It carries
+the per-task commit ranges and a DEFERRED list the final review must
+triage.
 
 HARD CONSTRAINT FROM JACOB: **DO NOT DEPLOY.** Local commits only. No
 git push (push = Vercel production deploy). No firebase deploy — the
 firestore.rules chat change is written and committed but NOT deployed.
 He is building this ahead of actually needing it.
+
+MODEL ROUTING CHANGED 2026-07-28: the main loop is now **Fable 5**
+(was Opus 5). This makes one existing rule critical rather than merely
+important — **every Agent/Workflow call MUST pass `model` explicitly.**
+An omitted model inherits the main loop, and a subagent must NEVER run on
+Fable 5, under any main-loop model, no exceptions. Use `model: "sonnet"`
+by default and `"opus"` for review/verify/judge stages. All Task 1-8
+reviews ran on Opus; keep the final whole-branch review on Opus too.
+
+TWO THINGS THAT ARE JACOB'S, NOT MINE:
+1. `firestore.rules` has NEVER been machine-validated — no firebase-tools
+   in this environment. Before ANY deploy it must be pasted into the
+   Firebase console Rules editor (validates on paste, pre-Publish) or run
+   against the emulator. A parse failure is a deploy-time outage.
+2. There is still no Adobe/e-sign API key, so no signature flow has ever
+   been exercised end-to-end. Everything about the provider is reasoned
+   from source, not observed. The specific unknown: whether SignWell's
+   `POST /documents` id matches the id in its `document_completed`
+   payload. If those diverge, EVERY signature drops silently — the
+   `esign_mismatch` ops alert added in Task 8 is the production
+   instrument that would surface it.
+
+TASK 8 SUMMARY (5 fix rounds, 4 independent Opus reviews, b7b1cc5..19daf11).
+The guarantee — a contract cannot be marked signed by typing into a box —
+is UPHELD. The e-sign webhook is the only writer of `approved` on a
+signature item, and only for the envelope currently recorded on the doc.
+Each round's fix exposed the next problem, so read the ledger before
+assuming any part of it is untouched. Recurring lesson worth carrying
+into Task 9: three separate rounds shipped a test stub that ignored its
+own arguments, so the code it "covered" could be broken arbitrarily and
+the whole suite stayed green. Break every new test before trusting it.
 
 The spec supersedes docs/superpowers/specs/2026-07-09-entry-level-rep-
 onboarding-gate-design.md on two points that were themselves client-
