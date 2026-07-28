@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
@@ -234,9 +234,11 @@ export async function POST(request: NextRequest) {
           link: '/portal/onboarding',
           metadata: { itemId },
         });
-        void maybeFlagActivationReady(userId).catch((error) => {
-          console.error('Failed to flag activation readiness after item approval:', error);
-        });
+        after(() =>
+          maybeFlagActivationReady(userId).catch((error) => {
+            console.error('Failed to flag activation readiness after item approval:', error);
+          })
+        );
       } else {
         const userSnap = await adminDb.collection('users').doc(userId).get();
         const name = (userSnap.get('displayName') as string | undefined) ?? 'Rep';

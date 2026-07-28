@@ -81,7 +81,9 @@ export async function activateUser(
   await dispatchToUser({
     userId,
     type: 'rep_activated',
-    title: 'Welcome aboard - you are active',
+    title: fieldRole
+      ? `Onboarding complete — your new role: ${RoleDisplayNames[graduatedFieldRole(fieldRole)]}`
+      : 'Welcome aboard - you are active',
     message: 'Your onboarding is complete.',
     link: '/portal',
     email: activationEmail({ name }),
@@ -104,22 +106,5 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   const { ready } = await getActivationReadiness(userId);
   if (!ready) return;
 
-  const now = new Date();
-  await userRef.update({
-    fieldRole: graduatedFieldRole(fieldRole),
-    status: 'active',
-    hireDate: now,
-    atRisk: null,
-    updatedAt: now,
-  });
-  await resolveAlertTasks(userId);
-
-  const graduatedRoleName = RoleDisplayNames[graduatedFieldRole(fieldRole)];
-  await dispatchToUser({
-    userId,
-    type: 'rep_activated',
-    title: `Onboarding complete — your new role: ${graduatedRoleName}`,
-    message: 'Your onboarding is complete and your account is active.',
-    link: '/portal',
-  });
+  await activateUser(userId);
 }

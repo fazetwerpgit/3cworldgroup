@@ -100,13 +100,23 @@ async function resolveDispatchAlert(userId: string): Promise<void> {
   }
 }
 
+async function hasFailedDispatch(userId: string): Promise<boolean> {
+  try {
+    const snapshot = await adminDb!.collection('userOnboarding').where('userId', '==', userId).get();
+    return snapshot.docs.some((doc) => dispatchState(doc).state === 'failed');
+  } catch (error) {
+    console.error(`[esign] failed to inspect dispatch failures for ${userId}`, error);
+    return true;
+  }
+}
+
 async function sendOne(
   provider: EsignProvider,
   pending: PendingItem,
   userId: string,
   signerName: string,
   signerEmail: string
-): Promise<{ sent: boolean; failed?: { previousAttempts: number; attempts: number } }> {
+): Promise<{ sent: boolean; recovered?: boolean; failed?: { previousAttempts: number; attempts: number } }> {
   let envelopeId: string;
   try {
     ({ envelopeId } = await provider.createEnvelope({
@@ -151,8 +161,7 @@ async function sendOne(
     }
   }
 
-  if (hadFailedDispatch) await resolveDispatchAlert(userId);
-  return { sent: true };
+  return { sent: true, recovered: hadFailedDispatch };
 }
 
 /**
@@ -206,7 +215,7 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
       let alertRaised = false;
       for (const item of pending) {
         const failure = await recordFailure(item, userId, error);
-        if (!alertRaised && failure && failure.previousAttempts < 3 && failure.attempts >= 3) {
+        if (!alertRaised && failure && failure.attempts >= 3) {
           alertRaised = true;
           await raiseDispatchAlert(userId, signerName);
         }
@@ -215,21 +224,26 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
     }
 
     let alertRaised = false;
+    let recovered = false;
     const sentLabels: string[] = [];
     for (const item of pending) {
       const result = await sendOne(provider, item, userId, signerName, signerEmail);
       if (result.sent) {
         sent.push(item.item.id);
         sentLabels.push(item.item.label);
+        recovered ||= !!result.recovered;
       } else if (
         !alertRaised &&
         result.failed &&
-        result.failed.previousAttempts < 3 &&
         result.failed.attempts >= 3
       ) {
         alertRaised = true;
         await raiseDispatchAlert(userId, signerName);
       }
+    }
+
+    if (recovered && !(await hasFailedDispatch(userId))) {
+      await resolveDispatchAlert(userId);
     }
 
     if (sentLabels.length > 0) {

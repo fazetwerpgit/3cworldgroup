@@ -103,12 +103,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, status: 'rejected' });
     }
 
-    const readiness = await getActivationReadiness(invite.convertedUserId);
-    if (!readiness.ready) {
-      return NextResponse.json(
-        { error: 'not ready', missing: readiness.missing },
-        { status: 409 }
-      );
+    const targetUserRef = adminDb.collection('users').doc(invite.convertedUserId);
+    const targetUser = await targetUserRef.get();
+    if (targetUser.get('status') !== 'active') {
+      const readiness = await getActivationReadiness(invite.convertedUserId);
+      if (!readiness.ready) {
+        return NextResponse.json(
+          { error: 'not ready', missing: readiness.missing },
+          { status: 409 }
+        );
+      }
     }
 
     const activation = await activateUser(invite.convertedUserId);
