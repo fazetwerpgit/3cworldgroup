@@ -14,6 +14,13 @@ explicit "deploy".
    signwell.com; the only SignWell surface left is the small brand mark
    inside the signing widget (removable only on SignWell Enterprise —
    accepted).
+3. Restyle the candidate-facing onboarding pages to match the portal's
+   existing design language (added by Jacob 2026-08-18). Reuse the
+   portal's established idioms/components — no new design system, no new
+   design decisions required from Jacob. Verified visually (Playwright
+   screenshots at 1440 and 390) before review. Executor note: Codex/GPT
+   sub is currently unavailable; implementation runs on Claude subagents
+   (sonnet build, opus review) — no dependency on GPT.
 
 ## Non-goals
 
