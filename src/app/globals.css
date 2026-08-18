@@ -2329,6 +2329,27 @@ body.portal-scope {
   display: none;
 }
 
+/* First-run "turn on notifications" prompt. Floats over the page instead of taking
+   layout space, since it mounts once in the portal layout rather than per page. Sits
+   below the mobile nav's z-index (40) so the nav and any sheet always win. */
+.portal-push-prompt {
+  position: fixed;
+  z-index: 39;
+  right: 16px;
+  bottom: 20px;
+  width: min(360px, calc(100vw - 32px));
+}
+
+@media (max-width: 1023px) {
+  /* Clears the 68px bottom nav plus the home-indicator inset. */
+  .portal-push-prompt {
+    right: 12px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+  }
+}
+
 .portal-scope a:focus-visible,
 .portal-scope button:focus-visible {
   outline: 2px solid var(--rail-lime);
