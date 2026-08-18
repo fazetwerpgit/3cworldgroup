@@ -120,6 +120,56 @@ describe('EsignSignAction', () => {
       await vi.advanceTimersByTimeAsync(3000 * 3);
     });
     expect(onRefresh).toHaveBeenCalledTimes(10);
+
+    // Polling stopping silently would leave "confirming..." displayed
+    // forever; the UI must switch to an honest slow-confirmation note instead
+    // of hanging, and must never claim approval it hasn't received.
+    expect(container.textContent).toContain('taking longer than usual');
+    expect(container.textContent).not.toMatch(/approved/i);
+  });
+
+  it('clears the poll timer on unmount and never updates state or refetches after that', async () => {
+    const { onRefresh } = await renderAction();
+    await clickSignNow();
+
+    await act(async () => {
+      capturedEvents!.completed!({ id: 'doc_1' });
+    });
+    expect(container.textContent).toContain('Signature received - confirming');
+
+    // First tick fires and schedules the next one; unmount before it lands.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root.unmount();
+    });
+
+    // If the pending timeout were not cleared, this would fire more ticks
+    // (and, without the mounted-ref guard, attempt a setState-after-unmount
+    // that React would warn about).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000 * 15);
+    });
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Sign now while the embed modal is open, preventing a second embed instance', async () => {
+    await renderAction();
+    await clickSignNow();
+
+    expect(loadSignWellEmbedMock).toHaveBeenCalledOnce();
+    const button = container.querySelector('button');
+    expect(button?.disabled).toBe(true);
+
+    await act(async () => {
+      button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    // A second click while 'signing' must not construct a second embed.
+    expect(loadSignWellEmbedMock).toHaveBeenCalledOnce();
   });
 
   it('shows a decline warning on the declined event without polling', async () => {
