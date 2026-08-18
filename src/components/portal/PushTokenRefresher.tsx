@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { pushSupported } from '@/lib/firebase/messaging';
-import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
+import { enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
 
 // Silently re-registers this device's FCM token on every portal open, but only
 // when the user already granted notifications (permission === 'granted' means
@@ -28,7 +28,8 @@ export default function PushTokenRefresher() {
         // Fire-and-forget: getToken returns the CURRENT subscription's token and
         // the register route arrayUnions it, so a rotated token gets stored and
         // an unchanged one is a no-op. Failures are non-fatal by design.
-        result = await enablePushOnDevice();
+        const detailed = await enablePushOnDeviceDetailed();
+        result = `${detailed.result} / ${detailed.detail}`;
       }
       // Health beacon: report what this device saw so silent delivery failures
       // are diagnosable server-side (users/{uid}.pushHealth).

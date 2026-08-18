@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         pushHealth: {
           supported: body.supported === true,
           permission: typeof body.permission === 'string' ? body.permission.slice(0, 20) : 'unknown',
-          result: typeof body.result === 'string' ? body.result.slice(0, 40) : 'unknown',
+          result: typeof body.result === 'string' ? body.result.slice(0, 240) : 'unknown',
           standalone: body.standalone === true,
           ua: (request.headers.get('user-agent') || '').slice(0, 200),
           at: FieldValue.serverTimestamp(),
