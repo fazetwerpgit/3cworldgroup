@@ -41,7 +41,7 @@ beforeEach(() => {
   gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam Rep', isAdmin: false });
   userDocGetMock.mockResolvedValue({
     exists: true,
-    data: () => ({ fieldRole: 'entry_level_rep', isIBO: false }),
+    data: () => ({ fieldRole: 'entry_level_rep', isIBO: false, status: 'pending' }),
   });
   progressGetMock.mockResolvedValue({ exists: false, data: () => undefined });
 });
@@ -56,6 +56,34 @@ describe('POST /api/portal/onboarding/submit', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'E-signature items are completed by the e-sign provider and do not accept typed references',
     });
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a submission for a user who is no longer pending', async () => {
+    userDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'active' }),
+    });
+
+    const response = await POST(request({ userId: 'u1', itemId: 'w9', reference: 'onboarding/users/u1/w9/' }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Onboarding is closed for this user',
+    });
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a management submission on behalf of a user who is no longer pending', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'admin1', name: 'Admin', isAdmin: true });
+    userDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'active' }),
+    });
+
+    const response = await POST(request({ userId: 'u1', itemId: 'w9', reference: 'onboarding/users/u1/w9/' }));
+
+    expect(response.status).toBe(403);
     expect(setMock).not.toHaveBeenCalled();
   });
 });

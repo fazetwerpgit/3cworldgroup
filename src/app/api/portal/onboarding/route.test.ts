@@ -63,7 +63,7 @@ beforeEach(() => {
   userDocGetMock.mockReset();
   userDocGetMock.mockResolvedValue({
     exists: true,
-    data: () => ({ fieldRole: 'entry_level_rep', isIBO: false }),
+    data: () => ({ fieldRole: 'entry_level_rep', isIBO: false, status: 'pending' }),
   });
 });
 
@@ -126,5 +126,50 @@ describe('GET /api/portal/onboarding', () => {
     const item = json.items.find((i: { id: string }) => i.id === 'contract');
 
     expect(item.esignSigningUrl).toBeNull();
+  });
+});
+
+describe('GET /api/portal/onboarding status gate', () => {
+  function activeUser() {
+    userDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'active' }),
+    });
+  }
+
+  it('auto-sends for a pending user reading their own checklist', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+
+    const res = await GET(makeRequest('u1'));
+    const json = await res.json();
+
+    expect(json.items.length).toBeGreaterThan(0);
+    expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('u1');
+  });
+
+  it('returns an empty checklist and never auto-sends for an active user reading their own', async () => {
+    activeUser();
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+    store.set('userOnboarding/u1_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
+
+    const res = await GET(makeRequest('u1'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.items).toEqual([]);
+    expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+
+  it('still returns records to management viewing an active user, without auto-sending', async () => {
+    activeUser();
+    gateMock.mockResolvedValue({ ok: true, uid: 'admin1', name: 'Admin', isManagement: true });
+    store.set('userOnboarding/u1_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
+
+    const res = await GET(makeRequest('u1'));
+    const json = await res.json();
+    const item = json.items.find((i: { id: string }) => i.id === 'contract');
+
+    expect(item.status).toBe('approved');
+    expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
   });
 });
