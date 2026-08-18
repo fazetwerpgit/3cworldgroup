@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { getEffectiveRole, resolveRoles, RoleDisplayNames } from '@/types';
+import { getEffectiveRole, isAdminLevel, resolveRoles, RoleDisplayNames } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import {
   isEligibleChatMember,
@@ -109,7 +109,7 @@ export async function GET(
 
     // Admins get a pick-list of people they can add (active users not already members).
     // Never returned to non-admins — the key is entirely absent for them.
-    const isAdmin = user.role === 'admin';
+    const isAdmin = isAdminLevel(user.role);
     if (!isAdmin) {
       return NextResponse.json({ members, memberCount: members.length });
     }

@@ -4,8 +4,8 @@ service cloud.firestore {
     // Is the signed-in caller a back-office or field-management user?
     function isManagement() {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return u.role in ['admin', 'operations'] ||
-             u.fieldRole in ['l1_manager','l2_manager','ibo_level_1','ibo_level_2','ibo_level_3','ibo_level_4','general_manager','office_manager'];
+      return u.role in ['admin', 'operations', 'owner'] ||
+             u.fieldRole in ['l1_manager','l2_manager','ibo_level_1','ibo_level_2','ibo_level_3','ibo_level_4','general_manager','office_manager','regional_manager','director'];
     }
 
     // Is the signed-in caller an APPROVED (active) user? Self-signups are
@@ -24,11 +24,14 @@ service cloud.firestore {
     function isOnboardingMember() {
       return request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'pending' &&
-        // Keep this list in step with INVITABLE_FIELD_ROLES in src/types/auth.ts;
-        // the rules language cannot import TypeScript constants.
+        // Keep this list in step with ONBOARDING_FIELD_ROLES in src/types/auth.ts;
+        // the rules language cannot import TypeScript constants. It KEEPS the
+        // retired legacy/IBO tiers — a hire already mid-checklist on one of them
+        // must not lose chat when the invite form stops offering it.
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('fieldRole', null) in
           ['entry_level_rep', 'entry_rep', 'l1_manager', 'l2_manager',
-           'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'];
+           'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4',
+           'ae_tier_1', 'ae_tier_2', 'regional_manager', 'director'];
     }
 
     // A user may create ONLY their own profile, ONLY pending, ONLY these 4
@@ -50,10 +53,10 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Admin/ops can read all users.
+    // Back-office users can read all users.
     match /users/{userId} {
       allow read: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'operations'];
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'operations', 'owner'];
     }
 
     // Per-user chat read receipts (client-written). Chat members only.

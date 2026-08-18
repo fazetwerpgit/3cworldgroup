@@ -1000,7 +1000,11 @@ export default function TeamChatPage() {
     });
   };
 
-  const roleLabel = isRole('admin')
+  // Owner first: isRole('admin') is true for an owner as well, so the owner
+  // branch has to come before it or an owner reads as "Admin".
+  const roleLabel = isRole('owner')
+    ? 'Owner'
+    : isRole('admin')
     ? 'Admin'
     : isRole('operations')
       ? 'Operations'

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { PlatformRole, FieldRole, FieldRoles } from '@/types';
+import { MANAGEMENT_PLATFORM_ROLES, PlatformRole, FieldRole, FieldRoles } from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
 
@@ -61,12 +61,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate roles: `role` is platform-only, `fieldRole` is field-only
-    const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
+    const validPlatformRoles: PlatformRole[] = [...MANAGEMENT_PLATFORM_ROLES];
     const validFieldRoles: FieldRole[] = Object.values(FieldRoles);
     if (role && !validPlatformRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
         { status: 400 }
+      );
+    }
+    // Owner carries the finance permissions. An admin may mint any other
+    // platform account, but only an owner may mint another owner.
+    if (role === 'owner' && !gate.isOwner) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an owner can assign the owner role' },
+        { status: 403 }
       );
     }
     if (fieldRole && !validFieldRoles.includes(fieldRole)) {

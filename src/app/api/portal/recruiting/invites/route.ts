@@ -5,6 +5,7 @@ import {
   FieldRole,
   IBO_FIELD_ROLES,
   INVITABLE_FIELD_ROLES,
+  isManagementRole,
   OnboardingInvite,
   resolveRoles,
 } from '@/types';
@@ -24,8 +25,7 @@ async function getRequester(userId: string) {
   const data = doc.data();
   const { role, fieldRole } = resolveRoles(data?.role, data?.fieldRole);
   const canManage =
-    role === 'admin' ||
-    role === 'operations' ||
+    isManagementRole(role) ||
     fieldRole === 'l1_manager' ||
     fieldRole === 'l2_manager' ||
     (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
@@ -34,7 +34,7 @@ async function getRequester(userId: string) {
     role,
     fieldRole,
     canManage,
-    canViewAll: role === 'admin' || role === 'operations',
+    canViewAll: isManagementRole(role),
     name: data?.displayName || data?.email || '3C Manager',
   };
 }

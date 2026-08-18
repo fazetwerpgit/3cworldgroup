@@ -9,6 +9,8 @@ import {
   CallAudience,
   CallDay,
   IBO_FIELD_ROLES,
+  isManagementRole,
+  PlatformRole,
   resolveRoles,
 } from '@/types';
 
@@ -17,8 +19,8 @@ const VALID_AUDIENCES: CallAudience[] = ['all', 'managers'];
 // Meet links only - video is never hosted in the app
 const MEET_LINK_PATTERN = /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/i;
 
-function canManage(role?: string): boolean {
-  return role === 'admin' || role === 'operations';
+function canManage(role?: PlatformRole): boolean {
+  return isManagementRole(role);
 }
 
 // GET /api/portal/calls - The recurring call schedule, scoped

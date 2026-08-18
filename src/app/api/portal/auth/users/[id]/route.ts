@@ -6,6 +6,8 @@ import {
   PlatformRole,
   FieldRole,
   FieldRoles,
+  isManagementRole,
+  MANAGEMENT_PLATFORM_ROLES,
   roleRequiresOnboarding,
   resolveRoles,
 } from '@/types';
@@ -124,15 +126,30 @@ export async function PUT(
         { status: 403 }
       );
     }
-    if ((existingRole === 'admin' || existingRole === 'operations') && !gate.isAdmin) {
+    if (isManagementRole(existingRole) && !gate.isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden: only an admin can edit an admin or operations account' },
+        { error: 'Forbidden: only an admin can edit a platform account' },
+        { status: 403 }
+      );
+    }
+    // The owner tier is the only one an admin cannot reach: an admin must not be
+    // able to edit an owner's record, nor promote anyone (including themselves)
+    // into the finance tier.
+    if (existingRole === 'owner' && !gate.isOwner) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an owner can edit an owner account' },
+        { status: 403 }
+      );
+    }
+    if (role === 'owner' && !gate.isOwner) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an owner can assign the owner role' },
         { status: 403 }
       );
     }
 
     // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
-    const validPlatformRoles: PlatformRole[] = ['admin', 'operations'];
+    const validPlatformRoles: PlatformRole[] = [...MANAGEMENT_PLATFORM_ROLES];
     const validFieldRoles: FieldRole[] = Object.values(FieldRoles);
     if (role && fieldRole) {
       return NextResponse.json(
@@ -373,12 +390,18 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Only an admin may delete an admin/operations account — an operations
-    // caller must not be able to remove an admin.
+    // Only an admin may delete a platform account — an operations caller must
+    // not be able to remove an admin. An owner may only be removed by an owner.
     const targetRole = doc.get('role') as PlatformRole | undefined;
-    if ((targetRole === 'admin' || targetRole === 'operations') && !gate.isAdmin) {
+    if (isManagementRole(targetRole) && !gate.isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden: only an admin can delete an admin or operations account' },
+        { error: 'Forbidden: only an admin can delete a platform account' },
+        { status: 403 }
+      );
+    }
+    if (targetRole === 'owner' && !gate.isOwner) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an owner can delete an owner account' },
         { status: 403 }
       );
     }

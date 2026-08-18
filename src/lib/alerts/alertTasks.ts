@@ -3,7 +3,7 @@ import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, managerAlertEmail } from '@/lib/email/templates';
 import { createNotificationForMany } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
-import { MANAGEMENT_FIELD_ROLES } from '@/types/auth';
+import { MANAGEMENT_FIELD_ROLES, MANAGEMENT_PLATFORM_ROLES } from '@/types/auth';
 import type { AlertTaskKind } from '@/types/alerts';
 
 const RENAG_MS = 24 * 3600 * 1000;
@@ -24,11 +24,11 @@ function requireDb() {
   return adminDb;
 }
 
-/** All admin/operations users plus active management field-role users. */
+/** All back-office users plus active management field-role users. */
 export async function getManagementUserIds(): Promise<string[]> {
   const db = requireDb();
   const [platform, field] = await Promise.all([
-    db.collection('users').where('role', 'in', ['admin', 'operations']).get(),
+    db.collection('users').where('role', 'in', [...MANAGEMENT_PLATFORM_ROLES]).get(),
     db.collection('users').where('fieldRole', 'in', [...MANAGEMENT_FIELD_ROLES]).get(),
   ]);
 

@@ -3,13 +3,28 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserRole } from '@/types';
+import { isOwner, UserRole, type FieldRole, type PlatformRole } from '@/types';
 
 interface UseRequireAuthOptions {
   requiredRoles?: UserRole[];
   requiredPermissions?: string[];
   redirectTo?: string;
   redirectIfFound?: string;
+}
+
+// The role check the redirect effect and isAuthorized() below share. It used to
+// be written out twice, so a gate fixed in one copy stayed broken in the other.
+// An owner satisfies any gate asking for 'admin': the tier sits above it, and
+// every ProtectedRoute in the portal admits admin.
+function satisfiesRoles(
+  user: { role?: PlatformRole; fieldRole?: FieldRole },
+  requiredRoles?: UserRole[]
+): boolean {
+  if (!requiredRoles || requiredRoles.length === 0) return true;
+  const roleKey = user.role ?? user.fieldRole;
+  if (!roleKey) return false;
+  if (requiredRoles.includes(roleKey)) return true;
+  return isOwner(roleKey) && requiredRoles.includes('admin');
 }
 
 export function useRequireAuth(options: UseRequireAuthOptions = {}) {
@@ -38,12 +53,9 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
     }
 
     // Check role requirements
-    if (requiredRoles && requiredRoles.length > 0) {
-      const roleKey = user.role ?? user.fieldRole;
-      if (!roleKey || !requiredRoles.includes(roleKey)) {
-        router.push('/portal/dashboard');
-        return;
-      }
+    if (!satisfiesRoles(user, requiredRoles)) {
+      router.push('/portal/dashboard');
+      return;
     }
 
     // Check permission requirements
@@ -68,10 +80,7 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
   const isAuthorized = (): boolean => {
     if (!user) return false;
 
-    if (requiredRoles && requiredRoles.length > 0) {
-      const roleKey = user.role ?? user.fieldRole;
-      if (!roleKey || !requiredRoles.includes(roleKey)) return false;
-    }
+    if (!satisfiesRoles(user, requiredRoles)) return false;
 
     if (requiredPermissions && requiredPermissions.length > 0) {
       if (!requiredPermissions.every((p) => hasPermission(p))) return false;

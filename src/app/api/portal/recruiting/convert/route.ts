@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
-import { IBO_FIELD_ROLES, resolveRoles } from '@/types';
+import { IBO_FIELD_ROLES, isManagementRole, resolveRoles } from '@/types';
 
 async function getRequester(userId: string) {
   if (!adminDb) return null;
@@ -11,8 +11,7 @@ async function getRequester(userId: string) {
   const data = doc.data();
   const { role, fieldRole } = resolveRoles(data?.role, data?.fieldRole);
   const canConvert =
-    role === 'admin' ||
-    role === 'operations' ||
+    isManagementRole(role) ||
     fieldRole === 'l1_manager' ||
     fieldRole === 'l2_manager' ||
     (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
@@ -21,7 +20,7 @@ async function getRequester(userId: string) {
     role,
     fieldRole,
     canConvert,
-    canViewAll: role === 'admin' || role === 'operations',
+    canViewAll: isManagementRole(role),
     name: data?.displayName || data?.email || '3C Manager',
   };
 }

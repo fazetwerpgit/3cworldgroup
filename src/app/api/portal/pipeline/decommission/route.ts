@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
-import { DecommissionReason, DecommissionReasonLabels } from '@/types';
+import { DecommissionReason, DecommissionReasonLabels, isManagementRole } from '@/types';
 
 const VALID_REASONS: DecommissionReason[] = ['non_activity', 'wrongdoing', 'manager_fire'];
 
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
     // Guard: only field reps go through decommission (platform users are
     // managed in User Management directly)
-    if (data?.role === 'admin' || data?.role === 'operations') {
+    if (isManagementRole(data?.role)) {
       return NextResponse.json(
         { error: 'Platform users cannot be decommissioned. Use User Management.' },
         { status: 400 }

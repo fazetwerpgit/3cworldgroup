@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
-import { resolveRoles } from '@/types';
+import { isAdminLevel, resolveRoles } from '@/types';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -19,7 +19,7 @@ async function notifyAdmins(title: string, message: string) {
     const adminUids = snap.docs
       .filter((d) => {
         const data = d.data();
-        return resolveRoles(data.role, data.fieldRole).role === 'admin';
+        return isAdminLevel(resolveRoles(data.role, data.fieldRole).role);
       })
       .map((d) => d.id);
     await Promise.all(

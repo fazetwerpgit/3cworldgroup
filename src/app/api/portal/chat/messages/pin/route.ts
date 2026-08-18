@@ -1,19 +1,18 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { PlatformRole, FieldRole, IBO_FIELD_ROLES } from '@/types';
+import { PlatformRole, FieldRole, IBO_FIELD_ROLES, isManagementRole } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { readStoredAttachment } from '@/lib/chat/media';
 
-// Who may pin/unpin: platform admins/operations OR field managers. This is
-// BROADER than canModerate (which is admin/operations only) — pinning is a
+// Who may pin/unpin: back-office management OR field managers. This is
+// BROADER than canModerate (which is management only) — pinning is a
 // lightweight curation act managers are trusted with, deleting others' messages is
 // not. Reps are excluded. Derived from the same role facts the client mirrors.
 function canPinMessages(user: { role?: PlatformRole; fieldRole?: FieldRole }): boolean {
   return (
-    user.role === 'admin' ||
-    user.role === 'operations' ||
+    isManagementRole(user.role) ||
     user.fieldRole === 'l1_manager' ||
     user.fieldRole === 'l2_manager' ||
     (user.fieldRole ? IBO_FIELD_ROLES.includes(user.fieldRole) : false)

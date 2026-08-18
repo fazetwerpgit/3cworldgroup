@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
-import { Sale, SaleStatus } from '@/types';
+import { MANAGEMENT_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 
@@ -245,11 +245,11 @@ export async function POST(request: NextRequest) {
       `/portal/sales/${docRef.id}`
     );
 
-    // Notify all admin/operations users (sales review is platform-only now).
+    // Notify all back-office users (sales review is platform-only now).
     try {
       const reviewersSnap = await adminDb
         .collection('users')
-        .where('role', 'in', ['admin', 'operations'])
+        .where('role', 'in', [...MANAGEMENT_PLATFORM_ROLES])
         .get();
       await Promise.all(
         reviewersSnap.docs.map((reviewerDoc) =>

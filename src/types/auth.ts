@@ -1,5 +1,6 @@
-// Platform (back-office) roles
-export type PlatformRole = 'admin' | 'operations';
+// Platform (back-office) roles. 'owner' sits above admin: it carries every
+// admin permission plus the finance ones, and satisfies every admin gate.
+export type PlatformRole = 'admin' | 'operations' | 'owner';
 
 // Field sales roles
 export type FieldRole =
@@ -29,6 +30,7 @@ export type UserRole = PlatformRole | FieldRole;
 export const PlatformRoles = {
   ADMIN: 'admin',
   OPERATIONS: 'operations',
+  OWNER: 'owner',
 } as const;
 
 export const FieldRoles = {
@@ -106,24 +108,29 @@ const FIELD_MANAGER_PERMISSIONS = [
   'recruiting:write',
 ];
 
+const ADMIN_PERMISSIONS = [
+  ...BASE_PERMISSIONS,
+  'users:read', 'users:write', 'users:delete',
+  'sales:read', 'sales:write', 'sales:approve', 'sales:delete',
+  'training:write', 'training:delete',
+  'leaderboard:manage',
+  'settings:read', 'settings:write',
+  'reports:read', 'reports:export',
+  'territories:read', 'territories:write',
+  'shorts:write',
+  'links:write',
+  'chat:moderate',
+  'recruiting:read',
+  'recruiting:write',
+  'recruiting:convert',
+];
+
 // Permission sets for each role - central authorization logic
 export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
-  admin: [
-    ...BASE_PERMISSIONS,
-    'users:read', 'users:write', 'users:delete',
-    'sales:read', 'sales:write', 'sales:approve', 'sales:delete',
-    'training:write', 'training:delete',
-    'leaderboard:manage',
-    'settings:read', 'settings:write',
-    'reports:read', 'reports:export',
-    'territories:read', 'territories:write',
-    'shorts:write',
-    'links:write',
-    'chat:moderate',
-    'recruiting:read',
-    'recruiting:write',
-    'recruiting:convert',
-  ],
+  admin: [...ADMIN_PERMISSIONS],
+  // Owner is admin plus the money: comp plan rates and the "3C Receives"
+  // margin. Nothing below owner ever carries a finance:* permission.
+  owner: [...ADMIN_PERMISSIONS, 'finance:read', 'finance:write'],
   operations: [
     ...BASE_PERMISSIONS,
     'users:read',
@@ -161,6 +168,7 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
 export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   admin: 'Administrator',
   operations: 'Operations',
+  owner: 'Owner',
   entry_rep: 'Account Executive',
   entry_level_rep: 'Entry Level Rep',
   l1_manager: 'L1 Manager',
@@ -253,6 +261,34 @@ export function resolveRoles(
 // Type guard: is this value a platform (back-office) role?
 export function isPlatformRole(value: string | undefined): value is PlatformRole {
   return !!value && PLATFORM_ROLE_VALUES.includes(value);
+}
+
+// Role predicates. Gates call these instead of comparing role literals: owner
+// is a superset of admin, so every `role === 'admin'` written by hand is a place
+// an owner would be locked out of. Adding a tier above admin has to stay a
+// one-file change.
+export function isOwner(role?: PlatformRole | FieldRole): boolean {
+  return role === 'owner';
+}
+
+/** Admin or above — the gate for anything an administrator may do. */
+export function isAdminLevel(role?: PlatformRole | FieldRole): boolean {
+  return role === 'admin' || role === 'owner';
+}
+
+// Every back-office role. Exported because a Firestore where('role','in',[...])
+// cannot call a predicate — the recipient queries that fan notifications out to
+// management read this list, so a new platform role can't silently drop out of
+// them the way it would from a hand-written array.
+export const MANAGEMENT_PLATFORM_ROLES: readonly PlatformRole[] = [
+  'admin',
+  'operations',
+  'owner',
+];
+
+/** Back-office management: admin, operations, or owner. */
+export function isManagementRole(role?: PlatformRole | FieldRole): boolean {
+  return !!role && (MANAGEMENT_PLATFORM_ROLES as readonly string[]).includes(role);
 }
 
 // The single role used for display/selection in UI.
