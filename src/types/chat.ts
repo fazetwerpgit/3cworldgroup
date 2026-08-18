@@ -1,4 +1,4 @@
-import { isManagementRole, PlatformRole, FieldRole, IBO_FIELD_ROLES } from './auth';
+import { isManagementRole, PlatformRole, FieldRole, MANAGEMENT_FIELD_ROLES } from './auth';
 
 export type ChatChannelAudience = 'all' | 'field' | 'managers' | 'platform';
 
@@ -107,11 +107,7 @@ export function canAccessChatChannel(
   if (channel.audience === 'all') return !!role || !!fieldRole;
   if (channel.audience === 'field') return !!fieldRole;
   if (channel.audience === 'managers') {
-    return (
-      fieldRole === 'l1_manager' ||
-      fieldRole === 'l2_manager' ||
-      (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false)
-    );
+    return fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false;
   }
   if (channel.audience === 'platform') return isManagementRole(role);
   return false;

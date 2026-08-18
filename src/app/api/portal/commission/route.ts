@@ -11,15 +11,8 @@ import {
   resolveRoles,
 } from '@/types';
 
-const FIELD_ROLES: FieldRole[] = [
-  'entry_rep',
-  'l1_manager',
-  'l2_manager',
-  'ibo_level_1',
-  'ibo_level_2',
-  'ibo_level_3',
-  'ibo_level_4',
-];
+// Derived so the editable role list can never drift from the tier defaults.
+const FIELD_ROLES: FieldRole[] = DEFAULT_COMMISSION.map((tier) => tier.fieldRole);
 
 // Load tiers from config/commission, falling back to the zero placeholders.
 async function loadTiers(): Promise<{
@@ -166,15 +159,27 @@ export async function PUT(request: NextRequest) {
           : {}),
       });
     }
-    if (cleaned.length !== FIELD_ROLES.length) {
+    if (!cleaned.length) {
       return NextResponse.json(
-        { error: `Expected exactly ${FIELD_ROLES.length} tiers (one per field role)` },
+        { error: 'Expected at least one tier' },
         { status: 400 }
       );
     }
 
+    // A payload may name any subset of the roles: demanding one tier per role
+    // would reject an older client the moment the role list grows. Roles the
+    // payload leaves out keep their stored rate instead of reverting to the
+    // placeholder, and the doc is still written whole, one row per known role.
+    const { tiers: stored } = await loadTiers();
+    const byRole = new Map(stored.map((tier) => [tier.fieldRole, tier]));
+    for (const tier of cleaned) byRole.set(tier.fieldRole, tier);
+    const merged = FIELD_ROLES.flatMap((role) => {
+      const tier = byRole.get(role);
+      return tier ? [tier] : [];
+    });
+
     await adminDb.collection('config').doc('commission').set({
-      tiers: cleaned,
+      tiers: merged,
       updatedBy: gate.uid,
       updatedByName: gate.name,
       updatedAt: new Date(),

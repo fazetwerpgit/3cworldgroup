@@ -73,7 +73,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 
 import { createChannelId, getMemberIdsForAudience, syncChatChannels } from './channels';
-import { canAccessChatChannel } from '@/types';
+import { canAccessChatChannel, MANAGEMENT_FIELD_ROLES } from '@/types';
 import type { ChatChannel } from '@/types';
 
 describe('createChannelId', () => {
@@ -167,5 +167,24 @@ describe('canAccessChatChannel', () => {
     };
 
     expect(canAccessChatChannel(channel, undefined, 'ibo_level_1')).toBe(true);
+  });
+
+  it('admits every management field role and no one else', () => {
+    const channel: ChatChannel = {
+      id: 'managers',
+      name: 'Managers',
+      description: '',
+      audience: 'managers',
+      order: 1,
+      active: true,
+    };
+
+    for (const fieldRole of MANAGEMENT_FIELD_ROLES) {
+      expect(canAccessChatChannel(channel, undefined, fieldRole)).toBe(true);
+    }
+    for (const fieldRole of ['entry_rep', 'ae_tier_1', 'ae_tier_2', 'internal_rep'] as const) {
+      expect(canAccessChatChannel(channel, undefined, fieldRole)).toBe(false);
+    }
+    expect(canAccessChatChannel(channel, undefined, undefined)).toBe(false);
   });
 });

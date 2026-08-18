@@ -7,7 +7,7 @@ import { Sale, SaleStatus, FIBER_COMPANIES, PAY_DELAY_DAYS } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
-import { expectedPayDate, expectedPayForSale } from '@/lib/pay/expectedPay';
+import { expectedPayDate, expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import {
   Dialog,
   DialogContent,
@@ -123,17 +123,20 @@ export function SalesTable({
     [canApprove, sales, statusFilter]
   );
   // Pay is owed off the install, so a sale without an install date has nothing
-  // to show yet. Newest install first — that is the money arriving soonest.
+  // to show yet, and a dead sale never will. Newest install first — that is the
+  // money arriving soonest.
   const paySales = useMemo(
     () => sales
-      .filter((sale) => !!sale.installDate)
+      .filter((sale) => !!sale.installDate && isPayableSale(sale))
       .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
     [sales]
   );
   const expectedBySale = useMemo(() => {
     const map: Record<string, number | null> = {};
     if (!repMode) return map;
-    for (const sale of sales) map[sale.id || ''] = expectedPayForSale(sale, rates);
+    for (const sale of sales) {
+      map[sale.id || ''] = isPayableSale(sale) ? expectedPayForSale(sale, rates) : null;
+    }
     return map;
   }, [rates, repMode, sales]);
 

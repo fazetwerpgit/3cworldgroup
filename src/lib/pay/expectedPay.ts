@@ -8,6 +8,16 @@ import { PAY_DELAY_DAYS } from '@/types';
 // planId → dollars) as served by GET /api/portal/comp-plan for a field user —
 // never the full role-keyed table.
 
+/**
+ * Is there still money coming for this sale? A rejected or cancelled sale is
+ * dead — it must never show an expected amount, count toward an expected total,
+ * or sit on the Pay list. Pending sales stay payable: they are money in review,
+ * not money lost.
+ */
+export function isPayableSale(sale: Pick<Sale, 'status'>): boolean {
+  return sale.status !== 'rejected' && sale.status !== 'cancelled';
+}
+
 /** A stored plan can lag the product catalog, so an unknown company/plan is 0, never a throw. */
 function rateForProduct(rates: CompPlanCompanyRates, company: string, planId: string): number {
   const value = rates[company]?.[planId];

@@ -11,7 +11,7 @@ import { SalesTable } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useAuth } from '@/contexts/AuthContext';
-import { expectedPayForSale } from '@/lib/pay/expectedPay';
+import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { Sale, SaleStatus } from '@/types';
 
 const STATUS_VALUES: SaleStatus[] = ['pending', 'approved', 'rejected', 'cancelled'];
@@ -169,9 +169,13 @@ function SalesContent() {
   // Expected pay is personal: only a rep on a comp plan gets a number here.
   // Management sees a dash — the ledger's commission column is where their
   // team's money lives, and their own pay is not this page's business.
+  // A rejected or cancelled sale is money that is not coming, so it adds nothing.
   const expectedPayMtd = canApprove || !hasPlan
     ? null
-    : mtdSales.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
+    : mtdSales.reduce(
+        (sum, sale) => sum + (isPayableSale(sale) ? expectedPayForSale(sale, rates) ?? 0 : 0),
+        0
+      );
   const dateLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
     .format(now)
     .toUpperCase();

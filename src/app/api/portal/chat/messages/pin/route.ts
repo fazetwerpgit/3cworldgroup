@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { PlatformRole, FieldRole, IBO_FIELD_ROLES, isManagementRole } from '@/types';
+import { PlatformRole, FieldRole, MANAGEMENT_FIELD_ROLES, isManagementRole } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { readStoredAttachment } from '@/lib/chat/media';
@@ -13,9 +13,7 @@ import { readStoredAttachment } from '@/lib/chat/media';
 function canPinMessages(user: { role?: PlatformRole; fieldRole?: FieldRole }): boolean {
   return (
     isManagementRole(user.role) ||
-    user.fieldRole === 'l1_manager' ||
-    user.fieldRole === 'l2_manager' ||
-    (user.fieldRole ? IBO_FIELD_ROLES.includes(user.fieldRole) : false)
+    (user.fieldRole ? MANAGEMENT_FIELD_ROLES.includes(user.fieldRole) : false)
   );
 }
 

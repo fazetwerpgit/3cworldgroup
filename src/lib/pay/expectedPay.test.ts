@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { SaleProduct } from '@/types';
-import { expectedPayDate, expectedPayForSale } from './expectedPay';
+import { expectedPayDate, expectedPayForSale, isPayableSale } from './expectedPay';
 
 const rates = {
   tfiber: { 'tfiber-1gig': 100, 'tfiber-2gig': 125 },
@@ -85,5 +85,17 @@ describe('expectedPayDate', () => {
   it('returns null without an install date, and for an unparseable one', () => {
     expect(expectedPayDate({}, 14)).toBeNull();
     expect(expectedPayDate({ installDate: 'not-a-date' as unknown as Date }, 14)).toBeNull();
+  });
+});
+
+describe('isPayableSale', () => {
+  it('treats pending and approved sales as money still coming', () => {
+    expect(isPayableSale({ status: 'pending' })).toBe(true);
+    expect(isPayableSale({ status: 'approved' })).toBe(true);
+  });
+
+  it('treats rejected and cancelled sales as dead', () => {
+    expect(isPayableSale({ status: 'rejected' })).toBe(false);
+    expect(isPayableSale({ status: 'cancelled' })).toBe(false);
   });
 });
