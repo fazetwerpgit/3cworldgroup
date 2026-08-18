@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase/config';
-import { pushSupported, requestPushToken } from '@/lib/firebase/messaging';
+import { pushSupported } from '@/lib/firebase/messaging';
+import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
 
 type State = 'checking' | 'unsupported' | 'off' | 'on' | 'working';
 
@@ -24,32 +24,20 @@ export default function PushNotificationsCard() {
     })();
   }, []);
 
-  const authedFetch = async (url: string, init?: RequestInit) => {
-    const token = await auth?.currentUser?.getIdToken();
-    return fetch(url, { ...init, headers: { ...(init?.headers || {}), Authorization: `Bearer ${token ?? ''}` } });
-  };
-
   const enable = async () => {
     setState('working');
     setError('');
-    try {
-      const fcmToken = await requestPushToken();
-      if (!fcmToken) {
-        setError('Notifications were blocked. Enable them in your browser settings and try again.');
-        setState('off');
-        return;
-      }
-      const res = await authedFetch('/api/portal/push/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: fcmToken }),
-      });
-      if (!res.ok) throw new Error('register failed');
+    const result = await enablePushOnDevice();
+    if (result === 'enabled') {
       setState('on');
-    } catch {
-      setError('Could not enable notifications. Please try again.');
-      setState('off');
+      return;
     }
+    setError(
+      result === 'blocked'
+        ? 'Notifications were blocked. Enable them in your browser settings and try again.'
+        : 'Could not enable notifications. Please try again.'
+    );
+    setState('off');
   };
 
   if (state === 'unsupported') {
