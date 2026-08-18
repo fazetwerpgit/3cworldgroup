@@ -1895,6 +1895,19 @@ body.portal-scope {
   border-color: var(--rail-line);
 }
 
+/* On phones the panel is wider than the space right of the bell (which sits
+   ~54px in from the edge), so absolute right:0 anchoring pushed its left side
+   off-screen. Pin it to the viewport instead. */
+@media (max-width: 640px) {
+  .portal-notification-panel {
+    position: fixed;
+    top: calc(var(--portal-safe-top) + 66px);
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
 .portal-notification-header,
 .portal-notification-clear {
   display: flex;
@@ -3415,7 +3428,10 @@ body.portal-scope {
   justify-content: space-between;
   gap: 20px;
   border-bottom: 1px solid rgba(231, 237, 244, 0.14);
-  padding: 25px;
+  /* The sheet is fixed to top:0 and draws under the iOS status bar
+     (viewport-fit=cover), so the header must clear the notch or the close X
+     is rendered underneath it — invisible and untappable on notched iPhones. */
+  padding: max(25px, calc(var(--portal-safe-top) + 12px)) 25px 25px;
 }
 
 .sales-line-sheet-top h2 {
@@ -3427,8 +3443,9 @@ body.portal-scope {
 
 .sales-line-icon-button {
   display: grid;
-  width: 32px;
-  height: 32px;
+  /* 44px = Apple's minimum touch target; this is the only way out of the sheet. */
+  width: 44px;
+  height: 44px;
   flex: none;
   place-items: center;
   border: 1px solid rgba(231, 237, 244, 0.14);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -88,14 +88,45 @@ export function SaleDetailSheet({
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
 
+  // Ref keeps the effects below on [open] only: callers pass an inline
+  // onOpenChange, and re-running the history effect per render would push a
+  // history entry per keystroke.
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false);
+      if (event.key === 'Escape') onOpenChangeRef.current(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onOpenChange, open]);
+  }, [open]);
+
+  // On phones the sheet covers the whole screen, so the back gesture/button
+  // must close it — not navigate away from the sales page. Opening pushes a
+  // history entry; back pops it and closes the sheet; closing any other way
+  // (X, backdrop, Escape) consumes the entry so history stays balanced.
+  const historyPushedRef = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    window.history.pushState({ saleDetailSheet: true }, '');
+    historyPushedRef.current = true;
+    const onPopState = () => {
+      historyPushedRef.current = false;
+      onOpenChangeRef.current(false);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      if (historyPushedRef.current) {
+        historyPushedRef.current = false;
+        window.history.back();
+      }
+    };
+  }, [open]);
 
   if (!sale) return null;
 
