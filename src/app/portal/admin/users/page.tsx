@@ -10,7 +10,11 @@ import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { graduatedFieldRole, FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
 
-const FIELD_ROLE_OPTIONS = Object.values(FieldRoles) as FieldRole[];
+// Assignable field roles only — retired tiers (IBO levels, L1/L2 manager)
+// stay valid for users who already hold them but are never offered here.
+const FIELD_ROLE_OPTIONS = (Object.values(FieldRoles) as FieldRole[]).filter(
+  (role) => !role.startsWith('ibo_level_') && role !== 'l1_manager' && role !== 'l2_manager'
+);
 
 // The user-management routes verify the caller from the ID token. The userId in
 // each URL is the TARGET being read, edited or deleted — management acting on
@@ -355,17 +359,18 @@ export default function UsersPage() {
                     {approvePanel === u.uid && (
                       <div className="admin-line-approval-panel open">
                         <div className="admin-line-meta">Assign role before approval</div>
-                        <div className="admin-line-segmented" role="group" aria-label="Field role">
-                          {FIELD_ROLE_OPTIONS.map((value) => (
-                            <button
-                              key={value}
-                              type="button"
-                              aria-pressed={approveFieldRole === value}
-                              onClick={() => setApproveFieldRole(value)}
-                            >
-                              {RoleDisplayNames[value]}
-                            </button>
-                          ))}
+                        <div className="admin-line-field">
+                          <select
+                            aria-label="Field role"
+                            value={approveFieldRole}
+                            onChange={(e) => setApproveFieldRole(e.target.value as FieldRole)}
+                          >
+                            {FIELD_ROLE_OPTIONS.map((value) => (
+                              <option key={value} value={value}>
+                                {RoleDisplayNames[value]}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div style={{ marginTop: 8 }}>
                           <button
