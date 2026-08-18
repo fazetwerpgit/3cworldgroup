@@ -5626,7 +5626,9 @@ body.portal-scope {
 
   .chat-line-thread-composer-row .chat-line-textarea {
     min-height: 30px !important;
-    font-size: 11px !important;
+    /* 16px minimum: iOS Safari force-zooms the page into any focused text box
+       smaller than 16px, leaving the composer off-screen while typing. */
+    font-size: 16px !important;
   }
 
   .chat-line-thread-composer-meta {
