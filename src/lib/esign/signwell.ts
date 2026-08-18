@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { EsignProvider, EsignDocKey, EnvelopeRequest, EnvelopeResult, EsignWebhookEvent } from './provider';
 
 const SIGNWELL_BASE = 'https://www.signwell.com/api/v1';
-const SIGNER_RECIPIENT_ID = 'signer';
+export const SIGNER_RECIPIENT_ID = 'signer';
 
 type SignWellFieldType = 'signature' | 'date';
 
@@ -134,7 +134,7 @@ export const signwellProvider: EsignProvider = {
       body: JSON.stringify({
         test_mode: testMode,
         name: config.name,
-        embedded_signing: false,
+        embedded_signing: true,
         metadata: { userId: req.userId, itemId: req.itemId },
         files: [{ name: config.file, file_base64: fileBase64 }],
         recipients: [
@@ -146,8 +146,13 @@ export const signwellProvider: EsignProvider = {
     if (!res.ok) {
       throw new Error(`SignWell createEnvelope failed: ${res.status} ${await res.text()}`);
     }
-    const data = (await res.json()) as { id: string };
-    return { envelopeId: data.id };
+    const data = (await res.json()) as {
+      id: string;
+      recipients?: Array<{ id?: string; embedded_signing_url?: string | null }>;
+    };
+    const signer = data.recipients?.find((r) => r.id === SIGNER_RECIPIENT_ID) ?? data.recipients?.[0];
+    const embeddedSigningUrl = signer?.embedded_signing_url || undefined;
+    return embeddedSigningUrl ? { envelopeId: data.id, embeddedSigningUrl } : { envelopeId: data.id };
   },
 
   async parseWebhook(rawBody: string, headers: Headers): Promise<EsignWebhookEvent | null> {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { verifySignwellHash, signwellProvider } from './signwell';
+import { verifySignwellHash, signwellProvider, SIGNER_RECIPIENT_ID } from './signwell';
 import { createHmac } from 'node:crypto';
 
 describe('verifySignwellHash', () => {
@@ -12,6 +12,14 @@ describe('verifySignwellHash', () => {
 });
 
 describe('signwellProvider.createEnvelope', () => {
+  const baseRequest = {
+    docKey: 'contract' as const,
+    userId: 'u1',
+    itemId: 'contract',
+    signerName: 'Sam Rep',
+    signerEmail: 'sam@x.com',
+  };
+
   beforeEach(() => {
     vi.stubEnv('SIGNWELL_API_KEY', 'sw_key');
     vi.stubEnv('SIGNWELL_TEST_MODE', 'true');
@@ -119,6 +127,29 @@ describe('signwellProvider.createEnvelope', () => {
         signerName: 'S', signerEmail: 's@x.com',
       })
     ).resolves.toEqual({ envelopeId: 'doc_123' });
+  });
+
+  it('requests embedded signing', async () => {
+    await signwellProvider.createEnvelope(baseRequest);
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.embedded_signing).toBe(true);
+  });
+
+  it('returns the signer embedded_signing_url from the response', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response(JSON.stringify({
+      id: 'env_1',
+      recipients: [{ id: SIGNER_RECIPIENT_ID, embedded_signing_url: 'https://www.signwell.com/e/abc' }],
+    }), { status: 201 }));
+    const result = await signwellProvider.createEnvelope(baseRequest);
+    expect(result).toEqual({ envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/abc' });
+  });
+
+  it('omits embeddedSigningUrl when the response has none', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response(JSON.stringify({ id: 'env_2' }), { status: 201 }));
+    const result = await signwellProvider.createEnvelope(baseRequest);
+    expect(result.envelopeId).toBe('env_2');
+    expect(result.embeddedSigningUrl).toBeUndefined();
   });
 });
 

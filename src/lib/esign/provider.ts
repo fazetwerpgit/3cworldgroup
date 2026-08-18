@@ -11,7 +11,11 @@ export interface EnvelopeRequest {
   prefill?: Record<string, string>;
 }
 
-export interface EnvelopeResult { envelopeId: string; }
+export interface EnvelopeResult {
+  envelopeId: string;
+  /** Present when the provider supports in-portal (embedded) signing. Bearer capability — owner-only. */
+  embeddedSigningUrl?: string;
+}
 
 export interface EsignWebhookEvent {
   envelopeId: string;
