@@ -15,6 +15,7 @@ import {
   RadioTower,
   Save,
 } from 'lucide-react';
+import { CompPlanMatrix } from '@/components/resources/CompPlanMatrix';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,13 +69,18 @@ const TIER_NOTES: Record<FieldRole, string> = {
   entry_level_rep: 'Entry-level onboarding role; commission begins after promotion.',
   l1_manager: 'Commission on your own sales plus an override on your team.',
   l2_manager: 'Commission on your own sales plus an override on your organization.',
-  ibo_level_1: 'Commission on your own sales plus an IBO team override.',
-  ibo_level_2: 'Commission on your own sales plus an IBO team override.',
-  ibo_level_3: 'Commission on your own sales plus an IBO team override.',
-  ibo_level_4: 'Commission on your own sales plus an IBO team override.',
+  ibo_level_1: 'Commission on your own approved sales at your tier rate.',
+  ibo_level_2: 'Commission on your own approved sales at your tier rate.',
+  ibo_level_3: 'Commission on your own approved sales at your tier rate.',
+  ibo_level_4: 'Commission on your own approved sales at your tier rate.',
   general_manager: 'General Manager commission on your own sales plus an override on your team.',
   gm_in_training: 'GM in Training commission on your own approved sales.',
   office_manager: 'Office Manager commission on your own sales plus an override on your team.',
+  ae_tier_1: 'Account Executive Tier 1 commission on your own approved sales.',
+  ae_tier_2: 'Account Executive Tier 2 commission on your own approved sales.',
+  regional_manager: 'Regional Manager commission on your own approved sales.',
+  director: 'Director commission on your own approved sales.',
+  internal_rep: 'Internal Rep commission on your own approved sales.',
 };
 
 export function ResourcesLineShell({ children }: { children: React.ReactNode }) {
@@ -263,7 +269,7 @@ export function ResourcesLineShortsLane() {
 }
 
 export function ResourcesLinePayLane() {
-  const { user, isRole } = useAuth();
+  const { user, isRole, hasPermission } = useAuth();
   const [data, setData] = useState<PayStructureResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -273,6 +279,10 @@ export function ResourcesLinePayLane() {
   const [success, setSuccess] = useState('');
 
   const isAdmin = isRole('admin');
+  // The comp plan carries the "3C Receives" margin, which is the finance tier's
+  // alone: owner AND the finance permission, never an isRole('admin') check
+  // (an owner satisfies that, but an admin must not satisfy this).
+  const showCompPlan = isRole('owner') && hasPermission('finance:read');
 
   const fetchStructure = useCallback(async () => {
     if (!user) return;
@@ -426,6 +436,8 @@ export function ResourcesLinePayLane() {
           {data.updatedByName ? ` by ${data.updatedByName}` : ''}
         </p>
       )}
+
+      {showCompPlan && <CompPlanMatrix />}
     </section>
   );
 }

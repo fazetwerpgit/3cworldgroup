@@ -1,7 +1,15 @@
 import { NextRequest } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { isOnboardingAllowedApi } from '@/lib/auth/onboardingAccess';
-import { MANAGEMENT_FIELD_ROLES, resolveRoles, PlatformRole, FieldRole } from '@/types';
+import {
+  isAdminLevel,
+  isManagementRole,
+  isOwner,
+  MANAGEMENT_FIELD_ROLES,
+  resolveRoles,
+  PlatformRole,
+  FieldRole,
+} from '@/types';
 
 // The onboarding-stage status relaxation is derived from the shared API
 // allowlist in onboardingAccess.ts, so route declarations cannot drift from it.
@@ -83,24 +91,30 @@ export async function requireVerifiedUser(
   };
 }
 
-// Verifies a real token and confirms the caller is management (admin/operations).
-// Use for review lists that expose customer PII. `isAdmin` distinguishes the two
-// so routes can enforce the platform-role boundary (only an admin may create,
-// edit or delete an admin/operations account) without a second lookup.
+// Verifies a real token and confirms the caller is management (admin, operations
+// or owner). Use for review lists that expose customer PII. `isAdmin` is true for
+// admin and owner, so routes can enforce the platform-role boundary (only an
+// admin-level caller may create, edit or delete a platform account) without a
+// second lookup. `isOwner` narrows that further: the owner role is the finance
+// tier, and only an owner may grant, edit or revoke it.
 export async function requireVerifiedManagement(
   request: NextRequest
-): Promise<{ ok: true; uid: string; name: string; isAdmin: boolean } | { ok: false; error: string; status: number }> {
+): Promise<
+  | { ok: true; uid: string; name: string; isAdmin: boolean; isOwner: boolean }
+  | { ok: false; error: string; status: number }
+> {
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
-  if (role !== 'admin' && role !== 'operations') {
+  if (!isManagementRole(role)) {
     return { ok: false, error: 'Forbidden: management access required', status: 403 };
   }
   return {
     ok: true,
     uid: c.uid,
     name: c.data.displayName || c.data.email || 'Manager',
-    isAdmin: role === 'admin',
+    isAdmin: isAdminLevel(role),
+    isOwner: isOwner(role),
   };
 }
 
@@ -117,7 +131,7 @@ export async function requireVerifiedSelfOrManagement(
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
-  const isManagement = role === 'admin' || role === 'operations';
+  const isManagement = isManagementRole(role);
   if (!isManagement && c.uid !== targetUserId) {
     return { ok: false, error: 'Forbidden: you can only access your own data', status: 403 };
   }
@@ -140,9 +154,7 @@ export async function requireVerifiedFieldManagerOrManagement(
   if (!c.ok) return c;
   const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
   const allowed =
-    role === 'admin' ||
-    role === 'operations' ||
-    (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
+    isManagementRole(role) || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
   if (!allowed) {
     return { ok: false, error: 'Forbidden: manager access required', status: 403 };
   }
@@ -166,7 +178,7 @@ export async function requireVerifiedAdmin(
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
-  if (role !== 'admin') {
+  if (!isAdminLevel(role)) {
     return { ok: false, error: 'Forbidden: admin access required', status: 403 };
   }
   return { ok: true, uid: c.uid, name: c.data.displayName || c.data.email || 'Admin' };
@@ -187,11 +199,11 @@ export async function requireVerifiedRequester(
       email: string;
       role?: PlatformRole;
       fieldRole?: FieldRole;
-      /** admin or operations */
+      /** admin, operations, or owner */
       isManagement: boolean;
-      /** admin only */
+      /** admin or owner */
       isAdmin: boolean;
-      /** admin, operations, or a management field role */
+      /** admin, operations, owner, or a management field role */
       isManagerOrAbove: boolean;
     }
   | { ok: false; error: string; status: number }
@@ -199,7 +211,7 @@ export async function requireVerifiedRequester(
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
-  const isManagement = role === 'admin' || role === 'operations';
+  const isManagement = isManagementRole(role);
   return {
     ok: true,
     uid: c.uid,
@@ -208,7 +220,7 @@ export async function requireVerifiedRequester(
     role,
     fieldRole,
     isManagement,
-    isAdmin: role === 'admin',
+    isAdmin: isAdminLevel(role),
     isManagerOrAbove:
       isManagement || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false),
   };

@@ -5,7 +5,7 @@ import {
   getOnboardingItemsForUser,
   requiresHeavyVetting,
 } from './onboarding';
-import { INVITABLE_FIELD_ROLES } from './auth';
+import { INVITABLE_FIELD_ROLES, LIGHT_VETTING_ROLES } from './auth';
 
 describe('checklist role filtering', () => {
   it('includes fcra_auth as a 4th esign item for base roles', () => {
@@ -49,7 +49,21 @@ describe('checklist role filtering', () => {
     expect(getOnboardingItemsForUser(role, isIBO)).toHaveLength(count);
   });
 
-  it('keeps the base-vetting and invitable role sets in lockstep', () => {
-    expect([...BASE_VETTING_ROLES].sort()).toEqual([...INVITABLE_FIELD_ROLES].sort());
+  // The two sets no longer match one-for-one: BASE_VETTING_ROLES keeps the
+  // legacy/IBO tiers that are no longer invitable, and the light-vetted
+  // regional_manager / director are invitable without a background screen. What
+  // must still hold is the reason the lockstep check existed - no invite target
+  // may land on an empty checklist.
+  it('gives every invitable role a non-empty checklist', () => {
+    for (const role of INVITABLE_FIELD_ROLES) {
+      expect(getOnboardingItemsForUser(role, false).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('heavy-vets every invitable role that is not light-vetted', () => {
+    for (const role of INVITABLE_FIELD_ROLES) {
+      if (LIGHT_VETTING_ROLES.includes(role)) continue;
+      expect(BASE_VETTING_ROLES).toContain(role);
+    }
   });
 });

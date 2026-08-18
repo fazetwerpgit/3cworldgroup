@@ -3920,6 +3920,120 @@ body.portal-scope {
   }
 }
 
+/* Rep pay view — the ledger re-cut around what actually lands in a paycheck.
+   Same row language as the sales ledger, minus the rep/value/actions columns,
+   plus the rep's own private "paid" tick. Declared after the ledger's own
+   responsive rules so the narrower column set wins at every breakpoint. */
+.sales-line-pay-note {
+  border-bottom: 1px solid var(--soft);
+  padding: 15px 10px;
+  color: var(--muted);
+  font: 10px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.sales-line-sale-row.sales-line-pay-row,
+.sales-line-totals.sales-line-pay-totals {
+  grid-template-columns: minmax(180px, 1.9fr) 118px 128px 132px 78px;
+}
+
+.sales-line-sale-row.sales-line-pay-row.no-money,
+.sales-line-totals.sales-line-pay-totals.no-money {
+  grid-template-columns: minmax(180px, 2.3fr) 128px 132px 78px;
+}
+
+.sales-line-pay-head-money {
+  text-align: right;
+}
+
+/* A rate of $0 is a real answer ("no contracted rate yet"), so it stays on the
+   row but reads as unresolved rather than as money. */
+.sales-line-money.sales-line-rate-pending {
+  color: var(--muted);
+}
+
+.sales-line-money.sales-line-rate-pending small {
+  display: block;
+  margin-left: 0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sales-line-paid-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.sales-line-paid-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sales-line-paid-toggle input {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  accent-color: var(--lime);
+  cursor: pointer;
+}
+
+.sales-line-paid-toggle input:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.sales-line-paid-toggle input:checked + .sales-line-paid-label {
+  color: var(--lime);
+}
+
+/* The column header carries the word on wide screens; the row repeats it only
+   once the header is dropped. */
+.sales-line-paid-label {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sales-line-sale-row.sales-line-pay-row,
+  .sales-line-totals.sales-line-pay-totals {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .sales-line-sale-row.sales-line-pay-row > div:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .sales-line-sale-row.sales-line-pay-row > div:nth-child(2) { grid-column: 2; grid-row: 1; }
+  .sales-line-sale-row.sales-line-pay-row > div:nth-child(3) { grid-column: 1; grid-row: 2; }
+  .sales-line-sale-row.sales-line-pay-row > div:nth-child(4) { grid-column: 2; grid-row: 2; justify-content: flex-end; }
+  .sales-line-sale-row.sales-line-pay-row > div:nth-child(5) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-start;
+    border-top: 1px solid var(--soft);
+    padding-top: 9px;
+  }
+
+  .sales-line-sale-row.sales-line-pay-row.no-money > div:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .sales-line-sale-row.sales-line-pay-row.no-money > div:nth-child(3) { grid-column: 2; grid-row: 2; justify-content: flex-end; }
+  .sales-line-sale-row.sales-line-pay-row.no-money > div:nth-child(4) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-start;
+    border-top: 1px solid var(--soft);
+    padding-top: 9px;
+  }
+
+  .sales-line-paid-label { display: inline; }
+
+  .sales-line-totals.sales-line-pay-totals > span:nth-child(n + 3) { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sales-line *,
   .sales-line *::before,
@@ -8315,6 +8429,103 @@ body.portal-scope {
   height: 14px;
   background: var(--resources-line-line);
   animation: resourcesLinePulse 1.4s ease-in-out infinite;
+}
+
+/* Owner-only comp plan matrix: every role's per-install rate plus the margin.
+   Wider than its lane by design — the scroll container carries it and the
+   product column stays pinned. */
+.comp-plan {
+  margin-top: 24px;
+  border-top: 1px solid var(--resources-line-line);
+  padding-top: 14px;
+}
+
+.comp-plan-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comp-plan-head h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.comp-plan-note {
+  margin: 6px 0 0;
+  color: var(--resources-line-muted);
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.comp-plan-scroll {
+  overflow-x: auto;
+  margin-top: 13px;
+  border: 1px solid var(--resources-line-line);
+}
+
+.comp-plan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.comp-plan-table th,
+.comp-plan-table td {
+  border-bottom: 1px solid var(--resources-line-line);
+  padding: 7px 9px;
+  text-align: right;
+}
+
+.comp-plan-table thead th {
+  background: var(--resources-line-panel);
+  color: var(--resources-line-muted);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.comp-plan-table thead th:first-child,
+.comp-plan-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--resources-line-panel);
+  text-align: left;
+  font-weight: 500;
+}
+
+.comp-plan-group th {
+  color: var(--resources-line-lime);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.comp-plan-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--resources-line-panel) 72%, transparent);
+}
+
+.comp-plan-empty {
+  color: var(--resources-line-muted);
+}
+
+.comp-plan-margin-cell {
+  border-left: 1px solid var(--resources-line-lime);
+  color: var(--resources-line-lime);
+}
+
+.comp-plan-table .resources-line-rate-input {
+  width: 62px;
+  margin-top: 0;
+  text-align: right;
 }
 
 .resources-line-status {

@@ -3,6 +3,7 @@ export * from './chat';
 export * from './calls';
 export * from './channels';
 export * from './commission';
+export * from './compPlan';
 export * from './emailTemplates';
 export * from './onboarding';
 export * from './pipeline';

@@ -8,7 +8,7 @@ import { UserForm } from '@/components/admin/UserForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
+import { User, UserRole, RoleDisplayNames, getEffectiveRole, isAdminLevel } from '@/types';
 
 export default function EditUserPage() {
   const params = useParams();
@@ -75,7 +75,7 @@ export default function EditUserPage() {
   // Real masked last-4 (admin only). Sends a REAL Firebase ID token — the
   // server verifies it before returning anything. Unchanged from today.
   useEffect(() => {
-    if (currentUser?.role !== 'admin' || !userId) return;
+    if (!isAdminLevel(currentUser?.role) || !userId) return;
     let active = true;
     (async () => {
       const token = await auth?.currentUser?.getIdToken();
@@ -167,7 +167,7 @@ export default function EditUserPage() {
                 <main className="admin-line-panel">
                   <UserForm user={user} isEdit />
 
-                  {currentUser?.role === 'admin' && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
+                  {isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
                     <div className="admin-line-form-section admin-line-vault">
                       <div className="admin-line-eyebrow">03 / sensitive records</div>
                       <h3>Vaulted, not casual.</h3>

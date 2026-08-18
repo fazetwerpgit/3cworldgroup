@@ -6,7 +6,7 @@
 //   role: 'sales_rep'     -> fieldRole: 'entry_rep',  role deleted
 //   role: 'sales_manager' -> fieldRole: 'l1_manager', role deleted
 //   role: <field value>   -> fieldRole: <value>,      role deleted
-//   role: 'admin'|'operations' -> untouched
+//   role: 'admin'|'operations'|'owner' -> untouched
 // Also backfills reportsToId from managerId when missing.
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
@@ -32,7 +32,7 @@ initializeApp({
 });
 
 const LEGACY_ROLE_MAP = { sales_rep: 'entry_rep', sales_manager: 'l1_manager' };
-const PLATFORM_ROLES = ['admin', 'operations'];
+const PLATFORM_ROLES = ['admin', 'operations', 'owner'];
 const FIELD_ROLES = ['entry_rep', 'l1_manager', 'l2_manager'];
 
 const apply = process.argv.includes('--apply');

@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react';
-import { Sale, SaleStatus, FIBER_COMPANIES } from '@/types';
+import { Sale, SaleStatus, FIBER_COMPANIES, PAY_DELAY_DAYS } from '@/types';
+import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSalePaid } from '@/hooks/useSalePaid';
+import { expectedPayDate, expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +27,11 @@ interface SalesTableProps {
   onApprove?: (saleId: string, status: 'approved' | 'rejected', reason?: string) => void | Promise<boolean>;
   onDelete?: (saleId: string) => void | Promise<boolean>;
   loading?: boolean;
+  /** Reps only: the [All | Pay] selection, held by the page (never in ?status=). */
+  payView?: boolean;
+  onPayViewChange?: (payView: boolean) => void;
+  /** The viewer's own comp-plan slice. Absent/planless reps see no dollar figures. */
+  payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
 }
 
 const STATUS_TABS: { value: SaleStatus | ''; label: string }[] = [
@@ -73,6 +81,10 @@ function ageTone(sale: Sale) {
   return days >= 14 ? 'red' : days >= 7 ? 'amber' : '';
 }
 
+function expectedLabel(value: number | null | undefined) {
+  return typeof value === 'number' ? formatMoney(value) : '—';
+}
+
 function StatusBadge({ status }: { status: SaleStatus }) {
   return <span className={`sales-line-badge ${status}`}>{status}</span>;
 }
@@ -84,37 +96,73 @@ export function SalesTable({
   onApprove,
   onDelete,
   loading = false,
+  payView = false,
+  onPayViewChange,
+  payPlan,
 }: SalesTableProps) {
-  const { hasPermission, isRole } = useAuth();
+  const { user, hasPermission, isRole } = useAuth();
   const canApprove = hasPermission('sales:approve');
   const isAdmin = isRole('admin');
+  // Everything below the ledger head forks here: management keeps the five
+  // status tabs and the approval queue, reps get [All | Pay].
+  const repMode = !canApprove;
+  const showPay = repMode && payView;
+  const rates = payPlan?.rates ?? null;
+  const hasPlan = !!payPlan?.hasPlan;
+  const payDelayDays = payPlan?.payDelayDays ?? PAY_DELAY_DAYS;
+  const { paidBySale, togglePaid } = useSalePaid(repMode ? user?.uid : null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
+  // Reps have no status tabs to filter with, so their ledger is always the whole book.
   const visibleSales = useMemo(
-    () => (statusFilter ? sales.filter((sale) => sale.status === statusFilter) : sales),
-    [sales, statusFilter]
+    () => (statusFilter && canApprove ? sales.filter((sale) => sale.status === statusFilter) : sales),
+    [canApprove, sales, statusFilter]
   );
+  // Pay is owed off the install, so a sale without an install date has nothing
+  // to show yet, and a dead sale never will. Newest install first — that is the
+  // money arriving soonest.
+  const paySales = useMemo(
+    () => sales
+      .filter((sale) => !!sale.installDate && isPayableSale(sale))
+      .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
+    [sales]
+  );
+  const expectedBySale = useMemo(() => {
+    const map: Record<string, number | null> = {};
+    if (!repMode) return map;
+    for (const sale of sales) {
+      map[sale.id || ''] = isPayableSale(sale) ? expectedPayForSale(sale, rates) : null;
+    }
+    return map;
+  }, [rates, repMode, sales]);
+
   const pendingSales = useMemo(
     () => [...sales].filter((sale) => sale.status === 'pending').sort((a, b) => ageDays(b) - ageDays(a)),
     [sales]
   );
-  const selectedIndex = selectedId ? visibleSales.findIndex((sale) => sale.id === selectedId) : -1;
-  const selectedSale = selectedIndex >= 0 ? visibleSales[selectedIndex] : null;
-  const totalValue = visibleSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
-  const commissionValues = visibleSales.flatMap((sale) => typeof sale.commission === 'number' ? [sale.commission] : []);
+  // The rows actually on screen — the ledger, or the rep's pay list.
+  const listSales = showPay ? paySales : visibleSales;
+  const selectedIndex = selectedId ? listSales.findIndex((sale) => sale.id === selectedId) : -1;
+  const selectedSale = selectedIndex >= 0 ? listSales[selectedIndex] : null;
+  const totalValue = listSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+  const commissionValues = listSales.flatMap((sale) => typeof sale.commission === 'number' ? [sale.commission] : []);
   const totalCommission = commissionValues.reduce((sum, value) => sum + value, 0);
   const commissionLabel = commissionValues.length ? formatMoney(totalCommission) : '—';
+  const expectedTotal = hasPlan
+    ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
+    : null;
+  const expectedTotalLabel = expectedLabel(expectedTotal);
 
   const moveSelection = useCallback((direction: number) => {
-    if (!visibleSales.length) return;
-    const current = visibleSales.findIndex((sale) => sale.id === selectedId);
-    const next = (current + direction + visibleSales.length) % visibleSales.length;
-    setSelectedId(visibleSales[next]?.id || null);
-  }, [selectedId, visibleSales]);
+    if (!listSales.length) return;
+    const current = listSales.findIndex((sale) => sale.id === selectedId);
+    const next = (current + direction + listSales.length) % listSales.length;
+    setSelectedId(listSales[next]?.id || null);
+  }, [listSales, selectedId]);
 
   useEffect(() => {
     if (!selectedSale) return;
@@ -228,12 +276,20 @@ export function SalesTable({
       <section className="sales-line-ledger">
         <div className="sales-line-ledger-head">
           <div>
-            <p className="sales-line-eyebrow">{canApprove ? 'The ledger / all statuses' : 'Your ledger / all statuses'}</p>
-            <h2>{canApprove ? 'The rest of the month' : 'Your sales'}</h2>
+            <p className="sales-line-eyebrow">{canApprove ? 'The ledger / all statuses' : showPay ? 'Your pay / installs and dates' : 'Your ledger / all statuses'}</p>
+            <h2>{canApprove ? 'The rest of the month' : showPay ? 'What you get paid' : 'Your sales'}</h2>
           </div>
-          <p>{visibleSales.length} recent records · click a row to inspect</p>
+          <p>{showPay
+            ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
+            : `${listSales.length} recent records · click a row to inspect`}</p>
         </div>
 
+        {repMode ? (
+          <nav className="sales-line-tabs" aria-label="Sales views">
+            <button className="sales-line-tab" role="tab" type="button" aria-selected={!showPay} onClick={() => { setSelectedId(null); onPayViewChange?.(false); }}>All</button>
+            <button className="sales-line-tab" role="tab" type="button" aria-selected={showPay} onClick={() => { setSelectedId(null); onPayViewChange?.(true); }}>Pay</button>
+          </nav>
+        ) : (
         <nav className="sales-line-tabs" aria-label="Sale status filters">
           {STATUS_TABS.map((tab) => {
             const active = statusFilter === tab.value;
@@ -245,13 +301,68 @@ export function SalesTable({
             );
           })}
         </nav>
+        )}
 
+        {showPay ? (
         <div className="sales-line-table-wrap">
-          <div className="sales-line-sale-row thead">
-            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>Commission</span><span>Status</span><span>Actions</span>
+          {!hasPlan && (
+            <p className="sales-line-pay-note">No pay plan assigned yet — ask an admin to set your role.</p>
+          )}
+          <div className={`sales-line-sale-row sales-line-pay-row thead${hasPlan ? '' : ' no-money'}`}>
+            <span>Customer</span>{hasPlan && <span className="sales-line-pay-head-money">Expected pay</span>}<span>Expected pay date</span><span>Status</span><span>Paid</span>
           </div>
           <div className="sales-line-sale-list">
-            {visibleSales.length ? visibleSales.map((sale) => (
+            {paySales.length ? paySales.map((sale) => {
+              const expected = expectedBySale[sale.id || ''] ?? null;
+              const due = expectedPayDate(sale, payDelayDays);
+              const paid = !!paidBySale[sale.id || ''];
+              return (
+                <div
+                  className={`sales-line-sale-row sales-line-pay-row ${sale.status}${hasPlan ? '' : ' no-money'}`}
+                  key={sale.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedId(sale.id || null)}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}
+                >
+                  <div className="sales-line-customer-cell"><strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong><span>{productSummary(sale)}</span></div>
+                  {hasPlan && (
+                    <div className={`sales-line-money${expected ? '' : ' sales-line-rate-pending'}`}>
+                      {formatMoney(expected || 0)}{!expected && <small>rate pending</small>}
+                    </div>
+                  )}
+                  <div className="sales-line-date-cell"><strong>{due ? formatDate(due) : '—'}</strong><span>Install {formatDate(sale.installDate)}</span></div>
+                  <div className="sales-line-status-cell"><StatusBadge status={sale.status} /></div>
+                  <div
+                    className="sales-line-paid-cell"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <label className="sales-line-paid-toggle">
+                      <input
+                        type="checkbox"
+                        checked={paid}
+                        onChange={() => void togglePaid(sale.id || '')}
+                        aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
+                      />
+                      <span className="sales-line-paid-label">Paid</span>
+                    </label>
+                  </div>
+                </div>
+              );
+            }) : <div className="sales-line-ledger-empty">Nothing installed yet. Pay shows up here once a sale has an install date.</div>}
+          </div>
+          <div className={`sales-line-totals sales-line-pay-totals${hasPlan ? '' : ' no-money'}`}>
+            <span><strong>{paySales.length}</strong> installs</span>{hasPlan && <span className="sales-line-total-commission">{expectedTotalLabel}</span>}<span /><span /><span />
+          </div>
+        </div>
+        ) : (
+        <div className="sales-line-table-wrap">
+          <div className="sales-line-sale-row thead">
+            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>{repMode ? 'Expected pay' : 'Commission'}</span><span>Status</span><span>Actions</span>
+          </div>
+          <div className="sales-line-sale-list">
+            {listSales.length ? listSales.map((sale) => (
               <div
                 className={`sales-line-sale-row ${sale.status}`}
                 key={sale.id}
@@ -264,22 +375,23 @@ export function SalesTable({
                 <div className="sales-line-rep-cell"><span className="sales-line-avatar">{repInitials(sale.salesRepName)}</span>{sale.salesRepName}</div>
                 <div className="sales-line-date-cell"><strong>Install {sale.installDate ? formatDate(sale.installDate) : '—'}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
                 <div className="sales-line-money">{formatMoney(sale.totalValue || 0)}<small>/mo</small></div>
-                <div className="sales-line-money">{typeof sale.commission === 'number' ? formatMoney(sale.commission) : '—'}</div>
+                <div className="sales-line-money">{repMode ? expectedLabel(expectedBySale[sale.id || '']) : typeof sale.commission === 'number' ? formatMoney(sale.commission) : '—'}</div>
                 <div className="sales-line-status-cell"><StatusBadge status={sale.status} />{sale.status === 'pending' && <span className={`sales-line-stale ${ageTone(sale)}`}>{ageLabel(sale)}</span>}</div>
                 <div className="sales-line-actions-cell">{rowActions(sale)}</div>
               </div>
-            )) : <div className="sales-line-ledger-empty">{statusFilter ? `No ${statusFilter} sales in this view.` : `No sales in ${canApprove ? 'the ledger' : 'your book'}.`}</div>}
+            )) : <div className="sales-line-ledger-empty">{statusFilter && canApprove ? `No ${statusFilter} sales in this view.` : `No sales in ${canApprove ? 'the ledger' : 'your book'}.`}</div>}
           </div>
           <div className="sales-line-totals">
-            <span><strong>{visibleSales.length}</strong> visible</span><span /><span /><span className="sales-line-total-value">{formatMoney(totalValue)}</span><span className="sales-line-total-commission">{commissionLabel}</span><span /><span />
+            <span><strong>{listSales.length}</strong> visible</span><span /><span /><span className="sales-line-total-value">{formatMoney(totalValue)}</span><span className="sales-line-total-commission">{repMode ? expectedTotalLabel : commissionLabel}</span><span /><span />
           </div>
         </div>
+        )}
       </section>
 
       <SaleDetailSheet
         sale={selectedSale}
         index={selectedIndex}
-        total={visibleSales.length}
+        total={listSales.length}
         open={!!selectedSale}
         onOpenChange={(open) => { if (!open) setSelectedId(null); }}
         onPrev={() => moveSelection(-1)}

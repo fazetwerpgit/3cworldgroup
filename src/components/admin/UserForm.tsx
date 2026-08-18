@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { User, UserRole, RoleDisplayNames, getEffectiveRole, isPlatformRole } from '@/types';
+import {
+  User,
+  UserRole,
+  RoleDisplayNames,
+  getEffectiveRole,
+  isAdminLevel,
+  isOwner,
+  isPlatformRole,
+} from '@/types';
 import type { FieldRole, PlatformRole } from '@/types';
 
 interface UserFormProps {
@@ -31,6 +39,9 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
 const ALL_ROLE_VALUES: UserRole[] = [
   'entry_rep',
   'entry_level_rep',
+  'ae_tier_1',
+  'ae_tier_2',
+  'internal_rep',
   'gm_in_training',
   'l1_manager',
   'l2_manager',
@@ -40,8 +51,11 @@ const ALL_ROLE_VALUES: UserRole[] = [
   'ibo_level_4',
   'office_manager',
   'general_manager',
+  'regional_manager',
+  'director',
   'operations',
   'admin',
+  'owner',
 ];
 
 const roleSegments: { value: UserRole; label: string }[] = ALL_ROLE_VALUES.map((value) => ({
@@ -55,7 +69,15 @@ const statusSegments: { value: 'pending' | 'active' | 'inactive'; label: string 
   { value: 'inactive', label: 'Inactive' },
 ];
 
-const MANAGER_ELIGIBLE: UserRole[] = ['l1_manager', 'l2_manager', 'operations', 'admin'];
+const MANAGER_ELIGIBLE: UserRole[] = [
+  'l1_manager',
+  'l2_manager',
+  'regional_manager',
+  'director',
+  'operations',
+  'admin',
+  'owner',
+];
 
 interface ManagerCandidate {
   uid: string;
@@ -317,11 +339,15 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         <div className="admin-line-field" style={{ marginTop: 12 }}>
           <label>Role / choose one</label>
           <div className="admin-line-segmented" role="group" aria-label="Role">
-            {/* Platform roles (Administrator/Operations) are admin-grantable
-                only — the server enforces this; hiding them here keeps the UI
-                from offering choices that would 403. */}
+            {/* Platform roles are admin-grantable only, and Owner is
+                owner-grantable only — the server enforces both; hiding them here
+                keeps the UI from offering choices that would 403. */}
             {roleSegments
-              .filter((seg) => currentUser?.role === 'admin' || !isPlatformRole(seg.value))
+              .filter((seg) =>
+                seg.value === 'owner'
+                  ? isOwner(currentUser?.role)
+                  : isAdminLevel(currentUser?.role) || !isPlatformRole(seg.value)
+              )
               .map((seg) => (
                 <button
                   key={seg.value}

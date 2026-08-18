@@ -267,7 +267,7 @@ export default function OnboardingPage() {
           headingLead={`${remaining} line${remaining === 1 ? '' : 's'} open.`}
           headingRest={`${approved} ${approved === 1 ? 'is' : 'are'} clear.`}
           intro={`The full ${total || ''}-item board stays in frame. Read the state, take the next action, move the signal forward.${
-            data?.isIBO ? ' IBO business items are included.' : ''
+            data?.isIBO ? ' Business entity items are included.' : ''
           }`}
           numeral={remaining}
           numeralAriaLabel={`${remaining} items left`}

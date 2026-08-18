@@ -18,7 +18,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
-import { User, AuthState, RolePermissions, UserRole, resolveRoles } from '@/types';
+import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
@@ -325,10 +325,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return permissions.includes(permission);
   };
 
+  // An owner satisfies a check for 'admin' as well as for 'owner': the tier sits
+  // above admin, so every isRole('admin') call site in the portal admits it
+  // without each one having to name both roles.
   const isRole = (...roles: UserRole[]): boolean => {
     if (!state.user) return false;
     const { role, fieldRole } = state.user;
-    return roles.some((r) => r === role || r === fieldRole);
+    if (roles.some((r) => r === role || r === fieldRole)) return true;
+    return isOwner(role) && roles.includes('admin');
   };
 
   return (

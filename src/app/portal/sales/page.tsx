@@ -9,7 +9,9 @@ import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { SalesTable } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
+import { useCompPlan } from '@/hooks/useCompPlan';
 import { useAuth } from '@/contexts/AuthContext';
+import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { Sale, SaleStatus } from '@/types';
 
 const STATUS_VALUES: SaleStatus[] = ['pending', 'approved', 'rejected', 'cancelled'];
@@ -149,6 +151,11 @@ function SalesContent() {
 
   const canApprove = hasPermission('sales:approve');
   const canViewAll = hasPermission('sales:approve');
+  // A rep's [All | Pay] choice is a view, not a status — it stays out of the URL
+  // so ?status= keeps meaning exactly the four SaleStatus values.
+  const [payView, setPayView] = useState(false);
+  const { rates, payDelayDays, hasPlan } = useCompPlan();
+  const payPlan = useMemo(() => ({ rates, payDelayDays, hasPlan }), [hasPlan, payDelayDays, rates]);
   const now = useMemo(() => new Date(), []);
   const currentMonth = monthKey(now);
   const mtdSales = sales.filter((sale) => monthKey(sale.saleDate) === currentMonth);
@@ -159,6 +166,15 @@ function SalesContent() {
     return Math.max(oldest, days);
   }, 0);
   const commissionCount = sales.filter((sale) => typeof sale.commission === 'number').length;
+  // Expected pay is personal: only a rep on a comp plan gets a number here.
+  // Management sees a dash — the ledger's commission column is where their
+  // team's money lives, and their own pay is not this page's business.
+  // A rejected or cancelled sale is money that is not coming, so it adds nothing
+  // to the total — and the "Across N sales" note counts the same set the total sums.
+  const payableMtd = mtdSales.filter(isPayableSale);
+  const expectedPayMtd = canApprove || !hasPlan
+    ? null
+    : payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
   const dateLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
     .format(now)
     .toUpperCase();
@@ -239,9 +255,13 @@ function SalesContent() {
                     <span className="sales-line-metric-note">Oldest <span className="sales-line-lime">{oldestIdle ? `${oldestIdle} days` : 'today'}</span> idle</span>
                   </div>
                   <div className="sales-line-metric">
-                    <span className="sales-line-metric-label">Commission MTD</span>
-                    <strong className="sales-line-metric-value portal-metallic-num">—</strong>
-                    <span className="sales-line-metric-note">{commissionCount ? `${commissionCount} recorded value${commissionCount === 1 ? '' : 's'}` : 'No commission values recorded'}</span>
+                    <span className="sales-line-metric-label">{expectedPayMtd === null ? 'Commission MTD' : 'Expected pay MTD'}</span>
+                    <strong className="sales-line-metric-value portal-metallic-num">
+                      {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ EXPECTED</small></>}
+                    </strong>
+                    <span className="sales-line-metric-note">{expectedPayMtd === null
+                      ? (commissionCount ? `${commissionCount} recorded value${commissionCount === 1 ? '' : 's'}` : 'No commission values recorded')
+                      : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} this month`}</span>
                   </div>
                 </section>
               </header>
@@ -257,6 +277,9 @@ function SalesContent() {
                 onApprove={canApprove ? handleApproval : undefined}
                 onDelete={deleteSale}
                 loading={loading}
+                payView={payView}
+                onPayViewChange={setPayView}
+                payPlan={payPlan}
               />
             </div>
           </main>

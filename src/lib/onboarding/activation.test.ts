@@ -91,7 +91,7 @@ describe('activateUser', () => {
     expect(resolveMock).toHaveBeenCalledWith('l1-manager');
   });
 
-  it('graduates an entry_level_rep to entry_rep', async () => {
+  it('graduates an entry_level_rep to ae_tier_1', async () => {
     store.set('users/entry-level-rep', {
       status: 'pending',
       fieldRole: 'entry_level_rep',
@@ -101,7 +101,7 @@ describe('activateUser', () => {
 
     expect(updates[0]?.data).toMatchObject({
       status: 'active',
-      fieldRole: 'entry_rep',
+      fieldRole: 'ae_tier_1',
     });
   });
 
@@ -138,8 +138,14 @@ describe('activateUser', () => {
 
 describe('computeReadiness', () => {
   const items = getOnboardingItemsForUser('entry_level_rep', false);
-  const invitableRoles: FieldRole[] = [
+  // Every role that runs a checklist, not just the ones still on the invite
+  // form — a retired tier must keep activating for hires already on it.
+  const onboardingRoles: FieldRole[] = [
     'entry_level_rep',
+    'ae_tier_1',
+    'ae_tier_2',
+    'regional_manager',
+    'director',
     'entry_rep',
     'l1_manager',
     'l2_manager',
@@ -197,11 +203,11 @@ describe('computeReadiness', () => {
     await maybeFlagActivationReady('ready-rep');
 
     expect(store.get('users/ready-rep')).toMatchObject({
-      fieldRole: 'entry_rep',
+      fieldRole: 'ae_tier_1',
       status: 'active',
     });
     expect(updates[0]?.data).toMatchObject({
-      fieldRole: 'entry_rep',
+      fieldRole: 'ae_tier_1',
       status: 'active',
       hireDate: expect.any(Date),
       atRisk: '__DELETE__',
@@ -212,7 +218,7 @@ describe('computeReadiness', () => {
       expect.objectContaining({
         userId: 'ready-rep',
         type: 'rep_activated',
-        title: 'Onboarding complete — your new role: Account Executive',
+        title: 'Onboarding complete — your new role: Account Executive Tier 1',
         message: 'Your onboarding is complete.',
         link: '/portal',
         email: expect.anything(),
@@ -263,7 +269,7 @@ describe('computeReadiness', () => {
     );
   });
 
-  it.each(invitableRoles)('activates an invited %s into its graduated role', async (invitedRole) => {
+  it.each(onboardingRoles)('activates an invited %s into its graduated role', async (invitedRole) => {
     const userId = `ready-${invitedRole}`;
     store.set(`users/${userId}`, {
       status: 'pending',

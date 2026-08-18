@@ -23,11 +23,12 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-type RoleBucket = 'all' | 'admin' | 'operations' | 'field rep';
+type RoleBucket = 'all' | 'owner' | 'admin' | 'operations' | 'field rep';
 type StatusBucket = 'all' | 'pending' | 'active' | 'inactive';
 
 function bucketForUser(user: User): RoleBucket {
   const role = user.role ?? user.fieldRole;
+  if (role === 'owner') return 'owner';
   if (role === 'admin') return 'admin';
   if (role === 'operations') return 'operations';
   return 'field rep';
@@ -260,7 +261,7 @@ export default function UsersPage() {
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="admin-line-pill-row" role="group" aria-label="Filter by role">
-              {(['all', 'admin', 'operations', 'field rep'] as RoleBucket[]).map((bucket) => (
+              {(['all', 'owner', 'admin', 'operations', 'field rep'] as RoleBucket[]).map((bucket) => (
                 <button
                   key={bucket}
                   type="button"

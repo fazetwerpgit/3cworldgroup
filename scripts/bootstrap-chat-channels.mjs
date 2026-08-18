@@ -29,8 +29,21 @@ const CHANNELS = [
   { id: 'training-updates', name: 'Training Updates', description: 'Online training, call reminders, and field-readiness notes.', audience: 'all', order: 3, active: true },
   { id: 'managers', name: 'Managers', description: 'Manager alignment, field-train requests, and rep support.', audience: 'managers', order: 4, active: true },
 ];
-const PLATFORM = ['admin', 'operations'];
-const FIELD = ['entry_rep', 'l1_manager', 'l2_manager'];
+const PLATFORM = ['admin', 'operations', 'owner'];
+const FIELD = [
+  'entry_rep', 'entry_level_rep', 'l1_manager', 'l2_manager',
+  'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4',
+  'general_manager', 'gm_in_training', 'office_manager',
+  'ae_tier_1', 'ae_tier_2', 'regional_manager', 'director', 'internal_rep',
+];
+// Mirror of MANAGEMENT_FIELD_ROLES. The IBO levels were missing here while the
+// app counted them as managers, so this script seeded the Managers channel
+// without them.
+const FIELD_MANAGERS = [
+  'l1_manager', 'l2_manager',
+  'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4',
+  'general_manager', 'office_manager', 'regional_manager', 'director',
+];
 function resolveRoles(rawRole, rawFieldRole) {
   const fieldRole = FIELD.includes(rawFieldRole) ? rawFieldRole : undefined;
   if (PLATFORM.includes(rawRole)) return { role: rawRole, fieldRole };
@@ -39,11 +52,11 @@ function resolveRoles(rawRole, rawFieldRole) {
 }
 function canAccess(channel, role, fieldRole) {
   if (!channel.active) return false;
-  if (role === 'admin' || role === 'operations') return true;
+  if (PLATFORM.includes(role)) return true;
   if (channel.audience === 'all') return !!role || !!fieldRole;
   if (channel.audience === 'field') return !!fieldRole;
-  if (channel.audience === 'managers') return fieldRole === 'l1_manager' || fieldRole === 'l2_manager';
-  if (channel.audience === 'platform') return role === 'admin' || role === 'operations';
+  if (channel.audience === 'managers') return FIELD_MANAGERS.includes(fieldRole);
+  if (channel.audience === 'platform') return PLATFORM.includes(role);
   return false;
 }
 

@@ -75,6 +75,8 @@ const managerRoles: UserRole[] = [
   'ibo_level_4',
   'general_manager',
   'office_manager',
+  'regional_manager',
+  'director',
 ];
 
 const platformRoles: UserRole[] = ['admin', 'operations'];

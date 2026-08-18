@@ -107,8 +107,8 @@ const REQUIRED_CALLS = [
     audience: 'managers' as CallAudience,
   },
   {
-    title: 'IBO Call',
-    description: 'IBO-specific operating guidance and business-owner updates.',
+    title: 'Leadership Call',
+    description: 'Leadership operating guidance and business updates.',
     day: 'monday' as CallDay,
     audience: 'managers' as CallAudience,
   },
@@ -124,8 +124,8 @@ const CALL_STARTERS = [
     description: 'Pipeline, coaching, and field blockers.',
   },
   {
-    label: 'IBO Leadership',
-    title: 'IBO Leadership Call',
+    label: 'Leadership',
+    title: 'Leadership Call',
     day: 'wednesday' as CallDay,
     time: '08:30',
     audience: 'managers' as CallAudience,

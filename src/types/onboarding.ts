@@ -24,7 +24,9 @@ export interface OnboardingItem {
   order: number;
 }
 
-/** Field roles that get full vetting (screen, SSN, DL). */
+// Field roles that get full vetting (screen, SSN, DL). Wider than the current
+// invite list on purpose: the legacy tiers and IBO levels are no longer offered
+// to candidates but in-flight hires on them must keep their vetting items.
 export const BASE_VETTING_ROLES: readonly FieldRole[] = [
   'entry_rep',
   'entry_level_rep',
@@ -34,9 +36,11 @@ export const BASE_VETTING_ROLES: readonly FieldRole[] = [
   'ibo_level_2',
   'ibo_level_3',
   'ibo_level_4',
+  'ae_tier_1',
+  'ae_tier_2',
 ];
 
-/** Light-vetting roles (GM, GM-in-training, Office Manager) skip SSN/DL/screen. */
+/** Light-vetting roles (see LIGHT_VETTING_ROLES) skip SSN/DL/screen. */
 export function requiresHeavyVetting(fieldRole: FieldRole): boolean {
   return (BASE_VETTING_ROLES as readonly string[]).includes(fieldRole);
 }
@@ -88,7 +92,7 @@ export const OnboardingStatusConfig: Record<OnboardingStatus, { name: string; co
 export const OnboardingCategoryLabels: Record<OnboardingCategory, string> = {
   paperwork: 'Paperwork',
   financial: 'Financial',
-  business: 'Business (IBO)',
+  business: 'Business',
   credential: 'Credentialing',
 };
 

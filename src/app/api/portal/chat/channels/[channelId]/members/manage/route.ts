@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { canAccessChatChannel, resolveRoles } from '@/types';
+import { canAccessChatChannel, isAdminLevel, resolveRoles } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { readExtraMemberIds, toChatChannel } from '@/lib/chat/channels';
 
@@ -15,7 +15,7 @@ async function requireAdmin(request: NextRequest) {
   if (!result.ok) {
     return { ok: false as const, res: NextResponse.json({ error: result.error }, { status: result.status }) };
   }
-  if (result.user.role !== 'admin') {
+  if (!isAdminLevel(result.user.role)) {
     return { ok: false as const, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { ok: true as const, user: result.user };

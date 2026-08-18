@@ -255,7 +255,9 @@ export default function TeamChatPage() {
     'ibo_level_1',
     'ibo_level_2',
     'ibo_level_3',
-    'ibo_level_4'
+    'ibo_level_4',
+    'regional_manager',
+    'director'
   );
   const shownError = error || channelsError || messagesError;
 
@@ -998,7 +1000,11 @@ export default function TeamChatPage() {
     });
   };
 
-  const roleLabel = isRole('admin')
+  // Owner first: isRole('admin') is true for an owner as well, so the owner
+  // branch has to come before it or an owner reads as "Admin".
+  const roleLabel = isRole('owner')
+    ? 'Owner'
+    : isRole('admin')
     ? 'Admin'
     : isRole('operations')
       ? 'Operations'

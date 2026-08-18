@@ -1,7 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, formSubmissionEmail } from '@/lib/email/templates';
-import { resolveRoles } from '@/types';
+import { isManagementRole, resolveRoles } from '@/types';
 
 // Per-form alert config. Each rebuilt form has a stable key; the label + review
 // link drive the notification text and deep-link. Adding a form here is all it
@@ -33,7 +33,7 @@ async function alertsEnabled(key: string): Promise<boolean> {
   }
 }
 
-// The UIDs of every admin/operations user — the people who work the review queues.
+// The UIDs of every management user — the people who work the review queues.
 async function managementUids(): Promise<string[]> {
   if (!adminDb) return [];
   const snap = await adminDb.collection('users').get();
@@ -41,7 +41,7 @@ async function managementUids(): Promise<string[]> {
     .filter((d) => {
       const data = d.data();
       const { role } = resolveRoles(data.role, data.fieldRole);
-      return role === 'admin' || role === 'operations';
+      return isManagementRole(role);
     })
     .map((d) => d.id);
 }

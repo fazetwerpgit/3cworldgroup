@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
-import { getEffectiveRole, resolveRoles, PlatformRole, FieldRole } from '@/types';
+import { getEffectiveRole, isManagementRole, resolveRoles, PlatformRole, FieldRole } from '@/types';
 
 // The verified chat identity. Everything is derived from a real Firebase ID token
 // (never a client-supplied userId), then the role is read from the user's own doc.
@@ -47,7 +47,7 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
       role,
       fieldRole,
       effectiveRole: getEffectiveRole({ role, fieldRole }),
-      canModerate: role === 'admin' || role === 'operations',
+      canModerate: isManagementRole(role),
     },
   };
 }
