@@ -6,8 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
 import { PUSH_PROMPT_SNOOZE_KEY, shouldShowPushPrompt } from '@/lib/push/pushPrompt';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 
 type State = 'hidden' | 'visible' | 'working' | 'failed';
 
@@ -60,37 +58,30 @@ export default function PushPromptBanner() {
 
   return (
     <div className="portal-push-prompt portal-enter" role="region" aria-label="Turn on notifications">
-      <Card className="rounded-lg py-0 shadow-lg">
-        <CardContent className="flex items-start gap-3 px-4 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-lime-100 text-lime-700 dark:bg-lime-500/20 dark:text-lime-300">
-            <Bell className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Turn on notifications?</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {state === 'failed'
-                ? 'Could not turn them on. Please try again.'
-                : 'Get mentions, DMs, and sale updates on this device.'}
-            </p>
-            <div className="mt-2.5 flex items-center gap-2">
-              <Button type="button" size="sm" onClick={turnOn} disabled={state === 'working'}>
-                {state === 'working' ? 'Turning on…' : 'Turn on'}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={notNow}>
-                Not now
-              </Button>
-            </div>
+      <div className="portal-push-prompt-card">
+        <span className="portal-push-prompt-bell" aria-hidden="true">
+          <Bell />
+        </span>
+        <div className="portal-push-prompt-body">
+          <p className="portal-push-prompt-eyebrow">Notifications / turn on?</p>
+          <p className="portal-push-prompt-text">
+            {state === 'failed'
+              ? 'Could not turn them on. Please try again.'
+              : 'Get chat messages and sale updates on this device.'}
+          </p>
+          <div className="portal-push-prompt-actions">
+            <button type="button" className="portal-push-prompt-primary" onClick={turnOn} disabled={state === 'working'}>
+              {state === 'working' ? 'Turning on…' : 'Turn on'}
+            </button>
+            <button type="button" className="portal-push-prompt-quiet" onClick={notNow}>
+              Not now
+            </button>
           </div>
-          <button
-            type="button"
-            className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground"
-            onClick={notNow}
-            aria-label="Dismiss"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </CardContent>
-      </Card>
+        </div>
+        <button type="button" className="portal-push-prompt-close" onClick={notNow} aria-label="Dismiss">
+          <X />
+        </button>
+      </div>
     </div>
   );
 }

@@ -2363,6 +2363,113 @@ body.portal-scope {
   }
 }
 
+/* House style, matching the notification panel: squared navy panel, lime hairline,
+   uppercase tracked labels. */
+.portal-push-prompt-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--rail-lime);
+  background: var(--rail-panel);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.35);
+  color: var(--rail-ink);
+}
+
+.portal-push-prompt-bell {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--rail-line);
+  color: var(--rail-lime);
+}
+
+.portal-push-prompt-bell svg {
+  width: 16px;
+  height: 16px;
+}
+
+.portal-push-prompt-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.portal-push-prompt-eyebrow {
+  margin: 0;
+  color: var(--rail-lime);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.portal-push-prompt-text {
+  margin: 5px 0 0;
+  color: var(--rail-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.portal-push-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.portal-push-prompt-primary,
+.portal-push-prompt-quiet {
+  padding: 7px 13px;
+  border: 1px solid var(--rail-lime);
+  background: transparent;
+  color: var(--rail-lime);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.portal-push-prompt-primary:hover:not(:disabled) {
+  background: var(--rail-lime);
+  color: var(--rail-panel);
+}
+
+.portal-push-prompt-primary:disabled {
+  opacity: 0.6;
+}
+
+.portal-push-prompt-quiet {
+  border-color: var(--rail-line);
+  color: var(--rail-muted);
+}
+
+.portal-push-prompt-quiet:hover {
+  color: var(--rail-ink);
+}
+
+.portal-push-prompt-close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  margin: -4px -6px 0 0;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--rail-muted);
+}
+
+.portal-push-prompt-close:hover {
+  color: var(--rail-ink);
+}
+
+.portal-push-prompt-close svg {
+  width: 15px;
+  height: 15px;
+}
+
 .portal-scope a:focus-visible,
 .portal-scope button:focus-visible {
   outline: 2px solid var(--rail-lime);
