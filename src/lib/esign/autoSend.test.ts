@@ -544,4 +544,38 @@ describe('sendPendingEsignDocs', () => {
 
     expect(resolveAlertTasksMock).not.toHaveBeenCalled();
   });
+
+  it('is a no-op for a user who is no longer pending', async () => {
+    store.set('users/u1', {
+      fieldRole: 'entry_rep',
+      isIBO: false,
+      displayName: 'Sam Rep',
+      email: 'sam@x.com',
+      status: 'active',
+    });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+  });
+
+  it('is a no-op for a role that never onboards, even while pending', async () => {
+    store.set('users/u1', {
+      fieldRole: 'general_manager',
+      isIBO: false,
+      displayName: 'Gm Person',
+      email: 'gm@x.com',
+      status: 'pending',
+    });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+  });
 });

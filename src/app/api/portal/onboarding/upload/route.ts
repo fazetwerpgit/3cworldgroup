@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOnboardingBucket } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { validateUpload, buildFolderPath } from '@/lib/onboarding/uploads';
 
@@ -13,6 +13,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
     const userId = gate.uid;
+
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+    }
+
+    // Uploads only ever complete a pending hire's checklist. Checked before the
+    // multipart body is buffered so an activated user's file is never read.
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (userDoc.data()?.status !== 'pending') {
+      return NextResponse.json(
+        { error: 'Onboarding is closed for this user' },
+        { status: 403 }
+      );
+    }
 
     const form = await request.formData();
     const bodyUserId = form.get('userId');

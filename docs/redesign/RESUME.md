@@ -7,23 +7,63 @@ Updated: 2026-08-18 (update at EVERY milestone).
 
 ## NEXT ACTION
 
+NEXT: wait on Jacob for (1) his live end-to-end signature test (invite
+himself → paperwork → in-portal Sign now → verify item flips approved, no
+esign_mismatch/review_needed alert, email From onboarding@), and (2) fresh
+invite to Bryan Curtis bryan@sreiowa.com (original lost pre-Postmark-paid).
+Master HEAD 3930256 = Track A + Track B + status-gate fix, deployed + Ready.
+
+STATUS-GATE FIX SHIPPED 2026-08-18 (commit 53a2941, merged 3930256):
+onboarding is pending-status-only everywhere — GET /api/portal/onboarding
+only auto-sends esign docs for status==='pending' (self non-pending gets
+empty items; management still reads records for review), submit/upload 403
+non-pending targets, sendPendingEsignDocs itself bails unless pending +
+roleRequiresOnboarding (covers public token route), nav/dashboard dropped
+the entry_level_rep escape hatch (isOnboardingUser only). Full gates green
+post-merge (tsc clean, 721 tests, build). CONTEXT: Wil Teasdale
+(active rep) got 4 auto-created SignWell envelopes at 19:06Z — created by
+a STALE LOCAL DEV process running pre-guard code with old .env.local
+(envelopes were test_mode:true; prod guard would have thrown). Cleaned via
+scratchpad clean-will.mjs (Jacob ran it): 4 envelopes voided at SignWell,
+4 userOnboarding rows deleted, account untouched. userOnboarding is now 0
+docs. coldsaint (real rep) strays cleaned earlier the same way. LESSON:
+local dev talks to PROD Firebase; current .env.local (Development pull)
+lacks SignWell/Postmark keys so autoSend can't fire locally anymore.
+
 TWO PARALLEL TRACKS as of 2026-08-18 — do not mix them.
 
-TRACK B (2026-08-18 evening, plan APPROVED, IN PROGRESS): roles overhaul +
-owner tier + rep pay tracking. Plan at
-~/.claude/plans/so-i-need-to-indexed-lampson.md. Isolated worktree
-/home/fazetwerpnerd69/dev/3cwg-payplan, branch feat/roles-owner-payplan
-(off onboarding/completion 827b789) — ALL Track B code changes go there,
-never in this tree. Summary: IBO hidden publicly (kept in data/admin),
-new roles from ~/"3C World Group 7.1 .26 Comp.xlsx" (AE T1/T2, GMIT, GM,
-OM, Regional, Director, Internal Rep), new 'owner' platform role (Jacob +
-Jeremy, exclusive financials/margins), comp plan → config/compPlan +
-config/compPlanMargin, rep sales tab → [All, Pay] with expected pay
-(install+14d) + private paid checkbox (users/{uid}/salePaid). Decisions:
-manual role assignment; no team overrides v1; $0 rates stay $0; legacy
-rep roles fall back to AE Tier 1. Jacob's standing rule: NO Sonnet
-agents — Fable orchestrates/reviews, Opus subagents. Business rules also
-saved to memory dir. NO PUSH without explicit go-ahead.
+TRACK B (2026-08-18): roles overhaul + owner tier + rep pay tracking —
+**NOW ON MASTER/DEPLOYED**: its session merged feat/roles-owner-payplan
+into master (merge 8a3bb11, incl. c8bdae2 MTD-tile fix) and pushed;
+deployed together with the status-gate merge 3930256. Track B's go-live
+checklist below (rules deploy, owner bootstrap, seeding, role reassign)
+is managed BY THAT SESSION — check with Jacob/that session before touching.
+Original state for reference:
+Worktree /home/fazetwerpnerd69/dev/3cwg-payplan, branch
+feat/roles-owner-payplan at c8bdae2 (8 commits off onboarding/completion
+827b789; full ledger in that worktree's .superpowers/sdd/progress.md).
+Delivered: IBO hidden from all public/rep surfaces (kept in data/admin;
+call templates renamed too), new comp roles (AE T1/T2, GMIT, GM, OM,
+Regional, Director, Internal Rep) from ~/"3C World Group 7.1 .26
+Comp.xlsx", 'owner' platform tier (owner-only margins/comp editing;
+admins/reps can NEVER receive margin), comp plan in
+src/data/compPlan.generated.json + /api/portal/comp-plan (own-slice
+scoping) + owner CompPlanMatrix, rep sales tab [All|Pay] with expected
+pay (install+14d, rejected/cancelled excluded) + private paid checkbox
+(users/{uid}/salePaid). Gates green (tsc/test 690/build; lint 40
+pre-existing). R1 CLEAR: zero IBO invites/users/calls in prod.
+GO-LIVE ON JACOB'S WORD (order matters): (1) deploy firestore.rules
+(salePaid rules NOT live — checkbox blocked until then); (2) FIRST OWNER
+BOOTSTRAP: zero owners exist and only owners grant owner → set Jacob's
+user doc role:'owner' in Firebase console, then he grants Jeremy in
+User Management; (3) optional seed scripts/seed-comp-plan.mjs --apply
+(API serves committed fallback meanwhile; .env.local
+FIREBASE_ADMIN_PRIVATE_KEY is TRUNCATED — only FIREBASE_SERVICE_ACCOUNT
+path works); (4) reassign 10 legacy-role users (9 entry_rep +
+connorcrouse321 l1_manager) to new roles. ENTANGLED: branch includes
+Track A's unmerged SignWell commits — deploying B deploys A.
+Jacob's standing rule: NO Sonnet agents — Fable orchestrates/reviews,
+Opus subagents. NO PUSH without explicit go-ahead.
 
 TRACK A — **DEPLOYED TO PRODUCTION 2026-08-18 evening** (Jacob's "deploy"):
 master fast-forwarded to the branch + fix commits, pushed, Vercel Ready,

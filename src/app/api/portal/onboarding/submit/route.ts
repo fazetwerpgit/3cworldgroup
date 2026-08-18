@@ -93,6 +93,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Onboarding closes the moment the hire is activated - no further
+    // submissions, by the user or by management on their behalf.
+    if (userData?.status !== 'pending') {
+      return NextResponse.json(
+        { error: 'Onboarding is closed for this user' },
+        { status: 403 }
+      );
+    }
+
     // Reject items that don't apply to this user (e.g. IBO-only items for non-IBO)
     const applicable = getOnboardingItemsForUser(fieldRole, userData?.isIBO ?? false);
     if (!applicable.some((i) => i.id === itemId)) {

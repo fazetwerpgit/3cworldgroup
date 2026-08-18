@@ -6,7 +6,7 @@ import { appBaseUrl, esignSentEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { isEsignItem } from '@/lib/onboarding/esign';
-import type { FieldRole } from '@/types/auth';
+import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 import { getEsignProvider } from './provider';
 import type { EsignDocKey, EsignProvider } from './provider';
 
@@ -282,6 +282,11 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
 
     const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
     if (!fieldRole) return sent;
+
+    // Last line of defence for every call site, including the public token
+    // route: only a hire still in the pending stage may have documents sent.
+    if (userSnap.get('status') !== 'pending') return sent;
+    if (!roleRequiresOnboarding(fieldRole)) return sent;
 
     const signerName = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
     const signerEmail = userSnap.get('email') as string | undefined;

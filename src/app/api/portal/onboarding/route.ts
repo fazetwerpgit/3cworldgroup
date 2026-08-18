@@ -51,15 +51,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: [], fieldRole: null, isIBO: false });
     }
 
-    // Retry delivery after the response. sendPendingEsignDocs is failure-contained
-    // and throttled, so a provider outage cannot delay or fail this checklist read.
-    after(() =>
-      sendPendingEsignDocs(userId).catch((error) => {
-        console.error('[onboarding] esign auto-send failed', error);
-      })
-    );
-
     const isIBO = userData?.isIBO ?? false;
+
+    // Onboarding is a `pending` stage only. Reading this route for anyone else
+    // must never create envelopes or email "your documents are ready to sign".
+    if (userData?.status === 'pending') {
+      // Retry delivery after the response. sendPendingEsignDocs is failure-contained
+      // and throttled, so a provider outage cannot delay or fail this checklist read.
+      after(() =>
+        sendPendingEsignDocs(userId).catch((error) => {
+          console.error('[onboarding] esign auto-send failed', error);
+        })
+      );
+    } else if (gate.uid === userId) {
+      // Own checklist, no longer pending: there is nothing left to work through.
+      return NextResponse.json({ items: [], fieldRole, isIBO });
+    }
+    // Management reading someone else's non-pending checklist falls through:
+    // Onboarding Review still has to show what a now-active hire completed.
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO);
 
     // Bearer capability: an embedded signing URL is only ever handed to the

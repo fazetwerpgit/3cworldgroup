@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const gateMock = vi.hoisted(() => vi.fn());
+const userDocGetMock = vi.hoisted(() => vi.fn());
 const validateUploadMock = vi.hoisted(() => vi.fn());
 const buildFolderPathMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn(async () => undefined));
@@ -14,7 +15,10 @@ vi.mock('@/lib/onboarding/uploads', () => ({
   validateUpload: validateUploadMock,
   buildFolderPath: buildFolderPathMock,
 }));
-vi.mock('@/lib/firebase/admin', () => ({ getOnboardingBucket: vi.fn(() => bucketMock) }));
+vi.mock('@/lib/firebase/admin', () => ({
+  getOnboardingBucket: vi.fn(() => bucketMock),
+  adminDb: { collection: vi.fn(() => ({ doc: vi.fn(() => ({ get: userDocGetMock })) })) },
+}));
 
 import { POST } from './route';
 
@@ -34,6 +38,8 @@ beforeEach(() => {
   buildFolderPathMock.mockReset();
   saveMock.mockClear();
   bucketMock.file.mockClear();
+  userDocGetMock.mockReset();
+  userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'pending' }) });
 });
 
 describe('POST /api/portal/onboarding/upload', () => {
@@ -79,6 +85,22 @@ describe('POST /api/portal/onboarding/upload', () => {
     expect(validateUploadMock).not.toHaveBeenCalled();
     expect(buildFolderPathMock).not.toHaveBeenCalled();
     expect(bucketMock.file).not.toHaveBeenCalled();
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an upload from a user who is no longer pending, before reading the body', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'active' }) });
+    const request = requestWithForm({ userId: 'verified-user', itemId: 'w9' });
+    const formData = vi.spyOn(request, 'formData');
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Onboarding is closed for this user',
+    });
+    expect(formData).not.toHaveBeenCalled();
     expect(saveMock).not.toHaveBeenCalled();
   });
 });

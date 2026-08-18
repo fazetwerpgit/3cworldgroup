@@ -17,6 +17,7 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCountUp } from '@/hooks/useCountUp';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { isAbortError } from '@/lib/fetch/isAbortError';
+import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -452,7 +453,7 @@ export default function DashboardPage() {
       icon: 'calls',
     });
 
-    if (!leadsWithQueue && isRole('entry_level_rep')) {
+    if (!leadsWithQueue && isOnboardingUser(user)) {
       items.splice(1, 0, {
         key: 'onboard',
         title: 'Continue onboarding',
@@ -475,7 +476,7 @@ export default function DashboardPage() {
     }
 
     return items;
-  }, [canManageRecruiting, isAdmin, isRole, leadsWithQueue, pendingCount, pendingSignups]);
+  }, [canManageRecruiting, isAdmin, leadsWithQueue, pendingCount, pendingSignups, user]);
 
   const commandBlock = (
     <header className={`portal-enter ${leadsWithQueue ? 'portal-enter-3 border-[#8dc63f]/40' : 'portal-enter border-[#0A1F44]/[.14] dark:border-white/[.14]'} border-b py-[43px] pb-6`}>
