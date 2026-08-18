@@ -15,6 +15,7 @@ import {
   RadioTower,
   Save,
 } from 'lucide-react';
+import { CompPlanMatrix } from '@/components/resources/CompPlanMatrix';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -268,7 +269,7 @@ export function ResourcesLineShortsLane() {
 }
 
 export function ResourcesLinePayLane() {
-  const { user, isRole } = useAuth();
+  const { user, isRole, hasPermission } = useAuth();
   const [data, setData] = useState<PayStructureResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -278,6 +279,10 @@ export function ResourcesLinePayLane() {
   const [success, setSuccess] = useState('');
 
   const isAdmin = isRole('admin');
+  // The comp plan carries the "3C Receives" margin, which is the finance tier's
+  // alone: owner AND the finance permission, never an isRole('admin') check
+  // (an owner satisfies that, but an admin must not satisfy this).
+  const showCompPlan = isRole('owner') && hasPermission('finance:read');
 
   const fetchStructure = useCallback(async () => {
     if (!user) return;
@@ -431,6 +436,8 @@ export function ResourcesLinePayLane() {
           {data.updatedByName ? ` by ${data.updatedByName}` : ''}
         </p>
       )}
+
+      {showCompPlan && <CompPlanMatrix />}
     </section>
   );
 }

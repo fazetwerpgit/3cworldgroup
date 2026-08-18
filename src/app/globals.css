@@ -8276,6 +8276,103 @@ body.portal-scope {
   animation: resourcesLinePulse 1.4s ease-in-out infinite;
 }
 
+/* Owner-only comp plan matrix: every role's per-install rate plus the margin.
+   Wider than its lane by design — the scroll container carries it and the
+   product column stays pinned. */
+.comp-plan {
+  margin-top: 24px;
+  border-top: 1px solid var(--resources-line-line);
+  padding-top: 14px;
+}
+
+.comp-plan-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comp-plan-head h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.comp-plan-note {
+  margin: 6px 0 0;
+  color: var(--resources-line-muted);
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.comp-plan-scroll {
+  overflow-x: auto;
+  margin-top: 13px;
+  border: 1px solid var(--resources-line-line);
+}
+
+.comp-plan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.comp-plan-table th,
+.comp-plan-table td {
+  border-bottom: 1px solid var(--resources-line-line);
+  padding: 7px 9px;
+  text-align: right;
+}
+
+.comp-plan-table thead th {
+  background: var(--resources-line-panel);
+  color: var(--resources-line-muted);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.comp-plan-table thead th:first-child,
+.comp-plan-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--resources-line-panel);
+  text-align: left;
+  font-weight: 500;
+}
+
+.comp-plan-group th {
+  color: var(--resources-line-lime);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.comp-plan-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--resources-line-panel) 72%, transparent);
+}
+
+.comp-plan-empty {
+  color: var(--resources-line-muted);
+}
+
+.comp-plan-margin-cell {
+  border-left: 1px solid var(--resources-line-lime);
+  color: var(--resources-line-lime);
+}
+
+.comp-plan-table .resources-line-rate-input {
+  width: 62px;
+  margin-top: 0;
+  text-align: right;
+}
+
 .resources-line-status {
   display: flex;
   align-items: center;

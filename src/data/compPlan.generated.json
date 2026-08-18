@@ -1,0 +1,408 @@
+{
+  "version": "2026-07-01",
+  "rates": {
+    "ae_tier_1": {
+      "att": {
+        "att-1gig": 150,
+        "att-2gig": 150,
+        "att-300": 120,
+        "att-500": 120,
+        "att-5gig": 150
+      },
+      "frontier": {
+        "frontier-1gig": 120,
+        "frontier-2gig": 132,
+        "frontier-500": 51,
+        "frontier-5gig": 150
+      },
+      "tfiber": {
+        "tfiber-1gig": 138,
+        "tfiber-2gig": 168,
+        "tfiber-300": 67.5,
+        "tfiber-500": 97.5
+      },
+      "xfinity": {
+        "xfinity-1gig": 105,
+        "xfinity-2gig": 112.5,
+        "xfinity-500": 60,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 37.5,
+        "xfinity-wireless-byod": 45,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "ae_tier_2": {
+      "att": {
+        "att-1gig": 200,
+        "att-2gig": 200,
+        "att-300": 160,
+        "att-500": 160,
+        "att-5gig": 200
+      },
+      "frontier": {
+        "frontier-1gig": 160,
+        "frontier-2gig": 176,
+        "frontier-500": 68,
+        "frontier-5gig": 200
+      },
+      "tfiber": {
+        "tfiber-1gig": 184,
+        "tfiber-2gig": 224,
+        "tfiber-300": 90,
+        "tfiber-500": 130
+      },
+      "xfinity": {
+        "xfinity-1gig": 140,
+        "xfinity-2gig": 150,
+        "xfinity-500": 80,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 50,
+        "xfinity-wireless-byod": 60,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "director": {
+      "att": {
+        "att-1gig": 375,
+        "att-2gig": 375,
+        "att-300": 300,
+        "att-500": 300,
+        "att-5gig": 375
+      },
+      "frontier": {
+        "frontier-1gig": 300,
+        "frontier-2gig": 330,
+        "frontier-500": 127.5,
+        "frontier-5gig": 375
+      },
+      "tfiber": {
+        "tfiber-1gig": 345,
+        "tfiber-2gig": 420,
+        "tfiber-300": 168.75,
+        "tfiber-500": 243.75
+      },
+      "xfinity": {
+        "xfinity-1gig": 262.5,
+        "xfinity-2gig": 281.25,
+        "xfinity-500": 150,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 93.75,
+        "xfinity-wireless-byod": 112.5,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "general_manager": {
+      "att": {
+        "att-1gig": 300,
+        "att-2gig": 300,
+        "att-300": 240,
+        "att-500": 240,
+        "att-5gig": 300
+      },
+      "frontier": {
+        "frontier-1gig": 240,
+        "frontier-2gig": 264,
+        "frontier-500": 102,
+        "frontier-5gig": 300
+      },
+      "tfiber": {
+        "tfiber-1gig": 276,
+        "tfiber-2gig": 336,
+        "tfiber-300": 135,
+        "tfiber-500": 195
+      },
+      "xfinity": {
+        "xfinity-1gig": 210,
+        "xfinity-2gig": 225,
+        "xfinity-500": 120,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 75,
+        "xfinity-wireless-byod": 90,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "gm_in_training": {
+      "att": {
+        "att-1gig": 250,
+        "att-2gig": 250,
+        "att-300": 200,
+        "att-500": 200,
+        "att-5gig": 250
+      },
+      "frontier": {
+        "frontier-1gig": 200,
+        "frontier-2gig": 220,
+        "frontier-500": 85,
+        "frontier-5gig": 250
+      },
+      "tfiber": {
+        "tfiber-1gig": 230,
+        "tfiber-2gig": 280,
+        "tfiber-300": 112.5,
+        "tfiber-500": 162.5
+      },
+      "xfinity": {
+        "xfinity-1gig": 175,
+        "xfinity-2gig": 187.5,
+        "xfinity-500": 100,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 62.5,
+        "xfinity-wireless-byod": 75,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "ibo_level_1": {
+      "att": {
+        "att-1gig": 150,
+        "att-2gig": 150,
+        "att-300": 120,
+        "att-500": 120,
+        "att-5gig": 150
+      },
+      "frontier": {
+        "frontier-1gig": 120,
+        "frontier-2gig": 132,
+        "frontier-500": 51,
+        "frontier-5gig": 150
+      },
+      "tfiber": {
+        "tfiber-1gig": 138,
+        "tfiber-2gig": 168,
+        "tfiber-300": 67.5,
+        "tfiber-500": 97.5
+      },
+      "xfinity": {
+        "xfinity-1gig": 105,
+        "xfinity-2gig": 112.5,
+        "xfinity-500": 60,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 37.5,
+        "xfinity-wireless-byod": 45,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "ibo_level_2": {
+      "att": {
+        "att-1gig": 200,
+        "att-2gig": 200,
+        "att-300": 160,
+        "att-500": 160,
+        "att-5gig": 200
+      },
+      "frontier": {
+        "frontier-1gig": 160,
+        "frontier-2gig": 176,
+        "frontier-500": 68,
+        "frontier-5gig": 200
+      },
+      "tfiber": {
+        "tfiber-1gig": 184,
+        "tfiber-2gig": 224,
+        "tfiber-300": 90,
+        "tfiber-500": 130
+      },
+      "xfinity": {
+        "xfinity-1gig": 140,
+        "xfinity-2gig": 150,
+        "xfinity-500": 80,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 50,
+        "xfinity-wireless-byod": 60,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "ibo_level_3": {
+      "att": {
+        "att-1gig": 250,
+        "att-2gig": 250,
+        "att-300": 200,
+        "att-500": 200,
+        "att-5gig": 250
+      },
+      "frontier": {
+        "frontier-1gig": 200,
+        "frontier-2gig": 220,
+        "frontier-500": 85,
+        "frontier-5gig": 250
+      },
+      "tfiber": {
+        "tfiber-1gig": 230,
+        "tfiber-2gig": 280,
+        "tfiber-300": 112.5,
+        "tfiber-500": 162.5
+      },
+      "xfinity": {
+        "xfinity-1gig": 175,
+        "xfinity-2gig": 187.5,
+        "xfinity-500": 100,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 62.5,
+        "xfinity-wireless-byod": 75,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "ibo_level_4": {
+      "att": {
+        "att-1gig": 300,
+        "att-2gig": 300,
+        "att-300": 240,
+        "att-500": 240,
+        "att-5gig": 300
+      },
+      "frontier": {
+        "frontier-1gig": 240,
+        "frontier-2gig": 264,
+        "frontier-500": 102,
+        "frontier-5gig": 300
+      },
+      "tfiber": {
+        "tfiber-1gig": 310,
+        "tfiber-2gig": 410,
+        "tfiber-300": 135,
+        "tfiber-500": 160
+      },
+      "xfinity": {
+        "xfinity-1gig": 210,
+        "xfinity-2gig": 225,
+        "xfinity-500": 120,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 75,
+        "xfinity-wireless-byod": 90,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "internal_rep": {
+      "att": {
+        "att-1gig": 400,
+        "att-2gig": 400,
+        "att-300": 300,
+        "att-500": 300,
+        "att-5gig": 400
+      },
+      "frontier": {
+        "frontier-1gig": 300,
+        "frontier-2gig": 340,
+        "frontier-500": 70,
+        "frontier-5gig": 400
+      },
+      "tfiber": {
+        "tfiber-1gig": 360,
+        "tfiber-2gig": 460,
+        "tfiber-300": 125,
+        "tfiber-500": 225
+      },
+      "xfinity": {
+        "xfinity-1gig": 250,
+        "xfinity-2gig": 275,
+        "xfinity-500": 100,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 90,
+        "xfinity-wireless-byod": 100,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "office_manager": {
+      "att": {
+        "att-1gig": 325,
+        "att-2gig": 325,
+        "att-300": 260,
+        "att-500": 260,
+        "att-5gig": 325
+      },
+      "frontier": {
+        "frontier-1gig": 260,
+        "frontier-2gig": 286,
+        "frontier-500": 110.5,
+        "frontier-5gig": 325
+      },
+      "tfiber": {
+        "tfiber-1gig": 299,
+        "tfiber-2gig": 364,
+        "tfiber-300": 146.25,
+        "tfiber-500": 211.25
+      },
+      "xfinity": {
+        "xfinity-1gig": 227.5,
+        "xfinity-2gig": 243.75,
+        "xfinity-500": 130,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 81.25,
+        "xfinity-wireless-byod": 97.5,
+        "xfinity-wireless-standard": 0
+      }
+    },
+    "regional_manager": {
+      "att": {
+        "att-1gig": 350,
+        "att-2gig": 350,
+        "att-300": 280,
+        "att-500": 280,
+        "att-5gig": 350
+      },
+      "frontier": {
+        "frontier-1gig": 280,
+        "frontier-2gig": 308,
+        "frontier-500": 119,
+        "frontier-5gig": 350
+      },
+      "tfiber": {
+        "tfiber-1gig": 322,
+        "tfiber-2gig": 392,
+        "tfiber-300": 157.5,
+        "tfiber-500": 227.5
+      },
+      "xfinity": {
+        "xfinity-1gig": 245,
+        "xfinity-2gig": 262.5,
+        "xfinity-500": 140,
+        "xfinity-eero-secure": 0,
+        "xfinity-home-phone": 0,
+        "xfinity-tv": 87.5,
+        "xfinity-wireless-byod": 105,
+        "xfinity-wireless-standard": 0
+      }
+    }
+  },
+  "margin": {
+    "att": {
+      "att-1gig": 500,
+      "att-2gig": 500,
+      "att-300": 400,
+      "att-500": 400,
+      "att-5gig": 500
+    },
+    "frontier": {
+      "frontier-1gig": 400,
+      "frontier-2gig": 440,
+      "frontier-500": 170,
+      "frontier-5gig": 500
+    },
+    "tfiber": {
+      "tfiber-1gig": 460,
+      "tfiber-2gig": 560,
+      "tfiber-300": 225,
+      "tfiber-500": 325
+    },
+    "xfinity": {
+      "xfinity-1gig": 350,
+      "xfinity-2gig": 375,
+      "xfinity-500": 200,
+      "xfinity-eero-secure": 0,
+      "xfinity-home-phone": 0,
+      "xfinity-tv": 125,
+      "xfinity-wireless-byod": 150,
+      "xfinity-wireless-standard": 0
+    }
+  }
+}
