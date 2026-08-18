@@ -50,6 +50,9 @@ export interface PortalNavItem {
 export interface PortalNavGroup {
   label?: string;
   roles?: UserRole[];
+  // Sidebar-only: renders the group label as a collapse toggle. The mobile
+  // sheet and palette ignore it and keep listing every item.
+  collapsible?: boolean;
   items: PortalNavItem[];
 }
 
@@ -103,19 +106,27 @@ export const portalNavGroups: PortalNavGroup[] = [
     ],
   },
   {
+    label: 'Recruiting',
+    roles: managerRoles,
+    collapsible: true,
+    items: [
+      { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', icon: PanelTop, roles: platformRoles },
+      { label: 'Manager Interviews', href: '/portal/admin/manager-interviews', icon: CheckSquare, roles: platformRoles },
+      { label: 'Recruit Onboarding', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
+      { label: 'Onboarding Review', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
+    ],
+  },
+  {
     label: 'Operations',
     roles: managerRoles,
+    collapsible: true,
     items: [
       { label: 'Ops Home', href: '/portal/admin', icon: Gauge, roles: platformRoles },
-      { label: 'Onboarding Review', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
       { label: 'University Content', href: '/portal/admin/university', icon: BookOpen, roles: platformRoles },
       { label: 'Fiber Reports', href: '/portal/admin/fiber-reports', icon: BarChart3, roles: platformRoles },
       { label: 'Expedite Orders', href: '/portal/admin/expedite-orders', icon: Zap, roles: platformRoles },
       { label: 'Payroll Disputes', href: '/portal/admin/payroll-disputes', icon: ReceiptText, roles: platformRoles },
-      { label: 'Manager Interviews', href: '/portal/admin/manager-interviews', icon: CheckSquare, roles: platformRoles },
       { label: 'Leads Requests', href: '/portal/admin/leads-requests', icon: Users, roles: platformRoles },
-      { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', icon: PanelTop, roles: platformRoles },
-      { label: 'Recruit Onboarding', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
       { label: 'Email Templates', href: '/portal/admin/email-templates', icon: Mail, roles: platformRoles },
       { label: 'Bug Reports', href: '/portal/admin/bug-reports', icon: Bug, roles: platformRoles },
     ],
