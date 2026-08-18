@@ -128,6 +128,14 @@ export function SaleDetailSheet({
     };
   }, [open]);
 
+  // Links inside the sheet navigate forward; the cleanup's history.back() would
+  // undo that navigation the moment the sheet unmounts. Disowning the entry
+  // before the router acts leaves an inert duplicate list entry behind instead
+  // — back from the target page still lands on the sales list as expected.
+  const disownHistoryEntry = () => {
+    historyPushedRef.current = false;
+  };
+
   if (!sale) return null;
 
   const saleId = sale.id || '';
@@ -255,7 +263,7 @@ export function SaleDetailSheet({
             )}
             {isAdmin && (
               <>
-                <Link className="admin" href={`/portal/sales/${saleId}/edit`}>
+                <Link className="admin" href={`/portal/sales/${saleId}/edit`} onClick={disownHistoryEntry}>
                   <Pencil className="sales-line-icon" />Edit
                 </Link>
                 <button className="admin" type="button" disabled={loading} onClick={() => onRequestDelete(saleId)}>
@@ -272,7 +280,7 @@ export function SaleDetailSheet({
               <button type="button" onClick={onNext}>Next<ChevronRight className="sales-line-icon" /></button>
             </div>
           )}
-          <Link className="sales-line-open-full" href={`/portal/sales/${saleId}`}>
+          <Link className="sales-line-open-full" href={`/portal/sales/${saleId}`} onClick={disownHistoryEntry}>
             Open full page <ArrowUpRight className="sales-line-icon" />
           </Link>
         </div>
