@@ -39,7 +39,11 @@ export async function requestPushTokenDetailed(): Promise<{ token: string | null
   const m = await getMessagingInstance();
   if (!m) return { token: null, detail: 'not-configured' };
 
-  const permission = await Notification.requestPermission();
+  // iOS quirk: requestPermission() without a user gesture resolves 'denied'
+  // even when the permission is already granted — so never re-ask when the
+  // static state already says granted, or silent refreshes bail out here.
+  const permission =
+    Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
   if (permission !== 'granted') return { token: null, detail: `permission-${permission}` };
 
   // The push service worker must be registered for FCM to bind the token.
