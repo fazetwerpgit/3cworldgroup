@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ESIGN_FAILURE_HELPER_TEXT,
   ESIGN_HELPER_TEXT,
@@ -123,7 +124,12 @@ export default function MemberLineOnboardingBoard({
         </div>
       </section>
 
-      {openItem && (
+      {/* Portaled to <body>: iOS WebKit breaks position:fixed inside the
+          app-shell <main> scroller (sheet clipped under the header with no
+          way out — see SaleDetailSheet). The display:contents wrapper keeps
+          the .member-line custom-property palette in scope. */}
+      {openItem && typeof document !== 'undefined' && createPortal(
+        <div className="member-line" style={{ display: 'contents' }}>
         <div
           className="member-line-sheet-overlay"
           role="dialog"
@@ -152,6 +158,8 @@ export default function MemberLineOnboardingBoard({
             />
           </div>
         </div>
+        </div>,
+        document.body
       )}
     </>
   );

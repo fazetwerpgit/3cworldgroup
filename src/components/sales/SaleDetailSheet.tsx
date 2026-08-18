@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -136,7 +137,7 @@ export function SaleDetailSheet({
     historyPushedRef.current = false;
   };
 
-  if (!sale) return null;
+  if (!sale || typeof document === 'undefined') return null;
 
   const saleId = sale.id || '';
   const showApproval = canApprove && sale.status === 'pending';
@@ -161,8 +162,14 @@ export function SaleDetailSheet({
     }
   };
 
-  return (
-    <>
+  // Portaled to <body>: on iPhones the portal locks scrolling into <main>
+  // (app-shell scroll lock), and iOS WebKit breaks position:fixed inside that
+  // scroller — the sheet gets clipped to main's box and painted UNDER the
+  // fixed header/bottom nav, hiding the close X with no way out. The
+  // display:contents wrapper re-supplies the .sales-line custom-property
+  // palette the sheet's styles read, without generating a layout box.
+  return createPortal(
+    <div className="sales-line" style={{ display: 'contents' }}>
       <button
         type="button"
         className={`sales-line-backdrop ${open ? 'is-open' : ''}`}
@@ -286,6 +293,7 @@ export function SaleDetailSheet({
         </div>
       </aside>
       <ChatLightbox image={proofImage} onClose={() => setProofImage(null)} />
-    </>
+    </div>,
+    document.body
   );
 }

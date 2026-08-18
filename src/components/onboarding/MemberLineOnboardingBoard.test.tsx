@@ -76,15 +76,17 @@ afterEach(() => {
 // presence - that's a separate, unrelated branch (rowDescription). These
 // assertions scope to the open sheet body itself, the exact branch finding 5
 // flagged as untested.
+// The sheet overlay portals to document.body (iOS app-shell scroller fix),
+// so queries go through body rather than the render container.
 function sheetText(): string {
-  return container.querySelector('.member-line-sheet')?.textContent ?? '';
+  return document.body.querySelector('.member-line-sheet')?.textContent ?? '';
 }
 
 describe('MemberLineOnboardingBoard esign sheet body', () => {
   it('renders the Sign now action when a signing url is present', async () => {
     await renderBoard(makeItem({ status: 'submitted', esignSigningUrl: 'https://www.signwell.com/e/abc' }));
 
-    expect(container.querySelector('button.bg-\\[\\#8dc63f\\]')?.textContent).toContain('Sign now');
+    expect(document.body.querySelector('button.bg-\\[\\#8dc63f\\]')?.textContent).toContain('Sign now');
     expect(sheetText()).not.toContain(ESIGN_HELPER_TEXT);
     expect(sheetText()).not.toContain(ESIGN_FAILURE_HELPER_TEXT);
   });
