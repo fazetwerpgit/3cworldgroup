@@ -5,6 +5,13 @@ export interface EmailInput {
   subject: string;
   htmlBody: string;
   textBody: string;
+  /** Optional sender override; falls back to EMAIL_FROM so a missing env can never block delivery. */
+  from?: string;
+}
+
+/** Sender for candidate-facing onboarding emails. Undefined when unconfigured (callers fall back). */
+export function onboardingFrom(): string | undefined {
+  return process.env.ONBOARDING_EMAIL_FROM || undefined;
 }
 
 /**
@@ -14,7 +21,7 @@ export interface EmailInput {
  */
 export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error?: string }> {
   const token = process.env.POSTMARK_SERVER_TOKEN;
-  const from = process.env.EMAIL_FROM;
+  const from = input.from ?? process.env.EMAIL_FROM;
   if (!token || !from) {
     console.warn('[email] not configured; skipping send:', input.subject);
     return { ok: false, error: 'not_configured' };
