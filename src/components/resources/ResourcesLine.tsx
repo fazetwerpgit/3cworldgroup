@@ -68,13 +68,18 @@ const TIER_NOTES: Record<FieldRole, string> = {
   entry_level_rep: 'Entry-level onboarding role; commission begins after promotion.',
   l1_manager: 'Commission on your own sales plus an override on your team.',
   l2_manager: 'Commission on your own sales plus an override on your organization.',
-  ibo_level_1: 'Commission on your own sales plus an IBO team override.',
-  ibo_level_2: 'Commission on your own sales plus an IBO team override.',
-  ibo_level_3: 'Commission on your own sales plus an IBO team override.',
-  ibo_level_4: 'Commission on your own sales plus an IBO team override.',
+  ibo_level_1: 'Commission on your own approved sales at your tier rate.',
+  ibo_level_2: 'Commission on your own approved sales at your tier rate.',
+  ibo_level_3: 'Commission on your own approved sales at your tier rate.',
+  ibo_level_4: 'Commission on your own approved sales at your tier rate.',
   general_manager: 'General Manager commission on your own sales plus an override on your team.',
   gm_in_training: 'GM in Training commission on your own approved sales.',
   office_manager: 'Office Manager commission on your own sales plus an override on your team.',
+  ae_tier_1: 'Account Executive Tier 1 commission on your own approved sales.',
+  ae_tier_2: 'Account Executive Tier 2 commission on your own approved sales.',
+  regional_manager: 'Regional Manager commission on your own approved sales.',
+  director: 'Director commission on your own approved sales.',
+  internal_rep: 'Internal Rep commission on your own approved sales.',
 };
 
 export function ResourcesLineShell({ children }: { children: React.ReactNode }) {

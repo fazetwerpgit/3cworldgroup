@@ -125,7 +125,9 @@ export default function RecruitingCommandCenterPage() {
       'ibo_level_1',
       'ibo_level_2',
       'ibo_level_3',
-      'ibo_level_4'
+      'ibo_level_4',
+      'regional_manager',
+      'director'
     );
 
   const fetchRecruiting = useCallback(async () => {

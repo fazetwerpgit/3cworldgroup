@@ -26,6 +26,8 @@ const managerInterviewRoles = [
   'ibo_level_4',
   'general_manager',
   'office_manager',
+  'regional_manager',
+  'director',
 ] as const;
 
 const formRows = [

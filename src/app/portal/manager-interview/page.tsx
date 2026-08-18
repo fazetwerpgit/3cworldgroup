@@ -38,6 +38,8 @@ const managerInterviewRoles = [
   'ibo_level_2',
   'ibo_level_3',
   'ibo_level_4',
+  'regional_manager',
+  'director',
 ] as const;
 
 export default function ManagerInterviewPage() {

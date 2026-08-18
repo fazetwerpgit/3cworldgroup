@@ -249,9 +249,7 @@ export default function PublicOnboardingPage() {
               <p className="member-line-eyebrow">candidate</p>
               <p style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{data?.invite.candidateName}</p>
               <p className="member-line-sub">{data?.invite.candidateEmail}</p>
-              <p className="member-line-sub">
-                {roleLabel}{data?.invite.isIBO ? ' / IBO' : ''}
-              </p>
+              <p className="member-line-sub">{roleLabel}</p>
 
               <div className="member-line-progress" style={{ marginTop: 18 }}>
                 <span style={{ width: total ? `${(completed / total) * 100}%` : '0%' }} />

@@ -31,6 +31,9 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
 const ALL_ROLE_VALUES: UserRole[] = [
   'entry_rep',
   'entry_level_rep',
+  'ae_tier_1',
+  'ae_tier_2',
+  'internal_rep',
   'gm_in_training',
   'l1_manager',
   'l2_manager',
@@ -40,6 +43,8 @@ const ALL_ROLE_VALUES: UserRole[] = [
   'ibo_level_4',
   'office_manager',
   'general_manager',
+  'regional_manager',
+  'director',
   'operations',
   'admin',
 ];
@@ -55,7 +60,14 @@ const statusSegments: { value: 'pending' | 'active' | 'inactive'; label: string 
   { value: 'inactive', label: 'Inactive' },
 ];
 
-const MANAGER_ELIGIBLE: UserRole[] = ['l1_manager', 'l2_manager', 'operations', 'admin'];
+const MANAGER_ELIGIBLE: UserRole[] = [
+  'l1_manager',
+  'l2_manager',
+  'regional_manager',
+  'director',
+  'operations',
+  'admin',
+];
 
 interface ManagerCandidate {
   uid: string;

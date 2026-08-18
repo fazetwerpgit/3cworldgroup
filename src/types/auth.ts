@@ -13,7 +13,14 @@ export type FieldRole =
   | 'ibo_level_4'
   | 'general_manager'
   | 'gm_in_training'
-  | 'office_manager';
+  | 'office_manager'
+  // Comp-plan roles (3C World Group 7.1.26 comp sheet). These are the roles
+  // new hires are invited as; the tiers above them are kept for existing reps.
+  | 'ae_tier_1'
+  | 'ae_tier_2'
+  | 'regional_manager'
+  | 'director'
+  | 'internal_rep';
 
 /** @deprecated Use PlatformRole | FieldRole instead */
 export type UserRole = PlatformRole | FieldRole;
@@ -36,6 +43,11 @@ export const FieldRoles = {
   GENERAL_MANAGER: 'general_manager',
   GM_IN_TRAINING: 'gm_in_training',
   OFFICE_MANAGER: 'office_manager',
+  AE_TIER_1: 'ae_tier_1',
+  AE_TIER_2: 'ae_tier_2',
+  REGIONAL_MANAGER: 'regional_manager',
+  DIRECTOR: 'director',
+  INTERNAL_REP: 'internal_rep',
 } as const;
 
 export const IBO_FIELD_ROLES: readonly FieldRole[] = [
@@ -50,6 +62,9 @@ export const LIGHT_VETTING_ROLES: readonly FieldRole[] = [
   'general_manager',
   'gm_in_training',
   'office_manager',
+  'regional_manager',
+  'director',
+  'internal_rep',
 ];
 
 /** Field roles treated as management for gating and alert broadcast. */
@@ -62,6 +77,8 @@ export const MANAGEMENT_FIELD_ROLES: readonly FieldRole[] = [
   'ibo_level_4',
   'general_manager',
   'office_manager',
+  'regional_manager',
+  'director',
 ];
 
 // Base permissions everyone gets
@@ -133,6 +150,11 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
   general_manager: [...FIELD_MANAGER_PERMISSIONS],
   gm_in_training: [...FIELD_REP_PERMISSIONS],
   office_manager: [...FIELD_MANAGER_PERMISSIONS],
+  ae_tier_1: [...FIELD_REP_PERMISSIONS],
+  ae_tier_2: [...FIELD_REP_PERMISSIONS],
+  internal_rep: [...FIELD_REP_PERMISSIONS],
+  regional_manager: [...FIELD_MANAGER_PERMISSIONS],
+  director: [...FIELD_MANAGER_PERMISSIONS],
 };
 
 // Role display names for UI
@@ -150,6 +172,11 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   general_manager: 'General Manager',
   gm_in_training: 'GM in Training',
   office_manager: 'Office Manager',
+  ae_tier_1: 'Account Executive Tier 1',
+  ae_tier_2: 'Account Executive Tier 2',
+  regional_manager: 'Regional Manager',
+  director: 'Director',
+  internal_rep: 'Internal Rep',
 };
 
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
@@ -161,10 +188,26 @@ const FIELD_ROLE_VALUES: readonly string[] = Object.values(FieldRoles);
 // the onboarding predicate can never disagree — an earlier version offered
 // eight roles while only one of them actually onboarded, which stranded the
 // other seven at status 'pending' with an empty checklist and no way out.
-// The internal/office roles general_manager, gm_in_training, and office_manager
-// are intentionally not recruit-invite targets.
+// The internal/office roles general_manager, gm_in_training, office_manager and
+// internal_rep are intentionally not recruit-invite targets. The IBO levels and
+// the legacy entry_rep/l1/l2 tiers are no longer offered to candidates either —
+// existing reps keep them, but new hires come in on the comp-plan roles.
 export const INVITABLE_FIELD_ROLES: readonly FieldRole[] = [
   'entry_level_rep',
+  'ae_tier_1',
+  'ae_tier_2',
+  'regional_manager',
+  'director',
+];
+
+// Every field role that runs the onboarding checklist. Deliberately wider than
+// INVITABLE_FIELD_ROLES: retiring a role from the invite form must not strand
+// the hires already mid-checklist on it. roleRequiresOnboarding gates far more
+// than the invite form — the checklist contents, onboarding-stage API and chat
+// access, stall detection, and activation — so a role dropped from here loses
+// its packet, its chat, and its way to ever activate.
+export const ONBOARDING_FIELD_ROLES: readonly FieldRole[] = [
+  ...INVITABLE_FIELD_ROLES,
   'entry_rep',
   'l1_manager',
   'l2_manager',
@@ -176,13 +219,13 @@ export const INVITABLE_FIELD_ROLES: readonly FieldRole[] = [
 
 export function roleRequiresOnboarding(fieldRole?: FieldRole): boolean {
   if (!fieldRole) return false;
-  return INVITABLE_FIELD_ROLES.includes(fieldRole);
+  return ONBOARDING_FIELD_ROLES.includes(fieldRole);
 }
 
 // What a hire becomes when their last checklist item is approved. Entry Level
-// Rep graduates to Account Executive; every other role activates as invited.
+// Rep graduates to Account Executive Tier 1; every other role activates as invited.
 export function graduatedFieldRole(fieldRole: FieldRole): FieldRole {
-  return fieldRole === 'entry_level_rep' ? 'entry_rep' : fieldRole;
+  return fieldRole === 'entry_level_rep' ? 'ae_tier_1' : fieldRole;
 }
 
 // Defensive mapping for raw role data read from Firestore.
