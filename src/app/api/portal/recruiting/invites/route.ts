@@ -189,11 +189,13 @@ export async function POST(request: NextRequest) {
 
     const inviteUrl = `${request.nextUrl.origin}/onboard/${token}`;
 
-    void sendEmail({
+    // Must be awaited: on serverless the instance freezes once the response
+    // returns, killing any in-flight send. sendEmail never throws.
+    await sendEmail({
       to: candidateEmail,
       from: onboardingFrom(),
       ...inviteEmail({ candidateName, ownerName: requester.name, inviteUrl }),
-    }).catch(() => {});
+    });
 
     return NextResponse.json({
       success: true,

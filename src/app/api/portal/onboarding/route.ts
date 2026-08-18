@@ -7,6 +7,7 @@ import {
 } from '@/types';
 import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { isEsignItem } from '@/lib/onboarding/esign';
 
 // GET /api/portal/onboarding?userId=xxx - Merged onboarding checklist for a user.
 // Returns the items that apply to the user's fieldRole/isIBO, each merged with
@@ -71,6 +72,21 @@ export async function GET(request: NextRequest) {
     );
     const progressDocs = refs.length > 0 ? await adminDb.getAll(...refs) : [];
 
+    // Signing URLs live in a server-only collection (no firestore.rules match,
+    // so the client SDK can never read it). Only fetched for the owner, and
+    // only for esign items, since management never needs it.
+    const esignItems = checklist.filter((item) => isEsignItem(item.id));
+    const signingUrlByItemId = new Map<string, string | null>();
+    if (isOwner && esignItems.length > 0) {
+      const signingRefs = esignItems.map((item) =>
+        adminDb!.collection('esignSigningUrls').doc(`${userId}_${item.id}`)
+      );
+      const signingDocs = await adminDb.getAll(...signingRefs);
+      signingDocs.forEach((doc, i) => {
+        signingUrlByItemId.set(esignItems[i].id, doc.exists ? ((doc.data()?.url as string | undefined) ?? null) : null);
+      });
+    }
+
     const items = checklist.map((item, i) => {
       const progress = progressDocs[i]?.exists ? progressDocs[i].data() : null;
       return {
@@ -87,7 +103,7 @@ export async function GET(request: NextRequest) {
               attempts: progress.esignDispatch.attempts,
             }
           : null,
-        esignSigningUrl: isOwner ? ((progress?.esignSigningUrl as string | undefined) ?? null) : null,
+        esignSigningUrl: isOwner ? (signingUrlByItemId.get(item.id) ?? null) : null,
       };
     });
 

@@ -3,36 +3,112 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-07-28 (update at EVERY milestone).
+Updated: 2026-08-18 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-ONBOARDING COMPLETION — Tasks 1-8 DONE and reviewed. Branch
-`onboarding/completion`, HEAD 19daf11, working tree clean.
+TWO PARALLEL TRACKS as of 2026-08-18 — do not mix them.
 
-**Start SDD Task 9.** Plan: docs/superpowers/plans/2026-07-25-onboarding-
-completion.md. Extract the brief with the superpowers script (do NOT make
-the implementer read the whole plan):
+TRACK B (2026-08-18 evening, plan APPROVED, IN PROGRESS): roles overhaul +
+owner tier + rep pay tracking. Plan at
+~/.claude/plans/so-i-need-to-indexed-lampson.md. Isolated worktree
+/home/fazetwerpnerd69/dev/3cwg-payplan, branch feat/roles-owner-payplan
+(off onboarding/completion 827b789) — ALL Track B code changes go there,
+never in this tree. Summary: IBO hidden publicly (kept in data/admin),
+new roles from ~/"3C World Group 7.1 .26 Comp.xlsx" (AE T1/T2, GMIT, GM,
+OM, Regional, Director, Internal Rep), new 'owner' platform role (Jacob +
+Jeremy, exclusive financials/margins), comp plan → config/compPlan +
+config/compPlanMargin, rep sales tab → [All, Pay] with expected pay
+(install+14d) + private paid checkbox (users/{uid}/salePaid). Decisions:
+manual role assignment; no team overrides v1; $0 rates stay $0; legacy
+rep roles fall back to AE Tier 1. Jacob's standing rule: NO Sonnet
+agents — Fable orchestrates/reviews, Opus subagents. Business rules also
+saved to memory dir. NO PUSH without explicit go-ahead.
 
-    ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.1/skills/\
-      subagent-driven-development/scripts/task-brief \
-      docs/superpowers/plans/2026-07-25-onboarding-completion.md 9
+TRACK A — **DEPLOYED TO PRODUCTION 2026-08-18 evening** (Jacob's "deploy"):
+master fast-forwarded to the branch + fix commits, pushed, Vercel Ready,
+aliased to www.3cworldgroup.com. Post-deploy fixes shipped same evening:
+(1) invite route `void sendEmail` → `await` (serverless freeze killed every
+invite email in prod — they NEVER worked live before); (2) removed stale
+SIGNWELL_TEST_MODE from Vercel Production env (would throw on real
+envelope creation) + redeployed. ROOT CAUSE of remaining vanishing email:
+Postmark FREE/TRIAL account was accepting API sends (200 + MessageID)
+then silently discarding them — Jacob bought a PAID Postmark plan
+2026-08-18 and delivery verified ("Delivered" event). Cleanup done: 4
+orphaned pending_assignment alertTasks deleted; leftover QA account
+qa-e2e-1@3cworldgroup.test (auth + users doc) fully deleted by Jacob via
+script. Vercel CLI is authenticated on this box (~/.vercel) and repo is
+linked — `npx vercel env ls/pull/rm`, `vercel logs`, `vercel redeploy`
+all work. NOTE: `vercel link` OVERWROTE .env.local with Development env
+(old local values lost; production values pullable except Sensitive).
+Real candidates invited 2026-08-18: Mason Steinberger (in_progress),
+Bryan Curtis (invite email lost pre-upgrade — needs fresh invite).
+Jacob's test addresses: jacobcmyers692@gmail.com and jacobcmyers@gmail.com
+are BOTH his real inboxes. STILL PENDING: live end-to-end signature test
+(invite → paperwork → in-portal Sign now → webhook flips to approved, no
+esign_mismatch alert).
 
-Task 9 is 12 steps (leftovers + final gates): dead metadata, guard test
-mode in prod, gate the upload route BEFORE parsing the multipart body,
-close the invite API role hole, positive checklist tests, finish the chat
-roster decision, hoist user queries out of the channel-sync loop, two
-review corrections, tell a graduating hire the right role, stop hand-
-copying the graduation mapping, full gates, commit.
+TRACK A ORIGINAL SCOPE (built + reviewed, all shipped above, 2026-08-18): Onboarding sender email + EMBEDDED
+in-portal SignWell signing + candidate-page portal restyle all SHIPPED
+locally on `onboarding/completion`, HEAD df4416a (spec 5124181+22f8f0f,
+plan dff3537, build ace1d6f..827b789 in swarm waves, fix wave df4416a).
+Gates: 603/603 tests, tsc clean, build clean. Final review dual-lens
+(security + correctness) + fix wave + re-review = CLEAN. Critical finding
+FIXED: signing URL now lives in server-only `esignSigningUrls/{uid}_{item}`
+collection (covered by default-deny — firestore.rules UNTOUCHED, Jacob
+need not re-paste). Restyle visually verified 1440/390 (screenshots in
+scratchpad; shoot script scratchpad/shoot-onboard.mjs, chromium-1234
+executablePath workaround). Ledger: .superpowers/sdd/progress.md.
+ADOBE: rejected — "Adobe for Team" has no API access; embedded SignWell
+hides SignWell branding-in-email instead.
 
-Task 9 Step 9 references the "Account Executive" title BY QUOTED STRING,
-not by line number — an earlier line number went stale after Task 7 moved
-the code, and a line-following implementer would have edited a different,
-correct dispatch. Do not "helpfully" convert it back to a line number.
+JACOB'S OPS: ALL CONFIRMED DONE 2026-08-18 in-chat — Firebase rules
+pasted + alertTasks index created, Postmark verified
+onboarding@3cworldgroup.com, all six Vercel Production vars set
+(SIGNWELL_API_KEY, SIGNWELL_WEBHOOK_ID=9f593de0-44af-4a6e-98e4-88ce59907901
+→ https://www.3cworldgroup.com/api/webhooks/esign, CRON_SECRET,
+ONBOARDING_FIELD_ENCRYPTION_KEY — both regenerated in-chat, key in his
+password manager — ONBOARDING_EMAIL_FROM=onboarding@3cworldgroup.com;
+no SIGNWELL_TEST_MODE row).
 
-After Task 9: the final whole-branch review (most capable model, one fix
-subagent for ALL findings, not one per finding), then
-superpowers:finishing-a-development-branch.
+TRACK A NEXT: nothing until Jacob says "deploy" → then merge
+onboarding/completion into master locally, push (= Vercel deploy), and
+run the live test: invite himself, sign in-portal, confirm item flips to
+approved and no esign_mismatch/review_needed alert. CANNOT be verified
+locally (say so honestly): real embedded envelope e2e, signing-URL
+expiry behavior (undocumented), production Postmark sender.
+FAST-FOLLOWS: GET /api/portal/onboarding esignSigningUrls read has no
+degrade-on-error wrap; signing-URL regeneration; plus the older 14-item
+list in .superpowers/sdd/progress.md. NOTE: Opus was 529-overloaded all
+session — reviews ran on sonnet pairs (pre-dates the no-Sonnet rule);
+optionally rerun one Opus whole-branch review before deploy.
+
+---
+
+ONBOARDING COMPLETION — **BRANCH COMPLETE, WAITING ON JACOB'S MERGE
+DECISION.** Branch `onboarding/completion`, HEAD 3a76f3a (e1b2173..3a76f3a,
+33 commits), 565/565 tests, tsc/build clean (re-verified by controller).
+
+Final whole-branch review (Opus): "With fixes" — 0 Critical, 12 Important
+(4 code seams + 8 argument-blind test suites). ONE fix round (ac78623 code,
+3a76f3a tests) closed all 12; Opus re-review: READY TO MERGE — YES.
+Deferred-findings triage: 0 must-fix, 14 fast-follow, 25 accept (full list
++ verdicts in .superpowers/sdd/progress.md and final-review-deferred.md).
+
+DECISION (2026-07-29): Jacob chose **KEEP BRANCH AS-IS**. The branch stays
+local and unmerged; master untouched. THE PROJECT IS DONE pending his
+go-ahead to merge + deploy. Nothing to resume — next session should ask
+Jacob what he wants to work on, unless he says "deploy the onboarding
+work", in which case: (1) merge onboarding/completion into master locally,
+(2) walk him through the ops checklist BEFORE any push: paste
+firestore.rules into the Firebase console Rules editor (never
+machine-validated), set SignWell env vars incl. SIGNWELL_WEBHOOK_ID +
+CRON_SECRET in Vercel, create the composite indexes, then push. One live
+SignWell envelope end-to-end test is strongly advised before real
+candidates (POST /documents id vs webhook payload id correspondence is
+UNKNOWN; the esign_mismatch alert is the production instrument for it).
+14 FAST-FOLLOW items are triaged in .superpowers/sdd/progress.md +
+final-review-deferred.md — good candidates for a next work session.
 
 The durable ledger is `.superpowers/sdd/progress.md` (git-ignored). It is
 the recovery map — trust it and `git log` over recollection. It carries
@@ -255,8 +331,10 @@ unauthenticated caller.
 - User non-technical: plain language, business decisions his,
   technical calls mine. No emojis. Mockups as Artifacts (attachment
   batches fail for him), strip doctype/html/head/body wrappers.
-- Subagents NEVER on Fable — always explicit model: sonnet builds,
-  opus reviews. Codex dead until Aug 12 2026.
+- Subagents NEVER on Fable — always explicit model. JACOB'S RULE
+  (2026-08-18): NO Sonnet agents — Fable orchestrates/reviews in the
+  main loop, subagents run on Opus. Codex is alive (see correction
+  above); use it when the GPT sub is active.
 - Pipeline per change: sonnet build from binding spec → gates
   (npx tsc --noEmit / eslint / npm test 346 / npm run build) → my
   browser verify (Playwright MCP, Jacob's admin session on :3000 —

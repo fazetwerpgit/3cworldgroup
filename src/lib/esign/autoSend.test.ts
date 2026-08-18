@@ -120,7 +120,12 @@ beforeEach(() => {
     store.set(path, next);
   });
   createEnvelopeMock.mockReset();
-  createEnvelopeMock.mockResolvedValue({ envelopeId: 'env_1' });
+  // Default: envelope creation succeeds AND returns an embedded signing url.
+  // Tests about the missing-url path override this explicitly per-call.
+  createEnvelopeMock.mockResolvedValue({
+    envelopeId: 'env_1',
+    embeddedSigningUrl: 'https://www.signwell.com/e/default',
+  });
   getEsignProviderMock.mockReset();
   getEsignProviderMock.mockImplementation(() => ({
     id: 'signwell' as const,
@@ -159,12 +164,22 @@ describe('sendPendingEsignDocs', () => {
     const sent = await sendPendingEsignDocs('u1');
     expect(sent.sort()).toEqual(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure']);
     expect(createEnvelopeMock).toHaveBeenCalledTimes(4);
+    // The signing URL is a bearer capability: it must never land in
+    // userOnboarding (client-readable via firestore.rules for owner/management).
     expect(store.get('userOnboarding/u1_contract')).toMatchObject({
       status: 'submitted',
       esignEnvelopeId: 'env_1',
-      esignSigningUrl: 'https://www.signwell.com/e/abc',
     });
-    expect(setOptions).toHaveLength(4);
+    expect(store.get('userOnboarding/u1_contract')).not.toHaveProperty('esignSigningUrl');
+    // It lives only in the server-only esignSigningUrls collection.
+    expect(store.get('esignSigningUrls/u1_contract')).toMatchObject({
+      userId: 'u1',
+      itemId: 'contract',
+      envelopeId: 'env_1',
+      url: 'https://www.signwell.com/e/abc',
+    });
+    // Two writes per item now: the signing url doc, then the userOnboarding doc.
+    expect(setOptions).toHaveLength(8);
     expect(setOptions.every((options) => options?.merge === true)).toBe(true);
     expect(createEnvelopeMock).toHaveBeenCalledWith({
       docKey: 'contract',
@@ -177,30 +192,51 @@ describe('sendPendingEsignDocs', () => {
       'userOnboarding/u1_contract',
       expect.objectContaining({
         esignEnvelopeId: 'env_1',
-        esignSigningUrl: 'https://www.signwell.com/e/abc',
         status: 'submitted',
+      }),
+      { merge: true }
+    );
+    expect(setMock).toHaveBeenCalledWith(
+      'esignSigningUrls/u1_contract',
+      expect.objectContaining({
+        url: 'https://www.signwell.com/e/abc',
+        envelopeId: 'env_1',
       }),
       { merge: true }
     );
     expect(dispatchMock).toHaveBeenCalledOnce();
   });
 
-  it('persists a null esignSigningUrl when the provider does not return one', async () => {
+  it('does not treat a missing embedded signing url as a clean send', async () => {
     for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
       store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
     }
     createEnvelopeMock.mockResolvedValueOnce({ envelopeId: 'env_1' });
 
-    await sendPendingEsignDocs('u1');
+    const sent = await sendPendingEsignDocs('u1');
 
-    expect(setMock).toHaveBeenCalledWith(
-      'userOnboarding/u1_contract',
+    // Never a silent no-URL dead end: not counted as sent...
+    expect(sent).not.toContain('contract');
+    // ...no esignSigningUrls doc is written for it...
+    expect(store.get('esignSigningUrls/u1_contract')).toBeUndefined();
+    // ...but the envelope fields are still persisted (webhook integrity)...
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({
+      status: 'submitted',
+      esignEnvelopeId: 'env_1',
+    });
+    expect(store.get('userOnboarding/u1_contract')).not.toHaveProperty('esignSigningUrl');
+    // ...and the dispatch state is marked failed immediately, not silently.
+    expect(store.get('userOnboarding/u1_contract')?.esignDispatch).toMatchObject({
+      state: 'failed',
+      attempts: 1,
+      lastError: 'missing_signing_url',
+    });
+    // Ops is alerted right away - not after three attempts.
+    expect(createAlertTaskMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        esignEnvelopeId: 'env_1',
-        esignSigningUrl: null,
-        status: 'submitted',
-      }),
-      { merge: true }
+        kind: 'review_needed',
+        title: 'E-signature signing link missing',
+      })
     );
   });
 
@@ -253,13 +289,32 @@ describe('sendPendingEsignDocs', () => {
     for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
       store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
     }
-    setMock.mockRejectedValueOnce(new Error('temporary firestore failure'));
+    // Call 1 is the esignSigningUrls write (must succeed so the item isn't
+    // routed down the missing-url path); call 2 is the userOnboarding
+    // envelope-persistence write, which fails once and then retries.
+    let call = 0;
+    setMock.mockImplementation(async (
+      path: string,
+      data: Record<string, unknown>,
+      options?: { merge?: boolean }
+    ) => {
+      call += 1;
+      if (call === 2) throw new Error('temporary firestore failure');
+      writes.push({ path, data });
+      setOptions.push(options);
+      const next = { ...(store.get(path) ?? {}), ...data };
+      Object.entries(data).forEach(([key, value]) => {
+        if (value === DELETE_SENTINEL) delete next[key];
+      });
+      store.set(path, next);
+    });
 
     const sent = await sendPendingEsignDocs('u1');
 
     expect(sent).toEqual(['contract']);
-    expect(setMock).toHaveBeenCalledTimes(2);
+    expect(setMock).toHaveBeenCalledTimes(3);
     expect(setMock.mock.calls.map(([, , options]) => options)).toEqual([
+      { merge: true },
       { merge: true },
       { merge: true },
     ]);
@@ -267,21 +322,42 @@ describe('sendPendingEsignDocs', () => {
       status: 'submitted',
       esignEnvelopeId: 'env_1',
     });
+    expect(store.get('esignSigningUrls/u1_contract')).toMatchObject({
+      url: 'https://www.signwell.com/e/default',
+      envelopeId: 'env_1',
+    });
   });
 
   it('records a post-send persistence failure with the created envelope details', async () => {
     for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
       store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
     }
-    setMock
-      .mockRejectedValueOnce(new Error('temporary firestore failure'))
-      .mockRejectedValueOnce(new Error('permanent firestore failure'));
+    // Call 1 (esignSigningUrls write) succeeds; calls 2 and 3 (userOnboarding
+    // write + its one retry) both fail, exhausting the retry budget; call 4
+    // is recordFailure's own esignDispatch write.
+    let call = 0;
+    setMock.mockImplementation(async (
+      path: string,
+      data: Record<string, unknown>,
+      options?: { merge?: boolean }
+    ) => {
+      call += 1;
+      if (call === 2) throw new Error('temporary firestore failure');
+      if (call === 3) throw new Error('permanent firestore failure');
+      writes.push({ path, data });
+      setOptions.push(options);
+      const next = { ...(store.get(path) ?? {}), ...data };
+      Object.entries(data).forEach(([key, value]) => {
+        if (value === DELETE_SENTINEL) delete next[key];
+      });
+      store.set(path, next);
+    });
 
     const sent = await sendPendingEsignDocs('u1');
 
     expect(sent).toEqual([]);
     expect(createEnvelopeMock).toHaveBeenCalledOnce();
-    expect(setMock).toHaveBeenCalledTimes(3);
+    expect(setMock).toHaveBeenCalledTimes(4);
     expect(store.get('userOnboarding/u1_contract')?.esignDispatch).toMatchObject({
       state: 'failed',
       attempts: 1,

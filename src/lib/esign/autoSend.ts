@@ -93,6 +93,96 @@ async function raiseDispatchAlert(userId: string, signerName: string): Promise<v
   }
 }
 
+// The embedded signing URL is a bearer capability and never lives in
+// userOnboarding (client-readable via firestore.rules). It is stored
+// server-only in esignSigningUrls/{userId}_{itemId}, a collection with no
+// firestore.rules match — the Admin SDK can read/write it, the client SDK
+// cannot read it under any role.
+async function persistSigningUrl(
+  userId: string,
+  itemId: string,
+  envelopeId: string,
+  url: string
+): Promise<boolean> {
+  const ref = adminDb!.doc(`esignSigningUrls/${userId}_${itemId}`);
+  const data = { userId, itemId, envelopeId, url, updatedAt: new Date() };
+  try {
+    await ref.set(data, { merge: true });
+    return true;
+  } catch (firstError) {
+    try {
+      await ref.set(data, { merge: true });
+      return true;
+    } catch (error) {
+      console.error(`[esign] embedded signing url failed to persist for ${userId}/${itemId}`, {
+        envelopeId,
+        error,
+        firstError,
+      });
+      return false;
+    }
+  }
+}
+
+// The envelope was created (webhook will still fire and must find a record to
+// update), but there is no usable in-portal signing link for the candidate —
+// either the provider never returned one, or persisting it failed after
+// retry. This is never a silent dead end: the item's dispatch state is marked
+// failed (surfaces the honest "we hit a snag" copy on the board) and ops is
+// alerted immediately, not after three attempts.
+async function recordMissingSigningUrl(
+  pending: PendingItem,
+  userId: string,
+  signerName: string,
+  envelopeId: string,
+  lastError: string
+): Promise<void> {
+  const now = new Date();
+  const state = dispatchState(pending.snap);
+  const attempts = previousAttempts(state) + 1;
+  const persistence = {
+    userId,
+    itemId: pending.item.id,
+    status: 'submitted',
+    reference: `esign:${envelopeId}`,
+    esignEnvelopeId: envelopeId,
+    esignDispatch: {
+      state: 'failed',
+      attempts,
+      lastError,
+      lastAttemptAt: now,
+    },
+    submittedAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    await pending.ref.set(persistence, { merge: true });
+  } catch (firstError) {
+    try {
+      await pending.ref.set(persistence, { merge: true });
+    } catch (error) {
+      console.error(
+        `[esign] envelope was created but its record failed to persist for ${userId}/${pending.item.id}`,
+        { envelopeId, userId, itemId: pending.item.id, error, firstError }
+      );
+    }
+  }
+
+  try {
+    await createAlertTask({
+      kind: ALERT_KIND,
+      subjectUserId: userId,
+      subjectName: signerName,
+      title: 'E-signature signing link missing',
+      message: `${signerName} has a document (${pending.item.label}) ready to sign, but no in-portal signing link was available.`,
+      link: '/portal/admin/onboarding',
+    });
+  } catch (error) {
+    console.error(`[esign] failed to raise missing-signing-url alert for ${userId}/${pending.item.id}`, error);
+  }
+}
+
 async function resolveDispatchAlert(userId: string): Promise<void> {
   try {
     await resolveAlertTasks(userId, [ALERT_KIND]);
@@ -133,6 +223,17 @@ async function sendOne(
     return { sent: false, failed: (await recordFailure(pending, userId, error)) ?? undefined };
   }
 
+  if (!embeddedSigningUrl) {
+    await recordMissingSigningUrl(pending, userId, signerName, envelopeId, 'missing_signing_url');
+    return { sent: false };
+  }
+
+  const urlPersisted = await persistSigningUrl(userId, pending.item.id, envelopeId, embeddedSigningUrl);
+  if (!urlPersisted) {
+    await recordMissingSigningUrl(pending, userId, signerName, envelopeId, 'signing_url_persist_failed');
+    return { sent: false };
+  }
+
   const now = new Date();
   const hadFailedDispatch = dispatchState(pending.snap).state === 'failed';
   const persistence = {
@@ -141,7 +242,6 @@ async function sendOne(
     status: 'submitted',
     reference: `esign:${envelopeId}`,
     esignEnvelopeId: envelopeId,
-    esignSigningUrl: embeddedSigningUrl ?? null,
     esignDispatch: FieldValue.delete(),
     submittedAt: now,
     updatedAt: now,

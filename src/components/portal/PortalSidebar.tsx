@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeftToLine, ChevronLeft } from 'lucide-react';
+import { ArrowLeftToLine, ChevronDown, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { MobileBottomNav } from '@/components/portal/MobileBottomNav';
@@ -15,9 +15,14 @@ import {
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 
 const EXACT_MATCH_ROUTES = new Set(['/portal/dashboard', '/portal/admin']);
+const GROUPS_OPEN_KEY = 'portal-rail-groups-open';
 
 function isItemActive(pathname: string, href: string) {
   return EXACT_MATCH_ROUTES.has(href) ? pathname === href : pathname.startsWith(href);
+}
+
+function groupItemsId(label: string) {
+  return `portal-rail-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 }
 
 function NavLink({
@@ -71,16 +76,67 @@ function NavGroups({
   getBadgeCount: (item: PortalNavItem) => number | undefined;
   onLinkClick?: () => void;
 }) {
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(GROUPS_OPEN_KEY);
+      const parsed = saved ? JSON.parse(saved) : null;
+      // Restoring after mount keeps the first server/client render identical.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (parsed && typeof parsed === 'object') setOpenGroups(parsed as Record<string, boolean>);
+    } catch {
+      // Ignore private-mode, quota, and malformed-JSON failures.
+    }
+  }, []);
+
+  const toggleGroup = (label: string, open: boolean) => {
+    const next = { ...openGroups, [label]: !open };
+    setOpenGroups(next);
+    try {
+      window.localStorage.setItem(GROUPS_OPEN_KEY, JSON.stringify(next));
+    } catch {
+      // Ignore private-mode and storage quota failures.
+    }
+  };
+
   return (
     <>
       {groups.map((group) => {
         const visibleItems = group.items.filter(canAccess);
         if (visibleItems.length === 0) return null;
 
+        // The icon-only rail hides labels, so a toggle there would be unusable.
+        const collapsible = Boolean(group.collapsible && group.label) && !collapsed;
+        const label = group.label ?? '';
+        // A stored choice wins; otherwise the group opens only when the current
+        // page lives inside it, so the default is closed.
+        const open =
+          !collapsible ||
+          (openGroups[label] ?? visibleItems.some((item) => isItemActive(pathname, item.href)));
+        const itemsId = groupItemsId(label);
+
         return (
           <section className="portal-rail-group" key={group.label ?? 'primary'}>
-            {group.label && <p className="portal-rail-group-label">{group.label}</p>}
-            <div className="portal-rail-group-items">
+            {collapsible ? (
+              <button
+                type="button"
+                className={`portal-rail-group-toggle${open ? ' is-open' : ''}`}
+                onClick={() => toggleGroup(label, open)}
+                aria-expanded={open}
+                aria-controls={itemsId}
+              >
+                <span>{label}</span>
+                <ChevronDown aria-hidden="true" />
+              </button>
+            ) : (
+              group.label && <p className="portal-rail-group-label">{group.label}</p>
+            )}
+            <div
+              className="portal-rail-group-items"
+              id={collapsible ? itemsId : undefined}
+              hidden={!open}
+            >
               {visibleItems.map((item) => (
                 <NavLink
                   key={item.href}

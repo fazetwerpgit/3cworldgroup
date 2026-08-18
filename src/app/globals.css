@@ -2154,9 +2154,50 @@ body.portal-scope {
   letter-spacing: 0.17em;
 }
 
+.portal-rail-group-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 7px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--rail-muted);
+  font: 900 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.17em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease-out, background 160ms ease-out;
+}
+
+.portal-rail-group-toggle:hover,
+.portal-rail-group-toggle:focus-visible {
+  background: rgba(163, 230, 53, 0.08);
+  color: var(--rail-ink);
+}
+
+.portal-rail-group-toggle svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  stroke-width: 2.4;
+}
+
+.portal-rail-group-toggle:not(.is-open) svg {
+  transform: rotate(-90deg);
+}
+
 .portal-rail-group-items {
   display: grid;
   gap: 1px;
+}
+
+.portal-rail-group-items[hidden] {
+  display: none;
 }
 
 .portal-rail-link {

@@ -224,6 +224,17 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     });
 
+    if (isRejectedEsign) {
+      // The signing URL is a bearer capability for the superseded envelope -
+      // once rejected, offering it back to the candidate would let them keep
+      // signing a document management has already thrown out.
+      try {
+        await adminDb.collection('esignSigningUrls').doc(`${userId}_${itemId}`).delete();
+      } catch (error) {
+        console.error('Failed to delete stale esign signing url:', error);
+      }
+    }
+
     try {
       // Notify the rep of the outcome
       if (status === 'approved') {
