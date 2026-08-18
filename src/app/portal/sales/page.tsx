@@ -169,13 +169,12 @@ function SalesContent() {
   // Expected pay is personal: only a rep on a comp plan gets a number here.
   // Management sees a dash — the ledger's commission column is where their
   // team's money lives, and their own pay is not this page's business.
-  // A rejected or cancelled sale is money that is not coming, so it adds nothing.
+  // A rejected or cancelled sale is money that is not coming, so it adds nothing
+  // to the total — and the "Across N sales" note counts the same set the total sums.
+  const payableMtd = mtdSales.filter(isPayableSale);
   const expectedPayMtd = canApprove || !hasPlan
     ? null
-    : mtdSales.reduce(
-        (sum, sale) => sum + (isPayableSale(sale) ? expectedPayForSale(sale, rates) ?? 0 : 0),
-        0
-      );
+    : payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
   const dateLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
     .format(now)
     .toUpperCase();
@@ -262,7 +261,7 @@ function SalesContent() {
                     </strong>
                     <span className="sales-line-metric-note">{expectedPayMtd === null
                       ? (commissionCount ? `${commissionCount} recorded value${commissionCount === 1 ? '' : 's'}` : 'No commission values recorded')
-                      : `Across ${mtdSales.length} sale${mtdSales.length === 1 ? '' : 's'} this month`}</span>
+                      : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} this month`}</span>
                   </div>
                 </section>
               </header>
