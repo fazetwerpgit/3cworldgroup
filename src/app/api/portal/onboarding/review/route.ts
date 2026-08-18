@@ -6,6 +6,7 @@ import { isStorageItem } from '@/lib/onboarding/uploads';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { appBaseUrl, itemRejectedEmail } from '@/lib/email/templates';
+import { onboardingFrom } from '@/lib/email/sendEmail';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
 
@@ -255,6 +256,7 @@ export async function POST(request: NextRequest) {
             reason,
             portalUrl: `${appBaseUrl()}/portal/onboarding`,
           }),
+          emailFrom: onboardingFrom(),
           metadata: { itemId, rejectionReason: reason },
         });
       }

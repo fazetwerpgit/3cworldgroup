@@ -13,6 +13,8 @@ export interface DispatchInput {
   link?: string;
   email?: EmailContent;
   metadata?: Record<string, unknown>;
+  /** Optional sender override forwarded to sendEmail (onboarding emails use onboardingFrom()). */
+  emailFrom?: string;
 }
 
 /**
@@ -36,7 +38,7 @@ export async function dispatchToUser(input: DispatchInput): Promise<void> {
           if (!adminDb) throw new Error('Database not configured');
           const snap = await adminDb.doc(`users/${input.userId}`).get();
           const to = snap.get('email') as string | undefined;
-          if (to) await sendEmail({ to, ...input.email! });
+          if (to) await sendEmail({ to, ...input.email!, from: input.emailFrom });
         })()
       : Promise.resolve(),
   ]);

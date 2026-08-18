@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { nudgeEmail, appBaseUrl, type NudgeTier } from '@/lib/email/templates';
+import { onboardingFrom } from '@/lib/email/sendEmail';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { roleRequiresOnboarding } from '@/types/auth';
 import { getActivationReadiness } from './activation';
@@ -83,6 +84,7 @@ export async function runOnboardingNudges(
             message: 'Pick up where you left off - a few steps remain.',
             link: '/portal/onboarding',
             email: nudgeEmail({ name, tier, portalUrl }),
+            emailFrom: onboardingFrom(),
           });
 
           sentNow.push(tier);

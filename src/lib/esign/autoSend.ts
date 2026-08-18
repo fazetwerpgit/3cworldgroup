@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { createAlertTask, resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { esignSentEmail } from '@/lib/email/templates';
+import { onboardingFrom } from '@/lib/email/sendEmail';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import type { FieldRole } from '@/types/auth';
@@ -255,6 +256,7 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
           message: `Check your email: ${sentLabels.join(', ')}`,
           link: '/portal/onboarding',
           email: esignSentEmail({ name: signerName, docLabels: sentLabels }),
+          emailFrom: onboardingFrom(),
         });
       } catch (error) {
         console.error(`[esign] failed to notify ${userId} about sent documents`, error);

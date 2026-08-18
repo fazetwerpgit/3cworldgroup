@@ -42,4 +42,15 @@ describe('dispatchToUser', () => {
     ).resolves.toBeUndefined();
     expect(createNotificationMock).toHaveBeenCalledOnce();
   });
+
+  it('forwards emailFrom to sendEmail', async () => {
+    await dispatchToUser({
+      userId: 'u1', type: 'system', title: 't', message: 'm', link: '/x',
+      email: { subject: 's', htmlBody: '<p>h</p>', textBody: 't' },
+      emailFrom: 'onboarding@3cworldgroup.com',
+    });
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ from: 'onboarding@3cworldgroup.com', subject: 's' })
+    );
+  });
 });

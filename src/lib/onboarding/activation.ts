@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { activationEmail } from '@/lib/email/templates';
+import { onboardingFrom } from '@/lib/email/sendEmail';
 import {
   getOnboardingItemsForUser,
   type OnboardingItem,
@@ -87,6 +88,7 @@ export async function activateUser(
     message: 'Your onboarding is complete.',
     link: '/portal',
     email: activationEmail({ name }),
+    emailFrom: onboardingFrom(),
   });
 
   return { alreadyActive: false };

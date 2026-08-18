@@ -15,6 +15,7 @@ import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { appBaseUrl, checklistReadyEmail } from '@/lib/email/templates';
+import { onboardingFrom } from '@/lib/email/sendEmail';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 
@@ -296,6 +297,7 @@ export async function PUT(
               name: updatedDisplayName,
               portalUrl: `${appBaseUrl()}/portal/onboarding`,
             }),
+            emailFrom: onboardingFrom(),
           }),
         ]);
       } catch (error) {

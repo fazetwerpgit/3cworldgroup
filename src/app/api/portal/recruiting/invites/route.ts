@@ -10,7 +10,7 @@ import {
 } from '@/types';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
-import { sendEmail } from '@/lib/email/sendEmail';
+import { sendEmail, onboardingFrom } from '@/lib/email/sendEmail';
 import { inviteEmail } from '@/lib/email/templates';
 
 function clean(value: unknown, max = 200) {
@@ -191,6 +191,7 @@ export async function POST(request: NextRequest) {
 
     void sendEmail({
       to: candidateEmail,
+      from: onboardingFrom(),
       ...inviteEmail({ candidateName, ownerName: requester.name, inviteUrl }),
     }).catch(() => {});
 
