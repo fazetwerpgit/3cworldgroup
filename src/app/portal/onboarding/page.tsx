@@ -24,6 +24,7 @@ interface ChecklistItem extends OnboardingItem {
   submittedAt: string | null;
   reviewedAt: string | null;
   esignDispatch: { state?: string; attempts?: number } | null;
+  esignSigningUrl: string | null;
 }
 
 interface ChecklistResponse {
@@ -306,6 +307,7 @@ export default function OnboardingPage() {
               renderItemAction={renderItemAction}
               openItemId={openItemId}
               onOpenItem={setOpenItemId}
+              onRefresh={fetchChecklist}
             />
             <aside className="member-line-stack">
               <section className="member-line-panel">

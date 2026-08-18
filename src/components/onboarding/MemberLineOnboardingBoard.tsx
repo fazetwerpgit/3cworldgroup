@@ -6,6 +6,7 @@ import {
   ESIGN_HELPER_TEXT,
   isEsignItem,
 } from '@/lib/onboarding/esign';
+import { EsignSignAction } from '@/components/onboarding/EsignSignAction';
 import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
 import type { OnboardingStatus } from '@/types/onboarding';
 
@@ -46,6 +47,7 @@ interface Props {
   renderItemAction: (item: WizardItem) => ReactNode;
   openItemId: string | null;
   onOpenItem: (id: string | null) => void;
+  onRefresh: () => void;
 }
 
 // Full always-visible checklist board — the mockup's primary/default onboarding
@@ -61,6 +63,7 @@ export default function MemberLineOnboardingBoard({
   renderItemAction,
   openItemId,
   onOpenItem,
+  onRefresh,
 }: Props) {
   const ordered = [...items].sort((a, b) => a.order - b.order);
   const openItem = ordered.find((item) => item.id === openItemId) ?? null;
@@ -142,7 +145,11 @@ export default function MemberLineOnboardingBoard({
                 Close
               </button>
             </div>
-            <MemberLineOnboardingSheetBody item={openItem} renderItemAction={renderItemAction} />
+            <MemberLineOnboardingSheetBody
+              item={openItem}
+              renderItemAction={renderItemAction}
+              onRefresh={onRefresh}
+            />
           </div>
         </div>
       )}
@@ -162,9 +169,11 @@ function rowDescription(item: WizardItem) {
 function MemberLineOnboardingSheetBody({
   item,
   renderItemAction,
+  onRefresh,
 }: {
   item: WizardItem;
   renderItemAction: (item: WizardItem) => ReactNode;
+  onRefresh: () => void;
 }) {
   if (item.status === 'approved') {
     return (
@@ -186,9 +195,13 @@ function MemberLineOnboardingSheetBody({
       )}
 
       {isEsignItem(item.id) ? (
-        <div className="member-line-note warn">
-          {item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT}
-        </div>
+        item.esignSigningUrl ? (
+          <EsignSignAction itemId={item.id} signingUrl={item.esignSigningUrl} onRefresh={onRefresh} />
+        ) : (
+          <div className="member-line-note warn">
+            {item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT}
+          </div>
+        )
       ) : (
         renderItemAction(item)
       )}
