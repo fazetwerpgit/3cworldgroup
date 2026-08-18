@@ -256,6 +256,9 @@ const ALLOWED_SUBPATHS = [
   '/api/portal/onboarding/review',
   // onboarding/activate has requireVerifiedManagement before activation.
   '/api/portal/onboarding/activate',
+  // onboarding/esign-embed-error has requireVerifiedUser and only raises a
+  // deduplicated review_needed alert about the caller's own signing widget.
+  '/api/portal/onboarding/esign-embed-error',
   // chat channel media has getVerifiedChatUser plus userCanAccessChannelDoc.
   '/api/portal/chat/channels/x/media',
   // chat channel members has getVerifiedChatUser plus userCanAccessChannelDoc.
