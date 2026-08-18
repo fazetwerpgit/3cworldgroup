@@ -25,8 +25,30 @@ rep roles fall back to AE Tier 1. Jacob's standing rule: NO Sonnet
 agents — Fable orchestrates/reviews, Opus subagents. Business rules also
 saved to memory dir. NO PUSH without explicit go-ahead.
 
-TRACK A (SignWell/onboarding) — **BUILD COMPLETE + REVIEWED, WAITING ON
-JACOB'S "deploy"** (2026-08-18). Onboarding sender email + EMBEDDED
+TRACK A — **DEPLOYED TO PRODUCTION 2026-08-18 evening** (Jacob's "deploy"):
+master fast-forwarded to the branch + fix commits, pushed, Vercel Ready,
+aliased to www.3cworldgroup.com. Post-deploy fixes shipped same evening:
+(1) invite route `void sendEmail` → `await` (serverless freeze killed every
+invite email in prod — they NEVER worked live before); (2) removed stale
+SIGNWELL_TEST_MODE from Vercel Production env (would throw on real
+envelope creation) + redeployed. ROOT CAUSE of remaining vanishing email:
+Postmark FREE/TRIAL account was accepting API sends (200 + MessageID)
+then silently discarding them — Jacob bought a PAID Postmark plan
+2026-08-18 and delivery verified ("Delivered" event). Cleanup done: 4
+orphaned pending_assignment alertTasks deleted; leftover QA account
+qa-e2e-1@3cworldgroup.test (auth + users doc) fully deleted by Jacob via
+script. Vercel CLI is authenticated on this box (~/.vercel) and repo is
+linked — `npx vercel env ls/pull/rm`, `vercel logs`, `vercel redeploy`
+all work. NOTE: `vercel link` OVERWROTE .env.local with Development env
+(old local values lost; production values pullable except Sensitive).
+Real candidates invited 2026-08-18: Mason Steinberger (in_progress),
+Bryan Curtis (invite email lost pre-upgrade — needs fresh invite).
+Jacob's test addresses: jacobcmyers692@gmail.com and jacobcmyers@gmail.com
+are BOTH his real inboxes. STILL PENDING: live end-to-end signature test
+(invite → paperwork → in-portal Sign now → webhook flips to approved, no
+esign_mismatch alert).
+
+TRACK A ORIGINAL SCOPE (built + reviewed, all shipped above, 2026-08-18): Onboarding sender email + EMBEDDED
 in-portal SignWell signing + candidate-page portal restyle all SHIPPED
 locally on `onboarding/completion`, HEAD df4416a (spec 5124181+22f8f0f,
 plan dff3537, build ace1d6f..827b789 in swarm waves, fix wave df4416a).
