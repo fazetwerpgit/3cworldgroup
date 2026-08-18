@@ -61,6 +61,10 @@ export async function GET(request: NextRequest) {
     const isIBO = userData?.isIBO ?? false;
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO);
 
+    // Bearer capability: an embedded signing URL is only ever handed to the
+    // checklist owner. Management viewing someone else's checklist gets null.
+    const isOwner = gate.uid === userId;
+
     // Fetch all progress docs for this user in one batch read
     const refs = checklist.map((item) =>
       adminDb!.collection('userOnboarding').doc(`${userId}_${item.id}`)
@@ -83,6 +87,7 @@ export async function GET(request: NextRequest) {
               attempts: progress.esignDispatch.attempts,
             }
           : null,
+        esignSigningUrl: isOwner ? ((progress?.esignSigningUrl as string | undefined) ?? null) : null,
       };
     });
 

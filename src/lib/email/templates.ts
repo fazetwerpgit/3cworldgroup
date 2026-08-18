@@ -62,13 +62,16 @@ export function itemRejectedEmail(p: { name: string; itemLabel: string; reason: 
   };
 }
 
-export function esignSentEmail(p: { name: string; docLabels: string[] }): EmailContent {
-  const subject = 'Documents sent for your signature';
+export function esignSentEmail(p: { name: string; docLabels: string[]; portalUrl: string }): EmailContent {
+  const subject = 'Your documents are ready to sign';
   const list = p.docLabels.join(', ');
   return {
     subject,
-    textBody: `Hi ${p.name},\n\nWe just emailed you the following for e-signature: ${list}. Check your inbox (and spam folder).\n`,
-    htmlBody: layout(subject, `<p>Hi ${p.name},</p><p>We just emailed you the following for e-signature: <strong>${list}</strong>.</p><p>Check your inbox (and spam folder).</p>`),
+    textBody: `Hi ${p.name},\n\nThe following documents are ready for your signature: ${list}.\n\nSign them in the portal: ${p.portalUrl}\n`,
+    htmlBody: layout(
+      subject,
+      `<p>Hi ${p.name},</p><p>The following documents are ready for your signature: <strong>${list}</strong>.</p><p><a href="${p.portalUrl}">Open your onboarding checklist</a> and sign them right there - it only takes a minute.</p>`,
+    ),
   };
 }
 

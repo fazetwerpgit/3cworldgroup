@@ -2,7 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { createAlertTask, resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
-import { esignSentEmail } from '@/lib/email/templates';
+import { appBaseUrl, esignSentEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { isEsignItem } from '@/lib/onboarding/esign';
@@ -119,8 +119,9 @@ async function sendOne(
   signerEmail: string
 ): Promise<{ sent: boolean; recovered?: boolean; failed?: { previousAttempts: number; attempts: number } }> {
   let envelopeId: string;
+  let embeddedSigningUrl: string | undefined;
   try {
-    ({ envelopeId } = await provider.createEnvelope({
+    ({ envelopeId, embeddedSigningUrl } = await provider.createEnvelope({
       docKey: pending.item.id as EsignDocKey,
       userId,
       itemId: pending.item.id,
@@ -140,6 +141,7 @@ async function sendOne(
     status: 'submitted',
     reference: `esign:${envelopeId}`,
     esignEnvelopeId: envelopeId,
+    esignSigningUrl: embeddedSigningUrl ?? null,
     esignDispatch: FieldValue.delete(),
     submittedAt: now,
     updatedAt: now,
@@ -253,9 +255,13 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
           userId,
           type: 'system',
           title: 'Documents sent for signature',
-          message: `Check your email: ${sentLabels.join(', ')}`,
+          message: `Ready to sign: ${sentLabels.join(', ')}`,
           link: '/portal/onboarding',
-          email: esignSentEmail({ name: signerName, docLabels: sentLabels }),
+          email: esignSentEmail({
+            name: signerName,
+            docLabels: sentLabels,
+            portalUrl: `${appBaseUrl()}/portal/onboarding`,
+          }),
           emailFrom: onboardingFrom(),
         });
       } catch (error) {

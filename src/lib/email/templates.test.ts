@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { inviteEmail, nudgeEmail, checklistReadyEmail, activationEmail, managerAlertEmail } from './templates';
+import {
+  inviteEmail,
+  nudgeEmail,
+  checklistReadyEmail,
+  activationEmail,
+  managerAlertEmail,
+  esignSentEmail,
+} from './templates';
 
 describe('email templates', () => {
   it('invite email contains the invite URL in html and text', () => {
@@ -28,6 +35,13 @@ describe('email templates', () => {
     expect(e.subject).toBe('Your onboarding checklist is ready');
     expect(e.htmlBody).toContain('https://portal.test/portal/onboarding');
     expect(e.textBody).toContain('https://portal.test/portal/onboarding');
+  });
+
+  it('esignSentEmail points to in-portal signing', () => {
+    const c = esignSentEmail({ name: 'Ana', docLabels: ['Contract'], portalUrl: 'https://x/portal/onboarding' });
+    expect(c.subject).toBe('Your documents are ready to sign');
+    expect(c.textBody).toContain('https://x/portal/onboarding');
+    expect(c.textBody).not.toMatch(/emailed you/i);
   });
 
   it('activation and manager alert emails render', () => {

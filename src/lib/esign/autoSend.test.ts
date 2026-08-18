@@ -41,10 +41,12 @@ const {
     set: (data: Record<string, unknown>, options?: { merge?: boolean }) =>
       setMock(path, data, options),
   }));
-  const createEnvelopeMock = vi.fn(async (request: { itemId: string }) => {
-    if (!request.itemId) throw new Error('item id required');
-    return { envelopeId: 'env_1' };
-  });
+  const createEnvelopeMock = vi.fn(
+    async (request: { itemId: string }): Promise<{ envelopeId: string; embeddedSigningUrl?: string }> => {
+      if (!request.itemId) throw new Error('item id required');
+      return { envelopeId: 'env_1' };
+    },
+  );
   const dispatchMock = vi.fn(async () => undefined);
   const getEsignProviderMock = vi.fn(() => ({
     id: 'signwell' as const,
@@ -150,12 +152,17 @@ afterEach(() => {
 
 describe('sendPendingEsignDocs', () => {
   it('creates envelopes for all applicable unsent esign items and marks them submitted', async () => {
+    createEnvelopeMock.mockResolvedValue({
+      envelopeId: 'env_1',
+      embeddedSigningUrl: 'https://www.signwell.com/e/abc',
+    });
     const sent = await sendPendingEsignDocs('u1');
     expect(sent.sort()).toEqual(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure']);
     expect(createEnvelopeMock).toHaveBeenCalledTimes(4);
     expect(store.get('userOnboarding/u1_contract')).toMatchObject({
       status: 'submitted',
       esignEnvelopeId: 'env_1',
+      esignSigningUrl: 'https://www.signwell.com/e/abc',
     });
     expect(setOptions).toHaveLength(4);
     expect(setOptions.every((options) => options?.merge === true)).toBe(true);
@@ -166,7 +173,35 @@ describe('sendPendingEsignDocs', () => {
       signerName: 'Sam Rep',
       signerEmail: 'sam@x.com',
     });
+    expect(setMock).toHaveBeenCalledWith(
+      'userOnboarding/u1_contract',
+      expect.objectContaining({
+        esignEnvelopeId: 'env_1',
+        esignSigningUrl: 'https://www.signwell.com/e/abc',
+        status: 'submitted',
+      }),
+      { merge: true }
+    );
     expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('persists a null esignSigningUrl when the provider does not return one', async () => {
+    for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+    createEnvelopeMock.mockResolvedValueOnce({ envelopeId: 'env_1' });
+
+    await sendPendingEsignDocs('u1');
+
+    expect(setMock).toHaveBeenCalledWith(
+      'userOnboarding/u1_contract',
+      expect.objectContaining({
+        esignEnvelopeId: 'env_1',
+        esignSigningUrl: null,
+        status: 'submitted',
+      }),
+      { merge: true }
+    );
   });
 
   it('skips items that already have an envelope', async () => {

@@ -26,7 +26,7 @@ const STATUS_CLASS: Record<OnboardingStatus, string> = {
 function nextActionLabel(item: WizardItem) {
   if (item.status === 'approved') return 'View';
   if (isEsignItem(item.id)) {
-    return item.esignDispatch?.state === 'failed' ? 'Preparing' : 'Check email';
+    return item.esignDispatch?.state === 'failed' ? 'Preparing' : 'Sign now';
   }
   if (item.status === 'rejected') return 'Resubmit';
   if (item.status === 'submitted') return 'In review';
