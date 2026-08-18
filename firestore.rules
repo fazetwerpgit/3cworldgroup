@@ -67,6 +67,17 @@ service cloud.firestore {
         request.resource.data.lastReadAt is timestamp;
     }
 
+    // Per-user "I've been paid for this sale" marks (client-written). Private to
+    // the rep: their own reconciliation against a paycheck, never a payroll
+    // record, so nobody — manager, admin or owner — can read another user's.
+    match /users/{userId}/salePaid/{saleId} {
+      allow read: if isApproved() && request.auth.uid == userId;
+      allow create, update: if isApproved() && request.auth.uid == userId &&
+        request.resource.data.keys().hasOnly(['paidAt']) &&
+        request.resource.data.paidAt is timestamp;
+      allow delete: if isApproved() && request.auth.uid == userId;
+    }
+
     // Sales are created, updated and deleted exclusively server-side
     // (/api/portal/sales, /api/portal/sales/[id], /api/portal/sales/approve) so
     // that totalPoints is calculated by the server and cannot be chosen by the
