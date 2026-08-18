@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { sendPushToUser } from '@/lib/push/sendPush';
+import { buildSaleDecisionPush } from '@/lib/push/salePush';
 import { SaleStatus } from '@/types';
 
 // Helper function to create a notification
@@ -136,6 +138,14 @@ export async function POST(request: NextRequest) {
           { saleId, rejectionReason }
         );
       }
+    }
+
+    // Push the decision to the rep's devices, unless the approver decided their own
+    // sale (they already know). after() runs this once the response is on the wire but
+    // keeps the function alive — a detached promise would be killed by the freeze.
+    if (salesRepId && salesRepId !== approverId) {
+      const payload = buildSaleDecisionPush(status, saleData, rejectionReason);
+      after(() => sendPushToUser(salesRepId, payload));
     }
 
     return NextResponse.json({
