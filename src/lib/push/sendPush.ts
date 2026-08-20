@@ -11,6 +11,9 @@ export interface PushPayload {
 // Sends a web push to every device token registered on a user. Best-effort: never
 // throws into the caller's request flow (mirrors notifySubmission). Prunes tokens
 // FCM reports as invalid so the user's token list stays clean.
+// Messages MUST stay data-only: a notification field makes the FCM SDK auto-display
+// in addition to firebase-messaging-sw.js's onBackgroundMessage showNotification,
+// producing duplicate notifications on iOS.
 export async function sendPushToUser(uid: string, payload: PushPayload): Promise<void> {
   if (!app || !adminDb) return;
   try {
@@ -21,15 +24,10 @@ export async function sendPushToUser(uid: string, payload: PushPayload): Promise
     const messaging = getMessaging(app);
     const res = await messaging.sendEachForMulticast({
       tokens,
-      notification: { title: payload.title, body: payload.body },
       data: {
         title: payload.title,
         body: payload.body,
         url: payload.url ?? '/portal/dashboard',
-      },
-      webpush: {
-        fcmOptions: { link: payload.url ?? '/portal/dashboard' },
-        notification: { icon: '/icons/icon-192.png' },
       },
     });
 
