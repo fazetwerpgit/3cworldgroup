@@ -78,6 +78,10 @@ interface MobileThreadProps {
   // (already-visible data — the same population whose names are shown per message).
   authorAvatars: Record<string, string>;
   loading: boolean;
+  // Which channel's messages are actually committed in state (from useMessages;
+  // null until the first commit). An EMPTY committed channel still counts —
+  // inspecting messages[0] would not cover it.
+  renderedChannel: string | null;
   error?: string;
   currentUserId?: string;
   canModerate: boolean;
@@ -229,6 +233,7 @@ export function MobileThread({
   companyTapeText,
   authorAvatars,
   loading,
+  renderedChannel,
   error,
   currentUserId,
   canModerate,
@@ -398,28 +403,74 @@ export function MobileThread({
     return () => observer.disconnect();
   }, [messagesEndRef]);
 
+  // True only when the rendered list is THIS channel's committed content
+  // (an empty committed channel counts). The auto-scroll effect must not
+  // consume its "opening" jump on the loading render — or, if a channel ever
+  // changes under a mounted thread, on a render still showing the OLD
+  // channel's messages (loading only flips true a render later). Consuming
+  // "opening" early hands the real first paint to the pinned SMOOTH path — an
+  // animated crawl from scrollTop 0 that sweeps the <=200px zone and arms a
+  // bogus load-older mid-flight.
+  const renderedChannelMatches = !loading && renderedChannel === channelId;
+
   // Pure DOM sync (no setState): opening a channel jumps instantly to the
   // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
   // new message only scrolls when the reader is already pinned.
   useEffect(() => {
     const anchor = messagesEndRef.current;
-    if (!anchor) return;
+    if (!anchor || !renderedChannelMatches) return;
     const opening = contextRef.current !== channelId;
     const forced = signalRef.current !== scrollToBottomSignal;
     contextRef.current = channelId;
     signalRef.current = scrollToBottomSignal;
     if (opening) {
-      anchor.scrollIntoView({ behavior: 'auto', block: 'end' });
+      // 'instant', not 'auto': the scroller inherits scroll-behavior: smooth,
+      // and 'auto' defers to it — the "jump" then animates up from scrollTop 0,
+      // sweeping through the <=200px zone where handleScroll arms a bogus
+      // load-older that interrupts the landing mid-history.
+      anchor.scrollIntoView({ behavior: 'instant', block: 'end' });
     } else if (forced || pinnedRef.current) {
       anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
-  }, [messages.length, channelId, scrollToBottomSignal, messagesEndRef]);
+  }, [messages.length, renderedChannelMatches, channelId, scrollToBottomSignal, messagesEndRef]);
 
   const jumpToLatest = () => {
     setPinned(true);
     setNewCount(0);
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
+
+  // iOS keyboard guard: in the installed PWA the software keyboard shrinks the
+  // layout viewport (~330px on current iPhones), which pushes the bottom anchor
+  // far outside the pinned observer's 150px margin — the reader silently
+  // becomes "not pinned" and new messages stop auto-scrolling while they type.
+  // If they were at the bottom when they tapped the composer, keep them there
+  // through the resize (its timing varies by device, hence the timer ladder).
+  const keyboardTimersRef = useRef<number[]>([]);
+  const clearKeyboardTimers = () => {
+    keyboardTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    keyboardTimersRef.current = [];
+  };
+  const handleComposerFocus = () => {
+    if (!pinnedRef.current) return;
+    clearKeyboardTimers();
+    const el = scrollRef.current;
+    // A touch on the thread while the ladder is live is the reader taking
+    // over — never yank them back down after that.
+    el?.addEventListener('touchstart', clearKeyboardTimers, { once: true, passive: true });
+    keyboardTimersRef.current = [80, 250, 600].map((ms) =>
+      window.setTimeout(() => {
+        const scroller = scrollRef.current;
+        if (!scroller) return;
+        // Scoped to the thread scroller (scrollIntoView would also scroll
+        // ancestors mid-keyboard-animation); 'instant' beats the inherited
+        // scroll-behavior: smooth. The queued scroll event refreshes the
+        // compensation's viewportOffset via handleScroll.
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'instant' });
+      }, ms)
+    );
+  };
+  useEffect(() => clearKeyboardTimers, []);
 
   // "Load older" trigger: scrolling near the top of the thread requests more
   // history (see useMessages' sliding window). olderPendingRef guards against
@@ -435,6 +486,14 @@ export function MobileThread({
   const olderPendingRef = useRef(false);
   const anchorRef = useRef<{ scrollHeight: number; scrollTop: number; minWindow: number } | null>(null);
 
+  // Tracks the topmost rendered message so a snapshot that PREPENDS history
+  // (the eviction guard grows the window on every new incoming message once
+  // it's full) can hold the reader's view steady. Safari has no native scroll
+  // anchoring (overflow-anchor), so without this the view visibly shifts up by
+  // the height of the prepended block. viewportOffset is refreshed from
+  // handleScroll so the correction lands where the reader actually is now.
+  const firstMsgRef = useRef<{ id: string; node: HTMLElement; viewportOffset: number } | null>(null);
+
   // Defensive parity with the desktop pane: MobileThread normally unmounts on
   // the way back to the channel list, but if a channel ever changes under a
   // mounted thread, an in-flight growth's anchor would target a minWindow the
@@ -442,12 +501,19 @@ export function MobileThread({
   useEffect(() => {
     olderPendingRef.current = false;
     anchorRef.current = null;
+    firstMsgRef.current = null;
   }, [channelId]);
 
   const handleScroll = () => {
     clearLongPress();
     const el = scrollRef.current;
-    if (!el || !hasMore || olderPendingRef.current) return;
+    // Scroll events during a channel-switch loading phase are clamp noise from
+    // the skeleton content (scrollTop 0) — acting on them arms a phantom
+    // load-older against the incoming channel.
+    if (!el || loading) return;
+    const first = firstMsgRef.current;
+    if (first?.node.isConnected) first.viewportOffset = first.node.offsetTop - el.scrollTop;
+    if (!hasMore || olderPendingRef.current) return;
     if (el.scrollTop > 200) return;
     anchorRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop, minWindow: Math.min(windowSize + GROW_STEP, MAX_WINDOW) };
     olderPendingRef.current = true;
@@ -461,24 +527,56 @@ export function MobileThread({
   // never when pinned to bottom, which is the auto-scroll effect's territory.
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    const anchor = anchorRef.current;
-    if (!anchor) return;
-    // The snapshot that just committed may still be from the OLD (pre-growth)
-    // listener — don't consume the anchor until one lands from a query whose
-    // limit actually covers the requested growth.
-    if (lastSnapshotWindow < anchor.minWindow) return;
-    anchorRef.current = null;
-    olderPendingRef.current = false;
-    if (!el || pinnedRef.current) return;
-    const newScrollHeight = el.scrollHeight;
+    if (!el) return;
     // `.chat-line-thread-messages` inherits scroll-behavior: smooth from the
     // global html rule, which would animate a plain scrollTop assignment —
     // visibly glide instead of snapping, and re-fire handleScroll mid-animation
     // while scrollTop still reads <200. Toggle to 'auto' for the instant jump.
-    const previousBehavior = el.style.scrollBehavior;
-    el.style.scrollBehavior = 'auto';
-    el.scrollTop = anchor.scrollTop + (newScrollHeight - anchor.scrollHeight);
-    el.style.scrollBehavior = previousBehavior;
+    const setScrollTopInstant = (value: number) => {
+      const previousBehavior = el.style.scrollBehavior;
+      el.style.scrollBehavior = 'auto';
+      el.scrollTop = value;
+      el.style.scrollBehavior = previousBehavior;
+    };
+    const remeasureFirst = () => {
+      const node = el.querySelector('[data-mid]');
+      firstMsgRef.current =
+        node instanceof HTMLElement
+          ? { id: node.getAttribute('data-mid') ?? '', node, viewportOffset: node.offsetTop - el.scrollTop }
+          : null;
+    };
+    const anchor = anchorRef.current;
+    if (anchor) {
+      // The snapshot that just committed may still be from the OLD (pre-growth)
+      // listener — don't consume the anchor until one lands from a query whose
+      // limit actually covers the requested growth.
+      if (lastSnapshotWindow < anchor.minWindow) {
+        remeasureFirst();
+        return;
+      }
+      anchorRef.current = null;
+      olderPendingRef.current = false;
+      if (!pinnedRef.current) {
+        setScrollTopInstant(anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight));
+      }
+      remeasureFirst();
+      return;
+    }
+    // No load-older in flight: this snapshot came from the live listener or an
+    // eviction growth. If history got spliced in ABOVE the previous topmost
+    // message (the tracked node is no longer topmost), put that message back
+    // at the exact viewport position the reader last saw it at, before paint.
+    // The assignment is absolute, so it's also a no-op on browsers whose
+    // native scroll anchoring already corrected. Guards: never while pinned
+    // (the bottom belongs to the auto-scroll effect, and viewportOffset can be
+    // one queued scroll event stale right after a programmatic jump), and
+    // never on pure appends (they don't move existing content).
+    const first = firstMsgRef.current;
+    if (!pinnedRef.current && first?.node.isConnected && el.querySelector('[data-mid]') !== first.node) {
+      const target = first.node.offsetTop - first.viewportOffset;
+      if (Math.abs(target - el.scrollTop) > 1) setScrollTopInstant(target);
+    }
+    remeasureFirst();
   }, [snapshotVersion, lastSnapshotWindow]);
 
   return (
@@ -593,7 +691,12 @@ export function MobileThread({
                     <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
                   </div>
                 )}
-                <div className={`chat-line-mobile-message flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
+                {/* data-mid anchors the scroll compensation. It lives HERE, not
+                    on the outer keyed wrapper: the wrapper also contains the
+                    day separator, which disappears when a prepend gives this
+                    message a same-day predecessor — anchoring the wrapper would
+                    then hold its top steady while the visible message shifts. */}
+                <div data-mid={message.id} className={`chat-line-mobile-message flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
                   {/* Own-message headers are hidden by design, except the
                       developer identity — it shows on the author's own phone too. */}
                   {(!isOwn || isDeveloperAuthor(message.authorId)) && isFirstOfGroup && (
@@ -896,6 +999,7 @@ export function MobileThread({
           <Textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value.slice(0, 1000))}
+            onFocus={handleComposerFocus}
             onKeyDown={(event) => {
               // Enter sends (or saves an edit); Shift+Enter inserts a newline;
               // Esc cancels edit mode.

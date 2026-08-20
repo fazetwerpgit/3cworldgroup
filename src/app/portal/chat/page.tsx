@@ -173,6 +173,7 @@ export default function TeamChatPage() {
     windowSize: messagesWindowSize,
     snapshotVersion,
     lastSnapshotWindow,
+    renderedChannel,
   } = useMessages(activeChannelId || null);
 
   // Desktop "load older" trigger: scrolling near the top of the scroller grows
@@ -189,6 +190,14 @@ export default function TeamChatPage() {
   const desktopOlderPendingRef = useRef(false);
   const desktopAnchorRef = useRef<{ scrollHeight: number; scrollTop: number; minWindow: number } | null>(null);
 
+  // Tracks the topmost rendered message so a snapshot that PREPENDS history
+  // (the eviction guard grows the window on every new incoming message once
+  // it's full) can hold the reader's view steady. Safari has no native scroll
+  // anchoring (overflow-anchor), so without this the view visibly shifts up by
+  // the height of the prepended block. viewportOffset is refreshed from
+  // handleDesktopScroll so the correction lands where the reader actually is.
+  const desktopFirstMsgRef = useRef<{ id: string; node: HTMLElement; viewportOffset: number } | null>(null);
+
   // Channel switch abandons any in-flight growth: the new channel restarts at
   // the initial window, so a leftover anchor's minWindow could never be met
   // and the stuck pending flag would silently disable load-older everywhere
@@ -196,11 +205,18 @@ export default function TeamChatPage() {
   useEffect(() => {
     desktopOlderPendingRef.current = false;
     desktopAnchorRef.current = null;
+    desktopFirstMsgRef.current = null;
   }, [activeChannelId]);
 
   const handleDesktopScroll = useCallback(() => {
     const el = desktopScrollRef.current;
-    if (!el || !hasMoreMessages || desktopOlderPendingRef.current) return;
+    // Scroll events during a channel-switch loading phase are clamp noise from
+    // the skeleton content (scrollTop 0) — acting on them arms a phantom
+    // load-older against the incoming channel.
+    if (!el || loadingMessages) return;
+    const first = desktopFirstMsgRef.current;
+    if (first?.node.isConnected) first.viewportOffset = first.node.offsetTop - el.scrollTop;
+    if (!hasMoreMessages || desktopOlderPendingRef.current) return;
     if (el.scrollTop > 200) return;
     desktopAnchorRef.current = {
       scrollHeight: el.scrollHeight,
@@ -209,7 +225,7 @@ export default function TeamChatPage() {
     };
     desktopOlderPendingRef.current = true;
     loadOlderMessages();
-  }, [hasMoreMessages, loadOlderMessages, messagesWindowSize]);
+  }, [hasMoreMessages, loadingMessages, loadOlderMessages, messagesWindowSize]);
 
   // Runs before paint after every COMMITTED snapshot (keyed on snapshotVersion,
   // not message count — a growth that leaves the count unchanged still bumps
@@ -219,24 +235,56 @@ export default function TeamChatPage() {
   // that path belongs to the auto-scroll effect below, not this one).
   useLayoutEffect(() => {
     const el = desktopScrollRef.current;
-    const anchor = desktopAnchorRef.current;
-    if (!anchor) return;
-    // The snapshot that just committed may still be from the OLD (pre-growth)
-    // listener — don't consume the anchor until one lands from a query whose
-    // limit actually covers the requested growth.
-    if (lastSnapshotWindow < anchor.minWindow) return;
-    desktopAnchorRef.current = null;
-    desktopOlderPendingRef.current = false;
-    if (!el || desktopPinnedRef.current) return;
-    const newScrollHeight = el.scrollHeight;
+    if (!el) return;
     // `.chat-line-messages` has scroll-behavior: smooth (globals.css), which
     // would animate a plain scrollTop assignment — visibly glide instead of
     // snapping, and while animating scrollTop briefly reads <200 and re-fires
     // handleDesktopScroll. Toggle to 'auto' for the instant jump, then restore.
-    const previousBehavior = el.style.scrollBehavior;
-    el.style.scrollBehavior = 'auto';
-    el.scrollTop = anchor.scrollTop + (newScrollHeight - anchor.scrollHeight);
-    el.style.scrollBehavior = previousBehavior;
+    const setScrollTopInstant = (value: number) => {
+      const previousBehavior = el.style.scrollBehavior;
+      el.style.scrollBehavior = 'auto';
+      el.scrollTop = value;
+      el.style.scrollBehavior = previousBehavior;
+    };
+    const remeasureFirst = () => {
+      const node = el.querySelector('[data-mid]');
+      desktopFirstMsgRef.current =
+        node instanceof HTMLElement
+          ? { id: node.getAttribute('data-mid') ?? '', node, viewportOffset: node.offsetTop - el.scrollTop }
+          : null;
+    };
+    const anchor = desktopAnchorRef.current;
+    if (anchor) {
+      // The snapshot that just committed may still be from the OLD (pre-growth)
+      // listener — don't consume the anchor until one lands from a query whose
+      // limit actually covers the requested growth.
+      if (lastSnapshotWindow < anchor.minWindow) {
+        remeasureFirst();
+        return;
+      }
+      desktopAnchorRef.current = null;
+      desktopOlderPendingRef.current = false;
+      if (!desktopPinnedRef.current) {
+        setScrollTopInstant(anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight));
+      }
+      remeasureFirst();
+      return;
+    }
+    // No load-older in flight: this snapshot came from the live listener or an
+    // eviction growth. If history got spliced in ABOVE the previous topmost
+    // message (the tracked node is no longer topmost), put that message back
+    // at the exact viewport position the reader last saw it at, before paint.
+    // The assignment is absolute, so it's also a no-op on browsers whose
+    // native scroll anchoring already corrected. Guards: never while pinned
+    // (the bottom belongs to the auto-scroll effect, and viewportOffset can be
+    // one queued scroll event stale right after a programmatic jump), and
+    // never on pure appends (they don't move existing content).
+    const first = desktopFirstMsgRef.current;
+    if (!desktopPinnedRef.current && first?.node.isConnected && el.querySelector('[data-mid]') !== first.node) {
+      const target = first.node.offsetTop - first.viewportOffset;
+      if (Math.abs(target - el.scrollTop) > 1) setScrollTopInstant(target);
+    }
+    remeasureFirst();
   }, [snapshotVersion, lastSnapshotWindow]);
 
   const activeChannel = useMemo(
@@ -646,6 +694,17 @@ export default function TeamChatPage() {
     return () => observer.disconnect();
   }, []);
 
+  // True only when the rendered list is THIS channel's committed content
+  // (renderedChannel comes from useMessages; an empty committed channel counts
+  // — messages[0] inspection would not cover it). The auto-scroll effect must
+  // not consume its "opening" jump before then: it also fires on the loading
+  // render and on the channel-switch render that still shows the OLD channel's
+  // messages (useMessages keeps them in state; loading only flips true a
+  // render later). Consuming "opening" early hands the real first paint to the
+  // pinned SMOOTH path — an animated crawl from scrollTop 0 that sweeps the
+  // <=200px zone and arms a bogus load-older mid-flight.
+  const renderedChannelMatches = !loadingMessages && renderedChannel === activeChannelId;
+
   // Desktop smart auto-scroll (mobile owns its own inside MobileThread). Pure
   // DOM sync (no setState): opening/switching a channel jumps instantly to the
   // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
@@ -653,17 +712,21 @@ export default function TeamChatPage() {
   const scrollContextRef = useRef('');
   useEffect(() => {
     const anchor = messagesEndRef.current;
-    if (!anchor) return;
+    if (!anchor || !renderedChannelMatches) return;
     const opening = scrollContextRef.current !== activeChannelId;
     const forced = desktopSignalRef.current !== scrollToBottomSignal;
     scrollContextRef.current = activeChannelId;
     desktopSignalRef.current = scrollToBottomSignal;
     if (opening) {
-      anchor.scrollIntoView({ behavior: 'auto', block: 'end' });
+      // 'instant', not 'auto': the scroller has scroll-behavior: smooth, and
+      // 'auto' defers to it — the "jump" then animates up from scrollTop 0,
+      // sweeping through the <=200px zone where handleDesktopScroll arms a
+      // bogus load-older that interrupts the landing mid-history.
+      anchor.scrollIntoView({ behavior: 'instant', block: 'end' });
     } else if (forced || desktopPinnedRef.current) {
       anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
-  }, [threadMessages.length, activeChannelId, scrollToBottomSignal]);
+  }, [threadMessages.length, renderedChannelMatches, activeChannelId, scrollToBottomSignal]);
 
   const jumpToLatestDesktop = () => {
     setDesktopPinned(true);
@@ -1097,7 +1160,7 @@ export default function TeamChatPage() {
                         const canDelete = canModerate || isOwn;
                         return <Fragment key={message.id}>
                           {showDayDivider && <div className="chat-line-day-divider"><span>{formatChatLineDayDivider(message.createdAt)}</span></div>}
-                          <article className={`chat-line-message ${isOwn ? 'is-own' : ''} ${grouped ? 'is-grouped' : ''} ${isFailed ? 'is-failed' : ''} ${message.pendingState === 'sending' ? 'is-sending' : ''}`}>
+                          <article data-mid={message.id} className={`chat-line-message ${isOwn ? 'is-own' : ''} ${grouped ? 'is-grouped' : ''} ${isFailed ? 'is-failed' : ''} ${message.pendingState === 'sending' ? 'is-sending' : ''}`}>
                             <div className="chat-line-avatar-column">{grouped ? <span className="chat-line-avatar-spacer" aria-hidden="true" /> : isOwn ? <span className="chat-line-avatar chat-line-avatar-own" aria-hidden="true">{getInitials(message.authorName)}</span> : <ChatAvatar authorId={message.authorId} authorName={message.authorName} avatarUrl={authorAvatars[message.authorId]} size="sm" className="chat-line-avatar" />}</div>
                             <div className="chat-line-message-content">
                               <div className="chat-line-message-top"><strong style={isDeveloperAuthor(message.authorId) ? undefined : ({ '--an': getAuthorColor(message.authorId).name, '--an-dark': getAuthorColor(message.authorId).nameDark } as CSSProperties)} className={isDeveloperAuthor(message.authorId) ? 'chat-dev-name' : 'chat-line-author'}>{message.authorName}</strong>{isDeveloperAuthor(message.authorId) && <span className="chat-dev-badge">DEV</span>}{message.authorRole && <span className="chat-line-role">{message.authorRole.replace(/_/g, ' ')}</span>}<span className="chat-line-timestamp">{formatTime(message.createdAt)}</span></div>
@@ -1142,7 +1205,7 @@ export default function TeamChatPage() {
                 </section>
               </div>
               <div className="chat-line-mobile">
-                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} snapshotVersion={snapshotVersion} windowSize={messagesWindowSize} lastSnapshotWindow={lastSnapshotWindow} hasMore={hasMoreMessages} onLoadOlder={loadOlderMessages} companyTapeText={activeChannelId === 'all-company' ? companyTapeText : ''} authorAvatars={authorAvatars} loading={loadingMessages} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
+                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} snapshotVersion={snapshotVersion} windowSize={messagesWindowSize} lastSnapshotWindow={lastSnapshotWindow} hasMore={hasMoreMessages} onLoadOlder={loadOlderMessages} companyTapeText={activeChannelId === 'all-company' ? companyTapeText : ''} authorAvatars={authorAvatars} loading={loadingMessages} renderedChannel={renderedChannel} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
               </div>
               <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
               <ChatLightbox image={lightbox} onClose={closeLightbox} />
