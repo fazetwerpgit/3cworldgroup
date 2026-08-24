@@ -174,11 +174,12 @@ const email = onboardingPacketEmail({
 let recipients = argValue('--send-to') ? [argValue('--send-to')] : [];
 if (recipients.length === 0) {
   const owners = await db.collection('users').where('role', '==', 'owner').get();
-  recipients = owners.docs.map((d) => d.get('email')).filter((e) => e && e.includes('@'));
+  // Legacy users docs store the address under 'Email' (see fbe4ba3).
+  recipients = owners.docs.map((d) => d.get('email') ?? d.get('Email')).filter((e) => e && e.includes('@'));
 }
 console.log(`Packet for ${user.displayName} (${uid})`);
 console.log(`Attachments: ${attachments.length} (${Math.round(attachmentBytes / 1024)}KB), skipped: ${skipped.length}`);
-console.log(`Recipients: ${dryRun ? 'none (--dry-run)' : recipients.join(', ') || 'NONE — no owner-role users with email'}`);
+console.log(`Recipients${dryRun ? ' (dry-run, not sending)' : ''}: ${recipients.join(', ') || 'NONE — no owner-role users with email'}`);
 console.log(`\n----- BODY -----\n${email.textBody}----------------\n`);
 
 const htmlOut = argValue('--html-out');
