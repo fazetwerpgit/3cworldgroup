@@ -353,7 +353,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                   key={seg.value}
                   type="button"
                   aria-pressed={formData.role === seg.value}
-                  onClick={() => handleChange('role', seg.value, false)}
+                  onClick={() => handleChange('role', seg.value)}
                 >
                   {seg.label}
                 </button>
@@ -370,7 +370,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                   key={seg.value}
                   type="button"
                   aria-pressed={formData.status === seg.value}
-                  onClick={() => handleChange('status', seg.value, false)}
+                  onClick={() => handleChange('status', seg.value)}
                 >
                   {seg.label}
                 </button>
