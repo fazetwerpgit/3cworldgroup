@@ -7,7 +7,54 @@ Updated: 2026-08-24 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-NEXT (2026-08-24): E-SIGN DOC SWAP — contract + direct_deposit DONE
+NEXT (2026-08-24, handoff after /clear): THREE UI FIXES Jacob asked
+for (investigation done — implement, verify, deploy). Recommended:
+spec all three to Codex in one run, review diff, gates, deploy.
+
+(1) /portal/admin/onboarding — REMOVE THE CATEGORY FILTER pills.
+    src/app/portal/admin/onboarding/page.tsx: categoryFilter state
+    (~line 80), pill row aria-label="Category filter" (~line 220),
+    and its uses in filtered/filteredEsignPending/filteredCompleted
+    useMemos. Keep the PERSON filter and the AT-RISK ONLY toggle
+    (Jacob said "all we need is all people" — interpreted as: only
+    the person row stays; if he objects to at-risk staying, drop it).
+
+(2) RETIRED ROLES STILL SHOW ON THE PHONE — root cause found: the
+    rep-facing pay-structure page (src/components/resources/
+    ResourcesLine.tsx, tiers.map ~line 384) renders tiers from
+    GET /api/portal/commission, which re-keys stored config against
+    DEFAULT_COMMISSION (src/types/commission.ts lines 11-24) — that
+    list still contains retired tiers l1_manager, l2_manager,
+    ibo_level_1..4. FIX: filter retired tiers out of the API
+    response EXCEPT when the tier is the caller's own fieldRole
+    (legacy reps mid-checklist must still see their own tier —
+    see ONBOARDING_FIELD_ROLES comment in src/types/auth.ts
+    ~211-222). Define a RETIRED_FIELD_ROLES const in types/auth.ts
+    (['l1_manager','l2_manager','ibo_level_1'..'ibo_level_4'];
+    entry_rep is NOT retired). Admin/owner all-tier scope also drops
+    retired. Keep data/config intact (IBO stays in data + admin per
+    standing rule; this is display filtering only). TIER_NOTES map
+    in ResourcesLine.tsx stays (safe superset).
+
+(3) ONBOARDING PAGE DENSITY — same rep repeats per row ("Mason 3
+    times a section"). Group rows BY REP within each of the three
+    sections (queue, awaiting-signature, completed): one rep header
+    (avatar + name + item count) per rep, then that rep's item rows
+    beneath WITHOUT repeating avatar/name (item label + meta +
+    actions only). Reuse ops-line-* classes; introduce minimal new
+    CSS in globals.css only if unavoidable, matching the ops-line
+    look. Queue rows keep their expand/approve/reject behavior.
+
+Gates: npx tsc --noEmit, npx vitest run, npm run build. Deploy:
+commit on onboarding/completion, push, ff master via
+`git -C ~/dev/3cwg-payplan merge --ff-only onboarding/completion`
+(master is checked out in that worktree), push master, then
+`npx vercel --prod` from the main repo. Verify with
+`npx vercel ls 3cworldgroup --prod`.
+NOTE: creating temp admin users in prod Firebase is classifier-
+blocked — skip logged-in browser verification, have Jacob eyeball.
+
+PREVIOUS (2026-08-24): E-SIGN DOC SWAP — contract + direct_deposit DONE
 (real PDFs captured from Jacob's Adobe Sign widgets, installed in
 assets/esign/, fields re-measured + extended with text/checkbox
 fill-ins in src/lib/esign/signwell.ts, verified via SIGNWELL_TEST_MODE
