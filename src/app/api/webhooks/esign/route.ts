@@ -6,6 +6,8 @@ import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
+import { adminStorage } from '@/lib/firebase/admin';
+import { notifyDocSigned } from '@/lib/onboarding/ownerNotify';
 
 const ALERT_KIND = 'esign_mismatch' as const;
 
@@ -140,6 +142,21 @@ export async function POST(request: Request) {
     { merge: true }
   );
 
+  try {
+    if (!adminStorage || !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
+      throw new Error('Storage bucket is not configured');
+    }
+    const completedPdf = await getEsignProvider().getCompletedPdf(event.envelopeId);
+    const completedPdfPath = `esign-completed/${userId}/${itemId}.pdf`;
+    await adminStorage
+      .bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
+      .file(completedPdfPath)
+      .save(completedPdf, { contentType: 'application/pdf', resumable: false });
+    await onboardingRef.set({ completedPdfPath }, { merge: true });
+  } catch (error) {
+    console.error('[esign webhook] completed pdf failed', { userId, itemId, envelopeId: event.envelopeId, error });
+  }
+
   await createNotification({
     userId,
     type: 'esign_completed',
@@ -147,6 +164,19 @@ export async function POST(request: Request) {
     message: `${item.label} is complete.`,
     link: '/portal/onboarding',
   });
+  let repName = userId;
+  try {
+    const userSnap = await adminDb.doc(`users/${userId}`).get();
+    repName = (userSnap.get('displayName') as string | undefined) ||
+      (userSnap.get('email') as string | undefined) || userId;
+  } catch (error) {
+    console.error('[esign webhook] failed to resolve rep name for owner notification', { userId, error });
+  }
+  try {
+    await notifyDocSigned({ userId, repName, itemLabel: item.label });
+  } catch (error) {
+    console.error('[esign webhook] owner signed notification failed', { userId, itemId, error });
+  }
   try {
     await maybeFlagActivationReady(userId);
   } catch (error) {

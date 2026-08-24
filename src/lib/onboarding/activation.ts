@@ -4,6 +4,7 @@ import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { activationEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
+import { sendOnboardingPacket } from '@/lib/onboarding/ownerNotify';
 import {
   getOnboardingItemsForUser,
   type OnboardingItem,
@@ -109,4 +110,9 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   if (!ready) return;
 
   await activateUser(userId);
+  try {
+    await sendOnboardingPacket({ userId });
+  } catch (error) {
+    console.error('[onboarding] owner packet failed', { userId, error });
+  }
 }

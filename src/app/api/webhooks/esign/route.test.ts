@@ -7,6 +7,9 @@ const {
   userDocGetMock,
   parseWebhookMock,
   createNotificationMock,
+  notifyDocSignedMock,
+  getCompletedPdfMock,
+  storageSaveMock,
   maybeFlagActivationReadyMock,
   createAlertTaskMock,
   consoleErrorMock,
@@ -17,6 +20,9 @@ const {
   userDocGetMock: vi.fn(),
   parseWebhookMock: vi.fn(),
   createNotificationMock: vi.fn(),
+  notifyDocSignedMock: vi.fn(),
+  getCompletedPdfMock: vi.fn(),
+  storageSaveMock: vi.fn(),
   maybeFlagActivationReadyMock: vi.fn(),
   createAlertTaskMock: vi.fn(),
   consoleErrorMock: vi.fn(),
@@ -31,9 +37,12 @@ vi.mock('@/lib/firebase/admin', () => ({
         : { get: docGetMock, set: docSetMock }
     ),
   },
+  adminStorage: {
+    bucket: vi.fn(() => ({ file: vi.fn(() => ({ save: storageSaveMock })) })),
+  },
 }));
 vi.mock('@/lib/esign/provider', () => ({
-  getEsignProvider: vi.fn(() => ({ parseWebhook: parseWebhookMock })),
+  getEsignProvider: vi.fn(() => ({ parseWebhook: parseWebhookMock, getCompletedPdf: getCompletedPdfMock })),
 }));
 vi.mock('@/lib/notifications/createNotification', () => ({
   createNotification: createNotificationMock,
@@ -48,6 +57,7 @@ vi.mock('@/types/onboarding', () => ({
 vi.mock('@/lib/onboarding/activation', () => ({
   maybeFlagActivationReady: maybeFlagActivationReadyMock,
 }));
+vi.mock('@/lib/onboarding/ownerNotify', () => ({ notifyDocSigned: notifyDocSignedMock }));
 
 import { POST } from './route';
 
@@ -80,6 +90,7 @@ function webhookRequest() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', 'bucket.example');
   consoleErrorMock.mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(consoleErrorMock);
   vi.spyOn(console, 'warn').mockImplementation(consoleWarnMock);
@@ -87,6 +98,8 @@ beforeEach(() => {
   docGetMock.mockResolvedValue(onboardingDoc('env_current'));
   userDocGetMock.mockResolvedValue(userDoc('Rep One', 'rep@example.com'));
   docSetMock.mockResolvedValue(undefined);
+  getCompletedPdfMock.mockResolvedValue(Buffer.from('%PDF-complete'));
+  storageSaveMock.mockResolvedValue(undefined);
   createNotificationMock.mockResolvedValue(undefined);
   maybeFlagActivationReadyMock.mockResolvedValue(undefined);
   createAlertTaskMock.mockResolvedValue('alert_1');
@@ -106,7 +119,17 @@ describe('POST /api/webhooks/esign', () => {
       expect.objectContaining({ status: 'approved', rejectionReason: null }),
       { merge: true }
     );
+    expect(storageSaveMock).toHaveBeenCalledWith(Buffer.from('%PDF-complete'), expect.objectContaining({
+      contentType: 'application/pdf',
+    }));
+    expect(docSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ completedPdfPath: 'esign-completed/user-1/contract.pdf' }),
+      { merge: true }
+    );
     expect(createNotificationMock).toHaveBeenCalledOnce();
+    expect(notifyDocSignedMock).toHaveBeenCalledWith({
+      userId: 'user-1', repName: 'Rep One', itemLabel: 'Contract',
+    });
     expect(maybeFlagActivationReadyMock).toHaveBeenCalledWith('user-1');
   });
 
@@ -211,6 +234,24 @@ describe('POST /api/webhooks/esign', () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(consoleErrorMock).toHaveBeenCalledWith(
       '[esign webhook] failed to raise envelope mismatch alert',
+      expect.objectContaining({ userId: 'user-1', itemId: 'contract' })
+    );
+  });
+
+  it('still approves and returns 200 when completed PDF storage fails', async () => {
+    getCompletedPdfMock.mockRejectedValueOnce(new Error('SignWell unavailable'));
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(docSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'approved' }),
+      { merge: true }
+    );
+    expect(createNotificationMock).toHaveBeenCalledOnce();
+    expect(notifyDocSignedMock).toHaveBeenCalledOnce();
+    expect(consoleErrorMock).toHaveBeenCalledWith(
+      '[esign webhook] completed pdf failed',
       expect.objectContaining({ userId: 'user-1', itemId: 'contract' })
     );
   });

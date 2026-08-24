@@ -155,6 +155,28 @@ export const signwellProvider: EsignProvider = {
     return embeddedSigningUrl ? { envelopeId: data.id, embeddedSigningUrl } : { envelopeId: data.id };
   },
 
+  async getCompletedPdf(envelopeId: string): Promise<Buffer> {
+    const res = await fetch(`${SIGNWELL_BASE}/documents/${envelopeId}/completed_pdf`, {
+      headers: { 'X-Api-Key': requireApiKey() },
+    });
+    if (!res.ok) {
+      throw new Error(`SignWell getCompletedPdf failed: ${res.status} ${await res.text()}`);
+    }
+
+    const contentType = res.headers.get('content-type')?.toLowerCase() ?? '';
+    if (contentType.includes('application/json')) {
+      const data = (await res.json()) as { file_url?: string };
+      if (!data.file_url) throw new Error('SignWell getCompletedPdf response did not include file_url');
+      const fileRes = await fetch(data.file_url);
+      if (!fileRes.ok) {
+        throw new Error(`SignWell completed PDF download failed: ${fileRes.status} ${await fileRes.text()}`);
+      }
+      return Buffer.from(await fileRes.arrayBuffer());
+    }
+
+    return Buffer.from(await res.arrayBuffer());
+  },
+
   async getEmbeddedSigningUrl(envelopeId: string): Promise<string | undefined> {
     const res = await fetch(`${SIGNWELL_BASE}/documents/${envelopeId}`, {
       headers: { 'X-Api-Key': requireApiKey() },

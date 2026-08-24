@@ -60,6 +60,31 @@ describe('sendEmail', () => {
     expect(body.From).toBe('notifications@example.com');
   });
 
+  it('serializes attachments for Postmark', async () => {
+    await sendEmail({
+      ...INPUT,
+      attachments: [{
+        name: 'contract.pdf',
+        contentBase64: 'JVBERi0x',
+        contentType: 'application/pdf',
+      }],
+    });
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(init.body as string).Attachments).toEqual([{
+      Name: 'contract.pdf',
+      Content: 'JVBERi0x',
+      ContentType: 'application/pdf',
+    }]);
+  });
+
+  it('omits Postmark attachments when none are provided', async () => {
+    await sendEmail(INPUT);
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('Attachments');
+  });
+
   describe('onboardingFrom', () => {
     it('returns the env value when set', () => {
       vi.stubEnv('ONBOARDING_EMAIL_FROM', 'onboarding@3cworldgroup.com');

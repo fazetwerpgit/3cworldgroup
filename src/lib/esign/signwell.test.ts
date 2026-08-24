@@ -197,6 +197,56 @@ describe('signwellProvider.getEmbeddedSigningUrl', () => {
   });
 });
 
+describe('signwellProvider.getCompletedPdf', () => {
+  beforeEach(() => {
+    vi.stubEnv('SIGNWELL_API_KEY', 'sw_key');
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns raw PDF bytes', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response('%PDF-raw', { status: 200, headers: { 'content-type': 'application/pdf' } })
+    );
+
+    await expect(signwellProvider.getCompletedPdf('env_123')).resolves.toEqual(
+      Buffer.from('%PDF-raw')
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      'https://www.signwell.com/api/v1/documents/env_123/completed_pdf',
+      { headers: { 'X-Api-Key': 'sw_key' } }
+    );
+  });
+
+  it('follows a JSON file_url response without API headers', async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ file_url: 'https://files.example.com/completed.pdf' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response('%PDF-followed', {
+        status: 200,
+        headers: { 'content-type': 'application/pdf' },
+      }));
+
+    await expect(signwellProvider.getCompletedPdf('env_123')).resolves.toEqual(
+      Buffer.from('%PDF-followed')
+    );
+    expect(fetch).toHaveBeenNthCalledWith(2, 'https://files.example.com/completed.pdf');
+  });
+
+  it('throws on a non-ok response', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response('gone', { status: 404 }));
+
+    await expect(signwellProvider.getCompletedPdf('env_123'))
+      .rejects.toThrow('SignWell getCompletedPdf failed: 404 gone');
+  });
+});
+
 describe('signwellProvider.parseWebhook', () => {
   afterEach(() => {
     vi.unstubAllEnvs();

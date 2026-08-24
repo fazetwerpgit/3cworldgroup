@@ -7,6 +7,7 @@ export interface EmailInput {
   textBody: string;
   /** Optional sender override; falls back to EMAIL_FROM so a missing env can never block delivery. */
   from?: string;
+  attachments?: { name: string; contentBase64: string; contentType: string }[];
 }
 
 /** Sender for candidate-facing onboarding emails. Undefined when unconfigured (callers fall back). */
@@ -41,6 +42,15 @@ export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error
         HtmlBody: input.htmlBody,
         TextBody: input.textBody,
         MessageStream: 'outbound',
+        ...(input.attachments?.length
+          ? {
+              Attachments: input.attachments.map((attachment) => ({
+                Name: attachment.name,
+                Content: attachment.contentBase64,
+                ContentType: attachment.contentType,
+              })),
+            }
+          : {}),
       }),
     });
     if (!res.ok) {

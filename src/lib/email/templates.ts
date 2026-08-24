@@ -84,6 +84,27 @@ export function activationEmail(p: { name: string }): EmailContent {
   };
 }
 
+export function ownerDocSignedEmail(p: { repName: string; itemLabel: string; link: string }): EmailContent {
+  const subject = `${p.repName} signed ${p.itemLabel}`;
+  return {
+    subject,
+    textBody: `${p.repName} signed ${p.itemLabel}.
+
+Review onboarding: ${p.link}
+`,
+    htmlBody: layout(subject, `<p><strong>${p.repName}</strong> signed <strong>${p.itemLabel}</strong>.</p><p><a href="${p.link}">Review onboarding</a></p>`),
+  };
+}
+
+export function onboardingPacketEmail(p: { repName: string; textBody: string; htmlBody: string }): EmailContent {
+  const subject = `Onboarding packet: ${p.repName}`;
+  return {
+    subject,
+    textBody: `${p.textBody}\n`,
+    htmlBody: layout(subject, p.htmlBody),
+  };
+}
+
 export function managerAlertEmail(p: { title: string; message: string; link: string }): EmailContent {
   return {
     subject: `[Portal] ${p.title}`,
