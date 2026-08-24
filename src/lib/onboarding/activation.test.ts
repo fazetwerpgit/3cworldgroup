@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getOnboardingItemsForUser, type OnboardingStatus } from '@/types/onboarding';
 import { graduatedFieldRole, type FieldRole } from '@/types/auth';
 
-const { store, updates, db, dispatchMock, resolveMock } = vi.hoisted(() => {
+const { store, updates, db, dispatchMock, resolveMock, sendPacketMock } = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>();
   const updates: Array<{ path: string; data: Record<string, unknown> }> = [];
   const get = (path: string) => ({
@@ -36,6 +36,7 @@ const { store, updates, db, dispatchMock, resolveMock } = vi.hoisted(() => {
     db,
     dispatchMock: vi.fn(async () => undefined),
     resolveMock: vi.fn(async () => undefined),
+    sendPacketMock: vi.fn(async () => undefined),
   };
 });
 
@@ -45,6 +46,7 @@ vi.mock('firebase-admin/firestore', () => ({
 }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: resolveMock }));
+vi.mock('@/lib/onboarding/ownerNotify', () => ({ sendOnboardingPacket: sendPacketMock }));
 
 import {
   activateUser,
@@ -58,6 +60,7 @@ beforeEach(() => {
   updates.length = 0;
   dispatchMock.mockReset();
   resolveMock.mockReset();
+  sendPacketMock.mockReset();
 });
 
 describe('activateUser', () => {
@@ -214,6 +217,7 @@ describe('computeReadiness', () => {
       updatedAt: expect.any(Date),
     });
     expect(resolveMock).toHaveBeenCalledWith('ready-rep');
+    expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'ready-rep' });
     expect(dispatchMock).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'ready-rep',
