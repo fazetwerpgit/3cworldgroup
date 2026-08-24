@@ -38,11 +38,26 @@ describe('computeStreak', () => {
   it('counts consecutive selling days', () => {
     expect(computeStreak(new Set(['2026-07-08', '2026-07-09', '2026-07-10']), '2026-07-10')).toBe(3);
   });
+  it('goes dormant after one idle calendar day', () => {
+    expect(computeStreak(new Set(['2026-07-09', '2026-07-10']), '2026-07-13')).toBe(0);
+  });
+  it('keeps a Friday streak visible on Saturday', () => {
+    expect(computeStreak(new Set(['2026-07-09', '2026-07-10']), '2026-07-11')).toBe(2);
+  });
+  it('does not keep a Friday-only streak visible through Sunday', () => {
+    expect(computeStreak(new Set(['2026-07-10']), '2026-07-12')).toBe(0);
+  });
   it('weekend without a sale does not break the streak (Fri -> Mon)', () => {
     expect(computeStreak(new Set(['2026-07-10', '2026-07-13']), '2026-07-13')).toBe(2);
   });
+  it('still walks across the weekend when today has a sale', () => {
+    expect(computeStreak(new Set(['2026-07-09', '2026-07-10', '2026-07-13']), '2026-07-13')).toBe(3);
+  });
   it('a weekend sale still counts toward the streak', () => {
     expect(computeStreak(new Set(['2026-07-10', '2026-07-11', '2026-07-13']), '2026-07-13')).toBe(3);
+  });
+  it('counts a sale today as a one-day streak', () => {
+    expect(computeStreak(new Set(['2026-07-13']), '2026-07-13')).toBe(1);
   });
   it('today without a sale is grace, not a break', () => {
     expect(computeStreak(new Set(['2026-07-08', '2026-07-09']), '2026-07-10')).toBe(2);

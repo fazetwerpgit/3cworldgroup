@@ -60,10 +60,14 @@ function ranksAsOfDay(
   return new Map(sorted.map(([repId], index) => [repId, index + 1]));
 }
 
-// Consecutive selling days walking back from today. Weekends without a sale
-// are skipped (never break), today without a sale is grace, a saleless
-// weekday stops the walk. Capped at 365 days.
+// Display consecutive selling days only when there was a sale today or on
+// calendar yesterday. Weekends without a sale are skipped (never break),
+// today without a sale is grace, a saleless weekday stops the walk. Capped at
+// 365 days.
 export function computeStreak(saleDayKeys: Set<string>, todayKey: string): number {
+  const yesterdayKey = addDaysToKey(todayKey, -1);
+  if (!saleDayKeys.has(todayKey) && !saleDayKeys.has(yesterdayKey)) return 0;
+
   let streak = 0;
   let key = todayKey;
   for (let i = 0; i < 365; i++) {
