@@ -83,6 +83,12 @@ describe('getOwnerRecipients', () => {
     expect(ownerQueryGetMock).toHaveBeenCalledOnce();
     expect(configGetMock).toHaveBeenCalledOnce();
   });
+
+  it("includes owners whose docs store the address under legacy 'Email'", async () => {
+    ownerQueryGetMock.mockResolvedValue({ docs: [{ data: () => ({ Email: 'legacy@example.com' }) }] });
+    configGetMock.mockResolvedValue({ data: () => ({}) });
+    await expect(getOwnerRecipients()).resolves.toEqual(['legacy@example.com']);
+  });
 });
 
 describe('notifyDocSigned', () => {

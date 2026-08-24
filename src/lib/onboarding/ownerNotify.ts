@@ -57,7 +57,9 @@ export async function getOwnerRecipients(): Promise<string[]> {
       adminDb.collection('users').where('role', '==', 'owner').get(),
       adminDb.doc('config/onboardingNotifications').get(),
     ]);
-    const raw = owners.docs.flatMap((doc) => [valueFromDoc(doc, 'email')]);
+    // Some legacy user docs store the address under 'Email' (capital E) —
+    // read both so no owner is silently dropped from notifications.
+    const raw = owners.docs.flatMap((doc) => [valueFromDoc(doc, 'email'), valueFromDoc(doc, 'Email')]);
     const extraEmails = valueFromDoc(config, 'extraEmails');
     if (Array.isArray(extraEmails)) raw.push(...extraEmails);
 
