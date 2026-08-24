@@ -31,26 +31,28 @@ for (const line of readFileSync(envFile, 'utf-8').split(/\r?\n/)) {
   const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
-// Same credential preference as src/lib/firebase/admin.ts: full base64 JSON
-// service account first, individual vars as fallback.
+// Same preference and fallback as src/lib/firebase/admin.ts: the stored
+// FIREBASE_SERVICE_ACCOUNT blob is corrupt (locally AND in the Vercel prod
+// env), so a parse failure falls through to the individual admin vars.
+let credential;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  // .env.local's copy contains stray backslashes/spaces that desync Node's
-  // lenient base64 decoder — strip everything outside the base64 alphabet.
-  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT.replace(/[^A-Za-z0-9+/=]/g, '');
-  const sa = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
-  initializeApp({ credential: cert(sa) });
-} else {
+  try {
+    const b64 = process.env.FIREBASE_SERVICE_ACCOUNT.replace(/[^A-Za-z0-9+/=]/g, '');
+    credential = cert(JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')));
+  } catch {
+    // fall through to individual vars
+  }
+}
+if (!credential) {
   let pk = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
   if (!pk.includes('-----BEGIN')) pk = Buffer.from(pk, 'base64').toString('utf-8');
-  pk = pk.replace(/\\n/g, '\n');
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: pk,
-    }),
+  credential = cert({
+    projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+    privateKey: pk.replace(/\\n/g, '\n').replace(/\\\\n/g, '\n'),
   });
 }
+initializeApp({ credential });
 const db = getFirestore();
 
 // 1. Find the rep by display name (exact, then case-insensitive scan).
