@@ -3,15 +3,221 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-08-18 (update at EVERY milestone).
+Updated: 2026-08-24 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-NEXT: wait on Jacob for (1) his live end-to-end signature test (invite
-himself → paperwork → in-portal Sign now → verify item flips approved, no
-esign_mismatch/review_needed alert, email From onboarding@), and (2) fresh
-invite to Bryan Curtis bryan@sreiowa.com (original lost pre-Postmark-paid).
-Master HEAD 3930256 = Track A + Track B + status-gate fix, deployed + Ready.
+NEXT (2026-08-24): E-SIGN DOC SWAP — contract + direct_deposit DONE
+(real PDFs captured from Jacob's Adobe Sign widgets, installed in
+assets/esign/, fields re-measured + extended with text/checkbox
+fill-ins in src/lib/esign/signwell.ts, verified via SIGNWELL_TEST_MODE
+embeds — placement confirmed good). All uncommitted. Remaining:
+(a) pay_structure.pdf + fcra_auth.pdf are STILL PLACEHOLDERS — Jacob
+    couldn't find the pay structure doc and hasn't sent an FCRA doc.
+    Ask again / wait.
+(b) W-9 DONE (Jacob approved): official Rev-3/2024 IRS W-9 installed
+    as assets/esign/w9.pdf and wired as 5th e-sign doc ('w9' added to
+    EsignDocKey, onboarding item w9 referenceKind storage→esign,
+    DOCUMENTS entry with name/address/TIN/checkbox fields, verified
+    in test-mode embed — placement good). Jacob's own upload
+    (~/fw9--2026-1.pdf) was the IRS DRAFT DO-NOT-FILE Jun-2026 rev —
+    rejected, not used. NOTE: SSN/EIN both optional (SignWell can't
+    do either-or); admin review catches missing TIN.
+(c) Email cleanup DONE by opus agent 'email-cleanup' (templates.ts,
+    ownerNotify.ts, preview script — packet email now intro line +
+    profile/checklist tables + documents + masked identity; gates
+    green). I reviewed rendered output; fixed stale note "Photo and
+    W-9 uploads stay in the admin page" → "Photo uploads..." after
+    the w9 flip.
+(d) Codex test updates DONE + reviewed (8 test files, assertions
+    kept strong). Full vitest 749/749 green, tsc clean, build green.
+    Everything UNCOMMITTED — commit when Jacob says.
+Notes: SignWell coords are 96dpi px from page TOP-LEFT; capture
+images were 120dpi → ×0.8. Old envelopes keep old PDFs; Mason's
+outstanding direct_deposit envelope still has the placeholder unless
+superseded.
+
+STILL OPEN (carry forward):
+- Webhook root cause: when Mason signs direct_deposit, run `npx vercel
+  logs www.3cworldgroup.com --scope jacob-s-projects-cdd9dff8` within
+  the hour. "[esign webhook] REJECTED" line → fix signature verify;
+  no "[esign webhook]" line at all → delivery-side, take to SignWell
+  dashboard/support. (Logging shipped in d1a3edd, deployed.)
+- Commit the /apply alert + honeypot + chat attachment changes still
+  uncommitted in the main tree (globals.css, chat/page.tsx,
+  MobileThread.tsx, attachmentUpload.ts, applications/route.ts,
+  notifySubmission.ts).
+- Push master 3451834 to GitHub (production ahead of GitHub).
+- docs/redesign/RESUME.md itself is modified+uncommitted — commit it.
+
+PREVIOUS CONTEXT (2026-08-24): (1) PIVOT — Mason ALREADY SIGNED: dry run showed his
+pay_structure envelope f8667ab0 is "Completed" at SignWell while the
+portal still says submitted → the document_completed WEBHOOK NEVER
+LANDED (possibly for everyone, not just him). Do NOT run
+refresh-esign-link --apply (a "ready to sign" nudge would be wrong).
+Jacob runs instead: `node scripts/esign-webhook-audit.mjs --env
+<envfile>` (dry run: lists SignWell registered webhooks + every
+envelope vs portal status), then `--apply` to backfill stuck items as
+the webhook would (approved, reviewer 'E-sign (auto)', bell notif;
+activation flag NOT replicated — check admin onboarding after).
+AUDIT DRY RUN RESULTS (2026-08-24): webhook URL correctly registered
+(hook 9f593de0 = SIGNWELL_WEBHOOK_ID env, verified match), payload
+shape + hash keying verified correct against SignWell docs; Mason is
+the FIRST real signer — contract/fcra_auth/pay_structure Completed at
+SignWell but portal=submitted (webhook never landed, cause unknown);
+direct_deposit only Viewed (he still must sign that one). Webhook
+route now logs every delivery outcome (d1a3edd) — after deploy, when
+Mason signs direct_deposit, `npx vercel logs` shows where events die.
+PLAN: (a) DONE 2026-08-24 — audit --apply backfilled Mason's
+contract/fcra_auth/pay_structure to approved; (b) DONE 2026-08-24 —
+deployed d1a3edd to production (dpl_6LxbtMxY READY, aliased
+www.3cworldgroup.com; Claude ran the deploy from the clean scratchpad
+deploy-tree after Jacob directed it); (c) DONE 2026-08-24 — Mason's
+direct_deposit URL refreshed + bell notif + email sent (first email
+attempt 422'd: ONBOARDING_EMAIL_FROM is Sensitive in Vercel so env
+pull writes literal "[SENSITIVE]" — script now skips non-@ From values
+and has --email-only retry, ad4973d); (d) STILL OPEN — when Mason
+signs direct_deposit, run `npx vercel logs www.3cworldgroup.com
+--scope jacob-s-projects-cdd9dff8` within the hour: a "[esign webhook]
+REJECTED" line → fix verification; no "[esign webhook]" line at all →
+delivery never arrives, take to SignWell. Check Mason in admin
+onboarding review (activation flag not auto-set by backfill). Classifier blocks Claude
+from prod-credential commands, so Jacob runs them; envfile = `npx
+vercel env pull --environment=production --scope
+jacob-s-projects-cdd9dff8` output
+(FIREBASE_ADMIN_PRIVATE_KEY is truncated everywhere, but
+FIREBASE_SERVICE_ACCOUNT is VALID — its base64 has real newlines that
+`vercel env pull` escapes as literal \n; scripts strip those before
+decoding as of d1a8966, so the pulled env works). (2) Deploy the two fixes below
+(commits 5204f2d esign + 5835536 streak on onboarding/completion; merge
+to master then Jacob deploys via `npx vercel deploy --prod --yes --scope
+jacob-s-projects-cdd9dff8`). (3) still open from before: push master
+3451834 to GitHub; commit /apply alert + honeypot changes (still
+uncommitted in main tree).
+
+DONE 2026-08-24 evening (deployed dpl_CMNe5Hh, gated tsc/747 tests/build):
+- feat(onboarding) ee8c4af+735537a: owner notifications — email to all
+  role=owner users (+ config/onboardingNotifications.extraEmails) when a
+  rep signs each e-sign doc (fires from the webhook, so dependent on the
+  webhook fix) and a full packet on checklist completion (fires from
+  maybeFlagActivationReady, works via manual admin approvals too):
+  profile + checklist + MASKED-ONLY sensitive (never decrypts; last4 +
+  audited-reveal pointer) + signed PDFs attached (pulled from SignWell
+  on document_completed, stored esign-completed/{uid}/{itemId}.pdf,
+  8MB cap). New lib src/lib/onboarding/ownerNotify.ts.
+- LATER 2026-08-24: Jeremy ALREADY has role=owner (an earlier phone save
+  went through silently) — packet preview script sent Mason's packet to
+  him directly. fix(onboarding) fbe4ba3 (deployed): owner recipient
+  lookup now also reads legacy 'Email' (capital E) so Jacob's account
+  isn't dropped. scripts/preview-onboarding-packet.mjs (4c37a28) sends
+  a rep's packet to owners or --send-to.
+- fix(admin) 2f55beb: role/status segment buttons passed markDirty=false
+  and the save bar only renders when dirty → role-only changes (e.g.
+  granting Jeremy owner) had NO save button. Jacob to retry assigning
+  jeremymcfarlandservices@gmail.com the owner role from his phone — once
+  role=owner he gets all owner notifications automatically.
+
+DONE 2026-08-24 (both gated: tsc clean, 738/738, build OK):
+- fix(esign) 5204f2d: SignWell embedded signing URL was minted once at
+  envelope creation and served forever from esignSigningUrls; links
+  expire → Mason's "signing window failed" alert. "Sign now" now POSTs
+  new /api/portal/onboarding/esign-signing-url which pulls a fresh URL
+  via SignWell Get Document for the SAME envelope (owner-scoped,
+  falls back to stored URL on failure, never clobbers stored URL on
+  error). scripts/refresh-esign-link.mjs = ops one-off for stuck reps.
+- fix(leaderboard) 5835536: streak badge (only rendered at >=2 days,
+  LeaderboardTable.tsx:92) stayed visible Sat-Mon after a Thu+Fri pair
+  (weekend-skip + today-grace). computeStreak now returns 0 unless a
+  sale today or calendar yesterday; counting unchanged (Mon sale
+  revives Thu,Fri,Mon = 3). Jacob chose this rule explicitly.
+  scripts/diagnose-streak.mjs = read-only replay of a rep's streak.
+
+PREVIOUS: (1) Jacob to `git push` master 3451834 from the payplan worktree
+(GitHub still at 4304362; production is ahead of GitHub until then);
+(2) confirm with a rep that chat messages now show exactly ONE
+notification; (3) commit the /apply alert + honeypot changes sitting
+uncommitted in the MAIN TREE on onboarding/completion.
+PUSH FIX IS DEPLOYED TO PRODUCTION (2026-08-20, Jacob ran deploy via
+`npx vercel deploy --prod --yes --scope jacob-s-projects-cdd9dff8`;
+plain deploy without --scope fails "Not authorized"): dpl_9dqS4xXEhTTs
+READY, target production, aliased www.3cworldgroup.com. Reps should see
+exactly ONE notification per chat message immediately (old cached SWs
+also drop to one — SDK auto-display is gone and the old handler already
+falls back to data fields).
+FIX (commit 3451834 fix/push-double-display → ff-merged to master):
+src/lib/push/sendPush.ts now sends DATA-ONLY FCM messages (dropped
+`notification` field + whole `webpush` block); firebase-messaging-sw.js
+untouched — its onBackgroundMessage is the single display path. New
+regression test src/lib/push/sendPush.test.ts (red→green: asserts no
+notification/webpush props, string data, url defaults to
+/portal/dashboard). Gates: tsc clean, 752/752 tests, build OK.
+ROOT CAUSE (confirmed in FCM SDK source
+node_modules/@firebase/messaging/dist/index.sw.cjs:839-846): payload
+`notification` field → SDK auto-display + SW onBackgroundMessage
+showNotification, no `tag` → exactly 2 notifications per push since chat
+push shipped 217b652 (2026-08-18).
+Secondary hygiene (separate, may cause future multi-device dupes):
+pushTokens arrayUnion never pruned per-device + PushTokenRefresher
+re-registers every portal open + token re-mint on failure never removes
+old token + /sw.js and /firebase-messaging-sw.js both claim scope '/';
+DELETE /api/portal/push/register has zero callers. Zero send logging on
+push path (after() block logs nothing).
+
+DONE 2026-08-20 (uncommitted in MAIN TREE, gates green: tsc clean, build OK):
+- /apply submission alerts: FORM_ALERTS['application'] ("Job Application" →
+  /portal/admin/recruiting) in src/lib/forms/notifySubmission.ts; public
+  route src/app/api/public/applications/route.ts now awaits
+  notifySubmission('application', "name (city)") after the Firestore write
+  AND enforces the `website` honeypot server-side (silent success, no
+  write) — was client-only before. Admin toggle card picks up the new
+  entry automatically. NOT COMMITTED (main tree also holds another
+  session's chat WIP — keep changes separate when committing).
+- Craigslist job post: modernized rewrite delivered to Jacob (owner asked
+  for updated version), links to 3cworldgroup.com/apply?ref=craigslist
+  (ref param prefills referredBy for source tracking).
+- Noted, not yet raised with owner: /apply FAQ says "no experience
+  required" but the ad targets experienced reps — copy tension to resolve.
+
+PREVIOUS: CHAT SCROLL FIX is DEPLOYED TO PRODUCTION (Jacob's "deploy",
+2026-08-19 ~22:47 CDT): Vercel 3cworldgroup-7fc9vqa8h Ready, target
+production, aliased to 3cworldgroup.com + www. Adversarial reviewer
+verdict on final commit: CLEAN — ship it (2 non-blocking minors: benign
+touchstart listener accumulation in the keyboard ladder; one-time ~25px
+nudge when the load-older pager unmounts at end-of-history).
+Master 4304362 PUSHED to GitHub (Jacob ran the push himself) — git and
+production are in sync. The payplan worktree now has master checked out
+(feat/roles-owner-payplan = same commit). REMAINING: Jacob to type in a
+busy channel on his iPhone to confirm the keyboard fix feels right (only
+path not testable headless).
+Commit 4304362 on feat/roles-owner-payplan (worktree
+/home/fazetwerpnerd69/dev/3cwg-payplan — done there because the MAIN TREE
+has another session's uncommitted chat WIP in page.tsx / MobileThread.tsx /
+attachmentUpload.ts; expect merge conflicts when that session syncs).
+Files: src/hooks/chat/useMessages.ts (+ new useMessages.test.tsx),
+src/components/chat/MobileThread.tsx, src/app/portal/chat/page.tsx.
+Root causes fixed: (1) useMessages blanked the list on every window growth
+— incl. the eviction guard firing on EVERY new message once the 75-window
+is full — collapsing the scroller → scrollTop clamped to 0 = the
+"scrolls to top while typing" bug; now only real channel switches blank
+(renderedChannel state gates it, empty channels count as rendered);
+(2) iOS keyboard un-pinned the reader (rootMargin 150px < keyboard ~330px)
+→ composer-focus instant-scroll ladder (80/250/600ms, cancelled on
+touchstart); (3) Safari lacks scroll anchoring → data-mid topmost-message
+compensation on prepends (prepend-only, never while pinned). Also fixed
+pre-existing desktop channel-open smooth-crawl + phantom-growth bugs.
+Gates ALL GREEN: tsc clean, 750/750 tests, lint (only master's
+pre-existing set-state-in-effect remains), build OK, read-only Playwright
+probe 10/10 (mobile 430px + desktop, typing/growth/anchoring/A→B→A).
+Keyboard path needs real-device confirm on Jacob's iPhone after deploy.
+Reminder: ship via `vercel --prod` after merging to master — push alone
+does not deploy. Dev server for probes runs on :3100 (3000 = tdi-doctor).
+
+ALSO STILL WAITING on Jacob: (1) his live end-to-end signature test
+(invite himself → paperwork → in-portal Sign now → verify item flips
+approved, no esign_mismatch/review_needed alert, email From onboarding@),
+and (2) fresh invite to Bryan Curtis bryan@sreiowa.com (original lost
+pre-Postmark-paid). Master 3930256 = Track A + B + status-gate fix,
+deployed + Ready.
 
 STATUS-GATE FIX SHIPPED 2026-08-18 (commit 53a2941, merged 3930256):
 onboarding is pending-status-only everywhere — GET /api/portal/onboarding
@@ -33,35 +239,88 @@ lacks SignWell/Postmark keys so autoSend can't fire locally anymore.
 TWO PARALLEL TRACKS as of 2026-08-18 — do not mix them.
 
 TRACK B (2026-08-18): roles overhaul + owner tier + rep pay tracking —
-**NOW ON MASTER/DEPLOYED**: its session merged feat/roles-owner-payplan
-into master (merge 8a3bb11, incl. c8bdae2 MTD-tile fix) and pushed;
-deployed together with the status-gate merge 3930256. Track B's go-live
-checklist below (rules deploy, owner bootstrap, seeding, role reassign)
-is managed BY THAT SESSION — check with Jacob/that session before touching.
-Original state for reference:
-Worktree /home/fazetwerpnerd69/dev/3cwg-payplan, branch
-feat/roles-owner-payplan at c8bdae2 (8 commits off onboarding/completion
-827b789; full ledger in that worktree's .superpowers/sdd/progress.md).
-Delivered: IBO hidden from all public/rep surfaces (kept in data/admin;
-call templates renamed too), new comp roles (AE T1/T2, GMIT, GM, OM,
-Regional, Director, Internal Rep) from ~/"3C World Group 7.1 .26
-Comp.xlsx", 'owner' platform tier (owner-only margins/comp editing;
-admins/reps can NEVER receive margin), comp plan in
-src/data/compPlan.generated.json + /api/portal/comp-plan (own-slice
-scoping) + owner CompPlanMatrix, rep sales tab [All|Pay] with expected
-pay (install+14d, rejected/cancelled excluded) + private paid checkbox
-(users/{uid}/salePaid). Gates green (tsc/test 690/build; lint 40
-pre-existing). R1 CLEAR: zero IBO invites/users/calls in prod.
-GO-LIVE ON JACOB'S WORD (order matters): (1) deploy firestore.rules
-(salePaid rules NOT live — checkbox blocked until then); (2) FIRST OWNER
-BOOTSTRAP: zero owners exist and only owners grant owner → set Jacob's
-user doc role:'owner' in Firebase console, then he grants Jeremy in
-User Management; (3) optional seed scripts/seed-comp-plan.mjs --apply
-(API serves committed fallback meanwhile; .env.local
-FIREBASE_ADMIN_PRIVATE_KEY is TRUNCATED — only FIREBASE_SERVICE_ACCOUNT
-path works); (4) reassign 10 legacy-role users (9 entry_rep +
-connorcrouse321 l1_manager) to new roles. ENTANGLED: branch includes
-Track A's unmerged SignWell commits — deploying B deploys A.
+**FULLY DEPLOYED 2026-08-18 evening** (Jacob's "deploy"). All go-live
+steps DONE by the Track B session: firestore.rules deployed (salePaid
+block + owner + new roles LIVE — paid checkbox works); Jacob's owner
+role CONFIRMED on users/bQWKezQmd1P9Yf3GzOdXXBkDzj93
+(jmyers@3cworldgroup.com — his portal account is the company email, NOT
+the gmail; user docs store it as `Email`, capital E); comp plan SEEDED
+(config/compPlan 12 roles/252 rates + config/compPlanMargin 21 entries,
+version 2026-07-01); master at 8e97c50 (= feat/roles-owner-payplan
+incl. both master-merges + seed-script FIREBASE_SERVICE_ACCOUNT/ENV_FILE
+fix 48544e0), gates green post-merge (tsc clean, 714/714 tests);
+Vercel production 3cworldgroup-6eitta4o8 Ready, aliased to
+3cworldgroup.com/www. NOTE: pushing master does NOT auto-deploy — this
+project ships via `vercel --prod` (CLI, authed).
+Post-deploy fix 9ec831a (deployed): phone chat composer textarea was 11px
+→ iOS force-zoomed on focus; now 16px (globals.css ~5629). NOTE for the
+chat-WIP session: main tree has uncommitted globals.css edits — expect a
+trivial merge at that line when syncing master.
+DEPLOYED 2026-08-18 late (master 7946594, Vercel Ready): (a) mobile
+dead-end fixes — sale sheet close X clears the notch (safe-area padding,
+44px target), back gesture closes sheet in place (history entry; sheet
+Links disown it so Open-full-page isn't bounced), Escape closes
+sheet/notification panel, notification panel pinned on-screen at <=640px;
+(b) FULL PUSH-NOTIFICATION SYSTEM — VAPID key live in Vercel env +
+main-tree .env.local; sends wired via after(): sale approve/reject →
+rep's devices (salePush.ts), chat message → channel memberIds minus
+author, cap 50 (chatPush.ts); first-run PushPromptBanner (portal
+layout-mounted, house-styled, 14d snooze key '3c-push-prompt-snoozed-at');
+enablePushOnDevice() sole caller of /api/portal/push/register. All
+E2E-verified at 59px notch inset ([[rep-device-baseline]]). 747 tests.
+Worktree /home/fazetwerpnerd69/dev/3cwg-push (feat/push-notifications,
+merged) can be removed.
+DEPLOYED f5d2ec4 (Ready): new-sale-pending push to management devices
+(sales POST route, after() + reviewerIds minus submitting rep).
+PUSH-DELIVERY SAGA RESOLVED 2026-08-18 night (master 81a2a69 deployed,
+Ready; all gates green, 747 tests): after the evening redeploys Jacob's
+iPhone silently stopped receiving pushes — FCM said ok but APNs dropped
+them (dead subscription; old token later confirmed
+registration-token-not-registered). Shipped, in order: PushTokenRefresher
+(b31081a, portal-layout mounted, silently re-registers FCM token on every
+open when permission granted); pushTokensUpdatedAt stamp on register
+(9b75620); push-health beacon (b055348, POST /api/portal/push/health →
+users/{uid}.pushHealth {supported, permission, result, standalone, ua,
+at}); dead-subscription recovery (534ec2c — getToken fail → unsubscribe
+stale pushManager subscription → retry once) + detailed results
+(requestPushTokenDetailed / enablePushOnDeviceDetailed); iOS quirk fix
+(81a2a69 — requestPermission() without gesture resolves 'denied' even
+when granted, so skip re-ask when Notification.permission==='granted').
+End-to-end confirmed on Jacob's phone: new token minted, test banner
+received; dead token pruned from his users doc (1 token remains). Whole
+team announced + installed; push now self-heals on every app open.
+FOLLOW-UP: who's-enabled report for Jacob in a few days (query users
+where pushTokens non-empty vs active roster).
+DEPLOYED c3aa668 (master, Vercel Ready, aliased www.3cworldgroup.com;
+gates green: tsc, 747 tests, build): THE REAL iOS DEAD-END ROOT CAUSE. Jacob (iPhone 17 Pro Max) still got stuck on a sale sheet
+after 7946594 because the July-14 app-shell scroll lock (globals.css
+~14098) makes <main> the phone scroller, and iOS WebKit breaks
+position:fixed INSIDE that scroller — sheet clipped to main's box,
+painted UNDER fixed header/bottom nav, X unreachable. Chrome renders it
+fine, which is why e2e passed while iPhones stayed broken. Fix: portal
+SaleDetailSheet + sales toast + member-line onboarding sheet to <body>
+via createPortal, each in a display:contents wrapper carrying its
+palette class (.sales-line / .member-line) so scoped CSS vars cascade.
+Verified in Chrome (body-child, X hittable at 59px inset, back/X close,
+Open-full-page 3/3). Awaiting Jacob's on-device retest (close app fully,
+reopen, tap a sale). RULE for future mobile
+overlays: any position:fixed element rendered inside <main> must be
+portaled to body (chat WIP session: check your sheets/overlays too).
+Post-deploy fix 77568d2 (deployed, Ready): role/status chips passed
+markDirty=false so a role-only edit never showed the Save bar ("doesn't
+save"); role pickers are now dropdowns; IBO + L1/L2 no longer assignable
+(retired role shows as disabled "(retired)" option on holders).
+REMAINING (Jacob, in-portal): (1) grant Jeremy 'owner' in User
+Management; (2) reassign 10 legacy-role users (9 entry_rep +
+connorcrouse321 l1_manager) to new tiers — they get AE Tier 1 rates
+until then; (3) sanity checks: owner sees comp matrix + margin on
+Resources, rep sees [All|Pay] + working paid checkbox, plain admin sees
+no margin. Feature spec/ledger: worktree
+/home/fazetwerpnerd69/dev/3cwg-payplan .superpowers/sdd/progress.md.
+Follow-ups (unscheduled): DirecTV/Brightspeed/Spectrum not in FIBER_PLANS
+catalog (their spreadsheet rates not in app); retire legacy "0%"
+commission strip on Resources; existing IBO users still display "IBO
+Level N" (intended keep-in-data).
 Jacob's standing rule: NO Sonnet agents — Fable orchestrates/reviews,
 Opus subagents. NO PUSH without explicit go-ahead.
 
