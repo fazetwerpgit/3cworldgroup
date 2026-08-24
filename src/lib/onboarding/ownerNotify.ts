@@ -34,20 +34,25 @@ function asDate(value: unknown): Date | null {
   return null;
 }
 
+const PACKET_TZ = 'America/Chicago';
+
 function dateText(value: unknown): string {
-  return asDate(value)?.toISOString() ?? '—';
+  const date = asDate(value);
+  return date
+    ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: PACKET_TZ })
+    : '—';
+}
+
+function statusText(value: unknown): string {
+  const status = typeof value === 'string' && value ? value : 'not_started';
+  const words = status.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function displayRole(value: unknown): string | null {
   return typeof value === 'string' && value in RoleDisplayNames
     ? RoleDisplayNames[value as keyof typeof RoleDisplayNames]
     : null;
-}
-
-function htmlEscape(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[character] ?? character));
 }
 
 export async function getOwnerRecipients(): Promise<string[]> {
@@ -113,8 +118,13 @@ function storageBucket() {
   return adminStorage.bucket(bucketName);
 }
 
-function checklistLine(item: OnboardingItem, progress: Record<string, unknown> | undefined): string {
-  return `${item.label}: ${String(progress?.status ?? 'not_started')}; submittedAt: ${dateText(progress?.submittedAt)}; reviewedAt: ${dateText(progress?.reviewedAt)}`;
+function checklistRow(item: OnboardingItem, progress: Record<string, unknown> | undefined) {
+  return {
+    label: item.label,
+    status: statusText(progress?.status),
+    submitted: dateText(progress?.submittedAt),
+    reviewed: dateText(progress?.reviewedAt),
+  };
 }
 
 export async function sendOnboardingPacket(opts: { userId: string }): Promise<void> {
@@ -131,33 +141,26 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
       if (typeof data.itemId === 'string') progressByItem.set(data.itemId, data);
     });
 
-    const profileLines = ['Rep profile:'];
-    const profileFields: Array<[string, unknown, (value: unknown) => string | null]> = [
-      ['Display name', user.displayName, (value) => typeof value === 'string' ? value : null],
-      ['Email', user.email, (value) => typeof value === 'string' ? value : null],
-      ['Phone', user.phone, (value) => typeof value === 'string' ? value : null],
-      ['Field role', displayRole(user.fieldRole), (value) => typeof value === 'string' ? value : null],
-      ['IBO', user.isIBO, (value) => typeof value === 'boolean' ? String(value) : null],
-      ['Created at', user.createdAt, (value) => asDate(value)?.toISOString() ?? null],
-    ];
-    profileFields.forEach(([label, value, format]) => {
-      const rendered = format(value);
-      if (rendered) profileLines.push(`${label}: ${rendered}`);
-    });
+    // Role carries the IBO flag so it does not need a row of its own; the flag
+    // stays owner-facing only (it is hidden from rep UI).
+    const role = displayRole(user.fieldRole);
+    const profile: Array<[string, string]> = [];
+    if (typeof user.email === 'string' && user.email) profile.push(['Email', user.email]);
+    if (typeof user.phone === 'string' && user.phone) profile.push(['Phone', user.phone]);
+    if (role) profile.push(['Role', user.isIBO === true ? `${role} · IBO` : role]);
+    if (asDate(user.createdAt)) profile.push(['Joined', dateText(user.createdAt)]);
 
     const sensitive = await adminDb.doc(`userSensitive/${opts.userId}`).get();
     const sensitiveData = sensitive.data?.() ?? {};
-    const sensitiveLines = ['Sensitive fields (masked):'];
+    const masked: Array<[string, string]> = [];
     if (typeof sensitiveData.ssnLast4 === 'string' && sensitiveData.ssnLast4) {
-      sensitiveLines.push(`SSN: ***-**-${sensitiveData.ssnLast4.slice(-4)}`);
+      masked.push(['SSN', `***-**-${sensitiveData.ssnLast4.slice(-4)}`]);
     }
     if (typeof sensitiveData.dlLast4 === 'string' && sensitiveData.dlLast4) {
-      sensitiveLines.push(`DL: ********${sensitiveData.dlLast4.slice(-4)}`);
+      masked.push(['DL', `********${sensitiveData.dlLast4.slice(-4)}`]);
     }
-    sensitiveLines.push('Full values: portal → Admin → Users → reveal (audited).');
 
-    const checklistLines = ['Onboarding checklist:', ...items.map((item) => checklistLine(item, progressByItem.get(item.id)))];
-    const attachmentLines = ['Attachments:'];
+    const checklist = items.map((item) => checklistRow(item, progressByItem.get(item.id)));
     const skipped: string[] = [];
     const attachments: { name: string; contentBase64: string; contentType: string }[] = [];
     let attachmentBytes = 0;
@@ -170,7 +173,7 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
         bucket ??= storageBucket();
         const [buffer] = await bucket.file(path).download();
         if (attachmentBytes + buffer.length > MAX_ATTACHMENT_BYTES) {
-          skipped.push(name);
+          skipped.push(`${name} (over the 8MB email limit)`);
           continue;
         }
         attachmentBytes += buffer.length;
@@ -180,22 +183,17 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
         console.error('[onboarding owner notify] attachment download failed', { path, error });
       }
     }
-    if (skipped.length) attachmentLines.push(`Skipped attachments: ${skipped.join(', ')}`);
-    else attachmentLines.push('Stored signed PDFs are attached. Uploaded photos and W-9 remain available from the admin page.');
-    attachmentLines.push(`Admin page: ${PACKET_URL()}`);
-
-    const textBody = [
-      ...profileLines,
-      '',
-      ...checklistLines,
-      '',
-      ...sensitiveLines,
-      '',
-      ...attachmentLines,
-    ].join('\n');
-    const htmlBody = `<pre style="font-family:Arial,Helvetica,sans-serif;white-space:pre-wrap">${htmlEscape(textBody)}</pre>`;
     await sendToRecipients({
-      ...onboardingPacketEmail({ repName: String(user.displayName || user.email || opts.userId), textBody, htmlBody }),
+      ...onboardingPacketEmail({
+        repName: String(user.displayName || user.email || opts.userId),
+        completedOn: dateText(new Date()),
+        profile,
+        checklist,
+        masked,
+        attached: attachments.map((attachment) => attachment.name),
+        skipped,
+        link: PACKET_URL(),
+      }),
       attachments,
     });
   } catch (error) {

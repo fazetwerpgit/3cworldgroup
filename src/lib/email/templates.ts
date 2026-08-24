@@ -96,12 +96,99 @@ Review onboarding: ${p.link}
   };
 }
 
-export function onboardingPacketEmail(p: { repName: string; textBody: string; htmlBody: string }): EmailContent {
+export interface OnboardingPacketData {
+  repName: string;
+  completedOn: string;
+  profile: Array<[string, string]>;
+  checklist: Array<{ label: string; status: string; submitted: string; reviewed: string }>;
+  masked: Array<[string, string]>;
+  attached: string[];
+  skipped: string[];
+  link: string;
+}
+
+const PACKET_MUTED = '#8a8f98';
+const PACKET_RULE = '#e6e8eb';
+
+// Packet values come from rep-entered profile data, so escape them for HTML.
+function esc(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character] ?? character));
+}
+
+function packetHeading(text: string): string {
+  return `<h3 style="margin:28px 0 8px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${PACKET_MUTED}">${text}</h3>`;
+}
+
+function packetNote(text: string): string {
+  return `<p style="margin:6px 0 0;font-size:13px;color:${PACKET_MUTED}">${text}</p>`;
+}
+
+export function onboardingPacketEmail(p: OnboardingPacketData): EmailContent {
   const subject = `Onboarding packet: ${p.repName}`;
+  const cell = `padding:6px 12px 6px 0;font-size:14px;border-bottom:1px solid ${PACKET_RULE}`;
+  // The HTML heading already carries the rep name; the text body has to repeat it.
+  const attachNote = p.attached.length ? ' Signed documents are attached.' : '';
+  const intro = `Onboarding completed ${p.completedOn}.${attachNote}`;
+  const textIntro = `${p.repName} completed onboarding ${p.completedOn}.${attachNote}`;
+
+  const profileHtml = p.profile.length
+    ? `<table style="width:100%;border-collapse:collapse;margin-top:4px">${p.profile
+        .map(([label, value]) => `<tr><td style="${cell};color:${PACKET_MUTED};width:120px">${esc(label)}</td><td style="${cell}">${esc(value)}</td></tr>`)
+        .join('')}</table>`
+    : '';
+
+  const checklistHtml = p.checklist.length
+    ? packetHeading('Checklist') + `<table style="width:100%;border-collapse:collapse">
+<tr><th style="${cell};text-align:left;color:${PACKET_MUTED};font-weight:600">Item</th><th style="${cell};text-align:left;color:${PACKET_MUTED};font-weight:600">Status</th><th style="${cell};text-align:left;color:${PACKET_MUTED};font-weight:600">Submitted</th><th style="${cell};text-align:left;color:${PACKET_MUTED};font-weight:600">Reviewed</th></tr>
+${p.checklist
+        .map((row) => `<tr><td style="${cell}">${esc(row.label)}</td><td style="${cell}">${esc(row.status)}</td><td style="${cell}">${esc(row.submitted)}</td><td style="${cell}">${esc(row.reviewed)}</td></tr>`)
+        .join('')}</table>`
+    : '';
+
+  const documentsHtml = packetHeading('Documents')
+    + `<p style="margin:0;font-size:14px">${p.attached.length ? esc(p.attached.join(', ')) : 'No signed PDFs were available to attach.'}</p>`
+    + (p.skipped.length ? packetNote(`Not attached: ${esc(p.skipped.join(', '))}`) : '')
+    + packetNote('Photo uploads stay in the admin page.');
+
+  const maskedHtml = p.masked.length
+    ? packetHeading('Identity (masked)')
+      + `<p style="margin:0;font-size:14px">${p.masked.map(([label, value]) => `${esc(label)} ${esc(value)}`).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</p>`
+      + packetNote('Full values: portal → Admin → Users → reveal (audited).')
+    : '';
+
+  const textBody = [
+    textIntro,
+    ...(p.profile.length ? ['', ...p.profile.map(([label, value]) => `${label}: ${value}`)] : []),
+    ...(p.checklist.length
+      ? ['', 'CHECKLIST', ...p.checklist.map((row) => {
+          const dates = [row.submitted !== '—' ? `submitted ${row.submitted}` : '', row.reviewed !== '—' ? `reviewed ${row.reviewed}` : '']
+            .filter(Boolean)
+            .join(', ');
+          return `${row.label}: ${row.status}${dates ? ` (${dates})` : ''}`;
+        })]
+      : []),
+    '',
+    'DOCUMENTS',
+    p.attached.length ? p.attached.join(', ') : 'No signed PDFs were available to attach.',
+    ...(p.skipped.length ? [`Not attached: ${p.skipped.join(', ')}`] : []),
+    'Photo uploads stay in the admin page.',
+    ...(p.masked.length
+      ? ['', 'IDENTITY (MASKED)', ...p.masked.map(([label, value]) => `${label}: ${value}`), 'Full values: portal → Admin → Users → reveal (audited).']
+      : []),
+    '',
+    `Review in the portal: ${p.link}`,
+    '',
+  ].join('\n');
+
   return {
     subject,
-    textBody: `${p.textBody}\n`,
-    htmlBody: layout(subject, p.htmlBody),
+    textBody,
+    htmlBody: layout(
+      `Onboarding packet: ${esc(p.repName)}`,
+      `<p style="margin:0 0 4px;font-size:14px">${intro}</p>${profileHtml}${checklistHtml}${documentsHtml}${maskedHtml}<p style="margin:28px 0 0"><a href="${p.link}">Review in the portal</a></p>`,
+    ),
   };
 }
 

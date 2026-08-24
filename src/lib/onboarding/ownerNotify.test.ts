@@ -130,8 +130,8 @@ describe('sendOnboardingPacket', () => {
     expect(packet.textBody).toContain('DL: ********9876');
     expect(packet.textBody).not.toContain('DO-NOT-READ');
     expect(packet.textBody).toContain('Full values: portal → Admin → Users → reveal (audited).');
-    expect(packet.textBody).toContain('Contract: approved');
-    expect(packet.textBody).toContain('Skipped attachments: direct.pdf');
+    expect(packet.textBody).toContain('Contract: Approved');
+    expect(packet.textBody).toContain('Not attached: direct.pdf (over the 8MB email limit)');
     expect(packet.textBody).toContain('https://portal.example/portal/admin/onboarding');
   });
 });

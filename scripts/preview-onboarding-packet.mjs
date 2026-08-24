@@ -6,20 +6,26 @@
 // copy exists yet (the webhook that stores them has not fired historically).
 // Recipients: the real owner list (users with role=owner) unless --send-to
 // overrides it.
-//   node scripts/preview-onboarding-packet.mjs --name "Mason Steinberger" --env <envfile> [--send-to you@x.com]
-import { readFileSync } from 'node:fs';
+// The email itself is rendered by the production template
+// (src/lib/email/templates.ts) so the preview cannot drift from what owners get.
+//   node scripts/preview-onboarding-packet.mjs --name "Mason Steinberger" --env <envfile> [--send-to you@x.com] [--dry-run] [--html-out packet.html]
+import { readFileSync, writeFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { onboardingPacketEmail } from '../src/lib/email/templates.ts';
+import { RoleDisplayNames } from '../src/types/auth.ts';
 
 const argValue = (flag) => {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : undefined;
 };
+const hasFlag = (flag) => process.argv.includes(flag);
 const name = argValue('--name');
 if (!name) {
-  console.error('Usage: node scripts/preview-onboarding-packet.mjs --name "Full Name" [--env <envfile>] [--send-to email]');
+  console.error('Usage: node scripts/preview-onboarding-packet.mjs --name "Full Name" [--env <envfile>] [--send-to email] [--dry-run] [--html-out file]');
   process.exit(1);
 }
+const dryRun = hasFlag('--dry-run');
 
 const envFile = argValue('--env') ?? '.env.local';
 for (const line of readFileSync(envFile, 'utf-8').split(/\r?\n/)) {
@@ -62,10 +68,17 @@ const ITEM_LABELS = {
 };
 const ESIGN_ITEMS = ['contract', 'direct_deposit', 'pay_structure', 'fcra_auth'];
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+const PACKET_TZ = 'America/Chicago';
 const asDate = (v) => (v?.toDate ? v.toDate() : v ? new Date(v) : null);
 const dateText = (v) => {
   const d = asDate(v);
-  return d && !Number.isNaN(d.getTime()) ? d.toISOString() : '—';
+  return d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: PACKET_TZ })
+    : '—';
+};
+const statusText = (v) => {
+  const words = String(v || 'not_started').replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
 // Find the rep.
@@ -86,26 +99,24 @@ progressSnap.docs.forEach((d) => {
   if (data.itemId) progressByItem.set(data.itemId, data);
 });
 
-const profileLines = ['Rep profile:'];
-if (user.displayName) profileLines.push(`Display name: ${user.displayName}`);
-if (user.email) profileLines.push(`Email: ${user.email}`);
-if (user.phone) profileLines.push(`Phone: ${user.phone}`);
-if (user.fieldRole) profileLines.push(`Field role: ${user.fieldRole}`);
-if (typeof user.isIBO === 'boolean') profileLines.push(`IBO: ${user.isIBO}`);
-if (user.createdAt) profileLines.push(`Created at: ${dateText(user.createdAt)}`);
+const profile = [];
+if (user.email) profile.push(['Email', user.email]);
+if (user.phone) profile.push(['Phone', user.phone]);
+const role = RoleDisplayNames[user.fieldRole];
+if (role) profile.push(['Role', user.isIBO === true ? `${role} · IBO` : role]);
+if (user.createdAt) profile.push(['Joined', dateText(user.createdAt)]);
 
 const sensitive = (await db.doc(`userSensitive/${uid}`).get()).data() ?? {};
-const sensitiveLines = ['Sensitive fields (masked):'];
-if (sensitive.ssnLast4) sensitiveLines.push(`SSN: ***-**-${String(sensitive.ssnLast4).slice(-4)}`);
-if (sensitive.dlLast4) sensitiveLines.push(`DL: ********${String(sensitive.dlLast4).slice(-4)}`);
-sensitiveLines.push('Full values: portal → Admin → Users → reveal (audited).');
+const masked = [];
+if (sensitive.ssnLast4) masked.push(['SSN', `***-**-${String(sensitive.ssnLast4).slice(-4)}`]);
+if (sensitive.dlLast4) masked.push(['DL', `********${String(sensitive.dlLast4).slice(-4)}`]);
 
-const checklistLines = ['Onboarding checklist:'];
-for (const [itemId, p] of [...progressByItem.entries()].sort()) {
-  checklistLines.push(
-    `${ITEM_LABELS[itemId] ?? itemId}: ${p.status ?? 'not_started'}; submittedAt: ${dateText(p.submittedAt)}; reviewedAt: ${dateText(p.reviewedAt)}`
-  );
-}
+const checklist = [...progressByItem.entries()].sort().map(([itemId, p]) => ({
+  label: ITEM_LABELS[itemId] ?? itemId,
+  status: statusText(p.status),
+  submitted: dateText(p.submittedAt),
+  reviewed: dateText(p.reviewedAt),
+}));
 
 // Attachments: fetch completed PDFs live from SignWell (no stored copies yet).
 const attachments = [];
@@ -140,7 +151,7 @@ for (const itemId of ESIGN_ITEMS) {
     buffer = Buffer.from(await res.arrayBuffer());
   }
   if (attachmentBytes + buffer.length > MAX_ATTACHMENT_BYTES) {
-    skipped.push(`${itemId}.pdf (size cap)`);
+    skipped.push(`${itemId}.pdf (over the 8MB email limit)`);
     continue;
   }
   attachmentBytes += buffer.length;
@@ -148,14 +159,16 @@ for (const itemId of ESIGN_ITEMS) {
 }
 
 const appUrl = process.env.APP_BASE_URL || 'https://www.3cworldgroup.com';
-const attachmentLines = ['Attachments:'];
-if (skipped.length) attachmentLines.push(`Skipped attachments: ${skipped.join(', ')}`);
-else attachmentLines.push('Stored signed PDFs are attached. Uploaded photos and W-9 remain available from the admin page.');
-attachmentLines.push(`Admin page: ${appUrl}/portal/admin/onboarding`);
-
-const textBody = [...profileLines, '', ...checklistLines, '', ...sensitiveLines, '', ...attachmentLines].join('\n');
-const htmlEscape = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const htmlBody = `<pre style="font-family:Arial,Helvetica,sans-serif;white-space:pre-wrap">${htmlEscape(textBody)}</pre>`;
+const email = onboardingPacketEmail({
+  repName: user.displayName || user.email || uid,
+  completedOn: dateText(new Date()),
+  profile,
+  checklist,
+  masked,
+  attached: attachments.map((a) => a.Name),
+  skipped,
+  link: `${appUrl}/portal/admin/onboarding`,
+});
 
 // Recipients: --send-to override, else real owner list.
 let recipients = argValue('--send-to') ? [argValue('--send-to')] : [];
@@ -165,8 +178,15 @@ if (recipients.length === 0) {
 }
 console.log(`Packet for ${user.displayName} (${uid})`);
 console.log(`Attachments: ${attachments.length} (${Math.round(attachmentBytes / 1024)}KB), skipped: ${skipped.length}`);
-console.log(`Recipients: ${recipients.join(', ') || 'NONE — no owner-role users with email'}`);
-console.log(`\n----- BODY -----\n${textBody}\n----------------\n`);
+console.log(`Recipients: ${dryRun ? 'none (--dry-run)' : recipients.join(', ') || 'NONE — no owner-role users with email'}`);
+console.log(`\n----- BODY -----\n${email.textBody}----------------\n`);
+
+const htmlOut = argValue('--html-out');
+if (htmlOut) {
+  writeFileSync(htmlOut, email.htmlBody);
+  console.log(`Wrote HTML to ${htmlOut}`);
+}
+if (dryRun) process.exit(0);
 
 const from = [process.env.ONBOARDING_EMAIL_FROM, process.env.EMAIL_FROM].find((v) => v && v.includes('@'));
 for (const to of recipients) {
@@ -180,9 +200,9 @@ for (const to of recipients) {
     body: JSON.stringify({
       From: from,
       To: to,
-      Subject: `Onboarding packet: ${user.displayName}`,
-      TextBody: `${textBody}\n`,
-      HtmlBody: htmlBody,
+      Subject: email.subject,
+      TextBody: email.textBody,
+      HtmlBody: email.htmlBody,
       MessageStream: 'outbound',
       ...(attachments.length ? { Attachments: attachments } : {}),
     }),
