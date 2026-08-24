@@ -40,6 +40,15 @@ embeds — placement confirmed good). All uncommitted. Remaining:
     overrode APP_BASE_URL; final copy has the prod link. Script fix
     committed (legacy 'Email' owner resolution + dry-run recipient
     print).
+(e) SHIPPED 2026-08-24 (later): "Completed" section on
+    /portal/admin/onboarding (Jeremy's ask — see what reps completed)
+    + GET /api/portal/onboarding/signed-pdf streams signed e-sign
+    PDFs (stored copy or live SignWell fetch, cached back). Codex
+    implemented from spec, diff reviewed, 794/794 tests + tsc +
+    build green, deployed to prod. CAVEAT: no logged-in visual pass
+    — classifier blocked creating a temp admin in prod Firebase;
+    Jacob/Jeremy to eyeball the page. Jeremy's reviewer address:
+    jeremymcfarlandservices@gmail.com.
 Notes: SignWell coords are 96dpi px from page TOP-LEFT; capture
 images were 120dpi → ×0.8. Old envelopes keep old PDFs; Mason's
 outstanding direct_deposit envelope still has the placeholder unless
