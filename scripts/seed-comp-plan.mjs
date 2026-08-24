@@ -28,20 +28,27 @@ if (!apply) {
   process.exit(0);
 }
 
-for (const line of readFileSync('.env.local', 'utf-8').split(/\r?\n/)) {
+const envFile = process.env.ENV_FILE || '.env.local';
+for (const line of readFileSync(envFile, 'utf-8').split(/\r?\n/)) {
   const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
-let pk = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
-if (!pk.includes('-----BEGIN')) pk = Buffer.from(pk, 'base64').toString('utf-8');
-pk = pk.replace(/\\n/g, '\n');
-initializeApp({
-  credential: cert({
-    projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-    privateKey: pk,
-  }),
-});
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // Whole service-account JSON, base64 (possibly with stray literal \n runs).
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n\s*/g, '');
+  initializeApp({ credential: cert(JSON.parse(Buffer.from(raw, 'base64').toString('utf-8'))) });
+} else {
+  let pk = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+  if (!pk.includes('-----BEGIN')) pk = Buffer.from(pk, 'base64').toString('utf-8');
+  pk = pk.replace(/\\n/g, '\n');
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: pk,
+    }),
+  });
+}
 const db = getFirestore();
 
 await db.collection('config').doc('compPlan').set({

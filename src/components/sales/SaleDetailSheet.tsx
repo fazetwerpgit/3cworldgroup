@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -88,16 +89,55 @@ export function SaleDetailSheet({
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
 
+  // Ref keeps the effects below on [open] only: callers pass an inline
+  // onOpenChange, and re-running the history effect per render would push a
+  // history entry per keystroke.
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false);
+      if (event.key === 'Escape') onOpenChangeRef.current(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onOpenChange, open]);
+  }, [open]);
 
-  if (!sale) return null;
+  // On phones the sheet covers the whole screen, so the back gesture/button
+  // must close it — not navigate away from the sales page. Opening pushes a
+  // history entry; back pops it and closes the sheet; closing any other way
+  // (X, backdrop, Escape) consumes the entry so history stays balanced.
+  const historyPushedRef = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    window.history.pushState({ saleDetailSheet: true }, '');
+    historyPushedRef.current = true;
+    const onPopState = () => {
+      historyPushedRef.current = false;
+      onOpenChangeRef.current(false);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      if (historyPushedRef.current) {
+        historyPushedRef.current = false;
+        window.history.back();
+      }
+    };
+  }, [open]);
+
+  // Links inside the sheet navigate forward; the cleanup's history.back() would
+  // undo that navigation the moment the sheet unmounts. Disowning the entry
+  // before the router acts leaves an inert duplicate list entry behind instead
+  // — back from the target page still lands on the sales list as expected.
+  const disownHistoryEntry = () => {
+    historyPushedRef.current = false;
+  };
+
+  if (!sale || typeof document === 'undefined') return null;
 
   const saleId = sale.id || '';
   const showApproval = canApprove && sale.status === 'pending';
@@ -122,8 +162,14 @@ export function SaleDetailSheet({
     }
   };
 
-  return (
-    <>
+  // Portaled to <body>: on iPhones the portal locks scrolling into <main>
+  // (app-shell scroll lock), and iOS WebKit breaks position:fixed inside that
+  // scroller — the sheet gets clipped to main's box and painted UNDER the
+  // fixed header/bottom nav, hiding the close X with no way out. The
+  // display:contents wrapper re-supplies the .sales-line custom-property
+  // palette the sheet's styles read, without generating a layout box.
+  return createPortal(
+    <div className="sales-line" style={{ display: 'contents' }}>
       <button
         type="button"
         className={`sales-line-backdrop ${open ? 'is-open' : ''}`}
@@ -224,7 +270,7 @@ export function SaleDetailSheet({
             )}
             {isAdmin && (
               <>
-                <Link className="admin" href={`/portal/sales/${saleId}/edit`}>
+                <Link className="admin" href={`/portal/sales/${saleId}/edit`} onClick={disownHistoryEntry}>
                   <Pencil className="sales-line-icon" />Edit
                 </Link>
                 <button className="admin" type="button" disabled={loading} onClick={() => onRequestDelete(saleId)}>
@@ -241,12 +287,13 @@ export function SaleDetailSheet({
               <button type="button" onClick={onNext}>Next<ChevronRight className="sales-line-icon" /></button>
             </div>
           )}
-          <Link className="sales-line-open-full" href={`/portal/sales/${saleId}`}>
+          <Link className="sales-line-open-full" href={`/portal/sales/${saleId}`} onClick={disownHistoryEntry}>
             Open full page <ArrowUpRight className="sales-line-icon" />
           </Link>
         </div>
       </aside>
       <ChatLightbox image={proofImage} onClose={() => setProofImage(null)} />
-    </>
+    </div>,
+    document.body
   );
 }

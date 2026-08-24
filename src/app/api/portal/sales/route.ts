@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
+import { sendPushToUser } from '@/lib/push/sendPush';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { MANAGEMENT_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
@@ -262,6 +263,24 @@ export async function POST(request: NextRequest) {
           )
         )
       );
+
+      // Same audience gets it on their phones. A manager logging their own sale
+      // is not pinged about it; after() keeps the sends alive past the response
+      // without a detached promise the freeze would kill.
+      const reviewerIds = reviewersSnap.docs.map((d) => d.id).filter((id) => id !== salesRepId);
+      if (reviewerIds.length > 0) {
+        after(async () => {
+          await Promise.all(
+            reviewerIds.map((uid) =>
+              sendPushToUser(uid, {
+                title: 'New sale pending review',
+                body: `${salesRepName || 'A team member'} — ${customerName || 'new sale'}`,
+                url: '/portal/sales?status=pending',
+              })
+            )
+          );
+        });
+      }
     } catch (error) {
       console.error('Error notifying reviewers of new sale:', error);
     }

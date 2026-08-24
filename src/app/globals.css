@@ -1895,6 +1895,19 @@ body.portal-scope {
   border-color: var(--rail-line);
 }
 
+/* On phones the panel is wider than the space right of the bell (which sits
+   ~54px in from the edge), so absolute right:0 anchoring pushed its left side
+   off-screen. Pin it to the viewport instead. */
+@media (max-width: 640px) {
+  .portal-notification-panel {
+    position: fixed;
+    top: calc(var(--portal-safe-top) + 66px);
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
 .portal-notification-header,
 .portal-notification-clear {
   display: flex;
@@ -2327,6 +2340,134 @@ body.portal-scope {
 .portal-mobile-nav,
 .portal-sheet-backdrop {
   display: none;
+}
+
+/* First-run "turn on notifications" prompt. Floats over the page instead of taking
+   layout space, since it mounts once in the portal layout rather than per page. Sits
+   below the mobile nav's z-index (40) so the nav and any sheet always win. */
+.portal-push-prompt {
+  position: fixed;
+  z-index: 39;
+  right: 16px;
+  bottom: 20px;
+  width: min(360px, calc(100vw - 32px));
+}
+
+@media (max-width: 1023px) {
+  /* Clears the 68px bottom nav plus the home-indicator inset. */
+  .portal-push-prompt {
+    right: 12px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+  }
+}
+
+/* House style, matching the notification panel: squared navy panel, lime hairline,
+   uppercase tracked labels. */
+.portal-push-prompt-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--rail-lime);
+  background: var(--rail-panel);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.35);
+  color: var(--rail-ink);
+}
+
+.portal-push-prompt-bell {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--rail-line);
+  color: var(--rail-lime);
+}
+
+.portal-push-prompt-bell svg {
+  width: 16px;
+  height: 16px;
+}
+
+.portal-push-prompt-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.portal-push-prompt-eyebrow {
+  margin: 0;
+  color: var(--rail-lime);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.portal-push-prompt-text {
+  margin: 5px 0 0;
+  color: var(--rail-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.portal-push-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.portal-push-prompt-primary,
+.portal-push-prompt-quiet {
+  padding: 7px 13px;
+  border: 1px solid var(--rail-lime);
+  background: transparent;
+  color: var(--rail-lime);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.portal-push-prompt-primary:hover:not(:disabled) {
+  background: var(--rail-lime);
+  color: var(--rail-panel);
+}
+
+.portal-push-prompt-primary:disabled {
+  opacity: 0.6;
+}
+
+.portal-push-prompt-quiet {
+  border-color: var(--rail-line);
+  color: var(--rail-muted);
+}
+
+.portal-push-prompt-quiet:hover {
+  color: var(--rail-ink);
+}
+
+.portal-push-prompt-close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  margin: -4px -6px 0 0;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--rail-muted);
+}
+
+.portal-push-prompt-close:hover {
+  color: var(--rail-ink);
+}
+
+.portal-push-prompt-close svg {
+  width: 15px;
+  height: 15px;
 }
 
 .portal-scope a:focus-visible,
@@ -3415,7 +3556,10 @@ body.portal-scope {
   justify-content: space-between;
   gap: 20px;
   border-bottom: 1px solid rgba(231, 237, 244, 0.14);
-  padding: 25px;
+  /* The sheet is fixed to top:0 and draws under the iOS status bar
+     (viewport-fit=cover), so the header must clear the notch or the close X
+     is rendered underneath it — invisible and untappable on notched iPhones. */
+  padding: max(25px, calc(var(--portal-safe-top) + 12px)) 25px 25px;
 }
 
 .sales-line-sheet-top h2 {
@@ -3427,8 +3571,9 @@ body.portal-scope {
 
 .sales-line-icon-button {
   display: grid;
-  width: 32px;
-  height: 32px;
+  /* 44px = Apple's minimum touch target; this is the only way out of the sheet. */
+  width: 44px;
+  height: 44px;
   flex: none;
   place-items: center;
   border: 1px solid rgba(231, 237, 244, 0.14);
@@ -5613,7 +5758,9 @@ body.portal-scope {
 
   .chat-line-thread-composer-row .chat-line-textarea {
     min-height: 30px !important;
-    font-size: 11px !important;
+    /* 16px minimum: iOS Safari force-zooms the page into any focused text box
+       smaller than 16px, leaving the composer off-screen while typing. */
+    font-size: 16px !important;
   }
 
   .chat-line-thread-composer-meta {

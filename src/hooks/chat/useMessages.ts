@@ -120,6 +120,24 @@ export function useMessages(channelId: string | null) {
   // fires (and bumps snapshotVersion) before the resubscribe lands — see the
   // anchor-race guard in page.tsx / MobileThread.tsx.
   const [lastSnapshotWindow, setLastSnapshotWindow] = useState(0);
+  // Which channel the messages in state actually belong to (null until the
+  // first commit). Consumers gate channel-open scrolling on this instead of
+  // inspecting messages[0] — an EMPTY committed channel has no messages to
+  // inspect but must still count as rendered. Deliberately NOT reset on a
+  // channel switch: until the new channel's first commit, state still holds
+  // the OLD channel's messages, and consumers detect that stale render by
+  // renderedChannel !== channelId.
+  const [renderedChannel, setRenderedChannel] = useState<string | null>(null);
+
+  // Ref twin of renderedChannel for the subscribe effect's loading gate (a
+  // state read there would force it into the deps and churn the listener).
+  // A resubscribe for
+  // the SAME channel (window growth — loadOlder or the eviction guard, which
+  // fires on every new incoming message once the window is full) must NOT show
+  // the loading state: both thread UIs unmount the entire message list while
+  // loading, which collapses the scroller and clamps scrollTop to 0 — the
+  // "chat jumps to the top mid-typing" bug. Only a channel switch may blank.
+  const renderedChannelRef = useRef<string | null>(null);
 
   // Oldest createdAt (ms) of the RAW window (before the deletedAt filter) as of
   // the last committed snapshot. Used to detect the sliding window evicting
@@ -136,6 +154,9 @@ export function useMessages(channelId: string | null) {
   const [prevChannelId, setPrevChannelId] = useState(channelId);
   if (channelId !== prevChannelId) {
     setPrevChannelId(channelId);
+    // Deselecting (null) is the one switch where "state still holds the old
+    // channel" must NOT survive: the subscribe effect clears messages for it.
+    if (!channelId) setRenderedChannel(null);
     setWindowSize(INITIAL_WINDOW);
     setHasMore(false);
     setLastSnapshotWindow(0);
@@ -147,13 +168,14 @@ export function useMessages(channelId: string | null) {
 
   useEffect(() => {
     if (!db || !channelId) {
+      renderedChannelRef.current = null;
       setMessages([]);
       setLoading(false);
       setError(db ? '' : 'Firebase is not configured');
       return;
     }
 
-    setLoading(true);
+    if (renderedChannelRef.current !== channelId) setLoading(true);
     setError('');
 
     const q = query(
@@ -216,6 +238,8 @@ export function useMessages(channelId: string | null) {
         }
 
         oldestDeliveredRef.current = rawOldest ?? prevOldest;
+        renderedChannelRef.current = channelId;
+        setRenderedChannel(channelId);
         setMessages(next);
         setHasMore(rawDocs.length >= windowSize && windowSize < MAX_WINDOW);
         setLastSnapshotWindow(windowSize);
@@ -236,5 +260,15 @@ export function useMessages(channelId: string | null) {
     setWindowSize((size) => (size >= MAX_WINDOW ? size : Math.min(MAX_WINDOW, size + GROW_STEP)));
   }, []);
 
-  return { messages, loading, error, hasMore, loadOlder, windowSize, snapshotVersion, lastSnapshotWindow };
+  return {
+    messages,
+    loading,
+    error,
+    hasMore,
+    loadOlder,
+    windowSize,
+    snapshotVersion,
+    lastSnapshotWindow,
+    renderedChannel,
+  };
 }

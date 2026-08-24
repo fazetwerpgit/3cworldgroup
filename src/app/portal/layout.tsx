@@ -3,6 +3,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import OnboardingGate from '@/components/portal/OnboardingGate';
+import PushPromptBanner from '@/components/portal/PushPromptBanner';
+import PushTokenRefresher from '@/components/portal/PushTokenRefresher';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 
 // Display face for portal brand moments (login, KPI headers) — exposed as
@@ -29,10 +31,15 @@ export default function PortalLayout({
       <AuthProvider>
         <MobileMenuProvider>
           <ServiceWorkerRegistrar />
+          {/* Heals iOS push-subscription rotation on every open — see component. */}
+          <PushTokenRefresher />
           {/* .portal-scope gates the portal reskin tokens/overrides in
               globals.css; display:contents keeps it out of the layout. */}
           <div className={`portal-scope contents ${archivo.variable}`}>
             <OnboardingGate>{children}</OnboardingGate>
+            {/* Floats over whatever page the rep landed on, so enabling push never
+                depends on them finding the Settings card. */}
+            <PushPromptBanner />
           </div>
         </MobileMenuProvider>
       </AuthProvider>

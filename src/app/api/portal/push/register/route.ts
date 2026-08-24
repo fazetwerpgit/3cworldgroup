@@ -20,7 +20,13 @@ export async function POST(request: NextRequest) {
     if (!token) return NextResponse.json({ error: 'token is required' }, { status: 400 });
 
     await adminDb.collection('users').doc(gate.uid).set(
-      { pushTokens: FieldValue.arrayUnion(token) },
+      {
+        pushTokens: FieldValue.arrayUnion(token),
+        // Stamped on every (re-)registration, including no-op same-token ones —
+        // lets ops tell "device re-registered, token unchanged" apart from
+        // "client never ran registration" when debugging delivery.
+        pushTokensUpdatedAt: FieldValue.serverTimestamp(),
+      },
       { merge: true }
     );
     return NextResponse.json({ success: true });

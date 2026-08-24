@@ -6,6 +6,27 @@ vi.mock('@/lib/chat/access', () => ({
   getVerifiedChatUser: vi.fn(),
 }));
 
+// The real after() throws when called outside a request scope, which is exactly where
+// these tests call the route handlers. Run the scheduled task inline instead and keep
+// its promise so a test can await the fan-out it was given.
+const afterTasks = vi.hoisted(() => [] as Promise<unknown>[]);
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return {
+    ...actual,
+    after: (task: () => unknown) => {
+      afterTasks.push(Promise.resolve(task()));
+    },
+  };
+});
+
+const sendPushMock = vi.hoisted(() =>
+  vi.fn<(uid: string, payload: { title: string; body: string; url?: string }) => Promise<void>>(
+    async () => undefined
+  )
+);
+vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: sendPushMock }));
+
 const addMock = vi.fn<(doc: Record<string, unknown>) => Promise<{ id: string }>>(
   async () => ({ id: 'msg123' })
 );
@@ -151,8 +172,15 @@ beforeEach(() => {
   addMock.mockClear();
   setMock.mockClear();
   msgSetMock.mockClear();
+  sendPushMock.mockClear();
+  afterTasks.length = 0;
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
 });
+
+// Drains the tasks the route handed to after(), so push assertions see a settled fan-out.
+async function flushAfter() {
+  await Promise.all(afterTasks);
+}
 
 describe('POST /api/portal/chat/messages (hardened)', () => {
   it('rejects an unauthenticated caller', async () => {
@@ -360,6 +388,43 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     expect(res.status).toBe(200);
     const written = addMock.mock.calls[0][0] as { replyTo?: { text: string } };
     expect(written.replyTo?.text).toHaveLength(140);
+  });
+});
+
+describe('POST /api/portal/chat/messages (push fan-out)', () => {
+  it('pushes the channel name and message to every member except the author', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    // 'managers-extra' lists mgr-1 alongside the author real-uid.
+    const res = await POST(req({ channelId: 'managers-extra', text: 'standup in five' }));
+    expect(res.status).toBe(200);
+    await flushAfter();
+    expect(sendPushMock).toHaveBeenCalledTimes(1);
+    expect(sendPushMock).toHaveBeenCalledWith('mgr-1', {
+      title: 'Managers',
+      body: 'Real User: standup in five',
+      url: '/portal/chat',
+    });
+  });
+
+  it('sends no push when the author is the channel’s only member', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'talking to myself' }));
+    expect(res.status).toBe(200);
+    await flushAfter();
+    expect(sendPushMock).not.toHaveBeenCalled();
+  });
+
+  it('describes an attachment-only message instead of pushing an empty body', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(
+      req({
+        channelId: 'managers-extra',
+        attachment: { type: 'image', url: imageUrl('managers-extra') },
+      })
+    );
+    expect(res.status).toBe(200);
+    await flushAfter();
+    expect(sendPushMock.mock.calls[0][1]).toMatchObject({ body: 'Real User sent a photo' });
   });
 });
 

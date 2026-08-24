@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { Sale, SaleStatus, FIBER_COMPANIES, PAY_DELAY_DAYS } from '@/types';
@@ -431,7 +432,16 @@ export function SalesTable({
         </DialogContent>
       </Dialog>
 
-      <div className={`sales-line-toast ${toastMessage ? 'show' : ''}`} role="status">{toastMessage}</div>
+      {/* Portaled out of the <main> scroller: iOS WebKit mis-renders
+          position:fixed inside it (see SaleDetailSheet). The .sales-line
+          wrapper re-supplies the palette vars the toast reads. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div className="sales-line" style={{ display: 'contents' }}>
+            <div className={`sales-line-toast ${toastMessage ? 'show' : ''}`} role="status">{toastMessage}</div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

@@ -1,8 +1,10 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
+import { sendPushToUser } from '@/lib/push/sendPush';
+import { buildChatPushBody, resolveChatPushRecipients } from '@/lib/push/chatPush';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   getChatStorageBucketName,
@@ -209,6 +211,22 @@ export async function POST(request: NextRequest) {
       await channelRef.set({ lastMessageAt: FieldValue.serverTimestamp() }, { merge: true });
     } catch (bumpError) {
       console.error('Error bumping channel lastMessageAt:', bumpError);
+    }
+
+    // Notify the rest of the channel: the doc's memberIds roster, minus the author and
+    // capped at CHAT_PUSH_MAX_RECIPIENTS. after() runs the sends once the response is
+    // on the wire while keeping the function alive — a detached promise would be killed
+    // by the serverless freeze.
+    const recipients = resolveChatPushRecipients(found.data, user.uid);
+    if (recipients.length > 0) {
+      const pushBody = buildChatPushBody(user.displayName, text, attachment);
+      after(async () => {
+        await Promise.all(
+          recipients.map((uid) =>
+            sendPushToUser(uid, { title: found.channel.name, body: pushBody, url: '/portal/chat' })
+          )
+        );
+      });
     }
 
     return NextResponse.json({ success: true, messageId: messageRef.id });

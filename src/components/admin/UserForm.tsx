@@ -32,10 +32,11 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-// Full real assignable role set from HEAD's RoleDisplayNames — every
-// PlatformRole and FieldRole, not a drafted-down subset. Order runs
-// field-rep tiers up through platform roles; labels come from the single
-// source of truth so this list can't drift from what the rest of the app calls each role.
+// Assignable roles only: the retired tiers (IBO levels, L1/L2 manager) are
+// deliberately absent — users still holding them keep working, but nobody new
+// is placed on them. Order runs field-rep tiers up through platform roles;
+// labels come from RoleDisplayNames so this list can't drift from what the
+// rest of the app calls each role.
 const ALL_ROLE_VALUES: UserRole[] = [
   'entry_rep',
   'entry_level_rep',
@@ -43,12 +44,6 @@ const ALL_ROLE_VALUES: UserRole[] = [
   'ae_tier_2',
   'internal_rep',
   'gm_in_training',
-  'l1_manager',
-  'l2_manager',
-  'ibo_level_1',
-  'ibo_level_2',
-  'ibo_level_3',
-  'ibo_level_4',
   'office_manager',
   'general_manager',
   'regional_manager',
@@ -88,7 +83,7 @@ interface ManagerCandidate {
 }
 
 const roleLabel = (role?: string) =>
-  roleSegments.find((r) => r.value === role)?.label || role || '—';
+  (role && RoleDisplayNames[role as UserRole]) || role || '—';
 
 export function UserForm({ user, isEdit = false }: UserFormProps) {
   const router = useRouter();
@@ -337,11 +332,23 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         <div className="admin-line-eyebrow">02 / role &amp; status</div>
         <h3>Place them on the line.</h3>
         <div className="admin-line-field" style={{ marginTop: 12 }}>
-          <label>Role / choose one</label>
-          <div className="admin-line-segmented" role="group" aria-label="Role">
-            {/* Platform roles are admin-grantable only, and Owner is
-                owner-grantable only — the server enforces both; hiding them here
-                keeps the UI from offering choices that would 403. */}
+          <label htmlFor="person-role">Role</label>
+          {/* Platform roles are admin-grantable only, and Owner is
+              owner-grantable only — the server enforces both; hiding them here
+              keeps the UI from offering choices that would 403. A retired role
+              the user still holds (IBO level, L1/L2 manager) is shown as a
+              disabled option so the dropdown reflects reality until they are
+              moved to a current role. */}
+          <select
+            id="person-role"
+            value={formData.role}
+            onChange={(e) => handleChange('role', e.target.value)}
+          >
+            {!ALL_ROLE_VALUES.includes(formData.role) && (
+              <option value={formData.role} disabled>
+                {roleLabel(formData.role)} (retired)
+              </option>
+            )}
             {roleSegments
               .filter((seg) =>
                 seg.value === 'owner'
@@ -349,16 +356,11 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                   : isAdminLevel(currentUser?.role) || !isPlatformRole(seg.value)
               )
               .map((seg) => (
-                <button
-                  key={seg.value}
-                  type="button"
-                  aria-pressed={formData.role === seg.value}
-                  onClick={() => handleChange('role', seg.value)}
-                >
+                <option key={seg.value} value={seg.value}>
                   {seg.label}
-                </button>
+                </option>
               ))}
-          </div>
+          </select>
         </div>
 
         {isEdit && (
