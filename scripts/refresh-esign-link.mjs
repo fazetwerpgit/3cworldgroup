@@ -31,13 +31,14 @@ for (const line of readFileSync(envFile, 'utf-8').split(/\r?\n/)) {
   const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
-// Same preference and fallback as src/lib/firebase/admin.ts: the stored
-// FIREBASE_SERVICE_ACCOUNT blob is corrupt (locally AND in the Vercel prod
-// env), so a parse failure falls through to the individual admin vars.
+// Same preference and fallback as src/lib/firebase/admin.ts. The stored
+// FIREBASE_SERVICE_ACCOUNT base64 contains real newlines (harmless to prod's
+// decoder); `vercel env pull` escapes them as literal \n, so strip those
+// two-char sequences FIRST, then anything else outside the base64 alphabet.
 let credential;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
-    const b64 = process.env.FIREBASE_SERVICE_ACCOUNT.replace(/[^A-Za-z0-9+/=]/g, '');
+    const b64 = process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
     credential = cert(JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')));
   } catch {
     // fall through to individual vars
