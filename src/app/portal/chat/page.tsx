@@ -65,7 +65,15 @@ let gifEnabledProbe: Promise<boolean> | null = null;
  * clickable then); a delivered image/GIF opens the lightbox on click. Renders
  * nothing for text-only messages.
  */
-function DesktopAttachment({ message, onOpen }: { message: ThreadMessage; onOpen: () => void }) {
+function DesktopAttachment({
+  message,
+  eager,
+  onOpen,
+}: {
+  message: ThreadMessage;
+  eager: boolean;
+  onOpen: () => void;
+}) {
   const previewUrl = message.localPreviewUrl;
   const src = previewUrl ?? message.attachment?.url;
   if (!src) return null;
@@ -96,9 +104,10 @@ function DesktopAttachment({ message, onOpen }: { message: ThreadMessage; onOpen
       <img
         src={src}
         alt={message.text || 'Shared image'}
-        loading="lazy"
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
         style={aspectStyle}
-        className={`chat-line-attachment-image max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
+        className={`chat-line-attachment-image max-h-64 w-full object-contain ${isUploading ? 'opacity-70' : ''}`}
       />
       {isUploading && (
         <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
@@ -1105,7 +1114,7 @@ export default function TeamChatPage() {
                                 <div className="chat-line-bubble">
                                   {message.isPinned && <span className="chat-line-pinned-mini"><Pin aria-hidden="true" /> PINNED</span>}
                                   {message.replyTo && <div className="chat-line-quote"><strong>{message.replyTo.authorName}</strong><span>{message.replyTo.text}</span></div>}
-                                  <DesktopAttachment message={message} onOpen={() => openLightbox({ url: message.attachment?.url ?? message.localPreviewUrl ?? '', author: message.authorName, time: formatTime(message.createdAt) })} />
+                                  <DesktopAttachment message={message} eager={index >= displayMessages.length - 12} onOpen={() => openLightbox({ url: message.attachment?.url ?? message.localPreviewUrl ?? '', author: message.authorName, time: formatTime(message.createdAt) })} />
                                   {message.text && <p>{message.text}{message.editedAt && <span className="chat-line-edited"> (edited)</span>}</p>}
                                   {isPending ? isFailed ? <div className="chat-line-failed-actions"><button type="button" onClick={() => retryPending(message)}><RotateCw aria-hidden="true" /> Failed — tap to retry</button><button type="button" onClick={() => discardPending(message.id)} aria-label="Discard message"><X aria-hidden="true" /></button></div> : <span className="chat-line-message-status"><Clock aria-hidden="true" /> Sending…</span> : <ReactionBar channelId={activeChannelId} messageId={message.id} reactionCounts={message.reactionCounts} myReactions={message.myReactions} onError={setError} />}
                                 </div>

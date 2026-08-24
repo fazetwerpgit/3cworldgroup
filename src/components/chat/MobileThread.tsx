@@ -131,10 +131,12 @@ interface MobileThreadProps {
 function BubbleImage({
   message,
   isOwn,
+  eager,
   onOpen,
 }: {
   message: ThreadMessage;
   isOwn: boolean;
+  eager: boolean;
   onOpen: () => void;
 }) {
   const previewUrl = message.localPreviewUrl;
@@ -167,9 +169,13 @@ function BubbleImage({
       <img
         src={src}
         alt={message.text || 'Shared image'}
-        loading="lazy"
+        // WebKit can leave a newly appended lazy image unloaded inside this
+        // nested overflow scroller. Eager-load the recent tail only; older
+        // history stays lazy so loading a large message window remains bounded.
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
         style={aspectStyle}
-        className={`chat-line-attachment-image max-h-64 w-full object-cover ${isUploading ? 'opacity-70' : ''}`}
+        className={`chat-line-attachment-image max-h-64 w-full object-contain ${isUploading ? 'opacity-70' : ''}`}
       />
       {isUploading && (
         <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
@@ -675,6 +681,7 @@ export function MobileThread({
                         <BubbleImage
                           message={message}
                           isOwn={isOwn}
+                          eager={index >= messages.length - 12}
                           onOpen={() =>
                             onOpenImage({
                               url: message.attachment?.url ?? message.localPreviewUrl ?? '',
