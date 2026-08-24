@@ -20,9 +20,10 @@ const ITEM_LABELS = {
   direct_deposit: 'Direct Deposit',
   pay_structure: 'Compensation',
   fcra_auth: 'Background Check Authorization (FCRA)',
+  w9: 'W-9',
 };
 if (!name || !ITEM_LABELS[itemId]) {
-  console.error('Usage: node scripts/refresh-esign-link.mjs --name "Full Name" --item <contract|direct_deposit|pay_structure|fcra_auth> [--apply]');
+  console.error('Usage: node scripts/refresh-esign-link.mjs --name "Full Name" --item <contract|direct_deposit|pay_structure|fcra_auth|w9> [--apply]');
   process.exit(1);
 }
 

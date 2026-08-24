@@ -45,7 +45,7 @@ beforeEach(() => {
 describe('POST /api/portal/onboarding/upload', () => {
   it('rejects before reading the multipart body when verification fails', async () => {
     gateMock.mockResolvedValue({ ok: false, error: 'Unauthorized', status: 401 });
-    const request = requestWithForm({ userId: 'attacker', itemId: 'w9' });
+    const request = requestWithForm({ userId: 'attacker', itemId: 'insurance' });
     const formData = vi.spyOn(request, 'formData');
 
     const response = await POST(request);
@@ -57,29 +57,29 @@ describe('POST /api/portal/onboarding/upload', () => {
   it('uses the verified UID for the folder instead of the body userId', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
     validateUploadMock.mockReturnValue({ ok: true, fileBase: 'photo', ext: 'jpg' });
-    buildFolderPathMock.mockReturnValue('onboarding/users/verified-user/w9/');
+    buildFolderPathMock.mockReturnValue('onboarding/users/verified-user/insurance/');
 
-    const response = await POST(requestWithForm({ userId: 'verified-user', itemId: 'w9' }));
+    const response = await POST(requestWithForm({ userId: 'verified-user', itemId: 'insurance' }));
 
     expect(response.status).toBe(200);
     expect(validateUploadMock).toHaveBeenCalledWith({
-      itemId: 'w9',
+      itemId: 'insurance',
       slot: null,
       mime: 'image/jpeg',
       size: 5,
     });
     expect(buildFolderPathMock).toHaveBeenCalledWith(
       { kind: 'user', userId: 'verified-user' },
-      'w9'
+      'insurance'
     );
-    expect(bucketMock.file).toHaveBeenCalledWith('onboarding/users/verified-user/w9/photo.jpg');
+    expect(bucketMock.file).toHaveBeenCalledWith('onboarding/users/verified-user/insurance/photo.jpg');
     expect(saveMock).toHaveBeenCalled();
   });
 
   it('rejects a mismatched body userId without upload or persistence side effects', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
 
-    const response = await POST(requestWithForm({ userId: 'someone-else', itemId: 'w9' }));
+    const response = await POST(requestWithForm({ userId: 'someone-else', itemId: 'insurance' }));
 
     expect(response.status).toBe(400);
     expect(validateUploadMock).not.toHaveBeenCalled();
@@ -91,7 +91,7 @@ describe('POST /api/portal/onboarding/upload', () => {
   it('rejects an upload from a user who is no longer pending, before reading the body', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
     userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'active' }) });
-    const request = requestWithForm({ userId: 'verified-user', itemId: 'w9' });
+    const request = requestWithForm({ userId: 'verified-user', itemId: 'insurance' });
     const formData = vi.spyOn(request, 'formData');
 
     const response = await POST(request);

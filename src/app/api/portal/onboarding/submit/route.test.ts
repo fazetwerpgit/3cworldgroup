@@ -65,7 +65,7 @@ describe('POST /api/portal/onboarding/submit', () => {
       data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'active' }),
     });
 
-    const response = await POST(request({ userId: 'u1', itemId: 'w9', reference: 'onboarding/users/u1/w9/' }));
+    const response = await POST(request({ userId: 'u1', itemId: 'insurance', reference: 'onboarding/users/u1/insurance/' }));
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
@@ -81,7 +81,7 @@ describe('POST /api/portal/onboarding/submit', () => {
       data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'active' }),
     });
 
-    const response = await POST(request({ userId: 'u1', itemId: 'w9', reference: 'onboarding/users/u1/w9/' }));
+    const response = await POST(request({ userId: 'u1', itemId: 'insurance', reference: 'onboarding/users/u1/insurance/' }));
 
     expect(response.status).toBe(403);
     expect(setMock).not.toHaveBeenCalled();

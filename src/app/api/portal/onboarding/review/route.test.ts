@@ -40,6 +40,7 @@ vi.mock('firebase-admin/firestore', () => ({
 }));
 vi.mock('@/types', () => ({
   ONBOARDING_ITEMS: [
+    { id: 'w9', label: 'W-9', category: 'paperwork', sensitive: true, referenceKind: 'esign' },
     { id: 'contract', label: 'Contract', category: 'paperwork', sensitive: false, referenceKind: 'esign' },
     { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', sensitive: false, referenceKind: 'manual' },
   ],
@@ -85,8 +86,8 @@ beforeEach(() => {
 });
 
 describe('POST /api/portal/onboarding/review', () => {
-  it('refuses approval for an e-sign item', async () => {
-    const response = await POST(postRequest('contract', 'approved'));
+  it.each(['w9', 'contract'])('refuses approval for the e-sign item %s', async (itemId) => {
+    const response = await POST(postRequest(itemId, 'approved'));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({

@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { ESIGN_HELPER_TEXT, ESIGN_ITEM_IDS, isEsignItem } from './esign';
 
 describe('ESIGN_ITEM_IDS', () => {
-  it('contains exactly the four esign items', () => {
+  it('contains exactly the five esign items', () => {
     expect(new Set(ESIGN_ITEM_IDS)).toEqual(
-      new Set(['contract', 'direct_deposit', 'pay_structure', 'fcra_auth'])
+      new Set(['contract', 'direct_deposit', 'pay_structure', 'fcra_auth', 'w9'])
     );
   });
 });
@@ -14,10 +14,10 @@ describe('isEsignItem', () => {
     expect(isEsignItem('contract')).toBe(true);
     expect(isEsignItem('direct_deposit')).toBe(true);
     expect(isEsignItem('pay_structure')).toBe(true);
+    expect(isEsignItem('w9')).toBe(true);
   });
 
   it('is false for non-esign items', () => {
-    expect(isEsignItem('w9')).toBe(false);
     expect(isEsignItem('background_check')).toBe(false);
     expect(isEsignItem('onboarding_submission')).toBe(false);
     expect(isEsignItem('llc_sos')).toBe(false);

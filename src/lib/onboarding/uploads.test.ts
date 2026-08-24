@@ -10,14 +10,14 @@ import {
 } from './uploads';
 
 describe('storage item identification', () => {
-  it('lists the four storage items', () => {
+  it('lists the three storage items', () => {
     expect(new Set(STORAGE_ITEM_IDS)).toEqual(
-      new Set(['w9', 'dl_photos', 'llc_sos', 'insurance'])
+      new Set(['dl_photos', 'llc_sos', 'insurance'])
     );
   });
 
   it('recognizes storage vs non-storage items', () => {
-    expect(isStorageItem('w9')).toBe(true);
+    expect(isStorageItem('w9')).toBe(false);
     expect(isStorageItem('background_check')).toBe(false);
     expect(isStorageItem('contract')).toBe(false);
   });
@@ -45,14 +45,16 @@ describe('validateUpload', () => {
     expect(r).toEqual({ ok: true, ext: 'jpg', fileBase: 'front' });
   });
 
-  it('accepts a W-9 PDF with the default file base', () => {
-    const r = validateUpload({ itemId: 'w9', mime: 'application/pdf', size: 500_000 });
+  it('accepts an insurance PDF with the default file base', () => {
+    const r = validateUpload({ itemId: 'insurance', mime: 'application/pdf', size: 500_000 });
     expect(r).toEqual({ ok: true, ext: 'pdf', fileBase: 'file' });
   });
 
   it('rejects a non-storage item', () => {
-    const r = validateUpload({ itemId: 'contract', mime: 'application/pdf', size: 10 });
-    expect(r.ok).toBe(false);
+    expect(validateUpload({ itemId: 'contract', mime: 'application/pdf', size: 10 })).toEqual({
+      ok: false,
+      error: 'This item does not accept file uploads',
+    });
   });
 
   it('rejects a PDF for dl_photos (images only)', () => {
@@ -66,22 +68,22 @@ describe('validateUpload', () => {
   });
 
   it('rejects a slot on a single-file item', () => {
-    const r = validateUpload({ itemId: 'w9', slot: 'front', mime: 'application/pdf', size: 10 });
+    const r = validateUpload({ itemId: 'insurance', slot: 'front', mime: 'application/pdf', size: 10 });
     expect(r.ok).toBe(false);
   });
 
   it('rejects files over 4 MB', () => {
-    const r = validateUpload({ itemId: 'w9', mime: 'application/pdf', size: 4 * 1024 * 1024 + 1 });
+    const r = validateUpload({ itemId: 'insurance', mime: 'application/pdf', size: 4 * 1024 * 1024 + 1 });
     expect(r.ok).toBe(false);
   });
 
   it('accepts a file exactly at the 4 MB boundary', () => {
-    const r = validateUpload({ itemId: 'w9', mime: 'application/pdf', size: MAX_FILE_BYTES });
+    const r = validateUpload({ itemId: 'insurance', mime: 'application/pdf', size: MAX_FILE_BYTES });
     expect(r).toEqual({ ok: true, ext: 'pdf', fileBase: 'file' });
   });
 
   it('rejects a zero-byte file', () => {
-    const r = validateUpload({ itemId: 'w9', mime: 'application/pdf', size: 0 });
+    const r = validateUpload({ itemId: 'insurance', mime: 'application/pdf', size: 0 });
     expect(r.ok).toBe(false);
   });
 
@@ -97,7 +99,7 @@ describe('expectedFileBases', () => {
   });
 
   it('requires a single file for other storage items', () => {
-    expect(expectedFileBases('w9')).toEqual(['file']);
+    expect(expectedFileBases('llc_sos')).toEqual(['file']);
     expect(expectedFileBases('insurance')).toEqual(['file']);
   });
 });
@@ -110,8 +112,8 @@ describe('buildFolderPath', () => {
   });
 
   it('builds an invite-scoped folder', () => {
-    expect(buildFolderPath({ kind: 'invite', inviteId: 'inv1' }, 'w9')).toBe(
-      'onboarding/invite_inv1/w9/'
+    expect(buildFolderPath({ kind: 'invite', inviteId: 'inv1' }, 'insurance')).toBe(
+      'onboarding/invite_inv1/insurance/'
     );
   });
 });

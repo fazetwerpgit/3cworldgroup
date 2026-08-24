@@ -6,7 +6,7 @@ import type { EsignProvider, EsignDocKey, EnvelopeRequest, EnvelopeResult, Esign
 const SIGNWELL_BASE = 'https://www.signwell.com/api/v1';
 export const SIGNER_RECIPIENT_ID = 'signer';
 
-type SignWellFieldType = 'signature' | 'date';
+type SignWellFieldType = 'signature' | 'date' | 'text' | 'checkbox';
 
 interface SignWellField {
   x: number;
@@ -22,11 +22,15 @@ interface SignWellField {
   lock_sign_date?: boolean;
 }
 
+type SignWellFieldSpec = Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
+
 interface SignWellDocumentConfig {
   file: string;
   name: string;
-  signature: Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
-  date: Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
+  signature: SignWellFieldSpec;
+  date: SignWellFieldSpec;
+  // Additional fill-in fields (text/checkbox) keyed by api_id suffix.
+  extra?: Array<SignWellFieldSpec & { key: string; type: 'text' | 'checkbox' }>;
 }
 
 // SignWell field x/y are 96dpi pixels from the page's TOP-LEFT (not PDF points,
@@ -35,21 +39,61 @@ interface SignWellDocumentConfig {
 const DOCUMENTS: Record<EsignDocKey, SignWellDocumentConfig> = {
   contract: {
     file: 'contract.pdf',
-    name: 'Employment Agreement',
-    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
-    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    name: 'Independent Agent Agreement',
+    signature: { x: 184, y: 584, page: 3, required: true, width: 312, height: 34 },
+    date: { x: 534, y: 584, page: 3, required: true, width: 148, height: 34, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    extra: [
+      { key: 'agent_name', type: 'text', x: 168, y: 636, page: 3, required: true, width: 532, height: 30 },
+      { key: 'business_name', type: 'text', x: 184, y: 684, page: 3, required: false, width: 516, height: 30 },
+      { key: 'ein', type: 'text', x: 132, y: 728, page: 3, required: false, width: 564, height: 30 },
+      { key: 'street_address', type: 'text', x: 180, y: 772, page: 3, required: true, width: 520, height: 34 },
+      { key: 'city_state_zip', type: 'text', x: 212, y: 820, page: 3, required: true, width: 488, height: 32 },
+      { key: 'office_phone', type: 'text', x: 168, y: 868, page: 3, required: false, width: 224, height: 32 },
+      { key: 'cell_phone', type: 'text', x: 460, y: 868, page: 3, required: true, width: 236, height: 32 },
+      { key: 'email', type: 'text', x: 180, y: 916, page: 3, required: true, width: 212, height: 32 },
+      { key: 'website', type: 'text', x: 452, y: 916, page: 3, required: false, width: 244, height: 32 },
+    ],
   },
   direct_deposit: {
     file: 'direct_deposit.pdf',
     name: 'Direct Deposit Authorization',
-    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
-    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    signature: { x: 112, y: 576, page: 1, required: true, width: 500, height: 34 },
+    date: { x: 676, y: 576, page: 1, required: true, width: 100, height: 34, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    extra: [
+      { key: 'legal_name', type: 'text', x: 132, y: 536, page: 1, required: true, width: 644, height: 34 },
+      { key: 'bank_name', type: 'text', x: 128, y: 164, page: 2, required: true, width: 644, height: 26 },
+      { key: 'routing_number', type: 'text', x: 124, y: 192, page: 2, required: true, width: 252, height: 26 },
+      { key: 'account_number', type: 'text', x: 468, y: 192, page: 2, required: true, width: 304, height: 26 },
+      { key: 'checking', type: 'checkbox', x: 46, y: 262, page: 2, required: false, width: 16, height: 16 },
+      { key: 'savings', type: 'checkbox', x: 200, y: 262, page: 2, required: false, width: 16, height: 16 },
+      { key: 'deposit_amount', type: 'text', x: 404, y: 258, page: 2, required: false, width: 120, height: 20 },
+      { key: 'full_net_amount', type: 'checkbox', x: 566, y: 262, page: 2, required: false, width: 16, height: 16 },
+    ],
   },
   pay_structure: {
     file: 'pay_structure.pdf',
     name: 'Pay Structure Acknowledgment',
     signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
     date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+  },
+  w9: {
+    file: 'w9.pdf',
+    name: 'Form W-9 (Request for Taxpayer Identification Number)',
+    signature: { x: 200, y: 770, page: 1, required: true, width: 304, height: 32 },
+    date: { x: 552, y: 770, page: 1, required: true, width: 208, height: 32, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    extra: [
+      { key: 'name', type: 'text', x: 98, y: 152, page: 1, required: true, width: 640, height: 18 },
+      { key: 'business_name', type: 'text', x: 98, y: 187, page: 1, required: false, width: 640, height: 18 },
+      { key: 'individual_sole_prop', type: 'checkbox', x: 96, y: 239, page: 1, required: false, width: 14, height: 14 },
+      { key: 'llc', type: 'checkbox', x: 96, y: 258, page: 1, required: false, width: 14, height: 14 },
+      { key: 'llc_classification', type: 'text', x: 512, y: 254, page: 1, required: false, width: 80, height: 16 },
+      { key: 'address', type: 'text', x: 84, y: 383, page: 1, required: true, width: 424, height: 20 },
+      { key: 'city_state_zip', type: 'text', x: 84, y: 417, page: 1, required: true, width: 424, height: 20 },
+      // TIN is one-of SSN/EIN — SignWell can't express either/or, so both are
+      // optional; admin review catches a missing TIN.
+      { key: 'ssn', type: 'text', x: 560, y: 498, page: 1, required: false, width: 200, height: 24 },
+      { key: 'ein', type: 'text', x: 560, y: 562, page: 1, required: false, width: 200, height: 24 },
+    ],
   },
   fcra_auth: {
     file: 'fcra_auth.pdf',
@@ -85,6 +129,11 @@ function fieldsFor(docKey: EsignDocKey, config: SignWellDocumentConfig): SignWel
         recipient_id: SIGNER_RECIPIENT_ID,
         api_id: `${docKey}_date`,
       },
+      ...(config.extra ?? []).map(({ key, ...spec }) => ({
+        ...spec,
+        recipient_id: SIGNER_RECIPIENT_ID,
+        api_id: `${docKey}_${key}`,
+      })),
     ],
   ];
 }

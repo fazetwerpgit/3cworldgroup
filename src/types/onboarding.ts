@@ -48,7 +48,7 @@ export function requiresHeavyVetting(fieldRole: FieldRole): boolean {
 // Onboarding checklist definitions
 export const ONBOARDING_ITEMS: OnboardingItem[] = [
   // Base items - all field roles
-  { id: 'w9', label: 'W-9', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 1 },
+  { id: 'w9', label: 'W-9', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', order: 1 },
   { id: 'fcra_auth', label: 'Background Check Authorization (FCRA)', category: 'credential', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: false, referenceKind: 'esign', order: 2 },
   // Background / drug screen carries DL# + SSN through the vendor - stored as a
   // vendor reference only, never the raw numbers.

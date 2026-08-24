@@ -48,26 +48,39 @@ describe('signwellProvider.createEnvelope', () => {
     expect(body.files[0].file_base64).toEqual(expect.stringMatching(/^JVBER/));
     expect(body.recipients).toEqual([{ id: 'signer', name: 'Sam Rep', email: 'sam@x.com' }]);
     expect(body.fields).toHaveLength(1);
-    expect(body.fields[0]).toEqual([
+    expect(body.fields[0][0]).toEqual(
       expect.objectContaining({
-        x: 187,
-        y: 827,
-        page: 1,
+        x: 184,
+        y: 584,
+        page: 3,
         type: 'signature',
         required: true,
         recipient_id: 'signer',
         api_id: 'contract_signature',
-      }),
+      })
+    );
+    expect(body.fields[0][1]).toEqual(
       expect.objectContaining({
-        x: 573,
-        y: 841,
-        page: 1,
+        x: 534,
+        y: 584,
+        page: 3,
         type: 'date',
         required: true,
         recipient_id: 'signer',
         api_id: 'contract_date',
-      }),
-    ]);
+      })
+    );
+    // Fill-in fields on the real contract's signature page follow sig/date.
+    expect(body.fields[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'text', api_id: 'contract_agent_name', required: true, page: 3 }),
+        expect.objectContaining({ type: 'text', api_id: 'contract_email', required: true, page: 3 }),
+      ])
+    );
+    for (const field of body.fields[0]) {
+      expect(field.recipient_id).toBe('signer');
+      expect((field as { key?: unknown }).key).toBeUndefined();
+    }
     expect((init.headers as Record<string, string>)['X-Api-Key']).toBe('sw_key');
   });
 

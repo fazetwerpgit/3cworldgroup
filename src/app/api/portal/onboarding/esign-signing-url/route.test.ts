@@ -78,7 +78,7 @@ describe('POST /api/portal/onboarding/esign-signing-url', () => {
   it('returns 400 for a non-esign itemId', async () => {
     requireVerifiedUserMock.mockResolvedValue(VERIFIED);
 
-    const res = await POST(req({ itemId: 'w9' }));
+    const res = await POST(req({ itemId: 'insurance' }));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'unknown item' });

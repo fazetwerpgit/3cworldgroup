@@ -8,9 +8,9 @@ import {
 import { INVITABLE_FIELD_ROLES, LIGHT_VETTING_ROLES } from './auth';
 
 describe('checklist role filtering', () => {
-  it('includes fcra_auth as a 4th esign item for base roles', () => {
+  it('includes w9 as the 5th esign item for base roles', () => {
     const esign = ONBOARDING_ITEMS.filter((i) => i.referenceKind === 'esign').map((i) => i.id);
-    expect(esign.sort()).toEqual(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure']);
+    expect(esign.sort()).toEqual(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure', 'w9']);
     const entryLevelRep = getOnboardingItemsForUser('entry_level_rep', false).map((i) => i.id);
     expect(entryLevelRep).toContain('fcra_auth');
     expect(entryLevelRep).toContain('background_check');

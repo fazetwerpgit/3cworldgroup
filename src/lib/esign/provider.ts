@@ -1,6 +1,6 @@
 import { signwellProvider } from './signwell';
 
-export type EsignDocKey = 'contract' | 'direct_deposit' | 'pay_structure' | 'fcra_auth';
+export type EsignDocKey = 'contract' | 'direct_deposit' | 'pay_structure' | 'fcra_auth' | 'w9';
 
 export interface EnvelopeRequest {
   docKey: EsignDocKey;
