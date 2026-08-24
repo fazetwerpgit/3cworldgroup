@@ -7,52 +7,37 @@ Updated: 2026-08-24 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-NEXT (2026-08-24, handoff after /clear): THREE UI FIXES Jacob asked
-for (investigation done — implement, verify, deploy). Recommended:
-spec all three to Codex in one run, review diff, gates, deploy.
+NEXT: nothing queued — ask Jacob what's next. Waiting on him:
+(a) EYEBALL the three shipped UI fixes (below) on his phone/desktop —
+    no logged-in browser verify possible (temp prod admin is
+    classifier-blocked); (b) pay_structure.pdf + fcra_auth.pdf still
+    PLACEHOLDERS — he hasn't sent the docs; (c) webhook log grab when
+    Mason signs direct_deposit (see STILL OPEN).
 
-(1) /portal/admin/onboarding — REMOVE THE CATEGORY FILTER pills.
-    src/app/portal/admin/onboarding/page.tsx: categoryFilter state
-    (~line 80), pill row aria-label="Category filter" (~line 220),
-    and its uses in filtered/filteredEsignPending/filteredCompleted
-    useMemos. Keep the PERSON filter and the AT-RISK ONLY toggle
-    (Jacob said "all we need is all people" — interpreted as: only
-    the person row stays; if he objects to at-risk staying, drop it).
+NEW STANDING RULE (Jacob, 2026-08-24): NO solo single-agent runs —
+split independent work across MULTIPLE PARALLEL `codex exec`
+background runs on gpt-5.6-luna or gpt-5.6-sol (sol = codex config
+default). Fable is the orchestrator AND the reviewer — review diffs
+in the main loop, do NOT spawn Opus/Sonnet reviewer agents. Only
+same-file work rides in one agent. (Memory updated.)
 
-(2) RETIRED ROLES STILL SHOW ON THE PHONE — root cause found: the
-    rep-facing pay-structure page (src/components/resources/
-    ResourcesLine.tsx, tiers.map ~line 384) renders tiers from
-    GET /api/portal/commission, which re-keys stored config against
-    DEFAULT_COMMISSION (src/types/commission.ts lines 11-24) — that
-    list still contains retired tiers l1_manager, l2_manager,
-    ibo_level_1..4. FIX: filter retired tiers out of the API
-    response EXCEPT when the tier is the caller's own fieldRole
-    (legacy reps mid-checklist must still see their own tier —
-    see ONBOARDING_FIELD_ROLES comment in src/types/auth.ts
-    ~211-222). Define a RETIRED_FIELD_ROLES const in types/auth.ts
-    (['l1_manager','l2_manager','ibo_level_1'..'ibo_level_4'];
-    entry_rep is NOT retired). Admin/owner all-tier scope also drops
-    retired. Keep data/config intact (IBO stays in data + admin per
-    standing rule; this is display filtering only). TIER_NOTES map
-    in ResourcesLine.tsx stays (safe superset).
-
-(3) ONBOARDING PAGE DENSITY — same rep repeats per row ("Mason 3
-    times a section"). Group rows BY REP within each of the three
-    sections (queue, awaiting-signature, completed): one rep header
-    (avatar + name + item count) per rep, then that rep's item rows
-    beneath WITHOUT repeating avatar/name (item label + meta +
-    actions only). Reuse ops-line-* classes; introduce minimal new
-    CSS in globals.css only if unavoidable, matching the ops-line
-    look. Queue rows keep their expand/approve/reject behavior.
-
-Gates: npx tsc --noEmit, npx vitest run, npm run build. Deploy:
-commit on onboarding/completion, push, ff master via
-`git -C ~/dev/3cwg-payplan merge --ff-only onboarding/completion`
-(master is checked out in that worktree), push master, then
-`npx vercel --prod` from the main repo. Verify with
-`npx vercel ls 3cworldgroup --prod`.
-NOTE: creating temp admin users in prod Firebase is classifier-
-blocked — skip logged-in browser verification, have Jacob eyeball.
+SHIPPED 2026-08-24 (commit a295c21, deployed 3cworldgroup-79u83b9gm
+Ready Production, www.3cworldgroup.com 200; gates tsc/796 tests/build
+green): the THREE UI FIXES —
+(1) /portal/admin/onboarding category filter pills removed (person
+    filter + at-risk toggle stay);
+(2) retired tiers (l1/l2_manager, ibo_level_1..4) hidden from
+    GET /api/portal/commission scope 'all'; a legacy rep still gets
+    their own retired tier (scope 'own' untouched). New
+    RETIRED_FIELD_ROLES in src/types/auth.ts; display-only, config +
+    PUT untouched; route test added
+    (src/app/api/portal/commission/route.test.ts);
+(3) onboarding admin rows grouped by rep in all three sections (rep
+    header avatar+name+count, item rows beneath keep expand/approve/
+    reject + signed-PDF links; FIFO preserved; .ops-line-rep-header
+    CSS in globals.css).
+Master fast-forwarded to a295c21 via payplan worktree; branch +
+master pushed to GitHub (GitHub in sync with prod).
 
 PREVIOUS (2026-08-24): E-SIGN DOC SWAP — contract + direct_deposit DONE
 (real PDFs captured from Jacob's Adobe Sign widgets, installed in
