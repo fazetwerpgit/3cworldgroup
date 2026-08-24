@@ -12,7 +12,37 @@ const ALERT_KIND = 'esign_mismatch' as const;
 export async function POST(request: Request) {
   const raw = await request.text();
   const event = await getEsignProvider().parseWebhook(raw, request.headers);
-  if (!event) return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
+  // Delivery evidence for every provider POST — SignWell's document_completed
+  // events have gone missing in production before (Mason, 2026-08-24) and this
+  // route is the only place that can say whether they arrived, verified, and
+  // matched. Never log the hash or body: type/time/envelope id only.
+  if (!event) {
+    let type: unknown, time: unknown, envelopeId: unknown;
+    try {
+      const p = JSON.parse(raw) as {
+        event?: { type?: unknown; time?: unknown };
+        data?: { object?: { id?: unknown } };
+      };
+      type = p.event?.type;
+      time = p.event?.time;
+      envelopeId = p.data?.object?.id;
+    } catch {
+      // unparseable body — lengths below still tell us something arrived
+    }
+    console.error('[esign webhook] REJECTED (signature verification failed)', {
+      type: type ?? null,
+      time: time ?? null,
+      envelopeId: envelopeId ?? null,
+      bodyLength: raw.length,
+    });
+    return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
+  }
+  console.log('[esign webhook] verified event', {
+    type: event.status,
+    envelopeId: event.envelopeId,
+    userId: event.metadata.userId ?? null,
+    itemId: event.metadata.itemId ?? null,
+  });
   if (event.status !== 'completed') return NextResponse.json({ ok: true });
 
   if (!adminDb) {
