@@ -114,29 +114,39 @@ if (!apply) {
   process.exit(0);
 }
 
-// 4. Persist (same shape as src/lib/esign/autoSend.ts persistSigningUrl).
-await db.doc(`esignSigningUrls/${uid}_${itemId}`).set(
-  { userId: uid, itemId, envelopeId, url, updatedAt: new Date() },
-  { merge: true }
-);
-console.log('Stored fresh signing URL.');
-
-// 5. Nudge: in-app bell (same shape as createNotification) + email via Postmark.
+// --email-only: retry just the email leg (e.g. after a From-address failure)
+// without re-writing the URL or duplicating the bell notification.
+const emailOnly = process.argv.includes('--email-only');
 const label = ITEM_LABELS[itemId];
 const title = 'Your document is ready to sign';
 const message = `Your ${label} document is ready — open Onboarding and tap Sign now.`;
-await db.collection('notifications').add({
-  userId: uid,
-  type: 'system',
-  title,
-  message,
-  link: '/portal/onboarding',
-  read: false,
-  createdAt: new Date(),
-});
-console.log('In-app notification created.');
 
-const from = process.env.ONBOARDING_EMAIL_FROM || process.env.EMAIL_FROM;
+if (!emailOnly) {
+  // 4. Persist (same shape as src/lib/esign/autoSend.ts persistSigningUrl).
+  await db.doc(`esignSigningUrls/${uid}_${itemId}`).set(
+    { userId: uid, itemId, envelopeId, url, updatedAt: new Date() },
+    { merge: true }
+  );
+  console.log('Stored fresh signing URL.');
+
+  // 5. Nudge: in-app bell (same shape as createNotification) + email via Postmark.
+  await db.collection('notifications').add({
+    userId: uid,
+    type: 'system',
+    title,
+    message,
+    link: '/portal/onboarding',
+    read: false,
+    createdAt: new Date(),
+  });
+  console.log('In-app notification created.');
+}
+
+// Vercel marks some env vars Sensitive; `vercel env pull` writes those as a
+// literal "[SENSITIVE]" placeholder — only trust a From that looks like email.
+const from = [process.env.ONBOARDING_EMAIL_FROM, process.env.EMAIL_FROM].find(
+  (v) => v && v.includes('@')
+);
 if (email && from && process.env.POSTMARK_SERVER_TOKEN) {
   const mail = await fetch('https://api.postmarkapp.com/email', {
     method: 'POST',
