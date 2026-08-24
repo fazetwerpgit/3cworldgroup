@@ -8,6 +8,7 @@ import {
   CommissionConfig,
   DEFAULT_COMMISSION,
   FieldRole,
+  RETIRED_FIELD_ROLES,
   resolveRoles,
 } from '@/types';
 
@@ -73,7 +74,12 @@ export async function GET(request: NextRequest) {
 
     // Platform users see the full structure (they administer it)
     if (role) {
-      return NextResponse.json({ tiers, scope: 'all', updatedAt, updatedByName });
+      return NextResponse.json({
+        tiers: tiers.filter((tier) => !RETIRED_FIELD_ROLES.includes(tier.fieldRole)),
+        scope: 'all',
+        updatedAt,
+        updatedByName,
+      });
     }
 
     if (!fieldRole) {

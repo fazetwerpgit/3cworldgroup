@@ -10920,6 +10920,19 @@ body.portal-scope {
   margin-top: 18px;
 }
 
+.ops-line-rep-header {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ops-line-line);
+  background: color-mix(in srgb, var(--ops-line-bg) 28%, transparent);
+}
+
+.ops-line-rep-header .ops-line-person {
+  flex: 1;
+}
+
 .ops-line-at-risk {
   border: 1px solid color-mix(in srgb, var(--ops-line-red) 60%, transparent);
   background: transparent;

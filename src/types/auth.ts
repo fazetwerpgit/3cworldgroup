@@ -225,6 +225,16 @@ export const ONBOARDING_FIELD_ROLES: readonly FieldRole[] = [
   'ibo_level_4',
 ];
 
+// Retired tiers stay in data/config for legacy reps but are hidden from pay-structure display.
+export const RETIRED_FIELD_ROLES: readonly FieldRole[] = [
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+];
+
 export function roleRequiresOnboarding(fieldRole?: FieldRole): boolean {
   if (!fieldRole) return false;
   return ONBOARDING_FIELD_ROLES.includes(fieldRole);

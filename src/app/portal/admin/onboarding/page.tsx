@@ -40,6 +40,13 @@ interface Submission {
   hasSignedPdf: boolean;
 }
 
+interface SubmissionGroup {
+  userId: string;
+  userName: string;
+  items: Submission[];
+  atRisk: boolean;
+}
+
 /** Display-only fallback for submissions missing a resolved userName — never touches
     the write path. The API falls back to the uid itself when no displayName exists,
     so "name equals uid" also counts as unnamed. */
@@ -53,6 +60,25 @@ function repLabel(userName: string, userId: string): string {
 
 function repKey(userName: string, userId: string): string {
   return hasRealName(userName, userId) ? userName : userId;
+}
+
+function groupSubmissions(items: Submission[]): SubmissionGroup[] {
+  const groups = new Map<string, SubmissionGroup>();
+  items.forEach((submission) => {
+    const existing = groups.get(submission.userId);
+    if (existing) {
+      existing.items.push(submission);
+      existing.atRisk ||= submission.atRisk;
+      return;
+    }
+    groups.set(submission.userId, {
+      userId: submission.userId,
+      userName: submission.userName,
+      items: [submission],
+      atRisk: submission.atRisk,
+    });
+  });
+  return Array.from(groups.values());
 }
 
 function waitLabel(submittedAt: string | null): string {
@@ -77,7 +103,6 @@ export default function OnboardingReviewPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState<OnboardingCategory | 'all'>('all');
   const [atRiskOnly, setAtRiskOnly] = useState(false);
 
   const fetchQueue = useCallback(async () => {
@@ -143,40 +168,32 @@ export default function OnboardingReviewPage() {
     });
     return Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
   }, [submissions, esignPending, completed]);
-  const categories = useMemo(
-    () => Array.from(new Set([...submissions, ...esignPending, ...completed].map((s) => s.category))),
-    [submissions, esignPending, completed]
-  );
-
   const filtered = useMemo(
     () =>
       submissions.filter(
         (s) =>
           (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
-          (categoryFilter === 'all' || s.category === categoryFilter) &&
           (!atRiskOnly || s.atRisk)
       ),
-    [submissions, personFilter, categoryFilter, atRiskOnly]
+    [submissions, personFilter, atRiskOnly]
   );
   const filteredEsignPending = useMemo(
     () =>
       esignPending.filter(
         (s) =>
           (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
-          (categoryFilter === 'all' || s.category === categoryFilter) &&
           (!atRiskOnly || s.atRisk)
       ),
-    [esignPending, personFilter, categoryFilter, atRiskOnly]
+    [esignPending, personFilter, atRiskOnly]
   );
   const filteredCompleted = useMemo(
     () =>
       completed.filter(
         (s) =>
           (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
-          (categoryFilter === 'all' || s.category === categoryFilter) &&
           (!atRiskOnly || s.atRisk)
       ),
-    [completed, personFilter, categoryFilter, atRiskOnly]
+    [completed, personFilter, atRiskOnly]
   );
 
   return (
@@ -216,22 +233,6 @@ export default function OnboardingReviewPage() {
                 </button>
               ))}
             </div>
-            <span className="ops-line-kicker">Category</span>
-            <div className="ops-line-pill-row" role="group" aria-label="Category filter">
-              <button type="button" aria-pressed={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')}>
-                All
-              </button>
-              {categories.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  aria-pressed={categoryFilter === c}
-                  onClick={() => setCategoryFilter(c)}
-                >
-                  {OnboardingCategoryLabels[c] ?? c}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
               className="ops-line-at-risk"
@@ -259,31 +260,39 @@ export default function OnboardingReviewPage() {
             </div>
           ) : (
             <div className="ops-line-list">
-              {filtered.map((submission) => {
-                const expanded = expandedId === submission.id;
-                return (
-                  <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
+              {groupSubmissions(filtered).map((group) => (
+                <div key={group.userId} className="ops-line-rep-group">
+                  <div className="ops-line-rep-header">
+                    <span className="ops-line-person ops-line-cell">
+                      <span className="ops-line-avatar">
+                        {repLabel(group.userName, group.userId).charAt(0).toUpperCase()}
+                      </span>
+                      <span>
+                        <strong>
+                          {repLabel(group.userName, group.userId)}
+                          {group.atRisk && ' · AT RISK'}
+                        </strong>
+                        <small>{group.items.length} item{group.items.length === 1 ? '' : 's'}</small>
+                      </span>
+                    </span>
+                  </div>
+                  {group.items.map((submission) => {
+                    const expanded = expandedId === submission.id;
+                    return (
+                      <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
                     <button
                       type="button"
                       className="ops-line-row-main onboard"
                       onClick={() => setExpandedId(expanded ? null : submission.id)}
                       aria-expanded={expanded}
                     >
-                      <span className="ops-line-person ops-line-cell">
-                        <span className="ops-line-avatar">
-                          {repLabel(submission.userName, submission.userId).charAt(0).toUpperCase()}
-                        </span>
-                        <span>
-                          <strong>
-                            {repLabel(submission.userName, submission.userId)}
-                            {submission.atRisk && ' · AT RISK'}
-                          </strong>
-                          <small>{submission.itemLabel}</small>
-                        </span>
+                      <span className="ops-line-cell">
+                        <strong>{submission.itemLabel}</strong>
+                        <small>{OnboardingCategoryLabels[submission.category] ?? submission.category}</small>
                       </span>
                       <span className="ops-line-cell">
-                        <strong>{OnboardingCategoryLabels[submission.category] ?? submission.category}</strong>
-                        <small>{waitLabel(submission.submittedAt)} waiting</small>
+                        <strong>{waitLabel(submission.submittedAt)} waiting</strong>
+                        <small>FIFO position</small>
                       </span>
                       <span className="ops-line-cell">
                         <strong className="ops-line-sensitive">
@@ -366,9 +375,11 @@ export default function OnboardingReviewPage() {
                         </div>
                       </div>
                     )}
-                  </article>
-                );
-              })}
+                      </article>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
 
@@ -390,31 +401,39 @@ export default function OnboardingReviewPage() {
                 </div>
               </div>
               <div className="ops-line-list">
-                {filteredEsignPending.map((submission) => {
-                  const expanded = expandedId === submission.id;
-                  return (
-                    <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
+                {groupSubmissions(filteredEsignPending).map((group) => (
+                  <div key={group.userId} className="ops-line-rep-group">
+                    <div className="ops-line-rep-header">
+                      <span className="ops-line-person ops-line-cell">
+                        <span className="ops-line-avatar">
+                          {repLabel(group.userName, group.userId).charAt(0).toUpperCase()}
+                        </span>
+                        <span>
+                          <strong>
+                            {repLabel(group.userName, group.userId)}
+                            {group.atRisk && ' · AT RISK'}
+                          </strong>
+                          <small>{group.items.length} item{group.items.length === 1 ? '' : 's'}</small>
+                        </span>
+                      </span>
+                    </div>
+                    {group.items.map((submission) => {
+                      const expanded = expandedId === submission.id;
+                      return (
+                        <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
                       <button
                         type="button"
                         className="ops-line-row-main onboard"
                         onClick={() => setExpandedId(expanded ? null : submission.id)}
                         aria-expanded={expanded}
                       >
-                        <span className="ops-line-person ops-line-cell">
-                          <span className="ops-line-avatar">
-                            {repLabel(submission.userName, submission.userId).charAt(0).toUpperCase()}
-                          </span>
-                          <span>
-                            <strong>
-                              {repLabel(submission.userName, submission.userId)}
-                              {submission.atRisk && ' · AT RISK'}
-                            </strong>
-                            <small>{submission.itemLabel}</small>
-                          </span>
+                        <span className="ops-line-cell">
+                          <strong>{submission.itemLabel}</strong>
+                          <small>{OnboardingCategoryLabels[submission.category] ?? submission.category}</small>
                         </span>
                         <span className="ops-line-cell">
-                          <strong>{OnboardingCategoryLabels[submission.category] ?? submission.category}</strong>
-                          <small>{waitLabel(submission.submittedAt)} out</small>
+                          <strong>{waitLabel(submission.submittedAt)} out</strong>
+                          <small>waiting time</small>
                         </span>
                         <span className="ops-line-cell">
                           <strong className="ops-line-sensitive">
@@ -464,9 +483,11 @@ export default function OnboardingReviewPage() {
                           </div>
                         </div>
                       )}
-                    </article>
-                  );
-                })}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -492,48 +513,58 @@ export default function OnboardingReviewPage() {
                 <p className="ops-line-intro">Nothing completed yet.</p>
               ) : (
                 <div className="ops-line-list">
-                  {filteredCompleted.map((submission) => (
-                    <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
-                      <div className="ops-line-row-main onboard">
+                  {groupSubmissions(filteredCompleted).map((group) => (
+                    <div key={group.userId} className="ops-line-rep-group">
+                      <div className="ops-line-rep-header">
                         <span className="ops-line-person ops-line-cell">
                           <span className="ops-line-avatar">
-                            {repLabel(submission.userName, submission.userId).charAt(0).toUpperCase()}
+                            {repLabel(group.userName, group.userId).charAt(0).toUpperCase()}
                           </span>
                           <span>
                             <strong>
-                              {repLabel(submission.userName, submission.userId)}
-                              {submission.atRisk && ' · AT RISK'}
+                              {repLabel(group.userName, group.userId)}
+                              {group.atRisk && ' · AT RISK'}
                             </strong>
-                            <small>{submission.itemLabel}</small>
+                            <small>{group.items.length} item{group.items.length === 1 ? '' : 's'}</small>
                           </span>
                         </span>
-                        <span className="ops-line-cell">
-                          <strong>{OnboardingCategoryLabels[submission.category] ?? submission.category}</strong>
-                          <small>Reviewed {formatDate(submission.reviewedAt)}</small>
-                        </span>
-                        <span className="ops-line-cell">
-                          <strong>{submission.reviewerName || '—'}</strong>
-                          <small>reviewer</small>
-                        </span>
-                        <span className="ops-line-evidence-group">
-                          {submission.hasSignedPdf ? (
-                            <a
-                              className="ops-line-file-chip"
-                              href={`/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(submission.userId)}&itemId=${encodeURIComponent(submission.itemId)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Signed PDF
-                            </a>
-                          ) : (
-                            <span className="ops-line-file-chip">no PDF</span>
-                          )}
-                        </span>
-                        <span className={`ops-line-status-chip ${submission.status === 'approved' ? 'tone-lime' : 'tone-red'}`}>
-                          {submission.status === 'approved' ? 'Approved' : 'Rejected'}
-                        </span>
                       </div>
-                    </article>
+                      {group.items.map((submission) => (
+                        <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
+                          <div className="ops-line-row-main onboard">
+                            <span className="ops-line-cell">
+                              <strong>{submission.itemLabel}</strong>
+                              <small>{OnboardingCategoryLabels[submission.category] ?? submission.category}</small>
+                            </span>
+                            <span className="ops-line-cell">
+                              <strong>Reviewed {formatDate(submission.reviewedAt)}</strong>
+                              <small>review history</small>
+                            </span>
+                            <span className="ops-line-cell">
+                              <strong>{submission.reviewerName || '—'}</strong>
+                              <small>reviewer</small>
+                            </span>
+                            <span className="ops-line-evidence-group">
+                              {submission.hasSignedPdf ? (
+                                <a
+                                  className="ops-line-file-chip"
+                                  href={`/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(submission.userId)}&itemId=${encodeURIComponent(submission.itemId)}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Signed PDF
+                                </a>
+                              ) : (
+                                <span className="ops-line-file-chip">no PDF</span>
+                              )}
+                            </span>
+                            <span className={`ops-line-status-chip ${submission.status === 'approved' ? 'tone-lime' : 'tone-red'}`}>
+                              {submission.status === 'approved' ? 'Approved' : 'Rejected'}
+                            </span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
                   ))}
                 </div>
               )}
