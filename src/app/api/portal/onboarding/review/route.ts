@@ -63,11 +63,20 @@ export async function GET(request: NextRequest) {
       .collection('userOnboarding')
       .where('status', '==', 'submitted')
       .get();
+    const completedSnapshot = await adminDb
+      .collection('userOnboarding')
+      .where('status', 'in', ['approved', 'rejected'])
+      .get();
     const reviewableDocs = snapshot.docs.filter((doc) => !isEsignItem(doc.data().itemId));
     const esignDocs = snapshot.docs.filter((doc) => isEsignItem(doc.data().itemId));
 
     // Collect unique user ids to join display names in one batch
-    const userIds = [...new Set(snapshot.docs.map((d) => d.data().userId as string))];
+    const userIds = [
+      ...new Set([
+        ...snapshot.docs.map((d) => d.data().userId as string),
+        ...completedSnapshot.docs.map((d) => d.data().userId as string),
+      ]),
+    ];
     const userMap = new Map<string, { displayName?: string; email?: string; atRisk: boolean }>();
     if (userIds.length > 0) {
       const userDocs = await adminDb.getAll(
@@ -94,6 +103,7 @@ export async function GET(request: NextRequest) {
         id: doc.id,
         userId: data.userId,
         itemId: data.itemId,
+        label: item?.label ?? data.itemId,
         itemLabel: item?.label ?? data.itemId,
         category: item?.category ?? 'paperwork',
         sensitive: item?.sensitive ?? false,
@@ -103,12 +113,18 @@ export async function GET(request: NextRequest) {
         userName: user?.displayName ?? user?.email ?? data.userId,
         userEmail: user?.email ?? '',
         atRisk: !!user?.atRisk,
+        status: data.status ?? null,
         submittedAt: data.submittedAt?.toDate() ?? null,
+        reviewedAt: data.reviewedAt?.toDate() ?? null,
+        reviewerName: data.reviewerName ?? null,
+        hasSignedPdf:
+          item?.referenceKind === 'esign' && Boolean(data.completedPdfPath || data.esignEnvelopeId),
       };
     };
 
     const submissions = await Promise.all(reviewableDocs.map(toSubmission));
     const esignPending = await Promise.all(esignDocs.map(toSubmission));
+    const completed = await Promise.all(completedSnapshot.docs.map(toSubmission));
 
     const sortOldestFirst = (a: typeof submissions[number], b: typeof submissions[number]) => {
       const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
@@ -117,8 +133,13 @@ export async function GET(request: NextRequest) {
     };
     submissions.sort(sortOldestFirst);
     esignPending.sort(sortOldestFirst);
+    completed.sort((a, b) => {
+      const ta = a.reviewedAt ? new Date(a.reviewedAt).getTime() : 0;
+      const tb = b.reviewedAt ? new Date(b.reviewedAt).getTime() : 0;
+      return tb - ta; // newest reviewed first
+    });
 
-    return NextResponse.json({ submissions, esignPending });
+    return NextResponse.json({ submissions, esignPending, completed });
   } catch (error) {
     console.error('Error fetching review queue:', error);
     return NextResponse.json(

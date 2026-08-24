@@ -254,6 +254,9 @@ const ALLOWED_SUBPATHS = [
   '/api/portal/onboarding/upload',
   // onboarding/review has requireVerifiedManagement on GET and POST.
   '/api/portal/onboarding/review',
+  // onboarding/signed-pdf has requireVerifiedManagement before reading the
+  // completed document or storage object.
+  '/api/portal/onboarding/signed-pdf',
   // onboarding/activate has requireVerifiedManagement before activation.
   '/api/portal/onboarding/activate',
   // onboarding/esign-embed-error has requireVerifiedUser and only raises a

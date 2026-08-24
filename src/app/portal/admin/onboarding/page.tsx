@@ -33,6 +33,11 @@ interface Submission {
   userEmail: string;
   atRisk: boolean;
   submittedAt: string | null;
+  label: string;
+  status: 'submitted' | 'approved' | 'rejected' | null;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  hasSignedPdf: boolean;
 }
 
 /** Display-only fallback for submissions missing a resolved userName — never touches
@@ -64,6 +69,7 @@ export default function OnboardingReviewPage() {
   const { user } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [esignPending, setEsignPending] = useState<Submission[]>([]);
+  const [completed, setCompleted] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -84,6 +90,7 @@ export default function OnboardingReviewPage() {
       if (!response.ok) throw new Error(json.error || 'Failed to load review queue');
       setSubmissions(Array.isArray(json.submissions) ? json.submissions : []);
       setEsignPending(Array.isArray(json.esignPending) ? json.esignPending : []);
+      setCompleted(Array.isArray(json.completed) ? json.completed : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load review queue');
     } finally {
@@ -130,15 +137,15 @@ export default function OnboardingReviewPage() {
 
   const people = useMemo(() => {
     const seen = new Map<string, string>();
-    [...submissions, ...esignPending].forEach((s) => {
+    [...submissions, ...esignPending, ...completed].forEach((s) => {
       const key = repKey(s.userName, s.userId);
       if (!seen.has(key)) seen.set(key, repLabel(s.userName, s.userId));
     });
     return Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
-  }, [submissions, esignPending]);
+  }, [submissions, esignPending, completed]);
   const categories = useMemo(
-    () => Array.from(new Set([...submissions, ...esignPending].map((s) => s.category))),
-    [submissions, esignPending]
+    () => Array.from(new Set([...submissions, ...esignPending, ...completed].map((s) => s.category))),
+    [submissions, esignPending, completed]
   );
 
   const filtered = useMemo(
@@ -160,6 +167,16 @@ export default function OnboardingReviewPage() {
           (!atRiskOnly || s.atRisk)
       ),
     [esignPending, personFilter, categoryFilter, atRiskOnly]
+  );
+  const filteredCompleted = useMemo(
+    () =>
+      completed.filter(
+        (s) =>
+          (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
+          (categoryFilter === 'all' || s.category === categoryFilter) &&
+          (!atRiskOnly || s.atRisk)
+      ),
+    [completed, personFilter, categoryFilter, atRiskOnly]
   );
 
   return (
@@ -451,6 +468,75 @@ export default function OnboardingReviewPage() {
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {!loading && (
+            <section style={{ marginTop: 28 }} aria-labelledby="completed-heading">
+              <div className="ops-line-hero ops-line-hero-subsection" style={{ marginBottom: 12 }}>
+                <div>
+                  <p className="ops-line-kicker">Review history</p>
+                  <h2 id="completed-heading" style={{ fontSize: 24, fontWeight: 900 }}>
+                    Completed
+                  </h2>
+                  <p className="ops-line-intro">
+                    Approved and rejected onboarding items, newest review first.
+                  </p>
+                </div>
+                <div className="ops-line-hero-count">
+                  <strong className="ops-line-display portal-metallic-num">{filteredCompleted.length}</strong>
+                  <small>completed</small>
+                </div>
+              </div>
+              {filteredCompleted.length === 0 ? (
+                <p className="ops-line-intro">Nothing completed yet.</p>
+              ) : (
+                <div className="ops-line-list">
+                  {filteredCompleted.map((submission) => (
+                    <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
+                      <div className="ops-line-row-main onboard">
+                        <span className="ops-line-person ops-line-cell">
+                          <span className="ops-line-avatar">
+                            {repLabel(submission.userName, submission.userId).charAt(0).toUpperCase()}
+                          </span>
+                          <span>
+                            <strong>
+                              {repLabel(submission.userName, submission.userId)}
+                              {submission.atRisk && ' · AT RISK'}
+                            </strong>
+                            <small>{submission.itemLabel}</small>
+                          </span>
+                        </span>
+                        <span className="ops-line-cell">
+                          <strong>{OnboardingCategoryLabels[submission.category] ?? submission.category}</strong>
+                          <small>Reviewed {formatDate(submission.reviewedAt)}</small>
+                        </span>
+                        <span className="ops-line-cell">
+                          <strong>{submission.reviewerName || '—'}</strong>
+                          <small>reviewer</small>
+                        </span>
+                        <span className="ops-line-evidence-group">
+                          {submission.hasSignedPdf ? (
+                            <a
+                              className="ops-line-file-chip"
+                              href={`/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(submission.userId)}&itemId=${encodeURIComponent(submission.itemId)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Signed PDF
+                            </a>
+                          ) : (
+                            <span className="ops-line-file-chip">no PDF</span>
+                          )}
+                        </span>
+                        <span className={`ops-line-status-chip ${submission.status === 'approved' ? 'tone-lime' : 'tone-red'}`}>
+                          {submission.status === 'approved' ? 'Approved' : 'Rejected'}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

@@ -151,7 +151,7 @@ describe('POST /api/portal/onboarding/review', () => {
 
 describe('GET /api/portal/onboarding/review', () => {
   it('excludes submitted e-sign items while retaining submitted non-e-sign items', async () => {
-    queryGetMock.mockResolvedValue({
+    queryGetMock.mockResolvedValueOnce({
       docs: [
         {
           id: 'user-1_contract',
@@ -163,11 +163,11 @@ describe('GET /api/portal/onboarding/review', () => {
         },
       ],
     });
+    queryGetMock.mockResolvedValueOnce({ docs: [] });
     getAllMock
       .mockResolvedValueOnce([
         { exists: true, id: 'user-2', data: () => ({ displayName: 'Rep', email: 'rep@example.com' }), get: () => false },
-      ])
-      .mockResolvedValueOnce([]);
+      ]);
 
     const response = await GET(new NextRequest('http://localhost/api/portal/onboarding/review'));
 
@@ -181,6 +181,67 @@ describe('GET /api/portal/onboarding/review', () => {
         id: 'user-1_contract',
         itemId: 'contract',
       })],
+      completed: [],
     });
+  });
+
+  it('returns approved and rejected items newest reviewed first with signed PDF availability', async () => {
+    queryGetMock.mockResolvedValueOnce({ docs: [] });
+    queryGetMock.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 'user-1_contract',
+          data: () => ({
+            userId: 'user-1',
+            itemId: 'contract',
+            status: 'approved',
+            submittedAt: { toDate: () => new Date('2026-07-20') },
+            reviewedAt: { toDate: () => new Date('2026-07-28') },
+            reviewerName: 'Manager',
+            esignEnvelopeId: 'env-1',
+          }),
+        },
+        {
+          id: 'user-2_w9',
+          data: () => ({
+            userId: 'user-2',
+            itemId: 'w9',
+            status: 'rejected',
+            submittedAt: { toDate: () => new Date('2026-07-21') },
+            reviewedAt: { toDate: () => new Date('2026-07-27') },
+            reviewerName: 'Operations',
+          }),
+        },
+      ],
+    });
+    getAllMock.mockResolvedValue([
+      { exists: true, id: 'user-1', data: () => ({ displayName: 'Rep One', email: 'one@example.com' }), get: () => false },
+      { exists: true, id: 'user-2', data: () => ({ displayName: 'Rep Two', email: 'two@example.com' }), get: () => false },
+    ]);
+
+    const response = await GET(new NextRequest('http://localhost/api/portal/onboarding/review'));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.completed).toEqual([
+      expect.objectContaining({
+        id: 'user-1_contract',
+        userId: 'user-1',
+        userName: 'Rep One',
+        itemId: 'contract',
+        label: 'Contract',
+        category: 'paperwork',
+        referenceKind: 'esign',
+        sensitive: false,
+        status: 'approved',
+        reviewerName: 'Manager',
+        hasSignedPdf: true,
+      }),
+      expect.objectContaining({
+        id: 'user-2_w9',
+        status: 'rejected',
+        hasSignedPdf: false,
+      }),
+    ]);
   });
 });
