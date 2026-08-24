@@ -29,9 +29,17 @@ embeds — placement confirmed good). All uncommitted. Remaining:
     green). I reviewed rendered output; fixed stale note "Photo and
     W-9 uploads stay in the admin page" → "Photo uploads..." after
     the w9 flip.
-(d) Codex test updates DONE + reviewed (8 test files, assertions
-    kept strong). Full vitest 749/749 green, tsc clean, build green.
-    Everything UNCOMMITTED — commit when Jacob says.
+(d) SHIPPED 2026-08-24: all work committed (5 commits + master merge
+    resolved UserForm.tsx conflict in master's favor — dropdown role
+    picker), master fast-forwarded (lives in ~/dev/3cwg-payplan
+    worktree), DEPLOYED to Vercel prod (verified 200), master+branch
+    pushed to GitHub (clears the old "push master" carry-forward).
+    Mason's packet email re-sent to Jeremy
+    (jeremymcfarlandservices@gmail.com) with the new template — note
+    he got 2 earlier copies with a localhost review link before I
+    overrode APP_BASE_URL; final copy has the prod link. Script fix
+    committed (legacy 'Email' owner resolution + dry-run recipient
+    print).
 Notes: SignWell coords are 96dpi px from page TOP-LEFT; capture
 images were 120dpi → ×0.8. Old envelopes keep old PDFs; Mason's
 outstanding direct_deposit envelope still has the placeholder unless
