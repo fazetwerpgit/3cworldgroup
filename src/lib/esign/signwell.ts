@@ -155,6 +155,20 @@ export const signwellProvider: EsignProvider = {
     return embeddedSigningUrl ? { envelopeId: data.id, embeddedSigningUrl } : { envelopeId: data.id };
   },
 
+  async getEmbeddedSigningUrl(envelopeId: string): Promise<string | undefined> {
+    const res = await fetch(`${SIGNWELL_BASE}/documents/${envelopeId}`, {
+      headers: { 'X-Api-Key': requireApiKey() },
+    });
+    if (!res.ok) {
+      throw new Error(`SignWell getEmbeddedSigningUrl failed: ${res.status} ${await res.text()}`);
+    }
+    const data = (await res.json()) as {
+      recipients?: Array<{ id?: string; embedded_signing_url?: string | null }>;
+    };
+    const signer = data.recipients?.find((r) => r.id === SIGNER_RECIPIENT_ID) ?? data.recipients?.[0];
+    return signer?.embedded_signing_url || undefined;
+  },
+
   async parseWebhook(rawBody: string, headers: Headers): Promise<EsignWebhookEvent | null> {
     let payload: {
       event?: { type?: string; time?: string | number; hash?: string; webhook_id?: string; webhookId?: string };

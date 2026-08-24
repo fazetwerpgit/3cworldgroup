@@ -29,6 +29,7 @@ type EmbedEvents = {
 let container: HTMLDivElement;
 let root: Root;
 let capturedEvents: EmbedEvents | null;
+let capturedOptions: { url?: string; events?: EmbedEvents } | null;
 let openMock: ReturnType<typeof vi.fn>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -37,7 +38,8 @@ function makeFakeConstructor() {
   // A vi.fn() mock cannot be invoked with `new` when its implementation is
   // an arrow function — use a real `function` so `new SignWellEmbed(...)`
   // works like the real embed constructor.
-  return vi.fn().mockImplementation(function (this: unknown, opts: { events?: EmbedEvents }) {
+  return vi.fn().mockImplementation(function (this: unknown, opts: { url?: string; events?: EmbedEvents }) {
+    capturedOptions = opts;
     capturedEvents = opts.events ?? null;
     return { open: openMock, close: vi.fn() };
   });
@@ -65,6 +67,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   capturedEvents = null;
+  capturedOptions = null;
   fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
   vi.stubGlobal('fetch', fetchMock);
   getIdTokenMock.mockReset().mockResolvedValue('id-token-123');
@@ -126,6 +129,37 @@ describe('EsignSignAction', () => {
     // of hanging, and must never claim approval it hasn't received.
     expect(container.textContent).toContain('taking longer than usual');
     expect(container.textContent).not.toMatch(/approved/i);
+  });
+
+  it('refreshes the signing URL at click time before opening the embed', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ url: 'https://sign.example/fresh' }) });
+    await renderAction();
+
+    await clickSignNow();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/portal/onboarding/esign-signing-url',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ itemId: 'contract' }),
+      })
+    );
+    expect(capturedOptions?.url).toBe('https://sign.example/fresh');
+    expect(openMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['returns non-ok', async () => ({ ok: false, json: async () => ({}) })],
+    ['throws', async () => { throw new Error('network down'); }],
+  ])('falls back to the stored URL when refresh %s', async (_label, response) => {
+    fetchMock.mockImplementationOnce(response);
+    await renderAction();
+
+    await clickSignNow();
+
+    expect(capturedOptions?.url).toBe('https://sign.example/x');
+    expect(openMock).toHaveBeenCalledOnce();
+    expect(container.textContent).not.toMatch(/snag preparing this document/i);
   });
 
   it('clears the poll timer on unmount and never updates state or refetches after that', async () => {
@@ -206,6 +240,7 @@ describe('EsignSignAction', () => {
         body: JSON.stringify({ itemId: 'contract' }),
       })
     );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(requestInit.headers).toMatchObject({ Authorization: 'Bearer id-token-123' });
   });
@@ -217,6 +252,6 @@ describe('EsignSignAction', () => {
     await clickSignNow();
 
     expect(container.textContent).toMatch(/snag preparing this document/i);
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

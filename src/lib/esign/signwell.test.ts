@@ -153,6 +153,50 @@ describe('signwellProvider.createEnvelope', () => {
   });
 });
 
+describe('signwellProvider.getEmbeddedSigningUrl', () => {
+  beforeEach(() => {
+    vi.stubEnv('SIGNWELL_API_KEY', 'sw_key');
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the signer's embedded signing URL", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response(JSON.stringify({
+      recipients: [
+        { id: 'other', embedded_signing_url: 'https://www.signwell.com/e/other' },
+        { id: SIGNER_RECIPIENT_ID, embedded_signing_url: 'https://www.signwell.com/e/fresh' },
+      ],
+    }), { status: 200 }));
+
+    await expect(signwellProvider.getEmbeddedSigningUrl('env_123'))
+      .resolves.toBe('https://www.signwell.com/e/fresh');
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://www.signwell.com/api/v1/documents/env_123',
+      { headers: { 'X-Api-Key': 'sw_key' } }
+    );
+  });
+
+  it('returns undefined when recipients lack an embedded signing URL', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response(JSON.stringify({
+      recipients: [{ id: SIGNER_RECIPIENT_ID, embedded_signing_url: null }],
+    }), { status: 200 }));
+
+    await expect(signwellProvider.getEmbeddedSigningUrl('env_123')).resolves.toBeUndefined();
+  });
+
+  it('throws a descriptive error for a non-ok response', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response('not found', { status: 404 }));
+
+    await expect(signwellProvider.getEmbeddedSigningUrl('env_123'))
+      .rejects.toThrow('SignWell getEmbeddedSigningUrl failed: 404 not found');
+  });
+});
+
 describe('signwellProvider.parseWebhook', () => {
   afterEach(() => {
     vi.unstubAllEnvs();

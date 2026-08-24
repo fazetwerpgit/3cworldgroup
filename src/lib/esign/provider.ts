@@ -26,6 +26,8 @@ export interface EsignWebhookEvent {
 export interface EsignProvider {
   id: 'signwell' | 'adobe_sign';
   createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult>;
+  /** Fetches a currently-valid embedded signing URL for an existing envelope. */
+  getEmbeddedSigningUrl(envelopeId: string): Promise<string | undefined>;
   /** Returns null when the payload fails signature verification. */
   parseWebhook(rawBody: string, headers: Headers): Promise<EsignWebhookEvent | null>;
 }

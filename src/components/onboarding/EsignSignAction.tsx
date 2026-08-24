@@ -93,9 +93,24 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
   const open = useCallback(async () => {
     safeSetState('opening');
     try {
+      let url = signingUrl;
+      try {
+        const res = await fetch('/api/portal/onboarding/esign-signing-url', {
+          method: 'POST',
+          headers: await authHeaders(),
+          body: JSON.stringify({ itemId }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { url?: string };
+          if (data.url) url = data.url;
+        }
+      } catch {
+        // Fall back to the stored URL when the refresh request fails.
+      }
+
       const SignWellEmbed = await loadSignWellEmbed();
       const embed = new SignWellEmbed({
-        url: signingUrl,
+        url,
         events: {
           completed: () => beginConfirmPolling(),
           declined: () => safeSetState('declined'),

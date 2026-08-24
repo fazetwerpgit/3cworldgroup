@@ -259,6 +259,9 @@ const ALLOWED_SUBPATHS = [
   // onboarding/esign-embed-error has requireVerifiedUser and only raises a
   // deduplicated review_needed alert about the caller's own signing widget.
   '/api/portal/onboarding/esign-embed-error',
+  // onboarding/esign-signing-url has requireVerifiedUser and scopes both the
+  // envelope lookup and refreshed bearer URL to the verified caller.
+  '/api/portal/onboarding/esign-signing-url',
   // chat channel media has getVerifiedChatUser plus userCanAccessChannelDoc.
   '/api/portal/chat/channels/x/media',
   // chat channel members has getVerifiedChatUser plus userCanAccessChannelDoc.
