@@ -3,16 +3,47 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-08-24 (update at EVERY milestone).
+Updated: 2026-08-25 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-NEXT: nothing queued — ask Jacob what's next. Waiting on him:
-(a) EYEBALL the three shipped UI fixes (below) on his phone/desktop —
-    no logged-in browser verify possible (temp prod admin is
-    classifier-blocked); (b) pay_structure.pdf + fcra_auth.pdf still
-    PLACEHOLDERS — he hasn't sent the docs; (c) webhook log grab when
-    Mason signs direct_deposit (see STILL OPEN).
+ACTIVE: redesign the public 3C landing page for clearer information
+funneling and stronger visual design. Product Design audit completed against
+production at desktop 1440x1000 and mobile 390x844; evidence and findings are
+in `docs/redesign/audits/landing-2026-08-25/`. Jacob confirmed the homepage is
+recruiting-first: attract people to work for 3C as salespeople while also
+welcoming independent sales contractors who want to work under 3C. Primary
+conversion is starting an application; provider services support credibility
+instead of competing with recruiting. Next: generate exactly three visual
+directions, then wait for Jacob's selection before changing production code.
+
+SHIPPED 2026-08-25: FIBER INSTALL-STATUS FEED (daily provider report
+email -> portal). Full pipeline: POST /api/webhooks/inbound-report
+(?token=POSTMARK_INBOUND_TOKEN, env set in .env.local + Vercel prod)
+parses the xlsx attachment (exceljs, header-name-based, all 4 sheets)
+-> upserts `fiberOrders` (doc id = Alt Order ID / brk_<sha1>), rep
+matched by dealer-id map (config/fiberRepMap, self-learning) then
+normalized displayName; import log in `fiberReportImports`; status in
+config/fiberReportStatus. GET /api/portal/sales/status (own for reps,
+all+unmatched for admin/owner). UI: InstallStatusSection on
+/portal/sales (filter chips, status pills, admin grouped by rep,
+breakage reason/notes, honest empty state). ISOLATED: never touches
+sales/leaderboard/commissions. Real report verified: 929 orders
+parsed, 0 missing rep names. Key files: src/lib/fiberReport/,
+src/types/fiberOrder.ts, src/hooks/useFiberStatus.ts,
+src/components/sales/InstallStatusSection.tsx.
+
+NEXT: WAITING ON JACOB to activate the email feed — Postmark plan has
+NO inbound (error 614), so transport = Google Apps Script poller in
+his Gmail: script prepped at scratchpad gmail-report-forwarder.gs
+(placeholder PASTE_TOKEN_HERE -> value of POSTMARK_INBOUND_TOKEN,
+last line of .env.local). He pastes it at script.google.com, runs
+once to authorize, adds 5-min time trigger. Until then fiberOrders is
+empty and the section shows its honest empty state. Also still
+waiting: (a) eyeball the three 8/24 UI fixes; (b) pay_structure.pdf +
+fcra_auth.pdf still PLACEHOLDERS; (c) webhook log grab when Mason
+signs direct_deposit (see STILL OPEN). NOTE: the ACTIVE landing-page
+block above belongs to a PARALLEL session — do not touch it here.
 
 NEW STANDING RULE (Jacob, 2026-08-24): NO solo single-agent runs —
 split independent work across MULTIPLE PARALLEL `codex exec`

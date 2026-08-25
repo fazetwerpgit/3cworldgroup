@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { SalesTable } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
 import { useCompPlan } from '@/hooks/useCompPlan';
@@ -269,6 +270,8 @@ function SalesContent() {
               {error && <div className="sales-line-error" role="alert">{error}</div>}
 
               {!canApprove && !loading && <InReviewSection sales={pendingSales} />}
+
+              <InstallStatusSection />
 
               <SalesTable
                 sales={sales}

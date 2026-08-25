@@ -13785,6 +13785,262 @@ body.portal-scope {
   .sales-line-inreview-wait { grid-area: wait; }
 }
 
+/* Sales-line addendum - provider report install status */
+.sales-line-fiber {
+  min-width: 0;
+  margin-top: 29px;
+  animation: salesLineRise 300ms ease-out both;
+}
+
+.sales-line-fiber-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 15px;
+  min-width: 0;
+  border-bottom: 1px solid var(--lime);
+  padding-bottom: 11px;
+}
+
+.sales-line-fiber-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.sales-line-fiber-updated {
+  flex: none;
+  margin: 0;
+  color: var(--muted);
+  font: 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.sales-line-fiber-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 14px 0 0;
+}
+
+.sales-line-fiber-chip {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 7px 9px;
+  background: transparent;
+  color: var(--muted);
+  font: 900 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sales-line-fiber-chip span {
+  color: inherit;
+  opacity: 0.78;
+}
+
+.sales-line-fiber-chip:hover,
+.sales-line-fiber-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--lime) 70%, transparent);
+  color: var(--ink);
+  outline: 2px solid color-mix(in srgb, var(--lime) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.sales-line-fiber-chip[aria-pressed="true"] {
+  border-color: var(--lime);
+  background: color-mix(in srgb, var(--lime) 12%, transparent);
+  color: var(--lime);
+}
+
+.sales-line-fiber-list,
+.sales-line-fiber-groups {
+  min-width: 0;
+}
+
+.sales-line-fiber-row {
+  min-width: 0;
+  border-bottom: 1px solid var(--soft);
+  padding: 13px 0;
+}
+
+.sales-line-fiber-row-primary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 14px;
+  min-width: 0;
+}
+
+.sales-line-fiber-address {
+  min-width: 0;
+}
+
+.sales-line-fiber-address strong,
+.sales-line-fiber-address span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sales-line-fiber-address strong {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.sales-line-fiber-address span {
+  margin-top: 3px;
+  color: var(--muted);
+  font: 10px ui-monospace, Consolas, monospace;
+}
+
+.sales-line-fiber-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  padding: 5px 7px;
+  font: 900 8px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sales-line-fiber-status-active {
+  border-color: color-mix(in srgb, var(--lime) 55%, transparent);
+  background: color-mix(in srgb, var(--lime) 12%, transparent);
+  color: var(--lime);
+}
+
+.sales-line-fiber-status-pending {
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--muted);
+}
+
+.sales-line-fiber-status-cancelled {
+  border-color: color-mix(in srgb, var(--red) 55%, transparent);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--red);
+}
+
+.sales-line-fiber-status-attention {
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  color: var(--amber);
+}
+
+.sales-line-fiber-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  min-width: 0;
+  margin-top: 6px;
+  color: var(--muted);
+  font: 10px/1.4 ui-monospace, Consolas, monospace;
+}
+
+.sales-line-fiber-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sales-line-fiber-meta span + span::before {
+  margin-right: 8px;
+  color: var(--line);
+  content: '·';
+}
+
+.sales-line-fiber-group {
+  min-width: 0;
+  margin-top: 18px;
+}
+
+.sales-line-fiber-group:first-child {
+  margin-top: 14px;
+}
+
+.sales-line-fiber-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  color: var(--muted);
+  font: 900 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sales-line-fiber-group-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sales-line-fiber-message {
+  margin: 0;
+  padding: 28px 0 8px;
+  color: var(--muted);
+  font: 10px/1.5 ui-monospace, Consolas, monospace;
+}
+
+.sales-line-fiber-loading {
+  margin-top: 14px;
+}
+
+.sales-line-fiber-skeleton-row {
+  display: block;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .sales-line-fiber-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sales-line-fiber-updated {
+    text-align: left;
+  }
+
+  .sales-line-fiber-row-primary {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sales-line-fiber-address {
+    flex: none;
+    width: 100%;
+  }
+
+  .sales-line-fiber-status {
+    align-self: flex-start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sales-line-fiber {
+    animation: none;
+  }
+}
+
 /* Chat-line addendum — history pager */
 .chat-line-history-pager {
   display: grid;
