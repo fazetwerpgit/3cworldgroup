@@ -7,6 +7,7 @@ const {
   getExistingTasksMock,
   getManagementUsersMock,
   getUserDocMock,
+  runTransactionMock,
   sendEmailMock,
   sendPushMock,
 } = vi.hoisted(() => {
@@ -14,6 +15,8 @@ const {
   const addAlertTaskMock = vi.fn();
   const getManagementUsersMock = vi.fn();
   const getUserDocMock = vi.fn();
+  const runTransactionMock = vi.fn();
+  const alertTaskRef = { id: 'alert-1' };
 
   const makeAlertQuery = () => {
     const query = {
@@ -21,6 +24,7 @@ const {
       limit: vi.fn(),
       get: getExistingTasksMock,
       add: addAlertTaskMock,
+      doc: vi.fn(() => alertTaskRef),
     };
     query.where.mockReturnValue(query);
     query.limit.mockReturnValue(query);
@@ -42,6 +46,7 @@ const {
     getExistingTasksMock,
     getManagementUsersMock,
     getUserDocMock,
+    runTransactionMock,
     sendEmailMock: vi.fn(),
     sendPushMock: vi.fn(),
   };
@@ -50,6 +55,7 @@ const {
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: collectionMock,
+    runTransaction: runTransactionMock,
   },
 }));
 vi.mock('@/lib/notifications/createNotification', () => ({
@@ -66,7 +72,7 @@ vi.mock('@/lib/email/templates', () => ({
   }),
 }));
 
-import { createAlertTask, shouldRenag } from './alertTasks';
+import { createAlertTask, dismissAlertTask, shouldRenag } from './alertTasks';
 
 const HOUR = 3600 * 1000;
 
@@ -85,6 +91,12 @@ beforeEach(() => {
   createNotificationForManyMock.mockResolvedValue(undefined);
   sendPushMock.mockResolvedValue(undefined);
   sendEmailMock.mockResolvedValue({ ok: true });
+  runTransactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      get: vi.fn(),
+      update: vi.fn(),
+    })
+  );
 });
 
 describe('shouldRenag', () => {
@@ -142,5 +154,48 @@ describe('createAlertTask', () => {
     );
 
     errorSpy.mockRestore();
+  });
+});
+
+describe('dismissAlertTask', () => {
+  it('returns not_found when the task does not exist', async () => {
+    const txGetMock = vi.fn().mockResolvedValue({ exists: false });
+    const txUpdateMock = vi.fn();
+    runTransactionMock.mockImplementationOnce(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ get: txGetMock, update: txUpdateMock })
+    );
+
+    await expect(dismissAlertTask('missing', 'manager-1', 'Manager One')).resolves.toBe('not_found');
+    expect(txUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['open', 'claimed'])('resolves a %s task with dismissal details', async (status) => {
+    const txGetMock = vi.fn().mockResolvedValue({ exists: true, get: () => status });
+    const txUpdateMock = vi.fn();
+    runTransactionMock.mockImplementationOnce(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ get: txGetMock, update: txUpdateMock })
+    );
+
+    await expect(dismissAlertTask('alert-1', 'manager-1', 'Manager One')).resolves.toBe('dismissed');
+    expect(txUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'alert-1' }),
+      {
+        status: 'resolved',
+        resolvedAt: expect.any(Date),
+        dismissedBy: 'manager-1',
+        dismissedByName: 'Manager One',
+      }
+    );
+  });
+
+  it('returns dismissed without writing an already resolved task', async () => {
+    const txGetMock = vi.fn().mockResolvedValue({ exists: true, get: () => 'resolved' });
+    const txUpdateMock = vi.fn();
+    runTransactionMock.mockImplementationOnce(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ get: txGetMock, update: txUpdateMock })
+    );
+
+    await expect(dismissAlertTask('alert-1', 'manager-1', 'Manager One')).resolves.toBe('dismissed');
+    expect(txUpdateMock).not.toHaveBeenCalled();
   });
 });

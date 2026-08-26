@@ -21,15 +21,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'no envelope' }, { status: 404 });
   }
 
-  let url: string | undefined;
+  let result: { url?: string; completed: boolean };
   try {
-    url = await getEsignProvider().getEmbeddedSigningUrl(envelopeId);
+    result = await getEsignProvider().getEmbeddedSigningUrl(envelopeId);
   } catch (error) {
     console.error(`[esign] signing url refresh failed for ${gate.uid}/${itemId}`, error);
     return NextResponse.json({ error: 'refresh failed' }, { status: 502 });
   }
 
-  if (!url) {
+  if (result.completed) return NextResponse.json({ completed: true });
+
+  if (!result.url) {
     console.error(`[esign] signing url refresh failed for ${gate.uid}/${itemId}`, 'provider returned no URL');
     return NextResponse.json({ error: 'refresh failed' }, { status: 502 });
   }
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
         userId: gate.uid,
         itemId,
         envelopeId,
-        url,
+        url: result.url,
         updatedAt: new Date(),
       },
       { merge: true }
@@ -49,5 +51,5 @@ export async function POST(request: NextRequest) {
     console.error(`[esign] signing url refresh persistence failed for ${gate.uid}/${itemId}`, error);
   }
 
-  return NextResponse.json({ url });
+  return NextResponse.json({ url: result.url });
 }

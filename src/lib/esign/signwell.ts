@@ -226,7 +226,7 @@ export const signwellProvider: EsignProvider = {
     return Buffer.from(await res.arrayBuffer());
   },
 
-  async getEmbeddedSigningUrl(envelopeId: string): Promise<string | undefined> {
+  async getEmbeddedSigningUrl(envelopeId: string): Promise<{ url?: string; completed: boolean }> {
     const res = await fetch(`${SIGNWELL_BASE}/documents/${envelopeId}`, {
       headers: { 'X-Api-Key': requireApiKey() },
     });
@@ -234,10 +234,13 @@ export const signwellProvider: EsignProvider = {
       throw new Error(`SignWell getEmbeddedSigningUrl failed: ${res.status} ${await res.text()}`);
     }
     const data = (await res.json()) as {
+      status?: string | null;
       recipients?: Array<{ id?: string; embedded_signing_url?: string | null }>;
     };
     const signer = data.recipients?.find((r) => r.id === SIGNER_RECIPIENT_ID) ?? data.recipients?.[0];
-    return signer?.embedded_signing_url || undefined;
+    const completed = typeof data.status === 'string' && data.status.toLowerCase() === 'completed';
+    const url = signer?.embedded_signing_url || undefined;
+    return url ? { url, completed } : { completed };
   },
 
   async parseWebhook(rawBody: string, headers: Headers): Promise<EsignWebhookEvent | null> {

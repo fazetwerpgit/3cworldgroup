@@ -115,7 +115,7 @@ describe('POST /api/portal/onboarding/esign-signing-url', () => {
   it('returns the fresh URL and persists it with merge', async () => {
     requireVerifiedUserMock.mockResolvedValue(VERIFIED);
     getMock.mockResolvedValue({ exists: true, data: () => ({ esignEnvelopeId: 'env_1' }) });
-    getEmbeddedSigningUrlMock.mockResolvedValue('https://sign.example/fresh');
+    getEmbeddedSigningUrlMock.mockResolvedValue({ url: 'https://sign.example/fresh', completed: false });
 
     const res = await POST(req({ itemId: 'contract' }));
 
@@ -138,7 +138,7 @@ describe('POST /api/portal/onboarding/esign-signing-url', () => {
   it('still returns the fresh URL when persistence fails', async () => {
     requireVerifiedUserMock.mockResolvedValue(VERIFIED);
     getMock.mockResolvedValue({ exists: true, data: () => ({ esignEnvelopeId: 'env_1' }) });
-    getEmbeddedSigningUrlMock.mockResolvedValue('https://sign.example/fresh');
+    getEmbeddedSigningUrlMock.mockResolvedValue({ url: 'https://sign.example/fresh', completed: false });
     setMock.mockRejectedValue(new Error('Firestore unavailable'));
 
     const res = await POST(req({ itemId: 'contract' }));
@@ -149,5 +149,29 @@ describe('POST /api/portal/onboarding/esign-signing-url', () => {
       '[esign] signing url refresh persistence failed for u1/contract',
       expect.any(Error)
     );
+  });
+
+  it('returns completed without persisting a URL when the envelope is already completed', async () => {
+    requireVerifiedUserMock.mockResolvedValue(VERIFIED);
+    getMock.mockResolvedValue({ exists: true, data: () => ({ esignEnvelopeId: 'env_1' }) });
+    getEmbeddedSigningUrlMock.mockResolvedValue({ completed: true });
+
+    const res = await POST(req({ itemId: 'contract' }));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ completed: true });
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when the incomplete envelope has no URL', async () => {
+    requireVerifiedUserMock.mockResolvedValue(VERIFIED);
+    getMock.mockResolvedValue({ exists: true, data: () => ({ esignEnvelopeId: 'env_1' }) });
+    getEmbeddedSigningUrlMock.mockResolvedValue({ completed: false });
+
+    const res = await POST(req({ itemId: 'contract' }));
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toEqual({ error: 'refresh failed' });
+    expect(setMock).not.toHaveBeenCalled();
   });
 });

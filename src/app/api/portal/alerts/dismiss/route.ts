@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { dismissAlertTask } from '@/lib/alerts/alertTasks';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+
+export async function POST(request: NextRequest) {
+  try {
+    // The dismisser is stamped onto the task, so identity comes from the verified
+    // token — never from the request body.
+    const gate = await requireVerifiedManagement(request);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
+    const body = (await request.json()) as { taskId?: string };
+    const { taskId } = body;
+
+    if (!taskId) {
+      return NextResponse.json(
+        { error: 'taskId is required' },
+        { status: 400 }
+      );
+    }
+
+    const result = await dismissAlertTask(taskId, gate.uid, gate.name);
+    if (result === 'not_found') {
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error('Error dismissing alert task:', error);
+    return NextResponse.json(
+      { error: 'Failed to dismiss alert task' },
+      { status: 500 }
+    );
+  }
+}

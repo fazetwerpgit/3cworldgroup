@@ -186,7 +186,7 @@ describe('signwellProvider.getEmbeddedSigningUrl', () => {
     }), { status: 200 }));
 
     await expect(signwellProvider.getEmbeddedSigningUrl('env_123'))
-      .resolves.toBe('https://www.signwell.com/e/fresh');
+      .resolves.toEqual({ url: 'https://www.signwell.com/e/fresh', completed: false });
 
     expect(fetch).toHaveBeenCalledWith(
       'https://www.signwell.com/api/v1/documents/env_123',
@@ -194,12 +194,21 @@ describe('signwellProvider.getEmbeddedSigningUrl', () => {
     );
   });
 
-  it('returns undefined when recipients lack an embedded signing URL', async () => {
+  it('returns completed when the document is completed without an embedded signing URL', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response(JSON.stringify({
+      status: 'COMPLETED',
+      recipients: [{ id: SIGNER_RECIPIENT_ID, embedded_signing_url: null }],
+    }), { status: 200 }));
+
+    await expect(signwellProvider.getEmbeddedSigningUrl('env_123')).resolves.toEqual({ completed: true });
+  });
+
+  it('returns incomplete when recipients lack an embedded signing URL', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(new Response(JSON.stringify({
       recipients: [{ id: SIGNER_RECIPIENT_ID, embedded_signing_url: null }],
     }), { status: 200 }));
 
-    await expect(signwellProvider.getEmbeddedSigningUrl('env_123')).resolves.toBeUndefined();
+    await expect(signwellProvider.getEmbeddedSigningUrl('env_123')).resolves.toEqual({ completed: false });
   });
 
   it('throws a descriptive error for a non-ok response', async () => {

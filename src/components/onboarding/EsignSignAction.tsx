@@ -42,6 +42,7 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
   const polls = useRef(0);
   const pollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
+  const failureReported = useRef(false);
 
   // Never setState (or schedule a poll tick that would setState) once the
   // sheet has closed and this component has unmounted - the parent's
@@ -59,6 +60,8 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
   }, []);
 
   const reportFailure = useCallback(async () => {
+    if (failureReported.current) return;
+    failureReported.current = true;
     safeSetState('failed');
     try {
       await fetch('/api/portal/onboarding/esign-embed-error', {
@@ -101,7 +104,11 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
           body: JSON.stringify({ itemId }),
         });
         if (res.ok) {
-          const data = (await res.json()) as { url?: string };
+          const data = (await res.json()) as { url?: string; completed?: boolean };
+          if (data.completed === true) {
+            beginConfirmPolling();
+            return;
+          }
           if (data.url) url = data.url;
         }
       } catch {
