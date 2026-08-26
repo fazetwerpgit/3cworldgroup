@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import type { FiberOrder, FiberOrderStatus } from '@/types';
 
@@ -21,6 +22,22 @@ const STATUS_LABELS: Record<FiberOrderStatus, string> = {
   cancelled: 'Cancelled',
   churned: 'Churned',
   breakage: 'Attention',
+};
+
+const SUMMARY_LABELS: Record<Exclude<FiberFilter, 'all'>, string> = {
+  pending: 'pending',
+  attention: 'attention',
+  active: 'active',
+  cancelled: 'cancelled',
+};
+
+type PortalUser = { uid: string; displayName?: string | null };
+
+type AssignmentGroup = {
+  key: string;
+  repName: string;
+  dealerId: string;
+  orders: FiberOrder[];
 };
 
 function parseDate(value: string | null | undefined) {
@@ -50,7 +67,7 @@ function relativeReportDate(value: string | null) {
   return `${days} days ago`;
 }
 
-function statusGroup(status: FiberOrderStatus): FiberFilter {
+function statusGroup(status: FiberOrderStatus): Exclude<FiberFilter, 'all'> {
   if (status === 'pending_install' || status === 'pre_sale') return 'pending';
   if (status === 'active') return 'active';
   if (status === 'cancelled' || status === 'churned') return 'cancelled';
@@ -87,6 +104,20 @@ function sortOrders(orders: FiberOrder[]) {
 
     return `${a.address} ${a.id}`.localeCompare(`${b.address} ${b.id}`);
   });
+}
+
+function statusSummary(orders: FiberOrder[]) {
+  const counts: Record<Exclude<FiberFilter, 'all'>, number> = {
+    pending: 0,
+    attention: 0,
+    active: 0,
+    cancelled: 0,
+  };
+  orders.forEach((order) => { counts[statusGroup(order.status)] += 1; });
+  return (Object.keys(SUMMARY_LABELS) as Array<Exclude<FiberFilter, 'all'>>)
+    .filter((key) => counts[key] > 0)
+    .map((key) => `${counts[key]} ${SUMMARY_LABELS[key]}`)
+    .join(' · ');
 }
 
 function relevantDate(order: FiberOrder) {
@@ -148,9 +179,24 @@ function FiberRows({ orders, showRepName = false }: { orders: FiberOrder[]; show
   );
 }
 
+function groupDomId(groupKey: string) {
+  return `sales-line-fiber-group-${encodeURIComponent(groupKey).replace(/%/g, '-')}`;
+}
+
 export function InstallStatusSection() {
-  const { data, loading, error } = useFiberStatus();
+  const { data, loading, error, refetch } = useFiberStatus();
   const [filter, setFilter] = useState<FiberFilter>('all');
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
+  const [users, setUsers] = useState<PortalUser[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<Record<string, string>>({});
+  const [assigningKey, setAssigningKey] = useState<string | null>(null);
+  const [assignmentErrors, setAssignmentErrors] = useState<Record<string, string>>({});
+  const [rematching, setRematching] = useState(false);
+  const [rematchError, setRematchError] = useState<string | null>(null);
+  const mutationInFlightRef = useRef(false);
 
   const allOrders = useMemo(
     () => [...(data?.orders ?? []), ...(data?.unmatched ?? [])],
@@ -181,8 +227,116 @@ export function InstallStatusSection() {
     });
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [matchedOrders]);
+  const unmatchedAssignmentGroups = useMemo(() => {
+    const groups = new Map<string, AssignmentGroup>();
+    unmatchedOrders.forEach((order) => {
+      const repName = order.repName || 'Unknown rep';
+      const dealerId = order.repDealerId || '';
+      const key = `${order.repName}\u0000${order.repDealerId}`;
+      const existing = groups.get(key);
+      groups.set(key, existing ?? { key, repName, dealerId, orders: [] });
+      groups.get(key)!.orders.push(order);
+    });
+    return [...groups.values()].sort((a, b) => a.repName.localeCompare(b.repName) || a.dealerId.localeCompare(b.dealerId));
+  }, [unmatchedOrders]);
   const updated = relativeReportDate(data?.lastReportAt ?? null);
   const isAdmin = data?.scope === 'all';
+
+  const loadUsers = useCallback(async () => {
+    if (usersLoaded || usersLoading) return;
+
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const token = await getIdToken();
+      const response = await fetch('/api/portal/auth/users', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const responseData = await response.json() as { users?: PortalUser[]; error?: string };
+      if (!response.ok) throw new Error(responseData.error || 'Failed to fetch portal users');
+
+      const nextUsers = (responseData.users ?? [])
+        .filter((user): user is PortalUser => Boolean(user?.uid))
+        .sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? ''));
+      setUsers(nextUsers);
+      setUsersLoaded(true);
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Failed to fetch portal users');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [usersLoaded, usersLoading]);
+
+  const toggleGroup = useCallback((groupKey: string) => {
+    const opening = !openGroups.has(groupKey);
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+    if (opening && groupKey.startsWith('unmatched:')) void loadUsers();
+  }, [loadUsers, openGroups]);
+
+  const postAssignmentAction = useCallback(async (body: Record<string, string>) => {
+    const token = await getIdToken();
+    const response = await fetch('/api/portal/sales/status/assign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    const responseData = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(responseData.error || 'Failed to update install status assignments');
+  }, []);
+
+  const handleRematch = useCallback(async () => {
+    if (mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
+    setRematching(true);
+    setRematchError(null);
+    try {
+      await postAssignmentAction({ action: 'rematch' });
+      await refetch();
+    } catch (err) {
+      setRematchError(err instanceof Error ? err.message : 'Failed to re-run matching');
+    } finally {
+      setRematching(false);
+      mutationInFlightRef.current = false;
+    }
+  }, [postAssignmentAction, refetch]);
+
+  const handleAssign = useCallback(async (assignment: AssignmentGroup) => {
+    const userId = selectedUsers[assignment.key];
+    if (!userId || mutationInFlightRef.current) return;
+
+    mutationInFlightRef.current = true;
+    setAssigningKey(assignment.key);
+    setAssignmentErrors((current) => {
+      const next = { ...current };
+      delete next[assignment.key];
+      return next;
+    });
+    try {
+      await postAssignmentAction({ action: 'assign', dealerId: assignment.dealerId, userId });
+      await refetch();
+      setSelectedUsers((current) => {
+        const next = { ...current };
+        delete next[assignment.key];
+        return next;
+      });
+    } catch (err) {
+      setAssignmentErrors((current) => ({
+        ...current,
+        [assignment.key]: err instanceof Error ? err.message : 'Failed to assign install statuses',
+      }));
+    } finally {
+      setAssigningKey(null);
+      mutationInFlightRef.current = false;
+    }
+  }, [postAssignmentAction, refetch, selectedUsers]);
 
   return (
     <section className="sales-line-fiber" aria-label="Install status">
@@ -224,15 +378,101 @@ export function InstallStatusSection() {
             <div className="sales-line-fiber-groups">
               {matchedGroups.map(([repName, orders]) => (
                 <section className="sales-line-fiber-group" key={repName} aria-label={`${repName}, ${orders.length} orders`}>
-                  <div className="sales-line-fiber-group-head"><strong>{repName}</strong><span>{orders.length}</span></div>
-                  <FiberRows orders={orders} />
+                  <button
+                    type="button"
+                    className="sales-line-fiber-group-head"
+                    aria-expanded={openGroups.has(`matched:${repName}`)}
+                    aria-controls={groupDomId(`matched:${repName}`)}
+                    onClick={() => toggleGroup(`matched:${repName}`)}
+                  >
+                    <span className="sales-line-fiber-group-head-main">
+                      <strong>{repName}</strong>
+                      <span className="sales-line-fiber-group-count">{orders.length} orders</span>
+                    </span>
+                    <span className="sales-line-fiber-group-head-side">
+                      <span className="sales-line-fiber-summary">{statusSummary(orders)}</span>
+                      <span className="sales-line-fiber-chevron" aria-hidden="true">⌄</span>
+                    </span>
+                  </button>
+                  {openGroups.has(`matched:${repName}`) && (
+                    <div id={groupDomId(`matched:${repName}`)}>
+                      <FiberRows orders={orders} />
+                    </div>
+                  )}
                 </section>
               ))}
-              {unmatchedOrders.length > 0 && (
-                <section className="sales-line-fiber-group" aria-label={`Unmatched reps, ${unmatchedOrders.length} orders`}>
-                  <div className="sales-line-fiber-group-head"><strong>Unmatched reps</strong><span>{unmatchedOrders.length}</span></div>
-                  <FiberRows orders={unmatchedOrders} showRepName />
-                </section>
+              {unmatchedAssignmentGroups.length > 0 && (
+                <>
+                  <div className="sales-line-fiber-unmatched-divider">
+                    <span>Not linked to an account yet</span>
+                    <button type="button" className="sales-line-fiber-action" onClick={() => void handleRematch()} disabled={rematching || Boolean(assigningKey)}>
+                      {rematching ? 'Matching…' : 'Re-run matching'}
+                    </button>
+                  </div>
+                  {rematchError && <p className="sales-line-fiber-inline-error" role="alert">{rematchError}</p>}
+                  {unmatchedAssignmentGroups.map((assignment) => {
+                    const groupKey = `unmatched:${assignment.key}`;
+                    return (
+                      <section className="sales-line-fiber-group" key={assignment.key} aria-label={`${assignment.repName}, ${assignment.orders.length} orders`}>
+                        <button
+                          type="button"
+                          className="sales-line-fiber-group-head"
+                          aria-expanded={openGroups.has(groupKey)}
+                          aria-controls={groupDomId(groupKey)}
+                          onClick={() => toggleGroup(groupKey)}
+                        >
+                          <span className="sales-line-fiber-group-head-main">
+                            <strong>{assignment.repName}</strong>
+                            <span className="sales-line-fiber-group-count">{assignment.orders.length} orders</span>
+                          </span>
+                          <span className="sales-line-fiber-group-head-side">
+                            <span className="sales-line-fiber-summary">{statusSummary(assignment.orders)}</span>
+                            <span className="sales-line-fiber-chevron" aria-hidden="true">⌄</span>
+                          </span>
+                        </button>
+                        {openGroups.has(groupKey) && (
+                          <div id={groupDomId(groupKey)}>
+                            <div className="sales-line-fiber-assignments">
+                              {usersLoading && <p className="sales-line-fiber-assignment-note">Loading portal users…</p>}
+                              {usersError && <p className="sales-line-fiber-inline-error" role="alert">{usersError}</p>}
+                              <div className="sales-line-fiber-assignment">
+                                <div className="sales-line-fiber-assignment-label">
+                                  <strong>{assignment.repName} — {assignment.orders.length} orders</strong>
+                                  {!assignment.dealerId && <span>no dealer id in report</span>}
+                                </div>
+                                {assignment.dealerId && (
+                                  <>
+                                    <select
+                                      aria-label={`Assign ${assignment.repName}`}
+                                      value={selectedUsers[assignment.key] ?? ''}
+                                      onChange={(event) => setSelectedUsers((current) => ({ ...current, [assignment.key]: event.target.value }))}
+                                      disabled={usersLoading || rematching || Boolean(assigningKey)}
+                                    >
+                                      <option value="">Select portal user</option>
+                                      {users.map((user) => <option key={user.uid} value={user.uid}>{user.displayName || user.uid}</option>)}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className="sales-line-fiber-action"
+                                      onClick={() => void handleAssign(assignment)}
+                                      disabled={!selectedUsers[assignment.key] || rematching || Boolean(assigningKey)}
+                                    >
+                                      {assigningKey === assignment.key ? 'Assigning…' : 'Assign'}
+                                    </button>
+                                  </>
+                                )}
+                                {assignmentErrors[assignment.key] && (
+                                  <p className="sales-line-fiber-inline-error" role="alert">{assignmentErrors[assignment.key]}</p>
+                                )}
+                              </div>
+                            </div>
+                            <FiberRows orders={assignment.orders} />
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </>
               )}
             </div>
           ) : (

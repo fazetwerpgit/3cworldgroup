@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
+import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
 import type { FiberOrder, FiberReportImport } from '@/types/fiberOrder';
 
 export const maxDuration = 60;
@@ -17,10 +18,6 @@ type InboundPayload = {
   Subject?: string;
   Attachments?: InboundAttachment[];
 };
-
-function normalizeName(value: unknown): string {
-  return typeof value === 'string' ? value.trim().toLowerCase().replace(/\s+/g, ' ') : '';
-}
 
 function importLog(
   receivedAt: string,
@@ -122,11 +119,9 @@ export async function POST(request: NextRequest) {
       ...((mapSnapshot.data()?.map ?? {}) as Record<string, string>),
     };
     const usersSnapshot = await adminDb.collection('users').get();
-    const usersByName = new Map<string, string>();
-    for (const user of usersSnapshot.docs) {
-      const displayName = normalizeName(user.data()?.displayName);
-      if (displayName && !usersByName.has(displayName)) usersByName.set(displayName, user.id);
-    }
+    const usersByName = buildNameIndex(
+      usersSnapshot.docs.map((user) => ({ uid: user.id, displayName: user.data()?.displayName })),
+    );
 
     const newlyMapped: Record<string, string> = {};
     const unmatchedRepNames = new Set<string>();
@@ -134,14 +129,14 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const orders: FiberOrder[] = parsed.orders.map((order) => {
       const dealerId = order.repDealerId.trim();
-      let matchedUserId = dealerId ? mappedDealerIds[dealerId] ?? null : null;
-      if (!matchedUserId) {
-        const normalizedRepName = normalizeName(order.repName);
-        matchedUserId = usersByName.get(normalizedRepName) ?? null;
-        if (matchedUserId && dealerId && mappedDealerIds[dealerId] !== matchedUserId) {
-          mappedDealerIds[dealerId] = matchedUserId;
-          newlyMapped[dealerId] = matchedUserId;
-        }
+      const matchedUserId = matchOrder(
+        { repDealerId: dealerId, repName: order.repName },
+        mappedDealerIds,
+        usersByName,
+      );
+      if (matchedUserId && dealerId && !mappedDealerIds[dealerId]) {
+        mappedDealerIds[dealerId] = matchedUserId;
+        newlyMapped[dealerId] = matchedUserId;
       }
       if (matchedUserId) matchedReps += 1;
       else if (order.repName.trim()) unmatchedRepNames.add(order.repName.trim());
