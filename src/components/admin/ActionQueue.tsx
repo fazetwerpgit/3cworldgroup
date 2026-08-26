@@ -42,6 +42,19 @@ function formatMissingItems(missing: unknown): string {
     : '';
 }
 
+function formatRelativeAge(createdAt: string | null): string {
+  if (!createdAt) return '';
+
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return '';
+
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - created) / 1000));
+  if (elapsedSeconds < 60) return ' · just now';
+  if (elapsedSeconds < 3600) return ` · ${Math.floor(elapsedSeconds / 60)}m ago`;
+  if (elapsedSeconds < 86400) return ` · ${Math.floor(elapsedSeconds / 3600)}h ago`;
+  return ` · ${Math.floor(elapsedSeconds / 86400)}d ago`;
+}
+
 export default function ActionQueue() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<AlertTaskRow[]>([]);
@@ -138,6 +151,31 @@ export default function ActionQueue() {
     }
   }
 
+  async function dismiss(taskId: string) {
+    if (!user) return;
+    setBusy(taskId);
+    setError('');
+
+    try {
+      const response = await fetch('/api/portal/alerts/dismiss', {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ taskId }),
+      });
+      const json = await readJson(response);
+      if (!response.ok) {
+        throw new Error(
+          typeof json.error === 'string' ? json.error : 'Failed to dismiss task'
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to dismiss task');
+    } finally {
+      setBusy(null);
+      void load();
+    }
+  }
+
   if (!loading && tasks.length === 0 && !error) return null;
 
   return (
@@ -174,6 +212,7 @@ export default function ActionQueue() {
                   {task.message}
                   {task.status === 'claimed' &&
                     ` · claimed by ${task.claimedByName || task.claimedBy || 'another manager'}`}
+                  {formatRelativeAge(task.createdAt)}
                 </small>
               </div>
             </div>
@@ -196,6 +235,9 @@ export default function ActionQueue() {
                   {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
                 </button>
               )}
+              <button type="button" disabled={busy === task.id} onClick={() => void dismiss(task.id)}>
+                {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Dismiss'}
+              </button>
             </div>
           </div>
         ))

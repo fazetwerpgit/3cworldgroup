@@ -148,6 +148,21 @@ describe('EsignSignAction', () => {
     expect(openMock).toHaveBeenCalledOnce();
   });
 
+  it('shows the confirming note and does not open the embed when refresh reports completion', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ completed: true }) });
+    const { onRefresh } = await renderAction();
+
+    await clickSignNow();
+
+    expect(loadSignWellEmbedMock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Signature received - confirming');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/api/portal/onboarding/esign-embed-error',
+      expect.anything()
+    );
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['returns non-ok', async () => ({ ok: false, json: async () => ({}) })],
     ['throws', async () => { throw new Error('network down'); }],
@@ -253,5 +268,21 @@ describe('EsignSignAction', () => {
 
     expect(container.textContent).toMatch(/snag preparing this document/i);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports repeated embed errors only once per mount', async () => {
+    await renderAction();
+    await clickSignNow();
+
+    await act(async () => {
+      capturedEvents!.error!(new Error('first'));
+      capturedEvents!.error!(new Error('second'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toMatch(/snag preparing this document/i);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/portal/onboarding/esign-embed-error')).toHaveLength(1);
   });
 });

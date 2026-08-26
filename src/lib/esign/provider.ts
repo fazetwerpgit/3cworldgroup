@@ -28,8 +28,8 @@ export interface EsignProvider {
   createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult>;
   /** Downloads the provider's completed, signed PDF. */
   getCompletedPdf(envelopeId: string): Promise<Buffer>;
-  /** Fetches a currently-valid embedded signing URL for an existing envelope. */
-  getEmbeddedSigningUrl(envelopeId: string): Promise<string | undefined>;
+  /** Fetches a currently-valid embedded signing URL and completion state for an existing envelope. */
+  getEmbeddedSigningUrl(envelopeId: string): Promise<{ url?: string; completed: boolean }>;
   /** Returns null when the payload fails signature verification. */
   parseWebhook(rawBody: string, headers: Headers): Promise<EsignWebhookEvent | null>;
 }

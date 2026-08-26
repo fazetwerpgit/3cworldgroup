@@ -124,6 +124,31 @@ export async function claimAlertTask(
   });
 }
 
+export async function dismissAlertTask(
+  taskId: string,
+  uid: string,
+  name: string
+): Promise<'dismissed' | 'not_found'> {
+  const db = requireDb();
+  const ref = db.collection('alertTasks').doc(taskId);
+
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return 'not_found';
+
+    const status = snap.get('status');
+    if (status !== 'open' && status !== 'claimed') return 'dismissed';
+
+    tx.update(ref, {
+      status: 'resolved',
+      resolvedAt: new Date(),
+      dismissedBy: uid,
+      dismissedByName: name,
+    });
+    return 'dismissed';
+  });
+}
+
 /** Marks matching open/claimed tasks resolved, e.g. after activation. */
 export async function resolveAlertTasks(
   subjectUserId: string,
