@@ -7,19 +7,27 @@ Updated: 2026-08-25 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-PUBLIC-SITE FIDELITY COMPLETE — WAITING ON JACOB: inspect the completed
-seven-route redesign in the local preview. Desktop now closely follows every
-locked mockup; the 390 px phone layouts preserve the same artwork, diagonals,
-connectors, color pacing, and information funnel through smaller crops and
-compact grids. Final source-versus-rendered evidence is in
-`docs/redesign/qa/fidelity-rebuild-2026-08-25/round2/`. Raw desktop captures are
-exactly 1440 px wide, phone captures exactly 390 px wide, all phone routes have
-zero horizontal overflow, and all imagery loaded. Sol xhigh passed all seven
-routes after the second Luna implementation round. Final gates passed: diff
-check, TypeScript, focused ESLint, 809 tests across 94 files, and the production
-build with 122/122 static pages and no warnings. `design-qa.md` now ends with
-`final result: passed`. No deployment was performed. Do not deploy unless Jacob
-explicitly asks.
+PUBLIC-SITE DESKTOP 1:1 REMEDIATION GOAL ACTIVE: Jacob explicitly requested a
+Luna implementation -> independent Sol validation -> Luna remediation loop
+until all seven locked desktop routes are accepted at 1440 px. The active goal
+is to recreate the locked desktop compositions literally while preserving the
+already-working responsive/mobile behavior and core interactions. Do not stop
+at directional similarity or code-gate success. Each route requires a fresh
+same-viewport source/render comparison board and explicit Sol acceptance; any
+failed route returns to Luna with the visible differences as its fix list.
+
+Baseline finding that opened this goal:
+the seven-route implementation is functional, responsive, and passed its code
+gates, but a fresh literal comparison confirmed that zero of seven desktop
+routes are pixel-for-pixel matches to the locked mockups. The earlier Sol PASS
+meant acceptable directional fidelity, not exact replication. Home, About, and
+Services have the largest composition differences; Careers, Culture, Contact,
+and Apply are closer but still differ in typography scale, section heights,
+artwork proportions, diagonals, and footer geometry. The evidence is in
+`docs/redesign/qa/fidelity-rebuild-2026-08-25/round2/*-desktop-comparison.jpg`.
+Do not claim 1:1 fidelity until the loop finishes, and do not deploy. The
+existing responsive/mobile work and passing gates remain valid baseline
+behavior that must be preserved.
 
 ## Previous implementation pass (superseded)
 
@@ -276,13 +284,17 @@ src/lib/fiberReport/matchReps.ts + POST
 /api/portal/sales/status/assign (actions: assign|rematch,
 admin/owner only).
 
-NEXT: WAITING ON JACOB to (1) open /portal/sales admin view, hit
-"Re-run matching" (fixes Cooper automatically), then Assign the rest:
-Wil Teasdale (report "Will"), Jeremy (report "Jeremy McFarland"),
-"mason Tran" (portal candidates: Brenden Tran / Mason Steinberger —
-Jacob decides). Gavin McCrory, Nolan Morrison, Colton Gordon, Daniel
-Ramirez, Joshua Dweh Jr, Cael Crawford have NO portal accounts —
-their named groups stay admin-only until they sign up, then Assign.
+UPDATE (2026-08-25 late): fuzzy matching shipped (same last name +
+prefix first names, single-word portal names; unambiguous only) —
+Cooper, Wil Teasdale, and Jeremy are ALL matched now (dealer map has
+9 entries; I triggered rematch remotely via the ops route:
+GET /api/webhooks/inbound-report?token=...&rematch=1; &assign=
+dealerId:uid also works). 814 tests. NEXT: WAITING ON JACOB only for
+"mason Tran" (128 orders, dealer 7054521 — portal candidates Brenden
+Tran / Mason Steinberger, or leave if no account). Gavin McCrory,
+Nolan Morrison, Colton Gordon, Daniel Ramirez, Joshua Dweh Jr, Cael
+Crawford have NO portal accounts — their named groups stay admin-only
+until they sign up, then Assign.
 Also still waiting: (a) eyeball the three 8/24 UI fixes; (b)
 pay_structure.pdf + fcra_auth.pdf still PLACEHOLDERS; (c) webhook log
 grab when Mason signs direct_deposit (see STILL OPEN). NOTE: the
