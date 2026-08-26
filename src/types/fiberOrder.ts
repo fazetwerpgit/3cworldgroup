@@ -40,6 +40,9 @@ export interface FiberOrder {
   sourceSheet: string;      // which tab of the workbook the row came from
   reportReceivedAt: string; // ISO timestamp of the email that last touched this doc
   updatedAt: string;
+  // Attached at read time only (never stored): customer name from a portal Sale
+  // the matched rep logged THEMSELVES, cross-matched by street address.
+  loggedCustomerName?: string | null;
 }
 
 // Import log entry, one per received report email (collection: fiberReportImports).
@@ -61,4 +64,6 @@ export interface FiberStatusResponse {
   orders: FiberOrder[];
   // Admin scope only: orders whose rep didn't match any portal user.
   unmatched?: FiberOrder[];
+  // Own scope only: how many sales this rep has logged in the portal themselves.
+  submittedTotal?: number;
 }

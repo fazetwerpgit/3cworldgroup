@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { FiberOrder, FiberStatusResponse } from '@/types';
+import { attachLoggedCustomerNames, LoggedSale } from '@/lib/fiberReport/matchSales';
 
 function sortByOrderDate(orders: FiberOrder[]): FiberOrder[] {
   return [...orders].sort((a, b) => {
@@ -13,6 +14,15 @@ function sortByOrderDate(orders: FiberOrder[]): FiberOrder[] {
 
 function toFiberOrder(id: string, data: FirebaseFirestore.DocumentData): FiberOrder {
   return { id, ...data } as FiberOrder;
+}
+
+function toLoggedSale(data: FirebaseFirestore.DocumentData): LoggedSale {
+  return {
+    salesRepId: data.salesRepId,
+    customerName: data.customerName,
+    customerAddress: data.customerAddress,
+    createdAt: data.createdAt?.toDate?.() ?? null,
+  };
 }
 
 // GET /api/portal/sales/status - Fiber install-status visibility scope.
@@ -53,13 +63,27 @@ export async function GET(request: NextRequest) {
       const orders = sortByOrderDate(
         snapshot.docs.map((doc) => toFiberOrder(doc.id, doc.data()))
       );
-      return NextResponse.json({ scope, lastReportAt, orders } satisfies FiberStatusResponse);
+      const salesSnapshot = await adminDb
+        .collection('sales')
+        .where('salesRepId', '==', userId)
+        .get();
+      const sales = salesSnapshot.docs.map((doc) => toLoggedSale(doc.data()));
+      const ordersWithNames = attachLoggedCustomerNames(orders, sales);
+      return NextResponse.json({
+        scope,
+        lastReportAt,
+        orders: ordersWithNames,
+        submittedTotal: salesSnapshot.docs.length,
+      } satisfies FiberStatusResponse);
     }
 
     const snapshot = await adminDb.collection('fiberOrders').get();
     const allOrders = snapshot.docs.map((doc) => toFiberOrder(doc.id, doc.data()));
+    const matchedOrders = allOrders.filter((order) => order.matchedUserId !== null);
+    const salesSnapshot = await adminDb.collection('sales').get();
+    const sales = salesSnapshot.docs.map((doc) => toLoggedSale(doc.data()));
     const orders = sortByOrderDate(
-      allOrders.filter((order) => order.matchedUserId !== null)
+      attachLoggedCustomerNames(matchedOrders, sales)
     );
     const unmatched = sortByOrderDate(
       allOrders.filter((order) => order.matchedUserId === null)

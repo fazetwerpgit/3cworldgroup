@@ -6,6 +6,7 @@ import { useFiberStatus } from '@/hooks/useFiberStatus';
 import type { FiberOrder, FiberOrderStatus } from '@/types';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
+type FiberBucket = Exclude<FiberFilter, 'all'>;
 
 const FILTERS: Array<{ key: FiberFilter; label: string }> = [
   { key: 'all', label: 'All' },
@@ -13,6 +14,13 @@ const FILTERS: Array<{ key: FiberFilter; label: string }> = [
   { key: 'active', label: 'Active' },
   { key: 'cancelled', label: 'Cancelled/Churned' },
   { key: 'attention', label: 'Attention' },
+];
+
+const OWN_BUCKETS: Array<{ key: FiberBucket; label: string }> = [
+  { key: 'pending', label: 'Pending install' },
+  { key: 'active', label: 'Active' },
+  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'attention', label: 'Needs attention' },
 ];
 
 const STATUS_LABELS: Record<FiberOrderStatus, string> = {
@@ -147,12 +155,14 @@ function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; show
   const location = [order.city, order.state].filter(Boolean).join(', ');
   const date = relevantDate(order);
   const dateLabel = formatDate(date.value);
+  const loggedCustomerName = order.loggedCustomerName?.trim();
 
   return (
     <article className="sales-line-fiber-row">
       <div className="sales-line-fiber-row-primary">
         <div className="sales-line-fiber-address">
-          <strong>{order.address || 'Address unavailable'}</strong>
+          <strong>{loggedCustomerName || order.address || 'Address unavailable'}</strong>
+          {loggedCustomerName && <span>{order.address || 'Address unavailable'}</span>}
           {location && <span>{location}</span>}
         </div>
         <FiberStatusPill status={order.status} />
@@ -186,6 +196,7 @@ function groupDomId(groupKey: string) {
 export function InstallStatusSection() {
   const { data, loading, error, refetch } = useFiberStatus();
   const [filter, setFilter] = useState<FiberFilter>('all');
+  const [openBucket, setOpenBucket] = useState<FiberBucket | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -211,6 +222,21 @@ export function InstallStatusSection() {
     () => sortOrders(allOrders.filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [allOrders, filter]
   );
+  const bucketOrders = useMemo(() => {
+    const grouped: Record<FiberBucket, FiberOrder[]> = {
+      pending: [],
+      active: [],
+      cancelled: [],
+      attention: [],
+    };
+    allOrders.forEach((order) => { grouped[statusGroup(order.status)].push(order); });
+    return {
+      pending: sortOrders(grouped.pending),
+      active: sortOrders(grouped.active),
+      cancelled: sortOrders(grouped.cancelled),
+      attention: sortOrders(grouped.attention),
+    } satisfies Record<FiberBucket, FiberOrder[]>;
+  }, [allOrders]);
   const matchedOrders = useMemo(
     () => sortOrders((data?.orders ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [data?.orders, filter]
@@ -357,7 +383,8 @@ export function InstallStatusSection() {
       ) : allOrders.length === 0 ? (
         <p className="sales-line-fiber-message">No install report data for you yet. Statuses appear here once the daily provider report includes your sales.</p>
       ) : (
-        <>
+        isAdmin ? (
+          <>
           <div className="sales-line-fiber-filters" role="group" aria-label="Filter install status">
             {FILTERS.map(({ key, label }) => (
               <button
@@ -374,7 +401,7 @@ export function InstallStatusSection() {
 
           {filteredOrders.length === 0 ? (
             <p className="sales-line-fiber-message">No install statuses match this filter.</p>
-          ) : isAdmin ? (
+          ) : (
             <div className="sales-line-fiber-groups">
               {matchedGroups.map(([repName, orders]) => (
                 <section className="sales-line-fiber-group" key={repName} aria-label={`${repName}, ${orders.length} orders`}>
@@ -475,10 +502,42 @@ export function InstallStatusSection() {
                 </>
               )}
             </div>
-          ) : (
-            <FiberRows orders={filteredOrders} />
           )}
-        </>
+          </>
+        ) : (
+          <>
+            <div className="sales-line-fiber-stats" role="group" aria-label="Your install status summary">
+              <div className="sales-line-fiber-stat sales-line-fiber-stat-sent">
+                <span className="sales-line-fiber-stat-label">Sent in</span>
+                <strong className="sales-line-fiber-stat-value">{data?.submittedTotal ?? '—'}</strong>
+              </div>
+              {OWN_BUCKETS.map(({ key, label }) => {
+                if (counts[key] === 0) return null;
+                const isOpen = openBucket === key;
+                const panelId = groupDomId(`own:${key}`);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`sales-line-fiber-stat sales-line-fiber-stat-${key}`}
+                    data-bucket={key}
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={() => setOpenBucket((current) => (current === key ? null : key))}
+                  >
+                    <span className="sales-line-fiber-stat-label">{label}</span>
+                    <strong className="sales-line-fiber-stat-value">{counts[key]}</strong>
+                  </button>
+                );
+              })}
+            </div>
+            {openBucket && counts[openBucket] > 0 && (
+              <section id={groupDomId(`own:${openBucket}`)} className="sales-line-fiber-bucket-panel" aria-label={`${OWN_BUCKETS.find(({ key }) => key === openBucket)?.label ?? openBucket} orders`}>
+                <FiberRows orders={bucketOrders[openBucket]} />
+              </section>
+            )}
+          </>
+        )
       )}
     </section>
   );

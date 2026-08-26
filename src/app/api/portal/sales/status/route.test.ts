@@ -7,6 +7,8 @@ const {
   userGetMock,
   ownOrdersGetMock,
   allOrdersGetMock,
+  ownSalesGetMock,
+  allSalesGetMock,
   gateMock,
 } = vi.hoisted(() => ({
   collectionMock: vi.fn(),
@@ -14,6 +16,8 @@ const {
   userGetMock: vi.fn(),
   ownOrdersGetMock: vi.fn(),
   allOrdersGetMock: vi.fn(),
+  ownSalesGetMock: vi.fn(),
+  allSalesGetMock: vi.fn(),
   gateMock: vi.fn(),
 }));
 
@@ -60,6 +64,8 @@ beforeEach(() => {
       doc('mine', { id: 'mine', matchedUserId: 'caller-1', orderDate: '2026-08-24' }),
     ],
   });
+  ownSalesGetMock.mockResolvedValue({ docs: [] });
+  allSalesGetMock.mockResolvedValue({ docs: [] });
   collectionMock.mockImplementation((name: string) => {
     if (name === 'users') return { doc: vi.fn(() => ({ get: userGetMock })) };
     if (name === 'config') return { doc: vi.fn(() => ({ get: configGetMock })) };
@@ -67,6 +73,12 @@ beforeEach(() => {
       return {
         get: allOrdersGetMock,
         where: vi.fn(() => ({ get: ownOrdersGetMock })),
+      };
+    }
+    if (name === 'sales') {
+      return {
+        get: allSalesGetMock,
+        where: vi.fn(() => ({ get: ownSalesGetMock })),
       };
     }
     throw new Error(`Unexpected collection: ${name}`);
@@ -81,12 +93,14 @@ describe('GET /api/portal/sales/status', () => {
     expect(response.status).toBe(200);
     expect(json.scope).toBe('all');
     expect(json.lastReportAt).toBe('2026-08-25T12:00:00.000Z');
+    expect(json).not.toHaveProperty('submittedTotal');
     expect(json.orders.map((order: { id: string }) => order.id)).toEqual([
       'matched-new',
       'matched-old',
     ]);
     expect(json.unmatched.map((order: { id: string }) => order.id)).toEqual(['unmatched']);
     expect(ownOrdersGetMock).not.toHaveBeenCalled();
+    expect(allSalesGetMock).toHaveBeenCalledOnce();
   });
 
   it('gives non-admin users only their matched orders', async () => {
@@ -99,6 +113,106 @@ describe('GET /api/portal/sales/status', () => {
     expect(json.scope).toBe('own');
     expect(json.orders.map((order: { id: string }) => order.id)).toEqual(['mine', 'other']);
     expect(json).not.toHaveProperty('unmatched');
+    expect(json.submittedTotal).toBe(0);
     expect(allOrdersGetMock).not.toHaveBeenCalled();
+    expect(ownSalesGetMock).toHaveBeenCalledOnce();
+  });
+
+  it('attaches a matching own sale name and reports submitted sales total', async () => {
+    userGetMock.mockResolvedValue({ exists: true, data: () => ({ role: 'rep' }) });
+    ownOrdersGetMock.mockResolvedValue({
+      docs: [
+        doc('mine', {
+          id: 'mine',
+          matchedUserId: 'caller-1',
+          orderDate: '2026-08-24',
+          address: '5780 Hall St SE',
+        }),
+        doc('other-address', {
+          id: 'other-address',
+          matchedUserId: 'caller-1',
+          orderDate: '2026-08-23',
+          address: '12 Other St',
+        }),
+      ],
+    });
+    ownSalesGetMock.mockResolvedValue({
+      docs: [
+        doc('sale-1', {
+          salesRepId: 'caller-1',
+          customerName: '  Alice Example  ',
+          customerAddress: '5780 Hall St SE, Grand Rapids MI',
+          createdAt: { toDate: () => new Date('2026-08-25T12:00:00.000Z') },
+        }),
+        doc('sale-2', {
+          salesRepId: 'caller-1',
+          customerName: 'Other Customer',
+          customerAddress: '90 Unrelated Ave',
+          createdAt: { toDate: () => new Date('2026-08-25T13:00:00.000Z') },
+        }),
+      ],
+    });
+
+    const response = await GET(request());
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.scope).toBe('own');
+    expect(json.submittedTotal).toBe(2);
+    expect(json.orders.find((order: { id: string }) => order.id === 'mine').loggedCustomerName)
+      .toBe('Alice Example');
+    expect(json.orders.find((order: { id: string }) => order.id === 'other-address').loggedCustomerName)
+      .toBeNull();
+  });
+
+  it('attaches all-scope names only for the matching rep and leaves unmatched orders unnamed', async () => {
+    allOrdersGetMock.mockResolvedValue({
+      docs: [
+        doc('matched-rep-1', {
+          id: 'matched-rep-1',
+          matchedUserId: 'rep-1',
+          orderDate: '2026-08-24',
+          address: '5780 hall st se',
+        }),
+        doc('matched-rep-2', {
+          id: 'matched-rep-2',
+          matchedUserId: 'rep-2',
+          orderDate: '2026-08-23',
+          address: '12 Other St',
+        }),
+        doc('unmatched', {
+          id: 'unmatched',
+          matchedUserId: null,
+          orderDate: '2026-08-22',
+          address: '5780 hall st se',
+        }),
+      ],
+    });
+    allSalesGetMock.mockResolvedValue({
+      docs: [
+        doc('sale-rep-1', {
+          salesRepId: 'rep-1',
+          customerName: 'Alice Example',
+          customerAddress: '5780 Hall St SE, Grand Rapids MI',
+        }),
+        doc('sale-other-rep', {
+          salesRepId: 'other-rep',
+          customerName: 'Wrong Rep',
+          customerAddress: '5780 Hall St SE',
+        }),
+      ],
+    });
+
+    const response = await GET(request());
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.scope).toBe('all');
+    expect(json.orders.find((order: { id: string }) => order.id === 'matched-rep-1').loggedCustomerName)
+      .toBe('Alice Example');
+    expect(json.orders.find((order: { id: string }) => order.id === 'matched-rep-2').loggedCustomerName)
+      .toBeNull();
+    expect(json.unmatched[0]).not.toHaveProperty('loggedCustomerName');
+    expect(allSalesGetMock).toHaveBeenCalledOnce();
   });
 });
