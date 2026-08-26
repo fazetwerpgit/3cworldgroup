@@ -47,6 +47,29 @@ async function writeImportLog(entry: FiberReportImport): Promise<void> {
   await adminDb.collection('fiberReportImports').add(entry);
 }
 
+// Token-gated health check: confirms whether reports are landing without
+// needing Firestore credentials — returns last-import status + recent log.
+export async function GET(request: NextRequest) {
+  const expectedToken = process.env.POSTMARK_INBOUND_TOKEN;
+  const suppliedToken = request.nextUrl.searchParams.get('token');
+  if (!expectedToken || suppliedToken !== expectedToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!adminDb) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+  }
+  const status = await adminDb.collection('config').doc('fiberReportStatus').get();
+  const imports = await adminDb
+    .collection('fiberReportImports')
+    .orderBy('receivedAt', 'desc')
+    .limit(10)
+    .get();
+  return NextResponse.json({
+    status: status.exists ? status.data() : null,
+    imports: imports.docs.map((doc) => doc.data()),
+  });
+}
+
 export async function POST(request: NextRequest) {
   const expectedToken = process.env.POSTMARK_INBOUND_TOKEN;
   const suppliedToken = request.nextUrl.searchParams.get('token');
