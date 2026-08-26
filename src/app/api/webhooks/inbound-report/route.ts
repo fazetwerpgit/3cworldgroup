@@ -61,8 +61,20 @@ export async function GET(request: NextRequest) {
     .orderBy('receivedAt', 'desc')
     .limit(10)
     .get();
-  // Display names help diagnose rep-matching misses (token-gated, names only).
+  // Display names + dealer map + unmatched tally help diagnose rep-matching
+  // misses (token-gated, no PII beyond names).
   const users = await adminDb.collection('users').get();
+  const repMap = await adminDb.collection('config').doc('fiberRepMap').get();
+  const unmatchedSnapshot = await adminDb
+    .collection('fiberOrders')
+    .where('matchedUserId', '==', null)
+    .get();
+  const unmatchedByRep: Record<string, number> = {};
+  for (const doc of unmatchedSnapshot.docs) {
+    const data = doc.data();
+    const key = `${data?.repName ?? '?'} (${data?.repDealerId ?? '?'})`;
+    unmatchedByRep[key] = (unmatchedByRep[key] ?? 0) + 1;
+  }
   return NextResponse.json({
     status: status.exists ? status.data() : null,
     imports: imports.docs.map((doc) => doc.data()),
@@ -70,6 +82,8 @@ export async function GET(request: NextRequest) {
       .map((doc) => doc.data()?.displayName ?? '')
       .filter(Boolean)
       .sort(),
+    dealerMap: repMap.data()?.map ?? {},
+    unmatchedByRep,
   });
 }
 
