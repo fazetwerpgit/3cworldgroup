@@ -7,6 +7,49 @@ Updated: 2026-08-25 (update at EVERY milestone).
 
 ## NEXT ACTION
 
+PUBLIC-SITE FIDELITY COMPLETE — WAITING ON JACOB: inspect the completed
+seven-route redesign in the local preview. Desktop now closely follows every
+locked mockup; the 390 px phone layouts preserve the same artwork, diagonals,
+connectors, color pacing, and information funnel through smaller crops and
+compact grids. Final source-versus-rendered evidence is in
+`docs/redesign/qa/fidelity-rebuild-2026-08-25/round2/`. Raw desktop captures are
+exactly 1440 px wide, phone captures exactly 390 px wide, all phone routes have
+zero horizontal overflow, and all imagery loaded. Sol xhigh passed all seven
+routes after the second Luna implementation round. Final gates passed: diff
+check, TypeScript, focused ESLint, 809 tests across 94 files, and the production
+build with 122/122 static pages and no warnings. `design-qa.md` now ends with
+`final result: passed`. No deployment was performed. Do not deploy unless Jacob
+explicitly asks.
+
+## Previous implementation pass (superseded)
+
+WAITING ON JACOB: inspect the completed responsive public redesign at the local
+preview. Do not deploy unless Jacob explicitly asks. All seven locked routes
+are implemented: Home `/`, About `/about`, Services `/services`, Careers
+`/opportunities`, Culture `/culture`, Contact `/contact`, and Apply `/apply`.
+The shared Navbar, Footer, public typography, CTA/footer surface, forms, links,
+responsive behavior, and people-free raster assets are integrated. Browser QA
+was completed at desktop, tablet, and 390 px mobile across all seven routes;
+all 21 combinations have no horizontal overflow. The Services connector now
+aligns Fiber, TV, Security, and Bundle at desktop, intermediate, and mobile
+breakpoints. Final gates passed: diff check, TypeScript, focused ESLint, 801
+tests, and the production build with 121 static pages. The blocking Product
+Design record is `design-qa.md` with `final result: passed`; screenshots and
+comparison boards are in
+`docs/redesign/qa/implementation-2026-08-25/`. The local preview runs on port
+3100. MOBILE IMAGERY FOLLOW-UP: Contact now retains a compact 168 × 104 px 3C
+raster in its mobile hero without adding document height, so both recruiting
+choices remain visible in the first phone viewport; Apply uses a real compact
+3C raster beside the proof points
+instead of the hidden CSS outline while keeping the form above the mobile fold;
+and the Home territory map is brighter on mobile. Browser checks passed at
+390 px and 1440 px with no horizontal overflow. Evidence is saved as
+`contact-mobile-images-before-after.png` and
+`apply-mobile-images-before-after.png` in the implementation QA directory.
+This status supersedes the historical design-selection narrative below.
+
+## Historical design-selection context
+
 ACTIVE: redesign the public 3C landing page for clearer information
 funneling and stronger visual design. Product Design audit completed against
 production at desktop 1440x1000 and mobile 390x844; evidence and findings are
@@ -14,8 +57,188 @@ in `docs/redesign/audits/landing-2026-08-25/`. Jacob confirmed the homepage is
 recruiting-first: attract people to work for 3C as salespeople while also
 welcoming independent sales contractors who want to work under 3C. Primary
 conversion is starting an application; provider services support credibility
-instead of competing with recruiting. Next: generate exactly three visual
-directions, then wait for Jacob's selection before changing production code.
+instead of competing with recruiting. Three visual directions are generated
+and displayed in the Product Design thread. Jacob selected displayed option 3
+but rejected generated people. A people-free revision replaces the hero team
+photo with an aerial neighborhood, territory map, and connectivity routes;
+the stable visual target candidate is
+`docs/redesign/concepts/landing-2026-08-25/selected-option-3-people-free-revision.png`.
+Jacob approved this people-free Home direction and requires the root page and
+navigation label to remain `Home`. For every other public page, generate three
+mockups within the locked visual direction and let Jacob pick or combine
+treatments before implementation. Work one page at a time so option numbering
+stays unambiguous. The fresh About-page set is complete and its authoritative
+displayed order is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/about/displayed-option-1.png`
+through `displayed-option-3.png`. Jacob chose option 2's hero, option 1's map
+directly below the hero, and requested a redesign of option 2's Connection /
+Community / Commitment treatment. The combined About lock candidate is saved
+at
+`docs/redesign/concepts/public-pages-2026-08-25/about/selected-combination-revision.png`.
+Jacob liked that composition but said the map section did not blend smoothly
+into the 3 C's section. A refined candidate now removes the hard seam, fades
+the territory-map grid into the white surface, and continues a lime route from
+the US map into the Connection / Community / Commitment connector. It is saved
+at
+`docs/redesign/concepts/public-pages-2026-08-25/about/selected-combination-blended-transition-revision.png`.
+Jacob approved and locked this blended About revision. Three fresh Services-
+page mockups are complete, grounded in the current Services content and the
+locked people-free Home/About visual system. Their first displayed order is
+saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/displayed-option-1.png`
+through `displayed-option-3.png`. Jacob rejected the house-led third direction
+and the overly blue second direction, then requested three new options. The
+latest authoritative Services set is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/revision-2/displayed-option-1.png`
+through `displayed-option-3.png`. Jacob said revision 2 overcorrected and became
+too white/flat; the real requirement is balanced color pacing and flow, not a
+single dominant surface. The latest authoritative Services set is revision 3,
+saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/revision-3/displayed-option-1.png`
+through `displayed-option-3.png`. Jacob still found all three heroes generic
+and overcrowded. He requested a six-way hero-only reset: three concepts rooted
+in the current live site's visual language, followed by three rooted in the
+locked redesigned Home direction. The latest authoritative displayed order is
+saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/hero-reset-6/displayed-option-1.png`
+through `displayed-option-6.png`; options 1–3 are current-site-derived and
+options 4–6 are Home-derived. Each frame contains the header, one restrained
+hero with a single focal idea, and only the start of the next section. All
+avoid people and houses. Jacob selected displayed option 4, the Home-derived
+diagonal hero with one US territory map, exactly three labeled service nodes,
+and one continuous lime route. That hero has been carried into a balanced full
+Services-page lock candidate at
+`docs/redesign/concepts/public-pages-2026-08-25/services/selected-hero-4-full-page-candidate.png`.
+Its route continues through alternating Fiber, TV, Security, bundle, and
+recruiting sections. Jacob liked the style but rejected the TV and Security
+imagery and established a hard content rule: never show real streaming-service,
+network, studio, hardware, security-company, telecom, or manufacturer names,
+logos, program art, app icons, or recognizable branded interfaces. Three new
+full-page variations preserve the selected map hero and structure while using
+different fully unbranded TV/Security art. Their authoritative displayed order
+is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/unbranded-media-3/displayed-option-1.png`
+through `displayed-option-3.png`. Jacob said those images still tried too hard
+and requested three calmer versions. The latest authoritative Services set is
+saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/simple-media-3/displayed-option-1.png`
+through `displayed-option-3.png`. These preserve the selected map hero and page
+system while reducing TV/Security pictures to: (1) two plain studio objects,
+(2) one catalog object per service, and (3) quiet close-up product details.
+Jacob then supplied two exact references and chose a combination: use the
+lighter Security section from his first reference and the warm staged TV/
+receiver/tablet composition from his second reference, but remove all real
+streaming-service names, logos, program art, and branded UI. The combined
+Services lock candidate is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/selected-combination-tv2-security1-final-candidate.png`.
+Its TV screens use only generic categories (Live TV, Movies, Sports, News,
+Kids, Recordings); its Security section preserves the unbranded camera/keypad/
+sensor/hub flat-lay. Jacob then flagged that the lime route disconnected
+between services 01, 02, 03 and the Bundle & Save section. A precise revision
+now uses one continuous lime route from the overview through Fiber, TV,
+Security, the `UP TO 30%` bundle node, and the recruiting CTA, with no loose
+dots or broken segments. The revised Services lock candidate is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/services/selected-combination-connected-route-final-candidate.png`.
+Jacob approved and locked this connected-route Services revision. The next
+page is Careers. Three fresh full-page Careers mockups preserve the current
+Careers information, the locked navy/lime people-free visual system, generic
+unbranded service imagery, and recruiting-first funnel. Their authoritative
+displayed order is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/careers/displayed-option-1.png`
+through `displayed-option-3.png`. Option numbering follows the order shown in
+the Product Design thread. Jacob chose option 3's hero, option 2's immediate
+`THE OPPORTUNITY, AT A GLANCE` band and dark `WHAT YOU'LL SELL` section, and
+option 1's pale six-column `WHAT WE OFFER` section. He also removed the FAQ and
+rejected the connector/string motif for the entire Careers page. The combined
+revision keeps the selected hero map network contained inside the hero, uses
+no lime routes, strings, connector nodes, or loose dots below it, and is saved
+at
+`docs/redesign/concepts/public-pages-2026-08-25/careers/selected-combination-no-connectors-revision.png`.
+Jacob approved and locked this no-connectors Careers revision. All currently
+locked visual targets (Home, About, Services, Careers) are desktop-only; no
+mobile mockup has been designed or approved yet. Mobile must receive its own
+page-by-page adaptation and approval pass before production implementation.
+Recommended sequence: finish the remaining desktop locks for Culture, Contact,
+and Apply, then mobile-lock every public page from Home through Apply so the
+mobile system inherits the final page content and shared patterns. NEXT: move
+to three desktop Culture mockups unless Jacob chooses to pause and begin the
+mobile pass now. UPDATE: Culture is an existing `/culture` page linked from the
+current footer but absent from the primary navigation; it is not a newly
+invented page. One Culture mockup was generated before Jacob questioned whether
+the page existed. Jacob confirmed to continue. The full three-option desktop
+Culture set is now complete, people-free, recruiting-oriented, and preserves
+the existing Connection / Community / Commitment, operating principles,
+life-at-3C, satisfaction, and CTA content. Its
+authoritative displayed order is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/culture/displayed-option-1.png`
+through `displayed-option-3.png`. Jacob chose option 1's hero and horizontal
+three-C arrangement, option 3's oversized-C visual treatment for that row, and
+option 2's `HOW WE OPERATE`, `THE RHYTHM OF LIFE AT 3C`, and `98% CONTRACTOR
+SATISFACTION` sections. Jacob identified the current Community Involvement
+claims as untrue; remove Local Charities, Youth Programs, Environmental Impact,
+giving-back, charity, nonprofit, and sustainability claims from the redesigned
+site. The combined Culture revision replaces that material with `FROM VALUES TO
+OPPORTUNITY`: Get Prepared, Stay Supported, and Grow Through Results, using only
+training, mentorship, communication, recognition, and performance claims
+already supported elsewhere on the site. It also restores Community Events to
+the existing neutral copy `Regional meetups and annual conferences.` The
+candidate is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/culture/selected-combination-truthful-replacement-revision.png`.
+Jacob approved the composition but said the final CTA and footer did not blend
+smoothly. A precise revision now places both on one continuous deep-navy
+topographic surface, tapers the lime CTA panel back into navy before the footer
+content, removes the hard full-width seam, and darkens gently toward the page
+bottom. It is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/culture/selected-combination-footer-blend-revision.png`.
+Jacob approved and locked the footer-blended Culture revision. Its seamless
+ending is now the shared desktop standard for every redesigned public page:
+CTA and footer sit on one continuous deep-navy topographic surface, the lime
+action panel tapers back into navy before the footer columns, there is no hard
+full-width seam, and the footer darkens gently toward the page bottom. This
+standard has now been applied without changing the locked page compositions:
+- Home: `docs/redesign/concepts/landing-2026-08-25/selected-option-3-people-free-footer-blend-revision.png`
+- About: `docs/redesign/concepts/public-pages-2026-08-25/about/selected-combination-footer-blend-revision.png`
+- Services: `docs/redesign/concepts/public-pages-2026-08-25/services/selected-combination-footer-blend-revision.png`
+- Careers: `docs/redesign/concepts/public-pages-2026-08-25/careers/selected-combination-footer-blend-revision.png`
+Three desktop Contact mockups are now complete and displayed in authoritative
+order:
+- `docs/redesign/concepts/public-pages-2026-08-25/contact/displayed-option-1.png`
+- `docs/redesign/concepts/public-pages-2026-08-25/contact/displayed-option-2.png`
+- `docs/redesign/concepts/public-pages-2026-08-25/contact/displayed-option-3.png`
+All preserve the current contact form/details, prioritize recruiting and
+contractor-team paths, avoid people/houses/real provider brands, and use the
+shared seamless CTA/footer standard. Option 1 is triage-first (`WHAT CAN WE
+HELP WITH?` before the form), option 2 is form-led (form embedded in the hero),
+and option 3 is an editorial `OPEN CHANNEL` direction with recruiting shortcuts
+before the form. Jacob selected a combination: option 1's hero, `SEND US A
+MESSAGE` form, and `GET IN TOUCH` panel; option 3's `THE FASTEST PATH` treatment
+with `JOIN AS A SALES REP` and `BRING OR BUILD A TEAM`; and option 2's `DON'T
+NEED TO WAIT? APPLY TODAY.` CTA. The combined Contact lock candidate is saved at
+`docs/redesign/concepts/public-pages-2026-08-25/contact/selected-combination-lock-candidate.png`.
+Jacob approved and locked this combined Contact candidate. Three desktop Apply
+mockups are now complete and displayed in authoritative order:
+- `docs/redesign/concepts/public-pages-2026-08-25/apply/displayed-option-1.png`
+- `docs/redesign/concepts/public-pages-2026-08-25/apply/displayed-option-2.png`
+- `docs/redesign/concepts/public-pages-2026-08-25/apply/displayed-option-3.png`
+All preserve the real five-field application, current earnings/market facts,
+transparent 1099/commission framing, the no-people/no-houses/no-real-brands
+rules, and the shared seamless CTA/footer. Option 1 is application-first with
+the form embedded in the hero; option 2 establishes market proof before a
+form/timeline split; option 3 leads with transparent terms before a wide form.
+Jacob selected and locked Apply option 1. Its authoritative desktop target is
+`docs/redesign/concepts/public-pages-2026-08-25/apply/displayed-option-1.png`.
+The complete desktop redesign set is now locked: Home, About, Services,
+Careers, Culture, Contact, and Apply. Jacob approved replacing the separate
+seven-page mobile mockup/approval phase with one responsive implementation and
+browser-QA pass. The locked desktop mocks are the source of truth; implement all
+seven public routes responsively in the existing Next.js app, preserve working
+forms/navigation/content, then verify desktop, tablet, and 390x844 mobile views
+and fix overflow, hierarchy, spacing, readability, tap-target, and interaction
+issues before handoff. NEXT: inventory the existing public-page architecture
+and dirty worktree, then implement the shared responsive shell/design system and
+all seven pages. Do not deploy unless Jacob explicitly asks.
+Earlier one-off About/Services/Careers drafts are not part of the numbered
+page-by-page sets. Do not change production code yet.
 
 SHIPPED 2026-08-25: FIBER INSTALL-STATUS FEED (daily provider report
 email -> portal). Full pipeline: POST /api/webhooks/inbound-report
@@ -33,17 +256,38 @@ parsed, 0 missing rep names. Key files: src/lib/fiberReport/,
 src/types/fiberOrder.ts, src/hooks/useFiberStatus.ts,
 src/components/sales/InstallStatusSection.tsx.
 
-NEXT: WAITING ON JACOB to activate the email feed — Postmark plan has
-NO inbound (error 614), so transport = Google Apps Script poller in
-his Gmail: script prepped at scratchpad gmail-report-forwarder.gs
-(placeholder PASTE_TOKEN_HERE -> value of POSTMARK_INBOUND_TOKEN,
-last line of .env.local). He pastes it at script.google.com, runs
-once to authorize, adds 5-min time trigger. Until then fiberOrders is
-empty and the section shows its honest empty state. Also still
-waiting: (a) eyeball the three 8/24 UI fixes; (b) pay_structure.pdf +
-fcra_auth.pdf still PLACEHOLDERS; (c) webhook log grab when Mason
-signs direct_deposit (see STILL OPEN). NOTE: the ACTIVE landing-page
-block above belongs to a PARALLEL session — do not touch it here.
+FEED IS LIVE (2026-08-25 eve): Jacob installed the Gmail Apps Script
+poller (Postmark has NO inbound — error 614); reports flow every 5
+min. Sender: Dakota.Russell72@t-mobile.com (Jeremy also forwards
+copies). Real import verified via token-gated GET
+/api/webhooks/inbound-report?token=POSTMARK_INBOUND_TOKEN (health
+check: status + last 10 imports + user displayNames): 929 orders,
+241 matched initially.
+
+SHIPPED 2026-08-25 (later, commit 348866a, deployed uwgaf0gtr Ready,
+gates tsc/809 tests/build green): admin view = collapsed-by-default
+dropdown per rep (matched AND not-yet-linked reps each get their own
+named group under divider "Not linked to an account yet"); per-group
+Assign control (dealer-id sticky via config/fiberRepMap + instant
+backfill) + "Re-run matching" button; matching now strips
+punctuation/diacritics (fixes Cooper O'Tool vs Otool), safe loose
+first+last matching, ambiguity never auto-assigns. New
+src/lib/fiberReport/matchReps.ts + POST
+/api/portal/sales/status/assign (actions: assign|rematch,
+admin/owner only).
+
+NEXT: WAITING ON JACOB to (1) open /portal/sales admin view, hit
+"Re-run matching" (fixes Cooper automatically), then Assign the rest:
+Wil Teasdale (report "Will"), Jeremy (report "Jeremy McFarland"),
+"mason Tran" (portal candidates: Brenden Tran / Mason Steinberger —
+Jacob decides). Gavin McCrory, Nolan Morrison, Colton Gordon, Daniel
+Ramirez, Joshua Dweh Jr, Cael Crawford have NO portal accounts —
+their named groups stay admin-only until they sign up, then Assign.
+Also still waiting: (a) eyeball the three 8/24 UI fixes; (b)
+pay_structure.pdf + fcra_auth.pdf still PLACEHOLDERS; (c) webhook log
+grab when Mason signs direct_deposit (see STILL OPEN). NOTE: the
+public-site redesign blocks above belong to a PARALLEL session — do
+not touch them here.
 
 NEW STANDING RULE (Jacob, 2026-08-24): NO solo single-agent runs —
 split independent work across MULTIPLE PARALLEL `codex exec`
