@@ -53,10 +53,51 @@ export function buildNameIndex(
   return index;
 }
 
+function isPrefixPair(a: string, b: string): boolean {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  return shorter.length >= 3 && longer.startsWith(shorter);
+}
+
+/**
+ * Last-resort fuzzy tier: same last name with first names that are prefixes of
+ * each other ("wil"/"will"), or a single-word portal name equal to the report
+ * first name ("jeremy" vs "jeremy mcfarland"). Only an UNAMBIGUOUS candidate
+ * (exactly one user) may match — two plausible users mean no auto-match.
+ */
+export function fuzzyMatchName(
+  reportName: string,
+  users: Array<{ uid: string; displayName?: unknown }>,
+): string | null {
+  const normalized = normalizeRepName(reportName);
+  const reportWords = normalized.split(' ').filter(Boolean);
+  if (reportWords.length < 1) return null;
+  const reportFirst = reportWords[0];
+  const reportLast = reportWords[reportWords.length - 1];
+
+  const candidates = new Set<string>();
+  for (const user of users) {
+    if (!user.uid) continue;
+    const portalWords = normalizeRepName(user.displayName).split(' ').filter(Boolean);
+    if (portalWords.length === 0) continue;
+    if (portalWords.length === 1) {
+      if (reportWords.length >= 2 && portalWords[0] === reportFirst) candidates.add(user.uid);
+      continue;
+    }
+    if (reportWords.length < 2) continue;
+    const portalFirst = portalWords[0];
+    const portalLast = portalWords[portalWords.length - 1];
+    if (portalLast === reportLast && isPrefixPair(portalFirst, reportFirst)) candidates.add(user.uid);
+  }
+  return candidates.size === 1 ? [...candidates][0] : null;
+}
+
 export function matchOrder(
   order: { repDealerId: string; repName: string },
   dealerMap: Record<string, string>,
   nameIndex: Map<string, string>,
+  users?: Array<{ uid: string; displayName?: unknown }>,
 ): string | null {
   const dealerId = order.repDealerId.trim();
   if (dealerId && dealerMap[dealerId]) return dealerMap[dealerId];
@@ -67,5 +108,8 @@ export function matchOrder(
   if (fullMatch) return fullMatch;
 
   const loose = looseName(normalized);
-  return loose ? nameIndex.get(loose) ?? null : null;
+  const looseMatch = loose ? nameIndex.get(loose) ?? null : null;
+  if (looseMatch) return looseMatch;
+
+  return users ? fuzzyMatchName(order.repName, users) : null;
 }

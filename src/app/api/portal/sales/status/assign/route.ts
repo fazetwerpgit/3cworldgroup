@@ -1,39 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
-
-const BATCH_SIZE = 450;
+import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
+import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readDealerMap(data: FirebaseFirestore.DocumentData | undefined): Record<string, string> {
-  const value = data?.map;
-  if (!isRecord(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
-  );
-}
-
-async function updateOrders(
-  orders: FirebaseFirestore.QueryDocumentSnapshot[],
-  userIdByOrder: Map<string, string>,
-  updatedAt: string,
-): Promise<void> {
-  if (!adminDb) throw new Error('Database not configured');
-  const fiberOrders = adminDb.collection('fiberOrders');
-  for (let offset = 0; offset < orders.length; offset += BATCH_SIZE) {
-    const batch = adminDb.batch();
-    for (const order of orders.slice(offset, offset + BATCH_SIZE)) {
-      batch.update(order.ref ?? fiberOrders.doc(order.id), {
-        matchedUserId: userIdByOrder.get(order.id),
-        updatedAt,
-      });
-    }
-    await batch.commit();
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -66,82 +38,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    if (body.action !== 'assign' && body.action !== 'rematch') {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-    }
-
-    let dealerId = '';
-    let userId = '';
     if (body.action === 'assign') {
-      if (
-        typeof body.dealerId !== 'string' ||
-        !body.dealerId.trim() ||
-        typeof body.userId !== 'string' ||
-        !body.userId.trim()
-      ) {
+      if (typeof body.dealerId !== 'string' || typeof body.userId !== 'string') {
         return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
       }
-      dealerId = body.dealerId.trim();
-      userId = body.userId.trim();
-    }
-
-    const configRef = adminDb.collection('config').doc('fiberRepMap');
-    const mapSnapshot = await configRef.get();
-    const dealerMap = readDealerMap(mapSnapshot.data());
-
-    if (body.action === 'assign') {
-      const targetUser = await adminDb.collection('users').doc(userId).get();
-      if (!targetUser.exists) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      const result = await assignDealerToUser(body.dealerId, body.userId);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
       }
-
-      dealerMap[dealerId] = userId;
-      await configRef.set({ map: dealerMap }, { merge: true });
-
-      const snapshot = await adminDb
-        .collection('fiberOrders')
-        .where('repDealerId', '==', dealerId)
-        .get();
-      const updatedAt = new Date().toISOString();
-      const updates = new Map(snapshot.docs.map((order) => [order.id, userId]));
-      await updateOrders(snapshot.docs, updates, updatedAt);
-      return NextResponse.json({ ok: true, updated: snapshot.docs.length });
+      return NextResponse.json({ ok: true, updated: result.updated });
     }
 
-    const usersSnapshot = await adminDb.collection('users').get();
-    const nameIndex = buildNameIndex(
-      usersSnapshot.docs.map((user) => ({ uid: user.id, displayName: user.data()?.displayName })),
-    );
-    const snapshot = await adminDb
-      .collection('fiberOrders')
-      .where('matchedUserId', '==', null)
-      .get();
-    const updatedAt = new Date().toISOString();
-    const updates = new Map<string, string>();
-    let learnedDealerMap = false;
-    for (const order of snapshot.docs) {
-      const data = order.data();
-      const repDealerId = typeof data?.repDealerId === 'string' ? data.repDealerId.trim() : '';
-      const repName = typeof data?.repName === 'string' ? data.repName : '';
-      const userId = matchOrder({ repDealerId, repName }, dealerMap, nameIndex);
-      if (!userId) continue;
-      updates.set(order.id, userId);
-      if (repDealerId && !dealerMap[repDealerId]) {
-        dealerMap[repDealerId] = userId;
-        learnedDealerMap = true;
-      }
+    if (body.action === 'rematch') {
+      const result = await rematchUnmatchedOrders();
+      return NextResponse.json({ ok: true, ...result });
     }
 
-    await updateOrders(snapshot.docs.filter((order) => updates.has(order.id)), updates, updatedAt);
-    // `dealerMap` is the complete map, so a shallow merge cannot erase older
-    // mappings when rematch learns a new dealer id.
-    if (learnedDealerMap) await configRef.set({ map: dealerMap }, { merge: true });
-
-    return NextResponse.json({
-      ok: true,
-      updated: updates.size,
-      stillUnmatched: snapshot.docs.length - updates.size,
-    });
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   } catch (error) {
     console.error('Error assigning fiber status:', error);
     return NextResponse.json({ error: 'Failed to assign fiber status' }, { status: 500 });

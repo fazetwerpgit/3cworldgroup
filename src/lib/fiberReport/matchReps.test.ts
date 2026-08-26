@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildNameIndex, matchOrder, normalizeRepName } from './matchReps';
+import { buildNameIndex, fuzzyMatchName, matchOrder, normalizeRepName } from './matchReps';
 
 describe('normalizeRepName', () => {
   it('removes punctuation, normalizes case and diacritics, and collapses spaces', () => {
@@ -48,7 +48,43 @@ describe('buildNameIndex', () => {
   });
 });
 
+describe('fuzzyMatchName', () => {
+  const users = [
+    { uid: 'wil', displayName: 'Wil Teasdale' },
+    { uid: 'jeremy', displayName: 'Jeremy' },
+    { uid: 'mason', displayName: 'Mason Steinberger' },
+  ];
+
+  it('matches prefix first names when the last name is identical', () => {
+    expect(fuzzyMatchName('Will Teasdale', users)).toBe('wil');
+  });
+
+  it('matches a single-word portal name against the report first name', () => {
+    expect(fuzzyMatchName('Jeremy McFarland', users)).toBe('jeremy');
+  });
+
+  it('never matches across different last names or short prefixes', () => {
+    expect(fuzzyMatchName('mason Tran', users)).toBeNull();
+    expect(fuzzyMatchName('Wi Teasdale', users)).toBeNull();
+  });
+
+  it('refuses ambiguous candidates', () => {
+    expect(fuzzyMatchName('Sam Jones', [
+      { uid: 'a', displayName: 'Sam Jones' },
+      { uid: 'b', displayName: 'Samuel Jones' },
+    ])).toBeNull();
+  });
+});
+
 describe('matchOrder', () => {
+  it('falls back to the fuzzy tier only when users are provided', () => {
+    const users = [{ uid: 'wil', displayName: 'Wil Teasdale' }];
+    const index = buildNameIndex(users);
+
+    expect(matchOrder({ repDealerId: '', repName: 'Will Teasdale' }, {}, index)).toBeNull();
+    expect(matchOrder({ repDealerId: '', repName: 'Will Teasdale' }, {}, index, users)).toBe('wil');
+  });
+
   it('uses dealer mappings before name matches and falls back to loose names', () => {
     const index = buildNameIndex([{ uid: 'name-user', displayName: 'Nolan James Morrison' }]);
 

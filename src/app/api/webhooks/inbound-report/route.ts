@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
+import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
+import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
 import type { FiberOrder, FiberReportImport } from '@/types/fiberOrder';
 
 export const maxDuration = 60;
@@ -55,6 +57,21 @@ export async function GET(request: NextRequest) {
   if (!adminDb) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
   }
+
+  // Ops actions (same token gate): ?rematch=1 re-runs matching over unmatched
+  // orders; ?assign=<dealerId>:<uid> maps a dealer id to a user and backfills.
+  const assignParam = request.nextUrl.searchParams.get('assign');
+  if (assignParam) {
+    const [dealerId, userId] = assignParam.split(':');
+    const result = await assignDealerToUser(dealerId ?? '', userId ?? '');
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ ok: true, assigned: dealerId, updated: result.updated });
+  }
+  if (request.nextUrl.searchParams.get('rematch')) {
+    const result = await rematchUnmatchedOrders();
+    return NextResponse.json({ ok: true, ...result });
+  }
+
   const status = await adminDb.collection('config').doc('fiberReportStatus').get();
   const imports = await adminDb
     .collection('fiberReportImports')
@@ -79,9 +96,9 @@ export async function GET(request: NextRequest) {
     status: status.exists ? status.data() : null,
     imports: imports.docs.map((doc) => doc.data()),
     userDisplayNames: users.docs
-      .map((doc) => doc.data()?.displayName ?? '')
-      .filter(Boolean)
-      .sort(),
+      .map((doc) => ({ uid: doc.id, displayName: doc.data()?.displayName ?? '' }))
+      .filter((entry) => entry.displayName)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName)),
     dealerMap: repMap.data()?.map ?? {},
     unmatchedByRep,
   });
@@ -133,9 +150,11 @@ export async function POST(request: NextRequest) {
       ...((mapSnapshot.data()?.map ?? {}) as Record<string, string>),
     };
     const usersSnapshot = await adminDb.collection('users').get();
-    const usersByName = buildNameIndex(
-      usersSnapshot.docs.map((user) => ({ uid: user.id, displayName: user.data()?.displayName })),
-    );
+    const userEntries = usersSnapshot.docs.map((user) => ({
+      uid: user.id,
+      displayName: user.data()?.displayName,
+    }));
+    const usersByName = buildNameIndex(userEntries);
 
     const newlyMapped: Record<string, string> = {};
     const unmatchedRepNames = new Set<string>();
@@ -147,6 +166,7 @@ export async function POST(request: NextRequest) {
         { repDealerId: dealerId, repName: order.repName },
         mappedDealerIds,
         usersByName,
+        userEntries,
       );
       if (matchedUserId && dealerId && !mappedDealerIds[dealerId]) {
         mappedDealerIds[dealerId] = matchedUserId;
