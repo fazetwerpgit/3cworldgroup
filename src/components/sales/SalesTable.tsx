@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { Sale, SaleStatus, FIBER_COMPANIES, PAY_DELAY_DAYS } from '@/types';
+import type { FiberOrder, FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
@@ -20,6 +21,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SaleDetailSheet } from './SaleDetailSheet';
+import { FiberRows, FiberStatusPill, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
+import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 
 interface SalesTableProps {
   sales: Sale[];
@@ -33,6 +36,8 @@ interface SalesTableProps {
   onPayViewChange?: (payView: boolean) => void;
   /** The viewer's own comp-plan slice. Absent/planless reps see no dollar figures. */
   payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
+  /** Reps only: provider install status, fetched once by the page. */
+  fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
 }
 
 const STATUS_TABS: { value: SaleStatus | ''; label: string }[] = [
@@ -47,7 +52,7 @@ function formatMoney(value: number) {
   return `$${Math.round(value).toLocaleString('en-US')}`;
 }
 
-function formatDate(value: Date | string | undefined) {
+function formatDate(value: Date | string | null | undefined) {
   if (!value) return 'N/A';
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
@@ -100,6 +105,7 @@ export function SalesTable({
   payView = false,
   onPayViewChange,
   payPlan,
+  fiber,
 }: SalesTableProps) {
   const { user, hasPermission, isRole } = useAuth();
   const canApprove = hasPermission('sales:approve');
@@ -117,6 +123,7 @@ export function SalesTable({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+  const [fiberView, setFiberView] = useState<FiberBucket | null>(null);
 
   // Reps have no status tabs to filter with, so their ledger is always the whole book.
   const visibleSales = useMemo(
@@ -157,6 +164,31 @@ export function SalesTable({
     ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
   const expectedTotalLabel = expectedLabel(expectedTotal);
+  const fiberOrders = useMemo(() => fiber?.data?.orders ?? [], [fiber?.data?.orders]);
+  const fiberBySale = useMemo(() => {
+    if (!repMode) return new Map<string, FiberOrder>();
+    return matchFiberOrdersToSales(sales, fiberOrders);
+  }, [fiberOrders, repMode, sales]);
+  const fiberBucketCounts = useMemo(() => {
+    const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };
+    fiberOrders.forEach((order) => {
+      if (order.status === 'pending_install' || order.status === 'pre_sale') counts.pending += 1;
+      else if (order.status === 'active') counts.active += 1;
+      else if (order.status === 'cancelled' || order.status === 'churned') counts.cancelled += 1;
+      else counts.attention += 1;
+    });
+    return counts;
+  }, [fiberOrders]);
+  const fiberBucketOrders = useMemo(() => {
+    if (!fiberView) return [];
+    return sortFiberOrders(fiberOrders.filter((order) => {
+      if (fiberView === 'pending') return order.status === 'pending_install' || order.status === 'pre_sale';
+      if (fiberView === 'active') return order.status === 'active';
+      if (fiberView === 'cancelled') return order.status === 'cancelled' || order.status === 'churned';
+      return order.status === 'breakage';
+    }));
+  }, [fiberOrders, fiberView]);
+  const showFiberView = repMode && fiberView !== null;
 
   const moveSelection = useCallback((direction: number) => {
     if (!listSales.length) return;
@@ -287,8 +319,8 @@ export function SalesTable({
 
         {repMode ? (
           <nav className="sales-line-tabs" aria-label="Sales views">
-            <button className="sales-line-tab" role="tab" type="button" aria-selected={!showPay} onClick={() => { setSelectedId(null); onPayViewChange?.(false); }}>All</button>
-            <button className="sales-line-tab" role="tab" type="button" aria-selected={showPay} onClick={() => { setSelectedId(null); onPayViewChange?.(true); }}>Pay</button>
+            <button className="sales-line-tab" role="tab" type="button" aria-selected={!showPay} onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(false); }}>All</button>
+            <button className="sales-line-tab" role="tab" type="button" aria-selected={showPay} onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(true); }}>Pay</button>
           </nav>
         ) : (
         <nav className="sales-line-tabs" aria-label="Sale status filters">
@@ -304,7 +336,46 @@ export function SalesTable({
         </nav>
         )}
 
-        {showPay ? (
+        {repMode && fiberOrders.length > 0 && (
+          <div className="sales-line-fiber-chips" role="group" aria-label="Fiber status views">
+            <button
+              type="button"
+              className="sales-line-fiber-ledger-chip sales-line-fiber-ledger-chip-sent"
+              aria-pressed={fiberView === null}
+              onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(false); }}
+            >
+              <span>Sent in</span>{' '}<strong>{sales.length}</strong>
+            </button>
+            {([
+              ['pending', 'Pending install'],
+              ['active', 'Active'],
+              ['cancelled', 'Cancelled'],
+              ['attention', 'Needs attention'],
+            ] as Array<[FiberBucket, string]>).map(([key, label]) => {
+              if (fiberBucketCounts[key] === 0) return null;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`sales-line-fiber-ledger-chip sales-line-fiber-ledger-chip-${key}`}
+                  aria-pressed={fiberView === key}
+                  onClick={() => { setSelectedId(null); setFiberView(key); onPayViewChange?.(false); }}
+                >
+                  <span>{label}</span>{' '}<strong>{fiberBucketCounts[key]}</strong>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {showFiberView ? (
+          <div className="sales-line-fiber-ledger">
+            <p className="sales-line-fiber-report-note">
+              From the provider report · updated {formatDate(fiber?.data?.lastReportAt)}
+            </p>
+            <FiberRows orders={fiberBucketOrders} />
+          </div>
+        ) : showPay ? (
         <div className="sales-line-table-wrap">
           {!hasPlan && (
             <p className="sales-line-pay-note">No pay plan assigned yet — ask an admin to set your role.</p>
@@ -333,7 +404,10 @@ export function SalesTable({
                     </div>
                   )}
                   <div className="sales-line-date-cell"><strong>{due ? formatDate(due) : '—'}</strong><span>Install {formatDate(sale.installDate)}</span></div>
-                  <div className="sales-line-status-cell"><StatusBadge status={sale.status} /></div>
+                  <div className="sales-line-status-cell">
+                    <StatusBadge status={sale.status} />
+                    {fiberBySale.get(sale.id || '') && <FiberStatusPill status={fiberBySale.get(sale.id || '')!.status} />}
+                  </div>
                   <div
                     className="sales-line-paid-cell"
                     onClick={(event) => event.stopPropagation()}
@@ -377,7 +451,11 @@ export function SalesTable({
                 <div className="sales-line-date-cell"><strong>Install {sale.installDate ? formatDate(sale.installDate) : '—'}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
                 <div className="sales-line-money">{formatMoney(sale.totalValue || 0)}<small>/mo</small></div>
                 <div className="sales-line-money">{repMode ? expectedLabel(expectedBySale[sale.id || '']) : typeof sale.commission === 'number' ? formatMoney(sale.commission) : '—'}</div>
-                <div className="sales-line-status-cell"><StatusBadge status={sale.status} />{sale.status === 'pending' && <span className={`sales-line-stale ${ageTone(sale)}`}>{ageLabel(sale)}</span>}</div>
+                <div className="sales-line-status-cell">
+                  <StatusBadge status={sale.status} />
+                  {fiberBySale.get(sale.id || '') && <FiberStatusPill status={fiberBySale.get(sale.id || '')!.status} />}
+                  {sale.status === 'pending' && <span className={`sales-line-stale ${ageTone(sale)}`}>{ageLabel(sale)}</span>}
+                </div>
                 <div className="sales-line-actions-cell">{rowActions(sale)}</div>
               </div>
             )) : <div className="sales-line-ledger-empty">{statusFilter && canApprove ? `No ${statusFilter} sales in this view.` : `No sales in ${canApprove ? 'the ledger' : 'your book'}.`}</div>}

@@ -7,6 +7,11 @@ export type LoggedSale = {
   createdAt?: Date | null;
 };
 
+export type SaleForFiberMatch = {
+  id?: string;
+  customerAddress?: string | null;
+};
+
 /** Normalize a free-text address for conservative street-prefix matching. */
 export function normalizeAddress(value: string | null | undefined): string {
   if (typeof value !== 'string') return '';
@@ -23,6 +28,46 @@ function isAddressPrefixPair(a: string, b: string): boolean {
   const shorter = a.length <= b.length ? a : b;
   const longer = a.length <= b.length ? b : a;
   return shorter.length >= 6 && longer.startsWith(shorter);
+}
+
+/** Match sales to the rep's own-scope API response in memory; callers own matchedUserId filtering. */
+export function matchFiberOrdersToSales(
+  sales: SaleForFiberMatch[],
+  orders: FiberOrder[],
+): Map<string, FiberOrder> {
+  const matches = new Map<string, FiberOrder>();
+
+  for (const sale of sales) {
+    const saleId = sale.id;
+    const saleAddress = normalizeAddress(sale.customerAddress);
+    if (!saleId?.trim() || saleAddress.length < 6) continue;
+
+    let selectedOrder: FiberOrder | undefined;
+    for (const order of orders) {
+      const orderAddress = normalizeAddress(order.address);
+      if (!isAddressPrefixPair(saleAddress, orderAddress)) continue;
+
+      if (!selectedOrder) {
+        selectedOrder = order;
+        continue;
+      }
+
+      if (order.status === 'breakage' && selectedOrder.status !== 'breakage') {
+        selectedOrder = order;
+        continue;
+      }
+
+      if (selectedOrder.status !== 'breakage' && order.status !== 'breakage') {
+        const selectedDate = selectedOrder.orderDate ?? selectedOrder.estInstallDate ?? '';
+        const orderDate = order.orderDate ?? order.estInstallDate ?? '';
+        if (orderDate > selectedDate) selectedOrder = order;
+      }
+    }
+
+    if (selectedOrder) matches.set(saleId, selectedOrder);
+  }
+
+  return matches;
 }
 
 function timestamp(sale: LoggedSale): number {

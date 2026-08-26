@@ -3417,6 +3417,7 @@ body.portal-scope {
 .sales-line-status-cell {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
 }
@@ -13827,6 +13828,123 @@ body.portal-scope {
   margin: 14px 0 0;
 }
 
+.sales-line-fiber-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 14px 0 0;
+}
+
+.sales-line-fiber-ledger-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
+  border-radius: 999px;
+  padding: 8px 12px 8px 10px;
+  background: transparent;
+  color: var(--muted);
+  font: 900 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sales-line-fiber-ledger-chip::before {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink);
+  content: "";
+}
+
+.sales-line-fiber-ledger-chip span {
+  color: var(--muted);
+}
+
+.sales-line-fiber-ledger-chip strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.sales-line-fiber-ledger-chip-sent {
+  color: var(--ink);
+}
+
+.sales-line-fiber-ledger-chip:hover,
+.sales-line-fiber-ledger-chip:focus-visible,
+.sales-line-fiber-ledger-chip[aria-pressed="true"] {
+  border-color: currentColor;
+  outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+  outline-offset: 2px;
+}
+
+.sales-line-fiber-ledger-chip[aria-pressed="true"] span {
+  color: var(--ink);
+}
+
+.sales-line-fiber-ledger-chip-pending {
+  border-left-color: var(--amber);
+}
+
+.sales-line-fiber-ledger-chip-pending::before,
+.sales-line-fiber-ledger-chip-pending strong,
+.sales-line-fiber-ledger-chip-pending[aria-pressed="true"] {
+  color: var(--amber);
+}
+
+.sales-line-fiber-ledger-chip-pending::before {
+  background: var(--amber);
+}
+
+.sales-line-fiber-ledger-chip-active {
+  border-left-color: var(--lime);
+}
+
+.sales-line-fiber-ledger-chip-active::before,
+.sales-line-fiber-ledger-chip-active strong,
+.sales-line-fiber-ledger-chip-active[aria-pressed="true"] {
+  color: var(--lime);
+}
+
+.sales-line-fiber-ledger-chip-active::before {
+  background: var(--lime);
+}
+
+.sales-line-fiber-ledger-chip-cancelled,
+.sales-line-fiber-ledger-chip-attention {
+  border-left-color: var(--red);
+}
+
+.sales-line-fiber-ledger-chip-cancelled::before,
+.sales-line-fiber-ledger-chip-cancelled strong,
+.sales-line-fiber-ledger-chip-cancelled[aria-pressed="true"],
+.sales-line-fiber-ledger-chip-attention::before,
+.sales-line-fiber-ledger-chip-attention strong,
+.sales-line-fiber-ledger-chip-attention[aria-pressed="true"] {
+  color: var(--red);
+}
+
+.sales-line-fiber-ledger-chip-cancelled::before,
+.sales-line-fiber-ledger-chip-attention::before {
+  background: var(--red);
+}
+
+.sales-line-fiber-ledger {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sales-line-fiber-report-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font: 9px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
 .sales-line-fiber-chip {
   border: 1px solid var(--line);
   border-radius: 99px;
@@ -13855,111 +13973,6 @@ body.portal-scope {
   border-color: var(--lime);
   background: color-mix(in srgb, var(--lime) 12%, transparent);
   color: var(--lime);
-}
-
-.sales-line-fiber-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 7px;
-  margin: 14px 0 0;
-}
-
-.sales-line-fiber-stat {
-  display: flex;
-  min-width: 0;
-  min-height: 64px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  border: 1px solid var(--line);
-  padding: 10px;
-  background: color-mix(in srgb, var(--panel2) 30%, transparent);
-  color: var(--ink);
-  text-align: left;
-}
-
-button.sales-line-fiber-stat {
-  font: inherit;
-  cursor: pointer;
-}
-
-.sales-line-fiber-stat-label {
-  color: var(--muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.sales-line-fiber-stat-value {
-  color: var(--ink);
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.05em;
-  line-height: 1;
-}
-
-.sales-line-fiber-stat-sent {
-  border-color: color-mix(in srgb, var(--ink) 35%, var(--line));
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-
-.sales-line-fiber-stat-pending {
-  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
-}
-
-.sales-line-fiber-stat-pending .sales-line-fiber-stat-value {
-  color: var(--amber);
-}
-
-.sales-line-fiber-stat-active {
-  border-color: color-mix(in srgb, var(--lime) 55%, transparent);
-}
-
-.sales-line-fiber-stat-active .sales-line-fiber-stat-value {
-  color: var(--lime);
-}
-
-.sales-line-fiber-stat-cancelled,
-.sales-line-fiber-stat-attention {
-  border-color: color-mix(in srgb, var(--red) 55%, transparent);
-}
-
-.sales-line-fiber-stat-cancelled .sales-line-fiber-stat-value,
-.sales-line-fiber-stat-attention .sales-line-fiber-stat-value {
-  color: var(--red);
-}
-
-button.sales-line-fiber-stat:hover,
-button.sales-line-fiber-stat:focus-visible,
-button.sales-line-fiber-stat[aria-expanded="true"] {
-  outline: 2px solid color-mix(in srgb, var(--lime) 55%, transparent);
-  outline-offset: 2px;
-}
-
-button.sales-line-fiber-stat-pending:hover,
-button.sales-line-fiber-stat-pending:focus-visible,
-button.sales-line-fiber-stat-pending[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--amber) 12%, transparent);
-}
-
-button.sales-line-fiber-stat-active:hover,
-button.sales-line-fiber-stat-active:focus-visible,
-button.sales-line-fiber-stat-active[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--lime) 12%, transparent);
-}
-
-button.sales-line-fiber-stat-cancelled:hover,
-button.sales-line-fiber-stat-cancelled:focus-visible,
-button.sales-line-fiber-stat-cancelled[aria-expanded="true"],
-button.sales-line-fiber-stat-attention:hover,
-button.sales-line-fiber-stat-attention:focus-visible,
-button.sales-line-fiber-stat-attention[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--red) 12%, transparent);
-}
-
-.sales-line-fiber-bucket-panel {
-  min-width: 0;
-  margin-top: 12px;
 }
 
 .sales-line-fiber-list,

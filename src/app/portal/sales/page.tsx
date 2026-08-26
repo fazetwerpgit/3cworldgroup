@@ -11,6 +11,7 @@ import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { SalesTable } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
 import { useCompPlan } from '@/hooks/useCompPlan';
+import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { Sale, SaleStatus } from '@/types';
@@ -145,6 +146,7 @@ function SalesContent() {
   const pathname = usePathname();
   const { user, hasPermission } = useAuth();
   const { sales, loading, error, fetchSales, approveSale, deleteSale } = useSales();
+  const fiber = useFiberStatus();
   const queryStatus = searchParams.get('status');
   const statusFilter: SaleStatus | '' = queryStatus && STATUS_VALUES.includes(queryStatus as SaleStatus)
       ? (queryStatus as SaleStatus)
@@ -271,7 +273,7 @@ function SalesContent() {
 
               {!canApprove && !loading && <InReviewSection sales={pendingSales} />}
 
-              <InstallStatusSection />
+              {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
 
               <SalesTable
                 sales={sales}
@@ -283,6 +285,7 @@ function SalesContent() {
                 payView={payView}
                 onPayViewChange={setPayView}
                 payPlan={payPlan}
+                fiber={fiber}
               />
             </div>
           </main>

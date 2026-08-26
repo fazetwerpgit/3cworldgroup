@@ -3,10 +3,18 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
-import type { FiberOrder, FiberOrderStatus } from '@/types';
+import type { FiberOrder, FiberOrderStatus, FiberStatusResponse } from '@/types';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
-type FiberBucket = Exclude<FiberFilter, 'all'>;
+export type FiberBucket = Exclude<FiberFilter, 'all'>;
+
+export type FiberStatusHookResult = {
+  data: FiberStatusResponse | null;
+  loading: boolean;
+  refreshing?: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+};
 
 const FILTERS: Array<{ key: FiberFilter; label: string }> = [
   { key: 'all', label: 'All' },
@@ -14,13 +22,6 @@ const FILTERS: Array<{ key: FiberFilter; label: string }> = [
   { key: 'active', label: 'Active' },
   { key: 'cancelled', label: 'Cancelled/Churned' },
   { key: 'attention', label: 'Attention' },
-];
-
-const OWN_BUCKETS: Array<{ key: FiberBucket; label: string }> = [
-  { key: 'pending', label: 'Pending install' },
-  { key: 'active', label: 'Active' },
-  { key: 'cancelled', label: 'Cancelled' },
-  { key: 'attention', label: 'Needs attention' },
 ];
 
 const STATUS_LABELS: Record<FiberOrderStatus, string> = {
@@ -97,7 +98,7 @@ function sortDate(order: FiberOrder) {
   return null;
 }
 
-function sortOrders(orders: FiberOrder[]) {
+export function sortFiberOrders(orders: FiberOrder[]) {
   return [...orders].sort((a, b) => {
     const rankDifference = sortRank(a.status) - sortRank(b.status);
     if (rankDifference) return rankDifference;
@@ -143,7 +144,7 @@ function truncateNotes(value: string) {
   return `${value.slice(0, 87).trimEnd()}...`;
 }
 
-function FiberStatusPill({ status }: { status: FiberOrderStatus }) {
+export function FiberStatusPill({ status }: { status: FiberOrderStatus }) {
   return (
     <span className={`sales-line-fiber-status sales-line-fiber-status-${statusGroup(status)}`}>
       {STATUS_LABELS[status]}
@@ -181,7 +182,7 @@ function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; show
   );
 }
 
-function FiberRows({ orders, showRepName = false }: { orders: FiberOrder[]; showRepName?: boolean }) {
+export function FiberRows({ orders, showRepName = false }: { orders: FiberOrder[]; showRepName?: boolean }) {
   return (
     <div className="sales-line-fiber-list">
       {orders.map((order) => <FiberOrderRow key={order.id} order={order} showRepName={showRepName} />)}
@@ -193,10 +194,9 @@ function groupDomId(groupKey: string) {
   return `sales-line-fiber-group-${encodeURIComponent(groupKey).replace(/%/g, '-')}`;
 }
 
-export function InstallStatusSection() {
-  const { data, loading, error, refetch } = useFiberStatus();
+function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }) {
+  const { data, loading, error, refetch } = fiber;
   const [filter, setFilter] = useState<FiberFilter>('all');
-  const [openBucket, setOpenBucket] = useState<FiberBucket | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -219,30 +219,15 @@ export function InstallStatusSection() {
     return next;
   }, [allOrders]);
   const filteredOrders = useMemo(
-    () => sortOrders(allOrders.filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
+    () => sortFiberOrders(allOrders.filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [allOrders, filter]
   );
-  const bucketOrders = useMemo(() => {
-    const grouped: Record<FiberBucket, FiberOrder[]> = {
-      pending: [],
-      active: [],
-      cancelled: [],
-      attention: [],
-    };
-    allOrders.forEach((order) => { grouped[statusGroup(order.status)].push(order); });
-    return {
-      pending: sortOrders(grouped.pending),
-      active: sortOrders(grouped.active),
-      cancelled: sortOrders(grouped.cancelled),
-      attention: sortOrders(grouped.attention),
-    } satisfies Record<FiberBucket, FiberOrder[]>;
-  }, [allOrders]);
   const matchedOrders = useMemo(
-    () => sortOrders((data?.orders ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
+    () => sortFiberOrders((data?.orders ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [data?.orders, filter]
   );
   const unmatchedOrders = useMemo(
-    () => sortOrders((data?.unmatched ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
+    () => sortFiberOrders((data?.unmatched ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [data?.unmatched, filter]
   );
   const matchedGroups = useMemo(() => {
@@ -363,6 +348,8 @@ export function InstallStatusSection() {
       mutationInFlightRef.current = false;
     }
   }, [postAssignmentAction, refetch, selectedUsers]);
+
+  if (!isAdmin) return null;
 
   return (
     <section className="sales-line-fiber" aria-label="Install status">
@@ -504,41 +491,17 @@ export function InstallStatusSection() {
             </div>
           )}
           </>
-        ) : (
-          <>
-            <div className="sales-line-fiber-stats" role="group" aria-label="Your install status summary">
-              <div className="sales-line-fiber-stat sales-line-fiber-stat-sent">
-                <span className="sales-line-fiber-stat-label">Sent in</span>
-                <strong className="sales-line-fiber-stat-value">{data?.submittedTotal ?? '—'}</strong>
-              </div>
-              {OWN_BUCKETS.map(({ key, label }) => {
-                if (counts[key] === 0) return null;
-                const isOpen = openBucket === key;
-                const panelId = groupDomId(`own:${key}`);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`sales-line-fiber-stat sales-line-fiber-stat-${key}`}
-                    data-bucket={key}
-                    aria-expanded={isOpen}
-                    aria-controls={panelId}
-                    onClick={() => setOpenBucket((current) => (current === key ? null : key))}
-                  >
-                    <span className="sales-line-fiber-stat-label">{label}</span>
-                    <strong className="sales-line-fiber-stat-value">{counts[key]}</strong>
-                  </button>
-                );
-              })}
-            </div>
-            {openBucket && counts[openBucket] > 0 && (
-              <section id={groupDomId(`own:${openBucket}`)} className="sales-line-fiber-bucket-panel" aria-label={`${OWN_BUCKETS.find(({ key }) => key === openBucket)?.label ?? openBucket} orders`}>
-                <FiberRows orders={bucketOrders[openBucket]} />
-              </section>
-            )}
-          </>
-        )
+        ) : null
       )}
     </section>
   );
+}
+
+function InstallStatusSectionFallback() {
+  const fiber = useFiberStatus();
+  return <InstallStatusSectionContent fiber={fiber} />;
+}
+
+export function InstallStatusSection({ fiber }: { fiber?: FiberStatusHookResult }) {
+  return fiber ? <InstallStatusSectionContent fiber={fiber} /> : <InstallStatusSectionFallback />;
 }

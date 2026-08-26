@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { FiberOrder } from '@/types/fiberOrder';
-import { attachLoggedCustomerNames, normalizeAddress } from './matchSales';
+import {
+  attachLoggedCustomerNames,
+  matchFiberOrdersToSales,
+  normalizeAddress,
+} from './matchSales';
 
 function order(overrides: Partial<FiberOrder> = {}): FiberOrder {
   return {
@@ -116,5 +120,53 @@ describe('attachLoggedCustomerNames', () => {
     ]);
 
     expect(result.map((item) => item.loggedCustomerName)).toEqual([null, null]);
+  });
+});
+
+describe('matchFiberOrdersToSales', () => {
+  it('maps a sale to a matching fiber order by address', () => {
+    const matchingOrder = order();
+
+    expect(matchFiberOrdersToSales([
+      { id: 'sale-1', customerAddress: '5780 Hall St SE, Grand Rapids MI' },
+    ], [matchingOrder])).toEqual(new Map([['sale-1', matchingOrder]]));
+  });
+
+  it('prefers a breakage order over an active order at the same address', () => {
+    const activeOrder = order({ id: 'active-order', status: 'active' });
+    const breakageOrder = order({ id: 'breakage-order', status: 'breakage' });
+
+    expect(matchFiberOrdersToSales([
+      { id: 'sale-1', customerAddress: '5780 Hall St SE' },
+    ], [activeOrder, breakageOrder]).get('sale-1')).toBe(breakageOrder);
+  });
+
+  it('uses the latest order date when no breakage order matches', () => {
+    const olderOrder = order({ id: 'older-order', orderDate: '2026-08-20' });
+    const newerOrder = order({ id: 'newer-order', orderDate: '2026-08-24' });
+
+    expect(matchFiberOrdersToSales([
+      { id: 'sale-1', customerAddress: '5780 Hall St SE' },
+    ], [olderOrder, newerOrder]).get('sale-1')).toBe(newerOrder);
+  });
+
+  it('omits sales with a short or empty address or missing id', () => {
+    const matchingOrder = order();
+    const result = matchFiberOrdersToSales([
+      { id: 'short-address', customerAddress: '123' },
+      { id: 'empty-address', customerAddress: '' },
+      { id: 'missing-address' },
+      { customerAddress: '5780 Hall St SE' },
+    ], [matchingOrder]);
+
+    expect(result).toEqual(new Map());
+  });
+
+  it('does not match unrelated addresses', () => {
+    const result = matchFiberOrdersToSales([
+      { id: 'sale-1', customerAddress: '100 Main St' },
+    ], [order()]);
+
+    expect(result).toEqual(new Map());
   });
 });
