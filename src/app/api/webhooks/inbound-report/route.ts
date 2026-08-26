@@ -64,9 +64,15 @@ export async function GET(request: NextRequest) {
     .orderBy('receivedAt', 'desc')
     .limit(10)
     .get();
+  // Display names help diagnose rep-matching misses (token-gated, names only).
+  const users = await adminDb.collection('users').get();
   return NextResponse.json({
     status: status.exists ? status.data() : null,
     imports: imports.docs.map((doc) => doc.data()),
+    userDisplayNames: users.docs
+      .map((doc) => doc.data()?.displayName ?? '')
+      .filter(Boolean)
+      .sort(),
   });
 }
 
