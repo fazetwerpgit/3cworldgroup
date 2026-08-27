@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { createNotification } from '@/lib/notifications/createNotification';
 import { sendEmail } from '@/lib/email/sendEmail';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import type { EmailContent } from '@/lib/email/templates';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import type { NotificationType } from '@/types/notifications';
@@ -37,7 +38,7 @@ export async function dispatchToUser(input: DispatchInput): Promise<void> {
       ? (async () => {
           if (!adminDb) throw new Error('Database not configured');
           const snap = await adminDb.doc(`users/${input.userId}`).get();
-          const to = snap.get('email') as string | undefined;
+          const to = emailFromUserDoc(snap);
           if (to) await sendEmail({ to, ...input.email!, from: input.emailFrom });
         })()
       : Promise.resolve(),

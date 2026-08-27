@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email/sendEmail';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { appBaseUrl, formSubmissionEmail } from '@/lib/email/templates';
 import { isManagementRole, resolveRoles } from '@/types';
 
@@ -82,7 +83,7 @@ export async function notifySubmission(formKey: string, submittedBy: string): Pr
       const results = await Promise.allSettled(
         uids.map(async (uid) => {
           const user = await adminDb!.collection('users').doc(uid).get();
-          const to = user.get('email') as string | undefined;
+          const to = emailFromUserDoc(user);
           if (!to) return;
 
           const result = await sendEmail({ to, ...email });

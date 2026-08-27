@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email/sendEmail';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { appBaseUrl, managerAlertEmail } from '@/lib/email/templates';
 import { createNotificationForMany } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
@@ -65,7 +66,7 @@ async function broadcast(task: NewAlertTask & { id: string }): Promise<void> {
         sendPushToUser(uid, { title: task.title, body: task.message, url: task.link }),
         (async () => {
           const snap = await db.collection('users').doc(uid).get();
-          const to = snap.get('email') as string | undefined;
+          const to = emailFromUserDoc(snap);
           if (to) await sendEmail({ to, ...email });
         })(),
       ]),
