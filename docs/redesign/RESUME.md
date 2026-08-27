@@ -3,18 +3,521 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-08-25 (update at EVERY milestone).
+Updated: 2026-08-27 (update at EVERY milestone).
 
 ## NEXT ACTION
 
-PUBLIC-SITE DESKTOP 1:1 REMEDIATION GOAL ACTIVE: Jacob explicitly requested a
-Luna implementation -> independent Sol validation -> Luna remediation loop
-until all seven locked desktop routes are accepted at 1440 px. The active goal
-is to recreate the locked desktop compositions literally while preserving the
-already-working responsive/mobile behavior and core interactions. Do not stop
-at directional similarity or code-gate success. Each route requires a fresh
-same-viewport source/render comparison board and explicit Sol acceptance; any
-failed route returns to Luna with the visible differences as its fix list.
+RECRUIT ALERT EMAIL FIX — CODE DONE, TWO STEPS LEFT FOR JACOB (2026-08-27):
+Bug: recruit-application alert emails reached Jeremy but never Jacob. Root
+cause (verified against live Firestore): Jacob's users doc stores his
+address as `Email` (capital E) with no lowercase `email`; the alert senders
+read only `email` and silently skipped him. Fix committed on
+onboarding/completion (40a0942): shared `src/lib/email/userEmail.ts`
+fallback used by notifySubmission + alertTasks + dispatch; test covers the
+capital-E case. Gates: 842 tests, tsc, build all clean. Remaining:
+1. `node scripts/backfill-user-email-field.mjs --apply` (classifier blocked
+   the prod write; dry run shows exactly one doc — Jacob's — gets
+   email <- jmyers@3cworldgroup.com; this alone fixes prod immediately).
+2. Deploy the commit whenever next shipping (code-level hardening).
+Note: no "onboarding role" exists — application alerts go to all
+admin/operations/owner users (Jacob, Jeremy, Braeden). If Jacob wants a
+dedicated onboarding role or extra recipient addresses, that is a new task.
+
+Home redesign work is PAUSED.
+
+REVERT DONE (2026-08-27): all of Claude's Home type-model changes are
+reversed — `home-page.module.css` and `public.css` are byte-identical to
+HEAD; `layout.tsx` keeps only Codex's two pre-session uncommitted imports
+(@fontsource/bebas-neue + ./public.css). Home is back to the Codex round-4
+state. Gates passed post-revert (tsc + build). Root-cause finding that
+survives the revert: public.css `.public-site :is(h1,h2,h3)` !important
+body-font rule flattens all headings sitewide; mockup headings are NOT one
+face (Bebas for display, OS Condensed for mid labels, wide bold for small
+labels) and sizes step down per section. Section crops for any future round:
+`round7/claude-visual-handoff/home-sections/`.
+
+PRIOR CONTEXT — CLAUDE TOOK OVER HOME (2026-08-27 ~2:30 AM): after 4 Codex rounds stalled,
+Jacob stood Codex down and Claude patched Home directly. ROOT CAUSE FOUND:
+`public.css` `.public-site :is(h1,h2,h3) { font-family: var(--public-body-font)
+!important }` was flattening every heading; mockup headings are Open Sans
+Condensed (TTFs were sitting unused in `src/app/fonts/`). Now registered via
+next/font/local in `layout.tsx` (`--font-os-condensed`), exposed as
+`--public-heading-font` in public.css, applied to Home headings in
+`home-page.module.css` (with !important to beat the shared override) plus:
+market lime strips + condensed city names, bigger path circles, reasonBody
+13rem (fixes ragged wrap), heading scale 2.9rem, heroTitle 6.15rem/lh1.3,
+map overlay repositioned. Gates: tsc clean, production build clean. Fresh
+board: `round7/claude-visual-handoff/boards/home-claude-round-board.png`
+(sent to Jacob). :3100 restarted on fresh build. WAITING: Jacob's eyeball on
+the board. If approved → apply same heading-font fix pattern to remaining
+pages (About, Culture, Services, Careers, Contact, Apply) — the public.css
+h1-h3 override affects them all; section crops for those pages not yet cut.
+Codex is STOOD DOWN on Home + shared public CSS; re-coordinate before
+restarting lunas there. Section crops for luna: `round7/claude-visual-handoff/
+home-sections/`.
+
+PRIOR SESSION ROLE (2026-08-27, context): Jacob is driving the Round 7
+redesign loop in the CODEX DESKTOP app (sol orchestrates, luna implements —
+resume prompt at `docs/redesign/qa/visual-remediation-2026-08-26/round7/
+claude-visual-handoff/CODEX-RESUME-PROMPT.md`). Claude's job is DESIGN-REVIEW
+COPILOT, not implementer: (1) when Jacob pastes/sends a side-by-side board or
+describes what looks wrong, translate it into a paste-ready Codex rejection
+list — format: "where → what's wrong → what the mockup shows", plus rules
+"match the mockup, don't reinterpret; fix nothing outside this list; fresh
+1440 production-build board when done"; (2) make side-by-side boards on
+request (magick: mockup resized to 1440w, +append with labeled headers;
+renders via node/playwright against the preview on :3100 using executablePath
+~/.cache/ms-playwright/chromium_headless_shell-1234/...); (3) keep worker
+splits conflict-free — one luna per FILE SET, not per section (Home =
+page.tsx + home-page.module.css; global font/kicker fixes = shared
+public.css/components = separate worker); parallel lunas are fine ACROSS
+pages once approved. Known systemic issues to watch on every board:
+condensed/squished font on buttons+labels (global), invented green kickers
+the mockups don't have, inflated headings + deflated buttons/padding,
+swapped icons, flattened art direction, boards captured from dev server
+(Next.js badge visible = reject the capture). Full defect list per page:
+HANDOFF.md in the same dir. Page order: Home, About, Culture, Services,
+Careers, Contact, Apply; Jacob's eyes are the acceptance test, metrics are
+diagnostics. Home round 1 feedback already sent (16-item list, incl. hero
+type scale, diagonal overrun, Clear Path icons 3/4, dividers, tall bottom
+band).
+
+JACOB PAUSED THE SESSION FOR A VISUAL HANDOFF (2026-08-27). THE
+AUTHORITATIVE ROUND 7 DEFECT LIST AND SIDE-BY-SIDE BOARDS ARE IN
+`docs/redesign/qa/visual-remediation-2026-08-26/round7/claude-visual-handoff/`
+(HANDOFF.md + boards/<route>-side-by-side.png, mockup left / render right at
+1440). START THERE — do not re-derive defects via another capture/Sol cycle
+first. Summary of the same list (details in HANDOFF.md):
+- HOME hero: render photo is dark/navy/low-contrast vs the mockup's bright
+  golden-hour neighborhood; the hard lime-edged diagonal is barely visible;
+  the faint US-map/route overlay under the headline is missing; CTA buttons
+  undersized.
+- HOME "A Clear Path": numerals must be small lime 1-4 inline beside the
+  labels BELOW the icons (render has giant numerals beside the circles);
+  dotted connectors need arrowheads; circles larger; restore vertical
+  padding; icon 3 = map-pin route, icon 4 = flag on mountain.
+- HOME below: heading/button hierarchy inverted — section headings are
+  oversized condensed caps while buttons shrank (mockup: modest headings
+  with inline icons, large buttons); "Why Sales Pros" belongs on white with
+  hairline dividers (not a gray panel) with US-map icon for National
+  Footprint and clipboard for Coaching; "How to Get Started" needs dotted
+  leaders between steps; the closing "YOUR MARKET IS OUT THERE" band must
+  be tall/commanding, not a thin strip.
+- ABOUT (P1): the locked blended transition is missing — map must sit on
+  the light surface, fade into white, and a lime route must continue from
+  the US map down into the Connection/Community/Commitment connector
+  (render has a dark map panel and no route).
+- CULTURE (P1): the oversized lime "C" letters in the 3 C's row (locked
+  from option 3) are missing; icons drifted (chain-link/people-group/
+  shield-check).
+- SERVICES: connector should read as one organic flowing curve like the
+  mockup, not boxy orthogonal lanes; TV screens lost their approved generic
+  category labels (Live TV/Movies/Sports/News/Kids/Recordings); Security
+  callouts shrank from a prominent vertical stack to a small strip;
+  recruiting CTA lost its angled lime banner shape.
+- CAREERS: "What You'll Sell" rich line illustrations became small generic
+  icons; final CTA band compressed.
+- CONTACT: hero 3C mark lost its lime outline and italic slant.
+- APPLY: closest to lock; only minor ghost-3C/type-condensation drift.
+- CROSS-ROUTE: sentence-case headings from mockups went all-caps in places
+  (e.g. Home "Open markets. New opportunities."); overall pattern is
+  inflated headings + deflated buttons/padding and flattened art direction.
+
+FINAL INTEGRATED GATES PASS (2026-08-26 23:50, run by the parallel Claude
+portal session after the usage cutoff): `git diff --check`, focused public-site
+ESLint, `npx tsc --noEmit`, 841/841 tests across 96 files, and a warning-free
+123-page production build all pass on the current tree. All public source-file
+mtimes predate the round7 `services-final` evidence capture, so that evidence
+matches this exact tree. ONLY REMAINING STEP: fresh independent Sol xhigh
+ACCEPT/BLOCKED verdict over the final code + round5 v2 + round6 focused +
+round7 services-final evidence. No commit or deployment is authorized.
+
+ROUND 5 CODE-INTEGRITY REMEDIATION INTEGRATED; FINAL SAME-BUILD GATES/EVIDENCE
+ACTIVE. The 900-999px footer is now content-driven normal flow and the 320px
+shared footer begins where the five-column layout fits at 1000px. Navbar/footer
+logos preserve the real 550:516 source ratio and request >=2x candidates; Home
+no longer falsely exposes Open Markets as the current page. Home/About/Culture
+responsive `sizes` match measured slots. All six Culture value/operating/rhythm/
+opportunity illustrations are now semantic Lucide components; its only remaining
+raster is the 3172x1984 hero and its measured slot clears the 2x budget. The two
+Services composite rasters are replaced by clean 2400x1500 map-only artwork,
+with Fiber/TV/Security labels retained as semantic text and all nine connector
+anchors preserved; lane checks report zero sampled text intersections and
+passing DPR2 budgets at all seven widths. NEXT: finish the final integrated
+gates, restart one production preview from that exact build, regenerate 1440 comparison
+boards and the complete 49 DPR1 + 30 DPR2 objective evidence, rerun in-app
+Browser navigation/footer/form/focus/live-resize checks, then obtain a fresh
+independent Sol xhigh ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+FINAL POST-CULTURE INTEGRATED GATES PASS: `git diff --check`, focused public-site
+ESLint, `npx tsc --noEmit`, 841 tests across 96 files, and a warning-free 123-page
+production build all pass. A fresh preview of that exact build is running at
+localhost:3100. Final evidence is being regenerated in new Round 5 v2 directories;
+the stale pre-value-icon evidence is not acceptance proof.
+
+FINAL ROUND 5 V2 EVIDENCE COMPLETE: 49 DPR1 full pages, 49 DOM records, 30 DPR2
+targets, 79/79 integrity checks, zero 2x source-budget failures, zero overflow/
+nav/normal-flow failures, 9 Services endpoints within 0.006px, zero glyph-aware
+connector/text crossings, 1,078 footer hit-target checks and 32 local activations
+with zero failures, plus passing mobile-menu, keyboard-focus, and Contact/Apply
+fill checks. Home intentionally has no `aria-current` because its source-derived
+nav has no Home link; restoring it would falsely mark Open Markets current. NEXT:
+fresh independent Sol xhigh acceptance over the final code and v2 evidence.
+
+ROUND 5 INDEPENDENT SOL XHIGH VERDICT: BLOCKED on five localized defects. Home
+still visually marks Open Markets active across desktop/mobile; Home desktop
+clips the four How to Get Started descriptions/CTA; Opportunities at 1024 lets
+the hero map overlap the headline; Services at 1920 clips Security content/CTA
+against Bundle; Contact at 1024 leaves form controls too narrow. Round 6 uses
+three disjoint Luna lanes: shared Home/nav, Opportunities/Contact, and Services.
+NEXT: integrate these five fixes, run full gates, recapture affected widths plus
+full same-build acceptance evidence as needed, and rerun a fresh Sol xhigh verdict.
+
+ROUND 6 FIXES INTEGRATED AND GATES PASS. Home active styling now follows the
+actual pathname and its start section is content-driven; Opportunities reduces
+the narrow-desktop hero title to clear the map; Contact stacks form rows through
+1080px and releases fixed height; Services Security uses auto height with a safe
+minimum. Final `git diff --check`, focused ESLint, TypeScript, 841 tests, and the
+123-page warning-free build pass. A fresh production preview from that exact
+build runs on localhost:3100. NEXT: focused 28-state recapture for the four
+affected routes, then a fresh independent Sol xhigh ACCEPT/BLOCKED verdict.
+
+ROUND 6 SOL VERDICT: BLOCKED on one remaining localized Services P2. The ninth
+connector endpoint is attached to the center of the recruiting Apply Now CTA,
+so the green path crosses its label at every required width. The prior glyph
+sampler incorrectly excluded text inside service anchors and missed this. All
+five prior Round 5 blockers are confirmed resolved. NEXT: move recruiting-apply
+to a dedicated edge marker, include anchor-label glyphs in the sampler, rerun
+Services-only evidence and gates, then obtain a fresh Sol xhigh verdict.
+
+ROUND 4 INTEGRATED TRIAGE COMPLETE; CODE-INTEGRITY REVIEW BLOCKED ACCEPTANCE.
+The fresh 1440 production captures have exact source document heights on all
+seven routes and no obvious clipping/CTA/footer overlap, but the independent
+review found five P1s and one P2 that must be fixed before final evidence: the
+shared footer overflows from 900-999px; header/footer logos request undersized
+Next image candidates and the footer logo distorts its aspect ratio; Services
+uses two undersized composite rasters containing labels/UI fragments; Culture
+illustrations miss the required 2x source budget; Home/About/Culture image
+`sizes` descriptors understate their real slots; and Home incorrectly marks
+the Open Markets link as `aria-current=page`. NEXT: run disjoint Luna lanes for
+shared shell, Services assets, and Home/About/Culture image budgets; rebuild and
+restart a single production preview; regenerate integrated 1440 triage and the
+complete 49 DPR1 + 30 DPR2 objective evidence; rerun in-app Browser navigation,
+footer, focus, and resize checks; then obtain a fresh independent Sol xhigh
+ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+ROUND 4 LUNA REMEDIATION INTEGRATED; SAME-BUILD ACCEPTANCE EVIDENCE IS NEXT.
+The route writers have stopped. The shared header is semantic code with measured
+non-overlap at every required width; the shared semantic footer is one 320px
+normal-flow component with 22 real >=44px links and distinct Story/Mission/
+Leadership destinations. Home, About, Services, Opportunities, Culture,
+Contact, and Apply now match their 1440 source document totals; every CTA is
+visible normal flow; Services has nine DOM-anchored endpoints and its prior
+ResizeObserver/scroll-height feedback loop is fixed. Direct board review rejected
+and corrected several misleading metric wins: a collapsed Opportunities CTA,
+Services recruiting/footer collision, Home nav/brand overlap, Culture hero crop,
+and Culture CTA line collision. Latest isolated normalized RMSE evidence is Home
+.323385 before its final scale pass, About .380420, Services .287856 with the
+clean ending, Opportunities .251119 with the readable 128px CTA, Culture .183973,
+Contact .170057, and Apply .196708. These numbers are diagnostic, not proof of
+1:1; the readable/semantic corrections intentionally take priority over lower
+scores produced by collapsed or overlapping content. Integrated gates are now
+running. NEXT: after gates pass, rebuild and restart one production preview,
+generate fresh integrated 1440 triage and reject any remaining visible P1,
+then recapture 49 DPR1 + 30 DPR2 lossless images, regenerate deterministic
+ImageMagick/DOM/source-budget/connector reports, rerun the chosen in-app Browser
+footer/nav/form/focus/live-resize matrix, and obtain an independent Sol xhigh
+ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+ROUND 3 FINAL EVIDENCE ACTIVE; FRESH SOL XHIGH ACCEPTANCE IS NEXT. All four Luna
+lanes completed: semantic shell/Contact, Home/About/Culture, Services, and
+Opportunities/Apply. The Round 2 P2 defects are corrected: Services no longer
+uses discontinuous per-service text scaling and its connector follows compact
+DOM-anchored lanes; Opportunities no longer breaks inside “opportunity”; Apply
+mobile benefit labels no longer fragment into letter stacks. Shared navigation
+and footer remain semantic code with 22 working footer anchors. The post-asset
+combined gates pass: `git diff --check`, focused ESLint, `npx tsc --noEmit`, 841
+tests across 96 files, and a warning-free 123-page production build. Fresh final
+same-build evidence is `round3/final-captures-v2` (49/49 DPR1, 49/49 DOM metrics,
+30/30 DPR2) and `round3/final-report-v2` (zero P0, zero source 2x budget misses,
+zero shell-height spread, nine Services endpoints with max delta <=0.006px).
+The in-app Browser interaction/resize record is `round3/combined-build-iab-
+matrix.md`: 49 route/width cells, 26/26 unique local footer activations at 1440
+and 390, visible keyboard focus, working mobile menu, and 56/56 seam checks.
+NEXT: complete the final same-build precise Services path/text check, then send
+all Round 3 evidence plus raw overlays to a new independent Sol xhigh validator.
+If any P1/P2 remains, loop through disjoint Luna lanes and regenerate evidence;
+otherwise mark the goal complete. No commit or deployment is authorized.
+
+ROUND 3 REMEDIATION ACTIVE AFTER INDEPENDENT SOL XHIGH BLOCKED ROUND 2. Sol found
+one systemic P1 fidelity failure across all seven routes plus three P2 defects:
+Services' breakpoint-specific type shrinking and perimeter connector trajectory,
+the Opportunities desktop heading breaking inside “opportunity,” and Apply mobile
+benefit labels fragmenting into letter stacks. The full verdict is
+`docs/redesign/qa/visual-remediation-2026-08-26/round2/sol-validation-final.md`.
+Parallel Luna lanes now own Services; Home/About/Culture; and shared shell/Contact,
+with a nested Luna lane required for Opportunities/Apply. Each lane must use the
+approved Round 28 sources and original-resolution ImageMagick/DOM measurements,
+not screenshot-only judgment. NEXT: integrate the disjoint lane results, rebuild,
+recapture the complete 49 DPR1 plus 30 DPR2 same-build matrix, regenerate uncropped
+comparisons, rerun interaction/resize/connector checks, and obtain a fresh Sol xhigh
+ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+ROUND 2 SAME-BUILD EVIDENCE COMPLETE; INDEPENDENT SOL XHIGH ACCEPTANCE IS NEXT. The
+post-fix in-app Browser rerun passes all 49 route/viewport cells with zero
+document overflow, 22/22 visible footer anchors, 44px minimum footer hit height,
+no anchor overlaps/bad hrefs, and correct active navigation. Every unique local
+footer destination and fragment was activated; social semantics and visible
+keyboard focus rings pass. A 56-cell 1023/1024/1080/1081 live-resize seam pass
+also has zero failures. Apply internal overflow, Culture mobile text clipping,
+Contact's locked-era 220px off-screen art displacement, and Services fixed-band
+copy overflow are resolved. Services now has nine DOM-anchored endpoints with
+max delta 0.0062px and zero path intersections against 2px-expanded DOM text
+Range boxes at all required widths. The 2x Home/Services assets are integrated.
+The production gates pass: focused ESLint, `npx tsc --noEmit`, 827/827 tests,
+and a 122-page warning-free Next build. Fresh styled-page-gated production
+evidence is in `round2/final-captures`: 49/49 DPR1 and 30/30 element-targeted
+DPR2 PNGs with validated signature/MIME/dimensions/SHA-256. ImageMagick/DOM
+results are in `round2/final-report`: zero P0, zero source 2x budget misses,
+zero header/footer route-height spread, and Services endpoint delta <=0.006px.
+NEXT: a new independent Sol xhigh validator must inspect the original boards,
+all widths, overlays/heatmaps, header/footer crops, full Services DPR2 evidence,
+and interaction matrix. Remediate and recapture every resulting P1/P2 until Sol
+returns ACCEPT. No commit or deployment is authorized.
+
+ROUND 1 SOL VERDICT: OVERALL BLOCKED; ROUND 2 IMPLEMENTATION ACTIVE. Round 1
+objective acceptance evidence remains in `docs/redesign/qa/visual-remediation-
+2026-08-26/round1/acceptance-*`: 49/49 DPR1, 30/30 DPR2, no P0/overflow/locked
+raster, zero header/footer route-height spread, zero source-budget misses after
+the Contact intrinsic-ratio fix, and Services endpoint deltas <=0.006 CSS px.
+These metrics did not prove visible fidelity. Independent Sol found transparent
+desktop/tablet header content at >=1024, blank Opportunities/Apply closing CTAs,
+major 1440 composition drift on all seven routes, Services connector segments
+crossing copy despite attached endpoints, Contact fast-path/form breakage at
+1024/834, Culture headline clipping at 390/375, Apply benefit/process overlaps,
+and a materially different footer missing approved social controls. Its report
+is `round1/sol-validation-round1.md`. It also rejected the DPR2 footer crops as
+mis-targeted and the 1080-CSS-px Services crops as incomplete proof. Round 2 is
+split across disjoint Luna lanes: shared shell/CTA/footer, Home/About/Culture,
+Services path/composition, Opportunities/Apply, and Contact. After all lanes,
+capture a new full same-build matrix with corrected element-targeted DPR2 footer
+and complete Services evidence, rerun ImageMagick/DOM/IAB checks, and send it to
+a fresh independent Sol xhigh pass. No commit or deployment is authorized.
+
+AUDIT 1 COMPLETE; BEGIN IMPLEMENTATION ROUND 1. Fresh read-only evidence now
+covers all seven public routes at 1920, 1440, 1280, 1024, 834, 390, and 375
+with 49 lossless DPR1 full-page PNGs, 49 DOM/image metric files, and 22 DPR2
+header/footer/Services crops. All images passed PNG signature, `file`,
+ImageMagick, dimension, and SHA-256 checks. Source, asset, route-risk, Services
+geometry, and in-app Browser reports are under
+`docs/redesign/qa/visual-remediation-2026-08-26/`. The live Browser additionally
+proved every footer link center fails hit testing at every sampled width (19/19
+on Home, 20/20 elsewhere), header heights differ by route, several semantic
+desktop footers collapse to zero height, broken hash destinations remain, and
+the Services overlay is a fixed 2293px raster through 1024px before vanishing
+at 1023px. Keyboard focus is inconclusive because both in-app Browser Tab paths
+left `body` focused; it must be rerun after the semantic shell rebuild. Start
+parallel Luna implementation with disjoint ownership: shared semantic shell
+and working links; Services semantic layout plus DOM-anchored responsive SVG
+connector; route-specific P1/P2 remediation without whole-section images.
+Recapture all 49 viewports and run deterministic diffs before independent Sol
+xhigh acceptance. No commit or deployment is authorized.
+
+JACOB APPROVED THE CODE-FIRST AND DETERMINISTIC PIXEL-VERIFICATION PLAN. The
+fresh read-only audit is active again with distinct Luna lanes. No implementation
+may begin until the new original-resolution evidence, ImageMagick/DOM geometry
+measurements, and source/asset audits are reconciled into the defect matrix.
+
+AUDIT 1 MILESTONE — SHARED SHELL SOURCE LANE COMPLETE: the current visible
+header, route endings, CTA buttons, and footer are stretched locked-chrome
+rasters while their semantic controls are transparent, zero-height, or absent.
+Several footer/header hash destinations are also missing, the desktop nav model
+changes between Home and inner routes, and Culture/Apply lack correct active
+states. The Services desktop connector is a fixed 829x1320 raster forced into a
+1440-calibrated 2293px box. Browser evidence and the remaining source lanes are
+still pending; no implementation has started.
+
+AUDIT 1 CAPTURE APPROVAL: the shared-shell, route-risk, and 67-file ImageMagick
+asset audits are complete and confirm the systemic P0/P1 causes. The fresh
+in-app Browser lane successfully captured Home and DOM geometry at all seven
+widths, but machine inspection proved the browser backend encoded every
+supposed `.png` screenshot as lossy JPEG bytes. Those files are rejected and
+must not be used for pixel comparison. Jacob approved local Playwright only for
+true lossless DPR-controlled PNG capture and deterministic ImageMagick
+comparisons; the in-app Browser remains required for live interaction,
+continuous resize, focus, and link-behavior checks. No implementation has begun.
+
+LATEST IMPLEMENTATION CLARIFICATION: rebuild the site primarily as semantic
+HTML and responsive CSS. The header, footer, navigation, text, controls,
+section surfaces, cards, and layout must not be screenshots or raster chrome.
+Do not use a whole-page or whole-section image. Use image assets only for
+purpose-fit photographic/illustrative content; create a sharp isolated asset
+when a suitable source is missing, then place it inside the code-built section.
+Pixel fidelity must be verified objectively with ImageMagick (or an equivalent
+pixel-analysis tool), native-resolution normalized captures, diff/heatmap and
+region metrics, plus browser DOM geometry assertions. LLM visual judgment is
+supplementary and cannot be the sole basis for a 1:1 claim.
+
+ACTIVE GOAL CREATED for the reopened multi-viewport remediation. Audit evidence
+must also verify that every footer link/button has a working hit target,
+keyboard focus behavior, and correct destination on all seven public routes.
+
+PUBLIC-SITE VISUAL QUALITY REMEDIATION REOPENED. Jacob inspected the real site
+on a large monitor and while resizing the browser, and rejected the previous
+Round 28/29 completion. Read and execute
+`docs/redesign/NEXT-VISUAL-REMEDIATION-PROMPT.md`. Start with a fresh live,
+read-only, original-resolution audit across all seven public routes and widths
+1920, 1440, 1280, 1024, 834, 390, and 375 before editing. Create a new active
+goal, orchestrate Luna implementation lanes, and require independent Sol xhigh
+multi-viewport acceptance.
+
+USER-REPORTED BLOCKERS: every footer is blurry; the shared top bar, logo, and
+company name are blurry; header/nav labels, clickable targets, active states,
+and Apply button do not align consistently between routes; Services imagery is
+blurry; the Services map-to-section connector is misaligned; and Services
+images/connector geometry break when the window size changes or the whole page
+is viewed on a large monitor. Footer buttons and links also do not work. The
+user says more defects exist, so perform a complete audit rather than limiting
+work to this list. Do not treat the prior Sol pass as current proof. No commit
+or deployment is authorized.
+
+CURRENT LOOP STATE: Round 8.2 fresh same-build in-app-browser captures/direct
+comparison boards are in `docs/redesign/qa/fidelity-1to1-2026-08-25/round8.2/`.
+Independent Sol validation accepted the source-derived headers and endings but
+returned `OVERALL: BLOCKED` on all seven routes because the HTML middle sections
+still had actionable P1/P2 density, scaling, crop, and spacing differences.
+Round 9 comparison boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round9/`; independent Sol validation
+returned `OVERALL: BLOCKED`, but failures were localized. Round 10 boards are
+in `docs/redesign/qa/fidelity-1to1-2026-08-25/round10/`; independent Sol
+validation returned `OVERALL: BLOCKED` on all seven routes. Round 11 Luna
+remediation is complete across Home/Contact, About/Culture, Services, and
+Careers/Apply. Fresh same-build in-app-browser captures and source-left/render-
+right boards are in `docs/redesign/qa/fidelity-1to1-2026-08-25/round11/`.
+Independent Sol Round 11 validation returned `OVERALL: BLOCKED` on all seven
+routes, including mission-line-wrap and Culture hero/satisfaction regressions.
+Round 12 Luna remediation is complete in the same four ownership lanes. Fresh
+same-build in-app-browser source/render boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round12/`; independent Sol Round 12
+validation returned `OVERALL: BLOCKED` on all seven routes. Round 13 Luna
+remediation and fresh same-build captures are complete; boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round13/` and independent Sol Round
+13 validation returned `OVERALL: BLOCKED`; the four hard regressions were fixed,
+but source crop, connector, icon/content scale, and section-density differences
+remain. Round 14 Luna remediation is active. Culture is switching from
+typographic C approximation to the existing isolated source-derived artwork;
+Services is tracing the recurring TV crop to the actual clipping ancestor and
+rebuilding its connector more literally. Round 14 remediation and fresh
+same-build boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round14/`; independent Sol Round 14
+validation returned `OVERALL: BLOCKED`; the TV crop and Culture source art were
+accepted, but typography/icon scale and geometry remain. Round 15 Luna
+remediation is active. Services is replacing its approximate route with an
+isolated transparent connector extracted from the locked source; other routes
+are scaling their semantic HTML groups to measured source bounds. Round 15
+remediation and fresh boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round15/`; independent Sol Round 15
+validation returned `OVERALL: BLOCKED`; the source route overlay is present but
+duplicated by semantic connector circles, and CTA/content scale issues remain.
+Round 16 Luna remediation is active, removing desktop connector duplicates,
+cleaning the source overlay artifact, restoring locked hero-button geometry,
+and correcting remaining typography/icon scale. Round 16 remediation and fresh
+boards are complete in `docs/redesign/qa/fidelity-1to1-2026-08-25/round16/`;
+independent Sol Round 16 validation returned `OVERALL: BLOCKED`, with regressions
+in the Home diagonal/content clearance, About map/text columns, and Careers
+Opportunity grid. Round 17 Luna remediation is active with those regressions as
+hard blockers before remaining P2 typography/spacing work. Round 17 remediation
+and fresh boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round17/`; independent Sol Round 17
+validation returned `OVERALL: BLOCKED`, but the remaining list is localized:
+Home diagonal/overlay, About mission/connector, Services Bundle composition,
+Careers process/success distribution, Culture hero/lower scale, Contact two-
+bubble icon, and Apply star/wireless icons. Round 18 Luna remediation is active
+with no broad redesign changes. Round 18 remediation and fresh boards are
+complete in `docs/redesign/qa/fidelity-1to1-2026-08-25/round18/`; independent
+Sol Round 18 validation accepted Contact and returned `OVERALL: BLOCKED` on the
+remaining six routes. Contact is now frozen. Round 19 Luna remediation is active
+for only Home, About, Services, Careers, Culture, and Apply, each with a localized
+geometry/typography fix. Round 19 validation kept Contact passed and localized
+each remaining route to one or two measured differences. Round 20 Luna
+remediation is complete for Home, About, Services, Careers, Culture, and Apply;
+fresh boards are in `docs/redesign/qa/fidelity-1to1-2026-08-25/round20/` and
+independent Sol Round 20 validation accepted Careers, Contact, and Apply; those
+routes are frozen. Round 21 Luna remediation is active only for Home, About,
+Services, and Culture, each with one localized composition fix. Round 21 is
+complete; fresh boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round21/` and independent Sol Round 21
+validation kept Careers, Contact, and Apply passed but blocked Home, About,
+Services, and Culture; Culture regressed because a Values layout rule leaked
+into Three C's. Round 22 remediation and fresh boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round22/`; independent Sol Round 22
+validation kept three routes passed but blocked the same four on narrow geometry
+and scale defects. Round 23 Luna remediation and fresh same-build in-app-browser
+captures are complete for Home, About, Services, and Culture; standardized
+source-left/render-right boards for all seven routes are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round23/`. Independent Sol Round 23
+validation accepted Services plus the previously frozen Careers, Contact, and
+Apply routes, and blocked only Home, About, and Culture. Round 24 Luna
+remediation and fresh same-build 1440px captures are complete for those three;
+standardized boards for all seven routes are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round24/`. Independent Sol Round 24
+validation accepted About plus the four already-frozen routes, and blocked only
+Home and Culture. Round 25 Luna remediation and fresh same-build 1440px
+captures are complete for those two; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round25/`. Independent Sol Round 25
+validation kept the same five routes passed and blocked only a Home overlay
+offset/contrast issue plus Culture hero/heading-rail geometry. Round 26 Luna
+remediation and fresh same-build 1440px captures are complete only for Home and
+Culture; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round26/`. Independent Sol Round 26
+validation kept the same five routes passed and blocked only Home photo
+luminance plus Culture rail length/card-stack/headline geometry. Round 27 Luna
+remediation and fresh same-build 1440px captures are complete only for Home and
+Culture; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round27/`. Independent Sol Round 27
+validation kept the same five routes passed, blocked a Home photo-edge P1
+regression, and localized Culture to artwork tone plus Operate-rail anchors.
+Round 28 Luna remediation and fresh same-build 1440px captures are complete only
+for Home and Culture; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round28/`. Independent Sol Round 28
+returned desktop `OVERALL PASS` for all seven routes. Final 390px in-app-browser
+QA passed Home, About, Careers, Culture, and Apply, but Sol blocked a clipped
+duplicate Services savings badge and compressed Contact hero phrase. Round 29
+fixed those two mobile defects; fresh captures are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/final-mobile-round29/`, and Sol
+returned mobile `OVERALL PASS` for all seven routes. Final gates passed:
+`git diff --check`, TypeScript, focused ESLint, 827 tests across 95 files, and
+the production build with 122/122 static pages generated.
+Round 13 corrected Home headline
+clipping, Services 02/title collision, Careers collapsed earnings figures, and
+Culture's two-line satisfaction heading. Round 12
+explicitly matched source line counts and measured geometry rather than
+applying relative scale/offset guesses. The Round 11 fix list was:
+correct Home hero crop and Clear
+Path icons/scale; raise and enlarge About mission content; rebuild Services TV
+art, connector, and single-column service modules; correct Careers hero and
+middle-section density; correct Culture C/hero/content geometry; restore
+Contact typography/form spacing; and narrow/reposition Apply hero while
+enlarging its badge and supporting sections. Do not declare success until the
+next Sol result returns `OVERALL: PASS`; any failed route must go back to its
+Luna lane for another numbered round and be recaptured. Round 8.2 uses exact
+mechanical crops from the approved people-free mockups for desktop header,
+route-specific closing/footer chrome, and isolated artwork/icon treatments
+while retaining semantic link overlays and responsive HTML/mobile. Duplicate
+desktop overlay paint, crop backgrounds, and the fragmented Apply 30 were fixed.
+Do not rasterize whole pages.
+Ownership is now shared shell/route-specific closings, Home/Contact,
+About/Culture, Services, and Careers/Apply. The dominant
+remaining failures are underscaled header/page/footer content, generic
+route-agnostic closing/footer geometry, underscaled section density, a missing
+Careers hero map, and collapsed Contact hero word spacing. The four ownership
+lanes remain shared shell/Home/Contact, About/Culture, Services, and
+Careers/Apply.
+The recurring failures are underscaled desktop branding/content, incorrect
+hero composition and headline wrapping, and generic/compressed diagonal CTA
+and footer assemblies. Do not reuse the older `round2` directory under
+`qa/fidelity-rebuild-2026-08-25/` as current evidence; the active strict-1:1
+evidence root is `qa/fidelity-1to1-2026-08-25/`.
 
 Baseline finding that opened this goal:
 the seven-route implementation is functional, responsive, and passed its code
@@ -300,6 +803,64 @@ pay_structure.pdf + fcra_auth.pdf still PLACEHOLDERS; (c) webhook log
 grab when Mason signs direct_deposit (see STILL OPEN). NOTE: the
 public-site redesign blocks above belong to a PARALLEL session — do
 not touch them here.
+
+SHIPPED 2026-08-25 (latest, commit 0e462f4, deployed nebal30q0 Ready,
+gates tsc/822 tests/build green): (1) rep fiber view resectioned per
+Jacob — "Sent in" tile (their own logged portal sales count,
+submittedTotal on FiberStatusResponse) + collapsed status bucket
+tiles (Pending install / Active / Cancelled / Needs attention),
+accordion expand one at a time, nothing scrolls by default; admin
+per-rep dropdowns unchanged. (2) customer names on fiber orders ONLY
+from the rep's OWN logged portal Sale (sale.salesRepId ===
+order.matchedUserId, conservative address prefix match >=6 chars both
+directions, latest createdAt wins) — attached at read time in
+src/lib/fiberReport/matchSales.ts, never stored, never from T-Mobile
+or other reps. Rows show name strong, address demoted.
+
+SUPERSEDED SAME DAY (commit 842d1e6, deployed 9o6arftsu Ready, gates
+tsc/827 tests/build green): Jacob saw a rep screenshot, wanted the
+status INSIDE the YOUR SALES ledger (confirmed via question UI +
+"That makes sense"). Rep view now: pill chips under [All | Pay]
+(Sent in / Pending install / Active / Cancelled / Needs attention)
+swap the ledger list to that report bucket (cancelled = latest cancel
+first, active = latest install first, pending = soonest first); every
+sale card gets a live fiber-status pill next to APPROVED via
+matchFiberOrdersToSales (address prefix, breakage wins, else latest).
+Standalone rep tiles REMOVED; InstallStatusSection is admin-only and
+prop-driven (page calls useFiberStatus once). Screenshots (dark
+portal skin, sample data) sent to Jacob; awaiting his eyeball on the
+live site. Known pre-existing, harness-only hydration warning from
+SalesTable's toast portal — not shipped-new, not visible in prod.
+2026-08-26 report ingested fine (937 orders, 669 matched; three
+back-to-back imports = duplicate forwarded copies, last wins).
+
+PORTAL SESSION (2026-08-26): MASON "COMPENSATION" ALERT DIAGNOSED —
+almost certainly a STALE Aug-24 alertTask re-nagged, not a live
+failure. "Compensation" = pay_structure; Mason's envelope was
+Completed at SignWell and backfilled to approved 8/24, so he can't
+even see Sign now for it. The alert comes from
+esign-embed-error/route.ts; alertTasks dedupe by (kind,uid), never
+expire, re-nag every 24h (renagStaleTasks "Still unclaimed:"), the
+backfill never resolved them, and ActionQueue shows no timestamp and
+has no dismiss. Real gap also found: esign-signing-url 502s for a
+completed envelope (SignWell returns no embedded_signing_url) and
+EsignSignAction then silently opens the STALE stored URL → embed
+error → false alert; error events also have no one-shot guard.
+SHIPPED (commit 6fafac4 on onboarding/completion, NOT deployed):
+(1) ActionQueue age display ("· 2d ago") + Dismiss button + POST
+/api/portal/alerts/dismiss + dismissAlertTask(); (2) provider
+getEmbeddedSigningUrl returns {url,completed}, route returns
+{completed:true} instead of 502, client skips embed + shows the
+confirm-polling note on completed envelopes, one-shot reportFailure.
+Diffs reviewed against spec; gates green: tsc clean, 55/55 targeted
+vitest, prod build OK. DO NOT deploy from this tree — it holds the
+redesign session's unauthorized WIP; deploy 6fafac4 from a clean
+worktree checkout only when Jacob asks. NEXT: tell Jacob the alert
+was stale (Mason signed Compensation 8/24; nothing live-broken) and
+after deploy he can Dismiss it in the admin queue. Related standing item: grab the webhook log when Mason signs
+direct_deposit (see STILL OPEN). Reminder rules: no solo agent runs
+(parallel codex luna/sol workers, Fable reviews); pay tiers/comp
+data sensitive — owner/admin only.
 
 NEW STANDING RULE (Jacob, 2026-08-24): NO solo single-agent runs —
 split independent work across MULTIPLE PARALLEL `codex exec`
