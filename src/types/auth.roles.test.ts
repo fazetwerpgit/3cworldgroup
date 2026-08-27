@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ADMIN_LEVEL_PLATFORM_ROLES,
   FieldRoles,
   isAdminLevel,
   isManagementRole,
@@ -93,5 +94,21 @@ describe('role predicates', () => {
     expect([...MANAGEMENT_PLATFORM_ROLES].sort()).toEqual(
       (Object.values(PlatformRoles) as PlatformRole[]).sort()
     );
+  });
+
+  // Same drift guard for the admin-level twin (sale-review fan-outs).
+  it('keeps ADMIN_LEVEL_PLATFORM_ROLES in step with isAdminLevel', () => {
+    const adminLevel = (Object.values(PlatformRoles) as PlatformRole[]).filter((role) =>
+      isAdminLevel(role)
+    );
+    expect([...ADMIN_LEVEL_PLATFORM_ROLES].sort()).toEqual(adminLevel.sort());
+  });
+
+  // Operations sees only their OWN sales: sales:approve doubles as the UI's
+  // "sees the whole book" switch, so operations must never carry it.
+  it('denies sales:approve to operations but keeps it for admin and owner', () => {
+    expect(RolePermissions.operations).not.toContain('sales:approve');
+    expect(RolePermissions.admin).toContain('sales:approve');
+    expect(RolePermissions.owner).toContain('sales:approve');
   });
 });

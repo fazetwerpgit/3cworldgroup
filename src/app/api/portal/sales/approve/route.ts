@@ -43,13 +43,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Approving/rejecting a sale is a money decision — it is the step that turns
-    // a pending sale into awarded points. Require a verified admin/operations
-    // login and stamp the approver from the VERIFIED identity, never from
-    // client-supplied fields (the client still sends approverId/approverName;
-    // they are ignored here).
+    // a pending sale into awarded points. Require a verified admin/owner login
+    // (operations sees only their own sales and cannot approve) and stamp the
+    // approver from the VERIFIED identity, never from client-supplied fields
+    // (the client still sends approverId/approverName; they are ignored here).
     const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    if (!gate.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: admin access required' },
+        { status: 403 }
+      );
     }
     const approverId = gate.uid;
     const approverName = gate.name;

@@ -12,9 +12,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Scope: a rep may only request their own stats; management may request
-    // any rep's or org-wide (no salesRepId). `salesRepId` is TARGET data — a
-    // non-management caller must pass their own uid, checked against the token.
+    // Scope: a rep (and operations — own sales only) may only request their
+    // own stats; admin/owner may request any rep's or org-wide (no salesRepId).
+    // `salesRepId` is TARGET data — a non-admin caller must pass their own
+    // uid, checked against the token.
     // The shared API allowlist excludes this route until the account is active.
     const requester = await requireVerifiedRequester(request);
     if (!requester.ok) {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     const salesRepId = searchParams.get('salesRepId');
     const period = searchParams.get('period') || 'month'; // day, week, month, year
 
-    if (!requester.isManagement && salesRepId !== requester.uid) {
+    if (!requester.isAdmin && salesRepId !== requester.uid) {
       return NextResponse.json(
         { error: 'Forbidden: you can only view your own stats' },
         { status: 403 }

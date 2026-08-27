@@ -134,7 +134,12 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
   operations: [
     ...BASE_PERMISSIONS,
     'users:read',
-    'sales:read', 'sales:write', 'sales:approve',
+    // Deliberately NOT sales:approve: operations sees only their OWN sales
+    // (rep-style ledger + fiber view); reviewing and approving other reps'
+    // sales is admin/owner only. sales:approve doubles as the UI's
+    // "sees the whole book" switch, so granting it back here would also
+    // reopen cross-rep sales visibility.
+    'sales:read', 'sales:write',
     'training:write',
     'leaderboard:manage',
     'reports:read',
@@ -300,6 +305,15 @@ export const MANAGEMENT_PLATFORM_ROLES: readonly PlatformRole[] = [
 export function isManagementRole(role?: PlatformRole | FieldRole): boolean {
   return !!role && (MANAGEMENT_PLATFORM_ROLES as readonly string[]).includes(role);
 }
+
+// Admin-level roles for Firestore where('role','in',[...]) queries — the
+// query-shaped twin of isAdminLevel, kept in step by a test the same way
+// MANAGEMENT_PLATFORM_ROLES mirrors isManagementRole. Used by fan-outs that
+// target only the people who can act on a sale review (operations cannot).
+export const ADMIN_LEVEL_PLATFORM_ROLES: readonly PlatformRole[] = [
+  'admin',
+  'owner',
+];
 
 // The single role used for display/selection in UI.
 // Platform role wins when both are set, matching permission resolution
