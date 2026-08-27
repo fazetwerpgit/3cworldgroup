@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
-import { MANAGEMENT_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
+import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 
@@ -55,9 +55,10 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') as SaleStatus | null;
-    // `salesRepId` is a management-only FILTER (target data), never identity —
-    // a non-management caller is pinned to their own token uid regardless of it.
-    const salesRepId = gate.isManagement
+    // `salesRepId` is an admin/owner-only FILTER (target data), never identity —
+    // every other caller (operations included: they see only their own sales)
+    // is pinned to their own token uid regardless of it.
+    const salesRepId = gate.isAdmin
       ? searchParams.get('salesRepId')
       : gate.uid;
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -246,11 +247,12 @@ export async function POST(request: NextRequest) {
       `/portal/sales/${docRef.id}`
     );
 
-    // Notify all back-office users (sales review is platform-only now).
+    // Notify the reviewers who can act on it — admin/owner only; operations
+    // sees only their own sales and cannot approve, so pinging them is noise.
     try {
       const reviewersSnap = await adminDb
         .collection('users')
-        .where('role', 'in', [...MANAGEMENT_PLATFORM_ROLES])
+        .where('role', 'in', [...ADMIN_LEVEL_PLATFORM_ROLES])
         .get();
       await Promise.all(
         reviewersSnap.docs.map((reviewerDoc) =>

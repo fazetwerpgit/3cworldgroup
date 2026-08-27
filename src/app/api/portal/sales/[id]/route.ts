@@ -36,8 +36,8 @@ export async function GET(
     const data = doc.data();
 
     // Ownership compares the sale's stored rep against the TOKEN uid — never a
-    // client-supplied field.
-    if (!requester.isManagement && data?.salesRepId !== requester.uid) {
+    // client-supplied field. Admin/owner only: operations sees only their own.
+    if (!requester.isAdmin && data?.salesRepId !== requester.uid) {
       return NextResponse.json(
         { error: 'Forbidden: you can only view your own sales' },
         { status: 403 }
@@ -95,8 +95,9 @@ export async function PUT(
     }
 
     // Ownership compares the sale's STORED salesRepId against the token uid.
+    // Admin/owner only: operations edits only their own sales.
     const existing = doc.data();
-    if (!requester.isManagement && existing?.salesRepId !== requester.uid) {
+    if (!requester.isAdmin && existing?.salesRepId !== requester.uid) {
       return NextResponse.json(
         { error: 'Forbidden: you can only edit your own sales' },
         { status: 403 }
