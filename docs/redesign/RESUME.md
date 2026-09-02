@@ -7,12 +7,19 @@ Updated: 2026-09-01 (update at EVERY milestone).
 
 ## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
 
-NEXT ACTION: Jacob said "we got some more things that we need to do" (portal
-ops) — ask what's next on his list and do it. Both deploys below are LIVE and
-verified. `git push` now WORKS from Claude (verified 2026-09-01: pushed
-onboarding/completion 842d1e6..d1acafd). Local `master` is checked out in the
-~/dev/3cwg-payplan worktree, so update it there (it is 2 behind origin/master).
-Still pending: Jacob to DELETE the bot account in the Pending queue.
+NEXT ACTION: Team-code signup gate + easy login path is DONE on branch
+onboarding/completion (commits d84b91e, 5536560, 6fbcf37; pushed). Gates
+passed (vitest 857, tsc, build); redirects + route verified on a built server.
+PORTAL_TEAM_CODE=3cteam set in Vercel (prod/preview/dev) + .env.local.
+Waiting on Jacob to say "deploy": then cherry-pick those three commits onto
+master (master is checked out in ~/dev/3cwg-payplan; use a temp worktree or
+that one), push, confirm Vercel deploy Ready, then verify on prod:
+(a) POST /api/portal/auth/team-code {"code":"wrong"} -> {"ok":false};
+(b) 3cworldgroup.com/login 308 -> /portal; (c) signup page shows the Team
+code field and applicant callout. Jacob then tells managers the code and
+the /login URL. Still pending on Jacob: DELETE the bot account in Pending.
+Spec: docs/superpowers/specs/2026-09-01-signup-team-code-and-login-path-design.md
+Plan: docs/superpowers/plans/2026-09-01-signup-team-code-and-login-path.md
 
 DONE this session (all verified):
 - reCAPTCHA v3 signup gate LIVE in production (commit 34634bc on master).
@@ -99,10 +106,16 @@ changing only the title family to AboutCondensed regular and transform to
 `translate(2.2px,-5px) scale(.858,.650)`, retaining weight 400. Independent gates
 passed once each. The final production title target/current masks are exactly
 `288x33+44+11` / `288x33+44+11`, with near-target thin ink `0.286932` / `0.273253`.
-Root reviewed the focused CTA and fresh full board top-to-bottom. NEXT ACTION: show
-Jacob `about-round3-r8c-target-current-review.png` (target left, current right) and
-request approve/reject About. Port 3100 is stopped. If approved, freeze About and
-begin Culture; if rejected, record only named residuals.
+Root's R8C approval is void. Jacob rejected it on 2026-09-01 because the font is
+wrong across the page and instructed root to inspect the locked About mockup against
+the render top-to-bottom without requiring him to enumerate the residuals. Matching
+the CTA title box and ink density did not prove matching glyph shapes. NEXT ACTION:
+root personally performs one complete original-detail About comparison, identifies
+all visible mismatches with typography first, and dispatches the smallest crop-
+grounded correction to the existing About Luna. Keep the 1 CSS px geometry bound and
+the no-overengineering rule: no broad test matrix, no antialiasing/subpixel chasing,
+one independent typecheck/build, one production capture, and one fresh full-page
+target/current board only after root's visual gate passes. Port 3100 is stopped.
 
 The authoritative continuation document for the active seven-page visual-fidelity
 loop is now `docs/redesign/HANDOFF.md`. Jacob rejected Home Round 3 on 2026-08-30
@@ -196,10 +209,11 @@ currently has a contract-compliant original-detail per-section crop set.
 
 ## NEXT ACTION
 
-REDESIGN: Home is approved and frozen. About Round 3 R8C fixes the only rejected CTA
-title with exact target/current geometry and thin ink; gates and one capture passed.
-NEXT: show the R8C full board and request Jacob's About verdict. Do not reopen frozen
-regions, commit, or deploy.
+REDESIGN: Home is approved and frozen. About Round 3 R8C is user-rejected because its
+font treatment and other visible page details do not match the locked mockup. NEXT:
+root audits About top-to-bottom at original detail, then dispatches the smallest
+crop-grounded correction round to the existing About Luna under the 1px/no-
+overengineering rule. Do not commit or deploy.
 
 VIDEO: ALL SIX EXTREME VARIANTS SENT 2026-08-31 (~13:20), AWAITING PICKS.
 Projects: ~/dev/3c-videos/recruiting-ad-{terminal,poster,cinema,mosaic,
