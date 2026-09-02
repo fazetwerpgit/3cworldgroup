@@ -7,17 +7,19 @@ Updated: 2026-09-02 (update at EVERY milestone).
 
 ## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
 
-NEXT ACTION: UX sweep fixes DEPLOYED — sweep commit 35bf04a on
-onboarding/completion (merged with origin/master as 01493f7, pushed),
-cherry-picked to master as ab7d89d and pushed (Vercel prod deploy).
-Verify on https://www.3cworldgroup.com (phone: dark by default, plain page
-headers, inline push prompt) then DELETE the QA bot qa-e2e-1@3cworldgroup.test
-(uid ROZ9ZiuDciRxcTmeyT344NXBpah2) from Auth + Firestore users. NOTE: master
-still lacks three older branch commits never cherry-picked (6fafac4 esign
-completed-envelope fix + dismissible aged alerts, 40a0942 alerts read legacy
-`Email`, 38d1f2b operations-only-own-sales view) — ask Jacob whether to ship
-them. Local `master` ref is checked out in worktree ~/dev/3cwg-payplan (stale
-at 842d1e6); never force-update it, push by sha (`git push origin <sha>:master`).
+NEXT ACTION: nothing pending on this track. UX sweep fixes are LIVE and
+verified on https://www.3cworldgroup.com (master cbeb4f0 = sweep ab7d89d +
+font-fallback fix 9b3cae4; phone dark by default, plain page headers, inline
+push prompt, page titles render in Archivo). QA bot qa-e2e-1@3cworldgroup.test
+deleted from Auth + Firestore (2026-09-02). Temp scripts removed.
+OPEN FOR JACOB: master still lacks three older branch commits never
+cherry-picked (6fafac4 esign completed-envelope fix + dismissible aged alerts,
+40a0942 alerts read legacy `Email`, 38d1f2b operations-only-own-sales view) —
+ship them or not is his call. Local `master` ref is checked out in worktree
+~/dev/3cwg-payplan (stale); never force-update it, push by sha
+(`git push origin <sha>:master`). Admin SDK scripts: load env via
+@next/env loadEnvConfig and use FIREBASE_SERVICE_ACCOUNT (base64 JSON);
+FIREBASE_ADMIN_PRIVATE_KEY in .env.local is truncated/unusable.
 Spec: docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md; shared
 header src/components/portal/PageTitle.tsx + src/styles/page-title.css; per-area
 CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
