@@ -7,8 +7,10 @@ import {
   ArrowLeftToLine,
   BadgeDollarSign,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageSquare,
+  Settings,
   Trophy,
   X,
 } from 'lucide-react';
@@ -93,7 +95,7 @@ export function MobileBottomNav({
   showAdminSection?: boolean;
 }) {
   const pathname = usePathname();
-  const { hasPermission, isRole, user } = useAuth();
+  const { hasPermission, isRole, signOut, user } = useAuth();
   const { isOpen, toggle, close } = useMobileMenu();
   const { channels } = useChatChannels();
   const { anyUnread } = useChatUnread(channels, user?.uid);
@@ -147,9 +149,27 @@ export function MobileBottomNav({
     ? mobileSlotItems.filter((item) => canAccess(item))
     : mobileSlotItems;
 
-  const visibleGroups = portalNavGroups.filter(
-    (group) => (!group.roles || isRole(...group.roles)) && group.items.some(canAccess)
+  const visibleBottomHrefs = new Set(
+    visibleMobileSlotItems.filter(canAccess).map((item) => item.href)
   );
+  const visibleGroups = portalNavGroups
+    .filter((group) => !group.roles || isRole(...group.roles))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.href !== '/portal/settings' && !visibleBottomHrefs.has(item.href)
+      ),
+    }))
+    .filter((group) => group.items.some(canAccess));
+
+  const handleSignOut = async () => {
+    close();
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   return (
     <>
@@ -209,11 +229,8 @@ export function MobileBottomNav({
           >
             <div className="portal-sheet-handle" aria-hidden="true" />
             <div className="portal-sheet-header">
-              <div>
-                <p>The Rail / full navigation</p>
-                <h2 id="portal-sheet-title">More of the portal</h2>
-              </div>
-              <button type="button" onClick={close} aria-label="Close full navigation">
+              <h2 id="portal-sheet-title">Menu</h2>
+              <button type="button" onClick={close} aria-label="Close menu">
                 <X aria-hidden="true" />
                 <span>Close</span>
               </button>
@@ -225,10 +242,20 @@ export function MobileBottomNav({
               pendingSignupsCount={showAdminSection ? pendingSignupsCount : 0}
               onLinkClick={close}
             />
-            <Link href="/" className="portal-sheet-footer" onClick={close}>
-              <ArrowLeftToLine aria-hidden="true" />
-              Back to Main Site
-            </Link>
+            <div className="portal-sheet-actions">
+              <Link href="/" onClick={close}>
+                <ArrowLeftToLine aria-hidden="true" />
+                Back to main site
+              </Link>
+              <Link href="/portal/settings" onClick={close}>
+                <Settings aria-hidden="true" />
+                Settings
+              </Link>
+              <button type="button" onClick={handleSignOut}>
+                <LogOut aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
           </section>
         </div>
       )}

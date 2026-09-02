@@ -31,7 +31,7 @@ import {
   RESOURCE_TYPES,
 } from '@/types';
 
-// Real field-tool links (carries into the hub's Field tools lane verbatim -
+// Real field-tool links used by the resources page -
 // never the mockup's demo Xfinity/Frontier/Brightspeed set).
 export const RESOURCE_QUICK_LINKS = [
   {
@@ -176,42 +176,37 @@ export function ResourcesLineSummaryStrip({
   );
 }
 
-export function ResourcesLineLaneHead({ title, metaTop, metaBottom }: { title: string; metaTop: string; metaBottom: string }) {
+export function ResourcesLineLaneHead({ title, metaTop = '', metaBottom = '' }: { title: string; metaTop?: string; metaBottom?: string }) {
   return (
     <div className="resources-line-lane-head">
       <h2>{title}</h2>
-      <p>
-        {metaTop}
-        <br />
-        {metaBottom}
-      </p>
+      {(metaTop || metaBottom) && (
+        <p>
+          {metaTop}
+          {metaTop && metaBottom && <br />}
+          {metaBottom}
+        </p>
+      )}
     </div>
   );
 }
 
 export function ResourcesLineDoorway({
-  incompleteCount,
   completed,
   total,
   percentage,
 }: {
-  incompleteCount: number;
   completed: number;
   total: number;
   percentage: number;
 }) {
-  const heading = incompleteCount > 0
-    ? <>{incompleteCount} item{incompleteCount === 1 ? '' : 's'} left<br />on your path.</>
-    : <>Your path is clear.<br />Keep moving.</>;
   return (
     <section className="resources-line-doorway" aria-labelledby="resources-line-doorway-title">
-      <p className="resources-line-eyebrow">My path / required items stay visible</p>
-      <h2 id="resources-line-doorway-title">{heading}</h2>
-      <p>Keep the essentials together, then return to the field with the route clear.</p>
-      <div className="resources-line-doorway-meta"><span>Path progress</span><strong>{total} items · {completed} complete</strong></div>
+      <h2 id="resources-line-doorway-title">Training progress</h2>
+      <p>{completed} of {total} modules complete</p>
       <div className="resources-line-progress" aria-label={`${completed} of ${total} complete`}><span style={{ width: `${percentage}%` }} /></div>
-      <Link className="resources-line-primary" href="/portal/training">
-        Enter University <ArrowRight aria-hidden="true" />
+      <Link className="resources-line-university-link" href="/portal/training">
+        <strong>Open University</strong><ArrowRight aria-hidden="true" />
       </Link>
     </section>
   );
@@ -227,14 +222,10 @@ export function ResourcesLineToolList() {
             <Icon className="resources-line-tool-icon" aria-hidden="true" />
             <div>
               <strong>{link.title}</strong>
-              <span>
-                {link.category} /{' '}
-                <a href={link.url} target="_blank" rel="noopener noreferrer">
-                  open in new tab <ExternalLink aria-hidden="true" />
-                </a>
-              </span>
             </div>
-            <ExternalLink className="resources-line-tool-arrow" aria-hidden="true" />
+            <a href={link.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${link.title}`}>
+              <ExternalLink className="resources-line-tool-arrow" aria-hidden="true" />
+            </a>
           </article>
         );
       })}
@@ -249,8 +240,8 @@ export function ResourcesLineShortsEmpty({ university = false }: { university?: 
         <RadioTower />
       </div>
       <div>
-        <strong>No shorts published</strong>
-        <p>Short-form training clips and quick field refreshers will appear here once Operations publishes them.</p>
+        <strong>No short videos yet</strong>
+        <p>Short training videos will appear here when they are ready.</p>
       </div>
     </div>
   );
@@ -260,7 +251,7 @@ export function ResourcesLineShortsLane() {
   return (
     <section className="resources-line-short-lane" aria-labelledby="resources-line-shorts-title">
       <div className="resources-line-short-head">
-        <h2 id="resources-line-shorts-title">Shorts</h2>
+        <h2 id="resources-line-shorts-title">Short videos</h2>
         <Link href="/portal/training?tab=shorts">View all in University <ArrowLeftRight aria-hidden="true" /></Link>
       </div>
       <ResourcesLineShortsEmpty />
@@ -352,7 +343,7 @@ export function ResourcesLinePayLane() {
         <h2 id="resources-line-pay-title">Pay structure</h2>
         {isAdmin && data?.scope === 'all' && !editing && (
           <button className="resources-line-edit-rates" type="button" onClick={() => { setDraft(data.tiers); setEditing(true); }}>
-            <Edit3 aria-hidden="true" /> Edit rates <ArrowRight aria-hidden="true" />
+            <Edit3 aria-hidden="true" /> Edit Rates <ArrowRight aria-hidden="true" />
           </button>
         )}
       </div>
@@ -423,7 +414,7 @@ export function ResourcesLinePayLane() {
             <div className="resources-line-edit-actions">
               <button type="button" onClick={() => { setEditing(false); setDraft(data?.tiers ?? []); }} disabled={saving}>Cancel</button>
               <button type="button" onClick={() => void handleSave()} disabled={saving}>
-                <Save aria-hidden="true" /> {saving ? 'Saving...' : 'Save rates'}
+                <Save aria-hidden="true" /> {saving ? 'Saving...' : 'Save Rates'}
               </button>
             </div>
           )}
@@ -445,8 +436,8 @@ export function ResourcesLinePayLane() {
 export function ResourcesLineFooter({ university = false, completed, total }: { university?: boolean; completed?: number; total?: number }) {
   return (
     <footer className={university ? 'resources-line-uni-foot' : 'resources-line-footer'}>
-      <span>{university ? 'University / My Path / progress signal' : 'The Line / resources broadcast'}</span>
-      <span>{university ? `${completed ?? 0} of ${total ?? 0} complete` : 'Make the next move legible.'}</span>
+      <span>{university ? 'University progress' : 'Resources'}</span>
+      <span>{university ? `${completed ?? 0} of ${total ?? 0} complete` : 'Use these links when you need them.'}</span>
     </footer>
   );
 }
@@ -489,8 +480,8 @@ export function ResourcesLineTabs({
 }) {
   return (
     <div className="resources-line-tabs" role="tablist" aria-label="University sections">
-      <button className="resources-line-tab" type="button" role="tab" aria-selected={active === 'path'} onClick={() => onChange('path')}>My Path</button>
-      <button className="resources-line-tab" type="button" role="tab" aria-selected={active === 'shorts'} onClick={() => onChange('shorts')}>Shorts</button>
+      <button className="resources-line-tab" type="button" role="tab" aria-selected={active === 'path'} onClick={() => onChange('path')}>My Training</button>
+      <button className="resources-line-tab" type="button" role="tab" aria-selected={active === 'shorts'} onClick={() => onChange('shorts')}>Short Videos</button>
     </div>
   );
 }
@@ -517,7 +508,7 @@ export function ResourcesLineFilterGroups({
         ))}
       </div>
       <div className="resources-line-filters" aria-label="Type filter">
-        <button className="resources-line-filter" type="button" aria-pressed={type === ''} onClick={() => onType('')}>All types</button>
+        <button className="resources-line-filter" type="button" aria-pressed={type === ''} onClick={() => onType('')}>All Types</button>
         {RESOURCE_TYPES.map((t) => (
           <button key={t.value} className="resources-line-filter" type="button" aria-pressed={type === t.value} onClick={() => onType(t.value)}>
             {t.label}
@@ -579,8 +570,8 @@ export function ResourcesLineCardGrid({
       <div className="resources-line-shorts-empty">
         <div className="resources-line-empty-icon" aria-hidden="true"><FileCheck2 /></div>
         <div>
-          <strong>No training resources yet</strong>
-          <p>No training resources are available yet.</p>
+          <strong>No training modules yet</strong>
+          <p>No training modules are available yet.</p>
         </div>
       </div>
     );

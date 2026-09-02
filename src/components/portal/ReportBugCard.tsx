@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bug, CheckCircle2, Send } from 'lucide-react';
+import { CheckCircle2, Send } from 'lucide-react';
 import { auth } from '@/lib/firebase/config';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -52,15 +52,7 @@ export default function ReportBugCard() {
   };
 
   return (
-    <section id="report-bug" className="member-line-panel member-line-bug">
-      <div className="member-line-panel-head">
-        <div>
-          <p className="member-line-eyebrow">02 / call the desk</p>
-          <h2>Report a bug</h2>
-          <p className="member-line-sub">The current page URL attaches automatically.</p>
-        </div>
-        <span className="member-line-meta">quick access</span>
-      </div>
+    <section id="report-bug" className="member-line-bug mt-8 border-t border-[var(--member-line-line)] pt-5">
 
       {done ? (
         <div className="member-line-note flex items-center gap-2">
@@ -71,9 +63,8 @@ export default function ReportBugCard() {
         <form onSubmit={submit}>
           {error && <div className="member-line-note warn mb-3">{error}</div>}
           {!open ? (
-            <button type="button" className="member-line-button primary small" onClick={() => setOpen(true)}>
-              <Bug className="mr-1.5 inline size-3.5" />
-              Report a bug
+            <button type="button" className="text-sm font-semibold text-[var(--member-line-lime)] underline-offset-4 hover:underline" onClick={() => setOpen(true)}>
+              Found a problem? Report a bug.
             </button>
           ) : (
             <>

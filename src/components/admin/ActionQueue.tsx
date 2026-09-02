@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import '@/styles/sweep-admin-a.css';
 import type { AlertTaskKind, AlertTaskStatus } from '@/types/alerts';
 
 interface AlertTaskRow {
@@ -181,10 +182,10 @@ export default function ActionQueue() {
     <aside className="ops-line-activation-rail">
       <div className="ops-line-activation-head">
         <div>
-          <p className="ops-line-kicker">Activation ready</p>
+          <span className="sweep-admin-label">Activation tasks</span>
           <h3>{tasks.length === 0 ? 'All items approved' : 'Needs attention'}</h3>
         </div>
-        <span className="ops-line-kicker">
+        <span className="sweep-admin-label">
           {tasks.length} task{tasks.length === 1 ? '' : 's'} ready
         </span>
       </div>
@@ -194,11 +195,11 @@ export default function ActionQueue() {
       {loading && tasks.length === 0 ? (
         <div className="ops-line-activation-person">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="ops-line-kicker">Loading action queue…</span>
+          <span>Loading activation tasks…</span>
         </div>
       ) : tasks.length === 0 ? (
         <div className="ops-line-activation-person">
-          <span className="ops-line-kicker">No manager tasks are waiting right now.</span>
+          <span>No manager tasks are waiting right now.</span>
         </div>
       ) : (
         tasks.map((task) => (

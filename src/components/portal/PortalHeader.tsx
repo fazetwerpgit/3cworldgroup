@@ -34,6 +34,14 @@ function getInitials(name?: string | null, email?: string | null) {
     : value.slice(0, 2).toUpperCase();
 }
 
+function shouldShowPushPermissionDot() {
+  return (
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    window.Notification.permission === 'default'
+  );
+}
+
 export function PortalHeader() {
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -41,6 +49,9 @@ export function PortalHeader() {
   usePresenceHeartbeat();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showPushPermissionDot, setShowPushPermissionDot] = useState(
+    shouldShowPushPermissionDot
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -50,6 +61,12 @@ export function PortalHeader() {
     return () => {
       delete document.body.dataset.portalShell;
     };
+  }, []);
+
+  useEffect(() => {
+    const updatePushPermissionDot = () => setShowPushPermissionDot(shouldShowPushPermissionDot());
+    window.addEventListener('focus', updatePushPermissionDot);
+    return () => window.removeEventListener('focus', updatePushPermissionDot);
   }, []);
 
   useEffect(() => {
@@ -164,9 +181,12 @@ export function PortalHeader() {
               onClick={() => setShowNotifications((open) => !open)}
               aria-expanded={showNotifications}
               aria-haspopup="true"
-              aria-label="Notifications"
+              aria-label={showPushPermissionDot ? 'Notifications. Alerts are off.' : 'Notifications'}
             >
               <Bell aria-hidden="true" />
+              {showPushPermissionDot && (
+                <span className="portal-push-permission-dot" aria-hidden="true" />
+              )}
               {unreadCount > 0 && (
                 <span className="portal-header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
               )}

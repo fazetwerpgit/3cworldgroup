@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Check, ChevronRight, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 
@@ -44,7 +44,7 @@ export function FormsLineSection({
       <div className="forms-line-section-label">
         <span className="forms-line-section-index">{number}</span>
         <p className="forms-line-eyebrow" id={`forms-line-section-${number}`}>
-          Section {number} / {title}
+          {title}
         </p>
       </div>
       {identity}
@@ -128,7 +128,7 @@ export function FormsLineChoicePicker({
 export function FormsLineIdentity({ name, role }: { name: string; role: string }) {
   return (
     <p className="forms-line-identity">
-      Submitting as <strong>{name}</strong><span>·</span>{role}
+      You are submitting as <strong>{name}</strong><span>·</span>{role}
     </p>
   );
 }
@@ -139,11 +139,11 @@ export function FormsLineFormHeader({ title, lane }: { title: string; lane: stri
     <header className="forms-line-fill-head">
       <div>
         <Link className="forms-line-back-link" href="/portal/forms">
-          <ArrowLeft aria-hidden="true" /> Back to forms
+          <ArrowLeft aria-hidden="true" /> Back to Forms
         </Link>
         <h2 id={titleId}>{title}</h2>
       </div>
-      <p>Representative fill / lane {lane} of 5</p>
+      <p>Form {lane} of 5</p>
     </header>
   );
 }
@@ -161,7 +161,7 @@ export function FormsLineRail({
       <strong>{status}</strong>
       <span>Review note</span>
       <strong>{note}</strong>
-      <span>Representative fill<br />real submission</span>
+      <span>Your submission</span>
     </aside>
   );
 }
@@ -191,46 +191,35 @@ export function FormsLineActions({
   saving: boolean;
   disabled?: boolean;
 }) {
+  const titleCaseVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
   return (
     <div className="forms-line-actions">
       <button className="forms-line-primary" type="submit" disabled={saving || disabled}>
-        {saving ? 'Submitting…' : `Submit ${verb} →`}
+        {saving ? 'Submitting…' : `Submit ${titleCaseVerb} →`}
       </button>
     </div>
   );
 }
 
 export function FormsLineHubRow({
-  lane,
   title,
   description,
   audience,
-  meta,
   href,
-  icon: Icon,
 }: {
-  lane: string;
   title: string;
   description: string;
   audience: string;
-  meta: string;
   href: string;
-  icon: LucideIcon;
 }) {
   return (
-    <article className="forms-line-row">
-      <span className="forms-line-row-number">{lane}</span>
-      <Icon className="forms-line-row-icon" aria-hidden="true" />
+    <Link className="forms-line-row" href={href}>
       <div className="forms-line-row-copy">
         <strong>{title}</strong>
-        <span>{description}</span>
+        <span className="forms-line-row-description">{description}</span>
+        {audience.toLowerCase() !== 'everyone' && <span className="forms-line-row-audience">{audience}</span>}
       </div>
-      <div className="forms-line-row-audience">
-        <b>{audience}</b>
-        {meta}
-      </div>
-      <Link className="forms-line-row-action" href={href}>Open form</Link>
       <ChevronRight className="forms-line-row-chevron" aria-hidden="true" />
-    </article>
+    </Link>
   );
 }

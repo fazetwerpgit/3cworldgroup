@@ -22,7 +22,7 @@ export function ResourceCard({ resource, progress }: ResourceCardProps) {
   return (
     <Link
       href={`/portal/training/${resource.id}`}
-      className="group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
+      className="training-resource-card group block overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-[border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8dc63f]/60 hover:shadow-md motion-reduce:transform-none"
     >
       <div className="relative flex h-36 items-center justify-center bg-[#0A1F44]">
         {resource.thumbnailUrl ? (
@@ -76,7 +76,7 @@ export function ResourceCard({ resource, progress }: ResourceCardProps) {
           </span>
         </div>
 
-        <h3 className="line-clamp-2 font-semibold text-[#0A1F44] transition-colors group-hover:text-[#5a8f1f]">
+        <h3 className="training-resource-title line-clamp-2 font-semibold text-[#0A1F44] transition-colors group-hover:text-[#5a8f1f]">
           {resource.title}
         </h3>
 

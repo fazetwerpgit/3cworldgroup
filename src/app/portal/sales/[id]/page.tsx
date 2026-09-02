@@ -17,6 +17,7 @@ import {
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { PageTitle } from '@/components/portal/PageTitle';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -32,6 +33,7 @@ import { auth } from '@/lib/firebase/config';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { FIBER_COMPANIES, Sale } from '@/types';
+import '@/styles/sweep-leftovers.css';
 
 function companyLabel(company: string) {
   return FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
@@ -52,24 +54,6 @@ function formatDate(value: Date | string | undefined) {
 
 function commissionLabel(value: number | undefined) {
   return typeof value === 'number' ? formatMoney(value) : '—';
-}
-
-function dateLabel() {
-  const now = new Date();
-  return {
-    month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now).toUpperCase(),
-    weekday: new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now).toUpperCase(),
-  };
-}
-
-function Mast() {
-  const { month, weekday } = dateLabel();
-  return (
-    <div className="sales-line-mast">
-      <span className="sales-line-mark">3C WORLD GROUP / THE LINE / SALES</span>
-      <span className="sales-line-mast-meta">{month} · {weekday}</span>
-    </div>
-  );
 }
 
 function SalesLineShell({ children }: { children: React.ReactNode }) {
@@ -145,7 +129,7 @@ export default function SaleDetailPage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <SalesLineShell>
-          <Mast />
+          <PageTitle title="Sale" meta="Loading" />
           <div className="sales-line-state-panel">
             <div className="sales-line-spinner" aria-hidden="true" />
             <p>Loading sale details...</p>
@@ -159,7 +143,7 @@ export default function SaleDetailPage() {
     return (
       <ProtectedRoute permissions={['sales:read']}>
         <SalesLineShell>
-          <Mast />
+          <PageTitle title="Sale" meta="Not found" />
           <div className="sales-line-state-panel">
             <TriangleAlert className="sales-line-icon-lg" aria-hidden="true" />
             <strong>Sale not found</strong>
@@ -174,35 +158,29 @@ export default function SaleDetailPage() {
   return (
     <ProtectedRoute permissions={['sales:read']}>
       <SalesLineShell>
-        <Mast />
-
-        <Link className="sales-line-back" href="/portal/sales">
-          <ArrowLeft className="sales-line-icon" aria-hidden="true" />
-          Back to sales
-        </Link>
-
-        <header className="sales-line-subhead">
-          <div>
-            <p className="sales-line-eyebrow">Sales workspace / detail</p>
-            <h1>{sale.customerName || sale.customerAddress || 'Customer pending'}</h1>
-            <p className="sales-line-subhead-id">ID: {sale.id}</p>
-          </div>
-          <div className="sales-line-subhead-actions">
-            <span className={`sales-line-badge ${sale.status}`}>{sale.status}</span>
-            {isAdmin && (
-              <>
-                <Link className="sales-line-btn" href={`/portal/sales/${sale.id}/edit`}>
-                  <Pencil className="sales-line-icon" aria-hidden="true" />
-                  Edit
-                </Link>
-                <button type="button" className="sales-line-btn danger" onClick={() => setShowDeleteModal(true)}>
-                  <Trash2 className="sales-line-icon" aria-hidden="true" />
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-        </header>
+        <PageTitle
+          title={sale.customerName || sale.customerAddress || 'Sale'}
+          meta={sale.status.replace(/^./, (c) => c.toUpperCase())}
+          subtitle={`Sale ID: ${sale.id}`}
+          back={(
+            <Link className="sales-line-back" href="/portal/sales">
+              <ArrowLeft className="sales-line-icon" aria-hidden="true" />
+              Back to sales
+            </Link>
+          )}
+          actions={isAdmin ? (
+            <>
+              <Link className="sales-line-btn" href={`/portal/sales/${sale.id}/edit`}>
+                <Pencil className="sales-line-icon" aria-hidden="true" />
+                Edit
+              </Link>
+              <button type="button" className="sales-line-btn danger" onClick={() => setShowDeleteModal(true)}>
+                <Trash2 className="sales-line-icon" aria-hidden="true" />
+                Delete
+              </button>
+            </>
+          ) : undefined}
+        />
 
         <div className="sales-line-body">
           <section className="sales-line-panel">

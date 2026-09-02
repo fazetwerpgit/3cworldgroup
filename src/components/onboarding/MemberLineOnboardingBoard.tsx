@@ -84,9 +84,8 @@ export default function MemberLineOnboardingBoard({
       <section className="member-line-panel">
         <div className="member-line-panel-head">
           <div>
-            <p className="member-line-eyebrow">01 / the board</p>
             <h2>
-              {memberLabel} / onboarding
+              Onboarding items for {memberLabel}
             </h2>
           </div>
           <span className="member-line-meta">{progress.approved} approved</span>
@@ -96,7 +95,7 @@ export default function MemberLineOnboardingBoard({
           <span style={{ width: `${pct}%` }} />
         </div>
         <p className="member-line-meta">
-          {progress.approved} of {progress.total} approved / one progress readout
+          {progress.approved} of {progress.total} approved
         </p>
 
         <div className="member-line-board" style={{ marginTop: 16 }}>
@@ -114,7 +113,7 @@ export default function MemberLineOnboardingBoard({
           ))}
           {ordered.length === 0 && (
             <div className="member-line-row">
-              <span className="member-line-state todo">—</span>
+              <span className="member-line-state todo">Not started</span>
               <div>
                 <strong>No onboarding items assigned</strong>
               </div>
@@ -142,8 +141,8 @@ export default function MemberLineOnboardingBoard({
           <div className="member-line-sheet">
             <div className="member-line-sheet-head">
               <div>
-                <p className="member-line-eyebrow">{STATUS_LABEL[openItem.status]}</p>
-                <h2 style={{ margin: '4px 0 0', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 20 }}>
+                <span className={`member-line-state ${STATUS_CLASS[openItem.status]}`}>{STATUS_LABEL[openItem.status]}</span>
+                <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--font-archivo), var(--font-sans), Arial, sans-serif', fontWeight: 700, fontSize: 20 }}>
                   {openItem.label}
                 </h2>
               </div>

@@ -5,8 +5,10 @@ import { useEffect, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-b.css';
 
-const InertNote = () => <span className="admin-line-inert-note">Not wired up yet</span>;
+const InertNote = () => <span className="admin-line-inert-note">Not available yet</span>;
 
 const WEEKLY_CHALLENGE_PRESETS = [
   { value: 3, descriptor: 'Warm-up' },
@@ -91,8 +93,7 @@ function WeeklyChallengeCard() {
 
   return (
     <section className="admin-line-settings-card">
-      <div className="admin-line-eyebrow">01 / weekly challenge</div>
-      <h2>Set the bar for the week.</h2>
+      <h2>Weekly challenge</h2>
       <div className="admin-line-field">
         <label>Target sales</label>
         {loading ? (
@@ -104,6 +105,7 @@ function WeeklyChallengeCard() {
                 <button
                   key={preset.value}
                   type="button"
+                  title={preset.descriptor}
                   aria-pressed={target === preset.value}
                   onClick={() => {
                     setTarget(preset.value);
@@ -112,7 +114,6 @@ function WeeklyChallengeCard() {
                   }}
                 >
                   {preset.value} sales
-                  <span className="admin-line-preset-descriptor">{preset.descriptor}</span>
                 </button>
               ))}
             </div>
@@ -140,7 +141,7 @@ function WeeklyChallengeCard() {
       </p>
       <div className="admin-line-save-line">
         <button type="button" className="admin-line-primary" disabled={saving || loading} onClick={handleSave}>
-          {saving ? 'Saving…' : 'Save weekly challenge'}
+          {saving ? 'Saving…' : 'Save changes'}
         </button>
         {saved && <span className="saved">Saved — live on the leaderboard now</span>}
         {error && <span className="admin-line-weekly-error">{error}</span>}
@@ -157,6 +158,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="admin-line-main">
         <div className="admin-line">
+          <PageTitle title="System Settings" meta="Admin access required" />
           <div className="admin-line-role-denied">
             <Lock className="mx-auto mb-3 h-8 w-8" style={{ color: 'var(--admin-line-red)' }} />
             <p style={{ fontSize: 16, fontWeight: 900 }}>Access Denied</p>
@@ -173,31 +175,13 @@ export default function AdminSettingsPage() {
   return (
     <div className="admin-line-main">
       <div className="admin-line">
-        <header className="admin-line-hero">
-          <div>
-            <div className="admin-line-kicker">admin settings / control room</div>
-            <h1>
-              <span className="accent">Tune the control</span>
-              <span className="plain">without hiding the risk.</span>
-            </h1>
-            <p className="admin-line-intro">
-              The weekly challenge section below is live — it reads and saves for real. The
-              remaining sections mirror settings this portal will eventually persist; every control
-              in them is disabled on purpose rather than faking a save.
-            </p>
-          </div>
-          <div className="admin-line-hero-count">
-            <span className="admin-line-display portal-metallic-num">4</span>
-            <small>sections to tune</small>
-          </div>
-        </header>
+        <PageTitle title="System Settings" meta="4 sections" subtitle="Manage weekly goals, company details, scoring, and notifications." />
 
         <div className="admin-line-settings-grid">
           <WeeklyChallengeCard />
 
           <section className="admin-line-settings-card">
-            <div className="admin-line-eyebrow">02 / company</div>
-            <h2>Company identity.</h2>
+            <h2>Company</h2>
             <div className="admin-line-field">
               <label htmlFor="company-name">Company name</label>
               <input id="company-name" value="3C World Group" disabled readOnly />
@@ -221,15 +205,14 @@ export default function AdminSettingsPage() {
             </div>
             <div className="admin-line-save-line">
               <button type="button" className="admin-line-primary" disabled>
-                Save company
+                Save changes
               </button>
               <InertNote />
             </div>
           </section>
 
           <section className="admin-line-settings-card">
-            <div className="admin-line-eyebrow">03 / sales &amp; points</div>
-            <h2>Scoring boundaries.</h2>
+            <h2>Sales and points</h2>
             <div className="admin-line-toggle-row">
               <div>
                 <strong>Auto-approve sales</strong>
@@ -240,7 +223,7 @@ export default function AdminSettingsPage() {
               </button>
             </div>
             <div className="admin-line-field">
-              <label>Points / min · default · max</label>
+              <label>Points</label>
               <div className="admin-line-number-grid">
                 <input aria-label="Minimum points" value={0} type="number" disabled readOnly />
                 <input aria-label="Default points" value={10} type="number" disabled readOnly />
@@ -249,7 +232,7 @@ export default function AdminSettingsPage() {
               <InertNote />
             </div>
             <div className="admin-line-field">
-              <label>Leaderboard periods / multi-toggle</label>
+              <label>Leaderboard periods</label>
               <div className="admin-line-multi-toggle">
                 {['Day', 'Week', 'Month', 'Quarter', 'Year', 'All-time'].map((label, i) => (
                   <button key={label} type="button" aria-pressed={i < 3} disabled>
@@ -261,20 +244,19 @@ export default function AdminSettingsPage() {
             </div>
             <div className="admin-line-save-line">
               <button type="button" className="admin-line-primary" disabled>
-                Save points
+                Save changes
               </button>
               <InertNote />
             </div>
           </section>
 
           <section className="admin-line-settings-card">
-            <div className="admin-line-eyebrow">04 / alerts</div>
-            <h2>Notification lines.</h2>
+            <h2>Notifications</h2>
             {[
               { label: 'New sale', sub: 'Tell the admin desk when a sale arrives.', on: true },
               { label: 'Approved', sub: "Keep the rep's next step visible.", on: true },
               { label: 'Rejected', sub: 'Surface the reason, not just the state.', on: false },
-              { label: 'Leaderboard changes', sub: 'Broadcast movement without noise.', on: true },
+              { label: 'Leaderboard changes', sub: 'Keep reps up to date when scores change.', on: true },
             ].map((row) => (
               <div className="admin-line-toggle-row" key={row.label}>
                 <div>
@@ -288,7 +270,7 @@ export default function AdminSettingsPage() {
             ))}
             <div className="admin-line-save-line">
               <button type="button" className="admin-line-primary" disabled>
-                Save alerts
+                Save changes
               </button>
               <InertNote />
             </div>
@@ -296,14 +278,11 @@ export default function AdminSettingsPage() {
         </div>
 
         <div className="admin-line-danger-room">
-          <div className="admin-line-eyebrow" style={{ color: 'var(--admin-line-red)' }}>
-            danger room / contained
-          </div>
-          <h2>Reset a system only on purpose.</h2>
+          <h2>Reset data</h2>
           <div className="admin-line-danger-actions">
             <div className="admin-line-danger-action">
               <strong>Reset sales</strong>
-              <p>Clears the sales ledger for a fresh review.</p>
+              <p>Clears saved sales data.</p>
               <button type="button" disabled>
                 Reset sales
               </button>
@@ -317,7 +296,7 @@ export default function AdminSettingsPage() {
             </div>
             <div className="admin-line-danger-action">
               <strong>Reset leaderboard</strong>
-              <p>Returns the ranking board to its starting state.</p>
+              <p>Returns leaderboard data to its starting state.</p>
               <button type="button" disabled>
                 Reset leaderboard
               </button>
@@ -331,9 +310,7 @@ export default function AdminSettingsPage() {
             </div>
           </div>
           <p className="admin-line-sub" style={{ marginTop: 12 }}>
-            Real settings persistence and reset endpoints are follow-up work, out of this round — a
-            destructive reset needs its own authorization and audit-trail design, not just a typed
-            client-side gate.
+            These controls are disabled until the required permissions and audit steps are ready.
           </p>
         </div>
       </div>

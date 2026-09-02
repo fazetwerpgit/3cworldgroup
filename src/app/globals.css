@@ -1663,7 +1663,7 @@ body.portal-scope {
 .portal-user-copy small,
 .portal-user-menu-name span {
   color: var(--rail-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1724,7 +1724,7 @@ body.portal-scope {
   padding: 3px 5px;
   border: 1px solid var(--rail-line);
   color: var(--rail-ink);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .portal-header-popover {
@@ -1759,7 +1759,7 @@ body.portal-scope {
   border-radius: 99px;
   background: var(--rail-lime);
   color: var(--rail-stage);
-  font: 900 9px/16px ui-monospace, Consolas, monospace;
+  font: 900 9px/16px ui-monospace, "SF Mono", Menlo, monospace;
   text-align: center;
 }
 
@@ -1790,7 +1790,7 @@ body.portal-scope {
   border: 1px solid var(--rail-lime);
   border-radius: 50%;
   color: var(--rail-lime);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .portal-user-copy {
@@ -1872,7 +1872,7 @@ body.portal-scope {
   background: transparent;
   color: var(--rail-muted);
   cursor: pointer;
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-align: left;
   text-decoration: none;
@@ -1929,7 +1929,7 @@ body.portal-scope {
 .portal-notification-header button,
 .portal-notification-clear {
   cursor: pointer;
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1999,7 +1999,7 @@ body.portal-scope {
 }
 
 .portal-notification-copy small {
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .portal-notification-item > i {
@@ -2091,7 +2091,7 @@ body.portal-scope {
 .portal-sheet-header p {
   margin: 0;
   color: var(--rail-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -2179,7 +2179,7 @@ body.portal-scope {
   border: 0;
   background: transparent;
   color: var(--rail-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.17em;
   text-align: left;
   text-transform: uppercase;
@@ -2316,7 +2316,7 @@ body.portal-scope {
   align-items: center;
   gap: 8px;
   color: var(--rail-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-decoration: none;
   text-transform: uppercase;
@@ -2584,7 +2584,7 @@ body.portal-scope {
     background: transparent;
     color: var(--rail-muted);
     cursor: pointer;
-    font: 900 8px ui-monospace, Consolas, monospace;
+    font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
     letter-spacing: 0.04em;
     text-decoration: none;
     text-transform: uppercase;
@@ -2672,7 +2672,7 @@ body.portal-scope {
     margin: 0;
     color: var(--rail-ink);
     font-size: 24px;
-    letter-spacing: -0.07em;
+    letter-spacing: -0.02em;
     text-transform: uppercase;
   }
 
@@ -2685,7 +2685,7 @@ body.portal-scope {
     background: transparent;
     color: var(--rail-muted);
     cursor: pointer;
-    font: 900 9px ui-monospace, Consolas, monospace;
+    font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
     letter-spacing: 0.1em;
     text-transform: uppercase;
   }
@@ -2757,7 +2757,7 @@ body.portal-scope {
     padding-top: 11px;
     border-top: 1px solid var(--rail-line);
     color: var(--rail-muted);
-    font: 9px ui-monospace, Consolas, monospace;
+    font: 9px ui-monospace, "SF Mono", Menlo, monospace;
     letter-spacing: 0.08em;
     text-decoration: none;
     text-transform: uppercase;
@@ -2820,7 +2820,7 @@ body.portal-scope {
   overflow-x: hidden;
   padding: 28px clamp(13px, 4vw, 58px) 42px;
   color: var(--ink);
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
 .dark .sales-line-main {
@@ -2898,7 +2898,7 @@ body.portal-scope {
 .sales-line-plan span,
 .sales-line-plan b,
 .sales-line-plan em {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-mast-meta {
@@ -2937,7 +2937,7 @@ body.portal-scope {
   /* Tailwind preflight resets h1 to weight 400; mockup relies on default bold */
   font-weight: 700;
   line-height: 0.82;
-  letter-spacing: -0.1em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -2949,7 +2949,7 @@ body.portal-scope {
   max-width: 620px;
   margin: 0;
   color: var(--muted);
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: 14px;
   line-height: 1.45;
 }
@@ -2996,10 +2996,10 @@ body.portal-scope {
   background: var(--metal);
   background-clip: text;
   -webkit-background-clip: text;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: clamp(64px, 9vw, 118px);
   font-weight: 900;
-  letter-spacing: -0.11em;
+  letter-spacing: -0.02em;
   line-height: 0.78;
 }
 
@@ -3007,7 +3007,7 @@ body.portal-scope {
   display: block;
   margin-top: 15px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -3049,12 +3049,12 @@ body.portal-scope {
   -webkit-background-clip: text;
   font-size: 23px;
   font-weight: 900;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.02em;
 }
 
 .sales-line-metric-value small {
   color: var(--muted);
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: 8px;
   letter-spacing: 0.1em;
 }
@@ -3068,7 +3068,7 @@ body.portal-scope {
 
 .sales-line-lime {
   color: var(--lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-flow,
@@ -3104,7 +3104,7 @@ body.portal-scope {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -3143,7 +3143,7 @@ body.portal-scope {
   border: 1px solid var(--lime);
   border-radius: 50%;
   color: var(--lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   font-weight: 900;
 }
@@ -3171,7 +3171,7 @@ body.portal-scope {
 .sales-line-priority-copy span {
   margin-top: 4px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
 }
 
@@ -3292,7 +3292,7 @@ body.portal-scope {
   border-radius: 99px;
   padding: 3px 6px;
   color: var(--muted);
-  font: 8px/1 ui-monospace, Consolas, monospace;
+  font: 8px/1 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-tab[aria-selected="true"] .sales-line-count-chip {
@@ -3379,7 +3379,7 @@ body.portal-scope {
   border-radius: 50%;
   background: var(--panel2);
   color: var(--ink);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-date-cell {
@@ -3409,7 +3409,7 @@ body.portal-scope {
 .sales-line-money small {
   margin-left: 2px;
   color: var(--muted);
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: 8px;
   font-weight: normal;
 }
@@ -3428,7 +3428,7 @@ body.portal-scope {
   border: 1px solid transparent;
   border-radius: 99px;
   padding: 5px 7px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3498,7 +3498,7 @@ body.portal-scope {
 .sales-line-ledger-empty {
   padding: 34px 12px;
   color: var(--muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   text-align: center;
 }
 
@@ -3567,7 +3567,7 @@ body.portal-scope {
   margin: 8px 0 0;
   font-size: 26px;
   font-weight: 700;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
 }
 
 .sales-line-icon-button {
@@ -3711,7 +3711,7 @@ body.portal-scope {
 .sales-line-summary strong {
   display: block;
   margin-top: 8px;
-  font: 15px ui-monospace, Consolas, monospace;
+  font: 15px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-proof {
@@ -3828,7 +3828,7 @@ body.portal-scope {
   background: var(--panel);
   padding: 11px 13px;
   color: var(--ink);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   opacity: 0;
   pointer-events: none;
   transform: translateY(12px);
@@ -4074,7 +4074,7 @@ body.portal-scope {
   border-bottom: 1px solid var(--soft);
   padding: 15px 10px;
   color: var(--muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
 }
 
@@ -4215,7 +4215,7 @@ body.portal-scope {
     linear-gradient(90deg, rgba(10, 31, 68, 0.025) 1px, transparent 1px);
   background-size: 56px 56px;
   color: var(--chat-line-ink);
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
 .dark .chat-line-page {
@@ -4281,7 +4281,7 @@ body.portal-scope {
 .chat-line-mobile-number,
 .chat-line-mobile-audience,
 .chat-line-mobile-pii {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
@@ -4316,7 +4316,7 @@ body.portal-scope {
   border-radius: 999px;
   background: var(--chat-line-lime);
   color: var(--chat-line-panel);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.14em;
@@ -4372,7 +4372,7 @@ body.portal-scope {
   color: var(--chat-line-ink);
   font-size: 31px;
   font-weight: 900;
-  letter-spacing: -0.11em;
+  letter-spacing: -0.02em;
   line-height: 0.85;
   text-transform: uppercase;
 }
@@ -4577,7 +4577,7 @@ body.portal-scope {
   -webkit-background-clip: text;
   font-size: clamp(44px, 7vw, 92px);
   font-weight: 900;
-  letter-spacing: -0.12em;
+  letter-spacing: -0.02em;
   line-height: 0.78;
   text-transform: uppercase;
   white-space: nowrap;
@@ -4708,7 +4708,7 @@ body.portal-scope {
   gap: 12px;
   margin: 4px 0 17px;
   color: var(--chat-line-muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.13em;
@@ -4761,7 +4761,7 @@ body.portal-scope {
   border-radius: 50%;
   background: var(--chat-line-panel);
   color: var(--chat-line-lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px !important;
   font-weight: 900;
 }
@@ -4778,7 +4778,7 @@ body.portal-scope {
 .chat-line-avatar:not(.chat-line-avatar-own) {
   background: var(--chat-line-panel) !important;
   color: var(--chat-line-lime) !important;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .chat-line-avatar-own {
@@ -4833,7 +4833,7 @@ body.portal-scope {
   border: 1px solid var(--chat-line-line);
   border-radius: 999px;
   color: var(--chat-line-muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 7px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -4842,7 +4842,7 @@ body.portal-scope {
 .chat-line-timestamp {
   margin-left: auto;
   color: var(--chat-line-muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
 }
 
@@ -4900,7 +4900,7 @@ body.portal-scope {
   gap: 5px;
   margin-bottom: 5px;
   color: var(--chat-line-lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -4925,7 +4925,7 @@ body.portal-scope {
 .chat-line-quote strong {
   margin-bottom: 3px;
   color: var(--chat-line-lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -4968,7 +4968,7 @@ body.portal-scope {
   border: 0;
   background: transparent;
   color: var(--chat-line-danger);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
 }
 
@@ -5040,7 +5040,7 @@ body.portal-scope {
   border-radius: 999px;
   background: var(--chat-line-panel);
   color: var(--chat-line-lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -5117,7 +5117,7 @@ body.portal-scope {
 
 .chat-line-compose-strip strong {
   color: var(--chat-line-lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 8px;
   letter-spacing: 0.1em;
 }
@@ -5562,7 +5562,7 @@ body.portal-scope {
     margin: 0 0 6px;
     overflow: hidden;
     color: var(--chat-line-lime);
-    font-family: ui-monospace, Consolas, monospace;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 9px;
     font-weight: 900;
     letter-spacing: 0.13em;
@@ -5582,7 +5582,7 @@ body.portal-scope {
     -webkit-background-clip: text;
     font-size: 30px;
     font-weight: 900;
-    letter-spacing: -0.12em;
+    letter-spacing: -0.02em;
     line-height: 0.8;
     text-transform: uppercase;
     white-space: nowrap;
@@ -5607,7 +5607,7 @@ body.portal-scope {
     align-items: center;
     gap: 6px;
     color: var(--chat-line-muted);
-    font-family: ui-monospace, Consolas, monospace;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 8px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -5781,7 +5781,7 @@ body.portal-scope {
   .chat-line-thread-composer-meta::before {
     color: var(--chat-line-muted);
     content: "No customer PII — never card numbers or SSNs.";
-    font-family: ui-monospace, Consolas, monospace;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 7px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -5897,7 +5897,7 @@ body.portal-scope {
   overflow-x: hidden;
   padding: 26px clamp(13px, 4vw, 58px) 40px;
   color: var(--calls-line-ink);
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
 .dark .calls-line-main {
@@ -5978,7 +5978,7 @@ body.portal-scope {
 .calls-line-starter,
 .calls-line-secondary,
 .calls-line-add-call {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .calls-line-mast-meta {
@@ -6027,7 +6027,7 @@ body.portal-scope {
   font-size: clamp(45px, 7.8vw, 98px);
   font-weight: 900;
   line-height: 0.82;
-  letter-spacing: -0.1em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -6054,15 +6054,15 @@ body.portal-scope {
   background: var(--calls-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font: 900 clamp(70px, 9vw, 119px)/0.78 ui-monospace, Consolas, monospace;
-  letter-spacing: -0.13em;
+  font: 900 clamp(70px, 9vw, 119px)/0.78 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
 }
 
 .calls-line-hero-number small {
   display: block;
   margin-top: 14px;
   color: var(--calls-line-muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -6081,7 +6081,7 @@ body.portal-scope {
 
 .calls-line-broadcast-label {
   color: var(--calls-line-lime);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -6177,7 +6177,7 @@ body.portal-scope {
 .calls-line-manage-bar p {
   margin: 0;
   color: var(--calls-line-muted);
-  font: 9px/1.5 ui-monospace, Consolas, monospace;
+  font: 9px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -6203,7 +6203,7 @@ body.portal-scope {
   margin: 0;
   font-size: 22px;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -6256,7 +6256,7 @@ body.portal-scope {
 
 .calls-line-day-dow {
   display: block;
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
@@ -6307,7 +6307,7 @@ body.portal-scope {
   margin: 0;
   font-size: 27px;
   font-weight: 900;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -6352,8 +6352,8 @@ body.portal-scope {
   background: var(--calls-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font: 900 clamp(38px, 3.2vw, 46px)/0.8 ui-monospace, Consolas, monospace;
-  letter-spacing: -0.14em;
+  font: 900 clamp(38px, 3.2vw, 46px)/0.8 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
 }
 
 .calls-line-air-time small {
@@ -6379,7 +6379,7 @@ body.portal-scope {
   font-size: 16px;
   font-weight: 900;
   line-height: 1.1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -6485,7 +6485,7 @@ body.portal-scope {
 
 .calls-line-empty-state p {
   margin: 0;
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
 }
 
@@ -6523,7 +6523,7 @@ body.portal-scope {
 
 .calls-line-required-calls button span {
   color: var(--calls-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -6615,7 +6615,7 @@ body.portal-scope {
   margin: 0 34px 5px 0;
   font-size: 25px;
   font-weight: 900;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -7038,7 +7038,7 @@ body.portal-scope {
 .forms-line-actions > span,
 .forms-line-proof-hint,
 .forms-line-choice-empty {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .forms-line-command {
@@ -7070,7 +7070,7 @@ body.portal-scope {
   font-size: clamp(45px, 7.8vw, 99px);
   font-weight: 950;
   line-height: 0.82;
-  letter-spacing: -0.1em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -7098,21 +7098,21 @@ body.portal-scope {
   background: var(--forms-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-weight: 900;
 }
 
 .forms-line-display {
   font-size: clamp(70px, 9vw, 120px);
   line-height: 0.78;
-  letter-spacing: -0.13em;
+  letter-spacing: -0.02em;
 }
 
 .forms-line-hero-number small {
   display: block;
   margin-top: 14px;
   color: var(--forms-line-muted);
-  font: 10px/1.35 ui-monospace, Consolas, monospace;
+  font: 10px/1.35 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -7150,14 +7150,14 @@ body.portal-scope {
 .forms-line-signal-value {
   font-size: 23px;
   line-height: 0.8;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.02em;
 }
 
 .forms-line-signal-note {
   display: block;
   margin-top: 10px;
   color: var(--forms-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .forms-line-list {
@@ -7178,7 +7178,7 @@ body.portal-scope {
   margin: 0;
   font-size: 23px;
   font-weight: 900;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -7214,7 +7214,7 @@ body.portal-scope {
   border: 1px solid var(--forms-line-lime);
   border-radius: 50%;
   color: var(--forms-line-lime);
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .forms-line-row-icon,
@@ -7325,7 +7325,7 @@ body.portal-scope {
   align-items: center;
   gap: 5px;
   color: var(--forms-line-lime);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.11em;
   text-decoration: none;
   text-transform: uppercase;
@@ -7342,7 +7342,7 @@ body.portal-scope {
   font-size: 34px;
   font-weight: 900;
   line-height: 0.88;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -7381,7 +7381,7 @@ body.portal-scope {
 
 .forms-line-section-index {
   color: var(--forms-line-lime);
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
 }
 
@@ -7427,7 +7427,7 @@ body.portal-scope {
   display: block;
   margin-bottom: 7px;
   color: var(--forms-line-muted);
-  font: 800 9px ui-monospace, Consolas, monospace;
+  font: 800 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
@@ -8034,7 +8034,7 @@ body.portal-scope {
 .resources-line-card-tag,
 .resources-line-card-meta,
 .resources-line-status {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .resources-line-head {
@@ -8063,7 +8063,7 @@ body.portal-scope {
   font-size: clamp(36px, 7.8vw, 92px);
   font-weight: 950;
   line-height: 0.82;
-  letter-spacing: -0.11em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -8087,14 +8087,14 @@ body.portal-scope {
   background: var(--resources-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-weight: 900;
 }
 
 .resources-line-display {
   font-size: clamp(70px, 9vw, 120px);
   line-height: 0.78;
-  letter-spacing: -0.13em;
+  letter-spacing: -0.02em;
 }
 
 .resources-line-head-count,
@@ -8143,7 +8143,7 @@ body.portal-scope {
   margin-top: 14px;
   font-size: 31px;
   line-height: 0.8;
-  letter-spacing: -0.1em;
+  letter-spacing: -0.02em;
 }
 
 .resources-line-signal-note {
@@ -8177,7 +8177,7 @@ body.portal-scope {
 .resources-line-lane-head h2 {
   margin: 0;
   font-size: 24px;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -8201,7 +8201,7 @@ body.portal-scope {
   margin: 12px 0 9px;
   font-size: clamp(32px, 4.8vw, 56px);
   line-height: 0.82;
-  letter-spacing: -0.1em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -8347,7 +8347,7 @@ body.portal-scope {
 .resources-line-pay-lane h2 {
   margin: 0;
   font-size: 22px;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -8585,7 +8585,7 @@ body.portal-scope {
 .comp-plan-head h2 {
   margin: 0;
   font-size: 16px;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -9118,9 +9118,9 @@ body.portal-scope {
   --member-line-red: #b91c1c;
   --member-line-gold: #92620a;
   --member-line-metal: linear-gradient(180deg, #0a1f44, #45617d 38%, #7f8c9b 80%, #0a1f44);
-  --member-line-sans: "Trebuchet MS", Arial, sans-serif;
-  --member-line-serif: Georgia, "Times New Roman", serif;
-  --member-line-mono: "Courier New", monospace;
+  --member-line-sans: var(--font-sans), system-ui, sans-serif;
+  --member-line-serif: var(--font-sans), system-ui, sans-serif;
+  --member-line-mono: ui-monospace, "SF Mono", Menlo, monospace;
   position: relative;
   z-index: 1;
   width: min(1400px, 100%);
@@ -9220,7 +9220,7 @@ body.portal-scope {
   font-weight: 700;
   font-size: clamp(36px, 10.5vw, 54px);
   line-height: 0.96;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.02em;
 }
 
 .member-line-masthead h1 span {
@@ -9249,7 +9249,7 @@ body.portal-scope {
   font-weight: 700;
   font-size: clamp(115px, 16vw, 218px);
   line-height: 0.78;
-  letter-spacing: -0.12em;
+  letter-spacing: -0.02em;
   text-align: right;
 }
 
@@ -9361,7 +9361,7 @@ body.portal-scope {
   font-family: var(--member-line-serif);
   font-weight: 600;
   font-size: 23px;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 
 .member-line-sub {
@@ -9916,7 +9916,7 @@ body.portal-scope {
   font-weight: 600;
   font-size: clamp(40px, 5.2vw, 76px);
   line-height: 0.9;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.02em;
 }
 
 .member-line-brand-card h2 em {
@@ -10108,7 +10108,7 @@ body.portal-scope {
   margin: 0 auto;
   padding: 22px clamp(14px, 3.5vw, 48px) 52px;
   color: var(--ops-line-ink);
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 .dark .ops-line {
@@ -10149,7 +10149,7 @@ body.portal-scope {
   border: 1px solid var(--ops-line-line);
   background: color-mix(in srgb, var(--ops-line-panel) 82%, transparent);
   color: var(--ops-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
@@ -10182,7 +10182,7 @@ body.portal-scope {
   right: 24px;
   bottom: 10px;
   color: color-mix(in srgb, var(--ops-line-lime) 60%, transparent);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.17em;
 }
 
@@ -10197,18 +10197,18 @@ body.portal-scope {
 .ops-line-kicker {
   margin: 0;
   color: var(--ops-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .ops-line-hero h1 {
   margin: 11px 0 12px;
-  font-family: "Arial Narrow", "Bahnschrift Condensed", "Trebuchet MS", sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: clamp(36px, 10.5vw, 54px);
   font-weight: 900;
   line-height: 0.86;
-  letter-spacing: -0.1em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   color: var(--ops-line-ink);
 }
@@ -10235,11 +10235,11 @@ body.portal-scope {
   background: var(--ops-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font-family: "Arial Narrow", "Bahnschrift Condensed", ui-monospace, Consolas, monospace;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-weight: 900;
   font-size: clamp(90px, 14vw, 172px);
   line-height: 0.78;
-  letter-spacing: -0.14em;
+  letter-spacing: -0.02em;
   text-shadow: 0 0 26px rgba(255, 255, 255, 0.08);
 }
 
@@ -10247,7 +10247,7 @@ body.portal-scope {
   display: block;
   margin-top: 14px;
   color: var(--ops-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -10276,7 +10276,7 @@ body.portal-scope {
 .ops-line-strip-cell > span:first-child {
   display: block;
   color: var(--ops-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10293,15 +10293,15 @@ body.portal-scope {
 .ops-line-strip-cell b {
   display: block;
   color: var(--ops-line-lime);
-  font: 900 23px ui-monospace, Consolas, monospace;
-  letter-spacing: -0.08em;
+  font: 900 23px ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
 }
 
 .ops-line-strip-cell .note {
   display: block;
   margin-top: 5px;
   color: var(--ops-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10319,10 +10319,10 @@ body.portal-scope {
 
 .ops-line-section-head h2 {
   margin: 6px 0 0;
-  font-family: "Arial Narrow", "Bahnschrift Condensed", "Trebuchet MS", sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: 25px;
   font-weight: 900;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   color: var(--ops-line-ink);
 }
@@ -10330,7 +10330,7 @@ body.portal-scope {
 .ops-line-section-head .right {
   text-align: right;
   color: var(--ops-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10367,7 +10367,7 @@ body.portal-scope {
   display: block;
   margin-bottom: 11px;
   color: var(--ops-line-lime);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.16em;
 }
 
@@ -10379,11 +10379,11 @@ body.portal-scope {
 }
 
 .ops-line-queue-name {
-  font-family: "Arial Narrow", "Bahnschrift Condensed", "Trebuchet MS", sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: 16px;
   font-weight: 900;
   line-height: 1.05;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -10392,8 +10392,8 @@ body.portal-scope {
   background: var(--ops-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font: 900 34px/0.8 ui-monospace, Consolas, monospace;
-  letter-spacing: -0.12em;
+  font: 900 34px/0.8 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
 }
 
 .ops-line-queue-card p {
@@ -10413,7 +10413,7 @@ body.portal-scope {
 
 .ops-line-age {
   color: var(--ops-line-soft);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -10425,7 +10425,7 @@ body.portal-scope {
   padding: 5px 7px;
   border: 1px solid color-mix(in srgb, var(--ops-line-lime) 55%, transparent);
   color: var(--ops-line-lime);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10459,7 +10459,7 @@ body.portal-scope {
   padding: 11px 13px;
   border: 1px dashed var(--ops-line-line);
   color: var(--ops-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10511,7 +10511,7 @@ body.portal-scope {
   background: transparent;
   color: var(--ops-line-muted);
   padding: 8px 9px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10542,7 +10542,7 @@ body.portal-scope {
   background: var(--ops-line-lime);
   color: #10240b;
   padding: 9px 11px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -10569,14 +10569,14 @@ body.portal-scope {
 
 .ops-line-filter-line > span:first-child {
   color: var(--ops-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .ops-line-filter-count {
   color: var(--ops-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10657,7 +10657,7 @@ body.portal-scope {
   border: 1px solid var(--ops-line-lime);
   border-radius: 50%;
   color: var(--ops-line-lime);
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .ops-line-person strong,
@@ -10675,7 +10675,7 @@ body.portal-scope {
   display: block;
   margin-top: 4px;
   color: var(--ops-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
 }
 
@@ -10686,7 +10686,7 @@ body.portal-scope {
   padding: 5px 7px;
   border: 1px solid color-mix(in srgb, var(--ops-line-lime) 55%, transparent);
   color: var(--ops-line-lime);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -10707,7 +10707,7 @@ body.portal-scope {
   padding: 5px 7px;
   border: 1px solid var(--ops-line-line);
   color: var(--ops-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
@@ -10731,7 +10731,7 @@ body.portal-scope {
 
 .ops-line-chevron {
   color: var(--ops-line-lime);
-  font: 900 14px ui-monospace, Consolas, monospace;
+  font: 900 14px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* Detail panel */
@@ -10761,7 +10761,7 @@ body.portal-scope {
   display: flex;
   justify-content: space-between;
   color: var(--ops-line-lime);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
 }
 
@@ -10769,7 +10769,7 @@ body.portal-scope {
   margin: 24px 0 7px;
   font-weight: 900;
   font-size: 22px;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.02em;
   color: var(--ops-line-ink);
 }
 
@@ -10797,7 +10797,7 @@ body.portal-scope {
   padding: 13px;
   border: 1px dashed var(--ops-line-line);
   color: var(--ops-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   text-align: center;
@@ -10807,7 +10807,7 @@ body.portal-scope {
   margin: 0;
   font-weight: 900;
   font-size: 18px;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   color: var(--ops-line-ink);
 }
@@ -10828,7 +10828,7 @@ body.portal-scope {
 .ops-line-detail-fields span {
   display: block;
   color: var(--ops-line-muted);
-  font: 8px ui-monospace, Consolas, monospace;
+  font: 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10865,7 +10865,7 @@ body.portal-scope {
   background: transparent;
   color: var(--ops-line-muted);
   padding: 8px 9px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -10939,7 +10939,7 @@ body.portal-scope {
   background: transparent;
   color: var(--ops-line-red);
   padding: 8px 9px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -10970,7 +10970,7 @@ body.portal-scope {
   border-left: 2px solid var(--ops-line-lime);
   padding-left: 11px;
   color: var(--ops-line-ink);
-  font: italic 14px/1.35 Georgia, serif;
+  font: italic 14px/1.35 var(--font-sans), system-ui, sans-serif;
 }
 
 /* Activation rail (restyled ActionQueue) */
@@ -10995,7 +10995,7 @@ body.portal-scope {
   font-weight: 900;
   font-size: 18px;
   text-transform: uppercase;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   color: var(--ops-line-ink);
 }
 
@@ -11024,7 +11024,7 @@ body.portal-scope {
   background: transparent;
   color: var(--ops-line-lime);
   padding: 7px 9px;
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -11064,7 +11064,7 @@ body.portal-scope {
 
 .ops-line-stage-strip span {
   display: block;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -11072,8 +11072,8 @@ body.portal-scope {
 .ops-line-stage-strip b {
   display: block;
   margin-top: 7px;
-  font: 900 20px ui-monospace, Consolas, monospace;
-  letter-spacing: -0.08em;
+  font: 900 20px ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
 }
 
 /* Pipeline — rep board */
@@ -11108,7 +11108,7 @@ body.portal-scope {
   display: block;
   margin-top: 4px;
   color: var(--ops-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .ops-line-ibo {
@@ -11117,7 +11117,7 @@ body.portal-scope {
   padding: 3px 4px;
   border: 1px solid var(--ops-line-amber);
   color: var(--ops-line-amber);
-  font: 900 7px ui-monospace, Consolas, monospace;
+  font: 900 7px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   vertical-align: 2px;
 }
@@ -11126,7 +11126,7 @@ body.portal-scope {
   display: block;
   margin-bottom: 4px;
   color: var(--ops-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -11136,7 +11136,7 @@ body.portal-scope {
   justify-content: space-between;
   gap: 6px;
   color: var(--ops-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
 }
 
@@ -11168,7 +11168,7 @@ body.portal-scope {
   background: color-mix(in srgb, var(--ops-line-bg) 36%, transparent);
   color: var(--ops-line-muted);
   padding: 5px 6px;
-  font: 900 7px ui-monospace, Consolas, monospace;
+  font: 900 7px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -11210,7 +11210,7 @@ body.portal-scope {
   margin: 0;
   font-weight: 900;
   color: var(--ops-line-red);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
@@ -11530,7 +11530,7 @@ body.portal-scope {
   margin: 0 auto;
   padding: 18px clamp(14px, 4vw, 54px) 52px;
   color: var(--admin-line-ink);
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 .dark .admin-line {
@@ -11564,7 +11564,7 @@ body.portal-scope {
 .admin-line-eyebrow,
 .admin-line-meta {
   color: var(--admin-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -11582,7 +11582,7 @@ body.portal-scope {
   margin: 11px 0 12px;
   font-size: clamp(36px, 10.5vw, 54px);
   line-height: 0.86;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   font-weight: 900;
 }
@@ -11614,15 +11614,15 @@ body.portal-scope {
   background: var(--admin-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font: 900 clamp(64px, 9vw, 118px) / 0.78 ui-monospace, Consolas, monospace;
-  letter-spacing: -0.14em;
+  font: 900 clamp(64px, 9vw, 118px) / 0.78 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
 }
 
 .admin-line-hero-count small {
   display: block;
   margin-top: 14px;
   color: var(--admin-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -11643,7 +11643,7 @@ body.portal-scope {
   padding: 5px 7px;
   border: 1px solid var(--admin-line-line);
   color: var(--admin-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -11713,7 +11713,7 @@ body.portal-scope {
   background: transparent;
   color: var(--admin-line-muted);
   padding: 8px 9px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -11742,7 +11742,7 @@ body.portal-scope {
   background: transparent;
   color: var(--admin-line-muted);
   padding: 8px 9px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -11771,7 +11771,7 @@ body.portal-scope {
   background: var(--admin-line-lime);
   color: #10240b;
   padding: 9px 11px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -11795,7 +11795,7 @@ body.portal-scope {
   margin: 6px 0 0;
   font-size: 25px;
   font-weight: 900;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -11831,7 +11831,7 @@ body.portal-scope {
   margin: 5px 0 0;
   font-size: 18px;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -11866,7 +11866,7 @@ body.portal-scope {
   border: 1px solid var(--admin-line-lime);
   border-radius: 50%;
   color: var(--admin-line-lime);
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-person strong,
@@ -11884,7 +11884,7 @@ body.portal-scope {
   display: block;
   margin-top: 4px;
   color: var(--admin-line-muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-online-dot {
@@ -11963,7 +11963,7 @@ body.portal-scope {
   margin-top: 9px;
   border-top: 1px solid color-mix(in srgb, var(--admin-line-red) 50%, transparent);
   color: var(--admin-line-red);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -11986,7 +11986,7 @@ body.portal-scope {
   padding: 22px 15px;
   border: 1px dashed var(--admin-line-line);
   color: var(--admin-line-muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -11997,7 +11997,7 @@ body.portal-scope {
   color: var(--admin-line-ink);
   font-size: 15px;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 /* Person / form */
@@ -12027,7 +12027,7 @@ body.portal-scope {
   margin: 5px 0 0;
   font-size: 20px;
   font-weight: 900;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -12048,7 +12048,7 @@ body.portal-scope {
   gap: 5px;
   margin-bottom: 6px;
   color: var(--admin-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -12088,7 +12088,7 @@ body.portal-scope {
   font-size: 16px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
 }
 
 .admin-line-lock {
@@ -12113,7 +12113,7 @@ body.portal-scope {
   background: color-mix(in srgb, var(--admin-line-bg) 40%, transparent);
   color: var(--admin-line-muted);
   padding: 6px 7px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
 }
 
@@ -12142,7 +12142,7 @@ body.portal-scope {
 
 .admin-line-vault-item strong {
   display: block;
-  font: 900 12px ui-monospace, Consolas, monospace;
+  font: 900 12px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
 }
 
@@ -12168,7 +12168,7 @@ body.portal-scope {
   padding: 9px;
   border-top: 1px solid color-mix(in srgb, var(--admin-line-amber) 55%, transparent);
   color: var(--admin-line-amber);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
 }
 
@@ -12177,7 +12177,7 @@ body.portal-scope {
   padding: 11px;
   border: 1px dashed var(--admin-line-line);
   color: var(--admin-line-muted);
-  font: 10px/1.45 ui-monospace, Consolas, monospace;
+  font: 10px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-new-note button {
@@ -12206,7 +12206,7 @@ body.portal-scope {
 
 .admin-line-save-bar span {
   color: var(--admin-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -12225,7 +12225,7 @@ body.portal-scope {
 
 .admin-line-save-line .saved {
   color: var(--admin-line-lime);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -12265,7 +12265,7 @@ body.portal-scope {
   margin: 0;
   font-size: 16px;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -12290,7 +12290,7 @@ body.portal-scope {
   gap: 10px;
   margin-top: 15px;
   color: var(--admin-line-soft);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -12337,7 +12337,7 @@ body.portal-scope {
   background: transparent;
   color: var(--admin-line-lime);
   padding: 6px 7px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-editor-actions {
@@ -12358,7 +12358,7 @@ body.portal-scope {
   padding: 4px 6px;
   border: 1px solid var(--admin-line-line);
   color: var(--admin-line-muted);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-quiet-empty {
@@ -12366,7 +12366,7 @@ body.portal-scope {
   padding: 22px 15px;
   border: 1px dashed var(--admin-line-line);
   color: var(--admin-line-muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.05em;
 }
 
@@ -12376,7 +12376,7 @@ body.portal-scope {
   color: var(--admin-line-ink);
   font-size: 15px;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .admin-line-starter {
@@ -12391,7 +12391,7 @@ body.portal-scope {
   background: transparent;
   color: var(--admin-line-lime);
   padding: 7px 8px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
 }
 
@@ -12415,7 +12415,7 @@ body.portal-scope {
   margin: 7px 0 0;
   font-size: 18px;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -12427,7 +12427,7 @@ body.portal-scope {
   display: block;
   margin-top: 5px;
   color: var(--admin-line-soft);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: none;
 }
@@ -12512,7 +12512,7 @@ body.portal-scope {
   background: transparent;
   color: var(--admin-line-muted);
   padding: 7px 8px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
 }
 
@@ -12539,7 +12539,7 @@ body.portal-scope {
   color: var(--admin-line-red);
   font-size: 20px;
   font-weight: 900;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -12572,7 +12572,7 @@ body.portal-scope {
   background: transparent;
   color: var(--admin-line-red);
   padding: 7px 8px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
 }
 
@@ -12597,7 +12597,7 @@ body.portal-scope {
   background: color-mix(in srgb, var(--admin-line-bg) 65%, transparent);
   color: var(--admin-line-ink);
   padding: 8px;
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-danger-confirm .confirm {
@@ -12605,7 +12605,7 @@ body.portal-scope {
   background: var(--admin-line-red);
   color: #260909;
   padding: 8px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
 }
 
@@ -12835,7 +12835,7 @@ body.portal-scope {
 }
 
 .ops-line-form-head h3 {
-  font: 900 12px ui-monospace, Consolas, monospace;
+  font: 900 12px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ops-line-ink);
@@ -12860,7 +12860,7 @@ body.portal-scope {
 }
 
 .ops-line-field label {
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ops-line-muted);
@@ -12908,7 +12908,7 @@ body.portal-scope {
 }
 
 .ops-line-invite-ready-title {
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ops-line-lime);
@@ -12946,7 +12946,7 @@ body.portal-scope {
 
 .ops-line-no-action {
   color: var(--ops-line-soft);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -12961,7 +12961,7 @@ body.portal-scope {
   padding: 9px 14px 13px;
   border-top: 1px solid color-mix(in srgb, var(--ops-line-red) 50%, transparent);
   color: var(--ops-line-red);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -13047,7 +13047,7 @@ body.portal-scope {
   gap: 7px;
   margin-bottom: 6px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -13075,14 +13075,14 @@ body.portal-scope {
   font-size: clamp(28px, 4.4vw, 46px);
   font-weight: 800;
   line-height: 0.98;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   text-transform: none;
 }
 
 .sales-line-subhead-id {
   margin: 0;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   letter-spacing: 0.08em;
 }
@@ -13103,7 +13103,7 @@ body.portal-scope {
   padding: 10px 14px;
   background: transparent;
   color: var(--ink);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -13179,7 +13179,7 @@ body.portal-scope {
 .sales-line-field-list dt {
   margin: 0 0 4px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;
@@ -13228,19 +13228,19 @@ body.portal-scope {
   display: block;
   margin-top: 3px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
 }
 
 .sales-line-plan-card b {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 12px;
   white-space: nowrap;
 }
 
 .sales-line-plan-card em {
   color: var(--lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-style: normal;
   white-space: nowrap;
@@ -13274,7 +13274,7 @@ body.portal-scope {
 
 .sales-line-audit-banner h3 {
   margin: 0 0 4px;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -13345,7 +13345,7 @@ body.portal-scope {
   display: block;
   margin-bottom: 6px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -13371,7 +13371,7 @@ body.portal-scope {
   background: color-mix(in srgb, var(--panel2) 45%, transparent);
   padding: 10px 12px;
   color: var(--ink);
-  font: 13px "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font: 13px var(--font-archivo), var(--font-sans), Arial, sans-serif;
 }
 
 .sales-line-textarea {
@@ -13434,7 +13434,7 @@ body.portal-scope {
 
 .sales-line-pick span {
   display: block;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.02em;
@@ -13455,7 +13455,7 @@ body.portal-scope {
 
 .sales-line-plan-pick-copy strong {
   display: block;
-  font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
   font-size: 12px;
   font-weight: 700;
 }
@@ -13474,7 +13474,7 @@ body.portal-scope {
 
 .sales-line-plan-pick-price b {
   display: block;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 12px;
 }
 
@@ -13482,7 +13482,7 @@ body.portal-scope {
   display: block;
   margin-top: 3px;
   color: var(--lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-style: normal;
 }
@@ -13514,7 +13514,7 @@ body.portal-scope {
   gap: 8px;
   margin-top: 3px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
 }
 
@@ -13613,7 +13613,7 @@ body.portal-scope {
 
 .admin-line-weekly-custom label {
   color: var(--admin-line-muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -13624,7 +13624,7 @@ body.portal-scope {
   background: color-mix(in srgb, var(--admin-line-bg) 70%, transparent);
   color: inherit;
   padding: 7px 8px;
-  font: 900 12px ui-monospace, Consolas, monospace;
+  font: 900 12px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .admin-line-weekly-custom input.admin-line-weekly-custom-active {
@@ -13644,7 +13644,7 @@ body.portal-scope {
 
 .admin-line-weekly-error {
   color: var(--admin-line-red);
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -13668,14 +13668,14 @@ body.portal-scope {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
 .sales-line-inreview-count {
   margin: 0;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -13721,7 +13721,7 @@ body.portal-scope {
 .sales-line-inreview-primary span {
   overflow: hidden;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -13732,10 +13732,10 @@ body.portal-scope {
   background: var(--metal);
   background-clip: text;
   -webkit-background-clip: text;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 15px;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
@@ -13747,7 +13747,7 @@ body.portal-scope {
 
 .sales-line-inreview-date {
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
   text-align: right;
   white-space: nowrap;
@@ -13755,7 +13755,7 @@ body.portal-scope {
 
 .sales-line-inreview-wait {
   color: var(--amber);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   letter-spacing: 0.04em;
   text-align: right;
@@ -13765,7 +13765,7 @@ body.portal-scope {
 .sales-line-inreview-empty {
   padding: 34px 12px;
   color: var(--muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
   text-align: center;
 }
 
@@ -13807,7 +13807,7 @@ body.portal-scope {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -13815,7 +13815,7 @@ body.portal-scope {
   flex: none;
   margin: 0;
   color: var(--muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-align: right;
   text-transform: uppercase;
@@ -13846,7 +13846,7 @@ body.portal-scope {
   padding: 8px 12px 8px 10px;
   background: transparent;
   color: var(--muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
@@ -13941,7 +13941,7 @@ body.portal-scope {
 .sales-line-fiber-report-note {
   margin: 14px 0 0;
   color: var(--muted);
-  font: 9px ui-monospace, Consolas, monospace;
+  font: 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
 }
 
@@ -13951,7 +13951,7 @@ body.portal-scope {
   padding: 7px 9px;
   background: transparent;
   color: var(--muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -14015,7 +14015,7 @@ body.portal-scope {
 .sales-line-fiber-address span {
   margin-top: 3px;
   color: var(--muted);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-status {
@@ -14025,7 +14025,7 @@ body.portal-scope {
   border: 1px solid transparent;
   border-radius: 99px;
   padding: 5px 7px;
-  font: 900 8px ui-monospace, Consolas, monospace;
+  font: 900 8px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -14062,7 +14062,7 @@ body.portal-scope {
   min-width: 0;
   margin-top: 6px;
   color: var(--muted);
-  font: 10px/1.4 ui-monospace, Consolas, monospace;
+  font: 10px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-meta span {
@@ -14095,7 +14095,7 @@ body.portal-scope {
   border-bottom: 1px solid var(--line);
   padding-bottom: 8px;
   color: var(--muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -14118,7 +14118,7 @@ body.portal-scope {
   padding-bottom: 8px;
   background: transparent;
   color: var(--muted);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-align: left;
   text-transform: uppercase;
@@ -14211,7 +14211,7 @@ body.portal-scope {
   gap: 3px;
   min-width: 0;
   color: var(--ink);
-  font: 10px/1.35 ui-monospace, Consolas, monospace;
+  font: 10px/1.35 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-assignment-label strong {
@@ -14222,7 +14222,7 @@ body.portal-scope {
 .sales-line-fiber-assignment-label span,
 .sales-line-fiber-assignment-note {
   color: var(--muted);
-  font: 9px/1.35 ui-monospace, Consolas, monospace;
+  font: 9px/1.35 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-assignment select {
@@ -14233,7 +14233,7 @@ body.portal-scope {
   padding: 7px 8px;
   background: var(--panel);
   color: var(--ink);
-  font: 10px ui-monospace, Consolas, monospace;
+  font: 10px ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-assignment select:focus-visible,
@@ -14249,7 +14249,7 @@ body.portal-scope {
   padding: 7px 9px;
   background: color-mix(in srgb, var(--lime) 10%, transparent);
   color: var(--lime);
-  font: 900 9px ui-monospace, Consolas, monospace;
+  font: 900 9px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -14271,7 +14271,7 @@ body.portal-scope {
   grid-column: 1 / -1;
   margin: 0;
   color: var(--red);
-  font: 9px/1.35 ui-monospace, Consolas, monospace;
+  font: 9px/1.35 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-assignment-note {
@@ -14282,7 +14282,7 @@ body.portal-scope {
   margin: 0;
   padding: 28px 0 8px;
   color: var(--muted);
-  font: 10px/1.5 ui-monospace, Consolas, monospace;
+  font: 10px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .sales-line-fiber-loading {
@@ -14408,7 +14408,7 @@ body.portal-scope {
   align-items: center;
   padding: 0 clamp(16px, 4vw, 48px);
   color: var(--chat-line-ink);
-  font: 900 10px ui-monospace, Consolas, monospace;
+  font: 900 10px ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -14480,7 +14480,7 @@ body.portal-scope {
   padding: 8px 10px;
   background: color-mix(in srgb, var(--panel2) 40%, transparent);
   color: var(--ink);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10.5px;
   font-weight: 900;
   letter-spacing: 0.02em;
@@ -14513,7 +14513,7 @@ body.portal-scope {
 .sales-line-subgroup-label {
   margin: 14px 0 6px;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;
@@ -14552,7 +14552,7 @@ body.portal-scope {
 
 .sales-line-plan-row-speed {
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
   font-weight: 500;
   white-space: nowrap;
@@ -14560,7 +14560,7 @@ body.portal-scope {
 
 .sales-line-plan-row-price {
   flex: none;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11.5px;
   color: var(--ink);
   white-space: nowrap;
@@ -14569,7 +14569,7 @@ body.portal-scope {
 .sales-line-plan-row-pts {
   flex: none;
   color: var(--lime);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 9.5px;
   white-space: nowrap;
 }
@@ -14619,7 +14619,7 @@ body.portal-scope {
 .sales-line-summary-stats div small {
   display: block;
   color: var(--muted);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 8.5px;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -14629,7 +14629,7 @@ body.portal-scope {
 .sales-line-summary-stats div strong {
   display: block;
   margin-top: 3px;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 14px;
   color: var(--ink);
 }
@@ -14648,7 +14648,7 @@ body.portal-scope {
 }
 
 .sales-line-auto-product .val {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10px;
 }
 

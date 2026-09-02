@@ -28,6 +28,8 @@ import { getAuthorColor, getInitials, isDeveloperAuthor } from '@/lib/chat/autho
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-rep-b.css';
 
 function getLocalDayKey(createdAt: Date | null) {
   const date = createdAt ?? new Date();
@@ -1072,22 +1074,6 @@ export default function TeamChatPage() {
     });
   };
 
-  // Owner first: isRole('admin') is true for an owner as well, so the owner
-  // branch has to come before it or an owner reads as "Admin".
-  const roleLabel = isRole('owner')
-    ? 'Owner'
-    : isRole('admin')
-    ? 'Admin'
-    : isRole('operations')
-      ? 'Operations'
-      : canPin
-        ? 'Manager'
-        : 'Rep';
-  const todayLabel = new Date().toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
   const pinnedMessage = useMemo(() => {
     let latest: ThreadMessage | null = null;
     for (const message of displayMessages) {
@@ -1110,47 +1096,34 @@ export default function TeamChatPage() {
           <PortalSidebar />
           <main className="chat-line-main flex-1 min-h-0 overflow-hidden">
             <div className="chat-line-page">
-              <header className="chat-line-masthead">
-                <div className="chat-line-mark"><span aria-hidden="true" />3C WORLD GROUP / THE LINE</div>
-                <p className="chat-line-mast-meta">Team chat · broadcast / {todayLabel}</p>
-                <span className="chat-line-role-chip">{roleLabel}</span>
-              </header>
               {shownError && <div className="chat-line-alert" role="alert">{shownError}</div>}
-              <div className="chat-line-desktop">
+              <div className="chat-line-desktop-shell">
+                <PageTitle title="Team Chat" />
+                <div className="chat-line-desktop">
                 <aside className="chat-line-rail">
-                  <p className="chat-line-kicker">Channel switcher / 01–{String(Math.max(channels.length, 1)).padStart(2, '0')}</p>
-                  <h1 className="chat-line-rail-title">The line<br />chat</h1>
+                  <h1 className="chat-line-rail-title">Channels</h1>
                   <div className="chat-line-channel-list">
-                    {loadingChannels ? [0, 1, 2, 3].map((row) => <div className="chat-line-channel-skeleton" key={row} aria-hidden="true"><span /><span /><span /></div>) : channels.length === 0 ? <p className="chat-line-empty">No live channels yet. Ask an admin to sync chat channels.</p> : channels.map((channel, index) => {
+                    {loadingChannels ? [0, 1, 2, 3].map((row) => <div className="chat-line-channel-skeleton" key={row} aria-hidden="true"><span /><span /><span /></div>) : channels.length === 0 ? <p className="chat-line-empty">No live channels yet. Ask an admin to sync chat channels.</p> : channels.map((channel) => {
                       const memberCount = memberCounts[channel.id] ?? channel.memberIds?.length ?? 0;
                       return <button key={channel.id} type="button" onClick={() => setActiveChannelId(channel.id)} className={`chat-line-channel ${channel.id === activeChannelId ? 'is-active' : ''}`}>
-                        <span className="chat-line-channel-number">{String(index + 1).padStart(2, '0')}</span>
+                        <span className="chat-line-channel-number" aria-hidden="true">#</span>
                         <span className="chat-line-channel-tick" />
                         <span className="chat-line-channel-copy"><strong>{channel.name}</strong><small>{channel.description}</small><span className="chat-line-channel-tail">{unreadByChannel[channel.id] && <i aria-label="Unread messages" />}{channel.audience.toUpperCase()} · {memberCount} member{memberCount === 1 ? '' : 's'}</span></span>
                       </button>;
                     })}
                   </div>
-                  <p className="chat-line-rail-note"><strong>Signal discipline</strong><br />Keep customer details out of chat.<br /><br />No customer PII — never card numbers or SSNs.</p>
+                  <p className="chat-line-rail-note"><strong>Chat guidelines</strong><br />Keep customer details out of chat.<br /><br />Don&apos;t post customer card numbers or SSNs.</p>
                 </aside>
                 <section className="chat-line-conversation">
                   <header className="chat-line-conversation-head">
                     <div className="chat-line-head-copy">
                       <button type="button" onClick={() => setInfoOpen(true)} disabled={!activeChannel} className="chat-line-title-button" aria-label="Channel details">
-                        <p className="chat-line-kicker">{activeChannel ? `${String(channels.indexOf(activeChannel) + 1).padStart(2, '0')} / ${activeChannel.audience.toUpperCase()} / BROADCAST` : '— / CHANNEL / BROADCAST'}</p>
-                        <h2 className="chat-line-display-title portal-metallic-num">{activeChannel?.name ?? 'Select a channel'}</h2>
+                        <h2 className="chat-line-thread-title portal-display">{activeChannel?.name ?? 'Select a channel'}</h2>
                         <p className="chat-line-head-description">{activeChannel?.description ?? 'Choose a channel to view messages.'}</p>
                       </button>
                     </div>
-                    <div className="chat-line-head-meta"><span className="chat-line-live">LIVE</span><span>{activeChannel ? `${memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0} members` : '— members'}</span></div>
+                    <div className="chat-line-head-meta"><span>{activeChannel ? `${memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0} members` : 'No members'}</span></div>
                   </header>
-                  {!onboardingUser && activeChannel?.id === 'all-company' && companyTapeText && (
-                    <div className="chat-line-tape" role="status" aria-label="Company sales line">
-                      <div className="chat-line-tape-track">
-                        <div className="chat-line-tape-seg"><span>{companyTapeText}</span></div>
-                        <div className="chat-line-tape-seg" aria-hidden="true"><span>{companyTapeText}</span></div>
-                      </div>
-                    </div>
-                  )}
                   <div className="chat-line-pinned-band"><span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span><span className="chat-line-pinned-copy">{pinnedCopy || 'No pinned message yet'}{pinnedAuthor && <em> · {pinnedAuthor}</em>}</span><span className="chat-line-pinned-time">{pinnedTime}</span></div>
                   <div className="chat-line-message-stage">
                     <div ref={desktopScrollRef} onScroll={handleDesktopScroll} className="chat-line-messages">
@@ -1205,16 +1178,17 @@ export default function TeamChatPage() {
                     {editTarget && <div className="chat-line-compose-strip"><div><strong>EDITING MESSAGE</strong><span>{editTarget.text}</span></div><button type="button" onClick={cancelEdit} aria-label="Cancel edit"><X aria-hidden="true" /></button></div>}
                     <div className="chat-line-composer">
                       <button type="button" className="chat-line-tool" onClick={() => fileInputRef.current?.click()} disabled={!activeChannelId || !!editTarget} aria-label="Attach an image"><ImagePlus aria-hidden="true" /></button>
-                      <Textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (editTarget) void saveEdit(); else handleDesktopSend(); } else if (event.key === 'Escape' && editTarget) { event.preventDefault(); cancelEdit(); } }} placeholder={editTarget ? 'Edit your message...' : 'Broadcast an update…'} disabled={!activeChannelId} rows={1} className="chat-line-textarea" />
+                      <Textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (editTarget) void saveEdit(); else handleDesktopSend(); } else if (event.key === 'Escape' && editTarget) { event.preventDefault(); cancelEdit(); } }} placeholder={editTarget ? 'Edit your message...' : 'Write an update…'} disabled={!activeChannelId} rows={1} className="chat-line-textarea" />
                       {gifEnabled && <div className="chat-line-gif-wrap"><button type="button" className="chat-line-tool chat-line-gif-button" onClick={() => setGifOpen((open) => !open)} disabled={!activeChannelId || !!editTarget} aria-label="Add a GIF" aria-expanded={gifOpen}>GIF</button>{gifOpen && activeChannelId && <GifPicker authedFetch={authedFetch} onSelect={sendGif} onClose={() => setGifOpen(false)} />}</div>}
                       <button type="button" className="chat-line-send" onClick={editTarget ? () => void saveEdit() : handleDesktopSend} disabled={!activeChannelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}>{sending ? <Loader2 aria-hidden="true" /> : editTarget ? <Check aria-hidden="true" /> : <Send aria-hidden="true" />}<span className="chat-line-send-label">{editTarget ? 'Save' : 'Send'}</span></button>
                     </div>
-                    <div className="chat-line-composer-meta"><span>No customer PII — never card numbers or SSNs.</span><span>Enter to send · Shift + Enter for line break</span></div>
+                    <div className="chat-line-composer-meta"><span>Don&apos;t post customer card numbers or SSNs.</span><span>Enter to send</span></div>
                   </div>
                 </section>
+                </div>
               </div>
               <div className="chat-line-mobile">
-                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channelNumber={activeChannel ? channels.indexOf(activeChannel) + 1 : 0} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} snapshotVersion={snapshotVersion} windowSize={messagesWindowSize} lastSnapshotWindow={lastSnapshotWindow} hasMore={hasMoreMessages} onLoadOlder={loadOlderMessages} companyTapeText={activeChannelId === 'all-company' ? companyTapeText : ''} authorAvatars={authorAvatars} loading={loadingMessages} renderedChannel={renderedChannel} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
+                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} snapshotVersion={snapshotVersion} windowSize={messagesWindowSize} lastSnapshotWindow={lastSnapshotWindow} hasMore={hasMoreMessages} onLoadOlder={loadOlderMessages} companyTapeText={activeChannelId === 'all-company' ? companyTapeText : ''} authorAvatars={authorAvatars} loading={loadingMessages} renderedChannel={renderedChannel} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
               </div>
               <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
               <ChatLightbox image={lightbox} onClose={closeLightbox} />

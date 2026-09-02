@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-b.css';
 
 interface Row { id: string; status: string; orderScreenshotPath?: string; [key: string]: unknown }
 
@@ -76,9 +78,9 @@ export default function PayrollDisputesReviewPage() {
         person: opsFormatValue(row.repName),
         personSub: opsFormatValue(row.contractorName),
         subject: opsFormatValue(row.typeOfOrder),
-        subjectSub: opsFormatValue(row.dateOfInstall),
-        secondary: opsFormatValue(row.campaign),
-        secondarySub: 'Payroll dispute',
+        subjectSub: opsFormatValue(row.contractorName),
+        secondary: opsFormatValue(row.dateOfInstall),
+        secondarySub: opsFormatValue(row.createdAt),
         evidenceKind: row.orderScreenshotPath ? 'files' : 'none',
         evidenceItems: row.orderScreenshotPath
           ? [{ label: 'screenshot', onClick: () => viewScreenshot(row.orderScreenshotPath as string) }]
@@ -99,12 +101,13 @@ export default function PayrollDisputesReviewPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
+          <PageTitle title="Payroll Disputes" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
           <OpsQueueList
-            kicker="02 / The Line / evidence relay"
-            heroWord="Call"
-            heroRest="the proof."
-            intro="A single row keeps the person, campaign, age, status, and evidence in view. Expand only when the decision needs the full case."
-            itemsLabel="items need action"
+            kicker="Payroll Disputes"
+            heroWord="Payroll"
+            heroRest="Disputes"
+            intro="Review pay questions submitted by reps."
+            itemsLabel="open"
             rows={queueRows}
             loading={loading}
             error={error}

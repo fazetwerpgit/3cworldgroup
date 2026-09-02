@@ -1,0 +1,460 @@
+/* Rep-page UX sweep styles. Keep every rule scoped to the portal. */
+.portal-scope .portal-push-prompt {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  max-width: none;
+  margin: 12px 0;
+  transform: none;
+  box-shadow: none;
+}
+
+.portal-scope .portal-push-prompt-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1px solid rgba(10, 31, 68, 0.16);
+  border-radius: 10px;
+  background: #fff;
+  color: #0a1f44;
+  box-shadow: none;
+}
+
+.portal-scope .portal-push-prompt-bell {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(141, 198, 63, 0.16);
+  color: #5a8f1f;
+}
+
+.portal-scope .portal-push-prompt-bell svg {
+  width: 18px;
+  height: 18px;
+}
+
+.portal-scope .portal-push-prompt-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.portal-scope .portal-push-prompt-text {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.portal-scope .portal-push-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.portal-scope .portal-push-prompt-actions button,
+.portal-scope .portal-add-home-prompt-dismiss {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .portal-push-prompt-primary {
+  border: 1px solid #8dc63f;
+  background: #8dc63f;
+  color: #0a1f44;
+}
+
+.portal-scope .portal-push-prompt-quiet {
+  border: 1px solid rgba(10, 31, 68, 0.18);
+  background: transparent;
+  color: inherit;
+}
+
+.portal-scope .portal-add-home-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  margin: 16px 0 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(10, 31, 68, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #0a1f44;
+}
+
+.portal-scope .portal-add-home-prompt-copy {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.portal-scope .portal-add-home-prompt-dismiss {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #5a8f1f;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.portal-scope .portal-dashboard-empty-leaderboard {
+  border: 1px solid rgba(10, 31, 68, 0.14);
+  background: #fff;
+  padding: 16px;
+  color: #687384;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.portal-scope .portal-leaderboard-filters {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.portal-scope .portal-leaderboard-filter-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.portal-scope .portal-leaderboard-filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.portal-scope .portal-leaderboard-filter-row button {
+  min-height: 44px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(10, 31, 68, 0.18);
+  border-radius: 999px;
+  padding: 8px 15px;
+  background: transparent;
+  color: #687384;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.portal-scope .portal-leaderboard-filter-row[aria-label='Leaderboard period'] button {
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+.portal-scope .portal-leaderboard-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  align-items: stretch;
+}
+
+.portal-scope .portal-leaderboard-summary-grid > * {
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.portal-scope .portal-leaderboard-filter-row button[aria-pressed='true'] {
+  border-color: #8dc63f;
+  background: #8dc63f;
+  color: #0a1f44;
+}
+
+.portal-scope .portal-live-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5a8f1f;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.portal-scope .portal-live-label::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #5a8f1f;
+}
+
+.portal-scope .chat-line-desktop-shell {
+  display: grid;
+  min-height: 0;
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.portal-scope .chat-line-page {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.portal-scope .chat-line-alert {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+
+.portal-scope .chat-line-rail-title,
+.portal-scope .chat-line-thread-title,
+.portal-scope .chat-line-thread-name {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.portal-scope .chat-line-rail-title {
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+
+.portal-scope .chat-line-thread-title,
+.portal-scope .chat-line-thread-name {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--chat-line-ink) !important;
+  background: none;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-scope .chat-line-head-description,
+.portal-scope .chat-line-thread-description {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-scope .chat-line-head-meta,
+.portal-scope .chat-line-thread-meta,
+.portal-scope .chat-line-channel-tail,
+.portal-scope .chat-line-pinned-label,
+.portal-scope .chat-line-pinned-time,
+.portal-scope .chat-line-message-status,
+.portal-scope .chat-line-composer-meta,
+.portal-scope .chat-line-tool,
+.portal-scope .chat-line-mobile-audience,
+.portal-scope .chat-line-mobile-pii,
+.portal-scope .chat-line-thread-composer-meta {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .chat-line-channel-number,
+.portal-scope .chat-line-mobile-number {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .chat-line-send {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .chat-line-thread-composer-meta {
+  font-size: 11px !important;
+}
+
+.portal-scope .chat-line-thread-composer-meta::before {
+  content: none;
+}
+
+.portal-scope .chat-line-desktop-shell > .pt-head {
+  padding: 14px clamp(14px, 3vw, 42px);
+  border-bottom: 1px solid var(--chat-line-line, rgba(10, 31, 68, 0.14));
+}
+
+.portal-scope .member-line {
+  --member-line-sans: var(--font-sans), system-ui, sans-serif;
+  --member-line-serif: var(--font-sans), system-ui, sans-serif;
+  --member-line-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.portal-scope .member-line-panel-head h2,
+.portal-scope .member-line-sheet-head h2 {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.portal-scope .member-line-chip,
+.portal-scope .member-line-state,
+.portal-scope .member-line-next,
+.portal-scope .member-line-field label,
+.portal-scope .member-line-status-text,
+.portal-scope .member-line-segmented button,
+.portal-scope .member-line-toggle-row small,
+.portal-scope .member-line-toggle-row strong {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+.portal-scope .member-line-details {
+  display: grid;
+  margin: 18px 0 0;
+  border-top: 1px solid var(--member-line-line);
+}
+
+.portal-scope .member-line-details > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.45fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--member-line-line);
+}
+
+.portal-scope .member-line-details dt {
+  color: var(--member-line-muted);
+  font-size: 12px;
+}
+
+.portal-scope .member-line-details dd {
+  margin: 0;
+  color: var(--member-line-ink);
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.portal-scope .member-line-details dd.font-mono {
+  font-family: var(--member-line-mono);
+}
+
+.portal-scope .member-line-sensitive-note {
+  margin: 14px 0 0;
+  color: var(--member-line-muted);
+  font-size: 12px;
+}
+
+.portal-scope .member-line-theme-label {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .member-line-empty-card {
+  margin-top: 16px;
+  border: 1px dashed var(--member-line-line);
+  background: color-mix(in srgb, var(--member-line-panel) 84%, transparent);
+  color: var(--member-line-muted);
+}
+
+.dark .portal-scope .portal-push-prompt-card,
+.dark .portal-scope .portal-add-home-prompt {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f7fa;
+}
+
+.dark .portal-scope .portal-dashboard-empty-leaderboard {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #9caabd;
+}
+
+.dark .portal-scope .portal-push-prompt-quiet,
+.dark .portal-scope .portal-leaderboard-filter-row button {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #dbe4ed;
+}
+
+.dark .portal-scope .portal-add-home-prompt-dismiss,
+.dark .portal-scope .portal-live-label {
+  color: #9fd44f;
+}
+
+.dark .portal-scope .portal-live-label::before {
+  background: #9fd44f;
+}
+
+@media (max-width: 600px) {
+  .portal-scope .portal-push-prompt-card {
+    align-items: flex-start;
+  }
+
+  .portal-scope .portal-push-prompt-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .portal-scope .portal-push-prompt-text {
+    font-size: 12px;
+  }
+
+  .portal-scope .portal-push-prompt-actions {
+    width: 100%;
+    gap: 4px;
+  }
+
+  .portal-scope .portal-push-prompt-actions button {
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+
+  .portal-scope .portal-add-home-prompt {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .portal-scope .portal-add-home-prompt-dismiss {
+    margin-left: 30px;
+  }
+}
+
+@media (min-width: 768px) {
+  .portal-scope .portal-leaderboard-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .portal-scope .chat-line-desktop-shell {
+    display: none;
+  }
+}

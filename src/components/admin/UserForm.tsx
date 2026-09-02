@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import '@/styles/sweep-admin-a.css';
 import {
   User,
   UserRole,
@@ -13,6 +14,7 @@ import {
   isAdminLevel,
   isOwner,
   isPlatformRole,
+  graduatedFieldRole,
 } from '@/types';
 import type { FieldRole, PlatformRole } from '@/types';
 
@@ -30,6 +32,13 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
     ...(json ? { 'Content-Type': 'application/json' } : {}),
     Authorization: `Bearer ${token ?? ''}`,
   };
+}
+
+async function readJsonIfPresent(response: Response): Promise<Record<string, unknown>> {
+  if (response.status === 204 || !response.headers.get('content-type')?.includes('application/json')) {
+    return {};
+  }
+  return response.json().catch(() => ({}));
 }
 
 // Assignable roles only: the retired tiers (IBO levels, L1/L2 manager) are
@@ -92,6 +101,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   const [error, setError] = useState('');
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -223,6 +233,67 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     }
   };
 
+  const updateStatus = async (status: 'active' | 'inactive') => {
+    if (!user || actionBusy) return;
+    if (status === 'inactive' && !window.confirm(`Deactivate ${user.displayName || user.email || 'this user'}?`)) return;
+    setActionBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
+        method: 'PUT',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ status }),
+      });
+      const data = await readJsonIfPresent(response);
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to update user status');
+      setFormData((prev) => ({ ...prev, status }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update user status');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!user || actionBusy) return;
+    if (!window.confirm(`Delete ${user.displayName || user.email || 'this user'}? This cannot be undone.`)) return;
+    setActionBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
+        method: 'DELETE',
+        headers: await authHeaders(),
+      });
+      const data = await readJsonIfPresent(response);
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to delete user');
+      router.push('/portal/admin/users');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      setActionBusy(false);
+    }
+  };
+
+  const acceptPending = async () => {
+    if (!user?.fieldRole || actionBusy) return;
+    if (!window.confirm(`Accept and activate ${user.displayName || user.email || 'this user'}?`)) return;
+    setActionBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
+        method: 'PUT',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ status: 'active', fieldRole: graduatedFieldRole(user.fieldRole) }),
+      });
+      const data = await readJsonIfPresent(response);
+      if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to accept user');
+      setFormData((prev) => ({ ...prev, status: 'active', role: graduatedFieldRole(user.fieldRole!) }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to accept user');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   return (
     <>
       {error && (
@@ -236,8 +307,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
 
       <div className="admin-line-panel-head" style={{ marginTop: error ? 14 : 0 }}>
         <div>
-          <div className="admin-line-eyebrow">01 / account</div>
-          <h2>Who they are.</h2>
+          <h2>Account details</h2>
           <p className="admin-line-sub">
             Identity fields are editable; the email stays locked to the account.
           </p>
@@ -312,9 +382,9 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
 
       {!isEdit && (
         <div className="admin-line-new-note" style={{ marginTop: 15 }}>
-          Creating new — set a temporary password below. Same form, new record.
+          Set a temporary password for this new user.
           <div className="admin-line-field" style={{ marginTop: 10 }}>
-            <label htmlFor="new-password">Temporary password / New User only</label>
+            <label htmlFor="new-password">Temporary password</label>
             <input
               id="new-password"
               type="password"
@@ -329,8 +399,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
       )}
 
       <div className="admin-line-form-section">
-        <div className="admin-line-eyebrow">02 / role &amp; status</div>
-        <h3>Place them on the line.</h3>
+        <h3>Role and status</h3>
         <div className="admin-line-field" style={{ marginTop: 12 }}>
           <label htmlFor="person-role">Role</label>
           {/* Platform roles are admin-grantable only, and Owner is
@@ -365,7 +434,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
 
         {isEdit && (
           <div className="admin-line-field" style={{ marginTop: 12 }}>
-            <label>Status / choose one</label>
+            <label>Status</label>
             <div className="admin-line-segmented" role="group" aria-label="Status">
               {statusSegments.map((seg) => (
                 <button
@@ -382,7 +451,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         )}
 
         <div className="admin-line-field admin-line-manager-picker" style={{ marginTop: 12 }}>
-          <label htmlFor="manager-search">Manager / named person picker</label>
+          <label htmlFor="manager-search">Manager</label>
           <input
             id="manager-search"
             type="search"
@@ -447,6 +516,24 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           <button type="button" className="admin-line-primary" onClick={handleSubmit} disabled={loading}>
             {loading ? 'Creating…' : 'Create user'}
           </button>
+        </div>
+      )}
+
+      {isEdit && user && (
+        <div className="sweep-user-danger">
+          <div>
+            <strong>Account actions</strong>
+            <p>Deactivate an account temporarily, or delete it permanently.</p>
+          </div>
+          <div className="sweep-user-danger-actions">
+            {formData.status === 'pending' && user.fieldRole && <button type="button" className="admin-line-primary" onClick={() => void acceptPending()} disabled={actionBusy}>{actionBusy ? 'Working…' : 'Accept'}</button>}
+            <button type="button" className="admin-line-action" onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')} disabled={actionBusy}>
+              {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
+            </button>
+            <button type="button" className="admin-line-action danger" onClick={() => void deleteUser()} disabled={actionBusy}>
+              Delete
+            </button>
+          </div>
         </div>
       )}
     </>

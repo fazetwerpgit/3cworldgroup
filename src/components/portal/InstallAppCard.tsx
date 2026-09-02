@@ -79,7 +79,7 @@ export default function InstallAppCard() {
     <div>
       <div className="member-line-toggle-row">
         <div>
-          <strong>Install the member app</strong>
+          <strong>Install the app</strong>
           <small>One device, quick access.</small>
         </div>
         {installed ? (

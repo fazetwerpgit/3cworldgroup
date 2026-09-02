@@ -15,9 +15,10 @@ type TestUser = {
 };
 
 const testState = vi.hoisted(() => ({
+  permissionsAllowed: false,
   auth: {
     user: null as TestUser | null,
-    hasPermission: () => false,
+    hasPermission: () => testState.permissionsAllowed,
     isRole: (...roles: string[]) =>
       roles.some((role) => role === testState.auth.user?.role || role === testState.auth.user?.fieldRole),
     signOut: vi.fn(async () => {}),
@@ -133,6 +134,7 @@ function renderNavigationMarkup() {
 describe('Task 4 portal navigation gates', () => {
   beforeEach(() => {
     installBrowserStubs();
+    testState.permissionsAllowed = false;
     setUser({
       status: 'pending',
       fieldRole: 'entry_level_rep',
@@ -200,5 +202,36 @@ describe('Task 4 portal brand link', () => {
     setUser({ status: 'active', fieldRole: 'entry_rep' });
 
     expect(renderBrandTag()).toContain('href="/portal/dashboard"');
+  });
+});
+
+describe('portal shell navigation', () => {
+  beforeEach(() => {
+    installBrowserStubs();
+    setUser({ status: 'active', fieldRole: 'entry_level_rep', uid: 'rep-1' });
+    testState.permissionsAllowed = true;
+  });
+
+  it('uses Calls as the navigation label everywhere', () => {
+    const { sidebar, mobile, palette } = renderNavigationMarkup();
+
+    expect(sidebar).toContain('>Calls<');
+    expect(mobile).toContain('>Calls<');
+    expect(palette).toContain('>Calls<');
+    expect(`${sidebar}${mobile}${palette}`).not.toContain('Calls Schedule');
+  });
+
+  it('keeps quick links out of the Menu sheet and puts account actions last', () => {
+    testState.mobileMenuOpen = true;
+    const mobile = renderToStaticMarkup(<MobileBottomNav />);
+
+    expect(mobile).toContain('<h2 id="portal-sheet-title">Menu</h2>');
+    expect(mobile.match(/>Dashboard</g)).toHaveLength(1);
+    expect(mobile.match(/>Sales</g)).toHaveLength(1);
+    expect(mobile.match(/>Leaderboard</g)).toHaveLength(1);
+    expect(mobile.match(/>Team Chat</g)).toHaveLength(1);
+    expect(mobile.indexOf('portal-sheet-actions')).toBeGreaterThan(mobile.indexOf('portal-sheet-nav'));
+    expect(mobile.indexOf('>Settings<')).toBeGreaterThan(mobile.indexOf('portal-sheet-actions'));
+    expect(mobile.indexOf('>Sign out<')).toBeGreaterThan(mobile.indexOf('>Settings<'));
   });
 });

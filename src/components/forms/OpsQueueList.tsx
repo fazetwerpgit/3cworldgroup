@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, FileText, PenLine } from 'lucide-react';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
+import '@/styles/sweep-leftovers.css';
 
 export interface OpsQueueEvidenceItem {
   label: string;
@@ -75,11 +76,6 @@ interface OpsQueueListProps {
 type StatusFilter = 'all' | 'new' | 'handled';
 
 export default function OpsQueueList({
-  kicker,
-  heroWord,
-  heroRest,
-  intro,
-  itemsLabel,
   rows,
   loading = false,
   error = '',
@@ -96,8 +92,6 @@ export default function OpsQueueList({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [secondaryFilter, setSecondaryFilter] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const heroCount = rows.filter((r) => r.status === 'new').length;
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -116,28 +110,6 @@ export default function OpsQueueList({
 
   return (
     <div>
-      <div className="ops-line-ticker">
-        <b>ON AIR</b>
-        <span>Ops signal / {kicker.split('/').pop()?.trim() ?? 'queue relay'}</span>
-        <strong>QUEUE LIVE</strong>
-      </div>
-
-      <div className="ops-line-hero">
-        <div>
-          <p className="ops-line-kicker">{kicker}</p>
-          <h1>
-            <span>{heroWord}</span>
-            <br />
-            {heroRest}
-          </h1>
-          <p className="ops-line-intro">{intro}</p>
-        </div>
-        <div className="ops-line-hero-count">
-          <strong className="ops-line-display portal-metallic-num">{heroCount}</strong>
-          <small>{itemsLabel}</small>
-        </div>
-      </div>
-
       <div className="ops-line-toolbar">
         <input
           type="search"
@@ -264,7 +236,7 @@ export default function OpsQueueList({
                     </span>
                   )}
                   <span className={`ops-line-status-chip${row.status === 'handled' ? ' handled' : ''}`}>
-                    {row.status === 'handled' ? 'handled' : 'new'}
+                    {row.status === 'handled' ? 'Handled' : 'New'}
                   </span>
                   <span className="ops-line-chevron">
                     {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -278,7 +250,7 @@ export default function OpsQueueList({
                     ) : row.evidenceKind === 'signature' && row.signatureUrl ? (
                       <div className="ops-line-proof-preview">
                         <div className="ops-line-proof-top">
-                          <span>SIGNATURE</span>
+                          <span>Signature</span>
                         </div>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={row.signatureUrl} alt="Captured signature" />
@@ -286,7 +258,7 @@ export default function OpsQueueList({
                     ) : (
                       <div className="ops-line-proof-preview">
                         <div className="ops-line-proof-top">
-                          <span>EVIDENCE</span>
+                          <span>Evidence</span>
                         </div>
                         <h4>{row.secondary}</h4>
                         <p>
@@ -311,7 +283,7 @@ export default function OpsQueueList({
                     )}
                     <div className="ops-line-detail-copy">
                       <h3>
-                        {row.person} / {row.subject}
+                        {row.person} · {row.subject}
                       </h3>
                       <div className="ops-line-detail-fields">
                         {row.detailFields.map((field) => (

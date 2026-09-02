@@ -1,0 +1,78 @@
+/* PageTitle — the single portal page header (2026-09 UX sweep).
+   Lives outside globals.css so parallel page work never touches that file. */
+.portal-scope .pt-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 16px;
+}
+.portal-scope .pt-head-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.portal-scope .pt-head-text {
+  min-width: 0;
+}
+.portal-scope .pt-head-title {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-weight: 800;
+  font-size: 1.65rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--portal-ink, #0f1b36);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  text-wrap: balance;
+}
+.portal-scope .pt-head-meta {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  color: #5f8a1a;
+  white-space: nowrap;
+}
+.portal-scope .pt-head-sub {
+  margin: 4px 0 0;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #5b6472;
+  max-width: 60ch;
+}
+.portal-scope .pt-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dark .portal-scope .pt-head-title,
+.portal-scope.dark .pt-head-title,
+.dark .pt-head-title {
+  color: #eef1f5;
+}
+.dark .pt-head-meta {
+  color: #9ccc4a;
+}
+.dark .pt-head-sub {
+  color: #9aa4b5;
+}
+@media (min-width: 768px) {
+  .portal-scope .pt-head {
+    padding: 8px 0 20px;
+  }
+  .portal-scope .pt-head-row {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .portal-scope .pt-head-title {
+    font-size: 2rem;
+  }
+  .portal-scope .pt-head-meta {
+    font-size: 1.05rem;
+  }
+}

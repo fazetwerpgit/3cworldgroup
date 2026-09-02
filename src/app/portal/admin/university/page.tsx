@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-a.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useTrainingUpload } from '@/hooks/useTrainingUpload';
 import { TRAINING_CATEGORIES, TrainingResource } from '@/types';
 import {
   AdminCatalogCard,
-  AdminCatalogList,
   AdminConfirmStrip,
 } from '@/components/admin/AdminCatalogList';
 
@@ -184,45 +185,20 @@ function AdminUniversity() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <AdminCatalogList
-        kicker="catalog / university content"
-        heroAccent="Keep every record"
-        heroPlain="ready to reuse."
-        intro="Upload documents and videos for reps, organized by carrier — the fourth room in the shared manage-a-list pattern."
-        heroCount={items.length}
-        heroCountLabel="university content on file"
-        search={{ value: query, onChange: setQuery, placeholder: 'Search content', ariaLabel: 'Search university content' }}
-        categoryFilter={{ value: category, onChange: setCategory, options: CATEGORY_OPTIONS }}
-        toolbarExtra={
-          <button type="button" className="admin-line-primary" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? 'Cancel' : 'Add content'}
-          </button>
-        }
-        loading={loading}
-        loadingLabel="Loading content…"
-        error={err || uploadError || null}
-        success={msg || null}
-        isEmpty={filtered.length === 0}
-        isFilteredEmpty={items.length > 0}
-        emptyTrue={{ title: 'No content yet.', body: 'Add carrier training content to get started.' }}
-        emptyFiltered={{
-          title: 'No content matches.',
-          body: 'Try a broader search or clear the category filter.',
-          action: (
-            <div className="admin-line-starter">
-              <button type="button" onClick={() => { setQuery(''); setCategory('all'); }}>Clear filters</button>
-            </div>
-          ),
-        }}
-      >
+      <div className="admin-line-main sweep-admin-page">
+        <div className="admin-line">
+          <PageTitle title="University Content" meta={`${items.length} items`} subtitle="Keep training documents and videos ready for reps." actions={<button type="button" className="admin-line-primary" onClick={() => setShowAdd((v) => !v)}>{showAdd ? 'Cancel' : 'Add Content'}</button>} />
+          <div className="admin-line-catalog-toolbar">
+            <input className="admin-line-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search content" aria-label="Search university content" />
+            <div className="admin-line-pill-row" role="group" aria-label="Filter by category">{CATEGORY_OPTIONS.map((opt) => <button key={opt.value} type="button" aria-pressed={category === opt.value} onClick={() => setCategory(opt.value)}>{opt.label}</button>)}</div>
+          </div>
+          {(err || uploadError) && <div className="admin-line-empty-state" style={{ borderColor: 'var(--admin-line-red)', color: 'var(--admin-line-red)' }}>{err || uploadError}</div>}
+          {msg && <div className="admin-line-empty-state" style={{ borderColor: 'var(--admin-line-lime)', color: 'var(--admin-line-lime)' }}>{msg}</div>}
         {showAdd && (
           <div className="admin-line-editor">
             <div className="admin-line-panel-head">
               <div>
-                <div className="admin-line-eyebrow">edit in place</div>
-                <h2 style={{ margin: '5px 0 0', fontSize: 19, fontWeight: 900, letterSpacing: '-.05em', textTransform: 'uppercase' }}>
-                  Add content.
-                </h2>
+                <h2>Add Content</h2>
               </div>
             </div>
             <div className="admin-line-editor-grid" style={{ marginTop: 13 }}>
@@ -231,7 +207,7 @@ function AdminUniversity() {
                 <input id="uni-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. AT&amp;T Fiber install walkthrough" />
               </div>
               <div className="admin-line-field">
-                <label>Carrier / choose one</label>
+                <label>Carrier</label>
                 <div className="admin-line-segmented" role="group" aria-label="Carrier">
                   {TRAINING_CATEGORIES.map((c) => (
                     <button key={c.value} type="button" aria-pressed={addCategory === c.value} onClick={() => setAddCategory(c.value)}>
@@ -265,7 +241,7 @@ function AdminUniversity() {
             </div>
             <div className="admin-line-editor-actions">
               <button type="button" className="admin-line-primary" onClick={onSave} disabled={!canSave}>
-                {saving ? 'Saving…' : 'Save content'}
+                {saving ? 'Saving…' : 'Save Content'}
               </button>
               <button type="button" className="admin-line-clear-button" onClick={() => setShowAdd(false)} disabled={saving}>
                 Cancel
@@ -274,7 +250,7 @@ function AdminUniversity() {
           </div>
         )}
 
-        {filtered.map((item) => (
+        {loading ? <div className="admin-line-empty-state sweep-admin-empty" style={{ display: 'block' }}><strong>Loading Content</strong><p>Checking the training library.</p></div> : filtered.length === 0 ? <div className="admin-line-empty-state sweep-admin-empty" style={{ display: 'block' }}><strong>{items.length ? 'No Content Matches' : 'No Content Yet'}</strong><p>{items.length ? 'Try a broader search or clear the category filter.' : 'Add training content to get started.'}</p>{!items.length && <button type="button" className="admin-line-primary" onClick={() => setShowAdd(true)}>Add Content</button>}</div> : <div className="admin-line-catalog-grid">{filtered.map((item) => (
           <AdminCatalogCard
             key={item.id}
             eyebrow={CATEGORY_LABEL[item.category] || item.category}
@@ -337,8 +313,9 @@ function AdminUniversity() {
               ) : undefined
             }
           />
-        ))}
-      </AdminCatalogList>
+        ))}</div>}
+        </div>
+      </div>
     </ProtectedRoute>
   );
 }

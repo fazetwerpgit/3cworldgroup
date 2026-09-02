@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-b.css';
 
 interface Row { id: string; status: string; [key: string]: unknown }
 
@@ -63,8 +65,8 @@ export default function BugReportsReviewPage() {
         personSub: opsFormatValue(row.repEmail),
         subject: opsFormatValue(row.summary),
         subjectSub: opsFormatValue(row.area),
-        secondary: opsFormatValue(row.pageUrl),
-        secondarySub: 'Bug report',
+        secondary: opsFormatValue(row.createdAt),
+        secondarySub: opsFormatValue(row.pageUrl),
         evidenceKind: 'none',
         detailFields: [
           { label: 'Area', value: opsFormatValue(row.area) },
@@ -81,12 +83,13 @@ export default function BugReportsReviewPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
+          <PageTitle title="Bug Reports" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
           <OpsQueueList
-            kicker="02 / The Line / evidence relay"
-            heroWord="Call"
-            heroRest="the proof."
-            intro="Reproduce, triage, and send the right signal to product."
-            itemsLabel="items need action"
+            kicker="Bug Reports"
+            heroWord="Bug"
+            heroRest="Reports"
+            intro="Review issues reported by reps."
+            itemsLabel="open"
             rows={queueRows}
             loading={loading}
             error={error}

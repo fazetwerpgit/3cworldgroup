@@ -1,19 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import {
   FormsLineAlert,
   FormsLineChoicePicker,
   FormsLineControl,
   FormsLineActions,
-  FormsLineFormHeader,
   FormsLineIdentity,
   FormsLineRail,
   FormsLineSection,
   FormsLineShell,
   FormsLineSuccess,
 } from '@/components/forms/FormsLine';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-leftovers.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
@@ -65,8 +67,11 @@ export default function ExpediteOrderPage() {
   return (
     <ProtectedRoute>
       <FormsLineShell>
-        <section className="forms-line-fill" aria-labelledby="expedite-order-title">
-          <FormsLineFormHeader title="Expedite Order" lane="02" />
+        <section className="forms-line-fill" aria-label="Expedite Order">
+          <PageTitle
+            title="Expedite Order"
+            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
+          />
           {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
           <div className="forms-line-fill-body">
             <div>
@@ -127,7 +132,7 @@ export default function ExpediteOrderPage() {
                 />
               )}
             </div>
-            <FormsLineRail status="Ready for order review" note="A clear timeline gives the install owner a clean handoff." />
+            <FormsLineRail status="Ready for order review" note="The dates and reason help the team plan the install." />
           </div>
         </section>
       </FormsLineShell>

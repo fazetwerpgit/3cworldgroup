@@ -3,13 +3,37 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-09-01 (update at EVERY milestone).
+Updated: 2026-09-02 (update at EVERY milestone).
 
 ## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
 
-NEXT ACTION: nothing pending from Claude. Ask Jacob what's next on the
-portal ops list. Jacob still owes: (1) tell managers the team code `3cteam`
-and the URL 3cworldgroup.com/login, (2) DELETE the bot account in Pending.
+NEXT ACTION: UX sweep fixes are IMPLEMENTED, gates green (tsc, vitest
+859/859, next build), NOT committed. Jacob is reviewing the before/after
+page (artifact "Sweep Fixes Review"). On his OK: commit ONLY the portal
+files (src/app/portal/**, src/components/{portal,admin,forms,resources,
+training,sales,chat,leaderboard,onboarding,auth/SignupForm.tsx}, src/contexts/
+ThemeContext.tsx, src/lib/push/pushPrompt*, src/styles/*, src/app/globals.css
+font-only diff, docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md,
+this file) — the public-site dirty files (src/app/{about,apply,contact,
+culture,opportunities,services,page,layout}.tsx, Footer/Navbar/PageWrapper,
+package*.json, *.module.css, src/components/public, public/redesign) belong
+to the separate redesign track and must NOT go in this commit. Then push
+master + verify on https://www.3cworldgroup.com. If he wants changes: the
+spec is docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md;
+shared header src/components/portal/PageTitle.tsx (+ src/styles/page-title.css);
+per-area CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
+What shipped: PageTitle on all 27+ pages, mastheads/eyebrows/numbering/
+slogans removed, plain copy; push prompt inline on dashboard only (30-day
+snooze) + A2HS one-at-a-time + header bell dot; More sheet = "Menu" without
+bar duplicates; phone-only dark default (ThemeContext, nothing stored ->
+dark at <=767px); font stacks normalized (Archivo headings, SF Mono/Menlo
+mono, no Windows-only faces, letter-spacing >= -0.02em) = the "text isn't
+straight" fix; onboarding crash guarded; admin destructive actions moved into
+person views behind confirm. QA bot qa-e2e-1@3cworldgroup.test (uid
+ROZ9ZiuDciRxcTmeyT344NXBpah2, role cleared back to undefined) still exists in
+prod; delete when done testing. Dev server on :3000 may still be running.
+Jacob still owes: tell managers code `3cteam` + URL 3cworldgroup.com/login;
+DELETE bot account in Pending.
 
 DONE 2026-09-02: team-code signup gate + easy login path LIVE on production
 (master 83a4329, Vercel Ready, verified on https://www.3cworldgroup.com —
@@ -54,6 +78,19 @@ centers, baselines, dividers, and spacing must stay within 1 CSS pixel of the lo
 crop. Use one measurement pass, the smallest direct fix, and one optimized capture;
 re-run only a failed check. Freeze components inside the 1px bound and do not chase
 subpixel RMSE or font-antialiasing noise.
+
+LATEST PUBLIC-SITE STATE (2026-09-02; supersedes the older chronology below):
+Home and About are approved/frozen. Jacob's verbatim About R11O verdict is
+`Approve`. Accepted board: `docs/redesign/qa/visual-remediation-2026-08-26/
+round16/about-round3-rejection-audit/about-round3-r11o-target-current-review.png`;
+independent production build `s1f6xgkwruZrBHBkLdabO` and exact 1440 runtime
+invariants pass. Do not reopen About.
+
+CURRENT PAGE/ROUND: Culture Round 1. NEXT ACTION: resolve the locked 1440 Culture
+source, capture the current optimized-production route once, create same-size
+section comparisons, then dispatch one measured consolidated Culture-only Luna
+correction. Shared shell, Home, and About remain read-only. Use the 1px/no-
+overengineering rule; no commit or deploy. Port 3100 is stopped.
 
 CURRENT MILESTONE (supersedes the older Home chronology below): Home is approved
 and frozen. Jacob rejected About Round 2 R11. Root audited it, dispatched About
@@ -109,12 +146,19 @@ Root's R8C approval is void. Jacob rejected it on 2026-09-01 because the font is
 wrong across the page and instructed root to inspect the locked About mockup against
 the render top-to-bottom without requiring him to enumerate the residuals. Matching
 the CTA title box and ink density did not prove matching glyph shapes. NEXT ACTION:
-root personally performs one complete original-detail About comparison, identifies
-all visible mismatches with typography first, and dispatches the smallest crop-
-grounded correction to the existing About Luna. Keep the 1 CSS px geometry bound and
-the no-overengineering rule: no broad test matrix, no antialiasing/subpixel chasing,
-one independent typecheck/build, one production capture, and one fresh full-page
-target/current board only after root's visual gate passes. Port 3100 is stopped.
+R10C is user-rejected with the verbatim verdict `reject.` The former root pass is
+void because it rechecked only the prior four reported issues while original-resolution
+target/current evidence still shows visible drift in all six About sections. R11 is
+active under the 1px/no-overengineering rule. Root has re-opened the full R10C board,
+all six section pairs, and same-size difference images and identified one consolidated
+About file-set correction covering Hero; Mission/map/topology; Values rings/glyphs/
+route/text; Leadership; both Audience columns; and the closing CTA. NEXT ACTION:
+dispatch `docs/redesign/qa/visual-remediation-2026-08-26/round16/
+about-round3-rejection-audit/ROUND3-R10C-USER-REJECT-R11-CONSOLIDATED-SPEC.md`
+to existing About Luna session `01a058f4-a3c0-72f1-b390-df30cd1be864`, then root
+reviews only the returned diff before independent typecheck/build and one optimized
+1440 capture. Home/shared shell stay frozen; topology SHA is unchanged; port 3100 is
+stopped; no commit or deploy.
 
 The authoritative continuation document for the active seven-page visual-fidelity
 loop is now `docs/redesign/HANDOFF.md`. Jacob rejected Home Round 3 on 2026-08-30

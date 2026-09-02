@@ -8,10 +8,10 @@ interface ProgressTrackerProps {
 
 export function ProgressTracker({ completed, total, percentage }: ProgressTrackerProps) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="training-progress-card rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold text-[#0A1F44]">My Path Progress</h2>
+          <h2 className="training-progress-title text-base font-semibold text-[#0A1F44]">Training progress</h2>
           <p className="mt-1 text-sm text-slate-500">
             Training modules completed across your assigned resources.
           </p>

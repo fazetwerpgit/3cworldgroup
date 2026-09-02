@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import '@/styles/sweep-admin-b.css';
 import {
   AdminCatalogCard,
   AdminCatalogList,
@@ -174,12 +175,8 @@ export default function EmailTemplatesPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <AdminCatalogList
-        kicker="catalog / message templates"
-        heroAccent="Keep every record"
-        heroPlain="ready to reuse."
-        intro="Email templates are the first room in a shared manage-a-list pattern that also works for chat channels, form options, and university content."
-        heroCount={templates.length}
-        heroCountLabel="templates on file"
+        title="Email Templates"
+        meta={`${templates.length} templates`}
         search={{
           value: query,
           onChange: setQuery,
@@ -206,18 +203,11 @@ export default function EmailTemplatesPage() {
         isEmpty={filtered.length === 0}
         isFilteredEmpty={templates.length > 0}
         emptyTrue={{
-          title: 'No templates saved.',
+          title: 'No templates saved',
           body: 'Start a new template to save manager-approved copy.',
-          action: (
-            <div className="admin-line-starter">
-              <button type="button" onClick={() => { setForm(EMPTY_FORM); setEditingId('new'); }}>
-                New template
-              </button>
-            </div>
-          ),
         }}
         emptyFiltered={{
-          title: 'No templates match.',
+          title: 'No templates match',
           body: 'Try a broader search or clear the category filter.',
           action: (
             <div className="admin-line-starter">
@@ -287,12 +277,11 @@ export default function EmailTemplatesPage() {
           <div className="admin-line-editor">
             <div className="admin-line-panel-head">
               <div>
-                <div className="admin-line-eyebrow">edit in place</div>
-                <h2 style={{ margin: '5px 0 0', fontSize: 19, fontWeight: 900, letterSpacing: '-.05em', textTransform: 'uppercase' }}>
+                <h2 className="admin-line-editor-title">
                   {form.id ? form.name || 'Edit template' : 'New template'}
                 </h2>
               </div>
-              <span className="admin-line-meta">no modal / no lost context</span>
+              <span className="admin-line-meta">Edit template</span>
             </div>
             <div className="admin-line-editor-grid" style={{ marginTop: 13 }}>
               <div className="admin-line-field">
@@ -305,7 +294,7 @@ export default function EmailTemplatesPage() {
                 />
               </div>
               <div className="admin-line-field">
-                <label>Category / choose one</label>
+                <label>Choose a category</label>
                 <div className="admin-line-segmented" role="group" aria-label="Category">
                   {(Object.keys(EmailTemplateCategoryLabels) as EmailTemplateCategory[]).map((c) => (
                     <button

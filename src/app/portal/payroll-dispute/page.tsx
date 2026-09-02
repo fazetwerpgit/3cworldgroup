@@ -1,19 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import {
   FormsLineAlert,
   FormsLineChoicePicker,
   FormsLineControl,
   FormsLineActions,
-  FormsLineFormHeader,
   FormsLineIdentity,
   FormsLineRail,
   FormsLineSection,
   FormsLineShell,
   FormsLineSuccess,
 } from '@/components/forms/FormsLine';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-leftovers.css';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
@@ -65,8 +67,11 @@ export default function PayrollDisputePage() {
   return (
     <ProtectedRoute>
       <FormsLineShell>
-        <section className="forms-line-fill" aria-labelledby="payroll-dispute-title">
-          <FormsLineFormHeader title="Payroll Dispute" lane="03" />
+        <section className="forms-line-fill" aria-label="Payroll Dispute">
+          <PageTitle
+            title="Payroll Dispute"
+            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
+          />
           {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
           <div className="forms-line-fill-body">
             <div>
@@ -128,7 +133,7 @@ export default function PayrollDisputePage() {
                 />
               )}
             </div>
-            <FormsLineRail status="Ready for payroll review" note="One clear proof frame keeps the handoff moving." />
+            <FormsLineRail status="Ready for payroll review" note="A clear screenshot helps the payroll team review this." />
           </div>
         </section>
       </FormsLineShell>

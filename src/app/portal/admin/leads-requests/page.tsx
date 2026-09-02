@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import OpsQueueList, { OpsQueueEvidenceItem, OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-b.css';
 
 interface Row {
   id: string;
@@ -99,8 +101,8 @@ export default function LeadsRequestsReviewPage() {
           personSub: opsFormatValue(row.repFirstName),
           subject: opsFormatValue(row.category),
           subjectSub: opsFormatValue(row.location),
-          secondary: opsFormatValue(row.campaign),
-          secondarySub: opsFormatValue(row.managerName),
+          secondary: opsFormatValue(row.createdAt),
+          secondarySub: opsFormatValue(row.campaign),
           evidenceKind: evidenceItems.length > 0 ? 'files' : 'none',
           evidenceItems,
           detailFields: [
@@ -124,12 +126,13 @@ export default function LeadsRequestsReviewPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
+          <PageTitle title="Leads Requests" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
           <OpsQueueList
-            kicker="02 / The Line / evidence relay"
-            heroWord="Call"
-            heroRest="the proof."
-            intro="Route fresh lead asks to the right manager — up to three field-proof uploads per request."
-            itemsLabel="items need action"
+            kicker="Leads Requests"
+            heroWord="Leads"
+            heroRest="Requests"
+            intro="Review lead requests and send them to the right manager."
+            itemsLabel="open"
             rows={queueRows}
             loading={loading}
             error={error}

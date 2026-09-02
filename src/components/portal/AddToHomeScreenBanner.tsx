@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Share, X } from 'lucide-react';
+import { Share } from 'lucide-react';
 import { shouldShowAddToHomeScreen } from '@/lib/pwa/addToHomeScreen';
+import '@/styles/sweep-rep-b.css';
 
 const DISMISSED_KEY = 'a2hs-dismissed';
 
@@ -29,11 +30,12 @@ function writeDismissed(): void {
  * screen. Rendering is decided on the client after mount so SSR never sees
  * navigator/localStorage. Never shows inside the installed app.
  */
-export default function AddToHomeScreenBanner() {
+export default function AddToHomeScreenBanner({ pushPromptVisible }: { pushPromptVisible: boolean | null }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const nav = window.navigator as Navigator & { standalone?: boolean };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(
       shouldShowAddToHomeScreen({
         userAgent: nav.userAgent ?? '',
@@ -43,7 +45,7 @@ export default function AddToHomeScreenBanner() {
     );
   }, []);
 
-  if (!visible) return null;
+  if (!visible || pushPromptVisible !== false) return null;
 
   const dismiss = () => {
     writeDismissed();
@@ -51,32 +53,11 @@ export default function AddToHomeScreenBanner() {
   };
 
   return (
-    <div
-      role="region"
-      aria-label="Add 3C Console to your home screen"
-      className="mb-4 flex items-start gap-3 rounded-lg border border-[#0A1F44]/[.14] bg-white px-4 py-3 text-[#0A1F44] shadow-sm dark:border-white/[.12] dark:bg-white/[.04] dark:text-[#f4f7fa]"
-    >
-      <Share className="mt-0.5 size-5 shrink-0 text-[#5a8f1f] dark:text-[#9fd44f]" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">Add 3C Console to your home screen</p>
-        <p className="mt-0.5 text-sm text-[#0A1F44]/75 dark:text-[#f4f7fa]/75">
-          Tap the Share button, then Add to Home Screen. You&apos;ll get an app icon that opens straight to the portal.
-        </p>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="mt-2 rounded-md bg-[#0A1F44] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#153c74] dark:bg-[#9fd44f] dark:text-[#0A1F44] dark:hover:bg-[#b5e06a]"
-        >
-          Got it
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Dismiss"
-        className="shrink-0 rounded p-1 text-[#0A1F44]/60 hover:text-[#0A1F44] dark:text-[#f4f7fa]/60 dark:hover:text-[#f4f7fa]"
-      >
-        <X className="size-4" aria-hidden="true" />
+    <div role="region" aria-label="Add this portal to your home screen" className="portal-add-home-prompt">
+      <Share className="size-5 shrink-0 text-[#5a8f1f] dark:text-[#9fd44f]" aria-hidden="true" />
+      <p className="portal-add-home-prompt-copy">Add this portal to your home screen from Safari&apos;s Share menu.</p>
+      <button type="button" onClick={dismiss} className="portal-add-home-prompt-dismiss">
+        Dismiss
       </button>
     </div>
   );

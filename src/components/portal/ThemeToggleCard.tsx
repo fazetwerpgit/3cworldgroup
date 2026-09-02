@@ -2,10 +2,10 @@
 
 import { useTheme } from '@/contexts/ThemeContext';
 
-// Appearance switch, shown in Settings inside the "App + appearance" panel.
+// Appearance switch, shown in Settings inside the "App and theme" panel.
 // Scoped to the portal. "Auto" follows the device's light/dark setting live.
 // Renders bare segmented-control markup — the panel chrome comes from the
-// Settings page (member-the-line-goal.md: one real "App + appearance" panel,
+// Settings page (member-the-line-goal.md: one real "App and theme" panel,
 // not a standalone card).
 export default function ThemeToggleCard() {
   const { theme, setTheme } = useTheme();
@@ -18,7 +18,7 @@ export default function ThemeToggleCard() {
 
   return (
     <div style={{ marginTop: 15 }}>
-      <p className="member-line-label">Appearance / segmented</p>
+      <p className="member-line-label member-line-theme-label">Theme</p>
       <div className="member-line-segmented" role="group" aria-label="Appearance">
         {options.map(({ value, label }) => (
           <button
