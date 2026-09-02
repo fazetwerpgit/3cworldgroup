@@ -40,7 +40,7 @@ push to install the portal to their iPhone home screen.
 - On `{ ok: true }` signup proceeds as today. The `users/{uid}` document
   written by `AuthContext` gains `signupMethod: "team_code"`.
 - Env: `PORTAL_TEAM_CODE` set in Vercel (all envs) and `.env.local`. Initial
-  value chosen by Jacob at deploy time.
+  value: `3cteam` (matching is case-insensitive, so `3CTEAM` also works).
 
 ### Files
 

@@ -1,37 +1,141 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useSearchParams } from "next/navigation";
+import {
+  ArrowRight,
+  BarChart3,
+  Check,
+  CircleDollarSign,
+  Clock3,
+  FilePenLine,
+  GraduationCap,
+  PhoneCall,
+  Star,
+  UserRound,
+  Wifi,
+  Zap,
+} from "lucide-react";
 import PageWrapper from "@/components/PageWrapper";
 import ScrollReveal from "@/components/ScrollReveal";
+import { ClosingCta, PublicContainer } from "@/components/public";
+import styles from "./apply-page.module.css";
 
-const faqs = [
-  {
-    question: "How much can I realistically earn?",
-    answer: "Most active contractors earn $1,000–$3,000 per week. Top performers consistently make $4,000–$5,000+ weekly. Your earnings depend on effort — the more doors you knock, the more you earn.",
-  },
-  {
-    question: "Do I need sales experience?",
-    answer: "No experience required. We provide comprehensive training on our products, sales techniques, and territory management. Many of our top earners started with zero sales background.",
-  },
-  {
-    question: "Is this commission-only?",
-    answer: "Yes, this is a 1099 independent contractor position. You're paid per sale with no cap on earnings. This structure rewards hard work and allows top performers to out-earn traditional salaried positions.",
-  },
-  {
-    question: "What are the hours like?",
-    answer: "You set your own schedule. Most contractors work 4-8 hours per day during peak hours (typically afternoons and early evenings when people are home). Work more, earn more.",
-  },
-  {
-    question: "What products will I be selling?",
-    answer: "Fiber internet, TV packages, and home security systems from leading providers. These are services people actually want — you're helping them upgrade, not pushing unwanted products.",
-  },
-  {
-    question: "What areas are you hiring in?",
-    answer: "We're actively expanding in 20+ markets including Chicago, Dallas, Atlanta, Phoenix, Denver, Philadelphia, and more. If you don't see your city, apply anyway — we're always growing.",
-  },
-];
+const inputClassName =
+  "mt-2 min-h-11 w-full border border-[#b9c7d7] bg-white px-4 py-3 text-base text-[#102649] outline-none transition-shadow placeholder:text-[#7b899d] focus-visible:ring-2 focus-visible:ring-[#8dc63f] focus-visible:ring-offset-2";
+
+const applyRouteCss = `
+  @media (min-width: 1023px) {
+    body:has(#apply-route-root) .public-nav-row > .public-brand,
+    body:has(#apply-route-root) .public-nav-row > .public-desktop-nav {
+      color: var(--public-ink) !important;
+      opacity: 1 !important;
+      text-shadow: none !important;
+    }
+    body:has(#apply-route-root) .public-nav-row > .public-brand *,
+    body:has(#apply-route-root) .public-nav-row > .public-desktop-nav * {
+      background: transparent !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      color: var(--public-ink) !important;
+      opacity: 1 !important;
+      text-shadow: none !important;
+    }
+    body:has(#apply-route-root) .public-nav-row > .public-brand img,
+    body:has(#apply-route-root) .public-nav-row > .public-desktop-nav svg {
+      opacity: 1 !important;
+    }
+    body:has(#apply-route-root) .public-nav-row > .public-desktop-nav .public-nav-apply {
+      background: var(--public-lime) !important;
+      border-color: var(--public-lime) !important;
+      color: var(--public-navy) !important;
+    }
+    body:has(#apply-route-root) .public-nav-row > .public-desktop-nav .public-nav-link.is-active::after {
+      background: var(--public-lime) !important;
+    }
+
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel,
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel * {
+      opacity: 1 !important;
+      text-shadow: none !important;
+    }
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel .public-eyebrow {
+      color: #fff !important;
+    }
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel .public-closing-cta-title {
+      color: var(--public-lime) !important;
+      max-width: none !important;
+    }
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel .public-closing-cta-body {
+      color: rgba(239, 246, 255, 0.78) !important;
+    }
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel .public-button {
+      background: var(--public-navy) !important;
+      border-color: var(--public-navy) !important;
+      color: #fff !important;
+    }
+    body:has(#apply-route-root) .apply-closing-route .public-closing-cta-panel svg {
+      color: currentColor !important;
+      opacity: 1 !important;
+    }
+
+    #apply-route-root .apply-hero-grid {
+      min-height: 29rem;
+      grid-template-columns: minmax(0, 1fr) minmax(30rem, 0.95fr);
+    }
+    #apply-route-root .apply-form-panel {
+      clip-path: polygon(11% 0, 100% 0, 100% 100%, 0 100%);
+      min-height: 27rem;
+      padding-left: clamp(4.75rem, 6vw, 7rem);
+    }
+    #apply-route-root .apply-hero-mark {
+      max-width: none;
+      opacity: 0.38;
+      position: absolute;
+      right: -1.5rem;
+      top: 2.5rem;
+      width: 22rem;
+      z-index: -1;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1199px) {
+    #apply-route-root .apply-benefits-section > .public-container > div {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    #apply-route-root .apply-benefits-section > .public-container > div > div {
+      min-height: 9rem;
+    }
+    #apply-route-root .apply-benefits-section > .public-container > div > div:nth-child(odd) {
+      border-left: 0;
+    }
+    #apply-route-root .apply-benefits-section > .public-container > div > div:nth-child(even) {
+      border-left: 1px solid #d7e0ea;
+    }
+  }
+
+  @media (max-width: 767px) {
+    #apply-route-root .apply-process-grid {
+      grid-template-columns: minmax(0, 1fr) !important;
+      gap: 2rem !important;
+      margin-top: 2rem;
+    }
+    #apply-route-root .apply-process-grid > div,
+    #apply-route-root .apply-process-grid > div:last-child {
+      align-items: flex-start;
+      grid-column: auto !important;
+      min-width: 0;
+    }
+    #apply-route-root .apply-process-grid > div > div:last-child {
+      min-width: 0;
+    }
+    #apply-route-root .apply-process-grid h3 {
+      overflow-wrap: anywhere;
+    }
+  }
+`;
 
 export default function ApplyPage() {
   return (
@@ -52,6 +156,8 @@ function ApplyPageContent() {
     referredBy: "",
     website: "",
   });
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -59,16 +165,10 @@ function ApplyPageContent() {
       setFormData((prev) => ({ ...prev, referredBy: ref }));
     }
   }, [searchParams]);
-  const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData((current) => ({ ...current, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,7 +201,7 @@ function ApplyPageContent() {
       }
 
       setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Error submitting application:", error);
       alert("There was an error submitting your application. Please try again.");
@@ -113,418 +213,174 @@ function ApplyPageContent() {
   if (submitted) {
     return (
       <PageWrapper>
-        <section className="bg-[#0A1F44] text-white py-20 md:py-28 min-h-[60vh] flex items-center relative overflow-hidden">
-          {/* Celebration Background */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-20 left-20 w-32 h-32 border-4 border-[#8dc63f] rotate-12"></div>
-            <div className="absolute bottom-20 right-20 w-48 h-48 border-4 border-[#6A8FE3] -rotate-6"></div>
-            <div className="absolute top-1/3 right-1/4 w-24 h-24 border-4 border-[#8dc63f] rotate-45"></div>
-          </div>
-
-          <div className="max-w-2xl mx-auto px-6 text-center relative">
-            <div className="w-20 h-20 bg-[#8dc63f] flex items-center justify-center mb-8 mx-auto shadow-sharp">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
+        <style>{applyRouteCss}</style>
+        <div id="apply-route-root" className={styles.route}>
+        <section className="public-topo-surface flex min-h-[65vh] items-center overflow-hidden py-20 text-white md:py-28">
+          <PublicContainer>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center bg-[#8dc63f] text-[#102649]">
+                <Check aria-hidden="true" className="h-9 w-9" strokeWidth={3} />
+              </div>
+              <p className="public-eyebrow mt-8 text-[#8dc63f]">You&apos;re in!</p>
+              <h1 className="mt-4 font-[var(--public-display-font)] text-5xl font-extrabold uppercase leading-[0.94] tracking-[-0.06em] sm:text-6xl">Application received.</h1>
+              <p className="mx-auto mt-6 max-w-[34ch] text-lg leading-8 text-white/80">We&apos;ll call you within <span className="font-bold text-[#8dc63f]">2-3 business days</span> to schedule your quick intro call.</p>
+              <div className="mx-auto mt-9 max-w-md border-l border-[#8dc63f]/70 bg-white/10 p-6 text-left">
+                <h2 className="font-bold">While you wait</h2>
+                <p className="mt-2 text-sm leading-6 text-white/75">Check your phone. Our team calls from local numbers, so save our number when it comes through.</p>
+              </div>
+              <Link href="/" className="public-button public-button-lime mt-9">Back to home <ArrowRight aria-hidden="true" size={17} strokeWidth={2.2} /></Link>
             </div>
-            <div className="inline-block bg-[#8dc63f] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
-              You&apos;re In!
-            </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6">
-              Application received.
-            </h1>
-            <p className="text-xl text-white/70 mb-10 max-w-md mx-auto leading-relaxed">
-              We&apos;ll call you within <span className="text-[#8dc63f] font-bold">2-3 business days</span> to schedule your quick intro call.
-            </p>
-
-            <div className="bg-white/10 backdrop-blur-sm p-6 mb-10 max-w-md mx-auto border-l-4 border-[#8dc63f]">
-              <h3 className="font-bold mb-2">While you wait:</h3>
-              <p className="text-white/70 text-sm">Check your phone - our team calls from local numbers. Save our number so you don&apos;t miss it!</p>
-            </div>
-
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 bg-white text-[#0A1F44] px-8 py-4 font-bold hover:bg-gray-100 transition-colors shadow-sharp hover:shadow-sharp-lg hover:-translate-y-1 transition-all"
-            >
-              Back to Home
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
-          </div>
+          </PublicContainer>
         </section>
+        </div>
       </PageWrapper>
     );
   }
 
   return (
-    <PageWrapper>
-      {/* Hero - Dark Blue with Stats */}
-      <section className="bg-[#0A1F44] text-white py-20 md:py-28 relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-10 left-10 w-40 h-40 border-4 border-white rotate-12"></div>
-          <div className="absolute bottom-10 right-10 w-60 h-60 border-4 border-white -rotate-6"></div>
-          <div className="absolute top-1/2 left-1/3 w-32 h-32 border-4 border-white rotate-45"></div>
-        </div>
-
-        <div className="max-w-6xl mx-auto px-6 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="inline-block bg-[#8dc63f] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
-                Now Hiring in 20+ Markets
-              </div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6">
-                Start earning<br />
-                <span className="text-[#8dc63f]">$3,000+/week</span>
+      <PageWrapper>
+        <style>{applyRouteCss}</style>
+        <div id="apply-route-root" className={styles.route}>
+        <section className="public-topo-surface overflow-hidden text-white">
+        <PublicContainer>
+          <div className="apply-hero-grid grid gap-10 py-12 md:py-16 lg:items-center lg:gap-14 lg:py-8">
+            <div className="apply-hero-copy relative z-10 max-w-xl">
+              <p className="public-eyebrow inline-block bg-[#8dc63f] px-4 py-2 text-white lg:flex lg:h-[43px] lg:w-[333px] lg:items-center lg:justify-center lg:px-5 lg:py-0 lg:text-center lg:!font-extrabold lg:!text-[1.15rem] lg:!text-white">Now hiring in 20+ markets</p>
+              <h1 className="relative z-10 mt-4 max-w-[18ch] font-[var(--public-display-font)] text-5xl font-extrabold uppercase leading-[0.9] tracking-[-0.07em] sm:text-6xl md:text-7xl lg:max-w-[18ch] lg:text-[clamp(4.5rem,6vw,7rem)]">
+                <span className="block lg:whitespace-nowrap">Start earning</span><span className="block text-[#8dc63f] lg:whitespace-nowrap">$3,000+/week</span>
               </h1>
-              <p className="text-xl text-white/70 max-w-md mb-8">
-                Join 500+ independent contractors making real money in door-to-door sales. No experience needed.
-              </p>
-              <div className="flex flex-wrap gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-[#8dc63f]" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>30-second application</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-[#8dc63f]" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Response in 2-3 days</span>
+              <p className="mt-6 max-w-[38ch] text-base leading-7 text-white/85 sm:text-lg lg:mt-2 lg:translate-y-0 lg:text-[1.35rem] lg:leading-8">Join 500+ independent contractors making real money in door-to-door sales. No experience needed.</p>
+              <div className="relative mt-8 max-w-md lg:mt-6">
+                <div className="grid max-w-[68%] gap-3 text-sm font-bold uppercase tracking-[0.08em] sm:max-w-md sm:grid-cols-2 lg:text-lg">
+                  <div className="flex items-center gap-3"><Clock3 aria-hidden="true" className="h-6 w-6 shrink-0 text-[#8dc63f] lg:h-8 lg:w-8" /><span>30-second application</span></div>
+                  <div className="flex items-center gap-3"><Check aria-hidden="true" className="h-6 w-6 shrink-0 text-[#8dc63f] lg:h-8 lg:w-8" /><span>Response in 2-3 days</span></div>
                 </div>
               </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="hidden lg:grid grid-cols-2 gap-4">
-              <div className="bg-white/10 backdrop-blur-sm p-6 border-l-4 border-[#8dc63f]">
-                <div className="text-4xl font-black text-[#8dc63f] mb-2">$2,847</div>
-                <div className="text-white/70 text-sm">Avg. weekly earnings</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm p-6 border-l-4 border-[#6A8FE3]">
-                <div className="text-4xl font-black text-[#6A8FE3] mb-2">500+</div>
-                <div className="text-white/70 text-sm">Active contractors</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm p-6 border-l-4 border-[#8dc63f]">
-                <div className="text-4xl font-black text-[#8dc63f] mb-2">20+</div>
-                <div className="text-white/70 text-sm">Markets nationwide</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm p-6 border-l-4 border-[#6A8FE3]">
-                <div className="text-4xl font-black text-[#6A8FE3] mb-2">92%</div>
-                <div className="text-white/70 text-sm">Satisfaction rate</div>
+              <div aria-hidden="true" className="mt-8 flex justify-center sm:justify-end lg:mt-10 lg:justify-center">
+                <Image
+                  src="/redesign/three-c-map-mark-transparent.png"
+                  alt=""
+                  width={793}
+                  height={496}
+                  className="apply-hero-mark h-auto w-full max-w-[20rem] object-contain opacity-70"
+                  sizes="(max-width: 639px) 80vw, 320px"
+                />
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Quick Benefits Banner */}
-      <section className="bg-[#8dc63f] py-6">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16 text-white text-center">
-            <div className="flex items-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-bold">Uncapped Earnings</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-bold">Flexible Hours</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              <span className="font-bold">Full Training</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="font-bold">Start This Week</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Form Section - Enhanced */}
-      <section className="bg-gray-50 py-20 md:py-28">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid lg:grid-cols-5 gap-12 items-start">
-            {/* Form Card */}
-            <ScrollReveal direction="left" className="lg:col-span-3">
-              <div className="bg-white p-8 md:p-10 shadow-sharp border-t-4 border-[#8dc63f]">
-                <h2 className="text-2xl md:text-3xl font-black text-[#0A1F44] mb-2">
-                  Apply in 30 Seconds
-                </h2>
-                <p className="text-gray-600 mb-8">No resume needed. Just tell us about yourself.</p>
-
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  {/* Honeypot — hidden from real users, bots fill it. Do not remove. */}
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      left: "-10000px",
-                      top: "auto",
-                      width: 1,
-                      height: 1,
-                      overflow: "hidden",
-                    }}
-                  >
+            <ScrollReveal direction="right">
+              <div id="apply-form" className="apply-form-panel relative z-10 scroll-mt-24 bg-[#f7f9fc] p-5 text-[#102649] shadow-[0_20px_60px_rgba(0,0,0,0.2)] sm:p-8 md:p-10 lg:px-12 lg:py-10 lg:pl-20">
+                <h2 className="font-[var(--public-display-font)] text-3xl font-extrabold uppercase leading-none tracking-[-0.05em] sm:text-4xl lg:text-6xl">Apply in 30 seconds</h2>
+                <p className="mt-3 text-base text-[#60728d] lg:text-lg">No resume needed. Just tell us about yourself.</p>
+                <form onSubmit={handleSubmit} className="mt-7 grid gap-4 lg:mt-8 lg:gap-4">
+                  <div aria-hidden="true" className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden">
                     <label htmlFor="website">Website (leave blank)</label>
-                    <input
-                      type="text"
-                      id="website"
-                      name="website"
-                      tabIndex={-1}
-                      autoComplete="off"
-                      value={formData.website}
-                      onChange={handleChange}
-                    />
+                    <input type="text" id="website" name="website" tabIndex={-1} autoComplete="off" value={formData.website} onChange={handleChange} />
                   </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-bold text-[#0A1F44] mb-2">
-                        Full name *
-                      </label>
-                      <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        required
-                        value={formData.name}
-                        onChange={handleChange}
-                        className="w-full px-4 py-4 border-2 border-gray-200 focus:border-[#0A1F44] outline-none transition-colors"
-                        placeholder="John Smith"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-bold text-[#0A1F44] mb-2">
-                        Phone *
-                      </label>
-                      <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        required
-                        value={formData.phone}
-                        onChange={handleChange}
-                        className="w-full px-4 py-4 border-2 border-gray-200 focus:border-[#0A1F44] outline-none transition-colors"
-                        placeholder="(555) 123-4567"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                      <label htmlFor="email" className="block text-sm font-bold text-[#0A1F44] mb-2">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleChange}
-                        className="w-full px-4 py-4 border-2 border-gray-200 focus:border-[#0A1F44] outline-none transition-colors"
-                        placeholder="john@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="city" className="block text-sm font-bold text-[#0A1F44] mb-2">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        id="city"
-                        name="city"
-                        required
-                        value={formData.city}
-                        onChange={handleChange}
-                        className="w-full px-4 py-4 border-2 border-gray-200 focus:border-[#0A1F44] outline-none transition-colors"
-                        placeholder="Dallas, TX"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="referredBy" className="block text-sm font-bold text-[#0A1F44] mb-2">
-                      Referred by
-                    </label>
-                    <input
-                      type="text"
-                      id="referredBy"
-                      name="referredBy"
-                      value={formData.referredBy}
-                      onChange={handleChange}
-                      className="w-full px-4 py-4 border-2 border-gray-200 focus:border-[#0A1F44] outline-none transition-colors"
-                      placeholder="Name of person who referred you (optional)"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-[#8dc63f] text-white px-6 py-5 font-bold text-lg hover:bg-[#7ab82e] transition-colors disabled:opacity-70 shadow-sharp-sm hover:shadow-sharp hover:-translate-y-1 transition-all uppercase tracking-wide"
-                  >
-                    {isSubmitting ? "Submitting..." : "Submit My Application →"}
-                  </button>
-
-                  <p className="text-center text-sm text-gray-500">
-                    By applying, you agree to be contacted about opportunities.
-                  </p>
+                  <label className="block text-sm font-bold lg:text-lg" htmlFor="apply-name">Full Name *<input className={`${inputClassName} lg:min-h-14 lg:px-5 lg:py-4`} type="text" id="apply-name" name="name" required value={formData.name} onChange={handleChange} placeholder="Enter your full name" /></label>
+                  <label className="block text-sm font-bold lg:text-lg" htmlFor="apply-phone">Phone *<input className={`${inputClassName} lg:min-h-14 lg:px-5 lg:py-4`} type="tel" id="apply-phone" name="phone" required value={formData.phone} onChange={handleChange} placeholder="(555) 123-4567" /></label>
+                  <label className="block text-sm font-bold lg:text-lg" htmlFor="apply-email">Email *<input className={`${inputClassName} lg:min-h-14 lg:px-5 lg:py-4`} type="email" id="apply-email" name="email" required value={formData.email} onChange={handleChange} placeholder="you@example.com" /></label>
+                  <label className="block text-sm font-bold lg:text-lg" htmlFor="apply-city">City *<input className={`${inputClassName} lg:min-h-14 lg:px-5 lg:py-4`} type="text" id="apply-city" name="city" required value={formData.city} onChange={handleChange} placeholder="Enter your city" /></label>
+                  <label className="block text-sm font-bold lg:text-lg" htmlFor="apply-referred-by">Referred By (optional)<input className={`${inputClassName} lg:min-h-14 lg:px-5 lg:py-4`} type="text" id="apply-referred-by" name="referredBy" value={formData.referredBy} onChange={handleChange} placeholder="How did you hear about us?" /></label>
+                  <button type="submit" disabled={isSubmitting} className="public-button public-button-lime mt-2 w-full lg:!min-h-[4rem] lg:px-8 lg:!text-[1.25rem] disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Submitting..." : "Submit my application"}<ArrowRight aria-hidden="true" size={17} strokeWidth={2.2} /></button>
+                  <p className="text-center text-xs leading-5 text-[#7b899d] lg:!text-[1.05rem] lg:leading-6">By applying, you agree to be contacted about opportunities.</p>
                 </form>
               </div>
             </ScrollReveal>
-
-            {/* Sidebar */}
-            <ScrollReveal direction="right" delay={200} className="lg:col-span-2 space-y-6">
-              {/* Testimonial Card */}
-              <div className="bg-[#0A1F44] text-white p-8 shadow-sharp">
-                <svg className="w-10 h-10 text-[#8dc63f] mb-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                </svg>
-                <p className="text-lg mb-6 leading-relaxed">
-                  &ldquo;I went from working retail making $15/hour to averaging <span className="text-[#8dc63f] font-bold">$3,200/week</span>. Best decision I ever made.&rdquo;
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#8dc63f] rounded-full flex items-center justify-center font-bold text-white">
-                    MR
-                  </div>
-                  <div>
-                    <div className="font-bold">Marcus R.</div>
-                    <div className="text-white/60 text-sm">Dallas, TX • 8 months</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* What Happens Next */}
-              <div className="bg-white p-8 shadow-sharp-sm border-l-4 border-[#6A8FE3]">
-                <h3 className="text-lg font-black text-[#0A1F44] mb-6 uppercase tracking-wide">
-                  What Happens Next
-                </h3>
-                <div className="space-y-5">
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 bg-[#8dc63f] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-[#0A1F44]">We review your application</h4>
-                      <p className="text-gray-600 text-sm">Within 24-48 hours</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 bg-[#8dc63f] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      2
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-[#0A1F44]">15-minute phone call</h4>
-                      <p className="text-gray-600 text-sm">Quick chat to learn about you</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 bg-[#8dc63f] text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      3
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-[#0A1F44]">Training & first day</h4>
-                      <p className="text-gray-600 text-sm">Start earning immediately</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="flex gap-4 text-center">
-                <div className="flex-1 bg-white p-4 shadow-sharp-sm">
-                  <div className="text-2xl font-black text-[#0A1F44]">4.8★</div>
-                  <div className="text-xs text-gray-600">Indeed Rating</div>
-                </div>
-                <div className="flex-1 bg-white p-4 shadow-sharp-sm">
-                  <div className="text-2xl font-black text-[#0A1F44]">Fast</div>
-                  <div className="text-xs text-gray-600">Onboarding</div>
-                </div>
-                <div className="flex-1 bg-white p-4 shadow-sharp-sm">
-                  <div className="text-2xl font-black text-[#0A1F44]">Weekly</div>
-                  <div className="text-xs text-gray-600">Pay</div>
-                </div>
-              </div>
-            </ScrollReveal>
           </div>
-        </div>
+        </PublicContainer>
       </section>
 
-      {/* FAQ Section */}
-      <section className="bg-gray-50 py-20 md:py-28">
-        <div className="max-w-3xl mx-auto px-6">
-          <ScrollReveal>
-            <div className="text-center mb-12">
-              <div className="inline-block bg-[#6A8FE3] text-white px-4 py-2 font-bold text-sm uppercase tracking-wider mb-6">
-                Common Questions
-              </div>
-              <h2 className="text-3xl md:text-4xl font-black text-[#0A1F44]">
-                Got Questions? We&apos;ve Got Answers.
-              </h2>
-            </div>
-          </ScrollReveal>
-
-          <ScrollReveal delay={200}>
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
-                <div
-                  key={index}
-                  className="bg-white border-l-4 border-[#8dc63f] shadow-sharp-sm"
-                >
-                <button
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  className="w-full px-6 py-5 text-left flex items-center justify-between gap-4"
-                >
-                  <span className="font-bold text-[#0A1F44]">{faq.question}</span>
-                  <svg
-                    className={`w-5 h-5 text-[#8dc63f] flex-shrink-0 transition-transform ${
-                      openFaq === index ? "rotate-180" : ""
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                <div
-                  className={`overflow-hidden transition-all duration-300 ${
-                    openFaq === index ? "max-h-48 pb-5" : "max-h-0"
-                  }`}
-                >
-                  <p className="px-6 text-gray-600 leading-relaxed">{faq.answer}</p>
-                </div>
-                </div>
-              ))}
-            </div>
-          </ScrollReveal>
-
-          <div className="text-center mt-12">
-            <p className="text-gray-600 mb-4">Still have questions?</p>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 text-[#6A8FE3] font-bold uppercase tracking-wide hover:gap-3 transition-all"
-            >
-              Contact Us
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
+      <section className="apply-benefits-section border-b border-[#d7e0ea] bg-[#f7f9fc]">
+        <PublicContainer>
+          <div className="grid grid-cols-2 divide-x divide-y divide-[#d7e0ea] py-2 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
+            <Benefit icon={<CircleDollarSign aria-hidden="true" />} title="Uncapped earnings" />
+            <Benefit icon={<Clock3 aria-hidden="true" />} title="Flexible hours" />
+            <Benefit icon={<GraduationCap aria-hidden="true" />} title="Full training" />
+            <Benefit icon={<Zap aria-hidden="true" />} title="Start this week" />
           </div>
-        </div>
+        </PublicContainer>
       </section>
+
+      <section className="apply-process-section bg-white py-12 sm:py-16 lg:py-16">
+        <PublicContainer>
+          <h2 className="apply-process-heading text-center font-[var(--public-display-font)] text-4xl font-extrabold uppercase leading-none tracking-[-0.06em] text-[#102649] sm:text-5xl lg:text-[4rem]">What happens next</h2>
+          <div className="apply-process-grid mt-7 grid grid-cols-2 gap-x-4 gap-y-6 md:mt-8 md:grid-cols-3 md:divide-x md:divide-[#d7e0ea] lg:mt-11 lg:px-14">
+            <NextStep icon={<FilePenLine aria-hidden="true" />} number="1" title="We review your application" body="Within 24-48 hours" />
+            <NextStep icon={<PhoneCall aria-hidden="true" />} number="2" title="15-minute phone call" body="Quick chat to learn about you" />
+            <NextStep icon={<BarChart3 aria-hidden="true" />} number="3" title="Training & first day" body="Start earning immediately" />
+          </div>
+        </PublicContainer>
+      </section>
+
+      <section className="apply-route-metrics public-topo-surface py-10 text-white sm:py-14 lg:py-16">
+        <PublicContainer>
+          <div className="grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-white/25">
+            <Metric value="$2,847" label="Avg. weekly earnings" accent="lime" />
+            <Metric value="500+" label="Active contractors" accent="blue" />
+            <Metric value="20+" label="Markets nationwide" accent="lime" />
+            <Metric value="92%" label="Satisfaction rate" accent="blue" />
+          </div>
+        </PublicContainer>
+      </section>
+
+      <section className="bg-white py-12 sm:py-16 lg:py-10">
+        <PublicContainer>
+          <h2 className="text-center font-[var(--public-display-font)] text-4xl font-extrabold uppercase leading-none tracking-[-0.06em] text-[#102649] sm:text-5xl lg:text-[3.75rem]">Good to know before you apply</h2>
+          <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:mt-10 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-[#d7e0ea]">
+            <GoodToKnow icon={<UserRound aria-hidden="true" />} title="1099 independent contractor" body="You&apos;ll work as a 1099 independent contractor." />
+            <GoodToKnow icon={<CircleDollarSign aria-hidden="true" />} title="Commission-only with uncapped earnings" body="Your effort drives your earnings. Top performers earn more." />
+            <GoodToKnow icon={<Star aria-hidden="true" />} title="No sales experience required" body="We provide full training and ongoing support." />
+            <GoodToKnow icon={<Wifi aria-hidden="true" />} title="Products you&apos;ll represent" body="Fiber internet, TV services, and security systems." />
+          </div>
+        </PublicContainer>
+      </section>
+
+      <div className="apply-closing-route lg:[&_.public-closing-cta_.public-eyebrow]:!text-[1.35rem] lg:[&_.public-closing-cta_.public-eyebrow]:!text-white lg:[&_.public-closing-cta-title]:!max-w-none lg:[&_.public-closing-cta-title]:!text-[4.2rem] lg:[&_.public-closing-cta-title]:!text-[#c3ed4d]"><ClosingCta eyebrow="Your next market" title="Starts here." body="" primaryLabel="Submit your application" primaryHref="#apply-form" secondaryLabel="" secondaryHref="" /></div>
+        </div>
     </PageWrapper>
+  );
+}
+
+function Benefit({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="flex min-w-0 min-h-28 items-center gap-4 px-4 py-5 sm:flex-col sm:justify-center sm:gap-3 sm:text-center lg:min-h-48">
+      <div className="shrink-0 text-[#8dc63f] [&>svg]:h-9 [&>svg]:w-9 lg:[&>svg]:h-16 lg:[&>svg]:w-16" aria-hidden="true">{icon}</div>
+      <span className={`${styles.benefitLabel} min-w-0 font-[var(--public-display-font)] text-lg font-extrabold uppercase tracking-[-0.02em] text-[#102649] lg:text-[1.8rem]`}>{title}</span>
+    </div>
+  );
+}
+
+function NextStep({ icon, number, title, body }: { icon: React.ReactNode; number: string; title: string; body: string }) {
+  return (
+    <div className="flex min-w-0 gap-4 px-0 last:col-span-2 md:flex-col md:items-center md:px-8 md:text-center md:last:col-span-1">
+        <div className="flex min-w-0 items-center gap-3 md:flex-row lg:gap-14">
+        <span className="font-[var(--public-display-font)] text-4xl font-extrabold text-[#8dc63f] lg:text-7xl">{number}</span>
+        <div className="text-[#102649] [&>svg]:h-10 [&>svg]:w-10 lg:[&>svg]:h-24 lg:[&>svg]:w-24" aria-hidden="true">{icon}</div>
+      </div>
+      <div className="min-w-0">
+        <h3 className="break-words font-[var(--public-display-font)] text-xl font-extrabold uppercase leading-tight tracking-[-0.03em] text-[#102649] lg:text-[1.9rem]">{title}</h3>
+        <p className="mt-2 text-sm leading-6 text-[#60728d] lg:text-[1.15rem] lg:leading-7">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ value, label, accent }: { value: string; label: string; accent: "lime" | "blue" }) {
+  return (
+    <div className="px-0 lg:px-8 lg:first:pl-0 lg:last:pr-0">
+      <p className={`font-[var(--public-display-font)] text-4xl font-extrabold tracking-[-0.05em] lg:text-6xl ${accent === "lime" ? "text-[#8dc63f]" : "text-[#8aa9e8]"}`}>{value}</p>
+      <p className="mt-1 text-sm font-bold uppercase tracking-[0.08em] text-white/80 lg:text-base">{label}</p>
+    </div>
+  );
+}
+
+function GoodToKnow({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+  return (
+    <div className="px-0 sm:px-5 lg:px-8 lg:first:pl-0 lg:last:pr-0">
+      <div className="text-center text-[#8dc63f] [&>svg]:mx-auto [&>svg]:h-9 [&>svg]:w-9 lg:[&>svg]:h-16 lg:[&>svg]:w-16" aria-hidden="true">{icon}</div>
+      <h3 className="mt-4 text-center font-[var(--public-display-font)] text-base font-extrabold uppercase leading-tight tracking-[-0.02em] text-[#102649] lg:text-[1.5rem]">{title}</h3>
+      <p className="mt-2 text-center text-sm leading-6 text-[#60728d] lg:text-lg lg:leading-7">{body}</p>
+    </div>
   );
 }

@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import "@fontsource/bebas-neue/latin-400.css";
 import "./globals.css";
+import "./public.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
