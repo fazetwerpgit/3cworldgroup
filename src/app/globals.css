@@ -153,7 +153,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, system-ui), Arial, Helvetica, sans-serif;
 }
 
 @layer base {
@@ -291,7 +291,7 @@ body {
 
 /* Display face for brand moments (login headline, marquee numbers) */
 .portal-display {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 /* Paint-area fix for background-clip:text display numerals: glyph ink that
@@ -2820,7 +2820,7 @@ body.portal-scope {
   overflow-x: hidden;
   padding: 28px clamp(13px, 4vw, 58px) 42px;
   color: var(--ink);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .dark .sales-line-main {
@@ -2949,7 +2949,7 @@ body.portal-scope {
   max-width: 620px;
   margin: 0;
   color: var(--muted);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 14px;
   line-height: 1.45;
 }
@@ -3054,7 +3054,7 @@ body.portal-scope {
 
 .sales-line-metric-value small {
   color: var(--muted);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 8px;
   letter-spacing: 0.1em;
 }
@@ -3409,7 +3409,7 @@ body.portal-scope {
 .sales-line-money small {
   margin-left: 2px;
   color: var(--muted);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 8px;
   font-weight: normal;
 }
@@ -4215,7 +4215,7 @@ body.portal-scope {
     linear-gradient(90deg, rgba(10, 31, 68, 0.025) 1px, transparent 1px);
   background-size: 56px 56px;
   color: var(--chat-line-ink);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .dark .chat-line-page {
@@ -5897,7 +5897,7 @@ body.portal-scope {
   overflow-x: hidden;
   padding: 26px clamp(13px, 4vw, 58px) 40px;
   color: var(--calls-line-ink);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .dark .calls-line-main {
@@ -9118,8 +9118,8 @@ body.portal-scope {
   --member-line-red: #b91c1c;
   --member-line-gold: #92620a;
   --member-line-metal: linear-gradient(180deg, #0a1f44, #45617d 38%, #7f8c9b 80%, #0a1f44);
-  --member-line-sans: var(--font-sans), system-ui, sans-serif;
-  --member-line-serif: var(--font-sans), system-ui, sans-serif;
+  --member-line-sans: var(--font-sans, system-ui), system-ui, sans-serif;
+  --member-line-serif: var(--font-sans, system-ui), system-ui, sans-serif;
   --member-line-mono: ui-monospace, "SF Mono", Menlo, monospace;
   position: relative;
   z-index: 1;
@@ -10108,7 +10108,7 @@ body.portal-scope {
   margin: 0 auto;
   padding: 22px clamp(14px, 3.5vw, 48px) 52px;
   color: var(--ops-line-ink);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .dark .ops-line {
@@ -10204,7 +10204,7 @@ body.portal-scope {
 
 .ops-line-hero h1 {
   margin: 11px 0 12px;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: clamp(36px, 10.5vw, 54px);
   font-weight: 900;
   line-height: 0.86;
@@ -10235,7 +10235,7 @@ body.portal-scope {
   background: var(--ops-line-metal);
   -webkit-background-clip: text;
   background-clip: text;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-weight: 900;
   font-size: clamp(90px, 14vw, 172px);
   line-height: 0.78;
@@ -10319,7 +10319,7 @@ body.portal-scope {
 
 .ops-line-section-head h2 {
   margin: 6px 0 0;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 25px;
   font-weight: 900;
   letter-spacing: -0.02em;
@@ -10379,7 +10379,7 @@ body.portal-scope {
 }
 
 .ops-line-queue-name {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 16px;
   font-weight: 900;
   line-height: 1.05;
@@ -10970,7 +10970,7 @@ body.portal-scope {
   border-left: 2px solid var(--ops-line-lime);
   padding-left: 11px;
   color: var(--ops-line-ink);
-  font: italic 14px/1.35 var(--font-sans), system-ui, sans-serif;
+  font: italic 14px/1.35 var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 /* Activation rail (restyled ActionQueue) */
@@ -11530,7 +11530,7 @@ body.portal-scope {
   margin: 0 auto;
   padding: 18px clamp(14px, 4vw, 54px) 52px;
   color: var(--admin-line-ink);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .dark .admin-line {
@@ -13371,7 +13371,7 @@ body.portal-scope {
   background: color-mix(in srgb, var(--panel2) 45%, transparent);
   padding: 10px 12px;
   color: var(--ink);
-  font: 13px var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font: 13px var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .sales-line-textarea {
@@ -13455,7 +13455,7 @@ body.portal-scope {
 
 .sales-line-plan-pick-copy strong {
   display: block;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 12px;
   font-weight: 700;
 }

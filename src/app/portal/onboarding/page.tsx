@@ -288,7 +288,7 @@ export default function OnboardingPage() {
             />
             <aside className="member-line-stack">
               <section className="member-line-panel">
-                <h2 style={{ margin: '0 0 14px', fontFamily: 'var(--font-archivo), var(--font-sans), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
+                <h2 style={{ margin: '0 0 14px', fontFamily: 'var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
                   How to finish an item
                 </h2>
                 <div className="member-line-note">
@@ -303,7 +303,7 @@ export default function OnboardingPage() {
                 </div>
               </section>
               <section className="member-line-panel">
-                <h2 style={{ margin: 0, fontFamily: 'var(--font-archivo), var(--font-sans), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
                   Keep sensitive data out of this page.
                 </h2>
                 <p className="member-line-sub">Never type raw SSN or card numbers here.</p>

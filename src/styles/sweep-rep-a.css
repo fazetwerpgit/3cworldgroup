@@ -3,7 +3,7 @@
 .portal-scope .calls-line,
 .portal-scope .forms-line,
 .portal-scope .resources-line {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope .sales-line h1,
@@ -17,7 +17,7 @@
 .portal-scope .resources-line h2,
 .portal-scope .training-progress-title,
 .portal-scope .training-resource-title {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -0.01em;
 }
 
@@ -42,12 +42,12 @@
 
 .portal-scope .sales-line-metric-value,
 .portal-scope .sales-line-inreview-value {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .portal-scope .sales-line-metric-label,
 .portal-scope .sales-line-metric-value small {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -56,7 +56,7 @@
 .portal-scope .sales-line-total-value,
 .portal-scope .sales-line-total-commission,
 .portal-scope .resources-line-signal-value {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .portal-scope .sales-line-command {
@@ -74,7 +74,7 @@
   display: block;
   margin-bottom: 3px;
   color: var(--muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -99,7 +99,7 @@
 /* Management copy and quick-add metadata are rep-facing text, not codes. */
 .portal-scope .calls-line-manage-bar p {
   color: var(--calls-line-muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.8rem;
   font-weight: 400;
   letter-spacing: 0;
@@ -114,7 +114,7 @@
 
 .portal-scope .calls-line-manage-bar .calls-line-add-call {
   min-height: 44px;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -126,13 +126,13 @@
 .portal-scope .calls-line-required-calls button {
   min-height: 44px;
   padding: 8px;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: 0;
   text-transform: none;
 }
 
 .portal-scope .calls-line-required-calls button strong {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.2;
@@ -140,7 +140,7 @@
 
 .portal-scope .calls-line-required-calls button span {
   color: var(--calls-line-muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.68rem;
   letter-spacing: 0;
   line-height: 1.2;
@@ -164,7 +164,7 @@
 }
 
 .portal-scope .calls-line-day-dow {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 1rem;
   font-weight: 700;
 }
@@ -172,7 +172,7 @@
 .portal-scope .calls-line-day-date {
   margin-top: 4px;
   color: var(--calls-line-muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.8rem;
   letter-spacing: 0;
 }
@@ -231,14 +231,14 @@
 }
 
 .portal-scope .forms-line-row-copy strong {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 1rem;
 }
 
 .portal-scope .forms-line-row-description {
   margin-top: 4px;
   color: var(--forms-line-muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.82rem;
 }
 
@@ -250,7 +250,7 @@
   border-radius: 999px;
   padding: 4px 8px;
   color: var(--forms-line-muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.72rem;
   white-space: nowrap;
   justify-self: start;
@@ -286,14 +286,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 1rem;
 }
 
 .portal-scope .resources-line-university-link small {
   margin-top: 4px;
   color: var(--resources-line-muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.82rem;
 }
 
@@ -307,7 +307,7 @@
 
 .portal-scope .training-progress-card,
 .portal-scope .training-resource-card {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope.dark .forms-line-row-audience,
@@ -322,7 +322,7 @@
 .portal-scope .resources-line-short-lane h2,
 .portal-scope .resources-line-pay-lane h2,
 .portal-scope .sales-line-fiber-head h2 {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -0.01em;
   text-transform: none;
 }
@@ -335,7 +335,7 @@
 
 .portal-scope .resources-line-doorway p {
   margin: 0;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.95rem;
 }
 
@@ -359,7 +359,7 @@
 .portal-scope .sales-line-fiber-updated {
   margin: 4px 0 0;
   color: var(--muted, #627187);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0;
   text-align: left;
@@ -367,7 +367,7 @@
 }
 
 .portal-scope .sales-line-fiber-group-head strong {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: 0;
   text-transform: none;
 }

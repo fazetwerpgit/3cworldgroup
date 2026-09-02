@@ -16,7 +16,7 @@
   margin-top: 18px;
   padding-top: 12px;
   border-top: 1px solid var(--rail-line);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope .portal-sheet-actions a,
@@ -50,11 +50,11 @@
 
 .portal-scope .portal-sheet-link {
   min-height: 44px;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope .portal-sheet-header h2 {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -0.02em;
   text-transform: none;
 }
@@ -63,7 +63,7 @@
   min-width: 44px;
   min-height: 44px;
   justify-content: center;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: 0;
   text-transform: none;
 }

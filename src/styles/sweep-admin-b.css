@@ -2,7 +2,7 @@
 .portal-scope .admin-line-main,
 .portal-scope .ops-line-main {
   min-width: 0;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 .portal-scope .admin-line-main h1,
 .portal-scope .admin-line-main h2,
@@ -10,13 +10,13 @@
 .portal-scope .ops-line-main h1,
 .portal-scope .ops-line-main h2,
 .portal-scope .ops-line-main h3 {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 .portal-scope .admin-line .pt-head-meta,
 .portal-scope .ops-line .pt-head-meta,
 .portal-scope .admin-line-number-grid input,
 .portal-scope .admin-line-weekly-custom input {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 
 .portal-scope .admin-line-catalog-toolbar {
@@ -38,7 +38,7 @@
 .portal-scope .admin-line-editor-actions button,
 .portal-scope .admin-line-catalog-actions button {
   min-height: 44px;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope .admin-line-catalog-grid {
@@ -70,7 +70,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--portal-ink, #18213b);
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 1rem;
   font-weight: 750;
   letter-spacing: -.01em;
@@ -81,21 +81,21 @@
 .portal-scope .admin-line-catalog-summary-description {
   overflow: hidden;
   color: var(--portal-muted, #667085);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: .87rem;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .portal-scope .admin-line-catalog-detail { border-top: 1px solid color-mix(in srgb, var(--portal-ink, #18213b) 12%, transparent); padding: 14px 16px 16px; }
-.portal-scope .admin-line-catalog-category { color: var(--portal-muted, #667085); font: 600 .76rem/1.2 var(--font-sans), system-ui, sans-serif; }
+.portal-scope .admin-line-catalog-category { color: var(--portal-muted, #667085); font: 600 .76rem/1.2 var(--font-sans, system-ui), system-ui, sans-serif; }
 .portal-scope .admin-line-catalog-detail h3 {
   margin: 4px 0 0;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -.01em;
 }
 .portal-scope .admin-line-catalog-meta {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -104,37 +104,37 @@
 .portal-scope .admin-line-chip,
 .portal-scope .admin-line-status,
 .portal-scope .admin-line-role {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
 .portal-scope .admin-line-value-chip {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
 }
 .portal-scope .admin-line-editor-title {
   margin: 5px 0 0;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 1.2rem;
   font-weight: 800;
   letter-spacing: -.01em;
 }
 .portal-scope .admin-line-settings-card h2,
 .portal-scope .admin-line-danger-room h2 {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -.01em;
 }
 .portal-scope .admin-line-settings-card,
 .portal-scope .admin-line-danger-room,
 .portal-scope .admin-line-catalog-detail {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 /* The frozen admin styles use uppercase mono labels for the old mockup.
    Keep this sweep's controls readable and sentence-cased. */
 .portal-scope .admin-line button:not(.admin-line-token),
 .portal-scope .ops-line button {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
   min-height: 44px;
@@ -148,7 +148,7 @@
 .portal-scope .admin-line-confirm-strip button,
 .portal-scope .ops-line-toolbar button,
 .portal-scope .ops-line-filter-line button {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -156,7 +156,7 @@
 .portal-scope .admin-line-weekly-custom label,
 .portal-scope .admin-line-inert-note,
 .portal-scope .admin-line-weekly-error {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -164,7 +164,7 @@
 
 /* Catalog empty states use the same plain prose treatment as queue pages. */
 .portal-scope .admin-line-empty-state {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: .95rem;
   line-height: 1.45;
   letter-spacing: normal;
@@ -172,7 +172,7 @@
 }
 .portal-scope .admin-line-empty-state strong {
   margin-bottom: 6px;
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   font-size: 1.1rem;
   letter-spacing: -.01em;
   text-transform: none;
@@ -180,14 +180,14 @@
 .portal-scope .admin-line-empty-state p { margin: 0; }
 .portal-scope .admin-line-empty-state .admin-line-starter { margin-top: 12px; }
 .portal-scope .admin-line-quiet-empty {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: .95rem;
   line-height: 1.45;
   letter-spacing: normal;
   text-transform: none;
 }
 .portal-scope .admin-line-quiet-empty strong {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -.01em;
   text-transform: none;
 }
@@ -210,7 +210,7 @@
 .portal-scope .ops-line-no-evidence,
 .portal-scope .ops-line-detail-fields span,
 .portal-scope .ops-line-quiet-rail {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -230,7 +230,7 @@
   padding: 0 6px 0 10px;
   border: 1px solid var(--admin-line-line, #d9dee8);
   color: var(--admin-line-ink, #18213b);
-  font: 400 13px/1 var(--font-sans), system-ui, sans-serif;
+  font: 400 13px/1 var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
   white-space: nowrap;
@@ -247,7 +247,7 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font: 400 18px/1 var(--font-sans), system-ui, sans-serif;
+  font: 400 18px/1 var(--font-sans, system-ui), system-ui, sans-serif;
 }
 .portal-scope .admin-line-value-chip-remove:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
 .portal-scope .admin-line-form-option-add { display: flex; align-items: center; gap: 6px; }
