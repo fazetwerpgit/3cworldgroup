@@ -294,9 +294,9 @@ export function LoginForm() {
           </form>
 
           <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            Need an account?{' '}
+            Have a team code?{' '}
             <Link href="/portal/signup" className="font-medium text-[#5a8f1f] hover:underline dark:text-[#9fd44f]">
-              Create one
+              Create your account
             </Link>
           </p>
         </>
