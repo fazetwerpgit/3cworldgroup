@@ -10,7 +10,7 @@
 .portal-scope .ops-line h1,
 .portal-scope .ops-line h2,
 .portal-scope .ops-line h3,
-.portal-scope .ops-line h4 { font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif; }
+.portal-scope .ops-line h4 { font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
 .portal-scope .sweep-admin-page button,
 .portal-scope .sweep-admin-page input,
 .portal-scope .sweep-admin-page select,
@@ -22,21 +22,21 @@
 .portal-scope .ops-line button,
 .portal-scope .ops-line input,
 .portal-scope .ops-line select,
-.portal-scope .ops-line textarea { font-family: var(--font-sans), system-ui, sans-serif; }
+.portal-scope .ops-line textarea { font-family: var(--font-sans, system-ui), system-ui, sans-serif; }
 .portal-scope .sweep-admin-page button,
 .portal-scope .admin-line button,
 .portal-scope .ops-line button { text-transform: none; letter-spacing: normal; }
 .portal-scope .ops-line-stage-strip button span {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   text-transform: none;
   letter-spacing: normal;
 }
 .portal-scope .ops-line-stage-strip b,
 .portal-scope .ops-line-recruiting-strip .ops-line-strip-cell b {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
 }
 .portal-scope .ops-line-recruiting-strip .ops-line-strip-cell > span:first-child {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   text-transform: none;
   letter-spacing: normal;
 }
@@ -63,12 +63,12 @@
 .portal-scope .sweep-admin-summary small,
 .portal-scope .sweep-admin-section-head > span,
 .portal-scope .sweep-admin-note { color: var(--ops-line-muted, #647084); font-size: .8rem; }
-.portal-scope .sweep-admin-label { color: var(--ops-line-muted, #647084); font: 650 .78rem/1.2 var(--font-sans), system-ui, sans-serif; }
-.portal-scope .sweep-admin-summary strong { font: 800 1.45rem/1 var(--font-archivo), var(--font-sans), Arial, sans-serif; }
+.portal-scope .sweep-admin-label { color: var(--ops-line-muted, #647084); font: 650 .78rem/1.2 var(--font-sans, system-ui), system-ui, sans-serif; }
+.portal-scope .sweep-admin-summary strong { font: 800 1.45rem/1 var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
 .portal-scope .sweep-admin-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 10px; }
-.portal-scope .sweep-admin-section-head h2 { margin: 0; font: 800 1.2rem/1.2 var(--font-archivo), var(--font-sans), Arial, sans-serif; }
+.portal-scope .sweep-admin-section-head h2 { margin: 0; font: 800 1.2rem/1.2 var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
 .portal-scope .sweep-admin-heading-count {
-  font: 400 0.95em/1 var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font: 400 0.95em/1 var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: normal;
 }
 .portal-scope .sweep-admin-queue-list { display: grid; gap: 8px; }
@@ -97,13 +97,13 @@
 .portal-scope .sweep-user-row:focus-visible { outline: 3px solid var(--ops-line-lime, #8dc63f); outline-offset: 2px; }
 .portal-scope .sweep-user-row .admin-line-row-actions { align-items: center; }
 .portal-scope .sweep-user-danger { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--ops-line-border, #d9dee8); }
-.portal-scope .sweep-user-danger strong { font: 750 1rem/1.2 var(--font-archivo), var(--font-sans), Arial, sans-serif; }
+.portal-scope .sweep-user-danger strong { font: 750 1rem/1.2 var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
 .portal-scope .sweep-user-danger p { margin: 4px 0 0; color: var(--ops-line-muted, #647084); font-size: .85rem; }
 .portal-scope .sweep-user-danger-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.portal-scope .sweep-detail-modal h3 { margin: 0; font: 800 1.25rem/1.2 var(--font-archivo), var(--font-sans), Arial, sans-serif; }
+.portal-scope .sweep-detail-modal h3 { margin: 0; font: 800 1.25rem/1.2 var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
 .portal-scope .sweep-subsection-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
-.portal-scope .sweep-subsection-head h2 { margin: 0; font: 800 1.25rem/1.2 var(--font-archivo), var(--font-sans), Arial, sans-serif; }
-.portal-scope .sweep-subsection-count { color: var(--ops-line-muted, #647084); font: 650 .9rem/1.2 var(--font-sans), system-ui, sans-serif; white-space: nowrap; }
+.portal-scope .sweep-subsection-head h2 { margin: 0; font: 800 1.25rem/1.2 var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
+.portal-scope .sweep-subsection-count { color: var(--ops-line-muted, #647084); font: 650 .9rem/1.2 var(--font-sans, system-ui), system-ui, sans-serif; white-space: nowrap; }
 .portal-scope .sweep-detail-fields { margin: 16px 0; }
 .portal-scope .sweep-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .portal-scope .sweep-signature { max-width: 100%; max-height: 180px; margin: 12px 0; border: 1px solid var(--ops-line-border, #d9dee8); border-radius: 8px; }
@@ -152,10 +152,10 @@
 }
 
 .portal-scope .sweep-admin-empty {
-  font: 0.9rem/1.45 var(--font-sans), system-ui, sans-serif;
+  font: 0.9rem/1.45 var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
-.portal-scope .sweep-admin-empty strong { font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif; }
+.portal-scope .sweep-admin-empty strong { font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif; }
 .portal-scope .sweep-admin-empty p { margin: 0 0 12px; }
 .portal-scope .sweep-admin-empty button { min-height: 44px; }

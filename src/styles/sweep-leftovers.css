@@ -7,7 +7,7 @@
 .portal-scope .ops-line-toolbar button,
 .portal-scope .ops-line-filter-line button {
   min-height: 44px;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope .forms-line-back-link,
@@ -18,7 +18,7 @@
 .portal-scope .sales-line-back,
 .portal-scope .sales-line-btn {
   min-height: 44px;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -27,7 +27,7 @@
 .portal-scope .admin-line h3,
 .portal-scope .sales-line h2,
 .portal-scope .sales-line h3 {
-  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif;
   letter-spacing: -0.01em;
 }
 
@@ -69,7 +69,7 @@
 .portal-scope .forms-line-fill .pt-head,
 .portal-scope .admin-line .pt-head,
 .portal-scope .sales-line .pt-head {
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
 }
 
 .portal-scope .forms-line-fill .pt-head a,
@@ -136,7 +136,7 @@
   padding: 0;
   border: 0;
   background: none;
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui), system-ui, sans-serif;
   font-size: 0.9rem;
   text-transform: none;
   letter-spacing: normal;

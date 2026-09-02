@@ -142,7 +142,7 @@ export default function MemberLineOnboardingBoard({
             <div className="member-line-sheet-head">
               <div>
                 <span className={`member-line-state ${STATUS_CLASS[openItem.status]}`}>{STATUS_LABEL[openItem.status]}</span>
-                <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--font-archivo), var(--font-sans), Arial, sans-serif', fontWeight: 700, fontSize: 20 }}>
+                <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif', fontWeight: 700, fontSize: 20 }}>
                   {openItem.label}
                 </h2>
               </div>
