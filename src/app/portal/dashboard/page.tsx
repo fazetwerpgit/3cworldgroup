@@ -20,6 +20,7 @@ import { isAbortError } from '@/lib/fetch/isAbortError';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 
 interface SalesStats {
   totalSales: number;
@@ -558,6 +559,7 @@ export default function DashboardPage() {
         aria-hidden="true"
       />
       <div aria-label={`${roleLabel} dashboard`} className="relative z-10 mx-auto w-full max-w-[1180px] px-[clamp(14px,4vw,58px)] pb-[42px] pt-[19px] max-[430px]:px-3">
+        <AddToHomeScreenBanner />
         {masthead}
         <div className="flex flex-col">
           {leadsWithQueue ? (
