@@ -7,33 +7,23 @@ Updated: 2026-09-02 (update at EVERY milestone).
 
 ## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
 
-NEXT ACTION: UX sweep fixes are IMPLEMENTED, gates green (tsc, vitest
-859/859, next build), NOT committed. Jacob is reviewing the before/after
-page (artifact "Sweep Fixes Review"). On his OK: commit ONLY the portal
-files (src/app/portal/**, src/components/{portal,admin,forms,resources,
-training,sales,chat,leaderboard,onboarding,auth/SignupForm.tsx}, src/contexts/
-ThemeContext.tsx, src/lib/push/pushPrompt*, src/styles/*, src/app/globals.css
-font-only diff, docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md,
-this file) — the public-site dirty files (src/app/{about,apply,contact,
-culture,opportunities,services,page,layout}.tsx, Footer/Navbar/PageWrapper,
-package*.json, *.module.css, src/components/public, public/redesign) belong
-to the separate redesign track and must NOT go in this commit. Then push
-master + verify on https://www.3cworldgroup.com. If he wants changes: the
-spec is docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md;
-shared header src/components/portal/PageTitle.tsx (+ src/styles/page-title.css);
-per-area CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
-What shipped: PageTitle on all 27+ pages, mastheads/eyebrows/numbering/
-slogans removed, plain copy; push prompt inline on dashboard only (30-day
-snooze) + A2HS one-at-a-time + header bell dot; More sheet = "Menu" without
-bar duplicates; phone-only dark default (ThemeContext, nothing stored ->
-dark at <=767px); font stacks normalized (Archivo headings, SF Mono/Menlo
-mono, no Windows-only faces, letter-spacing >= -0.02em) = the "text isn't
-straight" fix; onboarding crash guarded; admin destructive actions moved into
-person views behind confirm. QA bot qa-e2e-1@3cworldgroup.test (uid
-ROZ9ZiuDciRxcTmeyT344NXBpah2, role cleared back to undefined) still exists in
-prod; delete when done testing. Dev server on :3000 may still be running.
+NEXT ACTION: UX sweep fixes DEPLOYED — sweep commit 35bf04a on
+onboarding/completion (merged with origin/master as 01493f7, pushed),
+cherry-picked to master as ab7d89d and pushed (Vercel prod deploy).
+Verify on https://www.3cworldgroup.com (phone: dark by default, plain page
+headers, inline push prompt) then DELETE the QA bot qa-e2e-1@3cworldgroup.test
+(uid ROZ9ZiuDciRxcTmeyT344NXBpah2) from Auth + Firestore users. NOTE: master
+still lacks three older branch commits never cherry-picked (6fafac4 esign
+completed-envelope fix + dismissible aged alerts, 40a0942 alerts read legacy
+`Email`, 38d1f2b operations-only-own-sales view) — ask Jacob whether to ship
+them. Local `master` ref is checked out in worktree ~/dev/3cwg-payplan (stale
+at 842d1e6); never force-update it, push by sha (`git push origin <sha>:master`).
+Spec: docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md; shared
+header src/components/portal/PageTitle.tsx + src/styles/page-title.css; per-area
+CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
+Before/after review artifact: https://claude.ai/code/artifact/15b0dd76-0bbf-4c54-ad05-644effac70c9
 Jacob still owes: tell managers code `3cteam` + URL 3cworldgroup.com/login;
-DELETE bot account in Pending.
+DELETE bot signup account in Pending.
 
 DONE 2026-09-02: team-code signup gate + easy login path LIVE on production
 (master 83a4329, Vercel Ready, verified on https://www.3cworldgroup.com —
