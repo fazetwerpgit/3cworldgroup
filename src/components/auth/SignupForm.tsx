@@ -59,14 +59,16 @@ function loadRecaptchaScript() {
   return recaptchaScriptPromise;
 }
 
-// Real 3-step structural fact describing the account flow (verify -> manager
-// approves -> role assigned + onboarding starts) — not measured data, same
-// reasoning as Settings' static 5 (member-the-line-goal.md).
+// Real 3-step structural fact describing the account flow (team code ->
+// verify -> manager activates) — not measured data, same reasoning as
+// Settings' static 5 (member-the-line-goal.md).
 const SIGNUP_STEPS = [
-  { n: 1, label: 'Verify your email' },
-  { n: 2, label: 'Manager approves your account' },
-  { n: 3, label: 'You get your role and start onboarding' },
+  { n: 1, label: 'Enter your team code' },
+  { n: 2, label: 'Verify your email' },
+  { n: 3, label: 'Your manager activates your account' },
 ];
+
+const TEAM_CODE_ERROR = "That team code isn't right. Ask your manager for the current one.";
 
 // Scoped restyle: this component no longer renders the shared AuthShell (that
 // component stays untouched — still used by LoginForm/PendingApproval, out
@@ -79,6 +81,7 @@ export function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [teamCode, setTeamCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,6 +97,10 @@ export function SignupForm() {
     }
     if (looksLikeBotSignup(email, displayName)) {
       setError('This doesn\'t look like a real name and email. Use your everyday email address, or ask your manager to set up your account.');
+      return;
+    }
+    if (!teamCode.trim()) {
+      setError(TEAM_CODE_ERROR);
       return;
     }
     setError('');
@@ -136,6 +143,21 @@ export function SignupForm() {
           return;
         }
       }
+      try {
+        const codeResponse = await fetch('/api/portal/auth/team-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: teamCode }),
+        });
+        const codeData = await codeResponse.json() as { ok?: unknown };
+        if (!codeResponse.ok || codeData.ok !== true) {
+          setError(TEAM_CODE_ERROR);
+          return;
+        }
+      } catch {
+        setError(TEAM_CODE_ERROR);
+        return;
+      }
       await signUp(email.trim(), password, displayName.trim());
       // AuthContext set pendingApproval; go to /portal, which renders the
       // real PendingApproval component (this page only knows how to show the form).
@@ -158,7 +180,7 @@ export function SignupForm() {
               <span>Find your lane.</span>
             </h1>
             <p className="member-line-intro">
-              Verify. Get approved. Start onboarding with the role that fits your next move.
+              Enter your team code, verify your email, and your manager activates your account.
             </p>
           </div>
           <div className="member-line-display portal-metallic-num portal-num" aria-label="3 signup steps">
@@ -174,8 +196,8 @@ export function SignupForm() {
         <div className="member-line-signup">
           <section className="member-line-form-card">
             <p className="member-line-eyebrow">01 / your signal</p>
-            <h2>Create a member account</h2>
-            <p>Use an email you check regularly. Manager approval follows verification.</p>
+            <h2>Join with your team code</h2>
+            <p>Your manager gave you a team code. Use an email you check regularly.</p>
 
             <form onSubmit={handleSubmit} className="member-line-form-stack">
               {error && <div className="member-line-note warn" role="alert">{error}</div>}
@@ -200,6 +222,20 @@ export function SignupForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
+                  required
+                />
+              </div>
+
+              <div className="member-line-field">
+                <label htmlFor="signup-team-code">Team code / required</label>
+                <input
+                  id="signup-team-code"
+                  type="text"
+                  value={teamCode}
+                  onChange={(e) => setTeamCode(e.target.value)}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                 />
               </div>
@@ -252,9 +288,13 @@ export function SignupForm() {
               </div>
 
               <button type="submit" className="member-line-button primary" disabled={loading}>
-                {loading ? 'Requesting access…' : 'Request access'}
+                {loading ? 'Creating account…' : 'Create account'}
               </button>
             </form>
+
+            <p className="member-line-note" role="note">
+              Applied for a job? You don&apos;t need an account yet. We&apos;ll reach out after we review your application.
+            </p>
 
             <div className="member-line-steps">
               {SIGNUP_STEPS.map((step) => (

@@ -231,6 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email,
           displayName,
           status: 'pending',
+          signupMethod: 'team_code',
           createdAt: serverTimestamp(),
         });
         void fetch('/api/portal/auth/signup-notify', {
