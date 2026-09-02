@@ -47,7 +47,6 @@ export type ThreadMessage = ChatMessageView & {
 
 interface MobileThreadProps {
   pinnedMessage: ThreadMessage | null;
-  channelNumber: number;
   channel?: ChatChannel & { memberIds?: string[] };
   // Resolved active-account head-count from the members endpoint; the raw
   // memberIds array over-counts (deleted/deactivated uids linger in it).
@@ -226,7 +225,6 @@ function dayLabel(date: Date) {
  */
 export function MobileThread({
   pinnedMessage,
-  channelNumber,
   channel,
   memberCount,
   channelId,
@@ -604,14 +602,12 @@ export function MobileThread({
           className="chat-line-thread-info min-w-0 flex-1 rounded-md px-1.5 text-left hover:bg-slate-100 dark:hover:bg-muted"
         >
           <span className="chat-line-thread-head-copy">
-            <span className="chat-line-thread-kicker">{String(channelNumber).padStart(2, '0')} / {channel?.audience?.toUpperCase() ?? 'CHANNEL'} / BROADCAST</span>
-            <span className="chat-line-thread-name portal-metallic-num">{channel?.name ?? 'Channel'}</span>
+            <span className="chat-line-thread-name portal-display">{channel?.name ?? 'Channel'}</span>
             <span className="chat-line-thread-description">{channel?.description ?? 'Choose a channel to view messages.'}</span>
           </span>
         </button>
         <div className="chat-line-thread-meta">
-          <span className="chat-line-live">LIVE</span>
-          <span>{channel ? `${memberCount ?? channel.memberIds?.length ?? 0} members` : '— members'}</span>
+          <span>{channel ? `${memberCount ?? channel.memberIds?.length ?? 0} members` : 'No members'}</span>
         </div>
       </div>
 
@@ -768,7 +764,7 @@ export function MobileThread({
                     >
                       {message.replyTo && (
                         <div
-                          className={`chat-line-quote max-w-full rounded-lg border-l-2 border-[#8dc63f] bg-slate-100 px-2.5 py-1.5 dark:bg-muted/70 ${
+                          className={`chat-line-quote max-w-full rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 dark:border-border dark:bg-muted/70 ${
                             isOwn ? 'rounded-br-md' : 'rounded-bl-md'
                           }`}
                         >
@@ -909,9 +905,9 @@ export function MobileThread({
             pickFile(file);
           }}
         />
-        {/* Reply / edit staging bar (lime left border, X to cancel). */}
+        {/* Reply / edit staging bar, with a quiet border and X to cancel. */}
         {replyTarget && (
-          <div className="chat-line-compose-strip mb-2 flex items-start gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+          <div className="chat-line-compose-strip mb-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-border dark:bg-muted/60">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                 Replying to {replyTarget.authorName}
@@ -931,7 +927,7 @@ export function MobileThread({
           </div>
         )}
         {editTarget && (
-          <div className="chat-line-compose-strip mb-2 flex items-center gap-2 rounded-md border-l-2 border-[#8dc63f] bg-slate-50 px-3 py-2 dark:bg-muted/60">
+          <div className="chat-line-compose-strip mb-2 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-border dark:bg-muted/60">
             <Pencil className="size-3.5 shrink-0 text-slate-500 dark:text-muted-foreground" />
             <span className="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
               Editing message
@@ -1019,7 +1015,7 @@ export function MobileThread({
               }
             }}
             placeholder={
-              editTarget ? 'Edit your message...' : 'Broadcast an update…'
+              editTarget ? 'Edit your message...' : 'Write an update…'
             }
             disabled={!channelId}
             rows={1}
@@ -1045,7 +1041,7 @@ export function MobileThread({
           </Button>
         </div>
         <p className="chat-line-thread-composer-meta mt-1.5 text-[11px] text-slate-500 dark:text-muted-foreground">
-          Enter to send · Shift+Enter for a new line. No customer PII.
+          Enter to send
         </p>
       </div>
 

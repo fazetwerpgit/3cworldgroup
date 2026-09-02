@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, ClipboardCheck } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { MemberLineShell, MemberLineMasthead, MemberLineSectionIndex } from '@/components/member/MemberLine';
+import { MemberLineShell } from '@/components/member/MemberLine';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-rep-b.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -252,36 +254,13 @@ export default function OnboardingPage() {
     );
   };
 
-  const total = data?.progress.total ?? 0;
-  const approved = data?.progress.approved ?? 0;
-  const remaining = total - approved;
-  const reviewCount = data?.items.filter((i) => i.status === 'submitted').length ?? 0;
-  const attentionCount = data?.items.filter((i) => i.status === 'rejected').length ?? 0;
-  const todoCount = data?.items.filter((i) => i.status === 'not_started').length ?? 0;
+  const total = data?.progress?.total ?? 0;
+  const approved = data?.progress?.approved ?? 0;
 
   return (
     <ProtectedRoute roles={Object.values(FieldRoles)}>
       <MemberLineShell>
-        <MemberLineMasthead
-          kicker="onboarding broadcast / live board"
-          headingLead={`${remaining} line${remaining === 1 ? '' : 's'} open.`}
-          headingRest={`${approved} ${approved === 1 ? 'is' : 'are'} clear.`}
-          intro={`The full ${total || ''}-item board stays in frame. Read the state, take the next action, move the signal forward.${
-            data?.isIBO ? ' Business entity items are included.' : ''
-          }`}
-          numeral={remaining}
-          numeralAriaLabel={`${remaining} items left`}
-          tools={
-            <>
-              <span className="member-line-chip lime">
-                {approved} approved / {total} total
-              </span>
-              <span className="member-line-chip">
-                {reviewCount} review / {attentionCount} attention / {todoCount} to do
-              </span>
-            </>
-          }
-        />
+        <PageTitle title="My Onboarding" meta={`${approved} of ${total} complete`} />
 
         {error && (
           <div className="member-line-note warn" style={{ marginTop: 16 }}>
@@ -290,20 +269,18 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        <MemberLineSectionIndex index="01" label="live onboarding board" />
-
         {loading ? (
           <div className="member-line-panel grid gap-3">
             <Skeleton className="h-6 w-48" />
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
           </div>
-        ) : data ? (
+        ) : data?.items?.length ? (
           <div className="member-line-arena">
             <MemberLineOnboardingBoard
               memberLabel={user?.displayName || 'Member'}
               items={data.items}
-              progress={data.progress}
+              progress={data.progress ?? { approved: 0, total: 0, complete: false }}
               renderItemAction={renderItemAction}
               openItemId={openItemId}
               onOpenItem={setOpenItemId}
@@ -311,33 +288,31 @@ export default function OnboardingPage() {
             />
             <aside className="member-line-stack">
               <section className="member-line-panel">
-                <p className="member-line-eyebrow">02 / action type</p>
-                <h2 style={{ margin: '8px 0 14px', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 22 }}>
-                  Upload or e-sign.
+                <h2 style={{ margin: '0 0 14px', fontFamily: 'var(--font-archivo), var(--font-sans), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
+                  How to finish an item
                 </h2>
                 <div className="member-line-note">
-                  <strong style={{ color: 'var(--member-line-lime)' }}>UPLOAD</strong>
+                  <strong style={{ color: 'var(--member-line-lime)' }}>Upload</strong>
                   <br />
                   PNG / JPG / PDF · 4 MB max. License has front + back slots.
                 </div>
                 <div className="member-line-note warn" style={{ marginTop: 10 }}>
-                  <strong style={{ color: 'var(--member-line-gold)' }}>E-SIGN</strong>
+                  <strong style={{ color: 'var(--member-line-gold)' }}>E-sign</strong>
                   <br />
-                  Check your email for the signing link — this completes automatically after you sign.
+                  Check your email for the signing link. This completes automatically after you sign.
                 </div>
               </section>
               <section className="member-line-panel">
-                <p className="member-line-eyebrow">03 / sensitive items</p>
-                <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 22 }}>
-                  Keep raw data off-air.
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-archivo), var(--font-sans), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
+                  Keep sensitive data out of this page.
                 </h2>
                 <p className="member-line-sub">Never type raw SSN or card numbers here.</p>
               </section>
             </aside>
           </div>
         ) : (
-          <Alert className="border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300">
-            <AlertDescription>No onboarding checklist is available.</AlertDescription>
+          <Alert className="member-line-empty-card">
+            <AlertDescription>No onboarding items for your account.</AlertDescription>
           </Alert>
         )}
       </MemberLineShell>

@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-rep-b.css';
 
 type Period = 'week' | 'month' | 'year' | 'all';
 type Metric = 'totalPoints' | 'totalSales';
@@ -40,7 +42,7 @@ function countdownToSunday(now: Date) {
   return days > 0 ? `${days}d ${hours}h left` : hours > 0 ? `${hours}h left` : 'Under 1h left';
 }
 
-function ArenaMast({
+function LeaderboardFilters({
   period,
   metric,
   setPeriod,
@@ -52,42 +54,35 @@ function ArenaMast({
   setMetric: (metric: Metric) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b-[5px] border-[#0A1F44] pb-3 dark:border-[#8dc63f]">
-      <span className="font-['Trebuchet_MS'] text-[11px] font-black uppercase tracking-[0.2em] text-[#0A1F44] dark:text-[#f6f7f8]">
-        <span className="mr-2 inline-block size-3 align-[-1px] bg-[#8dc63f] dark:bg-[#d9a520] dark:shadow-[0_0_16px_rgba(245,215,128,0.5)]" aria-hidden="true" />
-        3C World Group / Arena
-      </span>
-      <div className="flex items-center gap-[18px] font-['Consolas'] text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#687384] dark:text-[#9caabd]">
-        <div className="flex items-center gap-2" aria-label="Leaderboard period">
+    <div className="portal-leaderboard-filters border-b border-[#0A1F44]/20 pb-4 dark:border-white/15">
+      <div className="portal-leaderboard-filter-row" aria-label="Leaderboard period">
           {periodOptions.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={period === option.value}
               onClick={() => setPeriod(option.value)}
-              className={`cursor-pointer transition-colors duration-150 ${period === option.value ? 'text-[#8dc63f]' : 'hover:text-[#8dc63f]'}`}
+              className="cursor-pointer transition-colors duration-150"
             >
-              {option.label.replace('This ', '')}
+              {option.label}
             </button>
           ))}
-        </div>
-        <span aria-hidden="true">·</span>
-        <div className="flex items-center gap-2" aria-label="Leaderboard metric">
+      </div>
+      <div className="portal-leaderboard-filter-row" aria-label="Leaderboard metric">
           {metricOptions.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={metric === option.value}
               onClick={() => setMetric(option.value)}
-              className={`cursor-pointer transition-colors duration-150 ${metric === option.value ? 'text-[#8dc63f]' : 'hover:text-[#8dc63f]'}`}
+              className="cursor-pointer transition-colors duration-150"
             >
               {option.label}
             </button>
           ))}
-        </div>
-        <span>· LIVE</span>
       </div>
-    </div>
+      <span className="portal-live-label">Live</span>
+      </div>
   );
 }
 
@@ -103,9 +98,9 @@ function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loa
   return (
     <div className="relative grid gap-3 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] py-4 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
       <div>
-        <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em] text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</span>
-        <span className="mt-2 block font-['Consolas'] text-[11px] font-black whitespace-nowrap text-white/85 sm:text-[12px]">
-          {loading || sales === null ? `-- / ${target} · Loading` : `${Math.min(sales, target)} / ${target} · ${countdownToSunday(now)}`}
+        <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</h2>
+        <span className="portal-display mt-2 block text-[12px] font-black whitespace-nowrap text-white/85">
+          {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${countdownToSunday(now)}`}
         </span>
         <span className="mt-2 block h-[3px] w-full bg-white/15" aria-hidden="true">
           <span
@@ -114,29 +109,28 @@ function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loa
           />
         </span>
       </div>
-      <strong className="font-['Trebuchet_MS'] text-[15px] font-black sm:text-[18px]">
-        {complete ? `Challenge complete · ${target} of ${target}` : `Close ${target} sales by Sunday`}
+      <strong className="portal-display text-[15px] font-black sm:text-[18px]">
+        {complete ? `Challenge complete. ${target} of ${target}` : `Close ${target} sales by Sunday`}
       </strong>
     </div>
   );
 }
 
 function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardEntry | null; userName: string; metric: Metric }) {
-  const rankAbove = userRank?.rank && userRank.rank > 1 ? userRank : null;
   const unit = metric === 'totalPoints' ? 'pts' : 'sales';
 
   return (
-    <aside className="min-h-[178px] w-full max-w-[280px] min-w-0 justify-self-end self-end border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
-      <span className="font-['Trebuchet_MS'] text-[10px] font-black uppercase tracking-[0.18em] text-[#8dc63f] dark:text-[#d9a520]">Your standing</span>
-      <div className="mt-[15px] flex w-fit items-baseline gap-[0.08em] font-['Trebuchet_MS'] text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.12em]">
+    <aside className="min-h-[178px] w-full min-w-0 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
+      <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Your standing</h2>
+      <div className="mt-[15px] flex w-fit items-baseline gap-[0.08em] portal-display text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.02em]">
         <small className="text-[0.4em] tracking-normal">#</small>
         {userRank?.rank ?? '—'}
       </div>
       <div className="mt-[17px] flex items-end justify-between gap-2.5 border-t border-white/35 pt-2.5">
         <strong className="truncate text-[14px]">{userName}</strong>
-        <span className="shrink-0 font-['Consolas'] text-[10px] whitespace-nowrap sm:text-[11px]">{formatNumber(userRank?.totalPoints ?? 0)} pts · {userRank?.totalSales ?? 0} sales</span>
+        <span className="portal-display shrink-0 text-[10px] whitespace-nowrap sm:text-[11px]">{formatNumber(userRank?.totalPoints ?? 0)} pts, {userRank?.totalSales ?? 0} sales</span>
       </div>
-      {rankAbove && <span className="sr-only">Metric: {unit}</span>}
+      <span className="sr-only">Metric: {unit}</span>
     </aside>
   );
 }
@@ -217,8 +211,6 @@ export default function LeaderboardPage() {
   const userRank = currentUser;
   const weeklyStanding = weeklyCurrentUser;
   const weeklySales = weeklyLoading ? weeklyStanding?.totalSales ?? null : weeklyStanding?.totalSales ?? 0;
-  const periodLabel = period === 'week' ? 'WEEK TO DATE' : period === 'month' ? 'MONTH TO DATE' : period === 'year' ? 'YEAR TO DATE' : 'ALL TIME';
-  const metricLabel = metric === 'totalPoints' ? 'POINTS' : 'SALES';
   const userName = userRank?.salesRepName ?? currentUser?.salesRepName ?? user?.displayName ?? user?.email ?? 'Your standing';
 
   return (
@@ -231,20 +223,16 @@ export default function LeaderboardPage() {
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%)] dark:bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%),#030916]" aria-hidden="true" />
             <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_42%,transparent_35%,rgba(0,0,0,0.46)_100%)] opacity-70 mix-blend-multiply dark:block" aria-hidden="true" />
             <div className="relative z-10 mx-auto w-full max-w-[1500px] px-[clamp(14px,3.6vw,56px)] pb-8 pt-[19px]">
-              <ArenaMast period={period} metric={metric} setPeriod={setPeriod} setMetric={setMetric} />
-              <header className="grid gap-[30px] border-b border-[#0A1F44] py-[46px] dark:border-[#e7edf4] lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-[clamp(30px,4%,48px)]">
-                <div className="min-w-0" style={{ containerType: 'inline-size' }}>
-                  <p className="font-['Trebuchet_MS'] text-[11px] font-black uppercase tracking-[0.2em] text-[#687384]">{periodLabel} / ranked by {metricLabel}</p>
-                  <h1 className="mt-[13px] mb-[17px] whitespace-nowrap font-['Trebuchet_MS'] text-[clamp(2.5rem,15.5cqw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.115em] text-[#0A1F44] dark:text-[#f6f7f8] dark:[text-shadow:0_0_26px_rgba(255,255,255,0.07)]">Leaderboard</h1>
-                  <p className="max-w-[520px] text-[15px] leading-[1.45] text-[#687384]">A scoreboard for the people making the number move. The lead is visible.<br className="hidden sm:block" /> The next opportunity is yours.</p>
-                </div>
+              <PageTitle title="Leaderboard" meta={`${leaderboard.length} ranked`} />
+              <LeaderboardFilters period={period} metric={metric} setPeriod={setPeriod} setMetric={setMetric} />
+              <div className="portal-leaderboard-summary-grid">
+                <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} target={challengeTarget} />
                 <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
-              </header>
-              <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} target={challengeTarget} />
+              </div>
 
               {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
-              <div className="pt-11">
+              <div className="pt-4">
                 {loading || !user ? <BoardSkeleton /> : <LeaderboardTable entries={leaderboard} currentUser={currentUser} metric={metric} period={period} />}
               </div>
             </div>

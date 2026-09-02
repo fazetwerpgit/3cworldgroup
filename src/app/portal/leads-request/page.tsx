@@ -1,19 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import {
   FormsLineAlert,
   FormsLineChoicePicker,
   FormsLineControl,
   FormsLineActions,
-  FormsLineFormHeader,
   FormsLineIdentity,
   FormsLineRail,
   FormsLineSection,
   FormsLineShell,
   FormsLineSuccess,
 } from '@/components/forms/FormsLine';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-leftovers.css';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
@@ -78,8 +80,11 @@ export default function LeadsRequestPage() {
   return (
     <ProtectedRoute>
       <FormsLineShell>
-        <section className="forms-line-fill" aria-labelledby="leads-request-title">
-          <FormsLineFormHeader title="Leads Request" lane="04" />
+        <section className="forms-line-fill" aria-label="Leads Request">
+          <PageTitle
+            title="Leads Request"
+            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
+          />
           {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
           <div className="forms-line-fill-body">
             <div>
@@ -123,7 +128,7 @@ export default function LeadsRequestPage() {
                     required
                   />
                 </FormsLineSection>
-                <FormsLineSection index={2} title="Choose the route">
+                <FormsLineSection index={2} title="Request details">
                   <FormsLineChoicePicker
                     name="category"
                     label="Category"
@@ -207,7 +212,7 @@ export default function LeadsRequestPage() {
                 />
               )}
             </div>
-            <FormsLineRail status="Ready for lead review" note="The selected route keeps the conditional handoff precise." />
+            <FormsLineRail status="Ready for lead review" note="Your choices show the team what help is needed." />
           </div>
         </section>
       </FormsLineShell>

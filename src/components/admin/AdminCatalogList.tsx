@@ -1,6 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-b.css';
 
 /**
  * Shared "manage a list of things" anatomy for the Admin Management redesign
@@ -16,12 +18,8 @@ interface AdminCatalogCategoryOption {
 }
 
 interface AdminCatalogListProps {
-  kicker: string;
-  heroAccent: string;
-  heroPlain: string;
-  intro: string;
-  heroCount: number;
-  heroCountLabel: string;
+  title: string;
+  meta?: string;
   search?: {
     value: string;
     onChange: (value: string) => void;
@@ -46,44 +44,28 @@ interface AdminCatalogListProps {
   children: ReactNode;
 }
 
-export function AdminCatalogList({
-  kicker,
-  heroAccent,
-  heroPlain,
-  intro,
-  heroCount,
-  heroCountLabel,
-  search,
-  categoryFilter,
-  toolbarExtra,
-  loading,
-  loadingLabel = 'Loading records...',
-  error,
-  success,
-  isEmpty,
-  isFilteredEmpty,
-  emptyTrue,
-  emptyFiltered,
-  gridClassName = 'admin-line-catalog-grid',
-  children,
-}: AdminCatalogListProps) {
+export function AdminCatalogList(props: AdminCatalogListProps) {
+  const {
+    title,
+    meta,
+    search,
+    categoryFilter,
+    toolbarExtra,
+    loading,
+    loadingLabel = 'Loading records...',
+    error,
+    success,
+    isEmpty,
+    isFilteredEmpty,
+    emptyTrue,
+    emptyFiltered,
+    gridClassName = 'admin-line-catalog-grid',
+    children,
+  } = props;
   return (
     <div className="admin-line-main">
       <div className="admin-line">
-        <header className="admin-line-hero">
-          <div>
-            <div className="admin-line-kicker">{kicker}</div>
-            <h1>
-              <span className="accent">{heroAccent}</span>
-              <span className="plain">{heroPlain}</span>
-            </h1>
-            <p className="admin-line-intro">{intro}</p>
-          </div>
-          <div className="admin-line-hero-count">
-            <span className="admin-line-display portal-metallic-num">{heroCount}</span>
-            <small>{heroCountLabel}</small>
-          </div>
-        </header>
+        <PageTitle title={title} meta={meta} />
 
         {(search || categoryFilter || toolbarExtra) && (
           <div className="admin-line-catalog-toolbar">
@@ -139,7 +121,7 @@ export function AdminCatalogList({
             {isEmpty && isFilteredEmpty && (
               <div className="admin-line-quiet-empty" style={{ display: 'block' }}>
                 <strong>{emptyFiltered.title}</strong>
-                {emptyFiltered.body}
+                <p>{emptyFiltered.body}</p>
                 {emptyFiltered.action}
               </div>
             )}
@@ -147,7 +129,7 @@ export function AdminCatalogList({
             {isEmpty && !isFilteredEmpty && (
               <div className="admin-line-empty-state" style={{ display: 'block' }}>
                 <strong>{emptyTrue.title}</strong>
-                {emptyTrue.body}
+                <p>{emptyTrue.body}</p>
                 {emptyTrue.action}
               </div>
             )}
@@ -196,8 +178,9 @@ export function AdminConfirmStrip({
 }
 
 interface AdminCatalogCardProps {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
+  summaryDescription?: string;
   statusLabel?: string;
   statusTone?: 'lime' | 'muted';
   subject?: string;
@@ -213,6 +196,7 @@ interface AdminCatalogCardProps {
 export function AdminCatalogCard({
   eyebrow,
   title,
+  summaryDescription,
   statusLabel,
   statusTone = 'muted',
   subject,
@@ -223,28 +207,40 @@ export function AdminCatalogCard({
   actions,
   confirmStrip,
 }: AdminCatalogCardProps) {
+  const description = summaryDescription || subject || preview || metaLeft || 'Open to view details.';
   return (
-    <article className="admin-line-catalog-card">
-      <div className="admin-line-catalog-top">
-        <div>
-          <div className="admin-line-eyebrow">{eyebrow}</div>
-          <h3>{title}</h3>
-        </div>
-        {statusLabel && (
-          <span className={`admin-line-chip ${statusTone === 'lime' ? 'lime' : ''}`}>{statusLabel}</span>
-        )}
+    <section className="admin-line-catalog-card">
+      <div className="admin-line-catalog-summary">
+        <span className="admin-line-catalog-summary-copy">
+          <h3 className="admin-line-catalog-summary-title">{title}</h3>
+          <span className="admin-line-catalog-summary-description">{description}</span>
+        </span>
       </div>
-      {subject && <p className="subject">{subject}</p>}
-      {preview && <p className="preview">{preview}</p>}
-      {extra}
-      {(metaLeft || metaRight) && (
-        <div className="admin-line-catalog-meta">
-          <span>{metaLeft}</span>
-          <span>{metaRight}</span>
-        </div>
-      )}
-      <div className="admin-line-catalog-actions">{actions}</div>
-      {confirmStrip}
-    </article>
+      <div className="admin-line-catalog-detail">
+        {(eyebrow || statusLabel) && (
+          <div className="admin-line-catalog-top">
+            {eyebrow && (
+              <div>
+                <span className="admin-line-catalog-category">{eyebrow}</span>
+              </div>
+            )}
+            {statusLabel && (
+              <span className={`admin-line-chip ${statusTone === 'lime' ? 'lime' : ''}`}>{statusLabel}</span>
+            )}
+          </div>
+        )}
+        {subject && <p className="subject">{subject}</p>}
+        {preview && <p className="preview">{preview}</p>}
+        {extra}
+        {(metaLeft || metaRight) && (
+          <div className="admin-line-catalog-meta">
+            <span>{metaLeft}</span>
+            <span>{metaRight}</span>
+          </div>
+        )}
+        {actions && <div className="admin-line-catalog-actions">{actions}</div>}
+        {confirmStrip}
+      </div>
+    </section>
   );
 }

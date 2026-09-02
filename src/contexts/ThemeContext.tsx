@@ -18,29 +18,44 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = '3c-theme';
 
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'system';
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
+  } catch {
+    // Fall through to the device-size default when storage is unavailable.
+  }
+
+  return window.matchMedia('(max-width: 767px)').matches ? 'dark' : 'system';
+}
+
+function getInitialSystemDark() {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Scoped to the portal: the `dark` class lives on the wrapper below (not <html>),
   // so the public marketing site is never affected. Default follows the DEVICE
-  // setting ('system'); an explicit choice in Settings overrides and persists.
-  // Server renders light; the real preference is applied on mount.
+  // setting ('system') on desktop; phones start dark until the user makes an
+  // explicit choice in Settings, which overrides and persists as before.
+  // Server renders light; the real preference is applied on mount (a lazy
+  // initializer would make the server and first client render differ).
   const [theme, setThemeState] = useState<Theme>('system');
   const [systemDark, setSystemDark] = useState(false);
 
   useEffect(() => {
-    const stored = (typeof localStorage !== 'undefined'
-      ? localStorage.getItem(STORAGE_KEY)
-      : null) as Theme | null;
-    if (stored === 'dark' || stored === 'light' || stored === 'system') {
-      // Restoring after mount (not via lazy initializer) keeps the server and
-      // first client render identical, avoiding a hydration mismatch.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setThemeState(stored);
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setThemeState(getInitialTheme());
+    setSystemDark(getInitialSystemDark());
 
     // Track the device preference live so 'system' mode follows OS switches
     // (e.g. phones that go dark at sunset) without a reload.
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    setSystemDark(mq.matches);
     const onChange = (event: MediaQueryListEvent) => setSystemDark(event.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);

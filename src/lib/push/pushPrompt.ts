@@ -3,7 +3,7 @@
 // project's DOM-less Vitest environment, leaving the component a thin shell.
 
 export const PUSH_PROMPT_SNOOZE_KEY = '3c-push-prompt-snoozed-at';
-export const PUSH_PROMPT_SNOOZE_DAYS = 14;
+export const PUSH_PROMPT_SNOOZE_DAYS = 30;
 
 const SNOOZE_MS = PUSH_PROMPT_SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 

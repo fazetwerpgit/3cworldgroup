@@ -3,18 +3,1050 @@
 This file is auto-injected at session start. Resume the "NEXT ACTION"
 immediately; do not ask the user to re-explain or to point you at docs.
 
-Updated: 2026-08-25 (update at EVERY milestone).
+Updated: 2026-09-02 (update at EVERY milestone).
+
+## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
+
+NEXT ACTION: UX sweep fixes are IMPLEMENTED, gates green (tsc, vitest
+859/859, next build), NOT committed. Jacob is reviewing the before/after
+page (artifact "Sweep Fixes Review"). On his OK: commit ONLY the portal
+files (src/app/portal/**, src/components/{portal,admin,forms,resources,
+training,sales,chat,leaderboard,onboarding,auth/SignupForm.tsx}, src/contexts/
+ThemeContext.tsx, src/lib/push/pushPrompt*, src/styles/*, src/app/globals.css
+font-only diff, docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md,
+this file) — the public-site dirty files (src/app/{about,apply,contact,
+culture,opportunities,services,page,layout}.tsx, Footer/Navbar/PageWrapper,
+package*.json, *.module.css, src/components/public, public/redesign) belong
+to the separate redesign track and must NOT go in this commit. Then push
+master + verify on https://www.3cworldgroup.com. If he wants changes: the
+spec is docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md;
+shared header src/components/portal/PageTitle.tsx (+ src/styles/page-title.css);
+per-area CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
+What shipped: PageTitle on all 27+ pages, mastheads/eyebrows/numbering/
+slogans removed, plain copy; push prompt inline on dashboard only (30-day
+snooze) + A2HS one-at-a-time + header bell dot; More sheet = "Menu" without
+bar duplicates; phone-only dark default (ThemeContext, nothing stored ->
+dark at <=767px); font stacks normalized (Archivo headings, SF Mono/Menlo
+mono, no Windows-only faces, letter-spacing >= -0.02em) = the "text isn't
+straight" fix; onboarding crash guarded; admin destructive actions moved into
+person views behind confirm. QA bot qa-e2e-1@3cworldgroup.test (uid
+ROZ9ZiuDciRxcTmeyT344NXBpah2, role cleared back to undefined) still exists in
+prod; delete when done testing. Dev server on :3000 may still be running.
+Jacob still owes: tell managers code `3cteam` + URL 3cworldgroup.com/login;
+DELETE bot account in Pending.
+
+DONE 2026-09-02: team-code signup gate + easy login path LIVE on production
+(master 83a4329, Vercel Ready, verified on https://www.3cworldgroup.com —
+note apex 307s to www, always test prod on www). /login, /signin, /employee
+308 -> /portal; POST /api/portal/auth/team-code wrong -> ok:false, 3CTEAM ->
+ok:true; signup page serves new copy. PORTAL_TEAM_CODE in Vercel (all envs)
++ .env.local. iOS Safari add-to-home-screen banner on dashboard (unit-tested,
+not yet eyeballed on a real iPhone — Jacob can confirm). Spec/plan under
+docs/superpowers/{specs,plans}/2026-09-01-signup-team-code-and-login-path*.
+
+DONE this session (all verified):
+- reCAPTCHA v3 signup gate LIVE in production (commit 34634bc on master).
+  Invisible; route /api/portal/auth/captcha rejects bogus tokens ({"ok":false}
+  verified on prod). Keys in Vercel (all envs) + .env.local. Blocks the spam
+  signups Jacob complained about; one bot account "CwPNROOVkyBFcfPUtb"
+  (z.u.sa.d.a.d.u.d.ey.96@gmail.com) still in Pending queue — Jacob to DELETE.
+- Google Sheet live-sync of job applications LIVE in production (commit
+  d1acafd on onboarding/completion, cherry-picked to master as 86fc866,
+  pushed by Jacob, Vercel deploy Ready, temp worktree cleaned). Sheet
+  "3C Applicants"
+  id 1-4Z_-0hYHOsgFuOJCpIa7aLKOf8QnTxQkRfuqppAk8o, created/shared by Jacob with
+  the firebase-admin SA + jeremymcfarlandservices@gmail.com +
+  wteasdale@3cworldgroup.com (Will) + coldsaint5343@gmail.com (Noah).
+  Backfilled all 37 applicants (verified by reading rows back). Sheets+Drive
+  APIs now ENABLED on project cworldgroup-cca68. APPLICATIONS_SHEET_ID set in
+  Vercel (all envs) + .env.local. New submissions append via
+  src/lib/sheets/applicationsSheet.ts (never throws; silent no-op if env unset).
+- Answered: Jeremy (owner role) can self-serve rep info (incl. vaulted SSN/DL
+  with audited reveal) at Portal → Admin → People → person record.
+
+Facts: Jeremy=jeremymcfarlandservices@gmail.com, Will=wteasdale@3cworldgroup.com,
+Noah=coldsaint5343@gmail.com (internal_rep; no Will user record in Firestore).
+Classifier blocks (cannot whitelist): bulk-PII exports to Drive/MCP, sharing
+files to external emails — have Jacob do those by hand. `.env.example` is
+gitignored. Video track: six recruiting-ad variants + v3 all sent; awaiting
+Jacob's picks (projects in ~/dev/3c-videos/recruiting-ad-*).
+
+## CURRENT PUBLIC-SITE VISUAL HANDOFF
+
+Standing user rule: do not overengineer or over-test. At 1440px, measurable edges,
+centers, baselines, dividers, and spacing must stay within 1 CSS pixel of the locked
+crop. Use one measurement pass, the smallest direct fix, and one optimized capture;
+re-run only a failed check. Freeze components inside the 1px bound and do not chase
+subpixel RMSE or font-antialiasing noise.
+
+LATEST PUBLIC-SITE STATE (2026-09-02; supersedes the older chronology below):
+Home and About are approved/frozen. Jacob's verbatim About R11O verdict is
+`Approve`. Accepted board: `docs/redesign/qa/visual-remediation-2026-08-26/
+round16/about-round3-rejection-audit/about-round3-r11o-target-current-review.png`;
+independent production build `s1f6xgkwruZrBHBkLdabO` and exact 1440 runtime
+invariants pass. Do not reopen About.
+
+CURRENT PAGE/ROUND: Culture Round 1. NEXT ACTION: resolve the locked 1440 Culture
+source, capture the current optimized-production route once, create same-size
+section comparisons, then dispatch one measured consolidated Culture-only Luna
+correction. Shared shell, Home, and About remain read-only. Use the 1px/no-
+overengineering rule; no commit or deploy. Port 3100 is stopped.
+
+CURRENT MILESTONE (supersedes the older Home chronology below): Home is approved
+and frozen. Jacob rejected About Round 2 R11. Root audited it, dispatched About
+Round 3 R1, and captured one optimized production render. R1 failed the visual
+crop gate. R2's scoped CSS correction and lower circuit group are source-approved
+and frozen. Root accepted and installed the exact binary-mask semantic path in
+`public/redesign/about-topology.svg`; candidate/product SHA is `e4836056...`,
+`cmp` and diff-check pass, and root personally accepted
+`/tmp/about-topology-r2f-source-on-white.png`. Independent Luna passed exactly
+`npx tsc --noEmit` and `npm run build` once each, and root made one optimized
+1440 capture. Structure remains exact, but root rejects all four reviewed bands.
+The same About Luna implemented R3 in only About CSS and the existing route path.
+Diff-check, independent `npx tsc --noEmit`, independent production build, and one
+optimized 1440 capture completed. Structure and topology SHA remain exact, but
+root internally rejects R3. The same Luna session completed R4, its scoped
+diff-check passed, and the independent verifier passed exactly one typecheck and
+one production build. Root made one optimized 1440 capture and stopped port
+3100. Structure/topology remain exact; Mission passes and Values/Leadership are
+inside 1px. Root internally rejects only Audience. The same About Luna completed
+the R5 Audience-only CSS correction, independent gates passed, and root made one
+optimized capture. R5 bodies/ticks and most geometry pass, but root internally
+rejects four residual declarations. The same About Luna completed R6, independent
+gates passed, and the optimized capture proves Audience is inside 1px. Freeze it.
+The fresh full board exposed a CTA title-only failure. The same About Luna applied
+exactly its two R7 text transforms; diff-check, independent typecheck/build, one
+optimized capture, CTA measurement, and full root review passed. Jacob rejected
+R7 for exactly three reasons: Mission/map background mismatch, incorrect bottom
+CTA/footer band, and Values text beneath Connection/Community/Commitment. The
+same About Luna completed the direct CSS-only R8 correction, and the independent
+typecheck/build passed. Root's one optimized R8 capture accepts and freezes Mission.
+It found only two residuals: Commitment wrapped on the wrong words, and the About
+CTA background lost to the more-specific shared ending-surface rule. R8A fixes both.
+The independent verifier passed exactly one typecheck and production build. Root's
+one optimized 1440px capture preserves the exact 2802px document and all section/
+shell invariants; runtime proves the CTA background now renders at `100% 100%` and
+all nine Values lines are locked blocks. Root reviewed Values/CTA and the fresh full
+board top-to-bottom, but Jacob rejected it for one item only: `Reject. The bottom
+where it says join the 3c team is all fucked up & bold`. Freeze every other region.
+Root measured passing target/current title geometry `288x33`/`287x33` but current ink
+is about 2.2x heavier. Production requests Bebas Neue 800 while only weight 400 is
+loaded, causing synthetic bold. The same About Luna completed R8B by adding only
+`font-weight:400!important` to the existing About CTA title selector. Root read it
+back; scoped diff-check passes and topology SHA remains exact. NEXT ACTION: the
+independent gates and one R8B capture passed structurally, but root internally rejects
+the title: Bebas 400 is still too heavy at `285x31`/ink `0.513639`. A direct runtime
+test of the existing AboutCondensed regular face produced exact `288x33`, x exact,
+y 1px high, and near-target ink `0.273253`. The same About Luna completed R8C by
+changing only the title family to AboutCondensed regular and transform to
+`translate(2.2px,-5px) scale(.858,.650)`, retaining weight 400. Independent gates
+passed once each. The final production title target/current masks are exactly
+`288x33+44+11` / `288x33+44+11`, with near-target thin ink `0.286932` / `0.273253`.
+Root's R8C approval is void. Jacob rejected it on 2026-09-01 because the font is
+wrong across the page and instructed root to inspect the locked About mockup against
+the render top-to-bottom without requiring him to enumerate the residuals. Matching
+the CTA title box and ink density did not prove matching glyph shapes. NEXT ACTION:
+R10C is user-rejected with the verbatim verdict `reject.` The former root pass is
+void because it rechecked only the prior four reported issues while original-resolution
+target/current evidence still shows visible drift in all six About sections. R11 is
+active under the 1px/no-overengineering rule. Root has re-opened the full R10C board,
+all six section pairs, and same-size difference images and identified one consolidated
+About file-set correction covering Hero; Mission/map/topology; Values rings/glyphs/
+route/text; Leadership; both Audience columns; and the closing CTA. NEXT ACTION:
+dispatch `docs/redesign/qa/visual-remediation-2026-08-26/round16/
+about-round3-rejection-audit/ROUND3-R10C-USER-REJECT-R11-CONSOLIDATED-SPEC.md`
+to existing About Luna session `01a058f4-a3c0-72f1-b390-df30cd1be864`, then root
+reviews only the returned diff before independent typecheck/build and one optimized
+1440 capture. Home/shared shell stay frozen; topology SHA is unchanged; port 3100 is
+stopped; no commit or deploy.
+
+The authoritative continuation document for the active seven-page visual-fidelity
+loop is now `docs/redesign/HANDOFF.md`. Jacob rejected Home Round 3 on 2026-08-30
+with the verdict `reject home everything is looking different it is not 1:1`.
+Home Round 4 is active. The first optimized-production crop gate BLOCKED both
+prior static-accepted lanes. The shared shell remains first in the same Luna
+session `01a05410-57e8-7780-ab33-d966c6242e6d`; Corrections 22H-A, 22I, 22J, 22K, 22K-B, 22K-C, 22K-D, 22L-A, and 22M are rejected,
+while micro-corrections 22K-A, 22K-C-restore, 22L-B, and 22M-restore pass. Correction 22L-B
+moved only the Employee Login icon 2px left; its target/current boxes are
+`1067,45..1210,65` / `1067,45..1209,65`, header RMSE improved to `0.110858`,
+and all gates passed. The entire header is frozen under the 1px rule.
+`public/redesign/home-footer-topo.svg`, and only the locked copy correction in
+`src/components/Footer.tsx`. Correction 22B optimized build
+`joW7iMlggxsm4yG6tMkHH` preserved the required shell/document invariants and used
+a method-compliant target-derived vector trace, but both worker and root audits
+failed typography and topology. Root reproduced header RMSE `0.114950`,
+closing-band RMSE `0.135520`, and footer-only RMSE `0.113073`; review
+`/tmp/home-c22d-shell-{header,footer}-pair.png` and
+`/tmp/home-c22d-footer-only-pair.png`. Its 69-fragment 1% edge trace is visibly
+sparse and contains false-positive text edges. Correction 22C must use the
+authoritative 1440x217 closing band, lower target-derived thresholding, complete
+text/logo/CTA/copyright/legal masks, observed near-horizontal component filtering,
+and a visual isolated-topology comparison. Procedural formulas and raster embedding
+remain forbidden. Correction 22D produced a new 792-polyline target-derived SVG and
+build `kjm2LFDvvxfK7rUOrnIV5`, but root rejected its horizontal scribbles and
+glyph-like fragments; closing/footer RMSE regressed to `0.135533` / `0.113093`.
+Correction 22E graph adjacency was valid and header RMSE improved to `0.113687`,
+but it skipped rows 0..44 and retained only 6,097 of 26,307 skeleton pixels.
+Root rejected the almost-empty dotted field; closing/footer RMSE regressed to
+`0.135549` / `0.113112`. Use `/tmp/home-c22e-{header,closing,footer}-pair2.png`.
+Correction 22F serialized every adjacent edge from its latest skeleton, but the
+source mask was still visually wrong: broken/speckled curves, missing contour
+fields, rectangular erased regions, and regressed typography. Its rejected pairs
+are `/tmp/home-c22f-{header,closing,footer}-pair4.png` plus
+`/tmp/c22f-topology-pair2.png`; RMSE is `0.114744` / `0.139195` / `0.119306`.
+Correction 22G restored the 22E CSS baseline and improved header RMSE to `0.113446`,
+but root still rejects the broken/speckled topology and footer typography; closing
+and footer-only remain `0.135509` / `0.113068`. Correction 22H is using the
+contract-permitted genuine-artwork route. Correction 22H-A now has a decorative-only
+1440x217 PNG and semantic four-line copy spans, but root rejects its opacity-0.5
+production result: header `0.113446`, closing `0.135665`, footer `0.112680`.
+Correction 22I proved opacity 1.00 is least-bad, but its final header/closing/footer
+RMSE remained `0.113446` / `0.135546` / `0.112511`. Exact footer-box transforms and
+an Apply-content shift regressed and were reverted. The tighter artwork retained
+readable glyph ghosts and was rejected; the safe broad-mask asset was restored.
+Correction 22J retained brand weight 675, improving header RMSE to `0.110921`, but
+nav/Apply paint still differs and closing/footer stayed `0.135546` / `0.112511`.
+Its 78.4236%-preservation art test retained obvious UI ghosts and is rejected.
+Correction 22K-A calibrated the footer wordmark to `left:-1px; top:0; scaleX(.998)
+scaleY(1.05)`, improving footer-only to `0.105912` and closing to `0.129941`.
+Freeze it. Correction 22K-B aborted after blue/edge extraction stayed sparse or ghosted.
+Correction 22K-C's composited asset retained UI/seams and was rejected; restore returned
+the clean asset to SHA `d9ad81b8…` and exact baseline. Root separately confirmed
+`/tmp/c22kc-generated-band.png` is UI-free continuous artwork, but Correction 22K-D's
+single production test regressed closing/footer-only RMSE to `0.130028` / `0.106058`.
+The worker restored clean asset SHA `d9ad81b8…` and exact baseline `0.110921` /
+`0.129941` / `0.105912` in build `PmMGYzOPpZkpfZig4Uo7f`; port 3100 is stopped.
+Correction 22M's only weight-700 test regressed closing/footer-only RMSE to
+`0.130937` / `0.107384`; exact rollback restored inherited weight 800. Correction
+22N then installed the already-existing clean dense contour band, SHA `0a9f9999…`.
+Root accepted its visibly closer art direction under the new rule without chasing the
+prior `0.0001` diagnostic RMSE noise. Build `Vsr3YVPG_AwGkliKWMzbK` passes with
+header/closing/footer diagnostic RMSE `0.110858` / `0.130028` / `0.106058` and all
+shell invariants exact. The shared shell is now frozen and passed.
+Freeze nothing until the optimized crop passes.
+Preserve the exact 108px/172px shell heights, 3043px document height, section bands,
+shell anchors, and all 22 footer anchors. The Home page session
+`01a0541d-cfd2-74e1-bbdc-af51d91897e7` remains visually rejected after
+optimized build `Ctf0yDs1pbGyujt_eecwL`. Use the authoritative r7 evidence in
+`/tmp/home-r4-prod-crops-aligned-r7/`,
+`/tmp/home-r4-review-pairs-aligned-r7/`, and
+`/tmp/home-r4-diffs-aligned-r7/`. The difference gate shows material drift in
+every page crop, so the old page-geometry freeze is superseded. The exact hero
+art source is the 403x489 isolated fragment; the v2 2x file is a different
+recreation. Root accepted `public/redesign/home-r8-hero-art.png`, a deterministic
+Lanczos 4x preservation upscale at 1612x1956 with exact composition and
+round-trip RMSE `460.808 (0.00703147)`. After the shell passes, return the
+complete r7 crop/diff failures plus this accepted asset to the same page Luna.
+Versioned market photos remain exact; page text/icon/connector geometry does not.
+Show
+exactly one fresh board only after every item passes internally.
+The shared shell, Hero, Open Markets, Clear Path, Join Panels, and Why Sales Pros
+now pass and are frozen. Why Correction 11 build `1xguIaJQ_X9CbPNKdkWkz` uses
+semantic even-odd SVG traces only; root measured handshake target/current
+`78x57 / 78x58` and U.S. `91x62 / 92x63`, both inside the 1px bound with matching
+art direction. Continue with only `6-get-started.png`; do not reopen frozen crops.
+Follow that handoff before the older historical visual-loop notes below. A read-only source inventory on
+2026-08-30 recovered the locked full-page source for every remaining page and
+recorded the exact paths in `docs/redesign/HANDOFF.md`; none of those six pages
+currently has a contract-compliant original-detail per-section crop set.
 
 ## NEXT ACTION
 
-PUBLIC-SITE DESKTOP 1:1 REMEDIATION GOAL ACTIVE: Jacob explicitly requested a
-Luna implementation -> independent Sol validation -> Luna remediation loop
-until all seven locked desktop routes are accepted at 1440 px. The active goal
-is to recreate the locked desktop compositions literally while preserving the
-already-working responsive/mobile behavior and core interactions. Do not stop
-at directional similarity or code-gate success. Each route requires a fresh
-same-viewport source/render comparison board and explicit Sol acceptance; any
-failed route returns to Luna with the visible differences as its fix list.
+REDESIGN: Home is approved and frozen. About Round 3 R8C is user-rejected because its
+font treatment and other visible page details do not match the locked mockup. NEXT:
+root audits About top-to-bottom at original detail, then dispatches the smallest
+crop-grounded correction round to the existing About Luna under the 1px/no-
+overengineering rule. Do not commit or deploy.
+
+VIDEO: ALL SIX EXTREME VARIANTS SENT 2026-08-31 (~13:20), AWAITING PICKS.
+Projects: ~/dev/3c-videos/recruiting-ad-{terminal,poster,cinema,mosaic,
+duotone,collage} — each 21s 9:16, same VO/beat map (TIMING.md in each),
+built by Luna workers from BRIEF-VARIANT.md, reviewed+fixed, check 0/0,
+rendered. Stock: 12 Mixkit 720p clips in stock-pool/clips + per-project
+media/clips (CLIPS.md manifests; mixkit.co rate-limits hard, only first
+3 SSR items per tag page; Pexels curl-blocked). AI stills reused across
+variants. See memory codex-exec-sandbox for worker launch flags (default
+sandbox is READ-ONLY) + /tmp cache pitfall. NEXT: Jacob picks winner(s);
+then likely BGM bed (/media-use + /hyperframes-audio), hook variants, or
+customer-facing fiber ad.
+
+Earlier: v3 (backdrops) of base recruiting-ad sent 2026-08-30.
+Jacob's v2 verdict: "too simplistic" — asked for /openai-image-gen
+supporting assets. v3 adds five generated duotone scene backdrops
+(media/images/s1..s5, prompts in media/prompts/) composited as a
+crossfading full-bleed layer under the type (seam-synced fades, per-scene
+Ken Burns drift, bd-scrim for legibility; data-layout-allow-overflow on
+.bd imgs). Check passes, contrast 13/13 AA; render:
+renders/recruiting-ad_2026-08-30_14-07-45.mp4, sent 14:08.
+Impeccable dark-glow finding on index.html = false positive (brand video
+art direction), left unsuppressed.
+
+REDESIGN: Home Round 4 shared shell passes after 22N in build
+`Vsr3YVPG_AwGkliKWMzbK`; freeze it completely. Resume Home page session
+`01a0541d-cfd2-74e1-bbdc-af51d91897e7` with the full r7 evidence and accepted r8
+hero asset, but correct one crop at a time under the 1px/no-overengineering rule.
+Start with Hero and keep all six later Home sections frozen during that round.
+Hero Correction 1 is rejected: `/tmp/home-r4-hero-c1-pair.png` shows material
+imagery/crop and heading drift, and `src/app/page.tsx` still references the
+rejected `home-environment-hero-v2-2x.png` rather than accepted
+`home-r8-hero-art.png`. Its capture retained the exact document and section
+bands. Resume the same page Luna for one direct Hero-only correction, then run
+only the single optimized capture and required narrow gate.
+Hero Correction 2 build `zgMJuyVVQWr_qkf37TYYC` installed r8 and retained every
+route invariant, but still fails: the art is 1169px wide because 81.2% was
+applied to the full 1440px plane instead of the required approximately 831px
+right-aligned render. The vertically aligned title line 1 is about 24px too
+narrow and line 2 needs nested-scale compensation. Send only these two direct
+CSS values back to the same worker; no new search or broad test.
+Hero Correction 3 build `dy93828x8CB8fzV94D32R` retained all invariants and
+fixed the primary 831px render/title line 1, but the original overlay still
+fails. The locked art is a two-layer composite of the same genuine r8 image:
+831px right-aligned primary plus a filtered .42-opacity duplicate translated
+-368px/scaled 1.03, with horizontal/bottom navy gradients. Target/current
+visual text boxes and exact deltas are recorded in `docs/redesign/HANDOFF.md`.
+Return this one consolidated Hero correction to the same worker; freeze CTA
+rectangles and every later section.
+Hero Correction 4 build `LTJIKK4BKFZGnLChLKIf2` retained invariants and all
+measured Hero text/CTA boxes now pass within 1px; freeze them. Its art still
+fails because 831px came from a rejected reconstruction. The exact 863x1823
+locked source and literal `403x489+460+65` art crop prove the correct 1440
+primary transform: 672.445x815.944, right aligned, top .459px. Apply only that
+art transform plus a clipped 177px lower-left triangular extension from the
+same genuine art; no text/CTA or later-section change.
+Hero Correction 5 build `pnio2RyJAOjdtcBLvWr3T` retained the exact shell and
+all seven section bands. Its 672.445x815.944 primary road/node artwork now
+aligns, and text/CTAs remain frozen, but the duplicated lower-left wedge has the
+wrong U.S. map continuation and a visible vertical join. Resume the same Luna
+for one art-only Correction 6: make a deterministic 1:1 genuine-art extraction
+from the locked Hero crop x590..1439/y108..925, alpha-mask it to the area right
+of the diagonal seam (about local x152 top to x4 bottom), preserve the live
+semantic text/CTAs and exact CSS seam, and remove the superseded duplicate and
+double color overlays. The raster must contain artwork only: no typography,
+buttons, header, footer, or whole section. Run one build/capture and review only
+the Hero pair under the 1px rule.
+Hero Correction 6 build `au-A0Is2tMd-xJYaz3UmI` retained every DOM invariant
+but is rejected before geometry review: the r9 masking command painted the kept
+polygon opaque white (`srgba(255,255,255,1)`) instead of preserving the crop RGB
+and attaching alpha. Resume the same Luna for mechanical asset-only Correction
+7: rebuild the identical 510x489+353+65 Lanczos 4x crop, make a separate black
+2040x1956 mask with white polygon `368,0 2040,0 2040,1956 12,1956`, and compose
+that mask with `CopyAlpha`. Do not touch CSS or any other file. Run the single
+required production build/capture, then review only the Hero pair.
+Hero Correction 7 build `3oYNZu2-Gs10hIwEjfsq1` passes. The corrected sRGBA
+asset retains real source RGB in the kept region and alpha 0 outside; the
+target-left/current-right pair and overlay align the road/node landmarks,
+diagonal boundary, and true U.S. map continuation without a vertical join.
+All Hero text/CTA geometry remains inside 1px, and every DOM invariant is exact.
+Freeze the entire Hero and `home-r9-hero-art.png`. NEXT: measure only the locked
+`2-open-markets.png` crop against `/tmp/home-r4-hero-c7-sections/2-open-markets.png`,
+then send one smallest direct Open Markets correction to the same page Luna.
+Open Markets is now measured once. Pair:
+`/tmp/home-r4-open-markets-r1-pair.png` target-left/current-right; overlay:
+`/tmp/home-r4-open-markets-r1-overlay.png`. Freeze all five 165x190 photo slots,
+5px green rules, exact x/y positions and 27px gaps, two-column layout, field,
+and versioned photos. Correct only typography/rhythm: eyebrow, title, CTA, market
+names and states are too wide; heading/body/CTA are about 5-6px low. Add the
+soft locked bottom transition around y384-390 without changing the accepted
+391px section boundary or downstream bands. One CSS patch/build/capture only.
+Open Markets Correction 1 build `xxo26FGWbx-g5jIAG6hsr` keeps every invariant;
+the photo/card geometry and soft bottom transition now pass and are frozen.
+Remaining target/current text boxes: eyebrow 187x17/126x15; heading
+281x94/283x87 and about 4px low; intro 319x47/279x40 and about 4px low; CTA
+197x18/204x11 and about 3px low. Send only the recorded direct transforms from
+HANDOFF plus caption sizes 19px names/17px states, with existing line boxes and
+y origins unchanged. No new measurement, photo/transition edit, or other crop.
+Open Markets Correction 2 build `iti7BUas3i5r9mVv4fAz7` retains invariants but
+fails because the color-fuzz boxes overcorrected eyebrow/CTA. The final clean
+grayscale target/current boxes and exact six current-to-target transforms are
+recorded in HANDOFF. Send only those transforms, keeping current font/line/margin
+tokens and every photo/transition/layout declaration frozen. Do not measure or
+self-adjust again; one patch/build/capture, then root decides this crop.
+Open Markets Correction 3 build `5yFIRHq-To6i-WhdPTKTN` leaves only two >1px
+deltas. Eyebrow dimensions match but x is 2px left; CTA dimensions/x match but
+y is 9px high. Heading is exact; intro/names/states are within 1px. Change only
+eyebrow transform to `translate(2px,2px) scale(1.04,1.073)` and CTA transform to
+`translate(2px,-5px) scale(.889,1.119)`. Freeze every scale/caption/other rule;
+one build/capture, no measurement or other edit.
+Open Markets Correction 4 build `zFMVrgslqrYNYS0F0uqnJ` passes. Final boxes are
+exact or within1: eyebrow y1; heading exact; intro height1; CTA exact; first name
+x1; first state height/y1. Photos/rules/gaps/transition/391px band and all DOM
+invariants remain exact. Freeze the whole crop. NEXT: crop Clear Path from
+`/tmp/home-r4-open-markets-c4-production.png` at 1440x567+0+1317, compare once
+to locked `3-clear-path.png`, and send only that crop's direct failures.
+Clear Path initial pair is `/tmp/home-r4-clear-path-r1-pair.png` target-left/current-right;
+overlay `/tmp/home-r4-clear-path-r1-overlay.png`. Keep its 535px band, following
+24px navy border, and 104px circle sizes frozen. Circle centers are already only
+0-1px apart. Correct CSS only: textured/luminous navy field; title/intro scale
+and intro about 6-7px up; per-icon drawing and connector endpoints/centerline;
+step numbers/title/body type and 3-8px position drift; final sentence about31px
+down and narrower. One measurement/patch/build/capture; no JSX or other crop.
+Clear Path Correction 1 is rejected. It preserved all route invariants, but its
+radial field is too bright at center and its inferred typography transforms
+overcorrect. The one clean target/current geometry pass and exact Correction 2
+CSS recipe are recorded in `docs/redesign/HANDOFF.md`: restore solid `#011d42`,
+shift centered head/intro/foot left for the target content center, apply the four
+per-child number/title transforms, and move/rescale the four bodies. Keep the
+accepted 104px circles, connectors, SVGs, band geometry, Hero, Open Markets,
+and all later crops frozen. Resume the same Home Luna for that CSS-only patch,
+one build/capture, and required narrow gates; no more measurement or self-adjustment.
+Clear Path Correction 2 build `zTL04BB3J54P_WqPuBzhc` brings every measured
+geometry row to exact or 1px, with only permitted target-blur text-height noise.
+It is rejected solely because body 4 wraps on the wrong words. Correction 3 is
+one CSS rule: set child 4 body `max-width:200px` and keep `translate(0,-5px)`
+while changing only `scaleX(.859)` to `scaleX(.955)`. This yields the locked
+three explicit visual lines. No other selector, measurement, or test expansion.
+Clear Path Correction 3 build `NmqjA6ds5te8NUGrei4QV` passes; the locked body-4
+line flow and every prior exact/1px row are preserved. Freeze the entire crop.
+Join Panels is now measured once. Its exact two-file direct recipe is recorded
+in HANDOFF: one span wrapper around checklist item text; 4px top shadow and 8px
+next-section boundary fade; 2px divider; two heading/icon transforms; independent
+check/text sizing; exact button rectangles/colors/label spacing. Dispatch that
+single implementation to the same Home Luna, one build/capture only, with every
+passed Home crop and all unrelated selectors frozen.
+Join Panels Correction 1 build `ZedQN46UhafBTeuV4N2i6` passes all invariants and
+fixes the main structure. It is narrowly rejected. The final CSS-only recipe is
+in HANDOFF: left heading x/width, two button label spacing/padding values, two
+per-panel check transforms, and corrected subpixel top/bottom fade stops. All
+right-heading, list, icon, divider, button-rectangle, JSX, and other crop rules
+are frozen. Dispatch only those values, one build/capture, no remeasurement.
+Join Panels Correction 2 build `vndJqQEDZ3cTWSoW10hm9` passes; every measured
+geometry row is exact or 1px and both fades match sampled RGB within 0-3. Freeze
+the crop, JSX spans, and boundary gradients. Why Sales Pros is measured once.
+HANDOFF contains its direct recipe: main heading; four icon/title/body transforms;
+three divider shifts; explicit target line breaks for bodies 3/4; sampled radial
+field; lower two-pixel fade; and the overlapping How heading transform. Dispatch
+that single page/CSS patch, one build/capture, no extra measurement or other crop.
+Why Sales Pros Correction 1 build `w9ko_NuYJ3lEDnCMH0l4V` restored the patch and
+preserves every route/shell invariant, but is narrowly rejected. Freeze the field,
+fades, dividers, all title boxes, bodies 1-3, exact bands, and every prior crop.
+NEXT: send only four C2 items to the same Home Luna: add vertical scale to the main
+heading (31px versus target33) and overlapping How heading (31px versus target34),
+widen only body4 from approximately154 to target158 while retaining its four lines,
+and correct the four icon stroke colors/weights and actual semantic paths inside
+their now-aligned outer boxes. The C1 true overlay shows full internal-shape ghosting
+for the handshake and U.S. outline, so transform-only scaling is not acceptance.
+Evidence: `/tmp/home-r4-why-sales-c1-{pair,overlay,diff}.png`. Run the required gates
+once and one fresh optimized capture; do not reopen any passing selector or crop.
+Why Sales Pros Correction 2 build `4-7-uRILjcrj_e0b0QGVx` passes all invariants;
+the two heading heights and fourth-body width now match and are frozen. C2 remains
+rejected only because all four internal SVG drawings are visibly wrong in the
+enlarged original-size pairs. NEXT: same Home Luna, `page.tsx` only, recreate the
+phone (two inset separators/speaker/home key), clipboard (raised rounded clip,
+four independent nodes, one diagonal), full two-cuff/four-finger handshake, and
+smooth contiguous-U.S. contour from the four enlarged target-left/current-right
+evidence paths recorded in HANDOFF. Preserve current CSS transforms/outer boxes;
+no CSS, raster, filter, other component, measurement expansion, or other crop.
+Run the required gates once and one fresh optimized capture.
+Why Sales Pros Correction 3 build `6Im1L1zJpHS5md6PDLLI7` passed the one narrow
+diff/ESLint/typecheck/build gate and changed only the four SVG definitions. The
+sandbox cannot bind the build, Chromium cannot create its socket, and the in-app
+browser policy blocks local build files; do not repeat those failed capture checks.
+Direct 4x target/current SVG evidence accepts and freezes the phone. Correction 4
+changes only the clipboard, handshake, and U.S. internal target traces in
+`src/app/page.tsx`, preserving all SVG boxes, CSS, phone, and every other crop.
+Why Sales Pros Correction 4 build `CpFywb-j-gEsQNAyT_G3R` passed its one narrow
+gate run and remains `page.tsx` only. Clipboard now passes and is frozen. Direct
+rendered bounds reject only handshake (`78.25x41.25` versus target `78x57`, wrong
+symmetric ring motif) and U.S. (`86.25x59.75` versus target `92x62`, effectively
+the C3 contour). Correction 5 changes only those two internal path groups. Do not
+retry the blocked page capture or touch CSS, phone, clipboard, or any other crop.
+Why Sales Pros Correction 5 build `N8Lj6H8l_lYRUPa6VGuLq` passed its one narrow
+gate run. U.S. now passes at `91.5x62` versus target `92x62` and is frozen.
+Handshake dimensions pass at `78.25x56.75` versus `78x57`, but target/current
+evidence `/tmp/c5-hand-target-current-4x.png` rejects its empty center diamond and
+symmetric cuffs. Correction 6 changes only HandshakeReasonIcon path topology to
+the target's dominant diagonal palm plus four stacked lower fingers. No capture
+retry, CSS, other icon, or other product-line change.
+Why Sales Pros Correction 6 build `8E4aeOnMBznQUb8200tcu` passed its one narrow
+gate run and keeps the outer box within1. Principal palm/cuff direction improved,
+but `/tmp/c6-hand-target-current-4x.png` rejects the small lower zigzag and single
+interior stroke against the target's four rounded lower fingers and three parallel
+palm strokes. Correction 7 replaces only those internal finger/crease subpaths.
+Why Sales Pros Correction 7 build `CIaeH5tdk1tq5_RX4XDq7` passed the narrow gates
+but `/tmp/c7-hand-target-current-4x.png` still fails: disconnected lower strokes
+replace the target's connected scalloped four-finger contour. Stop that repeated
+lane. Correction 8 goes to one fresh Luna worker, `page.tsx` only, to trace the
+target-left HandshakeReasonIcon literally inside the frozen passing box.
+Correction 8 build `9SX-ZF4gdiP171NlFglNP` passed code gates but its worker
+correctly reported visual FAIL. Browser permissions are restored. Root built and
+captured the exact current page at 1440: every document/shell/band invariant is
+exact. In-page target/current icon boxes are handshake `78x57 / 79x49` and U.S.
+`91x62 / 84x56`; standalone sizing was misleading because default SVG aspect
+fitting compresses both inside the nonmatching CSS slots. Correction 9 changes
+only those two root SVG aspect-ratio/internal transforms in `page.tsx`, then one
+build and one production crop capture. Phone/clipboard, paths, CSS, and all other
+code remain frozen.
+Correction 9 build `9KslRZhSI-jOuXng9Ge5y` validates the sizing recipe in an exact
+production capture: handshake `80x58` versus target `78x57`, U.S. `91x63` versus
+`91x62`; every page invariant is exact. Reject C9 for scope violation because it
+also changed frozen handshake paths. Correction 10 mechanically restores the five
+exact C8 handshake path strings while keeping only the approved preserve-aspect
+and group transforms, then one active-crop capture.
+Correction 10 build `q10o-d9ssUBBowLQM9r73` passes gates/scope and every invariant,
+but exact production still shows handshake `82x60` versus target `78x57` and both
+handshake/U.S. drawings visibly fail the locked silhouettes. Stop manual generic
+icons. Correction 11 sends only those two SVG internals to a fresh Luna for one
+deterministic target-to-vector silhouette trace from the original trimmed PNGs,
+mapped into their existing view boxes/production CSS slots. No raster embedding,
+CSS, other component, or trial matrix; one build/crop capture.
+The r8 hero asset is accepted. Only after the shell passes, send
+the full r7 page failures plus `public/redesign/home-r8-hero-art.png` to the same
+Home page Luna. Preserve exact document bands and all 22 footer anchors. Do not
+show Jacob a board until all seven Home crops pass internally.
+
+(v2 notes below kept for context.)
+Project: ~/dev/3c-videos/recruiting-ad (OUTSIDE the repo on purpose).
+v2 = 21s 9:16 kinetic-type ad using the ORIGINAL VOICEOVER from Jacob's
+reference video (~/Downloads/1000006367 (1).mp4 — a bad stock-template ad
+he wants beaten). VO extracted to media/vo-original.m4a; word-level
+transcript at media/transcript/vo-original.json (whisper-ctranslate2 via
+uvx, --device cpu; GPU path fails: libcublas missing). Every text beat is
+timed to the spoken words in index.html (5 scenes, cut-the-curve LEFT
+seams, League Gothic + IBM Plex Mono, navy #0A1F44 / green #8DC63F, logo
+media/logo.png). `npx hyperframes check` passes; latest render:
+renders/recruiting-ad_2026-08-30_13-48-40.mp4 (audio verified), sent.
+VO script: "Is AI changing your industry..." -> "technology can't replace
+/ real human connection" -> part-time/full-time/own business -> "powered
+by people, not data centers" -> "Apply today, grow with 3C World Group."
+
+NEXT ACTION on resume: act on Jacob's v2 feedback (copy/beat tweaks =
+edit index.html timings, re-run check, `npx hyperframes render`, send).
+Likely follow-ups he was offered: BGM bed under the VO (load /media-use +
+/hyperframes-audio for VO carve), hook variants x3 for ad testing, a
+customer-facing fiber ad next. Iteration loop: edit -> check -> snapshot
+(--at t1,t2,... comma list, NOT repeated flags) -> render (~11s, free).
+Stack: HyperFrames skills in repo .agents/skills + ~/.claude/skills;
+/hyperframes skill is the mandatory entry point for any NEW video; watch
+skill installed for reviewing footage. Research playbook artifact:
+https://claude.ai/code/artifact/9f40cd20-242a-441d-b468-032630df96af
+Rules: no earnings claims in ads without Jacob's sign-off; no AI avatars
+for testimonials/earnings; recruiting ads need Meta/TikTok Employment
+special-ad-category. ADHD output mode (/i-have-adhd) was ON — re-enable
+only if Jacob asks. Deploy rule still stands: never ship the uncommitted
+Codex redesign working-tree changes in ~/dev/3cworldgroup.
+
+OPERATIONS OWN-SALES SCOPE DONE (2026-08-27, commit 38d1f2b) — needs
+DEPLOY to take effect. Jacob's ask: operations sees only their own sales.
+Root cause of Braeden's empty live view: sales:approve put operations in
+the management ledger (no fiber pills) while the admin install feed needs
+scope 'all' — operations fell between the views (his 28 fiber orders were
+matched fine all along). Fix: operations lost sales:approve (page flips to
+rep view w/ fiber tiles), sales APIs pin non-admin to own uid, approve
+route rejects non-admin, review pings go admin/owner only. Gates: tsc,
+844 tests, build all clean. DEPLOYED to prod 2026-08-27 ~7:48 PM CT from a
+clean worktree at 38d1f2b (Codex redesign working-tree changes excluded);
+3cworldgroup.com serving 200. Both alert-email + ops-scope fixes are live.
+
+RECRUIT ALERT EMAIL FIX — CODE DONE, TWO STEPS LEFT FOR JACOB (2026-08-27):
+Bug: recruit-application alert emails reached Jeremy but never Jacob. Root
+cause (verified against live Firestore): Jacob's users doc stores his
+address as `Email` (capital E) with no lowercase `email`; the alert senders
+read only `email` and silently skipped him. Fix committed on
+onboarding/completion (40a0942): shared `src/lib/email/userEmail.ts`
+fallback used by notifySubmission + alertTasks + dispatch; test covers the
+capital-E case. Gates: 842 tests, tsc, build all clean. Backfill APPLIED
+(verified: Jacob's doc now has email jmyers@3cworldgroup.com) — prod emails
+Jacob starting with the next application. Remaining: deploy the commits
+whenever next shipping (code-level hardening only).
+Note: no "onboarding role" exists — application alerts go to all
+admin/operations/owner users (Jacob, Jeremy, Braeden). If Jacob wants a
+dedicated onboarding role or extra recipient addresses, that is a new task.
+
+Home redesign work is PAUSED.
+
+REVERT DONE (2026-08-27): all of Claude's Home type-model changes are
+reversed — `home-page.module.css` and `public.css` are byte-identical to
+HEAD; `layout.tsx` keeps only Codex's two pre-session uncommitted imports
+(@fontsource/bebas-neue + ./public.css). Home is back to the Codex round-4
+state. Gates passed post-revert (tsc + build). Root-cause finding that
+survives the revert: public.css `.public-site :is(h1,h2,h3)` !important
+body-font rule flattens all headings sitewide; mockup headings are NOT one
+face (Bebas for display, OS Condensed for mid labels, wide bold for small
+labels) and sizes step down per section. Section crops for any future round:
+`round7/claude-visual-handoff/home-sections/`.
+
+PRIOR CONTEXT — CLAUDE TOOK OVER HOME (2026-08-27 ~2:30 AM): after 4 Codex rounds stalled,
+Jacob stood Codex down and Claude patched Home directly. ROOT CAUSE FOUND:
+`public.css` `.public-site :is(h1,h2,h3) { font-family: var(--public-body-font)
+!important }` was flattening every heading; mockup headings are Open Sans
+Condensed (TTFs were sitting unused in `src/app/fonts/`). Now registered via
+next/font/local in `layout.tsx` (`--font-os-condensed`), exposed as
+`--public-heading-font` in public.css, applied to Home headings in
+`home-page.module.css` (with !important to beat the shared override) plus:
+market lime strips + condensed city names, bigger path circles, reasonBody
+13rem (fixes ragged wrap), heading scale 2.9rem, heroTitle 6.15rem/lh1.3,
+map overlay repositioned. Gates: tsc clean, production build clean. Fresh
+board: `round7/claude-visual-handoff/boards/home-claude-round-board.png`
+(sent to Jacob). :3100 restarted on fresh build. WAITING: Jacob's eyeball on
+the board. If approved → apply same heading-font fix pattern to remaining
+pages (About, Culture, Services, Careers, Contact, Apply) — the public.css
+h1-h3 override affects them all; section crops for those pages not yet cut.
+Codex is STOOD DOWN on Home + shared public CSS; re-coordinate before
+restarting lunas there. Section crops for luna: `round7/claude-visual-handoff/
+home-sections/`.
+
+PRIOR SESSION ROLE (2026-08-27, context): Jacob is driving the Round 7
+redesign loop in the CODEX DESKTOP app (sol orchestrates, luna implements —
+resume prompt at `docs/redesign/qa/visual-remediation-2026-08-26/round7/
+claude-visual-handoff/CODEX-RESUME-PROMPT.md`). Claude's job is DESIGN-REVIEW
+COPILOT, not implementer: (1) when Jacob pastes/sends a side-by-side board or
+describes what looks wrong, translate it into a paste-ready Codex rejection
+list — format: "where → what's wrong → what the mockup shows", plus rules
+"match the mockup, don't reinterpret; fix nothing outside this list; fresh
+1440 production-build board when done"; (2) make side-by-side boards on
+request (magick: mockup resized to 1440w, +append with labeled headers;
+renders via node/playwright against the preview on :3100 using executablePath
+~/.cache/ms-playwright/chromium_headless_shell-1234/...); (3) keep worker
+splits conflict-free — one luna per FILE SET, not per section (Home =
+page.tsx + home-page.module.css; global font/kicker fixes = shared
+public.css/components = separate worker); parallel lunas are fine ACROSS
+pages once approved. Known systemic issues to watch on every board:
+condensed/squished font on buttons+labels (global), invented green kickers
+the mockups don't have, inflated headings + deflated buttons/padding,
+swapped icons, flattened art direction, boards captured from dev server
+(Next.js badge visible = reject the capture). Full defect list per page:
+HANDOFF.md in the same dir. Page order: Home, About, Culture, Services,
+Careers, Contact, Apply; Jacob's eyes are the acceptance test, metrics are
+diagnostics. Home round 1 feedback already sent (16-item list, incl. hero
+type scale, diagonal overrun, Clear Path icons 3/4, dividers, tall bottom
+band).
+
+JACOB PAUSED THE SESSION FOR A VISUAL HANDOFF (2026-08-27). THE
+AUTHORITATIVE ROUND 7 DEFECT LIST AND SIDE-BY-SIDE BOARDS ARE IN
+`docs/redesign/qa/visual-remediation-2026-08-26/round7/claude-visual-handoff/`
+(HANDOFF.md + boards/<route>-side-by-side.png, mockup left / render right at
+1440). START THERE — do not re-derive defects via another capture/Sol cycle
+first. Summary of the same list (details in HANDOFF.md):
+- HOME hero: render photo is dark/navy/low-contrast vs the mockup's bright
+  golden-hour neighborhood; the hard lime-edged diagonal is barely visible;
+  the faint US-map/route overlay under the headline is missing; CTA buttons
+  undersized.
+- HOME "A Clear Path": numerals must be small lime 1-4 inline beside the
+  labels BELOW the icons (render has giant numerals beside the circles);
+  dotted connectors need arrowheads; circles larger; restore vertical
+  padding; icon 3 = map-pin route, icon 4 = flag on mountain.
+- HOME below: heading/button hierarchy inverted — section headings are
+  oversized condensed caps while buttons shrank (mockup: modest headings
+  with inline icons, large buttons); "Why Sales Pros" belongs on white with
+  hairline dividers (not a gray panel) with US-map icon for National
+  Footprint and clipboard for Coaching; "How to Get Started" needs dotted
+  leaders between steps; the closing "YOUR MARKET IS OUT THERE" band must
+  be tall/commanding, not a thin strip.
+- ABOUT (P1): the locked blended transition is missing — map must sit on
+  the light surface, fade into white, and a lime route must continue from
+  the US map down into the Connection/Community/Commitment connector
+  (render has a dark map panel and no route).
+- CULTURE (P1): the oversized lime "C" letters in the 3 C's row (locked
+  from option 3) are missing; icons drifted (chain-link/people-group/
+  shield-check).
+- SERVICES: connector should read as one organic flowing curve like the
+  mockup, not boxy orthogonal lanes; TV screens lost their approved generic
+  category labels (Live TV/Movies/Sports/News/Kids/Recordings); Security
+  callouts shrank from a prominent vertical stack to a small strip;
+  recruiting CTA lost its angled lime banner shape.
+- CAREERS: "What You'll Sell" rich line illustrations became small generic
+  icons; final CTA band compressed.
+- CONTACT: hero 3C mark lost its lime outline and italic slant.
+- APPLY: closest to lock; only minor ghost-3C/type-condensation drift.
+- CROSS-ROUTE: sentence-case headings from mockups went all-caps in places
+  (e.g. Home "Open markets. New opportunities."); overall pattern is
+  inflated headings + deflated buttons/padding and flattened art direction.
+
+FINAL INTEGRATED GATES PASS (2026-08-26 23:50, run by the parallel Claude
+portal session after the usage cutoff): `git diff --check`, focused public-site
+ESLint, `npx tsc --noEmit`, 841/841 tests across 96 files, and a warning-free
+123-page production build all pass on the current tree. All public source-file
+mtimes predate the round7 `services-final` evidence capture, so that evidence
+matches this exact tree. ONLY REMAINING STEP: fresh independent Sol xhigh
+ACCEPT/BLOCKED verdict over the final code + round5 v2 + round6 focused +
+round7 services-final evidence. No commit or deployment is authorized.
+
+ROUND 5 CODE-INTEGRITY REMEDIATION INTEGRATED; FINAL SAME-BUILD GATES/EVIDENCE
+ACTIVE. The 900-999px footer is now content-driven normal flow and the 320px
+shared footer begins where the five-column layout fits at 1000px. Navbar/footer
+logos preserve the real 550:516 source ratio and request >=2x candidates; Home
+no longer falsely exposes Open Markets as the current page. Home/About/Culture
+responsive `sizes` match measured slots. All six Culture value/operating/rhythm/
+opportunity illustrations are now semantic Lucide components; its only remaining
+raster is the 3172x1984 hero and its measured slot clears the 2x budget. The two
+Services composite rasters are replaced by clean 2400x1500 map-only artwork,
+with Fiber/TV/Security labels retained as semantic text and all nine connector
+anchors preserved; lane checks report zero sampled text intersections and
+passing DPR2 budgets at all seven widths. NEXT: finish the final integrated
+gates, restart one production preview from that exact build, regenerate 1440 comparison
+boards and the complete 49 DPR1 + 30 DPR2 objective evidence, rerun in-app
+Browser navigation/footer/form/focus/live-resize checks, then obtain a fresh
+independent Sol xhigh ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+FINAL POST-CULTURE INTEGRATED GATES PASS: `git diff --check`, focused public-site
+ESLint, `npx tsc --noEmit`, 841 tests across 96 files, and a warning-free 123-page
+production build all pass. A fresh preview of that exact build is running at
+localhost:3100. Final evidence is being regenerated in new Round 5 v2 directories;
+the stale pre-value-icon evidence is not acceptance proof.
+
+FINAL ROUND 5 V2 EVIDENCE COMPLETE: 49 DPR1 full pages, 49 DOM records, 30 DPR2
+targets, 79/79 integrity checks, zero 2x source-budget failures, zero overflow/
+nav/normal-flow failures, 9 Services endpoints within 0.006px, zero glyph-aware
+connector/text crossings, 1,078 footer hit-target checks and 32 local activations
+with zero failures, plus passing mobile-menu, keyboard-focus, and Contact/Apply
+fill checks. Home intentionally has no `aria-current` because its source-derived
+nav has no Home link; restoring it would falsely mark Open Markets current. NEXT:
+fresh independent Sol xhigh acceptance over the final code and v2 evidence.
+
+ROUND 5 INDEPENDENT SOL XHIGH VERDICT: BLOCKED on five localized defects. Home
+still visually marks Open Markets active across desktop/mobile; Home desktop
+clips the four How to Get Started descriptions/CTA; Opportunities at 1024 lets
+the hero map overlap the headline; Services at 1920 clips Security content/CTA
+against Bundle; Contact at 1024 leaves form controls too narrow. Round 6 uses
+three disjoint Luna lanes: shared Home/nav, Opportunities/Contact, and Services.
+NEXT: integrate these five fixes, run full gates, recapture affected widths plus
+full same-build acceptance evidence as needed, and rerun a fresh Sol xhigh verdict.
+
+ROUND 6 FIXES INTEGRATED AND GATES PASS. Home active styling now follows the
+actual pathname and its start section is content-driven; Opportunities reduces
+the narrow-desktop hero title to clear the map; Contact stacks form rows through
+1080px and releases fixed height; Services Security uses auto height with a safe
+minimum. Final `git diff --check`, focused ESLint, TypeScript, 841 tests, and the
+123-page warning-free build pass. A fresh production preview from that exact
+build runs on localhost:3100. NEXT: focused 28-state recapture for the four
+affected routes, then a fresh independent Sol xhigh ACCEPT/BLOCKED verdict.
+
+ROUND 6 SOL VERDICT: BLOCKED on one remaining localized Services P2. The ninth
+connector endpoint is attached to the center of the recruiting Apply Now CTA,
+so the green path crosses its label at every required width. The prior glyph
+sampler incorrectly excluded text inside service anchors and missed this. All
+five prior Round 5 blockers are confirmed resolved. NEXT: move recruiting-apply
+to a dedicated edge marker, include anchor-label glyphs in the sampler, rerun
+Services-only evidence and gates, then obtain a fresh Sol xhigh verdict.
+
+ROUND 4 INTEGRATED TRIAGE COMPLETE; CODE-INTEGRITY REVIEW BLOCKED ACCEPTANCE.
+The fresh 1440 production captures have exact source document heights on all
+seven routes and no obvious clipping/CTA/footer overlap, but the independent
+review found five P1s and one P2 that must be fixed before final evidence: the
+shared footer overflows from 900-999px; header/footer logos request undersized
+Next image candidates and the footer logo distorts its aspect ratio; Services
+uses two undersized composite rasters containing labels/UI fragments; Culture
+illustrations miss the required 2x source budget; Home/About/Culture image
+`sizes` descriptors understate their real slots; and Home incorrectly marks
+the Open Markets link as `aria-current=page`. NEXT: run disjoint Luna lanes for
+shared shell, Services assets, and Home/About/Culture image budgets; rebuild and
+restart a single production preview; regenerate integrated 1440 triage and the
+complete 49 DPR1 + 30 DPR2 objective evidence; rerun in-app Browser navigation,
+footer, focus, and resize checks; then obtain a fresh independent Sol xhigh
+ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+ROUND 4 LUNA REMEDIATION INTEGRATED; SAME-BUILD ACCEPTANCE EVIDENCE IS NEXT.
+The route writers have stopped. The shared header is semantic code with measured
+non-overlap at every required width; the shared semantic footer is one 320px
+normal-flow component with 22 real >=44px links and distinct Story/Mission/
+Leadership destinations. Home, About, Services, Opportunities, Culture,
+Contact, and Apply now match their 1440 source document totals; every CTA is
+visible normal flow; Services has nine DOM-anchored endpoints and its prior
+ResizeObserver/scroll-height feedback loop is fixed. Direct board review rejected
+and corrected several misleading metric wins: a collapsed Opportunities CTA,
+Services recruiting/footer collision, Home nav/brand overlap, Culture hero crop,
+and Culture CTA line collision. Latest isolated normalized RMSE evidence is Home
+.323385 before its final scale pass, About .380420, Services .287856 with the
+clean ending, Opportunities .251119 with the readable 128px CTA, Culture .183973,
+Contact .170057, and Apply .196708. These numbers are diagnostic, not proof of
+1:1; the readable/semantic corrections intentionally take priority over lower
+scores produced by collapsed or overlapping content. Integrated gates are now
+running. NEXT: after gates pass, rebuild and restart one production preview,
+generate fresh integrated 1440 triage and reject any remaining visible P1,
+then recapture 49 DPR1 + 30 DPR2 lossless images, regenerate deterministic
+ImageMagick/DOM/source-budget/connector reports, rerun the chosen in-app Browser
+footer/nav/form/focus/live-resize matrix, and obtain an independent Sol xhigh
+ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+ROUND 3 FINAL EVIDENCE ACTIVE; FRESH SOL XHIGH ACCEPTANCE IS NEXT. All four Luna
+lanes completed: semantic shell/Contact, Home/About/Culture, Services, and
+Opportunities/Apply. The Round 2 P2 defects are corrected: Services no longer
+uses discontinuous per-service text scaling and its connector follows compact
+DOM-anchored lanes; Opportunities no longer breaks inside “opportunity”; Apply
+mobile benefit labels no longer fragment into letter stacks. Shared navigation
+and footer remain semantic code with 22 working footer anchors. The post-asset
+combined gates pass: `git diff --check`, focused ESLint, `npx tsc --noEmit`, 841
+tests across 96 files, and a warning-free 123-page production build. Fresh final
+same-build evidence is `round3/final-captures-v2` (49/49 DPR1, 49/49 DOM metrics,
+30/30 DPR2) and `round3/final-report-v2` (zero P0, zero source 2x budget misses,
+zero shell-height spread, nine Services endpoints with max delta <=0.006px).
+The in-app Browser interaction/resize record is `round3/combined-build-iab-
+matrix.md`: 49 route/width cells, 26/26 unique local footer activations at 1440
+and 390, visible keyboard focus, working mobile menu, and 56/56 seam checks.
+NEXT: complete the final same-build precise Services path/text check, then send
+all Round 3 evidence plus raw overlays to a new independent Sol xhigh validator.
+If any P1/P2 remains, loop through disjoint Luna lanes and regenerate evidence;
+otherwise mark the goal complete. No commit or deployment is authorized.
+
+ROUND 3 REMEDIATION ACTIVE AFTER INDEPENDENT SOL XHIGH BLOCKED ROUND 2. Sol found
+one systemic P1 fidelity failure across all seven routes plus three P2 defects:
+Services' breakpoint-specific type shrinking and perimeter connector trajectory,
+the Opportunities desktop heading breaking inside “opportunity,” and Apply mobile
+benefit labels fragmenting into letter stacks. The full verdict is
+`docs/redesign/qa/visual-remediation-2026-08-26/round2/sol-validation-final.md`.
+Parallel Luna lanes now own Services; Home/About/Culture; and shared shell/Contact,
+with a nested Luna lane required for Opportunities/Apply. Each lane must use the
+approved Round 28 sources and original-resolution ImageMagick/DOM measurements,
+not screenshot-only judgment. NEXT: integrate the disjoint lane results, rebuild,
+recapture the complete 49 DPR1 plus 30 DPR2 same-build matrix, regenerate uncropped
+comparisons, rerun interaction/resize/connector checks, and obtain a fresh Sol xhigh
+ACCEPT with no P1/P2. No commit or deployment is authorized.
+
+ROUND 2 SAME-BUILD EVIDENCE COMPLETE; INDEPENDENT SOL XHIGH ACCEPTANCE IS NEXT. The
+post-fix in-app Browser rerun passes all 49 route/viewport cells with zero
+document overflow, 22/22 visible footer anchors, 44px minimum footer hit height,
+no anchor overlaps/bad hrefs, and correct active navigation. Every unique local
+footer destination and fragment was activated; social semantics and visible
+keyboard focus rings pass. A 56-cell 1023/1024/1080/1081 live-resize seam pass
+also has zero failures. Apply internal overflow, Culture mobile text clipping,
+Contact's locked-era 220px off-screen art displacement, and Services fixed-band
+copy overflow are resolved. Services now has nine DOM-anchored endpoints with
+max delta 0.0062px and zero path intersections against 2px-expanded DOM text
+Range boxes at all required widths. The 2x Home/Services assets are integrated.
+The production gates pass: focused ESLint, `npx tsc --noEmit`, 827/827 tests,
+and a 122-page warning-free Next build. Fresh styled-page-gated production
+evidence is in `round2/final-captures`: 49/49 DPR1 and 30/30 element-targeted
+DPR2 PNGs with validated signature/MIME/dimensions/SHA-256. ImageMagick/DOM
+results are in `round2/final-report`: zero P0, zero source 2x budget misses,
+zero header/footer route-height spread, and Services endpoint delta <=0.006px.
+NEXT: a new independent Sol xhigh validator must inspect the original boards,
+all widths, overlays/heatmaps, header/footer crops, full Services DPR2 evidence,
+and interaction matrix. Remediate and recapture every resulting P1/P2 until Sol
+returns ACCEPT. No commit or deployment is authorized.
+
+ROUND 1 SOL VERDICT: OVERALL BLOCKED; ROUND 2 IMPLEMENTATION ACTIVE. Round 1
+objective acceptance evidence remains in `docs/redesign/qa/visual-remediation-
+2026-08-26/round1/acceptance-*`: 49/49 DPR1, 30/30 DPR2, no P0/overflow/locked
+raster, zero header/footer route-height spread, zero source-budget misses after
+the Contact intrinsic-ratio fix, and Services endpoint deltas <=0.006 CSS px.
+These metrics did not prove visible fidelity. Independent Sol found transparent
+desktop/tablet header content at >=1024, blank Opportunities/Apply closing CTAs,
+major 1440 composition drift on all seven routes, Services connector segments
+crossing copy despite attached endpoints, Contact fast-path/form breakage at
+1024/834, Culture headline clipping at 390/375, Apply benefit/process overlaps,
+and a materially different footer missing approved social controls. Its report
+is `round1/sol-validation-round1.md`. It also rejected the DPR2 footer crops as
+mis-targeted and the 1080-CSS-px Services crops as incomplete proof. Round 2 is
+split across disjoint Luna lanes: shared shell/CTA/footer, Home/About/Culture,
+Services path/composition, Opportunities/Apply, and Contact. After all lanes,
+capture a new full same-build matrix with corrected element-targeted DPR2 footer
+and complete Services evidence, rerun ImageMagick/DOM/IAB checks, and send it to
+a fresh independent Sol xhigh pass. No commit or deployment is authorized.
+
+AUDIT 1 COMPLETE; BEGIN IMPLEMENTATION ROUND 1. Fresh read-only evidence now
+covers all seven public routes at 1920, 1440, 1280, 1024, 834, 390, and 375
+with 49 lossless DPR1 full-page PNGs, 49 DOM/image metric files, and 22 DPR2
+header/footer/Services crops. All images passed PNG signature, `file`,
+ImageMagick, dimension, and SHA-256 checks. Source, asset, route-risk, Services
+geometry, and in-app Browser reports are under
+`docs/redesign/qa/visual-remediation-2026-08-26/`. The live Browser additionally
+proved every footer link center fails hit testing at every sampled width (19/19
+on Home, 20/20 elsewhere), header heights differ by route, several semantic
+desktop footers collapse to zero height, broken hash destinations remain, and
+the Services overlay is a fixed 2293px raster through 1024px before vanishing
+at 1023px. Keyboard focus is inconclusive because both in-app Browser Tab paths
+left `body` focused; it must be rerun after the semantic shell rebuild. Start
+parallel Luna implementation with disjoint ownership: shared semantic shell
+and working links; Services semantic layout plus DOM-anchored responsive SVG
+connector; route-specific P1/P2 remediation without whole-section images.
+Recapture all 49 viewports and run deterministic diffs before independent Sol
+xhigh acceptance. No commit or deployment is authorized.
+
+JACOB APPROVED THE CODE-FIRST AND DETERMINISTIC PIXEL-VERIFICATION PLAN. The
+fresh read-only audit is active again with distinct Luna lanes. No implementation
+may begin until the new original-resolution evidence, ImageMagick/DOM geometry
+measurements, and source/asset audits are reconciled into the defect matrix.
+
+AUDIT 1 MILESTONE — SHARED SHELL SOURCE LANE COMPLETE: the current visible
+header, route endings, CTA buttons, and footer are stretched locked-chrome
+rasters while their semantic controls are transparent, zero-height, or absent.
+Several footer/header hash destinations are also missing, the desktop nav model
+changes between Home and inner routes, and Culture/Apply lack correct active
+states. The Services desktop connector is a fixed 829x1320 raster forced into a
+1440-calibrated 2293px box. Browser evidence and the remaining source lanes are
+still pending; no implementation has started.
+
+AUDIT 1 CAPTURE APPROVAL: the shared-shell, route-risk, and 67-file ImageMagick
+asset audits are complete and confirm the systemic P0/P1 causes. The fresh
+in-app Browser lane successfully captured Home and DOM geometry at all seven
+widths, but machine inspection proved the browser backend encoded every
+supposed `.png` screenshot as lossy JPEG bytes. Those files are rejected and
+must not be used for pixel comparison. Jacob approved local Playwright only for
+true lossless DPR-controlled PNG capture and deterministic ImageMagick
+comparisons; the in-app Browser remains required for live interaction,
+continuous resize, focus, and link-behavior checks. No implementation has begun.
+
+LATEST IMPLEMENTATION CLARIFICATION: rebuild the site primarily as semantic
+HTML and responsive CSS. The header, footer, navigation, text, controls,
+section surfaces, cards, and layout must not be screenshots or raster chrome.
+Do not use a whole-page or whole-section image. Use image assets only for
+purpose-fit photographic/illustrative content; create a sharp isolated asset
+when a suitable source is missing, then place it inside the code-built section.
+Pixel fidelity must be verified objectively with ImageMagick (or an equivalent
+pixel-analysis tool), native-resolution normalized captures, diff/heatmap and
+region metrics, plus browser DOM geometry assertions. LLM visual judgment is
+supplementary and cannot be the sole basis for a 1:1 claim.
+
+ACTIVE GOAL CREATED for the reopened multi-viewport remediation. Audit evidence
+must also verify that every footer link/button has a working hit target,
+keyboard focus behavior, and correct destination on all seven public routes.
+
+PUBLIC-SITE VISUAL QUALITY REMEDIATION REOPENED. Jacob inspected the real site
+on a large monitor and while resizing the browser, and rejected the previous
+Round 28/29 completion. Read and execute
+`docs/redesign/NEXT-VISUAL-REMEDIATION-PROMPT.md`. Start with a fresh live,
+read-only, original-resolution audit across all seven public routes and widths
+1920, 1440, 1280, 1024, 834, 390, and 375 before editing. Create a new active
+goal, orchestrate Luna implementation lanes, and require independent Sol xhigh
+multi-viewport acceptance.
+
+USER-REPORTED BLOCKERS: every footer is blurry; the shared top bar, logo, and
+company name are blurry; header/nav labels, clickable targets, active states,
+and Apply button do not align consistently between routes; Services imagery is
+blurry; the Services map-to-section connector is misaligned; and Services
+images/connector geometry break when the window size changes or the whole page
+is viewed on a large monitor. Footer buttons and links also do not work. The
+user says more defects exist, so perform a complete audit rather than limiting
+work to this list. Do not treat the prior Sol pass as current proof. No commit
+or deployment is authorized.
+
+CURRENT LOOP STATE: Round 8.2 fresh same-build in-app-browser captures/direct
+comparison boards are in `docs/redesign/qa/fidelity-1to1-2026-08-25/round8.2/`.
+Independent Sol validation accepted the source-derived headers and endings but
+returned `OVERALL: BLOCKED` on all seven routes because the HTML middle sections
+still had actionable P1/P2 density, scaling, crop, and spacing differences.
+Round 9 comparison boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round9/`; independent Sol validation
+returned `OVERALL: BLOCKED`, but failures were localized. Round 10 boards are
+in `docs/redesign/qa/fidelity-1to1-2026-08-25/round10/`; independent Sol
+validation returned `OVERALL: BLOCKED` on all seven routes. Round 11 Luna
+remediation is complete across Home/Contact, About/Culture, Services, and
+Careers/Apply. Fresh same-build in-app-browser captures and source-left/render-
+right boards are in `docs/redesign/qa/fidelity-1to1-2026-08-25/round11/`.
+Independent Sol Round 11 validation returned `OVERALL: BLOCKED` on all seven
+routes, including mission-line-wrap and Culture hero/satisfaction regressions.
+Round 12 Luna remediation is complete in the same four ownership lanes. Fresh
+same-build in-app-browser source/render boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round12/`; independent Sol Round 12
+validation returned `OVERALL: BLOCKED` on all seven routes. Round 13 Luna
+remediation and fresh same-build captures are complete; boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round13/` and independent Sol Round
+13 validation returned `OVERALL: BLOCKED`; the four hard regressions were fixed,
+but source crop, connector, icon/content scale, and section-density differences
+remain. Round 14 Luna remediation is active. Culture is switching from
+typographic C approximation to the existing isolated source-derived artwork;
+Services is tracing the recurring TV crop to the actual clipping ancestor and
+rebuilding its connector more literally. Round 14 remediation and fresh
+same-build boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round14/`; independent Sol Round 14
+validation returned `OVERALL: BLOCKED`; the TV crop and Culture source art were
+accepted, but typography/icon scale and geometry remain. Round 15 Luna
+remediation is active. Services is replacing its approximate route with an
+isolated transparent connector extracted from the locked source; other routes
+are scaling their semantic HTML groups to measured source bounds. Round 15
+remediation and fresh boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round15/`; independent Sol Round 15
+validation returned `OVERALL: BLOCKED`; the source route overlay is present but
+duplicated by semantic connector circles, and CTA/content scale issues remain.
+Round 16 Luna remediation is active, removing desktop connector duplicates,
+cleaning the source overlay artifact, restoring locked hero-button geometry,
+and correcting remaining typography/icon scale. Round 16 remediation and fresh
+boards are complete in `docs/redesign/qa/fidelity-1to1-2026-08-25/round16/`;
+independent Sol Round 16 validation returned `OVERALL: BLOCKED`, with regressions
+in the Home diagonal/content clearance, About map/text columns, and Careers
+Opportunity grid. Round 17 Luna remediation is active with those regressions as
+hard blockers before remaining P2 typography/spacing work. Round 17 remediation
+and fresh boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round17/`; independent Sol Round 17
+validation returned `OVERALL: BLOCKED`, but the remaining list is localized:
+Home diagonal/overlay, About mission/connector, Services Bundle composition,
+Careers process/success distribution, Culture hero/lower scale, Contact two-
+bubble icon, and Apply star/wireless icons. Round 18 Luna remediation is active
+with no broad redesign changes. Round 18 remediation and fresh boards are
+complete in `docs/redesign/qa/fidelity-1to1-2026-08-25/round18/`; independent
+Sol Round 18 validation accepted Contact and returned `OVERALL: BLOCKED` on the
+remaining six routes. Contact is now frozen. Round 19 Luna remediation is active
+for only Home, About, Services, Careers, Culture, and Apply, each with a localized
+geometry/typography fix. Round 19 validation kept Contact passed and localized
+each remaining route to one or two measured differences. Round 20 Luna
+remediation is complete for Home, About, Services, Careers, Culture, and Apply;
+fresh boards are in `docs/redesign/qa/fidelity-1to1-2026-08-25/round20/` and
+independent Sol Round 20 validation accepted Careers, Contact, and Apply; those
+routes are frozen. Round 21 Luna remediation is active only for Home, About,
+Services, and Culture, each with one localized composition fix. Round 21 is
+complete; fresh boards are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round21/` and independent Sol Round 21
+validation kept Careers, Contact, and Apply passed but blocked Home, About,
+Services, and Culture; Culture regressed because a Values layout rule leaked
+into Three C's. Round 22 remediation and fresh boards are complete in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round22/`; independent Sol Round 22
+validation kept three routes passed but blocked the same four on narrow geometry
+and scale defects. Round 23 Luna remediation and fresh same-build in-app-browser
+captures are complete for Home, About, Services, and Culture; standardized
+source-left/render-right boards for all seven routes are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round23/`. Independent Sol Round 23
+validation accepted Services plus the previously frozen Careers, Contact, and
+Apply routes, and blocked only Home, About, and Culture. Round 24 Luna
+remediation and fresh same-build 1440px captures are complete for those three;
+standardized boards for all seven routes are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round24/`. Independent Sol Round 24
+validation accepted About plus the four already-frozen routes, and blocked only
+Home and Culture. Round 25 Luna remediation and fresh same-build 1440px
+captures are complete for those two; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round25/`. Independent Sol Round 25
+validation kept the same five routes passed and blocked only a Home overlay
+offset/contrast issue plus Culture hero/heading-rail geometry. Round 26 Luna
+remediation and fresh same-build 1440px captures are complete only for Home and
+Culture; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round26/`. Independent Sol Round 26
+validation kept the same five routes passed and blocked only Home photo
+luminance plus Culture rail length/card-stack/headline geometry. Round 27 Luna
+remediation and fresh same-build 1440px captures are complete only for Home and
+Culture; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round27/`. Independent Sol Round 27
+validation kept the same five routes passed, blocked a Home photo-edge P1
+regression, and localized Culture to artwork tone plus Operate-rail anchors.
+Round 28 Luna remediation and fresh same-build 1440px captures are complete only
+for Home and Culture; standardized boards for all seven are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/round28/`. Independent Sol Round 28
+returned desktop `OVERALL PASS` for all seven routes. Final 390px in-app-browser
+QA passed Home, About, Careers, Culture, and Apply, but Sol blocked a clipped
+duplicate Services savings badge and compressed Contact hero phrase. Round 29
+fixed those two mobile defects; fresh captures are in
+`docs/redesign/qa/fidelity-1to1-2026-08-25/final-mobile-round29/`, and Sol
+returned mobile `OVERALL PASS` for all seven routes. Final gates passed:
+`git diff --check`, TypeScript, focused ESLint, 827 tests across 95 files, and
+the production build with 122/122 static pages generated.
+Round 13 corrected Home headline
+clipping, Services 02/title collision, Careers collapsed earnings figures, and
+Culture's two-line satisfaction heading. Round 12
+explicitly matched source line counts and measured geometry rather than
+applying relative scale/offset guesses. The Round 11 fix list was:
+correct Home hero crop and Clear
+Path icons/scale; raise and enlarge About mission content; rebuild Services TV
+art, connector, and single-column service modules; correct Careers hero and
+middle-section density; correct Culture C/hero/content geometry; restore
+Contact typography/form spacing; and narrow/reposition Apply hero while
+enlarging its badge and supporting sections. Do not declare success until the
+next Sol result returns `OVERALL: PASS`; any failed route must go back to its
+Luna lane for another numbered round and be recaptured. Round 8.2 uses exact
+mechanical crops from the approved people-free mockups for desktop header,
+route-specific closing/footer chrome, and isolated artwork/icon treatments
+while retaining semantic link overlays and responsive HTML/mobile. Duplicate
+desktop overlay paint, crop backgrounds, and the fragmented Apply 30 were fixed.
+Do not rasterize whole pages.
+Ownership is now shared shell/route-specific closings, Home/Contact,
+About/Culture, Services, and Careers/Apply. The dominant
+remaining failures are underscaled header/page/footer content, generic
+route-agnostic closing/footer geometry, underscaled section density, a missing
+Careers hero map, and collapsed Contact hero word spacing. The four ownership
+lanes remain shared shell/Home/Contact, About/Culture, Services, and
+Careers/Apply.
+The recurring failures are underscaled desktop branding/content, incorrect
+hero composition and headline wrapping, and generic/compressed diagonal CTA
+and footer assemblies. Do not reuse the older `round2` directory under
+`qa/fidelity-rebuild-2026-08-25/` as current evidence; the active strict-1:1
+evidence root is `qa/fidelity-1to1-2026-08-25/`.
 
 Baseline finding that opened this goal:
 the seven-route implementation is functional, responsive, and passed its code
@@ -300,6 +1332,64 @@ pay_structure.pdf + fcra_auth.pdf still PLACEHOLDERS; (c) webhook log
 grab when Mason signs direct_deposit (see STILL OPEN). NOTE: the
 public-site redesign blocks above belong to a PARALLEL session — do
 not touch them here.
+
+SHIPPED 2026-08-25 (latest, commit 0e462f4, deployed nebal30q0 Ready,
+gates tsc/822 tests/build green): (1) rep fiber view resectioned per
+Jacob — "Sent in" tile (their own logged portal sales count,
+submittedTotal on FiberStatusResponse) + collapsed status bucket
+tiles (Pending install / Active / Cancelled / Needs attention),
+accordion expand one at a time, nothing scrolls by default; admin
+per-rep dropdowns unchanged. (2) customer names on fiber orders ONLY
+from the rep's OWN logged portal Sale (sale.salesRepId ===
+order.matchedUserId, conservative address prefix match >=6 chars both
+directions, latest createdAt wins) — attached at read time in
+src/lib/fiberReport/matchSales.ts, never stored, never from T-Mobile
+or other reps. Rows show name strong, address demoted.
+
+SUPERSEDED SAME DAY (commit 842d1e6, deployed 9o6arftsu Ready, gates
+tsc/827 tests/build green): Jacob saw a rep screenshot, wanted the
+status INSIDE the YOUR SALES ledger (confirmed via question UI +
+"That makes sense"). Rep view now: pill chips under [All | Pay]
+(Sent in / Pending install / Active / Cancelled / Needs attention)
+swap the ledger list to that report bucket (cancelled = latest cancel
+first, active = latest install first, pending = soonest first); every
+sale card gets a live fiber-status pill next to APPROVED via
+matchFiberOrdersToSales (address prefix, breakage wins, else latest).
+Standalone rep tiles REMOVED; InstallStatusSection is admin-only and
+prop-driven (page calls useFiberStatus once). Screenshots (dark
+portal skin, sample data) sent to Jacob; awaiting his eyeball on the
+live site. Known pre-existing, harness-only hydration warning from
+SalesTable's toast portal — not shipped-new, not visible in prod.
+2026-08-26 report ingested fine (937 orders, 669 matched; three
+back-to-back imports = duplicate forwarded copies, last wins).
+
+PORTAL SESSION (2026-08-26): MASON "COMPENSATION" ALERT DIAGNOSED —
+almost certainly a STALE Aug-24 alertTask re-nagged, not a live
+failure. "Compensation" = pay_structure; Mason's envelope was
+Completed at SignWell and backfilled to approved 8/24, so he can't
+even see Sign now for it. The alert comes from
+esign-embed-error/route.ts; alertTasks dedupe by (kind,uid), never
+expire, re-nag every 24h (renagStaleTasks "Still unclaimed:"), the
+backfill never resolved them, and ActionQueue shows no timestamp and
+has no dismiss. Real gap also found: esign-signing-url 502s for a
+completed envelope (SignWell returns no embedded_signing_url) and
+EsignSignAction then silently opens the STALE stored URL → embed
+error → false alert; error events also have no one-shot guard.
+SHIPPED (commit 6fafac4 on onboarding/completion, NOT deployed):
+(1) ActionQueue age display ("· 2d ago") + Dismiss button + POST
+/api/portal/alerts/dismiss + dismissAlertTask(); (2) provider
+getEmbeddedSigningUrl returns {url,completed}, route returns
+{completed:true} instead of 502, client skips embed + shows the
+confirm-polling note on completed envelopes, one-shot reportFailure.
+Diffs reviewed against spec; gates green: tsc clean, 55/55 targeted
+vitest, prod build OK. DO NOT deploy from this tree — it holds the
+redesign session's unauthorized WIP; deploy 6fafac4 from a clean
+worktree checkout only when Jacob asks. NEXT: tell Jacob the alert
+was stale (Mason signed Compensation 8/24; nothing live-broken) and
+after deploy he can Dismiss it in the admin queue. Related standing item: grab the webhook log when Mason signs
+direct_deposit (see STILL OPEN). Reminder rules: no solo agent runs
+(parallel codex luna/sol workers, Fable reviews); pay tiers/comp
+data sensitive — owner/admin only.
 
 NEW STANDING RULE (Jacob, 2026-08-24): NO solo single-agent runs —
 split independent work across MULTIPLE PARALLEL `codex exec`

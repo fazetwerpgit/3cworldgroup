@@ -1,0 +1,143 @@
+/* Small, local overrides for the remaining portal pages in the UX sweep. */
+.portal-scope .ops-line-toolbar,
+.portal-scope .ops-line-filter-line {
+  min-width: 0;
+}
+
+.portal-scope .ops-line-toolbar button,
+.portal-scope .ops-line-filter-line button {
+  min-height: 44px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.portal-scope .forms-line-back-link,
+.portal-scope .forms-line-primary,
+.portal-scope .forms-line-choice-button,
+.portal-scope .admin-line-clear-button,
+.portal-scope .admin-line-action,
+.portal-scope .sales-line-back,
+.portal-scope .sales-line-btn {
+  min-height: 44px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.portal-scope .admin-line h2,
+.portal-scope .admin-line h3,
+.portal-scope .sales-line h2,
+.portal-scope .sales-line h3 {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.portal-scope .ops-line-segmented,
+.portal-scope .ops-line-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.portal-scope .ops-line-segmented button,
+.portal-scope .ops-line-pill-row button {
+  min-width: 44px;
+  padding: 10px 14px;
+  border-radius: 999px;
+}
+
+.portal-scope .ops-line-row-main {
+  min-height: 72px;
+}
+
+.portal-scope .ops-line-cell strong,
+.portal-scope .ops-line-cell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-scope .ops-line-cell small {
+  display: block;
+}
+
+.portal-scope .forms-line-fill > .pt-head,
+.portal-scope .admin-line > .pt-head,
+.portal-scope .sales-line > .pt-head {
+  margin-bottom: 8px;
+}
+
+.portal-scope .forms-line-fill .pt-head,
+.portal-scope .admin-line .pt-head,
+.portal-scope .sales-line .pt-head {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.portal-scope .forms-line-fill .pt-head a,
+.portal-scope .admin-line .pt-head a,
+.portal-scope .sales-line .pt-head a {
+  min-height: 44px;
+}
+
+.portal-scope.dark .ops-line-segmented button,
+.portal-scope.dark .ops-line-pill-row button,
+.dark .portal-scope .ops-line-segmented button,
+.dark .portal-scope .ops-line-pill-row button {
+  color: var(--ops-line-ink, #f5f8fb);
+}
+
+@media (max-width: 767px) {
+  .portal-scope .ops-line-toolbar {
+    align-items: stretch;
+  }
+
+  .portal-scope .ops-line-search {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .portal-scope .ops-line-segmented,
+  .portal-scope .ops-line-pill-row {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .portal-scope .ops-line-segmented button,
+  .portal-scope .ops-line-pill-row button {
+    flex: 0 0 auto;
+  }
+
+  .portal-scope .ops-line-filter-line {
+    align-items: flex-start;
+  }
+}
+
+@media (min-width: 768px) {
+  .portal-scope .ops-line-row-main {
+    min-height: 78px;
+  }
+}
+
+/* PageTitle inside old page wrappers: never inherit uppercase/tracking. */
+.portal-scope .sales-line .pt-head-title,
+.portal-scope .admin-line .pt-head-title,
+.portal-scope .forms-line .pt-head-title,
+.portal-scope .member-line .pt-head-title {
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+.portal-scope .pt-head > .admin-line-clear-button,
+.portal-scope .pt-head > .sales-line-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+}

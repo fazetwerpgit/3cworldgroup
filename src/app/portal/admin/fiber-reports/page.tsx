@@ -5,6 +5,8 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-b.css';
 
 interface Row { id: string; status: string; [key: string]: unknown }
 
@@ -65,10 +67,10 @@ export default function FiberReportsReviewPage() {
         status: row.status === 'handled' ? 'handled' : 'new',
         person: opsFormatValue(row.repName),
         personSub: opsFormatValue(row.companySold),
-        subject: opsFormatValue(row.orderNumber),
-        subjectSub: opsFormatValue(row.dateKnocked),
-        secondary: `Pack ${opsFormatValue(row.packNumber)}`,
-        secondarySub: `${opsFormatValue(row.numberOfSales)} sales`,
+        subject: opsFormatValue(row.companySold),
+        subjectSub: opsFormatValue(row.orderNumber),
+        secondary: opsFormatValue(row.dateKnocked),
+        secondarySub: opsFormatValue(row.createdAt),
         evidenceKind: 'none',
         detailFields: [
           { label: 'Reps', value: opsFormatValue(row.numberOfReps) },
@@ -85,12 +87,13 @@ export default function FiberReportsReviewPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
+          <PageTitle title="Fiber Reports" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
           <OpsQueueList
-            kicker="02 / The Line / evidence relay"
-            heroWord="Call"
-            heroRest="the proof."
-            intro="Fiber field reports awaiting review before commission can move."
-            itemsLabel="items need action"
+            kicker="Fiber Reports"
+            heroWord="Fiber"
+            heroRest="Reports"
+            intro="Review reports submitted by reps."
+            itemsLabel="open"
             rows={queueRows}
             loading={loading}
             error={error}

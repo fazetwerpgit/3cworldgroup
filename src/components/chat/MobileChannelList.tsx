@@ -2,6 +2,8 @@
 
 import { Lock } from 'lucide-react';
 import { ChatChannel } from '@/types';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-rep-b.css';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'ALL',
@@ -27,9 +29,7 @@ export function MobileChannelList({
 }: MobileChannelListProps) {
   return (
     <section className="chat-line-mobile-channel-screen">
-      <p className="chat-line-mobile-kicker">The Line / mobile channel switcher</p>
-      <h1 className="chat-line-mobile-title portal-metallic-num">Team Chat</h1>
-      <p className="chat-line-mobile-intro">Numbered signals, one calm floor. Select a channel to enter.</p>
+      <PageTitle title="Team Chat" />
 
       {error && <p className="chat-line-mobile-error" role="alert">{error}</p>}
 
@@ -48,7 +48,7 @@ export function MobileChannelList({
               onClick={() => onOpenChannel(channel.id)}
               className={`chat-line-mobile-channel ${index === 0 ? 'is-active' : ''}`}
             >
-              <span className="chat-line-mobile-number">{String(index + 1).padStart(2, '0')}</span>
+              <span className="chat-line-mobile-number" aria-hidden="true">#</span>
               <span className="chat-line-mobile-tick" />
               <span className="chat-line-mobile-copy">
                 <strong>{channel.name}{channel.audience === 'managers' && <Lock aria-hidden="true" />}</strong>
@@ -60,7 +60,7 @@ export function MobileChannelList({
         </div>
       )}
 
-      <p className="chat-line-mobile-pii">No customer PII — never card numbers or SSNs.</p>
+      <p className="chat-line-mobile-pii">Don&apos;t post customer card numbers or SSNs here.</p>
     </section>
   );
 }

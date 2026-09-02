@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-a.css';
 import { UserTable } from '@/components/admin/UserTable';
-import { AdminConfirmStrip } from '@/components/admin/AdminCatalogList';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { graduatedFieldRole, FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
+import { FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
 
 // Assignable field roles only — retired tiers (IBO levels, L1/L2 manager)
 // stay valid for users who already hold them but are never offered here.
@@ -59,11 +60,8 @@ export default function UsersPage() {
   const [query, setQuery] = useState('');
   const [salesCounts, setSalesCounts] = useState<Record<string, number>>({});
   const [approvePanel, setApprovePanel] = useState<string | null>(null);
-  const [confirmAcceptId, setConfirmAcceptId] = useState<string | null>(null);
   const [approveFieldRole, setApproveFieldRole] = useState<FieldRole>('entry_level_rep');
   const [approving, setApproving] = useState(false);
-  const [accepting, setAccepting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     if (!currentUser) return;
@@ -133,49 +131,6 @@ export default function UsersPage() {
     [users]
   );
 
-  const handleStatusChange = async (userId: string, status: 'active' | 'inactive') => {
-    try {
-      const response = await fetch(`/api/portal/auth/users/${userId}`, {
-        method: 'PUT',
-        headers: await authHeaders(true),
-        body: JSON.stringify({ status }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to update user');
-      }
-      fetchUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
-    }
-  };
-
-  const handleAcceptConfirm = async (userId: string) => {
-    const target = users.find((u) => u.uid === userId);
-    if (!target?.fieldRole || target.status !== 'pending') return;
-    setAccepting(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/portal/auth/users/${userId}`, {
-        method: 'PUT',
-        headers: await authHeaders(true),
-        body: JSON.stringify({
-          status: 'active',
-          fieldRole: graduatedFieldRole(target.fieldRole),
-        }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to accept user');
-      }
-      await fetchUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to accept user');
-    } finally {
-      setAccepting(false);
-    }
-  };
-
   const handleApproveConfirm = async (userId: string) => {
     setApproving(true);
     setError('');
@@ -198,26 +153,6 @@ export default function UsersPage() {
     }
   };
 
-  const handleDelete = async (userId: string) => {
-    setDeleting(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/portal/auth/users/${userId}`, {
-        method: 'DELETE',
-        headers: await authHeaders(),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to delete user');
-      }
-      fetchUsers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   const clearFilters = () => {
     setQuery('');
     setRoleFilter('all');
@@ -231,29 +166,7 @@ export default function UsersPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="admin-line-main">
         <div className="admin-line">
-          <header className="admin-line-hero">
-            <div>
-              <div className="admin-line-kicker">admin management / the roster</div>
-              <h1>
-                <span className="accent">Keep the roster</span>
-                <span className="plain">close to the work.</span>
-              </h1>
-              <p className="admin-line-intro">
-                A practical people-and-records view for decisions that should stay visible: who
-                needs approval, who is active, and who can move to the next record.
-              </p>
-              <div className="admin-line-quick-rail">
-                <span className="admin-line-chip lime">
-                  {users.length} member{users.length === 1 ? '' : 's'} / {pendingUsers.length} pending
-                </span>
-                <span className="admin-line-chip">updated moments ago</span>
-              </div>
-            </div>
-            <div className="admin-line-hero-count">
-              <span className="admin-line-display portal-metallic-num">{users.length}</span>
-              <small>members on file</small>
-            </div>
-          </header>
+          <PageTitle title="User Management" meta={`${users.length} members`} subtitle={`${pendingUsers.length} pending approval`} />
 
           <div className="admin-line-toolbar">
             <input
@@ -272,7 +185,7 @@ export default function UsersPage() {
                   aria-pressed={roleFilter === bucket}
                   onClick={() => setRoleFilter(bucket)}
                 >
-                  {bucket === 'all' ? 'All roles' : bucket}
+                  {bucket === 'all' ? 'All Roles' : bucket === 'field rep' ? 'Field Rep' : bucket.charAt(0).toUpperCase() + bucket.slice(1)}
                 </button>
               ))}
             </div>
@@ -284,7 +197,7 @@ export default function UsersPage() {
                   aria-pressed={statusFilter === s}
                   onClick={() => setStatusFilter(s)}
                 >
-                  {s === 'all' ? 'All' : s}
+                  {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}
             </div>
@@ -303,15 +216,27 @@ export default function UsersPage() {
             <div className="admin-line-decision-strip">
               <div className="admin-line-decision-head">
                 <div>
-                  <div className="admin-line-eyebrow">needs a decision</div>
-                  <h3>Pending people, surfaced first.</h3>
+                  <h3>
+                    Pending approval <span className="sweep-admin-heading-count">· {pendingUsers.length}</span>
+                  </h3>
                 </div>
-                <span className="admin-line-meta">{pendingUsers.length} waiting</span>
               </div>
               {pendingUsers.map((u) => {
                 const name = u.displayName || u.email || 'this user';
                 return (
-                  <div className="admin-line-decision-row" key={u.uid}>
+                  <div
+                    className="admin-line-decision-row sweep-user-row"
+                    key={u.uid}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/portal/admin/users/${u.uid}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        router.push(`/portal/admin/users/${u.uid}`);
+                      }
+                    }}
+                  >
                     <div className="admin-line-person">
                       <span className="admin-line-avatar">{(name.charAt(0) || 'U').toUpperCase()}</span>
                       <span>
@@ -326,36 +251,18 @@ export default function UsersPage() {
                         <button
                           type="button"
                           className="admin-line-action"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setApproveFieldRole('entry_level_rep');
                             setApprovePanel(approvePanel === u.uid ? null : u.uid);
                           }}
                         >
-                          Assign role
+                          Assign Role
                         </button>
                       ) : (
-                        <button
-                          type="button"
-                          className="admin-line-primary"
-                          disabled={accepting}
-                          onClick={() => setConfirmAcceptId(u.uid)}
-                        >
-                          {accepting ? 'Accepting…' : 'Accept'}
-                        </button>
+                        <span className="sweep-admin-label">Open profile to accept</span>
                       )}
                     </div>
-                    {confirmAcceptId === u.uid && (
-                      <AdminConfirmStrip
-                        label={`Accept & activate ${name} as ${RoleDisplayNames[graduatedFieldRole(u.fieldRole!)]}. Any outstanding onboarding checklist items will be skipped.`}
-                        confirming={accepting}
-                        confirmingLabel="Accepting…"
-                        onCancel={() => setConfirmAcceptId(null)}
-                        onConfirm={() => {
-                          handleAcceptConfirm(u.uid);
-                          setConfirmAcceptId(null);
-                        }}
-                      />
-                    )}
                     {approvePanel === u.uid && (
                       <div className="admin-line-approval-panel open">
                         <div className="admin-line-meta">Assign role before approval</div>
@@ -379,7 +286,7 @@ export default function UsersPage() {
                             disabled={approving}
                             onClick={() => handleApproveConfirm(u.uid)}
                           >
-                            {approving ? 'Assigning…' : 'Confirm role'}
+                            {approving ? 'Assigning…' : 'Confirm Role'}
                           </button>
                         </div>
                       </div>
@@ -392,11 +299,9 @@ export default function UsersPage() {
 
           <div className="admin-line-section-head">
             <div>
-              <div className="admin-line-eyebrow">01 / member records</div>
-              <h2>Everyone on the line.</h2>
-            </div>
-            <div className="right admin-line-meta" id="people-count">
-              {filteredUsers.length} record{filteredUsers.length === 1 ? '' : 's'} · sorted by attention
+              <h2>
+                All members <span className="sweep-admin-heading-count">· {filteredUsers.length}</span>
+              </h2>
             </div>
           </div>
 
@@ -420,15 +325,12 @@ export default function UsersPage() {
           ) : (
             <UserTable
               users={filteredUsers}
-              onStatusChange={handleStatusChange}
               onApprove={(uid) => {
                 setApproveFieldRole('entry_level_rep');
                 setApprovePanel(uid);
               }}
-              onAccept={handleAcceptConfirm}
-              onDelete={(uid) => handleDelete(uid)}
               onPersonLink={(uid) => router.push(`/portal/admin/users/${uid}`)}
-              loading={loading || approving || accepting || deleting}
+              loading={loading || approving}
               salesCounts={salesCounts}
             />
           )}

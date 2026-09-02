@@ -3,21 +3,21 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
 import {
   ResourcesLineShell,
-  ResourcesLineHero,
   ResourcesLineRequiredStrip,
-  ResourcesLineUniProgress,
   ResourcesLineTabs,
   ResourcesLineFilterGroups,
   ResourcesLineCardGrid,
   ResourcesLineShortsEmpty,
-  ResourcesLineFooter,
   ResourcesLineLaneHead,
 } from '@/components/resources/ResourcesLine';
 import { useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { TrainingCategory, ResourceType } from '@/types';
+import '@/styles/sweep-rep-a.css';
 
 type TrainingTab = 'path' | 'shorts';
 
@@ -29,7 +29,6 @@ function TrainingContent() {
     progress,
     fetchResources,
     fetchProgress,
-    getOverallProgress,
     getIncompleteRequired,
   } = useTraining();
 
@@ -37,6 +36,7 @@ function TrainingContent() {
   const [activeTab, setActiveTab] = useState<TrainingTab>(initialTab);
   const [categoryFilter, setCategoryFilter] = useState<TrainingCategory | ''>('');
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
+  const [unfilteredResourceCount, setUnfilteredResourceCount] = useState(0);
 
   useEffect(() => {
     const filters: { category?: TrainingCategory; type?: ResourceType } = {};
@@ -49,29 +49,38 @@ function TrainingContent() {
     if (user) fetchProgress(user.uid);
   }, [user, fetchProgress]);
 
-  const { completed, total, percentage } = getOverallProgress();
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const loadCount = async () => {
+      try {
+        const token = await getIdToken();
+        const response = await fetch('/api/portal/training', {
+          headers: { Authorization: `Bearer ${token ?? ''}` },
+        });
+        if (!response.ok) return;
+        const data = await response.json() as { resources?: unknown[] };
+        if (active) setUnfilteredResourceCount(data.resources?.length ?? 0);
+      } catch {
+        // The filtered list still renders when the count request is unavailable.
+      }
+    };
+    void loadCount();
+    return () => { active = false; };
+  }, [user]);
+
   const incompleteRequired = getIncompleteRequired();
 
   return (
     <ProtectedRoute permissions={['training:read']}>
       <ResourcesLineShell>
-        <ResourcesLineHero
-          variant="university"
-          eyebrow="University / training broadcast / my path"
-          headingLead="Learn the line."
-          headingRest="Keep moving."
-          context={`${incompleteRequired.length} item${incompleteRequired.length === 1 ? '' : 's'} left on your path. Required work stays at the top; every card below carries one clear next state.`}
-          numeral={incompleteRequired.length}
-          captionTop="items left"
-          captionBottom="on your path"
-        />
+        <PageTitle title="University" meta={`${resources.length} modules`} />
 
         <ResourcesLineRequiredStrip count={incompleteRequired.length} />
-        <ResourcesLineUniProgress completed={completed} total={total} percentage={percentage} />
 
         <div className="resources-line-uni-toolbar">
           <ResourcesLineTabs active={activeTab} onChange={setActiveTab} />
-          {activeTab === 'path' && (
+          {activeTab === 'path' && unfilteredResourceCount >= 4 && (
             <ResourcesLineFilterGroups
               category={categoryFilter}
               onCategory={(value) => setCategoryFilter(value as TrainingCategory | '')}
@@ -85,12 +94,11 @@ function TrainingContent() {
           <ResourcesLineCardGrid resources={resources} progress={progress} />
         ) : (
           <section className="resources-line-uni-shorts" aria-label="Shorts library">
-            <ResourcesLineLaneHead title="Shorts library" metaTop="Fast cuts" metaBottom="field pace" />
+            <ResourcesLineLaneHead title="Short videos" metaTop="Quick lessons" metaBottom="for the field" />
             <ResourcesLineShortsEmpty university />
           </section>
         )}
 
-        <ResourcesLineFooter university completed={completed} total={total} />
       </ResourcesLineShell>
     </ProtectedRoute>
   );

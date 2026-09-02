@@ -277,7 +277,7 @@ export function SalesTable({
       <section className="sales-line-flow">
         <div className="sales-line-section-head">
           <div>
-            <p className="sales-line-eyebrow">Priority ordered / manager queue</p>
+            <p className="sales-line-eyebrow">Pending sales</p>
             <h2>Needs your attention</h2>
           </div>
           <p>{pendingSales.length} pending · oldest first</p>
@@ -286,7 +286,7 @@ export function SalesTable({
         <div className="sales-line-priority-list">
           {pendingSales.length ? pendingSales.map((sale, index) => (
             <div className="sales-line-priority-row" key={sale.id} role="button" tabIndex={0} onClick={() => setSelectedId(sale.id || null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}>
-              <span className="sales-line-tick">{String(index + 1).padStart(2, '0')}</span>
+              <span className="sales-line-tick">{index + 1}</span>
               <FileText className="sales-line-priority-icon" aria-hidden="true" />
               <div className="sales-line-priority-copy">
                 <strong>{sale.customerName || sale.customerAddress || 'Customer pending'} · {sale.salesRepName}</strong>
@@ -302,19 +302,19 @@ export function SalesTable({
             </div>
           )) : <div className="sales-line-empty-priority">No pending sales in your book.</div>}
         </div>
-        <p className="sales-line-flow-note">Click any row to open the review sheet. Approve or reject without leaving the flow.</p>
+        <p className="sales-line-flow-note">Select a row to review it. Approve or reject without leaving this page.</p>
       </section>
       )}
 
       <section className="sales-line-ledger">
         <div className="sales-line-ledger-head">
           <div>
-            <p className="sales-line-eyebrow">{canApprove ? 'The ledger / all statuses' : showPay ? 'Your pay / installs and dates' : 'Your ledger / all statuses'}</p>
-            <h2>{canApprove ? 'The rest of the month' : showPay ? 'What you get paid' : 'Your sales'}</h2>
+            {!canApprove && <p className="sales-line-eyebrow">{showPay ? 'Your pay' : 'Your sales'}</p>}
+            <h2>{canApprove ? 'All sales' : showPay ? 'What you get paid' : 'Your sales'}</h2>
           </div>
           <p>{showPay
             ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
-            : `${listSales.length} recent records · click a row to inspect`}</p>
+            : `${listSales.length} recent records · select a row to inspect`}</p>
         </div>
 
         {repMode ? (
@@ -428,7 +428,7 @@ export function SalesTable({
             }) : <div className="sales-line-ledger-empty">Nothing installed yet. Pay shows up here once a sale has an install date.</div>}
           </div>
           <div className={`sales-line-totals sales-line-pay-totals${hasPlan ? '' : ' no-money'}`}>
-            <span><strong>{paySales.length}</strong> installs</span>{hasPlan && <span className="sales-line-total-commission">{expectedTotalLabel}</span>}<span /><span /><span />
+            <span><b>Sales</b><strong>{paySales.length}</strong></span>{hasPlan && <span className="sales-line-total-commission"><b>Expected pay</b>{expectedTotalLabel}</span>}<span /><span /><span />
           </div>
         </div>
         ) : (
@@ -458,10 +458,10 @@ export function SalesTable({
                 </div>
                 <div className="sales-line-actions-cell">{rowActions(sale)}</div>
               </div>
-            )) : <div className="sales-line-ledger-empty">{statusFilter && canApprove ? `No ${statusFilter} sales in this view.` : `No sales in ${canApprove ? 'the ledger' : 'your book'}.`}</div>}
+            )) : <div className="sales-line-ledger-empty">{statusFilter && canApprove ? `No ${statusFilter} sales in this view.` : 'No sales found.'}</div>}
           </div>
           <div className="sales-line-totals">
-            <span><strong>{listSales.length}</strong> visible</span><span /><span /><span className="sales-line-total-value">{formatMoney(totalValue)}</span><span className="sales-line-total-commission">{repMode ? expectedTotalLabel : commissionLabel}</span><span /><span />
+            <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>{repMode ? 'Expected pay' : 'Commission'}</b>{repMode ? expectedTotalLabel : commissionLabel}</span><span /><span />
           </div>
         </div>
         )}
@@ -492,7 +492,7 @@ export function SalesTable({
           <Textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} rows={3} placeholder="Enter rejection reason..." />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => { setRejectingId(null); setRejectionReason(''); }}>Cancel</Button>
-            <Button type="button" variant="destructive" disabled={!rejectionReason.trim() || loading} onClick={() => void handleReject()}>Reject sale</Button>
+            <Button type="button" variant="destructive" disabled={!rejectionReason.trim() || loading} onClick={() => void handleReject()}>Reject Sale</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -505,7 +505,7 @@ export function SalesTable({
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
-            <Button type="button" variant="destructive" disabled={loading} onClick={() => void handleDelete()}>Delete sale</Button>
+            <Button type="button" variant="destructive" disabled={loading} onClick={() => void handleDelete()}>Delete Sale</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

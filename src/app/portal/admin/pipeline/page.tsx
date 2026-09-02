@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-a.css';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
@@ -49,6 +51,7 @@ export default function PipelinePage() {
   const [decommissionModal, setDecommissionModal] = useState<PipelineRep | null>(null);
   const [decommissionReason, setDecommissionReason] = useState<DecommissionReason>('non_activity');
   const [decommissionNotes, setDecommissionNotes] = useState('');
+  const [selectedRep, setSelectedRep] = useState<PipelineRep | null>(null);
 
   const flash = (msg: string) => {
     setSuccess(msg);
@@ -73,6 +76,7 @@ export default function PipelinePage() {
   useEffect(() => { fetchPipeline(); }, [fetchPipeline]);
 
   const openChannels = async (rep: PipelineRep) => {
+    setSelectedRep(null);
     setChannelsModal(rep);
     setChannelsLoading(true);
     try {
@@ -114,6 +118,7 @@ export default function PipelinePage() {
 
   const requestFieldTraining = async (rep: PipelineRep) => {
     if (!user) return;
+    setSelectedRep(null);
     setBusy(true);
     setError('');
     try {
@@ -134,6 +139,7 @@ export default function PipelinePage() {
 
   const decommission = async () => {
     if (!user || !decommissionModal) return;
+    if (!window.confirm(`Decommission ${decommissionModal.displayName}?`)) return;
     setBusy(true);
     setError('');
     try {
@@ -162,6 +168,8 @@ export default function PipelinePage() {
 
   const reinstate = async (rep: PipelineRep) => {
     if (!user) return;
+    if (!window.confirm(`Reinstate ${rep.displayName}?`)) return;
+    setSelectedRep(null);
     setBusy(true);
     setError('');
     try {
@@ -202,26 +210,7 @@ export default function PipelinePage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
-          <div className="ops-line-ticker">
-            <b>ON AIR</b>
-            <span>Ops signal / recruiting pipeline · stage board</span>
-            <strong>QUEUE LIVE</strong>
-          </div>
-
-          <div className="ops-line-hero">
-            <div>
-              <p className="ops-line-kicker">04 / The Line / stage board</p>
-              <h1><span>Move</span><br />the line.</h1>
-              <p className="ops-line-intro">
-                Stage counts stay visible; reps stay scannable. Track each field rep from onboarding paperwork to
-                channel credentials, active sales, and decommissioning.
-              </p>
-            </div>
-            <div className="ops-line-hero-count">
-              <strong className="ops-line-display portal-metallic-num">{heroCount}</strong>
-              <small>reps need action</small>
-            </div>
-          </div>
+          <PageTitle title="Recruiting Pipeline" meta={`${heroCount} need attention`} subtitle="Review each rep's progress and open their details for next steps." />
 
           {error && <div className="ops-line-error-banner">{error}</div>}
           {success && (
@@ -286,7 +275,19 @@ export default function PipelinePage() {
           ) : (
             <div className="ops-line-list" style={{ marginTop: 13 }}>
               {visibleReps.map((rep) => (
-                <article key={rep.uid} className="ops-line-row ops-line-rep-row">
+                <article
+                  key={rep.uid}
+                  className="ops-line-row ops-line-rep-row sweep-user-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedRep(rep)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedRep(rep);
+                    }
+                  }}
+                >
                   <div className="ops-line-rep-grid">
                     <div className="ops-line-rep-title">
                       <span className="ops-line-avatar">{rep.displayName?.charAt(0).toUpperCase() || 'R'}</span>
@@ -329,35 +330,7 @@ export default function PipelinePage() {
                       <span className="meta">Approved sales</span>
                       <strong>{rep.approvedSales}</strong>
                     </div>
-                    <div className="ops-line-rep-actions">
-                      {rep.stage !== 'decommissioned' ? (
-                        <>
-                          <button type="button" className="ops-line-action" disabled={busy} onClick={() => requestFieldTraining(rep)}>
-                            Field train
-                          </button>
-                          <button type="button" className="ops-line-action" disabled={busy} onClick={() => openChannels(rep)}>
-                            Channels
-                          </button>
-                          <button
-                            type="button"
-                            className="ops-line-action reject"
-                            disabled={busy}
-                            onClick={() => setDecommissionModal(rep)}
-                          >
-                            Decommission
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="ops-line-action reinstate"
-                          disabled={busy}
-                          onClick={() => reinstate(rep)}
-                        >
-                          Reinstate
-                        </button>
-                      )}
-                    </div>
+                    <div className="ops-line-rep-actions"><span className="sweep-user-chevron" aria-hidden="true">›</span></div>
                   </div>
                 </article>
               ))}
@@ -365,6 +338,31 @@ export default function PipelinePage() {
           )}
         </div>
       </div>
+
+      {selectedRep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={`${selectedRep.displayName} details`}>
+          <div className="ops-line sweep-detail-modal" style={{ margin: 0, padding: 0, width: '100%', maxWidth: 480 }}>
+            <div className="ops-line-reference-card" style={{ background: 'var(--ops-line-panel)' }}>
+              <h3>{selectedRep.displayName}</h3>
+              <p className="sweep-admin-note">{RoleDisplayNames[selectedRep.fieldRole]} · {PipelineStageConfig[selectedRep.stage].name}</p>
+              <div className="ops-line-detail-fields sweep-detail-fields">
+                <div><span>Manager</span><b>{selectedRep.managerName ?? '—'}</b></div>
+                <div><span>Onboarding</span><b>{selectedRep.onboarding.approved}/{selectedRep.onboarding.total} approved</b></div>
+                <div><span>Channels</span><b>{selectedRep.channelsCleared} cleared{selectedRep.channelsSubmitted ? `, ${selectedRep.channelsSubmitted} pending` : ''}</b></div>
+                <div><span>Approved sales</span><b>{selectedRep.approvedSales}</b></div>
+              </div>
+              <div className="sweep-detail-actions">
+                {selectedRep.stage !== 'decommissioned' ? <>
+                  <button type="button" className="ops-line-action" disabled={busy} onClick={() => void requestFieldTraining(selectedRep)}>Field Train</button>
+                  <button type="button" className="ops-line-action" disabled={busy} onClick={() => void openChannels(selectedRep)}>Channels</button>
+                  <button type="button" className="ops-line-action reject" disabled={busy} onClick={() => { setSelectedRep(null); setDecommissionModal(selectedRep); }}>Decommission</button>
+                </> : <button type="button" className="ops-line-action reinstate" disabled={busy} onClick={() => void reinstate(selectedRep)}>Reinstate</button>}
+                <button type="button" className="ops-line-action" onClick={() => setSelectedRep(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {channelsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

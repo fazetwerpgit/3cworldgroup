@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, ArrowRight, CalendarClock, Check, ExternalLink, Plus, ShieldCheck, Users } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +20,7 @@ import {
   CallDay,
   CallDayLabels,
 } from '@/types';
+import '@/styles/sweep-rep-a.css';
 
 interface CallEntry {
   id: string;
@@ -44,13 +46,13 @@ interface CentralNow {
 
 const CENTRAL_TIME_ZONE = 'America/Chicago';
 const CALL_DAY_SHORT: Record<CallDay, string> = {
-  monday: 'MON',
-  tuesday: 'TUE',
-  wednesday: 'WED',
-  thursday: 'THU',
-  friday: 'FRI',
-  saturday: 'SAT',
-  sunday: 'SUN',
+  monday: 'M',
+  tuesday: 'T',
+  wednesday: 'W',
+  thursday: 'T',
+  friday: 'F',
+  saturday: 'S',
+  sunday: 'S',
 };
 
 const EMPTY_FORM = {
@@ -194,6 +196,19 @@ function isPastOccurrence(call: CallEntry, now: CentralNow): boolean {
 function formatCountdown(minutes: number | null): string {
   if (minutes === null) return 'IN —';
   return `IN ${Math.floor(minutes / 60)}H ${minutes % 60}M`;
+}
+
+function getCentralDateNumber(day: CallDay, date: Date): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: CENTRAL_TIME_ZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(date).map(({ type, value }) => [type, value]));
+  const centralDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  const offset = CALL_DAY_ORDER.indexOf(day) - CALL_DAY_ORDER.indexOf(getCentralNow(date).day);
+  centralDate.setUTCDate(centralDate.getUTCDate() + offset);
+  return String(centralDate.getUTCDate());
 }
 
 function CallsSkeleton() {
@@ -352,10 +367,7 @@ export default function CallsSchedulePage() {
           <PortalSidebar />
           <main className="calls-line-main flex-1 overflow-auto">
             <div className="calls-line">
-              <header className="calls-line-mast">
-                <span className="calls-line-mark">3C WORLD GROUP / THE LINE</span>
-                <span className="calls-line-mast-meta">Calls broadcast · America/Chicago</span>
-              </header>
+              <PageTitle title="Calls" meta={`${todayCalls.length} today`} />
 
               {error && (
                 <Alert className="calls-line-alert">
@@ -368,23 +380,7 @@ export default function CallsSchedulePage() {
                 <CallsSkeleton />
               ) : (
                 <>
-                  <section className="calls-line-command">
-                    <div className="calls-line-command-top">
-                      <div>
-                        <p className="calls-line-eyebrow">03 / The Line / recurring calls</p>
-                        <h1>
-                          {todayCalls.length} calls on the board <span>today.</span>
-                        </h1>
-                        <p className="calls-line-context">
-                          A single priority-ordered flow for the floor. The next signal is fused into the masthead; the full week stays below as a clean ledger.
-                        </p>
-                      </div>
-                      <div className="calls-line-hero-number">
-                        <strong className="calls-line-hero-display portal-metallic-num">{todayCalls.length}</strong>
-                        <small>visible calls · {CallDayLabels[now.day]}</small>
-                      </div>
-                    </div>
-
+                  {!scheduleIsEmpty && <section className="calls-line-command">
                     <div className="calls-line-broadcast" aria-label="Next call">
                       <span className="calls-line-broadcast-label">Next call</span>
                       <div>
@@ -404,11 +400,11 @@ export default function CallsSchedulePage() {
                         <span className="calls-line-join calls-line-join-disabled">Join Meet</span>
                       )}
                     </div>
-                  </section>
+                  </section>}
 
                   {data?.canManage && (
                     <div className="calls-line-manage-bar">
-                      <p><strong>Operations desk</strong><br />Admin / operations view · management calls and recurrence controls visible.</p>
+                      <p><strong>Call settings</strong><br />Manage recurring calls and times.</p>
                       <button className="calls-line-add-call" onClick={() => setShowForm(true)} type="button">
                         <Plus aria-hidden="true" />
                         Add Call
@@ -416,40 +412,52 @@ export default function CallsSchedulePage() {
                     </div>
                   )}
 
-                  <section className="calls-line-air-times">
+                  {scheduleIsEmpty ? (
+                    <div className="calls-line-empty-state calls-line-empty-state-published" role="status">
+                      <CalendarClock aria-hidden="true" />
+                      <div>
+                        <strong>Call schedule not published yet.</strong>
+                        {data?.canManage && (
+                          <div className="calls-line-required-calls">
+                            {REQUIRED_CALLS.map((call) => (
+                              <button key={call.title} onClick={() => applyRequiredCall(call)} type="button">
+                                <strong>{call.title}</strong>
+                                <span>{CallDayLabels[call.day]} · {CallAudienceLabels[call.audience]}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : <section className="calls-line-air-times">
                     <div className="calls-line-section-head">
                       <div>
-                        <p className="calls-line-eyebrow">Week strip / select a broadcast day</p>
-                        <h2>Air times</h2>
+                        <h2>Weekly calls</h2>
                       </div>
-                      <p>{CallDayLabels[selectedDay]} selected</p>
+                      <p>{CallDayLabels[selectedDay]}</p>
                     </div>
 
-                    <div className="calls-line-week-strip" role="tablist" aria-label="Select broadcast day">
-                      {CALL_DAY_ORDER.map((day) => {
-                        const dayCount = calls.filter((call) => call.day === day).length;
-                        return (
-                          <button
-                            key={day}
-                            className={`calls-line-day-tab ${dayCount === 0 ? 'empty' : ''}`}
-                            type="button"
-                            role="tab"
-                            aria-selected={selectedDay === day}
-                            onClick={() => setSelectedDay(day)}
-                          >
-                            <span className="calls-line-day-dow">{CALL_DAY_SHORT[day]}</span>
-                            <span className="calls-line-day-date">{day === now.day ? 'TODAY' : CallDayLabels[day]}</span>
-                            <span className="calls-line-day-count">{dayCount} CALL{dayCount === 1 ? '' : 'S'}</span>
-                            <i className="calls-line-day-mark" aria-hidden="true" />
-                          </button>
-                        );
-                      })}
+                    <div className="calls-line-week-strip" role="tablist" aria-label="Select day">
+                      {CALL_DAY_ORDER.map((day) => (
+                        <button
+                          key={day}
+                          className="calls-line-day-tab"
+                          type="button"
+                          role="tab"
+                          aria-label={`${CallDayLabels[day]} ${getCentralDateNumber(day, new Date(nowTick))}`}
+                          aria-selected={selectedDay === day}
+                          onClick={() => setSelectedDay(day)}
+                        >
+                          <span className="calls-line-day-dow">{CALL_DAY_SHORT[day]}</span>
+                          <span className="calls-line-day-date">{getCentralDateNumber(day, new Date(nowTick))}</span>
+                        </button>
+                      ))}
                     </div>
 
                     <div className="calls-line-air-pane">
                       <div className="calls-line-pane-head">
                         <h3>{CallDayLabels[selectedDay]} {selectedDay === now.day && <span>/ today</span>}</h3>
-                        <p>{selectedCalls.length} visible call{selectedCalls.length === 1 ? '' : 's'} · America/Chicago</p>
+                        <p>{selectedCalls.length} call{selectedCalls.length === 1 ? '' : 's'} · Central Time</p>
                       </div>
 
                       {selectedCalls.length > 0 ? (
@@ -460,7 +468,7 @@ export default function CallsSchedulePage() {
                               <article className={`calls-line-air-card ${past ? 'past' : ''}`} key={call.id}>
                                 <div className="calls-line-air-time">
                                   <strong>{formatTime(call.time)}</strong>
-                                  <small>AMERICA / CHICAGO<br />{past ? 'COMPLETED' : 'ON AIR'}</small>
+                                  <small>Central Time<br />{past ? 'Completed' : 'Upcoming'}</small>
                                 </div>
                                 <div className="calls-line-air-copy">
                                   <h4>{call.title}</h4>
@@ -471,7 +479,7 @@ export default function CallsSchedulePage() {
                                   <p>{call.description || 'Recurring team call.'}</p>
                                   <div className="calls-line-air-actions">
                                     {past ? (
-                                      <span className="calls-line-done"><Check aria-hidden="true" />DONE</span>
+                                      <span className="calls-line-done"><Check aria-hidden="true" />Completed</span>
                                     ) : (
                                       <a className="calls-line-join" href={call.meetLink} target="_blank" rel="noreferrer">
                                         <ExternalLink aria-hidden="true" />
@@ -498,34 +506,18 @@ export default function CallsSchedulePage() {
                         <div className="calls-line-empty-state">
                           <CalendarClock aria-hidden="true" />
                           <div>
-                            <strong>Call schedule not published yet.</strong>
-                            <p>
-                              {scheduleIsEmpty
-                                ? data?.canManage
-                                  ? 'Leadership listed the required cadence below. Add each call once the Meet link and exact time are confirmed.'
-                                  : 'Management is still confirming the recurring call times and Meet links.'
-                                : `No recurring calls are scheduled for ${CallDayLabels[selectedDay]}.`}
-                            </p>
+                            <strong>No calls scheduled for this day.</strong>
                           </div>
-                          {scheduleIsEmpty && data?.canManage && (
-                            <div className="calls-line-required-calls">
-                              {REQUIRED_CALLS.map((call) => (
-                                <button key={call.title} onClick={() => applyRequiredCall(call)} type="button">
-                                  <strong>{call.title}</strong>
-                                  <span>{CallDayLabels[call.day]} · {CallAudienceLabels[call.audience]}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
                   </section>
+                  }
 
-                  <footer className="calls-line-footer">
+                  {!scheduleIsEmpty && <footer className="calls-line-footer">
                     <span>Times shown in CT · Google Meet links only.</span>
                     <span>Click any day to filter</span>
-                  </footer>
+                  </footer>}
                 </>
               )}
             </div>
@@ -536,9 +528,9 @@ export default function CallsSchedulePage() {
       <Dialog open={showForm} onOpenChange={(open) => (open ? setShowForm(true) : closeForm())}>
         <DialogContent className="calls-line-modal" showCloseButton>
           <DialogHeader className="calls-line-modal-header">
-            <p className="calls-line-eyebrow">Admin / recurring schedule</p>
+            <p className="calls-line-eyebrow">Call settings</p>
             <DialogTitle>Add recurring call</DialogTitle>
-            <DialogDescription>Create a weekly Meet block and keep the floor on the same signal.</DialogDescription>
+            <DialogDescription>Set a weekly Meet call for the team.</DialogDescription>
           </DialogHeader>
 
           <div className="calls-line-starter-row">

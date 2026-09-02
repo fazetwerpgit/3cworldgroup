@@ -1,17 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
 import { isOnline } from '@/lib/presence/isOnline';
-import { AdminConfirmStrip } from '@/components/admin/AdminCatalogList';
 
 interface UserTableProps {
   users: User[];
-  onStatusChange?: (userId: string, status: 'active' | 'inactive') => void;
   onApprove?: (userId: string) => void;
-  onAccept?: (userId: string) => void;
-  onDelete?: (userId: string, userName: string) => void;
   onPersonLink?: (userId: string) => void;
   loading?: boolean;
   /** uid -> approved (all-time) sales count, from the existing leaderboard
@@ -42,17 +37,11 @@ function initials(name?: string, email?: string) {
 
 export function UserTable({
   users,
-  onStatusChange,
   onApprove,
-  onAccept,
-  onDelete,
   onPersonLink,
   loading,
   salesCounts,
 }: UserTableProps) {
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [confirmAcceptId, setConfirmAcceptId] = useState<string | null>(null);
-
   if (users.length === 0) {
     return (
       <div className="admin-line-empty-state" style={{ display: 'block' }}>
@@ -74,7 +63,19 @@ export function UserTable({
         const approvedSales = salesCounts?.[user.uid] ?? 0;
 
         return (
-          <div className="admin-line-people-row" key={user.uid}>
+          <div
+            className="admin-line-people-row sweep-user-row"
+            key={user.uid}
+            role="button"
+            tabIndex={0}
+            onClick={() => onPersonLink?.(user.uid)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onPersonLink?.(user.uid);
+              }
+            }}
+          >
             <div className="admin-line-person">
               <span className="admin-line-avatar">{initials(user.displayName, user.email)}</span>
               <span>
@@ -102,87 +103,21 @@ export function UserTable({
               <small>approved sales</small>
             </div>
             <div className="admin-line-row-actions">
-              <button
-                type="button"
-                className="admin-line-action"
-                onClick={() => onPersonLink?.(user.uid)}
-              >
-                Person
-              </button>
               {onApprove && status === 'pending' && !user.fieldRole && (
                 <button
                   type="button"
                   className="admin-line-primary"
-                  onClick={() => onApprove(user.uid)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onApprove(user.uid);
+                  }}
                   disabled={loading}
                 >
-                  Assign role
+                  Assign Role
                 </button>
               )}
-              {onAccept && status === 'pending' && user.fieldRole && (
-                <button
-                  type="button"
-                  className="admin-line-primary"
-                  onClick={() => setConfirmAcceptId(user.uid)}
-                  disabled={loading}
-                >
-                  Accept
-                </button>
-              )}
-              {onStatusChange && status === 'active' && (
-                <button
-                  type="button"
-                  className="admin-line-action"
-                  onClick={() => onStatusChange(user.uid, 'inactive')}
-                  disabled={loading}
-                >
-                  Deactivate
-                </button>
-              )}
-              {onStatusChange && status === 'inactive' && (
-                <button
-                  type="button"
-                  className="admin-line-action"
-                  onClick={() => onStatusChange(user.uid, 'active')}
-                  disabled={loading}
-                >
-                  Activate
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  type="button"
-                  className="admin-line-action danger"
-                  onClick={() => setConfirmDeleteId(user.uid)}
-                  disabled={loading}
-                >
-                  Delete
-                </button>
-              )}
+              <span className="sweep-user-chevron" aria-hidden="true">›</span>
             </div>
-            {onAccept && confirmAcceptId === user.uid && (
-              <AdminConfirmStrip
-                label={`Accept & activate ${displayName}?`}
-                confirming={loading}
-                confirmingLabel="Accepting…"
-                onCancel={() => setConfirmAcceptId(null)}
-                onConfirm={() => {
-                  onAccept(user.uid);
-                  setConfirmAcceptId(null);
-                }}
-              />
-            )}
-            {onDelete && confirmDeleteId === user.uid && (
-              <AdminConfirmStrip
-                label={`Delete ${displayName}?`}
-                confirming={loading}
-                onCancel={() => setConfirmDeleteId(null)}
-                onConfirm={() => {
-                  onDelete(user.uid, displayName);
-                  setConfirmDeleteId(null);
-                }}
-              />
-            )}
           </div>
         );
       })}

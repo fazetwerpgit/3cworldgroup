@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import '@/styles/sweep-admin-b.css';
 import { ChatChannelAudience } from '@/types';
 import {
   AdminCatalogCard,
@@ -186,12 +187,8 @@ export default function AdminChatChannelsPage() {
   return (
     <ProtectedRoute roles={['admin']}>
       <AdminCatalogList
-        kicker="catalog / chat channels"
-        heroAccent="Keep every record"
-        heroPlain="ready to reuse."
-        intro="Create, rename, and remove channels. Members are added automatically by role."
-        heroCount={channels.length}
-        heroCountLabel="channels on file"
+        title="Chat Channels"
+        meta={`${channels.length} channels`}
         search={{ value: query, onChange: setQuery, placeholder: 'Search channels', ariaLabel: 'Search channels' }}
         toolbarExtra={
           <button type="button" className="admin-line-primary" onClick={() => setCreating((v) => !v)}>
@@ -219,8 +216,7 @@ export default function AdminChatChannelsPage() {
           <div className="admin-line-editor">
             <div className="admin-line-panel-head">
               <div>
-                <div className="admin-line-eyebrow">edit in place</div>
-                <h2 style={{ margin: '5px 0 0', fontSize: 19, fontWeight: 900, letterSpacing: '-.05em', textTransform: 'uppercase' }}>
+                <h2 className="admin-line-editor-title">
                   New channel.
                 </h2>
               </div>
@@ -231,7 +227,7 @@ export default function AdminChatChannelsPage() {
                 <input id="channel-name" maxLength={60} value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} placeholder="Announcements" />
               </div>
               <div className="admin-line-field">
-                <label>Audience / choose one</label>
+                <label>Choose an audience</label>
                 <div className="admin-line-segmented" role="group" aria-label="Audience">
                   {(Object.keys(audienceCopy) as ChatChannelAudience[]).map((a) => (
                     <button key={a} type="button" aria-pressed={draft.audience === a} onClick={() => setDraft((p) => ({ ...p, audience: a }))}>
@@ -259,13 +255,11 @@ export default function AdminChatChannelsPage() {
         {filtered.map((channel) => (
           <AdminCatalogCard
             key={channel.id}
-            eyebrow="chat channels"
             title={channel.name}
+            summaryDescription={channel.description || 'No description'}
             statusLabel={channel.active ? undefined : 'Archived'}
             statusTone="muted"
-            preview={channel.description || 'No description'}
             metaLeft={`${audienceCopy[channel.audience]} · ${channel.memberCount} member${channel.memberCount === 1 ? '' : 's'}`}
-            metaRight={`#${channel.id}`}
             extra={
               editingId === channel.id ? (
                 <div className="admin-line-editor-grid" style={{ marginTop: 8 }}>

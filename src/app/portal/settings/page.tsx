@@ -5,27 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { MemberLineShell, MemberLineMasthead, MemberLineSectionIndex, MemberLineLock } from '@/components/member/MemberLine';
+import { MemberLineShell, MemberLineLock } from '@/components/member/MemberLine';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
-
-// Structural fact, not a live metric: Settings always has exactly these 5
-// real panels (identity, bug report, password, app+appearance, sensitive
-// boundary) — same reasoning as Resources' static lane count.
-const SETTINGS_GROUP_COUNT = 5;
-
-function getInitials(displayName?: string, email?: string) {
-  const name = (displayName || '').trim();
-  if (name) {
-    const parts = name.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-  return (email || 'U').charAt(0).toUpperCase();
-}
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-rep-b.css';
 
 export default function SettingsPage() {
   const { user, resetPassword, changePassword, refreshUser } = useAuth();
@@ -41,8 +28,6 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Profile editing state — always-editable inputs on this canvas (mockup has
-  // no separate edit mode), saved on demand via "Save member lines".
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
@@ -128,7 +113,7 @@ export default function SettingsPage() {
       });
       if (!response.ok) throw new Error('Failed to update profile');
       await refreshUser();
-      setSuccess('Member lines saved.');
+      setSuccess('Changes saved.');
       setTimeout(() => setSuccess(''), 3000);
     } catch {
       setError('Failed to update profile. Please try again.');
@@ -139,7 +124,6 @@ export default function SettingsPage() {
 
   const effectiveRole = getEffectiveRole(user);
   const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
-  const initials = getInitials(user?.displayName, user?.email);
 
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'N/A';
@@ -147,7 +131,7 @@ export default function SettingsPage() {
   };
 
   const formatShortDate = (date: Date | string | undefined) => {
-    if (!date) return '—';
+    if (!date) return 'Not available';
     return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
   };
 
@@ -157,28 +141,7 @@ export default function SettingsPage() {
   return (
     <ProtectedRoute>
       <MemberLineShell>
-        <MemberLineMasthead
-          kicker="member broadcast / settings"
-          headingLead="Set the signal."
-          headingRest="Stay on the line."
-          intro="A broadcast-ready member record: the open lines are yours to tune, the locked lines stay with the account."
-          numeral={SETTINGS_GROUP_COUNT}
-          numeralAriaLabel={`${SETTINGS_GROUP_COUNT} settings groups`}
-          tools={
-            <>
-              <button
-                type="button"
-                className="member-line-chip lime"
-                onClick={() => document.getElementById('report-bug')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                Report a bug
-              </button>
-              <span className="member-line-chip">
-                {initials} / {roleLabel} / {user?.status === 'active' ? 'active' : 'inactive'}
-              </span>
-            </>
-          }
-        />
+        <PageTitle title="Settings" />
 
         {(success || error) && (
           <div className="member-line-tools" style={{ marginTop: 16 }}>
@@ -187,26 +150,22 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <MemberLineSectionIndex index="01" label="who you are" />
-
         <div className="member-line-arena">
           <div className="member-line-stack">
-            {/* Member identity panel */}
+            {/* Profile panel */}
             <section className="member-line-panel">
               <div className="member-line-panel-head">
                 <div>
-                  <p className="member-line-eyebrow">01 / who you are</p>
-                  <h2>Member identity</h2>
+                  <h2>Your profile</h2>
                   <p className="member-line-sub">
-                    {user?.displayName || 'Member'} · employee ID {user?.uid?.slice(-6).toUpperCase()}
+                    {user?.displayName || 'Member'}
                   </p>
                 </div>
-                <span className="member-line-meta">open lines / locked lines</span>
               </div>
 
               <div className="member-line-profile-grid">
                 <div className="member-line-field">
-                  <label htmlFor="line-name">Display name / open</label>
+                  <label htmlFor="line-name">Display name</label>
                   <input
                     id="line-name"
                     value={displayName}
@@ -214,7 +173,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="member-line-field">
-                  <label htmlFor="line-phone">Phone / open</label>
+                  <label htmlFor="line-phone">Phone</label>
                   <input
                     id="line-phone"
                     type="tel"
@@ -225,55 +184,55 @@ export default function SettingsPage() {
                 </div>
                 <div className="member-line-field locked">
                   <label htmlFor="line-email">
-                    Email / locked <MemberLineLock />
+                    Email <MemberLineLock />
                   </label>
                   {/* Some older user docs lack an email field — fall back to the auth account's. */}
                   <input id="line-email" value={user?.email || auth?.currentUser?.email || ''} readOnly />
                 </div>
                 <div className="member-line-field locked">
                   <label htmlFor="line-role">
-                    Role / locked <MemberLineLock />
+                    Role <MemberLineLock />
                   </label>
                   <input id="line-role" value={roleLabel} readOnly />
                 </div>
                 <div className="member-line-field locked">
                   <label htmlFor="line-status">
-                    Status / locked <MemberLineLock />
+                    Status <MemberLineLock />
                   </label>
                   <input id="line-status" value={user?.status === 'active' ? 'Active' : 'Inactive'} readOnly />
                 </div>
                 <div className="member-line-field locked">
                   <label htmlFor="line-hire">
-                    Hire date / locked <MemberLineLock />
+                    Member since <MemberLineLock />
                   </label>
                   <input id="line-hire" value={formatDate(user?.hireDate)} readOnly />
                 </div>
                 <div className="member-line-field locked full">
                   <label htmlFor="line-address">
-                    Address / locked <MemberLineLock />
+                    Address <MemberLineLock />
                   </label>
                   <input id="line-address" value={fullAddress} readOnly />
                 </div>
               </div>
 
-              <div className="member-line-stats">
-                <div className="member-line-stat">
-                  <strong>{formatShortDate(user?.createdAt)}</strong>
-                  <small>Member since</small>
+              <dl className="member-line-details">
+                <div>
+                  <dt>Member since</dt>
+                  <dd>{formatShortDate(user?.createdAt)}</dd>
                 </div>
-                <div className="member-line-stat">
-                  <strong>{user?.territoryId || '—'}</strong>
-                  <small>Territory</small>
+                <div>
+                  <dt>Territory</dt>
+                  <dd>{user?.territoryId || 'Not assigned'}</dd>
                 </div>
-                <div className="member-line-stat">
-                  <strong>{user?.uid?.slice(-6).toUpperCase() || '—'}</strong>
-                  <small>Employee ID / last 6</small>
+                <div>
+                  <dt>Employee ID</dt>
+                  <dd className="font-mono">{user?.uid ? user.uid.slice(-6) : 'Not available'}</dd>
                 </div>
-                <div className="member-line-stat">
-                  <strong>{user?.status === 'active' ? 'Yes' : 'No'}</strong>
-                  <small>Active yes / no</small>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{user?.status === 'active' ? 'Active' : 'Inactive'}</dd>
                 </div>
-              </div>
+              </dl>
 
               <div className="member-line-actions">
                 <button
@@ -282,15 +241,15 @@ export default function SettingsPage() {
                   onClick={handleSaveProfile}
                   disabled={saving}
                 >
-                  {saving ? 'Saving…' : 'Save member lines'}
+                  {saving ? 'Saving…' : 'Save changes'}
                 </button>
                 <span className="member-line-status-text">
                   Contact your admin for role, territory, or address changes.
                 </span>
               </div>
+              <p className="member-line-sensitive-note">Don&apos;t enter card numbers or SSNs here.</p>
             </section>
 
-            <ReportBugCard />
           </div>
 
           <aside className="member-line-stack">
@@ -298,9 +257,7 @@ export default function SettingsPage() {
             <section className="member-line-panel">
               <div className="member-line-panel-head">
                 <div>
-                  <p className="member-line-eyebrow">03 / security channel</p>
                   <h2>Change password</h2>
-                  <p className="member-line-sub">Collapsed until you call it up.</p>
                 </div>
               </div>
               <button
@@ -382,12 +339,11 @@ export default function SettingsPage() {
               </div>
             </section>
 
-            {/* App + appearance panel */}
+            {/* App and theme panel */}
             <section className="member-line-panel">
               <div className="member-line-panel-head">
                 <div>
-                  <p className="member-line-eyebrow">04 / device channel</p>
-                  <h2>App + appearance</h2>
+                  <h2>App and theme</h2>
                 </div>
               </div>
               <InstallAppCard />
@@ -395,18 +351,9 @@ export default function SettingsPage() {
               <ThemeToggleCard />
             </section>
 
-            {/* Sensitive-data boundary panel */}
-            <section className="member-line-panel">
-              <p className="member-line-eyebrow">05 / hard boundary</p>
-              <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--member-line-serif)', fontWeight: 600, fontSize: 22 }}>
-                Never broadcast raw sensitive data.
-              </h2>
-              <p className="member-line-sub">
-                No raw SSN, card numbers, or bank-account numbers in member settings.
-              </p>
-            </section>
           </aside>
         </div>
+        <ReportBugCard />
       </MemberLineShell>
     </ProtectedRoute>
   );

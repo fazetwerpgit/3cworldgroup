@@ -1,0 +1,456 @@
+/* Rep-page sweep overrides. Keep this file scoped so the shared portal CSS stays untouched. */
+.portal-scope .sales-line,
+.portal-scope .calls-line,
+.portal-scope .forms-line,
+.portal-scope .resources-line {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.portal-scope .sales-line h1,
+.portal-scope .sales-line h2,
+.portal-scope .calls-line h1,
+.portal-scope .calls-line h2,
+.portal-scope .calls-line h3,
+.portal-scope .forms-line h1,
+.portal-scope .forms-line h2,
+.portal-scope .resources-line h1,
+.portal-scope .resources-line h2,
+.portal-scope .training-progress-title,
+.portal-scope .training-resource-title {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* PageTitle sits inside legacy page wrappers that still uppercase headings and controls. */
+.portal-scope .sales-line .pt-head-title,
+.portal-scope .calls-line .pt-head-title,
+.portal-scope .forms-line .pt-head-title,
+.portal-scope .resources-line .pt-head-title {
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.portal-scope .sales-line .sales-line-primary,
+.portal-scope .sales-line button,
+.portal-scope .calls-line button,
+.portal-scope .forms-line button,
+.portal-scope .resources-line button,
+.portal-scope .resources-line-primary {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.portal-scope .sales-line-metric-value,
+.portal-scope .sales-line-inreview-value {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+}
+
+.portal-scope .sales-line-metric-label,
+.portal-scope .sales-line-metric-value small {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .sales-line-totals strong,
+.portal-scope .sales-line-total-value,
+.portal-scope .sales-line-total-commission,
+.portal-scope .resources-line-signal-value {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+}
+
+.portal-scope .sales-line-command {
+  border-bottom: 0;
+  padding: 0;
+}
+
+.portal-scope .sales-line-empty-state {
+  margin: 4px 0 18px;
+  color: var(--muted, #627187);
+  font-size: 0.95rem;
+}
+
+.portal-scope .sales-line-totals b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.portal-scope .sales-line-totals strong {
+  display: block;
+}
+
+.portal-scope .calls-line-mast,
+.portal-scope .forms-line-command,
+.portal-scope .resources-line-head,
+.portal-scope .resources-line-uni-head {
+  display: none;
+}
+
+.portal-scope .calls-line-command {
+  padding-top: 0;
+}
+
+/* Management copy and quick-add metadata are rep-facing text, not codes. */
+.portal-scope .calls-line-manage-bar p {
+  color: var(--calls-line-muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.portal-scope .calls-line-manage-bar strong {
+  color: var(--calls-line-ink, #0a1f44);
+  font-weight: 700;
+}
+
+.portal-scope .calls-line-manage-bar .calls-line-add-call {
+  min-height: 44px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .calls-line-required-calls {
+  gap: 6px;
+}
+
+.portal-scope .calls-line-required-calls button {
+  min-height: 44px;
+  padding: 8px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .calls-line-required-calls button strong {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.portal-scope .calls-line-required-calls button span {
+  color: var(--calls-line-muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.portal-scope .calls-line-week-strip {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.portal-scope .calls-line-day-tab {
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 4px;
+}
+
+.portal-scope .calls-line-day-dow,
+.portal-scope .calls-line-day-date {
+  display: block;
+  text-align: center;
+}
+
+.portal-scope .calls-line-day-dow {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.portal-scope .calls-line-day-date {
+  margin-top: 4px;
+  color: var(--calls-line-muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+}
+
+.portal-scope .calls-line-day-count,
+.portal-scope .calls-line-day-mark {
+  display: none;
+}
+
+.portal-scope .calls-line-empty-state-published {
+  grid-template-columns: auto 1fr;
+  justify-items: start;
+  align-items: center;
+  text-align: left;
+}
+
+.portal-scope .calls-line-empty-state-published strong {
+  margin: 0;
+}
+
+.portal-scope .forms-line-list {
+  margin-top: 0;
+}
+
+.portal-scope .forms-line-section-head {
+  align-items: center;
+}
+
+.portal-scope .forms-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 68px;
+  gap: 12px;
+  padding: 10px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.portal-scope .forms-line-row-number,
+.portal-scope .forms-line-row-icon,
+.portal-scope .forms-line-row-action {
+  display: none;
+}
+
+.portal-scope .forms-line-row-copy {
+  min-width: 0;
+}
+
+.portal-scope .forms-line-row-copy strong,
+.portal-scope .forms-line-row-description {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-scope .forms-line-row-copy strong {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-size: 1rem;
+}
+
+.portal-scope .forms-line-row-description {
+  margin-top: 4px;
+  color: var(--forms-line-muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+
+.portal-scope .forms-line-row-audience {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border: 1px solid var(--forms-line-line, rgba(10, 31, 68, 0.16));
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--forms-line-muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  justify-self: start;
+}
+
+.portal-scope .forms-line-row-copy .forms-line-row-audience {
+  margin-top: 7px;
+}
+
+.portal-scope .resources-line-university-link {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+  border: 1px solid var(--resources-line-line, rgba(10, 31, 68, 0.16));
+  padding: 14px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.portal-scope .resources-line-university-link > span {
+  min-width: 0;
+}
+
+.portal-scope .resources-line-university-link strong,
+.portal-scope .resources-line-university-link small {
+  display: block;
+}
+
+.portal-scope .resources-line-university-link strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  font-size: 1rem;
+}
+
+.portal-scope .resources-line-university-link small {
+  margin-top: 4px;
+  color: var(--resources-line-muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+
+.portal-scope .resources-line-university-link svg {
+  flex: none;
+}
+
+.portal-scope .resources-line-lane-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.portal-scope .training-progress-card,
+.portal-scope .training-resource-card {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.portal-scope.dark .forms-line-row-audience,
+.dark .portal-scope .forms-line-row-audience,
+.portal-scope.dark .resources-line-university-link,
+.dark .portal-scope .resources-line-university-link {
+  border-color: var(--forms-line-line, rgba(231, 237, 244, 0.14));
+}
+
+.portal-scope .resources-line-doorway h2,
+.portal-scope .resources-line-lane-head h2,
+.portal-scope .resources-line-short-lane h2,
+.portal-scope .resources-line-pay-lane h2,
+.portal-scope .sales-line-fiber-head h2 {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.portal-scope .resources-line-doorway h2 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.portal-scope .resources-line-doorway p {
+  margin: 0;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.95rem;
+}
+
+.portal-scope .resources-line-doorway .resources-line-university-link {
+  margin: 14px 0 0;
+  border: 0;
+  padding: 10px 0;
+}
+
+.portal-scope .resources-line-tool-row > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.portal-scope .sales-line-fiber-head h2 {
+  font-size: 1.4rem;
+}
+
+.portal-scope .sales-line-fiber-updated {
+  margin: 4px 0 0;
+  color: var(--muted, #627187);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+}
+
+.portal-scope .sales-line-fiber-group-head strong {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope .calls-line-join,
+.portal-scope .calls-line-done,
+.portal-scope .resources-line-short-head a {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope.dark .sales-line-empty-state,
+.dark .portal-scope .sales-line-empty-state,
+.portal-scope.dark .forms-line-row-description,
+.dark .portal-scope .forms-line-row-description,
+.portal-scope.dark .resources-line-university-link small,
+.dark .portal-scope .resources-line-university-link small {
+  color: #9caabd;
+}
+
+.portal-scope.dark .calls-line-manage-bar strong,
+.dark .portal-scope .calls-line-manage-bar strong {
+  color: var(--calls-line-ink, #f4f7fa);
+}
+
+.portal-scope.dark .calls-line-manage-bar p,
+.dark .portal-scope .calls-line-manage-bar p {
+  color: #9caabd;
+}
+
+.portal-scope.dark .calls-line-required-calls button span,
+.dark .portal-scope .calls-line-required-calls button span {
+  color: #9caabd;
+}
+
+@media (max-width: 800px) {
+  .portal-scope .calls-line-week-strip {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  }
+
+  .portal-scope .calls-line-day-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    border-right: 1px solid var(--calls-line-line);
+    border-bottom: 0;
+  }
+
+  .portal-scope .calls-line-day-tab:last-child {
+    border-right: 0;
+  }
+
+  .portal-scope .forms-line-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 68px;
+  }
+
+  .portal-scope .sales-line-pay-totals > span:nth-child(2) {
+    display: block;
+  }
+}
+
+@media (max-width: 460px) {
+  .portal-scope .calls-line-required-calls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .portal-scope .forms-line {
+    padding-top: 20px;
+  }
+
+  .portal-scope .forms-line-row-copy strong {
+    font-size: 0.95rem;
+  }
+
+  .portal-scope .forms-line-row-description {
+    font-size: 0.76rem;
+  }
+
+  .portal-scope .forms-line-row-audience {
+    font-size: 0.68rem;
+  }
+}

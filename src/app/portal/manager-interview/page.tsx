@@ -1,19 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import {
   FormsLineAlert,
   FormsLineChoicePicker,
   FormsLineControl,
   FormsLineActions,
-  FormsLineFormHeader,
   FormsLineIdentity,
   FormsLineRail,
   FormsLineSection,
   FormsLineShell,
   FormsLineSuccess,
 } from '@/components/forms/FormsLine';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-leftovers.css';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
@@ -83,8 +85,11 @@ export default function ManagerInterviewPage() {
   return (
     <ProtectedRoute roles={[...managerInterviewRoles]}>
       <FormsLineShell>
-        <section className="forms-line-fill" aria-labelledby="manager-interview-title">
-          <FormsLineFormHeader title="Manager Interview" lane="05" />
+        <section className="forms-line-fill" aria-label="Manager Interview">
+          <PageTitle
+            title="Manager Interview"
+            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
+          />
           {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
           <div className="forms-line-fill-body">
             <div>
@@ -190,7 +195,7 @@ export default function ManagerInterviewPage() {
                 />
               )}
             </div>
-            <FormsLineRail status="Ready for manager review" note="A complete signature closes the final interview handoff." />
+            <FormsLineRail status="Ready for manager review" note="The signed decision is ready for the manager to review." />
           </div>
         </section>
       </FormsLineShell>

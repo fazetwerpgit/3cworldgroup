@@ -89,7 +89,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
       { label: 'Sales', href: '/portal/sales', icon: BadgeDollarSign, permissions: ['sales:read'] },
       { label: 'Team Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
-      { label: 'Calls Schedule', href: '/portal/calls', icon: CalendarClock },
+      { label: 'Calls', href: '/portal/calls', icon: CalendarClock },
       { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
       { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, onboardingOnly: true },
     ],

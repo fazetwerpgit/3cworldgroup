@@ -355,10 +355,9 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
     <section className="sales-line-fiber" aria-label="Install status">
       <div className="sales-line-fiber-head">
         <div>
-          <p className="sales-line-eyebrow">Provider report / install status</p>
-          <h2>Where your sales actually stand</h2>
+          <h2>Install status by rep</h2>
+          {updated && <p className="sales-line-fiber-updated">Updated {updated}</p>}
         </div>
-        {updated && <p className="sales-line-fiber-updated">Updated {updated}</p>}
       </div>
 
       {loading ? (

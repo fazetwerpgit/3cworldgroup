@@ -20,17 +20,17 @@ const SHOWABLE: PushPromptConditions = {
 };
 
 describe('isPushPromptSnoozed', () => {
-  it('snoozes for 14 days', () => {
-    expect(PUSH_PROMPT_SNOOZE_DAYS).toBe(14);
+  it('snoozes for 30 days', () => {
+    expect(PUSH_PROMPT_SNOOZE_DAYS).toBe(30);
   });
 
   it('is snoozed immediately after a dismissal and a day before the window closes', () => {
     expect(isPushPromptSnoozed(String(NOW), NOW)).toBe(true);
-    expect(isPushPromptSnoozed(String(NOW - 13 * DAY), NOW)).toBe(true);
+    expect(isPushPromptSnoozed(String(NOW - 29 * DAY), NOW)).toBe(true);
   });
 
   it('expires once the full window has passed', () => {
-    expect(isPushPromptSnoozed(String(NOW - 14 * DAY), NOW)).toBe(false);
+    expect(isPushPromptSnoozed(String(NOW - 30 * DAY), NOW)).toBe(false);
     expect(isPushPromptSnoozed(String(NOW - 90 * DAY), NOW)).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe('shouldShowPushPrompt', () => {
   it('stays hidden inside the snooze window and returns after it', () => {
     const snoozedAt = String(NOW - 3 * DAY);
     expect(shouldShowPushPrompt({ ...SHOWABLE, snoozedAt })).toBe(false);
-    expect(shouldShowPushPrompt({ ...SHOWABLE, snoozedAt, now: NOW + 12 * DAY })).toBe(true);
+    expect(shouldShowPushPrompt({ ...SHOWABLE, snoozedAt, now: NOW + 28 * DAY })).toBe(true);
   });
 
   it('keeps a denied permission hidden even after the snooze expires', () => {

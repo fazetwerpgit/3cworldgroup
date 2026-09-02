@@ -1,60 +1,86 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, X } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
 import { PUSH_PROMPT_SNOOZE_KEY, shouldShowPushPrompt } from '@/lib/push/pushPrompt';
+import '@/styles/sweep-rep-b.css';
 
-type State = 'hidden' | 'visible' | 'working' | 'failed';
+type State = 'ready' | 'working' | 'failed';
+
+export function usePushPromptVisible() {
+  const { user, loading } = useAuth();
+  const [visible, setVisible] = useState<boolean | null>(null);
+  const active = user?.status === 'active';
+
+  useEffect(() => {
+    if (loading || !active) return;
+    let cancelled = false;
+    void (async () => {
+      const supported = await pushSupported();
+      if (cancelled) return;
+      let snoozedAt: string | null = null;
+      try {
+        snoozedAt = window.localStorage.getItem(PUSH_PROMPT_SNOOZE_KEY);
+      } catch {
+        // If storage is unavailable, the prompt can still be shown.
+      }
+      setVisible(shouldShowPushPrompt({
+        active,
+        supported,
+        permission: supported ? Notification.permission : 'denied',
+        snoozedAt,
+        now: Date.now(),
+      }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, loading]);
+
+  const hide = useCallback(() => setVisible(false), []);
+  const resolvedVisible = loading ? null : active ? visible : false;
+  return [resolvedVisible, hide] as const;
+}
 
 // One-time nudge to turn on push, so a rep doesn't have to find the Settings card.
 // It cannot fire the native dialog itself: browsers (iOS PWA especially) only allow
 // Notification.requestPermission() from a user gesture, so the "Turn on" button is
 // the gesture. Shows only while the permission is still undecided — a granted or
 // denied permission is never 'default' again, so the prompt retires on its own.
-export default function PushPromptBanner() {
-  const { user, loading } = useAuth();
-  const [state, setState] = useState<State>('hidden');
-
-  const active = !loading && user?.status === 'active';
-
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    (async () => {
-      const supported = await pushSupported();
-      if (cancelled) return;
-      const show = shouldShowPushPrompt({
-        active,
-        supported,
-        // Safe to read only once pushSupported() confirmed Notification exists.
-        permission: supported ? Notification.permission : 'denied',
-        snoozedAt: window.localStorage.getItem(PUSH_PROMPT_SNOOZE_KEY),
-        now: Date.now(),
-      });
-      if (show) setState('visible');
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [active]);
+export default function PushPromptBanner({
+  visible,
+  onDismiss,
+}: {
+  visible: boolean | null;
+  onDismiss: () => void;
+}) {
+  const [state, setState] = useState<State>('ready');
 
   const turnOn = useCallback(async () => {
     setState('working');
     const result = await enablePushOnDevice();
     // 'blocked' means they declined the native dialog — permission is 'denied' now, so
     // hiding is final. Only a failed registration is worth offering a retry for.
-    setState(result === 'failed' ? 'failed' : 'hidden');
-  }, []);
+    if (result === 'failed') {
+      setState('failed');
+      return;
+    }
+    onDismiss();
+  }, [onDismiss]);
 
   const notNow = useCallback(() => {
-    window.localStorage.setItem(PUSH_PROMPT_SNOOZE_KEY, String(Date.now()));
-    setState('hidden');
-  }, []);
+    try {
+      window.localStorage.setItem(PUSH_PROMPT_SNOOZE_KEY, String(Date.now()));
+    } catch {
+      // Ignore storage failures; hide for this visit.
+    }
+    onDismiss();
+  }, [onDismiss]);
 
-  if (state === 'hidden') return null;
+  if (visible !== true) return null;
 
   return (
     <div className="portal-push-prompt portal-enter" role="region" aria-label="Turn on notifications">
@@ -63,11 +89,10 @@ export default function PushPromptBanner() {
           <Bell />
         </span>
         <div className="portal-push-prompt-body">
-          <p className="portal-push-prompt-eyebrow">Notifications / turn on?</p>
           <p className="portal-push-prompt-text">
             {state === 'failed'
               ? 'Could not turn them on. Please try again.'
-              : 'Get chat messages and sale updates on this device.'}
+              : 'Get chat and sale alerts on this phone'}
           </p>
           <div className="portal-push-prompt-actions">
             <button type="button" className="portal-push-prompt-primary" onClick={turnOn} disabled={state === 'working'}>
@@ -78,9 +103,6 @@ export default function PushPromptBanner() {
             </button>
           </div>
         </div>
-        <button type="button" className="portal-push-prompt-close" onClick={notNow} aria-label="Dismiss">
-          <X />
-        </button>
       </div>
     </div>
   );

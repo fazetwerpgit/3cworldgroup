@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Lock } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-a.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
@@ -200,32 +202,13 @@ export default function OnboardingReviewPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
-          <div className="ops-line-ticker">
-            <b>ON AIR</b>
-            <span>Ops signal / onboarding review · people on deck</span>
-            <strong>QUEUE LIVE</strong>
-          </div>
-
-          <div className="ops-line-hero">
-            <div>
-              <p className="ops-line-kicker">03 / The Line / people on deck</p>
-              <h1><span>Clear</span><br />the people.</h1>
-              <p className="ops-line-intro">
-                Keep one queue model for every document. Filters make the work narrow; the activation rail makes the
-                handoff obvious.
-              </p>
-            </div>
-            <div className="ops-line-hero-count">
-              <strong className="ops-line-display portal-metallic-num">{submissions.length}</strong>
-              <small>submissions waiting</small>
-            </div>
-          </div>
+          <PageTitle title="Onboarding Review" meta={`${submissions.length} waiting`} subtitle="Review submitted documents and send clear next steps." />
 
           <div className="ops-line-onboarding-filters">
             <span className="ops-line-kicker">Person</span>
             <div className="ops-line-pill-row" role="group" aria-label="Person filter">
               <button type="button" aria-pressed={personFilter === 'all'} onClick={() => setPersonFilter('all')}>
-                All people
+                All People
               </button>
               {people.map((p) => (
                 <button key={p.key} type="button" aria-pressed={personFilter === p.key} onClick={() => setPersonFilter(p.key)}>
@@ -239,7 +222,7 @@ export default function OnboardingReviewPage() {
               aria-pressed={atRiskOnly}
               onClick={() => setAtRiskOnly((v) => !v)}
             >
-              At-risk only
+              At-risk Only
             </button>
           </div>
 
@@ -255,7 +238,7 @@ export default function OnboardingReviewPage() {
               <p>
                 {submissions.length === 0
                   ? 'No onboarding submissions need review right now.'
-                  : 'Clear filters to return to FIFO.'}
+                  : 'Clear filters to see all submissions.'}
               </p>
             </div>
           ) : (
@@ -292,14 +275,14 @@ export default function OnboardingReviewPage() {
                       </span>
                       <span className="ops-line-cell">
                         <strong>{waitLabel(submission.submittedAt)} waiting</strong>
-                        <small>FIFO position</small>
+                        <small>Waiting time</small>
                       </span>
                       <span className="ops-line-cell">
                         <strong className="ops-line-sensitive">
                           {submission.sensitive && <Lock className="h-3 w-3" aria-hidden="true" />}
                           {submission.sensitive ? 'Sensitive item' : 'Standard review'}
                         </strong>
-                        <small>FIFO position</small>
+                        <small>Waiting time</small>
                       </span>
                       <span className="ops-line-evidence-group">
                         <span className="ops-line-file-chip">
@@ -385,20 +368,16 @@ export default function OnboardingReviewPage() {
 
           {!loading && filteredEsignPending.length > 0 && (
             <section style={{ marginTop: 28 }} aria-labelledby="esign-pending-heading">
-              <div className="ops-line-hero ops-line-hero-subsection" style={{ marginBottom: 12 }}>
+              <div className="sweep-subsection-head" style={{ marginBottom: 12 }}>
                 <div>
-                  <p className="ops-line-kicker">Signature lane</p>
                   <h2 id="esign-pending-heading" style={{ fontSize: 24, fontWeight: 900 }}>
                     Out for signature
                   </h2>
                   <p className="ops-line-intro">
-                    These documents are with the rep. Reject an envelope only when ops needs a fresh one sent.
+                    These documents are with the rep. Reject one only when a fresh signature is needed.
                   </p>
                 </div>
-                <div className="ops-line-hero-count">
-                  <strong className="ops-line-display portal-metallic-num">{filteredEsignPending.length}</strong>
-                  <small>out for signature</small>
-                </div>
+                <span className="sweep-subsection-count">{filteredEsignPending.length} out for signature</span>
               </div>
               <div className="ops-line-list">
                 {groupSubmissions(filteredEsignPending).map((group) => (
@@ -494,20 +473,16 @@ export default function OnboardingReviewPage() {
 
           {!loading && (
             <section style={{ marginTop: 28 }} aria-labelledby="completed-heading">
-              <div className="ops-line-hero ops-line-hero-subsection" style={{ marginBottom: 12 }}>
+              <div className="sweep-subsection-head" style={{ marginBottom: 12 }}>
                 <div>
-                  <p className="ops-line-kicker">Review history</p>
                   <h2 id="completed-heading" style={{ fontSize: 24, fontWeight: 900 }}>
                     Completed
                   </h2>
                   <p className="ops-line-intro">
-                    Approved and rejected onboarding items, newest review first.
+                    Approved and rejected items, newest review first.
                   </p>
                 </div>
-                <div className="ops-line-hero-count">
-                  <strong className="ops-line-display portal-metallic-num">{filteredCompleted.length}</strong>
-                  <small>completed</small>
-                </div>
+                <span className="sweep-subsection-count">{filteredCompleted.length} completed</span>
               </div>
               {filteredCompleted.length === 0 ? (
                 <p className="ops-line-intro">Nothing completed yet.</p>

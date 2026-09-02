@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { Lock } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserForm } from '@/components/admin/UserForm';
@@ -9,10 +10,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole, isAdminLevel } from '@/types';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-leftovers.css';
 
 export default function EditUserPage() {
   const params = useParams();
-  const router = useRouter();
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +106,10 @@ export default function EditUserPage() {
     setRevealLogged(true);
   };
 
+  const userRole = user ? getEffectiveRole(user) : undefined;
+  const userRoleLabel = userRole ? RoleDisplayNames[userRole as UserRole] : 'Role not set';
+  const userStatusLabel = user?.status ? user.status.replace(/^./, (c) => c.toUpperCase()) : 'Active';
+
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className="admin-line-main">
@@ -122,46 +128,15 @@ export default function EditUserPage() {
 
           {user && (
             <>
-              <header className="admin-line-hero">
-                <div>
-                  <div className="admin-line-kicker">person record / approved sales</div>
-                  <h1>
-                    <span className="accent">{user.displayName || user.email}.</span>
-                    <span className="plain">Make the record useful.</span>
-                  </h1>
-                  <p className="admin-line-intro">
-                    The same record surface serves editing and creating. Keep identity clear, role
-                    decisions explicit, and sensitive records behind a visible boundary.
-                  </p>
-                  <div className="admin-line-quick-rail">
-                    <span className="admin-line-role">
-                      {(() => {
-                        const effective = getEffectiveRole(user);
-                        return effective ? RoleDisplayNames[effective as UserRole] : '—';
-                      })()}
-                    </span>
-                    <span className={`admin-line-status ${user.status || 'active'}`}>
-                      {(user.status || 'active').replace(/^./, (c) => c.toUpperCase())}
-                    </span>
-                    <span className="admin-line-chip">
-                      employee / {user.uid.slice(0, 8).toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                <div className="admin-line-hero-count">
-                  <span className="admin-line-display portal-metallic-num">{salesCount}</span>
-                  <small>approved sales</small>
-                </div>
-              </header>
-
-              <button
-                type="button"
-                className="admin-line-clear-button"
-                style={{ marginTop: 14 }}
-                onClick={() => router.push('/portal/admin/users')}
-              >
-                ← Back to roster
-              </button>
+              <PageTitle
+                title={user.displayName || user.email || 'User'}
+                meta={`${userRoleLabel} · ${userStatusLabel}`}
+                back={(
+                  <Link className="admin-line-clear-button" href="/portal/admin/users">
+                    ← Back to users
+                  </Link>
+                )}
+              />
 
               <div className="admin-line-person-layout">
                 <main className="admin-line-panel">
@@ -169,10 +144,9 @@ export default function EditUserPage() {
 
                   {isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
                     <div className="admin-line-form-section admin-line-vault">
-                      <div className="admin-line-eyebrow">03 / sensitive records</div>
-                      <h3>Vaulted, not casual.</h3>
+                      <h3>Sensitive information</h3>
                       <p className="admin-line-sub">
-                        Admin-only reference values remain masked until someone names the risk.
+                        Admin-only values stay masked until you choose to view them.
                       </p>
                       <div className="admin-line-vault-grid">
                         <div className="admin-line-vault-item">
@@ -197,7 +171,7 @@ export default function EditUserPage() {
                           >
                             Reveal for this session
                           </button>
-                          <span className="admin-line-meta">audit trail records the reveal</span>
+                          <span className="admin-line-meta">This view is recorded.</span>
                         </div>
                       )}
                       {revealOpen && !revealed && (
@@ -217,21 +191,19 @@ export default function EditUserPage() {
                   )}
                 </main>
                 <aside className="admin-line-panel">
-                  <div className="admin-line-eyebrow">record posture</div>
-                  <h2 style={{ margin: '7px 0 0', fontSize: 20, fontWeight: 900, letterSpacing: '-.06em', textTransform: 'uppercase' }}>
-                    One person, one decision.
+                  <h2 style={{ margin: '7px 0 0', fontSize: 20, fontWeight: 900 }}>
+                    Account details
                   </h2>
                   <p className="admin-line-sub">
-                    Role chips, status chips, and a named manager keep the record legible to the next
-                    admin.
+                    Review the role, status, and manager details here.
                   </p>
                   <div className="admin-line-quick-rail">
                     <span className="admin-line-chip lime">{salesCount} sales</span>
                   </div>
                   <div className="admin-line-form-section">
-                    <div className="admin-line-eyebrow">saved lines</div>
+                    <h3>Saving changes</h3>
                     <p className="admin-line-sub">
-                      Profile edits save inline. Dirty fields pull the save bar into view.
+                      Profile edits save in the form. Unsaved changes show a save action.
                     </p>
                   </div>
                 </aside>

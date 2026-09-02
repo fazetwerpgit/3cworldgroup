@@ -12,6 +12,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-admin-a.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
 import { getIdToken } from '@/lib/firebase/getIdToken';
@@ -269,51 +271,29 @@ export default function RecruitingCommandCenterPage() {
     >
       <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
         <div className="ops-line">
-          <div className="ops-line-ticker">
-            <b>ON AIR</b>
-            <span>Ops signal / recruit intake · one board</span>
-            <strong>{loading ? 'SYNCING' : 'LIVE'}</strong>
-          </div>
-
-          <div className="ops-line-hero">
-            <div>
-              <p className="ops-line-kicker">05 / The Line / recruit intake</p>
-              <h1>
-                <span>Open</span>
-                <br />
-                the line.
-              </h1>
-              <p className="ops-line-intro">
-                Create invite links, keep recruits inside the website, and activate submitted profiles
-                from one manager queue.
-              </p>
-            </div>
-            <div className="ops-line-hero-count">
-              <strong className="ops-line-display portal-metallic-num">{loading ? '—' : submittedCount}</strong>
-              <small>submitted, waiting on you</small>
-            </div>
-          </div>
+          <PageTitle
+            title="Recruiting"
+            meta={`${loading ? '—' : waitingApplications} applications`}
+            subtitle="Send invites, review applications, and activate submitted profiles."
+            actions={<button type="button" className="ops-line-primary" onClick={() => document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>New Invite</button>}
+          />
 
           <div className="ops-line-recruiting-strip">
             <div className="ops-line-strip-cell">
-              <span>In motion</span>
+              <span>Invited</span>
               <b>{loading ? '—' : inProgressCount}</b>
-              <span className="note">invited, not yet submitted</span>
             </div>
             <div className="ops-line-strip-cell accent">
               <span>Submitted</span>
               <b>{loading ? '—' : submittedCount}</b>
-              <span className="note">ready to activate or reject</span>
             </div>
             <div className="ops-line-strip-cell">
               <span>Activated</span>
               <b>{loading ? '—' : activeCount}</b>
-              <span className="note">converted to a real account</span>
             </div>
             <div className="ops-line-strip-cell">
               <span>Applications</span>
               <b>{loading ? '—' : waitingApplications}</b>
-              <span className="note">from the public website</span>
             </div>
           </div>
 
@@ -325,7 +305,7 @@ export default function RecruitingCommandCenterPage() {
           )}
 
           <div className="ops-line-recruiting-grid">
-            <div className="ops-line-form-card">
+            <div className="ops-line-form-card" id="invite-form">
               <div className="ops-line-form-head">
                 <UserPlus size={15} />
                 <h3>Start Recruit Onboarding</h3>
@@ -388,7 +368,7 @@ export default function RecruitingCommandCenterPage() {
                   </div>
                 </div>
                 <div className="ops-line-field">
-                  <label>Role Path</label>
+                  <label>Role</label>
                   <select
                     className="ops-line-select"
                     value={form.intendedFieldRole}
@@ -413,7 +393,7 @@ export default function RecruitingCommandCenterPage() {
                 </label>
                 <button type="submit" className="ops-line-primary" disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
                   {saving ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                  Create Invite Link
+                  Create invite
                 </button>
               </form>
 
@@ -499,7 +479,7 @@ export default function RecruitingCommandCenterPage() {
 
             <div className="ops-line-queue-card-wide">
               <div className="ops-line-form-head">
-                <h3>Recruit Onboarding Queue</h3>
+                <h3>Invites</h3>
               </div>
               {loading ? (
                 <div className="ops-line-state-card">Loading recruits…</div>
@@ -592,7 +572,7 @@ export default function RecruitingCommandCenterPage() {
           </div>
 
           <div className="ops-line-quiet-rail">
-            <span>Empty queues stay quiet — 0 new means clear, never an alarm.</span>
+            <span>No new items means there is nothing to review.</span>
             <button type="button" className="ops-line-export" onClick={fetchRecruiting} disabled={loading}>
               {loading ? <Loader2 size={12} className="animate-spin" /> : <Clipboard size={12} />}
               Refresh

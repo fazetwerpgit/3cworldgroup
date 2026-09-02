@@ -12,6 +12,7 @@ import {
   OptionKey,
 } from '@/lib/forms/formOptionsRegistry';
 import { AdminCatalogCard, AdminCatalogList } from '@/components/admin/AdminCatalogList';
+import '@/styles/sweep-admin-b.css';
 
 export default function AdminFormOptionsPage() {
   const { user } = useAuth();
@@ -93,12 +94,8 @@ export default function AdminFormOptionsPage() {
   return (
     <ProtectedRoute roles={['admin']}>
       <AdminCatalogList
-        kicker="catalog / form options"
-        heroAccent="Keep every record"
-        heroPlain="ready to reuse."
-        intro="Edit dropdown lists used by portal forms. Saved changes are used by reps and server-side validation."
-        heroCount={EDITABLE_OPTION_KEYS.length}
-        heroCountLabel="option lists on file"
+        title="Form Options"
+        meta={`${EDITABLE_OPTION_KEYS.length} option lists`}
         loading={loading}
         loadingLabel="Loading form options…"
         error={error || null}
@@ -111,7 +108,6 @@ export default function AdminFormOptionsPage() {
         {EDITABLE_OPTION_KEYS.map((key) => (
           <AdminCatalogCard
             key={key}
-            eyebrow="form options"
             title={FORM_OPTION_LABELS[key]}
             statusLabel={successKey === key ? 'saved' : undefined}
             statusTone="lime"
@@ -123,13 +119,13 @@ export default function AdminFormOptionsPage() {
                     <span className="admin-line-meta">No options yet.</span>
                   ) : (
                     options[key].map((value, index) => (
-                      <span key={`${value}-${index}`} className="admin-line-value-chip" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span key={`${value}-${index}`} className="admin-line-value-chip">
                         {value}
                         <button
                           type="button"
+                          className="admin-line-value-chip-remove"
                           aria-label={`Remove ${value}`}
                           onClick={() => removeValue(key, index)}
-                          style={{ border: 0, background: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 900 }}
                         >
                           ×
                         </button>
@@ -137,7 +133,7 @@ export default function AdminFormOptionsPage() {
                     ))
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="admin-line-form-option-add">
                   <input
                     className="admin-line-search"
                     style={{ flex: '1 1 auto' }}
@@ -152,16 +148,20 @@ export default function AdminFormOptionsPage() {
                     placeholder="Type a value"
                   />
                   <button type="button" className="admin-line-action" onClick={() => addValue(key)}>
-                    Add value
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-line-primary"
+                    onClick={() => saveValues(key)}
+                    disabled={savingKey === key}
+                  >
+                    {savingKey === key ? 'Saving…' : 'Save'}
                   </button>
                 </div>
               </div>
             }
-            actions={
-              <button type="button" className="admin-line-primary" onClick={() => saveValues(key)} disabled={savingKey === key}>
-                {savingKey === key ? 'Saving…' : 'Save inline'}
-              </button>
-            }
+            actions={null}
           />
         ))}
       </AdminCatalogList>

@@ -1,19 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import {
   FormsLineAlert,
   FormsLineChoicePicker,
   FormsLineControl,
   FormsLineActions,
-  FormsLineFormHeader,
   FormsLineIdentity,
   FormsLineRail,
   FormsLineSection,
   FormsLineShell,
   FormsLineSuccess,
 } from '@/components/forms/FormsLine';
+import { PageTitle } from '@/components/portal/PageTitle';
+import '@/styles/sweep-leftovers.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
@@ -63,8 +65,11 @@ export default function FiberReportPage() {
   return (
     <ProtectedRoute>
       <FormsLineShell>
-        <section className="forms-line-fill" aria-labelledby="fiber-report-title">
-          <FormsLineFormHeader title="Fiber Report" lane="01" />
+        <section className="forms-line-fill" aria-label="Fiber Report">
+          <PageTitle
+            title="Fiber Report"
+            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
+          />
           {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
           <div className="forms-line-fill-body">
             <div>

@@ -201,14 +201,13 @@ export function PortalSidebar() {
         style={{ '--portal-rail-width': railWidth } as React.CSSProperties}
       >
         <div className="portal-rail-top">
-          <p className="portal-rail-kicker">Navigation / rail</p>
           <button
             type="button"
             className="portal-rail-collapse"
             onClick={() => setCollapsed((current) => !current)}
-            aria-label={collapsed ? 'Expand navigation rail' : 'Collapse navigation rail'}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
             aria-expanded={!collapsed}
-            title={collapsed ? 'Expand navigation rail' : 'Collapse navigation rail'}
+            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
           >
             <ChevronLeft aria-hidden="true" />
           </button>
@@ -225,9 +224,9 @@ export function PortalSidebar() {
         </nav>
 
         <div className="portal-rail-footer">
-          <Link href="/" className="portal-rail-footer-link" title={collapsed ? 'Back to Main Site' : undefined}>
+          <Link href="/" className="portal-rail-footer-link" title={collapsed ? 'Back to main site' : undefined}>
             <ArrowLeftToLine aria-hidden="true" />
-            <span>Back to Main Site</span>
+            <span>Back to main site</span>
           </Link>
         </div>
       </aside>

@@ -1,0 +1,75 @@
+/* Portal UX sweep shell fixes. Keep this file scoped so public pages are untouched. */
+.portal-scope .portal-push-permission-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--rail-stage, #ffffff);
+  border-radius: 999px;
+  background: #d97706;
+}
+
+.portal-scope .portal-sheet-actions {
+  display: grid;
+  gap: 4px;
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rail-line);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.portal-scope .portal-sheet-actions a,
+.portal-scope .portal-sheet-actions button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--rail-muted);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.portal-scope .portal-sheet-actions a:hover,
+.portal-scope .portal-sheet-actions a:focus-visible,
+.portal-scope .portal-sheet-actions button:hover,
+.portal-scope .portal-sheet-actions button:focus-visible {
+  color: var(--rail-lime);
+}
+
+.portal-scope .portal-sheet-actions svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+
+.portal-scope .portal-sheet-link {
+  min-height: 44px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.portal-scope .portal-sheet-header h2 {
+  font-family: var(--font-archivo), var(--font-sans), Arial, sans-serif;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.portal-scope .portal-sheet-header button {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.portal-scope.dark .portal-push-permission-dot,
+.dark .portal-scope .portal-push-permission-dot {
+  border-color: var(--rail-stage, #030916);
+  background: #f59e0b;
+}

@@ -174,10 +174,10 @@ export function SignupForm() {
       <div className="member-line-signup-shell member-line">
         <div className="member-line-masthead">
           <div>
-            <p className="member-line-kicker">signup broadcast / first signal</p>
+            <p className="member-line-kicker">Employee portal</p>
             <h1>
-              <span className="accent">Join the line.</span>
-              <span>Find your lane.</span>
+              <span className="accent">Create your account.</span>
+              <span>Takes about a minute.</span>
             </h1>
             <p className="member-line-intro">
               Enter your team code, verify your email, and your manager activates your account.
@@ -195,7 +195,7 @@ export function SignupForm() {
 
         <div className="member-line-signup">
           <section className="member-line-form-card">
-            <p className="member-line-eyebrow">01 / your signal</p>
+            <p className="member-line-eyebrow">Your details</p>
             <h2>Join with your team code</h2>
             <p>Your manager gave you a team code. Use an email you check regularly.</p>
 
@@ -316,8 +316,8 @@ export function SignupForm() {
           <aside className="member-line-brand-card">
             <div>
               <div className="member-line-index-line">
-                <b>02</b>
-                <span>/ the member signal</span>
+                <b>3C</b>
+                <span>Team portal</span>
               </div>
               <h2>
                 Make the next move <em>visible.</em>

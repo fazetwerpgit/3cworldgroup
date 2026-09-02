@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PageTitle } from '@/components/portal/PageTitle';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
 import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
@@ -15,6 +16,7 @@ import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { Sale, SaleStatus } from '@/types';
+import '@/styles/sweep-rep-a.css';
 
 const STATUS_VALUES: SaleStatus[] = ['pending', 'approved', 'rejected', 'cancelled'];
 
@@ -79,9 +81,7 @@ function InReviewSection({ sales }: { sales: Sale[] }) {
             );
           })}
         </div>
-      ) : (
-        <p className="sales-line-inreview-empty">Nothing waiting on review. Everything you&apos;ve sent in has been decided.</p>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -113,7 +113,7 @@ function AnimatedNumber({ value }: { value: number }) {
 function SalesLineSkeleton() {
   return (
     <div className="sales-line sales-line-loading" aria-label="Loading sales">
-      <div className="sales-line-mast sales-skeleton-line" />
+      <PageTitle title="Sales" meta="Loading" />
       <div className="sales-line-command">
         <div className="sales-line-command-top">
           <div className="sales-skeleton-stack">
@@ -178,12 +178,6 @@ function SalesContent() {
   const expectedPayMtd = canApprove || !hasPlan
     ? null
     : payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
-  const dateLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
-    .format(now)
-    .toUpperCase();
-  const weekdayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long' })
-    .format(now)
-    .toUpperCase();
 
   useEffect(() => {
     const filters: { salesRepId?: string; limit?: number } = { limit: 100 };
@@ -204,13 +198,8 @@ function SalesContent() {
     return approveSale(saleId, status, reason);
   };
 
-  const managerCopy = canApprove;
   const boardCount = mtdSales.length;
   const boardValue = sumValue(mtdSales);
-  const contextCopy = managerCopy
-    ? `${pendingSales.length} submission${pendingSales.length === 1 ? '' : 's'} in flight. Start with the oldest, then let the ledger carry the rest of the month.`
-    : 'Your sales are on the board. Pending statuses stay visible, but review decisions remain with management.';
-
   return (
     <ProtectedRoute permissions={['sales:read']}>
       <div className="min-h-screen portal-canvas">
@@ -219,28 +208,22 @@ function SalesContent() {
           <PortalSidebar />
           <main className="sales-line-main flex-1 overflow-auto">
             <div className="sales-line">
-              <div className="sales-line-mast">
-                <span className="sales-line-mark">3C WORLD GROUP / THE LINE / SALES</span>
-                <span className="sales-line-mast-meta">{dateLabel} · {weekdayLabel}</span>
-              </div>
+              <PageTitle
+                title="Sales"
+                meta={`${boardCount} this month`}
+                actions={(
+                  <Link className="sales-line-primary" href="/portal/sales/new">
+                    <Plus className="sales-line-icon" aria-hidden="true" />
+                    Log Sale
+                  </Link>
+                )}
+              />
 
-              <header className="sales-line-command">
-                <div className="sales-line-command-top">
-                  <div>
-                    <p className="sales-line-eyebrow">{managerCopy ? 'Management / priority flow' : 'Field sales / your flow'}</p>
-                    <h1><span>{boardCount} sales</span> on the board.</h1>
-                    <p className="sales-line-context">{contextCopy}</p>
-                    <Link className="sales-line-primary" href="/portal/sales/new">
-                      <Plus className="sales-line-icon" aria-hidden="true" />
-                      Log sale
-                    </Link>
-                  </div>
-                  <div className="sales-line-hero-number">
-                    <strong className="sales-line-display portal-metallic-num"><AnimatedNumber value={boardValue} /></strong>
-                    <small>Monthly value · $ / mo</small>
-                  </div>
-                </div>
+              {!loading && sales.length === 0 && (
+                <p className="sales-line-empty-state">No sales yet. Log your first one.</p>
+              )}
 
+              <section className="sales-line-command" aria-label="Sales summary">
                 <section className="sales-line-broadcast" aria-label="Sales KPIs">
                   <div className="sales-line-metric">
                     <span className="sales-line-metric-label">Value MTD</span>
@@ -248,45 +231,47 @@ function SalesContent() {
                     <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records this month</span>
                   </div>
                   <div className="sales-line-metric">
-                    <span className="sales-line-metric-label">Sales on board</span>
-                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardCount} /><small>SALES</small></strong>
+                    <span className="sales-line-metric-label">Sales this month</span>
+                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardCount} /><small>sales</small></strong>
                     <span className="sales-line-metric-note">{approvedMtd} approved · {pendingSales.length} pending</span>
                   </div>
                   <div className="sales-line-metric">
                     <span className="sales-line-metric-label">Pending review</span>
-                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={pendingSales.length} /><small>OPEN</small></strong>
+                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={pendingSales.length} /><small>open</small></strong>
                     <span className="sales-line-metric-note">Oldest <span className="sales-line-lime">{oldestIdle ? `${oldestIdle} days` : 'today'}</span> idle</span>
                   </div>
                   <div className="sales-line-metric">
                     <span className="sales-line-metric-label">{expectedPayMtd === null ? 'Commission MTD' : 'Expected pay MTD'}</span>
                     <strong className="sales-line-metric-value portal-metallic-num">
-                      {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ EXPECTED</small></>}
+                      {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ expected</small></>}
                     </strong>
                     <span className="sales-line-metric-note">{expectedPayMtd === null
                       ? (commissionCount ? `${commissionCount} recorded value${commissionCount === 1 ? '' : 's'}` : 'No commission values recorded')
                       : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} this month`}</span>
                   </div>
                 </section>
-              </header>
+              </section>
 
               {error && <div className="sales-line-error" role="alert">{error}</div>}
 
-              {!canApprove && !loading && <InReviewSection sales={pendingSales} />}
+              {!canApprove && !loading && pendingSales.length > 0 && <InReviewSection sales={pendingSales} />}
 
               {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
 
-              <SalesTable
-                sales={sales}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setFilter}
-                onApprove={canApprove ? handleApproval : undefined}
-                onDelete={deleteSale}
-                loading={loading}
-                payView={payView}
-                onPayViewChange={setPayView}
-                payPlan={payPlan}
-                fiber={fiber}
-              />
+              {(loading || sales.length > 0) && (
+                <SalesTable
+                  sales={sales}
+                  statusFilter={statusFilter}
+                  onStatusFilterChange={setFilter}
+                  onApprove={canApprove ? handleApproval : undefined}
+                  onDelete={deleteSale}
+                  loading={loading}
+                  payView={payView}
+                  onPayViewChange={setPayView}
+                  payPlan={payPlan}
+                  fiber={fiber}
+                />
+              )}
             </div>
           </main>
         </div>
