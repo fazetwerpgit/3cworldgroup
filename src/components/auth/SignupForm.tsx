@@ -10,6 +10,55 @@ import { validateSignup, passwordStrength, PASSWORD_STRENGTH_LABEL } from '@/lib
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { looksLikeBotSignup } from '@/lib/auth/botDetection';
 
+interface Grecaptcha {
+  ready(callback: () => void): void;
+  execute(siteKey: string, options: { action: string }): Promise<string> | string;
+}
+
+declare global {
+  interface Window {
+    grecaptcha?: Grecaptcha;
+  }
+}
+
+let recaptchaScriptPromise: Promise<void> | null = null;
+
+function loadRecaptchaScript() {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('reCAPTCHA is only available in the browser'));
+  }
+  if (window.grecaptcha) {
+    return Promise.resolve();
+  }
+  if (recaptchaScriptPromise) {
+    return recaptchaScriptPromise;
+  }
+
+  const existingScript = document.querySelector<HTMLScriptElement>(
+    'script[src^="https://www.google.com/recaptcha/api.js"]',
+  );
+  recaptchaScriptPromise = new Promise<void>((resolve, reject) => {
+    const script = existingScript ?? document.createElement('script');
+    script.addEventListener('load', () => resolve(), { once: true });
+    script.addEventListener('error', () => reject(new Error('Failed to load reCAPTCHA')), { once: true });
+    if (!existingScript) {
+      script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? '')}`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }).then(() => {
+    if (!window.grecaptcha) {
+      throw new Error('reCAPTCHA did not initialize');
+    }
+  }).catch((error) => {
+    recaptchaScriptPromise = null;
+    throw error;
+  });
+
+  return recaptchaScriptPromise;
+}
+
 // Real 3-step structural fact describing the account flow (verify -> manager
 // approves -> role assigned + onboarding starts) — not measured data, same
 // reasoning as Settings' static 5 (member-the-line-goal.md).
@@ -50,6 +99,43 @@ export function SignupForm() {
     setError('');
     setLoading(true);
     try {
+      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+      if (siteKey) {
+        try {
+          await loadRecaptchaScript();
+          const token = await new Promise<string>((resolve, reject) => {
+            try {
+              const grecaptcha = window.grecaptcha;
+              if (!grecaptcha) {
+                reject(new Error('reCAPTCHA is unavailable'));
+                return;
+              }
+              grecaptcha.ready(() => {
+                try {
+                  Promise.resolve(grecaptcha.execute(siteKey, { action: 'signup' })).then(resolve).catch(reject);
+                } catch (error) {
+                  reject(error);
+                }
+              });
+            } catch (error) {
+              reject(error);
+            }
+          });
+          const captchaResponse = await fetch('/api/portal/auth/captcha', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+          });
+          const captchaData = await captchaResponse.json() as { ok?: unknown };
+          if (!captchaResponse.ok || captchaData.ok !== true) {
+            setError('Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.');
+            return;
+          }
+        } catch {
+          setError('Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.');
+          return;
+        }
+      }
       await signUp(email.trim(), password, displayName.trim());
       // AuthContext set pendingApproval; go to /portal, which renders the
       // real PendingApproval component (this page only knows how to show the form).
