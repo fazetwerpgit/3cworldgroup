@@ -12,10 +12,11 @@ verified on https://www.3cworldgroup.com (master cbeb4f0 = sweep ab7d89d +
 font-fallback fix 9b3cae4; phone dark by default, plain page headers, inline
 push prompt, page titles render in Archivo). QA bot qa-e2e-1@3cworldgroup.test
 deleted from Auth + Firestore (2026-09-02). Temp scripts removed.
-OPEN FOR JACOB: master still lacks three older branch commits never
-cherry-picked (6fafac4 esign completed-envelope fix + dismissible aged alerts,
-40a0942 alerts read legacy `Email`, 38d1f2b operations-only-own-sales view) —
-ship them or not is his call. Local `master` ref is checked out in worktree
+Jacob approved shipping the three older branch commits (esign completed-envelope
+fix + dismissible aged alerts, alerts read legacy `Email`, operations-only-own
+sales) — cherry-picked to master as 4ed3092 (2026-09-02). Note: Jacob has a
+separate redesign in progress in Codex; do NOT merge unreviewed branch work to
+master without asking. Local `master` ref is checked out in worktree
 ~/dev/3cwg-payplan (stale); never force-update it, push by sha
 (`git push origin <sha>:master`). Admin SDK scripts: load env via
 @next/env loadEnvConfig and use FIREBASE_SERVICE_ACCOUNT (base64 JSON);
@@ -72,17 +73,40 @@ re-run only a failed check. Freeze components inside the 1px bound and do not ch
 subpixel RMSE or font-antialiasing noise.
 
 LATEST PUBLIC-SITE STATE (2026-09-02; supersedes the older chronology below):
-Home and About are approved/frozen. Jacob's verbatim About R11O verdict is
-`Approve`. Accepted board: `docs/redesign/qa/visual-remediation-2026-08-26/
-round16/about-round3-rejection-audit/about-round3-r11o-target-current-review.png`;
-independent production build `s1f6xgkwruZrBHBkLdabO` and exact 1440 runtime
-invariants pass. Do not reopen About.
+Home, About, Culture, Services, and Careers are approved/frozen. Jacob's verbatim
+Careers Round 1 verdict is `Approve`. Accepted board: `docs/redesign/qa/
+visual-remediation-2026-08-26/round19/careers-round1/
+careers-adapted-target-current-final.png`; production build
+`j1R5rW6Dd66KCaofFZWOB` and exact 1440 runtime invariants pass. Do not reopen any
+approved page.
 
-CURRENT PAGE/ROUND: Culture Round 1. NEXT ACTION: resolve the locked 1440 Culture
-source, capture the current optimized-production route once, create same-size
-section comparisons, then dispatch one measured consolidated Culture-only Luna
-correction. Shared shell, Home, and About remain read-only. Use the 1px/no-
-overengineering rule; no commit or deploy. Port 3100 is stopped.
+CURRENT PAGE/ROUND: Contact Round 1 — corrected after the user's Round 1I rejection;
+awaiting Jacob's new approve/reject verdict. Jacob's latest rejection was `Rejected.
+Theres some very minor things that are wrong that you haven’t caught yet. The section
+below the top hero the white section is boxed & screwed up where as in the mockup
+it’s all a light grey color`. Locked source: `docs/redesign/concepts/
+public-pages-2026-08-25/contact/selected-combination-lock-candidate.png`; live route
+`/contact`. Root's complete native review localized the remaining failures to Hero,
+Pathways, and submit-button ink. The same Contact Luna applied only the measured
+Round 1G-A and Round 1H CSS corrections. Independent focused ESLint, typecheck,
+production build, and diff-check pass on build `xE9guK5AEaRRx7l9kjuhR`, which is
+running on port 3100. The final exact capture is 1440x2676 with bands
+108/647/508/983/258/172, scroll width 1440, 22 footer links, six form controls and
+the correct four required fields, no development badge, and no console errors. Root
+reviewed the original-resolution Hero, Pathways, and Form pairs, then the corrected
+submit-detail pair and complete full-page board. Evidence is under `docs/redesign/qa/
+visual-remediation-2026-08-26/round20/contact-round1/round1h-*` and `round1i-*`;
+board for that rejected state is `contact-adapted-target-current-round1i.png`.
+Round 1J changed only the desktop `.contact-fast-path` base to `#F6F6F8`; the four
+formerly white wedge samples now all equal `#f6f6f8`, removing the boxed panel while
+preserving the passing right child. Focused ESLint, typecheck, production build, and
+diff-check pass on build `iBPP-A1jtZvUtK4YxdAJx`, running on port 3100. Exact runtime
+remains 1440x2676 with bands 108/647/508/983/258/172, scroll width 1440, 22 footer
+links, six controls/four required fields, no development badge, and no console
+errors. Root reviewed the original-resolution Pathways pair and full board. Current
+evidence is `round1j-*`; board `contact-adapted-target-current-round1j.png`. NEXT
+ACTION: ask Jacob to approve or reject Contact. Do not start Apply before the verdict.
+All approved pages and shared files remain frozen. No commit or deploy.
 
 CURRENT MILESTONE (supersedes the older Home chronology below): Home is approved
 and frozen. Jacob rejected About Round 2 R11. Root audited it, dispatched About
