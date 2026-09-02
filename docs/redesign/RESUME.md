@@ -7,19 +7,18 @@ Updated: 2026-09-01 (update at EVERY milestone).
 
 ## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
 
-NEXT ACTION: Team-code signup gate + easy login path is DONE on branch
-onboarding/completion (commits d84b91e, 5536560, 6fbcf37; pushed). Gates
-passed (vitest 857, tsc, build); redirects + route verified on a built server.
-PORTAL_TEAM_CODE=3cteam set in Vercel (prod/preview/dev) + .env.local.
-Waiting on Jacob to say "deploy": then cherry-pick those three commits onto
-master (master is checked out in ~/dev/3cwg-payplan; use a temp worktree or
-that one), push, confirm Vercel deploy Ready, then verify on prod:
-(a) POST /api/portal/auth/team-code {"code":"wrong"} -> {"ok":false};
-(b) 3cworldgroup.com/login 308 -> /portal; (c) signup page shows the Team
-code field and applicant callout. Jacob then tells managers the code and
-the /login URL. Still pending on Jacob: DELETE the bot account in Pending.
-Spec: docs/superpowers/specs/2026-09-01-signup-team-code-and-login-path-design.md
-Plan: docs/superpowers/plans/2026-09-01-signup-team-code-and-login-path.md
+NEXT ACTION: nothing pending from Claude. Ask Jacob what's next on the
+portal ops list. Jacob still owes: (1) tell managers the team code `3cteam`
+and the URL 3cworldgroup.com/login, (2) DELETE the bot account in Pending.
+
+DONE 2026-09-02: team-code signup gate + easy login path LIVE on production
+(master 83a4329, Vercel Ready, verified on https://www.3cworldgroup.com —
+note apex 307s to www, always test prod on www). /login, /signin, /employee
+308 -> /portal; POST /api/portal/auth/team-code wrong -> ok:false, 3CTEAM ->
+ok:true; signup page serves new copy. PORTAL_TEAM_CODE in Vercel (all envs)
++ .env.local. iOS Safari add-to-home-screen banner on dashboard (unit-tested,
+not yet eyeballed on a real iPhone — Jacob can confirm). Spec/plan under
+docs/superpowers/{specs,plans}/2026-09-01-signup-team-code-and-login-path*.
 
 DONE this session (all verified):
 - reCAPTCHA v3 signup gate LIVE in production (commit 34634bc on master).
