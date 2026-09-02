@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
+import { appendApplicationRow } from '@/lib/sheets/applicationsSheet';
 
 function clean(value: unknown, max = 200) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -42,6 +43,15 @@ export async function POST(request: NextRequest) {
       source: 'website',
       createdAt: now,
       updatedAt: now,
+    });
+    await appendApplicationRow({
+      name,
+      phone,
+      email,
+      city,
+      referredBy,
+      status: 'applied',
+      createdAt: now,
     });
     await notifySubmission('application', `${name} (${city})`);
 
