@@ -20,89 +20,95 @@ Jacob. Codex transcript (1.3 GB): ~/.codex/sessions/2026/08/30/rollout-2026-08-3
 To continue: resume that Codex thread in the app, or hand Claude the
 HANDOFF + RESUME next action and let it orchestrate Luna/Sol workers.
 
-NEXT ACTION (2026-09-03): Await Jacob's verdict on the three fixes just
-deployed (master edd6b13). Ask him to check /portal/sales as an owner on
-https://www.3cworldgroup.com: (a) the carrier report is back under the board
-with its Pending install / Active / Cancelled-Churned / Attention tabs,
-(b) the Paid tick is on each row of the My pay tab, (c) Cancel sale + Restore
-are in the sale detail sheet and cancelled sales collect in a collapsed
-"Cancelled this month" section.
+NEXT ACTION (2026-09-03): Jacob is deciding TWO CALLS on the sales/carrier
+merge (below). Nothing is being built until he answers. If he says "both as
+recommended", build the merge (~4h). Do NOT start it before that.
 
-LIVE on https://www.3cworldgroup.com — master edd6b13 = pay linkage af41e23 +
-sales rebuild d376b9a + month-filter fix a0916a4 + cancel action febf218 +
-carrier-report/Paid-tick restore edd6b13. (Branch shas on onboarding/completion:
-539826a cancel, d59ec32 restore.)
+ADHD MODE IS ON (he ran /i-have-adhd this session). Persist it: lead with the
+action, number multi-step work, cap lists at 5, restate state every turn, one
+concrete next action at the end, no preamble/recap/closers. Only "stop adhd
+mode" turns it off.
 
-TWO FEEDS, DO NOT CONFLATE (Jacob asked): the board's counts, value, rep rows
-and pipeline colours come from what reps LOG in the portal (Firestore `sales`).
-The morning-email carrier workbook is a separate feed — parsed by
-src/lib/fiberReport/parseReport.ts off the sheets "Orders To Date",
-"Pre-Sale to Schedule" and "Unconfirmed to Cancelled Orders" into `fiberOrders`
-(pending_install / active / pre_sale / cancelled / churned / breakage), served
-by GET /api/portal/sales/status and shown by InstallStatusSection. That report
-is where Pending / Cancelled / Churned live; it also sharpens the board's own
-install chips where an order matches a sale (active -> installed, breakage ->
-needs a date). Pending/cancelled/churned are NOT sale statuses on the board.
+=== SHIPPED AND LIVE (master edd6b13, deploy Ready) =====================
+https://www.3cworldgroup.com/portal/sales
+  af41e23  pay linkage — admin+owner resolve to internal_rep comp scale
+  d376b9a  approval removed; admin board grouped by rep
+  a0916a4  month picker actually refetches (range pushed into the query)
+  febf218  cancel a sale (+ restore)
+  edd6b13  restored the carrier report + the Paid tick for admins
+Branch shas on onboarding/completion: 539826a cancel, d59ec32 restore.
+All four gates green (tsc, vitest 885/885, eslint touched, build).
+Deploy worktree: ~/dev/3cwg-deploy (detached, hard-linked node_modules).
+Ship with: git -C ~/dev/3cwg-deploy push origin <sha>:master
 
+=== THE OPEN DECISION ==================================================
+Jacob wants ONE list: all carrier orders + all rep-logged sales, visible to
+owners/admins, joined so a rep's logged sale supplies the customer NAME that
+the carrier email never carries (it has addresses only).
+
+Proposal board (his, approved visuals pending):
+  Merge design   https://claude.ai/code/artifact/b6b596aa-2c76-48ae-bad1-ab4ed637d44d
+  Admin board    https://claude.ai/code/artifact/c67b4485-e2e6-453f-b42e-892c7e054824
+  Rep view       https://claude.ai/code/artifact/4e52419d-b533-4c10-b2c4-4fb535db686b
+
+CALL 1 — does a carrier order nobody logged count as a sale/pay?
+  Recommended: NO. Show it in red, chase it, pay once logged.
+CALL 2 — carrier vs rep disagreement?
+  Recommended: carrier wins the STATUS, the sale keeps the MONEY.
+
+CONSTRAINT HE ADDED: "we want all the sales still there." Month is the DEFAULT
+VIEW, never a filter that hides. Every drawer prints "+N older" and there is an
+all-time switch.
+
+Month rule for the merge: matched rows take their month from the SALE; rows
+with no sale take the order's orderDate (fallback estInstallDate); the
+"no rep matched" drawer is a backlog, month-scoped with "+N older".
+
+=== FACTS ESTABLISHED THIS SESSION (do not re-derive) ==================
+- TWO FEEDS. Board figures = rep-logged sales (Firestore `sales`). Carrier
+  statuses (pending_install/active/pre_sale/cancelled/churned/breakage) come
+  from the morning email workbook, parsed by src/lib/fiberReport/parseReport.ts
+  off sheets "Orders To Date", "Pre-Sale to Schedule", "Unconfirmed to
+  Cancelled Orders". Served by GET /api/portal/sales/status.
+- The join is ADDRESS-PREFIX ONLY (src/lib/fiberReport/matchSales.ts,
+  normalizeAddress + isAddressPrefixPair, >=6 chars). Carrier rows carry no
+  customer name outside the breakage sheet; attachLoggedCustomerNames borrows
+  the name from a sale the SAME rep logged. A miss = phantom "never logged"
+  row, so the merge MUST ship a manual link-to-sale action.
+- PERF, not yet urgent: GET /api/portal/sales/status reads the ENTIRE
+  fiberOrders (947 docs) AND sales (123 docs) collections on every admin load,
+  no date bound, no limit. Fix it AS PART OF the merge — the window is the
+  merge decision. Don't do it twice.
+- Reps ALREADY see carrier status: SalesTable renders FiberStatusPill on each
+  sale plus filter chips (Sent in / Pending install / Active / Needs attention)
+  that swap the list to raw carrier rows. Not broken by the rebuild.
+- The rep Paid checkbox is LIVE under the Pay tab (useSalePaid ->
+  users/{uid}/salePaid, private per user). It only lists sales WITH an install
+  date — that is why a rep thought it was gone. Jacob still owes the rep's name
+  so their actual sales can be checked.
+- Jacob is an owner, so his Sales page renders AdminSalesBoard and he has never
+  seen the rep view. Hence the rep-view board above.
+- Regression I caused and fixed: InstallStatusSection is gated on fiber scope
+  'all' (admin/owner only) but I left it inside the REP branch of page.tsx, so
+  the only people allowed to see it never rendered it.
+
+=== FILES THAT MATTER ==================================================
+  src/app/portal/sales/page.tsx          forks admin board vs rep table
+  src/components/sales/AdminSalesBoard.tsx
+  src/components/sales/SalesTable.tsx    rep-only now
+  src/components/sales/InstallStatusSection.tsx  carrier report + FiberRows
+  src/components/sales/SaleDetailSheet.tsx
+  src/lib/sales/installBucket.ts (+test) bucketing, countedSales, cancelledSales
+  src/lib/fiberReport/matchSales.ts      the address join
+  src/app/api/portal/sales/route.ts      month range in the query
+  src/app/api/portal/sales/[id]/cancel/route.ts (+test)
+  src/app/api/portal/sales/status/route.ts   the unbounded read
+  src/styles/sweep-rep-a.css             .sales-board-* (tokens from .sales-line)
 Spec: docs/superpowers/specs/2026-09-03-sales-rep-grouped-no-approval-design.md
-Approved visual board: https://claude.ai/code/artifact/902fd8ef-22b2-4d6e-bdf4-a147a3ede4d0
 
-WHAT SHIPPED (three phases, all done):
-- Pay linkage: PLATFORM_ROLE_COMP_FALLBACK in src/types/compPlan.ts pays admin +
-  owner on the internal_rep scale (operations deliberately excluded; a field role
-  still wins). GET /api/portal/comp-plan returns compRole + ownRates for platform
-  callers; useCompPlan reads ownRates when scope==='all'. Root cause fixed: PATCH
-  /api/portal/auth/users/[id]:196 runs fieldRole = FieldValue.delete() when a
-  platform role is assigned, which destroyed Wil Teasdale's internal_rep scale
-  (uid Qo7SIygzjmhImBIFX15mANQw6Ml1) when Jacob promoted him to admin.
-- Approval REMOVED entirely (Jacob: "useless feature"). sales:approve is gone
-  from every role; sales:read:all replaces the half of it that gated "sees the
-  whole company book" (admin + owner only — operations still sees only its own).
-  Deleted: /api/portal/sales/approve, /portal/approvals, approveSale in useSales,
-  buildSaleDecisionPush + salePush.test, the pending queue, status tabs, the
-  reject dialog, the approve/reject buttons in SaleDetailSheet, the "Approve
-  Sales" quick action and "Review pending sales" palette entry. New sales are
-  created status:'approved'. The status field survives for legacy rows and for
-  isPayableSale (cancelled/rejected).
-- New Sales page. SalesTable is now REP-ONLY (all canApprove forks removed).
-  Management gets src/components/sales/AdminSalesBoard.tsx: Company tab (month
-  picker, count + value, a flex-weighted install-pipeline bar, one collapsible
-  row per rep sorted by value, tap to expand their sales) and a My pay tab
-  (own installed sales, internal_rep rates, expected pay dates). Bucketing lives
-  in one place: src/lib/sales/installBucket.ts (+ tests). CSS appended to
-  src/styles/sweep-rep-a.css under .sales-board-*, all colour from the existing
-  .sales-line token block.
-  page.tsx now fetches a month at a time for management (limit 500 + startDate/
-  endDate) instead of the old unbounded limit:100.
-
-- Month-filter fix (a0916a4): GET /api/portal/sales accepted startDate/endDate
-  but never read them, so the picker changed the label and nothing else. The
-  range now goes into the Firestore query (a range on saleDate alone needs no
-  composite index; pairing it with the salesRepId equality would, so when both
-  are present the rep filter wins the query and dates narrow in memory).
-  Tests: src/app/api/portal/sales/route.test.ts.
-- Cancel action (539826a, NOT DEPLOYED): admin-only POST/DELETE
-  /api/portal/sales/[id]/cancel writes status cancelled/approved plus
-  cancelledAt/By/cancellerName/cancelReason. `status` stays OFF the PUT
-  allowlist on purpose — an edit must not become the back door that resurrects
-  approval. UI: "Cancel sale" in SaleDetailSheet (before Delete) with an
-  optional-reason dialog, "Restore" on a cancelled one, and a collapsed
-  "Cancelled this month" section at the foot of the Company tab.
-  cancelledSales() in src/lib/sales/installBucket.ts is the complement of
-  countedSales, so a cancelled sale is in exactly one list.
-
-OPEN ITEMS FOR JACOB:
-1. Existing `pending` sales in production are NOT backfilled to `approved`
-   (a data write — his call). They render fine either way.
-2. Deploy the cancel action (see NEXT ACTION) — he has not seen it yet.
-3. Visual sign-off on the cancel UI. Claude could not screenshot it: seeing the
-   admin board needs an admin login, and scripts/e2e-create-test-user.mjs
-   deliberately creates non-admin bots ("a leaked test login should not be
-   powerful").
-
-My changes are disjoint from Jacob's uncommitted public-site redesign
-(about/apply/contact/culture/opportunities/services/page/Navbar/PageWrapper) —
-do not sweep those into a commit.
+DO NOT COMMIT Jacob's uncommitted public-site redesign (about/apply/contact/
+culture/opportunities/services/page/Navbar/PageWrapper, .gitignore). All my
+commits are disjoint from it. He also said: ignore the redesign track.
 
 PRIOR TRACK: UX sweep fixes are LIVE and
 verified on https://www.3cworldgroup.com (master cbeb4f0 = sweep ab7d89d +
