@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { FieldValue } from 'firebase-admin/firestore';
+import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 import { Sale } from '@/types';
 import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
@@ -196,9 +198,30 @@ export async function DELETE(
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
     }
 
+    // Clear any carrier order pointing at this sale BEFORE the delete. A
+    // saleLink naming a deleted sale is worse than no link: the order comes back
+    // as a red "Never logged" row, and the stale link permanently blocks the
+    // address guess from ever re-joining it. Done first so a failure here leaves
+    // the sale in place rather than stranding links behind a successful delete.
+    // The equality is on a map subfield, which Firestore single-field indexes
+    // automatically — no composite index is required.
+    const linked = await adminDb
+      .collection('fiberOrders')
+      .where('saleLink.saleId', '==', id)
+      .get();
+    if (!linked.empty) {
+      const batch = adminDb.batch();
+      const updatedAt = new Date().toISOString();
+      for (const order of linked.docs) {
+        batch.update(order.ref, { saleLink: FieldValue.delete(), updatedAt });
+      }
+      await batch.commit();
+      invalidateFiberOrdersCache();
+    }
+
     await docRef.delete();
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, clearedLinks: linked.size });
   } catch (error) {
     console.error('Error deleting sale:', error);
     return NextResponse.json(

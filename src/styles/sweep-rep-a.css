@@ -773,13 +773,209 @@
 .portal-scope .sales-board-chip.attention { color: var(--red); }
 .portal-scope .sales-board-chip.cancelled { color: var(--muted); }
 
-/* Cancellations: a record, not a task. They sit below everything else, dimmed
-   and struck through, so the eye reads them as history and never as pipeline. */
-.portal-scope .sales-board-cancelled {
+/* ── The merged book ────────────────────────────────────────────────────────
+   The board lists one row per CUSTOMER now, sales and carrier report in one
+   list. Three things had to become visible without adding a second palette or
+   a single card: money nobody logged (red), a value the carrier disagrees with
+   (amber), and rows the month picker is holding off screen. */
+
+/* "Not logged" is the one figure here that means somebody is owed money and
+   does not know it. Red while it stands, indistinguishable from the rest at 0. */
+.portal-scope .sales-board-fig.alert strong,
+.portal-scope .sales-board-fig.alert > span {
+  color: var(--red);
+}
+
+/* ── Submitted (owners only) ────────────────────────────────────────────────
+   The raw rep-logged feed, read beside a red row to answer one question: did
+   anybody log this address? So the address leads every row and every row is
+   the same shape, which is what makes a column scannable. */
+
+.portal-scope .sales-board-search {
+  display: block;
+  margin-top: 20px;
+}
+
+.portal-scope .sales-board-search input {
+  width: 100%;
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.portal-scope .sales-board-search input::placeholder { color: var(--muted); }
+
+.portal-scope .sales-board-search input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--lime);
+}
+
+.portal-scope .sales-board-sub-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--soft);
+  cursor: pointer;
+}
+
+.portal-scope .sales-board-sub-row:hover {
+  background: color-mix(in srgb, var(--lime) 7%, transparent);
+}
+
+.portal-scope .sales-board-sub-row:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
+}
+
+/* The scanning column. Tabular figures keep the house numbers in a line down
+   the page, which is the whole reason this list is worth opening. */
+.portal-scope .sales-board-sub-addr {
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Said before the figures, because it is the reason not to trust them. A left
+   stripe rather than a box: still no cards on this page. */
+.portal-scope .sales-board-warning {
+  margin: 18px 0 0;
+  padding: 10px 0 10px 12px;
+  border-left: 2px solid var(--red);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--red);
+}
+
+/* Nothing is hidden without saying so — the month is a default view, not a filter. */
+.portal-scope .sales-board-scope {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* Rides on the end of the rep's pipeline sub-line, in red, so a rep carrying
+   unlogged installs says so on the collapsed row. */
+.portal-scope .sales-board-rep-flag {
+  color: var(--red);
+  font-style: normal;
+}
+
+/* The third line of a row: the carrier disagreeing about money, or a sale the
+   report has not caught up with yet. Full width under both columns. */
+.portal-scope .sales-board-sale-note {
+  grid-column: 1 / -1;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-sale-note.gap { color: var(--amber); }
+.portal-scope .sales-board-sale-note.warn { color: var(--red); }
+
+/* CALL 1: the carrier installed it and nobody here wrote it down. It sits in
+   the rep's own list so the gap is impossible to miss, led by the address
+   because there is no logged customer name to lead with, and it is not
+   clickable — there is no sale behind it to open. */
+.portal-scope .sales-board-sale.never-logged {
+  border-left-color: var(--red);
+  cursor: default;
+}
+
+.portal-scope .sales-board-sale.never-logged:hover {
+  background: color-mix(in srgb, var(--red) 7%, transparent);
+}
+
+.portal-scope .sales-board-sale.never-logged .sales-board-sale-cust {
+  color: var(--red);
+}
+
+.portal-scope .sales-board-chip.never { color: var(--red); }
+.portal-scope .sales-board-chip.broken { color: var(--red); }
+
+/* A dangling link is still red — it is still a row nobody can act on — but the
+   stripe is dashed, because the problem is a broken join rather than a rep who
+   never wrote the sale down. */
+.portal-scope .sales-board-sale.never-logged.link-broken {
+  border-left-style: dashed;
+}
+
+/* Settled: an admin answered "not a sale". It reads like the cancelled rows
+   below it — a record, not a task — and it is the only thing on this board
+   that is allowed to be grey and still be a carrier order. */
+.portal-scope .sales-board-sale.dismissed {
+  border-left-color: var(--line);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.portal-scope .sales-board-sale.dismissed .sales-board-sale-cust {
+  font-weight: 500;
+  text-decoration: line-through;
+}
+
+.portal-scope .sales-board-chip.dismissed { color: var(--muted); }
+
+/* Carrier history from before the portal existed. Quiet like a dismissal, but
+   NOT struck through — nothing here was decided or undone, it simply predates
+   anyone logging sales, and striking it would read as a judgement nobody made. */
+.portal-scope .sales-board-sale.historic {
+  border-left-color: var(--line);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.portal-scope .sales-board-sale.historic .sales-board-sale-cust { font-weight: 500; }
+.portal-scope .sales-board-chip.historic { color: var(--muted); }
+
+.portal-scope .sales-board-rowact {
+  grid-column: 1 / -1;
+  margin-top: 7px;
+}
+
+.portal-scope .sales-board-rowact-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.portal-scope .sales-board-rowact-btn:hover:not(:disabled) {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.portal-scope .sales-board-rowact-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The three drawers. Two of them are work (red count), one is history (muted).
+   Each says what the month is holding back rather than hiding it. */
+.portal-scope .sales-board-drawer {
   margin-top: 18px;
 }
 
-.portal-scope .sales-board-cancelled-head {
+.portal-scope .sales-board-drawer + .sales-board-drawer {
+  margin-top: 0;
+}
+
+.portal-scope .sales-board-drawer-head {
   display: grid;
   grid-template-columns: 15px minmax(0, 1fr) auto;
   align-items: center;
@@ -798,15 +994,148 @@
   cursor: pointer;
 }
 
-.portal-scope .sales-board-cancelled-head:focus-visible {
+.portal-scope .sales-board-drawer-head:focus-visible {
   outline: 2px solid var(--lime);
   outline-offset: -2px;
 }
 
-.portal-scope .sales-board-cancelled-count {
-  font-variant-numeric: tabular-nums;
+.portal-scope .sales-board-drawer-head.alert .sales-board-drawer-count { color: var(--red); }
+.portal-scope .sales-board-drawer-head.open { color: var(--ink); }
+
+.portal-scope .sales-board-drawer-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
 }
 
+.portal-scope .sales-board-drawer-more {
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.portal-scope .sales-board-drawer-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+/* Separates the settled rows from the live ones inside drawer 1, without
+   promoting them to a drawer of their own. */
+.portal-scope .sales-board-drawer-sub {
+  margin: 10px 0 0 25px;
+  padding-top: 9px;
+  border-top: 1px solid var(--soft);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The first group in drawer 1 is the only one that means anything is wrong;
+   the ones under it are very likely paid work that never reached the portal. */
+.portal-scope .sales-board-drawer-sub.attention {
+  color: var(--red);
+}
+
+/* Out-of-month counts on a group line, said quietly. */
+.portal-scope .sales-board-drawer-sub em {
+  font-style: normal;
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+/* A whole group held back: rows that carry no accusation. */
+.portal-scope .sales-board-group-quiet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  opacity: 0.62;
+}
+
+.portal-scope .sales-board-group-quiet .sales-board-sale.never-logged {
+  border-left-color: var(--line);
+}
+
+.portal-scope .sales-board-group-quiet .sales-board-chip.never {
+  color: var(--muted);
+  border-color: var(--soft);
+}
+
+.portal-scope .sales-board-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--soft);
+}
+
+/* The existing dealer-scoped assign control, carried into the drawer unchanged:
+   the report names a dealer id, an admin names the portal user it belongs to,
+   and every order that dealer ever sent lands in the right list. */
+.portal-scope .sales-board-assign {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portal-scope .sales-board-assign-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--red);
+}
+
+.portal-scope .sales-board-assign-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.portal-scope .sales-board-assign-label strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.portal-scope .sales-board-assign-label > span {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-assign-row select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+
+.portal-scope .sales-board-assign-note {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-assign-error,
+.sales-board-assign-error {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--red, #ef4444);
+}
+
+/* Cancellations: a record, not a task. They sit below everything else, dimmed
+   and struck through, so the eye reads them as history and never as pipeline. */
 .portal-scope .sales-board-sale.cancelled {
   border-left-color: var(--line);
   opacity: 0.6;
@@ -859,9 +1188,14 @@
 }
 
 @media (max-width: 460px) {
-  .portal-scope .sales-board-figs { gap: 20px; }
+  /* Three figures instead of two now, so the row is allowed to wrap rather
+     than squeeze "Not logged" off the edge of a phone. */
+  .portal-scope .sales-board-figs { flex-wrap: wrap; gap: 14px 20px; }
   .portal-scope .sales-board-fig strong { font-size: 1.45rem; }
   .portal-scope .sales-board-sale { margin-left: 15px; }
   .portal-scope .sales-board-key { gap: 10px; font-size: 0.56rem; }
   .portal-scope .sales-board-paid { padding-left: 10px; }
+  .portal-scope .sales-board-drawer-head { gap: 8px; letter-spacing: 0.1em; }
+  .portal-scope .sales-board-assign-row select { flex: 1 1 100%; }
+  .portal-scope .sales-board-rowact-btn { width: 100%; }
 }

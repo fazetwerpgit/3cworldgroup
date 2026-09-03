@@ -1,4 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
+import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 
 const BATCH_SIZE = 450;
 
@@ -43,5 +44,8 @@ export async function assignDealerToUser(
     }
     await batch.commit();
   }
+  // The admin board reads fiberOrders from a module cache; this backfill just
+  // changed matchedUserId on every order of the dealer.
+  invalidateFiberOrdersCache();
   return { ok: true, updated: snapshot.docs.length };
 }

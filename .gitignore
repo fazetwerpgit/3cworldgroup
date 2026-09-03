@@ -51,3 +51,5 @@ next-env.d.ts
 # visual-audit screenshot archives
 .audit/
 /.playwright-mcp/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
