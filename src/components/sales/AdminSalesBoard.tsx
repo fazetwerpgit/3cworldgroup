@@ -304,25 +304,33 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   // is the answer to a not-logged row, so it belongs where the question was
   // asked rather than in a drawer of its own. `neverView` is the head count for
   // the whole drawer; the two groups inside it each carry their own.
+  //
+  // These four drawers are deliberately NOT month-scoped. A not-logged install,
+  // an order with no rep, and a pre-portal order are BACKLOGS, not monthly
+  // figures — nobody asks "how many were never logged in September". Scoping
+  // them to the picker made every head read 0 with the real number hidden in a
+  // "+211 older outside this month" aside, which is the same trap that cost
+  // Connor his August sales. Only "Cancelled this month" keeps the month, and
+  // its label says so.
   const neverView = useMemo(
-    () => drawerView(fullBook, [...fullBook.neverLogged, ...fullBook.dismissed], month),
-    [fullBook, month]
+    () => drawerView(fullBook, [...fullBook.neverLogged, ...fullBook.dismissed], undefined),
+    [fullBook]
   );
   // The pile is split because mixing the two hides the only rows that matter:
   // an install missing from a month nobody was logging in says nothing, and an
   // install missing from a month a rep was working in says something.
   const sinceView = useMemo(
-    () => drawerView(fullBook, fullBook.neverLogged.filter(afterLoggingStarted), month),
-    [fullBook, month]
+    () => drawerView(fullBook, fullBook.neverLogged.filter(afterLoggingStarted), undefined),
+    [fullBook]
   );
   const earlierView = useMemo(
-    () => drawerView(fullBook, fullBook.neverLogged.filter((row) => !afterLoggingStarted(row)), month),
-    [fullBook, month]
+    () => drawerView(fullBook, fullBook.neverLogged.filter((row) => !afterLoggingStarted(row)), undefined),
+    [fullBook]
   );
-  const dismissedView = useMemo(() => drawerView(fullBook, fullBook.dismissed, month), [fullBook, month]);
-  const unassignedView = useMemo(() => drawerView(fullBook, fullBook.unassigned, month), [fullBook, month]);
+  const dismissedView = useMemo(() => drawerView(fullBook, fullBook.dismissed, undefined), [fullBook]);
+  const unassignedView = useMemo(() => drawerView(fullBook, fullBook.unassigned, undefined), [fullBook]);
   const cancelledView = useMemo(() => drawerView(fullBook, fullBook.cancelled, month), [fullBook, month]);
-  const historicView = useMemo(() => drawerView(fullBook, fullBook.historic, month), [fullBook, month]);
+  const historicView = useMemo(() => drawerView(fullBook, fullBook.historic, undefined), [fullBook]);
 
   // My pay: the viewer's own installed work, soonest money first. The month is
   // applied here now that the page hands over the whole book — this tab has
