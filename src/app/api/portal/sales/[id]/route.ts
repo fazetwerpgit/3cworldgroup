@@ -52,6 +52,7 @@ export async function GET(
       createdAt: data?.createdAt?.toDate(),
       updatedAt: data?.updatedAt?.toDate(),
       approvedAt: data?.approvedAt?.toDate(),
+      cancelledAt: data?.cancelledAt?.toDate(),
     } as Sale;
 
     return NextResponse.json({ sale });

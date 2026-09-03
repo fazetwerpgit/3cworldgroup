@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FiberOrder, Sale } from '@/types';
 import {
+  cancelledSales,
   countInstallBuckets,
   countedSales,
   installBucketForSale,
@@ -66,6 +67,20 @@ describe('countedSales', () => {
       sale({ id: 'd', status: 'pending' }),
     ]);
     expect(kept.map((s) => s.id)).toEqual(['a', 'd']);
+  });
+});
+
+describe('cancelledSales', () => {
+  it('is the exact complement of what the board counts: the cancellations', () => {
+    const all = [
+      sale({ id: 'a', status: 'approved' }),
+      sale({ id: 'b', status: 'cancelled' }),
+      sale({ id: 'c', status: 'cancelled' }),
+    ];
+    expect(cancelledSales(all).map((s) => s.id)).toEqual(['b', 'c']);
+    // A cancelled sale is never in both lists — the sheet relies on that to
+    // decide which list it is arrowing through.
+    expect(countedSales(all).some((s) => s.status === 'cancelled')).toBe(false);
   });
 });
 

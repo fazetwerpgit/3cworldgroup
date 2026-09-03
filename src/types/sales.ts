@@ -70,6 +70,13 @@ export interface Sale {
   approverName?: string;
   approvedAt?: Date;
   rejectionReason?: string;
+  // Set when an admin cancels a sale the customer backed out of. The row stays
+  // on the books as history — out of totals, pipeline and pay — so who
+  // cancelled it and why survives, which a delete would take with it.
+  cancelledAt?: Date;
+  cancelledBy?: string;
+  cancellerName?: string;
+  cancelReason?: string;
 
   // Timestamps
   saleDate: Date;
