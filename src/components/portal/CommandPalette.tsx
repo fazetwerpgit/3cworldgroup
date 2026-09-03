@@ -147,7 +147,6 @@ export const portalNavGroups: PortalNavGroup[] = [
 
 const actionDestinations: ActionDestination[] = [
   { label: 'Log a sale', href: '/portal/sales/new', permission: 'sales:write' },
-  { label: 'Review pending sales', href: '/portal/sales?status=pending', permission: 'sales:approve' },
   { label: 'Report a bug', href: '/portal/settings#report-bug' },
 ];
 

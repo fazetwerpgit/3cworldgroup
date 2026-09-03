@@ -114,10 +114,11 @@ export async function PUT(
       }
     }
 
-    // Allowlist of fields a sale edit may set. Approval status and its audit
-    // trail are controlled only by /sales/approve; ownership, points, and
-    // server-managed timestamps are immutable here. This closes the
-    // edit-to-self-approve bypass.
+    // Allowlist of fields a sale edit may set. `status` stays off it: sale
+    // approval was removed in Sep 2026 and no route writes the field any more,
+    // so an edit must not become the back door that resurrects it. Ownership,
+    // points and server-managed timestamps are immutable here for the same
+    // reason — an edit is a correction, never a re-attribution.
     const EDITABLE_FIELDS = [
       'customerName',
       'customerPhone',

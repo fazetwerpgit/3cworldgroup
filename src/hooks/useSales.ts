@@ -180,51 +180,6 @@ export function useSales() {
     }
   }, []);
 
-  const approveSale = useCallback(async (
-    saleId: string,
-    status: 'approved' | 'rejected',
-    rejectionReason?: string
-  ): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // The approve endpoint verifies the caller's token and stamps the
-      // approver from it — the client never names the approver.
-      const token = await getIdToken();
-      const response = await fetch('/api/portal/sales/approve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          saleId,
-          status,
-          rejectionReason,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to process sale');
-      }
-
-      // Update local state
-      setSales((prev) =>
-        prev.map((s) => (s.id === saleId ? { ...s, status } : s))
-      );
-
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to process sale';
-      setError(message);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const fetchStats = useCallback(async (
     period?: 'day' | 'week' | 'month' | 'year',
     salesRepId?: string
@@ -268,7 +223,6 @@ export function useSales() {
     createSale,
     updateSale,
     deleteSale,
-    approveSale,
     fetchStats,
   };
 }

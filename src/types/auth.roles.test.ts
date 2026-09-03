@@ -104,11 +104,18 @@ describe('role predicates', () => {
     expect([...ADMIN_LEVEL_PLATFORM_ROLES].sort()).toEqual(adminLevel.sort());
   });
 
-  // Operations sees only their OWN sales: sales:approve doubles as the UI's
-  // "sees the whole book" switch, so operations must never carry it.
-  it('denies sales:approve to operations but keeps it for admin and owner', () => {
-    expect(RolePermissions.operations).not.toContain('sales:approve');
-    expect(RolePermissions.admin).toContain('sales:approve');
-    expect(RolePermissions.owner).toContain('sales:approve');
+  // Operations sees only their OWN sales. sales:read:all is the "sees the whole
+  // book" switch (it took that job over from sales:approve when approval was
+  // removed), so operations must never carry it.
+  it('denies sales:read:all to operations but keeps it for admin and owner', () => {
+    expect(RolePermissions.operations).not.toContain('sales:read:all');
+    expect(RolePermissions.admin).toContain('sales:read:all');
+    expect(RolePermissions.owner).toContain('sales:read:all');
+  });
+
+  it('grants sale approval to nobody — the feature is gone', () => {
+    for (const permissions of Object.values(RolePermissions)) {
+      expect(permissions).not.toContain('sales:approve');
+    }
   });
 });

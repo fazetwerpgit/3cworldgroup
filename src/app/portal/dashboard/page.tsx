@@ -275,7 +275,7 @@ export default function DashboardPage() {
     'regional_manager',
     'director'
   );
-  const leadsWithQueue = hasPermission('sales:approve') || isRole('admin', 'operations');
+  const leadsWithQueue = hasPermission('sales:read:all') || isRole('admin', 'operations');
   const isAdmin = isRole('admin');
   const pendingSignups = usePendingSignupsCount(isAdmin);
 
@@ -308,7 +308,7 @@ export default function DashboardPage() {
         // everyone else.
         const token = await getIdToken();
         const statsRes = await fetch(
-          `/api/portal/sales/stats?${hasPermission('sales:approve') ? '' : `salesRepId=${user.uid}&`}period=month`,
+          `/api/portal/sales/stats?${hasPermission('sales:read:all') ? '' : `salesRepId=${user.uid}&`}period=month`,
           {
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             signal: controller.signal,
