@@ -2,12 +2,12 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PageTitle } from '@/components/portal/PageTitle';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { AdminSalesBoard } from '@/components/sales/AdminSalesBoard';
 import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { SalesTable } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
@@ -15,75 +15,28 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
-import { Sale, SaleStatus } from '@/types';
+import { dateToSaleDateInput } from '@/lib/sales/saleDate';
 import '@/styles/sweep-rep-a.css';
 
-const STATUS_VALUES: SaleStatus[] = ['pending', 'approved', 'rejected', 'cancelled'];
+// A month, as the page tracks it. Sales are fetched a month at a time now: the
+// old unbounded `limit: 100` silently truncated a busy month, and every figure
+// on the admin board is a monthly figure anyway.
+interface MonthKey { year: number; month: number; }
 
-function monthKey(value: Date | string | undefined) {
-  if (!value) return '';
-  const date = new Date(value);
-  return `${date.getFullYear()}-${date.getMonth()}`;
+function monthBounds({ year, month }: MonthKey) {
+  // Local-noon bounds, matching how install and sale dates are stored.
+  const start = new Date(year, month, 1, 12, 0, 0);
+  const end = new Date(year, month + 1, 0, 12, 0, 0);
+  return { startDate: dateToSaleDateInput(start), endDate: dateToSaleDateInput(end) };
 }
 
-function sumValue(sales: Sale[]) {
-  return sales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+function monthLabel({ year, month }: MonthKey) {
+  return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-function formatSubmittedDate(value: Date | string | undefined) {
-  if (!value) return 'N/A';
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function formatMonthlyValue(value: number) {
-  return `$${Math.round(value).toLocaleString('en-US')}`;
-}
-
-function daysWaiting(value: Date | string | undefined) {
-  if (!value) return 0;
-  return Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000));
-}
-
-function InReviewSection({ sales }: { sales: Sale[] }) {
-  const ordered = useMemo(
-    () => [...sales].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [sales]
-  );
-
-  return (
-    <section className="sales-line-inreview" aria-label="Submitted, in review">
-      <div className="sales-line-inreview-head">
-        <div>
-          <p className="sales-line-eyebrow">Submitted / in review</p>
-          <h2>Waiting on a decision</h2>
-        </div>
-        <p className="sales-line-inreview-count">{ordered.length} pending</p>
-      </div>
-
-      {ordered.length ? (
-        <div className="sales-line-inreview-list">
-          {ordered.map((sale) => {
-            const waiting = daysWaiting(sale.createdAt);
-            return (
-              <Link
-                className="sales-line-inreview-row"
-                key={sale.id}
-                href={`/portal/sales/${sale.id}`}
-              >
-                <div className="sales-line-inreview-primary">
-                  <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
-                  {sale.productSold && <span>{sale.productSold}</span>}
-                </div>
-                <span className="sales-line-inreview-value portal-metallic-num">{formatMonthlyValue(sale.totalValue || 0)}<small>/mo</small></span>
-                <span className="sales-line-inreview-date">{sale.installDate ? `Install ${formatSubmittedDate(sale.installDate)}` : 'Install —'}</span>
-                <span className="sales-line-inreview-wait">{waiting === 0 ? 'Today' : `${waiting}d waiting`}</span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-    </section>
-  );
+function shiftMonth({ year, month }: MonthKey, by: number): MonthKey {
+  const shifted = new Date(year, month + by, 1);
+  return { year: shifted.getFullYear(), month: shifted.getMonth() };
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -141,65 +94,57 @@ function SalesLineSkeleton() {
 }
 
 function SalesContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
   const { user, hasPermission } = useAuth();
-  const { sales, loading, error, fetchSales, approveSale, deleteSale } = useSales();
+  const { sales, loading, error, fetchSales, deleteSale } = useSales();
   const fiber = useFiberStatus();
-  const queryStatus = searchParams.get('status');
-  const statusFilter: SaleStatus | '' = queryStatus && STATUS_VALUES.includes(queryStatus as SaleStatus)
-      ? (queryStatus as SaleStatus)
-      : '';
 
-  const canApprove = hasPermission('sales:approve');
-  const canViewAll = hasPermission('sales:approve');
-  // A rep's [All | Pay] choice is a view, not a status — it stays out of the URL
-  // so ?status= keeps meaning exactly the four SaleStatus values.
+  // Admins and owners read the whole company book; everyone else reads their own.
+  // This replaced sales:approve, which used to carry the visibility switch as a
+  // side effect of the approval permission.
+  const canViewAll = hasPermission('sales:read:all');
+
   const [payView, setPayView] = useState(false);
-  const { rates, payDelayDays, hasPlan } = useCompPlan();
-  const payPlan = useMemo(() => ({ rates, payDelayDays, hasPlan }), [hasPlan, payDelayDays, rates]);
-  const now = useMemo(() => new Date(), []);
-  const currentMonth = monthKey(now);
-  const mtdSales = sales.filter((sale) => monthKey(sale.saleDate) === currentMonth);
-  const pendingSales = sales.filter((sale) => sale.status === 'pending');
-  const approvedMtd = mtdSales.filter((sale) => sale.status === 'approved').length;
-  const oldestIdle = pendingSales.reduce((oldest, sale) => {
-    const days = Math.max(0, Math.floor((now.getTime() - new Date(sale.saleDate).getTime()) / 86_400_000));
-    return Math.max(oldest, days);
-  }, 0);
-  const commissionCount = sales.filter((sale) => typeof sale.commission === 'number').length;
-  // Expected pay is personal: only a rep on a comp plan gets a number here.
-  // Management sees a dash — the ledger's commission column is where their
-  // team's money lives, and their own pay is not this page's business.
-  // A rejected or cancelled sale is money that is not coming, so it adds nothing
-  // to the total — and the "Across N sales" note counts the same set the total sums.
-  const payableMtd = mtdSales.filter(isPayableSale);
-  const expectedPayMtd = canApprove || !hasPlan
-    ? null
-    : payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
+  const [month, setMonth] = useState<MonthKey>(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const { rates, payDelayDays, hasPlan, compRole } = useCompPlan();
+  const payPlan = useMemo(
+    () => ({ rates, payDelayDays, hasPlan, compRole }),
+    [compRole, hasPlan, payDelayDays, rates]
+  );
+
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return month.year === now.getFullYear() && month.month === now.getMonth();
+  }, [month]);
 
   useEffect(() => {
-    const filters: { salesRepId?: string; limit?: number } = { limit: 100 };
-    if (!canViewAll && user) filters.salesRepId = user.uid;
-    if (user) fetchSales(filters);
-  }, [canViewAll, fetchSales, user]);
+    if (!user) return;
+    // Management fetches one month at a time; a rep's book is small enough to
+    // read whole, and their pay list has to reach back past the current month
+    // to sales that installed earlier.
+    const filters: { salesRepId?: string; limit?: number; startDate?: string; endDate?: string } =
+      canViewAll ? { limit: 500, ...monthBounds(month) } : { limit: 200, salesRepId: user.uid };
+    fetchSales(filters);
+  }, [canViewAll, fetchSales, month, user]);
 
-  const setFilter = (next: SaleStatus | '') => {
-    router.replace(next ? `${pathname}?status=${next}` : pathname, { scroll: false });
-  };
+  // Rep KPIs stay month-to-date over their own book.
+  const now = useMemo(() => new Date(), []);
+  const mtdSales = useMemo(
+    () =>
+      sales.filter((sale) => {
+        const date = new Date(sale.saleDate);
+        return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+      }),
+    [now, sales]
+  );
+  const payableMtd = useMemo(() => mtdSales.filter(isPayableSale), [mtdSales]);
+  const expectedPayMtd = hasPlan
+    ? payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0)
+    : null;
+  const boardValue = mtdSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
 
-  const handleApproval = async (
-    saleId: string,
-    status: 'approved' | 'rejected',
-    reason?: string
-  ) => {
-    if (!user) return false;
-    return approveSale(saleId, status, reason);
-  };
-
-  const boardCount = mtdSales.length;
-  const boardValue = sumValue(mtdSales);
   return (
     <ProtectedRoute permissions={['sales:read']}>
       <div className="min-h-screen portal-canvas">
@@ -210,7 +155,7 @@ function SalesContent() {
             <div className="sales-line">
               <PageTitle
                 title="Sales"
-                meta={`${boardCount} this month`}
+                meta={canViewAll ? monthLabel(month) : `${mtdSales.length} this month`}
                 actions={(
                   <Link className="sales-line-primary" href="/portal/sales/new">
                     <Plus className="sales-line-icon" aria-hidden="true" />
@@ -219,58 +164,81 @@ function SalesContent() {
                 )}
               />
 
-              {!loading && sales.length === 0 && (
-                <p className="sales-line-empty-state">No sales yet. Log your first one.</p>
-              )}
-
-              <section className="sales-line-command" aria-label="Sales summary">
-                <section className="sales-line-broadcast" aria-label="Sales KPIs">
-                  <div className="sales-line-metric">
-                    <span className="sales-line-metric-label">Value MTD</span>
-                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardValue} /><small>$ / mo</small></strong>
-                    <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records this month</span>
-                  </div>
-                  <div className="sales-line-metric">
-                    <span className="sales-line-metric-label">Sales this month</span>
-                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardCount} /><small>sales</small></strong>
-                    <span className="sales-line-metric-note">{approvedMtd} approved · {pendingSales.length} pending</span>
-                  </div>
-                  <div className="sales-line-metric">
-                    <span className="sales-line-metric-label">Pending review</span>
-                    <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={pendingSales.length} /><small>open</small></strong>
-                    <span className="sales-line-metric-note">Oldest <span className="sales-line-lime">{oldestIdle ? `${oldestIdle} days` : 'today'}</span> idle</span>
-                  </div>
-                  <div className="sales-line-metric">
-                    <span className="sales-line-metric-label">{expectedPayMtd === null ? 'Commission MTD' : 'Expected pay MTD'}</span>
-                    <strong className="sales-line-metric-value portal-metallic-num">
-                      {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ expected</small></>}
-                    </strong>
-                    <span className="sales-line-metric-note">{expectedPayMtd === null
-                      ? (commissionCount ? `${commissionCount} recorded value${commissionCount === 1 ? '' : 's'}` : 'No commission values recorded')
-                      : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} this month`}</span>
-                  </div>
-                </section>
-              </section>
-
               {error && <div className="sales-line-error" role="alert">{error}</div>}
 
-              {!canApprove && !loading && pendingSales.length > 0 && <InReviewSection sales={pendingSales} />}
+              {canViewAll ? (
+                <>
+                  <div className="sales-board-month" role="group" aria-label="Month">
+                    <button
+                      type="button"
+                      onClick={() => setMonth((current) => shiftMonth(current, -1))}
+                      aria-label="Previous month"
+                    >
+                      ‹
+                    </button>
+                    <span>{monthLabel(month)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setMonth((current) => shiftMonth(current, 1))}
+                      disabled={isCurrentMonth}
+                      aria-label="Next month"
+                    >
+                      ›
+                    </button>
+                  </div>
 
-              {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
+                  <AdminSalesBoard
+                    sales={sales}
+                    loading={loading}
+                    onDelete={deleteSale}
+                    fiber={fiber}
+                    payPlan={payPlan}
+                  />
+                </>
+              ) : (
+                <>
+                  {!loading && sales.length === 0 && (
+                    <p className="sales-line-empty-state">No sales yet. Log your first one.</p>
+                  )}
 
-              {(loading || sales.length > 0) && (
-                <SalesTable
-                  sales={sales}
-                  statusFilter={statusFilter}
-                  onStatusFilterChange={setFilter}
-                  onApprove={canApprove ? handleApproval : undefined}
-                  onDelete={deleteSale}
-                  loading={loading}
-                  payView={payView}
-                  onPayViewChange={setPayView}
-                  payPlan={payPlan}
-                  fiber={fiber}
-                />
+                  <section className="sales-line-command" aria-label="Sales summary">
+                    <section className="sales-line-broadcast" aria-label="Sales KPIs">
+                      <div className="sales-line-metric">
+                        <span className="sales-line-metric-label">Value MTD</span>
+                        <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardValue} /><small>$ / mo</small></strong>
+                        <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records this month</span>
+                      </div>
+                      <div className="sales-line-metric">
+                        <span className="sales-line-metric-label">Sales this month</span>
+                        <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={mtdSales.length} /><small>sales</small></strong>
+                        <span className="sales-line-metric-note">{sales.length} on your board all time</span>
+                      </div>
+                      <div className="sales-line-metric">
+                        <span className="sales-line-metric-label">Expected pay MTD</span>
+                        <strong className="sales-line-metric-value portal-metallic-num">
+                          {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ expected</small></>}
+                        </strong>
+                        <span className="sales-line-metric-note">{expectedPayMtd === null
+                          ? 'No pay plan assigned yet'
+                          : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} this month`}</span>
+                      </div>
+                    </section>
+                  </section>
+
+                  {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
+
+                  {(loading || sales.length > 0) && (
+                    <SalesTable
+                      sales={sales}
+                      onDelete={deleteSale}
+                      loading={loading}
+                      payView={payView}
+                      onPayViewChange={setPayView}
+                      payPlan={payPlan}
+                      fiber={fiber}
+                    />
+                  )}
+                </>
               )}
             </div>
           </main>

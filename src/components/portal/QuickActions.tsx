@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, BarChart3, CheckCircle2, GraduationCap, PlusCircle } from 'lucide-react';
+import { ArrowRight, BarChart3, GraduationCap, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
@@ -35,13 +35,6 @@ const actions: QuickAction[] = [
     href: '/portal/leaderboard',
     icon: <BarChart3 className="h-5 w-5" />,
     permissions: ['leaderboard:read'],
-  },
-  {
-    title: 'Approve Sales',
-    description: 'Review team submissions.',
-    href: '/portal/sales?status=pending',
-    icon: <CheckCircle2 className="h-5 w-5" />,
-    permissions: ['sales:approve'],
   },
 ];
 

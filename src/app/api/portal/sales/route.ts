@@ -225,7 +225,11 @@ export async function POST(request: NextRequest) {
       products,
       totalValue: totalValue || 0,
       totalPoints: calculatedPoints, // Server-calculated, not from client
-      status: 'pending' as SaleStatus, // Requires approval
+      // Sale approval was removed in Sep 2026 — a logged sale is a sale, and the
+      // install pipeline is the only lifecycle the portal tracks now. The field
+      // survives because isPayableSale still reads it (a sale can be cancelled)
+      // and because rows written before the change carry the old values.
+      status: 'approved' as SaleStatus,
       saleDate: resolvedSaleDate,
       installDate: resolvedInstallDate,
       notes: notes || '',
@@ -238,53 +242,42 @@ export async function POST(request: NextRequest) {
 
     const docRef = await adminDb.collection('sales').add(newSale);
 
-    // Send confirmation notification - sale is pending approval
     await createNotification(
       salesRepId,
       'sale_submitted',
-      'Sale Submitted! 📋',
-      'Your sale has been submitted and is pending review.',
+      'Sale logged',
+      'Your sale is on the board. Pay follows about two weeks after the install.',
       `/portal/sales/${docRef.id}`
     );
 
-    // Notify the reviewers who can act on it — admin/owner only; operations
-    // sees only their own sales and cannot approve, so pinging them is noise.
+    // Admins and owners used to be notified that a sale needed approval. With
+    // approval gone there is no decision waiting on them, so the fan-out is too:
+    // a new sale is not an interruption, it shows up on the board on its own.
     try {
-      const reviewersSnap = await adminDb
-        .collection('users')
-        .where('role', 'in', [...ADMIN_LEVEL_PLATFORM_ROLES])
-        .get();
-      await Promise.all(
-        reviewersSnap.docs.map((reviewerDoc) =>
-          createNotification(
-            reviewerDoc.id,
-            'sale_pending',
-            'New Sale Needs Approval',
-            `${salesRepName || 'A team member'} submitted a new sale for review.`,
-            '/portal/sales?status=pending'
-          )
-        )
-      );
+      const ownerIds = (
+        await adminDb
+          .collection('users')
+          .where('role', 'in', [...ADMIN_LEVEL_PLATFORM_ROLES])
+          .get()
+      ).docs.map((d) => d.id).filter((id) => id !== salesRepId);
 
-      // Same audience gets it on their phones. A manager logging their own sale
-      // is not pinged about it; after() keeps the sends alive past the response
-      // without a detached promise the freeze would kill.
-      const reviewerIds = reviewersSnap.docs.map((d) => d.id).filter((id) => id !== salesRepId);
-      if (reviewerIds.length > 0) {
+      // after() keeps the sends alive past the response without a detached
+      // promise the freeze would kill.
+      if (ownerIds.length > 0) {
         after(async () => {
           await Promise.all(
-            reviewerIds.map((uid) =>
+            ownerIds.map((uid) =>
               sendPushToUser(uid, {
-                title: 'New sale pending review',
+                title: 'New sale logged',
                 body: `${salesRepName || 'A team member'} — ${customerName || 'new sale'}`,
-                url: '/portal/sales?status=pending',
+                url: `/portal/sales/${docRef.id}`,
               })
             )
           );
         });
       }
     } catch (error) {
-      console.error('Error notifying reviewers of new sale:', error);
+      console.error('Error notifying owners of new sale:', error);
     }
 
     return NextResponse.json({

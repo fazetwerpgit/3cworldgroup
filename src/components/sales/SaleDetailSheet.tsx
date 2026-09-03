@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   ArrowUpRight,
-  Check,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -28,11 +27,8 @@ interface SaleDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   onPrev: () => void;
   onNext: () => void;
-  canApprove: boolean;
   isAdmin: boolean;
   loading?: boolean;
-  onApprove: (saleId: string) => void | Promise<boolean>;
-  onRequestReject: (saleId: string) => void;
   onRequestDelete: (saleId: string) => void;
 }
 
@@ -78,11 +74,8 @@ export function SaleDetailSheet({
   onOpenChange,
   onPrev,
   onNext,
-  canApprove,
   isAdmin,
   loading,
-  onApprove,
-  onRequestReject,
   onRequestDelete,
 }: SaleDetailSheetProps) {
   const [proofLoading, setProofLoading] = useState(false);
@@ -140,7 +133,6 @@ export function SaleDetailSheet({
   if (!sale || typeof document === 'undefined') return null;
 
   const saleId = sale.id || '';
-  const showApproval = canApprove && sale.status === 'pending';
   const tone = ageTone(sale);
   const openScreenshot = async () => {
     if (!sale.proofScreenshotPath) return;
@@ -258,16 +250,6 @@ export function SaleDetailSheet({
           </section>
 
           <div className="sales-line-sheet-actions">
-            {showApproval && (
-              <>
-                <button className="approve" type="button" disabled={loading} onClick={() => void onApprove(saleId)}>
-                  <Check className="sales-line-icon" />Approve sale
-                </button>
-                <button className="reject" type="button" disabled={loading} onClick={() => onRequestReject(saleId)}>
-                  <X className="sales-line-icon" />Reject sale
-                </button>
-              </>
-            )}
             {isAdmin && (
               <>
                 <Link className="admin" href={`/portal/sales/${saleId}/edit`} onClick={disownHistoryEntry}>

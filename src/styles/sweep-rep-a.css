@@ -454,3 +454,312 @@
     font-size: 0.68rem;
   }
 }
+
+/* ── Admin/owner sales board ────────────────────────────────────────────────
+   The company book, grouped by rep. Colour comes entirely from the .sales-line
+   token block (--lime installed, --amber scheduled, --red needs a date), so the
+   board follows the portal's light and dark themes without a second palette.
+   No cards: hairline --soft dividers and 2px left stripes carry the structure,
+   matching the ledger it sits next to. */
+
+.portal-scope .sales-board-month {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.portal-scope .sales-board-month > span {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-month button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.portal-scope .sales-board-month button:hover:not(:disabled) {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.portal-scope .sales-board-month button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.portal-scope .sales-board-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0 18px;
+}
+
+.portal-scope .sales-board-figs {
+  display: flex;
+  align-items: flex-end;
+  gap: 30px;
+}
+
+.portal-scope .sales-board-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.portal-scope .sales-board-fig strong {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-scope .sales-board-fig strong small {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-fig > span {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-scale {
+  align-self: flex-start;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--lime) 62%, transparent);
+  color: var(--lime);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Flex weights are set inline from the bucket counts, so the bar's proportions
+   are the pipeline itself rather than a decorative rule. */
+.portal-scope .sales-board-strip {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+}
+
+.portal-scope .sales-board-strip i { display: block; }
+.portal-scope .sales-board-strip i.installed { background: var(--lime); }
+.portal-scope .sales-board-strip i.scheduled { background: var(--amber); }
+.portal-scope .sales-board-strip i.attention { background: var(--red); }
+.portal-scope .sales-board-strip i.empty { background: var(--soft); }
+
+.portal-scope .sales-board-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-key .installed { color: var(--lime); }
+.portal-scope .sales-board-key .scheduled { color: var(--amber); }
+.portal-scope .sales-board-key .attention { color: var(--red); }
+
+.portal-scope .sales-board-note {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-reps-head {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-rep {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 10px;
+  width: 100%;
+  padding: 14px 0 13px;
+  border: 0;
+  border-bottom: 1px solid var(--soft);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.portal-scope .sales-board-rep.open {
+  border-bottom-color: transparent;
+}
+
+.portal-scope .sales-board-caret {
+  grid-row: 1 / span 2;
+  font-size: 0.55rem;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-rep-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-scope .sales-board-rep.open .sales-board-rep-name { color: var(--lime); }
+
+.portal-scope .sales-board-rep-value {
+  text-align: right;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-scope .sales-board-rep-sub,
+.portal-scope .sales-board-rep-count {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-rep-sub { grid-column: 2; }
+.portal-scope .sales-board-rep-count { grid-column: 3; text-align: right; }
+
+.portal-scope .sales-board-sales {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--soft);
+}
+
+.portal-scope .sales-board-sale,
+.portal-scope .sales-board-payrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 12px;
+  padding: 11px 0 11px 12px;
+  cursor: pointer;
+}
+
+.portal-scope .sales-board-sale {
+  margin-left: 25px;
+  border-left: 2px solid var(--line);
+}
+
+.portal-scope .sales-board-sale.installed { border-left-color: var(--lime); }
+.portal-scope .sales-board-sale.scheduled { border-left-color: var(--amber); }
+.portal-scope .sales-board-sale.attention { border-left-color: var(--red); }
+
+.portal-scope .sales-board-payrow {
+  padding-left: 0;
+  border-bottom: 1px solid var(--soft);
+}
+
+.portal-scope .sales-board-sale:hover,
+.portal-scope .sales-board-payrow:hover {
+  background: color-mix(in srgb, var(--lime) 7%, transparent);
+}
+
+.portal-scope .sales-board-sale:focus-visible,
+.portal-scope .sales-board-payrow:focus-visible,
+.portal-scope .sales-board-rep:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
+}
+
+.portal-scope .sales-board-sale-cust {
+  font-size: 0.86rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-scope .sales-board-sale-val,
+.portal-scope .sales-board-amt {
+  text-align: right;
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.portal-scope .sales-board-sale-val small {
+  font-weight: 400;
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-amt {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--lime);
+}
+
+/* A rate the comp plan has not contracted yet reads as unfinished, not as money. */
+.portal-scope .sales-board-amt.pending {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-scope .sales-board-sale-prod,
+.portal-scope .sales-board-when {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-scope .sales-board-when { text-align: right; white-space: nowrap; }
+
+.portal-scope .sales-board-chip {
+  justify-self: end;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.portal-scope .sales-board-chip.installed { color: var(--lime); }
+.portal-scope .sales-board-chip.scheduled { color: var(--amber); }
+.portal-scope .sales-board-chip.attention { color: var(--red); }
+
+@media (max-width: 460px) {
+  .portal-scope .sales-board-figs { gap: 20px; }
+  .portal-scope .sales-board-fig strong { font-size: 1.45rem; }
+  .portal-scope .sales-board-sale { margin-left: 15px; }
+  .portal-scope .sales-board-key { gap: 10px; font-size: 0.56rem; }
+}

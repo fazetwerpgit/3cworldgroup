@@ -7,33 +7,89 @@ Updated: 2026-09-02 (update at EVERY milestone).
 
 ## PORTAL OPS TRACK (2026-09-01 session — separate from the visual redesign below)
 
-NEXT ACTION: UX sweep fixes are IMPLEMENTED, gates green (tsc, vitest
-859/859, next build), NOT committed. Jacob is reviewing the before/after
-page (artifact "Sweep Fixes Review"). On his OK: commit ONLY the portal
-files (src/app/portal/**, src/components/{portal,admin,forms,resources,
-training,sales,chat,leaderboard,onboarding,auth/SignupForm.tsx}, src/contexts/
-ThemeContext.tsx, src/lib/push/pushPrompt*, src/styles/*, src/app/globals.css
-font-only diff, docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md,
-this file) — the public-site dirty files (src/app/{about,apply,contact,
-culture,opportunities,services,page,layout}.tsx, Footer/Navbar/PageWrapper,
-package*.json, *.module.css, src/components/public, public/redesign) belong
-to the separate redesign track and must NOT go in this commit. Then push
-master + verify on https://www.3cworldgroup.com. If he wants changes: the
-spec is docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md;
-shared header src/components/portal/PageTitle.tsx (+ src/styles/page-title.css);
-per-area CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
-What shipped: PageTitle on all 27+ pages, mastheads/eyebrows/numbering/
-slogans removed, plain copy; push prompt inline on dashboard only (30-day
-snooze) + A2HS one-at-a-time + header bell dot; More sheet = "Menu" without
-bar duplicates; phone-only dark default (ThemeContext, nothing stored ->
-dark at <=767px); font stacks normalized (Archivo headings, SF Mono/Menlo
-mono, no Windows-only faces, letter-spacing >= -0.02em) = the "text isn't
-straight" fix; onboarding crash guarded; admin destructive actions moved into
-person views behind confirm. QA bot qa-e2e-1@3cworldgroup.test (uid
-ROZ9ZiuDciRxcTmeyT344NXBpah2, role cleared back to undefined) still exists in
-prod; delete when done testing. Dev server on :3000 may still be running.
+REDESIGN TRACK STATE (2026-09-02 evening): Jacob's Codex APP session died
+mid-task during the post-approval reopen. Home + About reopen are COMPLETE;
+Services reopen Round 1 was IN PROGRESS (see "CURRENT PAGE/ROUND" under
+"CURRENT PUBLIC-SITE VISUAL HANDOFF" below, and docs/redesign/HANDOFF.md
+"Post-approval reopen — active"). Still open after Services: Careers Hero
+sharpness, Contact full-page fidelity, minor Apply fidelity. Culture frozen.
+All redesign work is UNCOMMITTED in the working tree (7 public pages, their
+*.module.css, src/app/public.css, src/components/public/, src/app/fonts/,
+public/redesign/) — never commit it to onboarding/completion or master without
+Jacob. Codex transcript (1.3 GB): ~/.codex/sessions/2026/08/30/rollout-2026-08-30T13-29-51-01a053ee-*.jsonl.
+To continue: resume that Codex thread in the app, or hand Claude the
+HANDOFF + RESUME next action and let it orchestrate Luna/Sol workers.
+
+NEXT ACTION (2026-09-03): Sales rebuild is CODE-COMPLETE and UNCOMMITTED on
+onboarding/completion. All four gates pass (tsc, vitest 871/871, eslint on
+touched files, npm run build). Jacob has NOT eyeballed it yet — he is the
+acceptance gate. Ask him to open http://localhost:3000/portal/sales as an admin
+(dev server already running on :3000) and give a verdict, then commit.
+
+Spec: docs/superpowers/specs/2026-09-03-sales-rep-grouped-no-approval-design.md
+Approved visual board: https://claude.ai/code/artifact/902fd8ef-22b2-4d6e-bdf4-a147a3ede4d0
+
+WHAT SHIPPED (three phases, all done):
+- Pay linkage: PLATFORM_ROLE_COMP_FALLBACK in src/types/compPlan.ts pays admin +
+  owner on the internal_rep scale (operations deliberately excluded; a field role
+  still wins). GET /api/portal/comp-plan returns compRole + ownRates for platform
+  callers; useCompPlan reads ownRates when scope==='all'. Root cause fixed: PATCH
+  /api/portal/auth/users/[id]:196 runs fieldRole = FieldValue.delete() when a
+  platform role is assigned, which destroyed Wil Teasdale's internal_rep scale
+  (uid Qo7SIygzjmhImBIFX15mANQw6Ml1) when Jacob promoted him to admin.
+- Approval REMOVED entirely (Jacob: "useless feature"). sales:approve is gone
+  from every role; sales:read:all replaces the half of it that gated "sees the
+  whole company book" (admin + owner only — operations still sees only its own).
+  Deleted: /api/portal/sales/approve, /portal/approvals, approveSale in useSales,
+  buildSaleDecisionPush + salePush.test, the pending queue, status tabs, the
+  reject dialog, the approve/reject buttons in SaleDetailSheet, the "Approve
+  Sales" quick action and "Review pending sales" palette entry. New sales are
+  created status:'approved'. The status field survives for legacy rows and for
+  isPayableSale (cancelled/rejected).
+- New Sales page. SalesTable is now REP-ONLY (all canApprove forks removed).
+  Management gets src/components/sales/AdminSalesBoard.tsx: Company tab (month
+  picker, count + value, a flex-weighted install-pipeline bar, one collapsible
+  row per rep sorted by value, tap to expand their sales) and a My pay tab
+  (own installed sales, internal_rep rates, expected pay dates). Bucketing lives
+  in one place: src/lib/sales/installBucket.ts (+ tests). CSS appended to
+  src/styles/sweep-rep-a.css under .sales-board-*, all colour from the existing
+  .sales-line token block.
+  page.tsx now fetches a month at a time for management (limit 500 + startDate/
+  endDate) instead of the old unbounded limit:100.
+
+OPEN ITEMS FOR JACOB:
+1. Existing `pending` sales in production are NOT backfilled to `approved`
+   (a data write — his call). They render fine either way.
+2. There is now no UI path to CANCEL a sale — reject used to be it. Admin Delete
+   is the only removal. Ask whether cancel should come back as its own action.
+3. Visual sign-off. Claude could not screenshot it: seeing the admin board needs
+   an admin login, and scripts/e2e-create-test-user.mjs deliberately creates
+   non-admin bots ("a leaked test login should not be powerful").
+
+NOT COMMITTED. My changes are disjoint from Jacob's uncommitted public-site
+redesign (about/apply/contact/culture/opportunities/services/page/Navbar/
+PageWrapper) — do not sweep those into a commit.
+
+PRIOR TRACK: UX sweep fixes are LIVE and
+verified on https://www.3cworldgroup.com (master cbeb4f0 = sweep ab7d89d +
+font-fallback fix 9b3cae4; phone dark by default, plain page headers, inline
+push prompt, page titles render in Archivo). QA bot qa-e2e-1@3cworldgroup.test
+deleted from Auth + Firestore (2026-09-02). Temp scripts removed.
+Jacob approved shipping the three older branch commits (esign completed-envelope
+fix + dismissible aged alerts, alerts read legacy `Email`, operations-only-own
+sales) — cherry-picked to master as 4ed3092 (2026-09-02). Note: Jacob has a
+separate redesign in progress in Codex; do NOT merge unreviewed branch work to
+master without asking. Local `master` ref is checked out in worktree
+~/dev/3cwg-payplan (stale); never force-update it, push by sha
+(`git push origin <sha>:master`). Admin SDK scripts: load env via
+@next/env loadEnvConfig and use FIREBASE_SERVICE_ACCOUNT (base64 JSON);
+FIREBASE_ADMIN_PRIVATE_KEY in .env.local is truncated/unusable.
+Spec: docs/superpowers/specs/2026-09-02-portal-ux-sweep-fixes-design.md; shared
+header src/components/portal/PageTitle.tsx + src/styles/page-title.css; per-area
+CSS src/styles/sweep-{rep-a,rep-b,admin-a,admin-b,shell,leftovers}.css.
+Before/after review artifact: https://claude.ai/code/artifact/15b0dd76-0bbf-4c54-ad05-644effac70c9
 Jacob still owes: tell managers code `3cteam` + URL 3cworldgroup.com/login;
-DELETE bot account in Pending.
+DELETE bot signup account in Pending.
 
 DONE 2026-09-02: team-code signup gate + easy login path LIVE on production
 (master 83a4329, Vercel Ready, verified on https://www.3cworldgroup.com —
@@ -73,6 +129,154 @@ Jacob's picks (projects in ~/dev/3c-videos/recruiting-ad-*).
 
 ## CURRENT PUBLIC-SITE VISUAL HANDOFF
 
+POST-APPROVAL REOPEN ACTIVE (2026-09-02): Jacob rejected six pages after reviewing
+the running production build. Culture remains approved/frozen. Reopened scope: Home
+recruitment-card icons; About Hero/map image sharpness; Services full-page fidelity,
+especially What You'll Sell and What We Offer; Careers Hero sharpness; Contact
+full-page fidelity; and minor Apply fidelity. The former goal-complete state below is
+superseded. HOME REOPEN COMPLETE: Jacob's verbatim Round 5H verdict is
+`Approve that section`. The Join-panel section and every other Home surface are now
+approved/frozen. Accepted build is `d8GSfFMwpPln1erixzteG`; evidence board is
+`round22/home-post-approval-round5/home-join-panels-target-current-r5h.png`.
+
+ABOUT REOPEN COMPLETE: Jacob's verbatim sharpness Round 1C verdict is `Approve`.
+Only the Hero `3C` artwork and Mission U.S. map were changed. Generative edits were
+rejected and not integrated because they altered topology. Current production uses an
+exact-size `650x622` luminance-sharpened Hero served directly and a topology-preserving
+2440x1520 Mission source. Independent review accepts both: Hero edge energy is +6.6%
+without halos/moved nodes, and Mission geography/routes/nodes are unchanged and
+sharper. Focused ESLint, dimensions, diff-check, and one build pass on
+`v_E_Uzxs1lBi1_wjMXks-`, running on port3100; DOM is 1440x2802, 22 footer links, no
+development badge. Evidence is under `round23/about-post-approval-sharpness/`;
+`about-hero-before-current-r1c.png` and `about-map-before-current-r1c.png` are old left,
+current right. About is approved/frozen.
+
+CURRENT PAGE/ROUND: Services post-approval reopen Round 1. NEXT ACTION: re-audit the
+complete Services page against its locked 1440px source and make one smallest
+consolidated correction to the failed Hero/What We Offer and What You'll Sell rows.
+Preserve exact band geometry, correct Fiber copy, the angled recruiting CTA, Home,
+About, Culture, the shared shell, and unrelated sections. Use one measurement pass,
+one scoped gate pass, and one optimized production capture. No commit/deployment.
+
+ROUND 1 STATUS (2026-09-02 late, Claude orchestrating): full-page audit done. Target
+= round18/services-round1/services-adapted-target-1440.png; band geometry and height
+(3304) already match. Failures are type-scale/position drift: hero copy 7-8px left,
+eyebrow tiny, body pitch 33 vs 30; nav labels small; Fiber/TV copy columns 8-9px left;
+Security accent tiny; body pitch 26 vs 30; bullets bold+condensed vs regular+wider;
+CTA labels small; fiber photo over-zoomed; security highlights 40px icons/68 pitch vs
+54px/100 with two-line labels, HD icon renders "Hb"; bundle item labels + stat text
+small, 30% circle white-filled with shadow vs thin ring, stats 19px low; recruiting
+title/body 8px left, tagline tiny. Worker spec with exact target boxes:
+docs/redesign/qa/visual-remediation-2026-08-26/round24/services-post-approval/SPEC.md.
+Codex usage limit hit (locked until Sep 6 9:24 PM) -> both workers ran on Opus
+subagents instead. SEPARATE SITEWIDE FINDING: the shared footer wraps at 1440 on every
+page in Linux Chromium (legal links stack over the Contact column; copy paragraph
+wraps to 5 lines) -> fixed by Opus worker, Fable technical review passed, AWAITING JACOB'S VERDICT on
+round24/footer-wrap/footer-approved-before-after-board.png (2026-09-03): public.css
+@media(min-width:1081px) `.public-site .public-footer-copy` max-width 240->260px;
+`.public-site .public-footer-legal` + flex-wrap/white-space nowrap, min-width
+max-content (width 210 kept). Crops in round24/footer-wrap/*-r1-footer.png match the
+approved About footer. Needs the same production build/capture as Services. RESTART NOTE (2026-09-02): after the reboot neither worker had edited anything;
+both were RE-DISPATCHED on Opus (dev server restarted on :3000). If they die again,
+their edits may be PARTIAL. On resume: (1) `git diff --stat
+src/components/public/services src/app/services/page.tsx src/app/public.css` and read
+the diffs; (2) check for round24/services-post-approval/R1-MEASUREMENTS.md and
+round24/footer-wrap/R1-RESULT.md — if missing, the worker did not finish: re-dispatch
+the same SPEC.md to a fresh Opus worker (tell it to first read the existing diff and
+continue, not restart); (3) dev server :3000 and prod :3100 will be down — start dev
+with `npm run dev -- -p 3000` for worker captures. SERVICES R1 DONE BY OPUS WORKER (2026-09-03): all 7 spec items landed, measurement
+table round24/services-post-approval/R1-MEASUREMENTS.md (mostly PASS within 1-2px).
+Fable visual review: big improvement; boards sent to Jacob
+(round24/services-post-approval/boards/*-mockup-vs-r1.png) — AWAITING JACOB'S
+VERDICT. Residuals Fable saw: (1) service-row bullets are letter-spaced condensed
+text, mock is a wider regular sans — reads "tracked out"; (2) bundle stat body text
+is a wide Geist-like sans, mock is small condensed + indented; (3) fiber photo can't
+match the mock's wider framing — source asset is a tighter crop (needs a re-crop of
+the original photo); (4) 24/7 + house icons are different drawings than the mock;
+(5) recruiting APPLY NOW label smaller than mock; (6) headline tracking (Bebas
+scaleX hack) is site-wide and pre-approved elsewhere — not touched. After
+Jacob's verdict: one fix pass, then ONE production build + capture on :3100
+(kill pid of old next start first), board vs target, update this file. No commit.
+
+SERVICES R1 PIXEL-DIFF LOOP (2026-09-03, Claude session, Codex out of credits until Sep 6 9:24 PM):
+Jacob's instruction this session: put the mockup in the browser, compare by PIXEL DIFF (not vision),
+use vision only to read the diff, "whatever it takes to match 99%". Jacob also reminded: main loop
+must orchestrate workers (Opus), never write the code itself — an Opus worker (services-r1n-worker)
+is now running the remaining polish loop from
+docs/redesign/qa/visual-remediation-2026-08-26/round24/services-post-approval/WORKER-SPEC-R1N.md
+and will write R1N-RESULT.md there.
+Toolchain (same dir): capture-1440.mjs, pixdiff.sh (per-band match% at fuzz 10%, t-/c-/diff-<band>.png),
+reg.sh / reg2.sh / reg3.sh (uniform / inverted / anisotropic registration), dom-probe.mjs, font-audit.mjs.
+Playwright CLI 0.1.19 installed globally + skills (.claude/skills/playwright-cli). Dev :3000 running.
+Match% per band, baseline r1 -> latest r1m (dev == prod build):
+hero 96.81->97.66 | overview 96.46->96.76 | fiber 93.55->98.14 | tv 92.91->98.42 |
+security 93.11->97.51 | bundle 90.96->96.45 | recruit 96.73->96.70 | footer 97.90->97.90.
+What changed (all uncommitted): fiber/tv/security artwork now 1:1 crops of the mockup
+(public/redesign/service-fiber-target-2x.png, service-tv-target-2x-r1.png, service-security-target-2x-r1.png —
+the old fiber asset was a different render and could never register better than rmse 0.15);
+hero/bundle map placements re-registered; security artwork height fixed (was clipped to 420 by the inner);
+tv clip corner; hero diagonal (4px, #7b8d27); overview markers 26px/7px #729616 + route stubs;
+security->bundle route now drops at x≈658 into a node on the savings ring (ServicesConnector.tsx);
+recruiting CTA 32px cream text on #73921b, rounded corner into it; bundle icon rings 3px #87a14b,
+TV icon -> lucide Monitor; bundle stats 580px, ServicesCopy 13.5px #3d4d6e; dev "N" badge hidden in captures.
+Remaining residual is glyph shape: mock display/body fonts differ from Bebas Neue / ServicesCopy.
+99% is not reachable without a font decision — that is Jacob's call (flag it with the board).
+public/redesign/qa-tmp removed. Prod build passes; prod :3100 was started this session.
+CODEX METHOD MINED (METHOD-FROM-CODEX.md in the round24/services-post-approval dir): Luna/Sol
+ran ONE lane at a time with exclusive file ownership, captured at 1440 dpr1 on prod :3100 every turn,
+compared per band with RMSE (+AE at fuzz 2-25%) and DOM-box JSON, cropped photos from the mock with
+Lanczos upscales validated by round-trip, sampled colours, and FITTED TYPEFACES (fc-list candidates ->
+ink-bounding-box score -> private @font-face family -> scale()/translate()/letter-spacing per class).
+Jacob (2026-09-03): "If you see how Luna & sol were doing that you can do it the same." -> font fitting
+is now IN scope for Services: WORKER-SPEC-R1O-FONTS.md is the next lane (runs after worker A, which owns
+the CSS until it finishes its 4-item list: security asset rebuild + un-hide highlights, bundle/hero map
+1:1 mock crops, stroke-width/Apply-button/stray-diagonal).
+Worker B (connector) is DONE and accepted. Worker A's kept changes so far: serviceCta dark lime + light
+text, accent words #729616, recruitingCta geometry, navMarker 28/4px, row markers on mock rings, savings
+ring ellipse, bundle rings periwinkle (mock), hero divider, security clip 38.1/46.1.
+ALL THREE LANES DONE (2026-09-03 ~06:00): A (CSS/markup), B (connector), fonts (R1o: face substitution
+measured and rejected — Bebas already fits the mock trim boxes; residual is stroke weight; hairline
+-webkit-text-stroke kept only over flat grounds). Latest dev numbers: hero 98.26 | overview 97.33 |
+fiber 98.51 | tv 98.78 | security 97.93 | bundle 97.12 | recruit 97.08 | footer 97.90 (rmse column now in
+pixdiff.sh). Finalizer worker (services-r1-finalizer) is running gates -> npm run build -> prod :3100 ->
+capture -> pixdiff -> boards.sh -> FINAL-R1.md in the round24/services-post-approval dir.
+SERVICES R1 — REJECTED by Jacob (2026-09-03): "Rejected. make a rule not to over engineer / over test
+and stay within a 1 pixel bound". No itemised diffs; the standing 1px rule below IS the spec.
+State of the tree: R1b CSS block, connector refits, mockup-crop assets all still in the working tree
+(uncommitted). Round tooling lives in round24/services-post-approval/ (capture-1440.mjs, pixdiff.sh).
+SERVICES R2 (2026-09-03 06:39) — AWAITING JACOB'S VERDICT. Opus lane stripped all text-strokes, the
+ServicesCopy font override, inert colour; measured boxes vs mock; fixed >1px offsets (bundle CTA, row/nav
+marker ring size+stroke+colour, connector stroke 6, route meets ring edges, bundle stat pitch 195).
+Still >1px, by cause: overview/bundle/tv titles (typeface word-gap metric, rule forbids refitting),
+security highlight icons (different artwork), TV/SECURITY nav labels +3/+4, bundle stat copy wraps 3 lines,
+footer ghosting (shared component, out of lane scope). Full record: R2-RESULT.md; boards boards-r2/.
+eslint/tsc/build 0. Prod :3100 serving R2. Boards sent to Jacob.
+SITE-WIDE DEFECT LIST from Jacob (2026-09-03 ~11:00) SUPERSEDES the per-page pixel rounds: nav bar
+changes on the Work tab; no image is responsive (only good at one viewport); About hero broken, About
+map blurry, 3 C's section misaligned; Services hero blurry + body broken at 1920; Careers broken;
+Contact hero blurry + section below off. Spec + screenshots: docs/redesign/qa/site-defects-2026-09-03/
+(DEFECTS.md). Root cause suspected: 1440-only absolute geometry + upscaled mock crops.
+TRIAGE.md written (root cause: 1440 pixel compositions in unbounded min-width media queries; three
+assets upscaled/squashed; home nav uses a different link set). Jacob DECIDED (2026-09-03): above
+1440 SCALE THE WHOLE 1440 LAYOUT UP (one zoom rule per page, identical at 1440), not cap, not re-author.
+Lanes running (Opus, exclusive files): E careers container cap (opportunities-page.module.css);
+A nav = always innerNavLinks (Navbar.tsx); C about hero HD asset + map object-fit contain (about/*);
+D services hero/bundle -target-2x assets (services page.tsx + module.css); F contact 3C asset + copy
+width cap (contact/*, public.css contact rules). Captures in site-defects-2026-09-03/fix-captures/.
+Lanes A,C,D,E DONE + reviewed (nav one link set; about hero HD asset + map object-fit cover; services
+maps on -target-2x assets, override rules removed; careers container cap 1440). Lane F: contact hero
+blur needs a NEW 2x asset (only a 380px crop exists; other 3C marks are different designs) — ask Jacob
+for the source; predicted copy collision was dead CSS, no change. Lane scale DONE: PageWrapper.tsx adds `.public-scale` child; public.css ~6376 `.public-site{container-type:inline-size}`
++ `@media(min-width:1282px){.public-site>.public-scale{zoom:tan(atan2(100cqw,1440px))}}` (cqw excludes
+scrollbar). AE 0 at 1440 + 390 on all pages. opportunities-page.module.css ~613-622 froze 4 vw rules at
+1440px values. ServicesConnector.tsx divides rects by currentCSSZoom (route correct at 1282/1920).
+Boards (1440 vs 1920-scaled) in site-defects-2026-09-03/boards/; home/about/opportunities/contact SENT
+to Jacob; services board being regenerated after prod rebuild.
+NEXT ACTION: all five boards SENT (2026-09-03 16:43). AWAIT JACOB'S VERDICT. On reject, one Opus lane per owned file, his diffs as spec.
+Open: contact hero 3C needs a 2x source asset (ask Jacob); his note on "section below contact hero";
+Windows/Linux classic-scrollbar check in a real browser; eslint has a pre-existing error in
+src/components/onboarding/EsignSignAction.tsx:96 (not ours). Do not commit.
+
 Standing user rule: do not overengineer or over-test. At 1440px, measurable edges,
 centers, baselines, dividers, and spacing must stay within 1 CSS pixel of the locked
 crop. Use one measurement pass, the smallest direct fix, and one optimized capture;
@@ -80,17 +284,94 @@ re-run only a failed check. Freeze components inside the 1px bound and do not ch
 subpixel RMSE or font-antialiasing noise.
 
 LATEST PUBLIC-SITE STATE (2026-09-02; supersedes the older chronology below):
-Home and About are approved/frozen. Jacob's verbatim About R11O verdict is
-`Approve`. Accepted board: `docs/redesign/qa/visual-remediation-2026-08-26/
-round16/about-round3-rejection-audit/about-round3-r11o-target-current-review.png`;
-independent production build `s1f6xgkwruZrBHBkLdabO` and exact 1440 runtime
-invariants pass. Do not reopen About.
+Home, About, Culture, Services, and Careers are approved/frozen. Jacob's verbatim
+Careers Round 1 verdict is `Approve`. Accepted board: `docs/redesign/qa/
+visual-remediation-2026-08-26/round19/careers-round1/
+careers-adapted-target-current-final.png`; production build
+`j1R5rW6Dd66KCaofFZWOB` and exact 1440 runtime invariants pass. Do not reopen any
+approved page.
 
-CURRENT PAGE/ROUND: Culture Round 1. NEXT ACTION: resolve the locked 1440 Culture
-source, capture the current optimized-production route once, create same-size
-section comparisons, then dispatch one measured consolidated Culture-only Luna
-correction. Shared shell, Home, and About remain read-only. Use the 1px/no-
-overengineering rule; no commit or deploy. Port 3100 is stopped.
+Contact is approved and frozen. Jacob's verbatim Contact Round 1 verdict is
+`Approve`. His final pre-approval feedback was `One last thing in the hero on
+the top there’s a line that is next to the C it’s cut short`. The preceding rejection was `Rejected.
+Theres some very minor things that are wrong that you haven’t caught yet. The section
+below the top hero the white section is boxed & screwed up where as in the mockup
+it’s all a light grey color`. Locked source: `docs/redesign/concepts/
+public-pages-2026-08-25/contact/selected-combination-lock-candidate.png`; live route
+`/contact`. Root's complete native review localized the remaining failures to Hero,
+Pathways, and submit-button ink. The same Contact Luna applied only the measured
+Round 1G-A and Round 1H CSS corrections. Independent focused ESLint, typecheck,
+production build, and diff-check pass on build `xE9guK5AEaRRx7l9kjuhR`, which is
+running on port 3100. The final exact capture is 1440x2676 with bands
+108/647/508/983/258/172, scroll width 1440, 22 footer links, six form controls and
+the correct four required fields, no development badge, and no console errors. Root
+reviewed the original-resolution Hero, Pathways, and Form pairs, then the corrected
+submit-detail pair and complete full-page board. Evidence is under `docs/redesign/qa/
+visual-remediation-2026-08-26/round20/contact-round1/round1h-*` and `round1i-*`;
+board for that rejected state is `contact-adapted-target-current-round1i.png`.
+Round 1J changed only the desktop `.contact-fast-path` base to `#F6F6F8`; the four
+formerly white wedge samples now all equal `#f6f6f8`, removing the boxed panel while
+preserving the passing right child. Focused ESLint, typecheck, production build, and
+diff-check pass on build `iBPP-A1jtZvUtK4YxdAJx`, running on port 3100. Exact runtime
+remains 1440x2676 with bands 108/647/508/983/258/172, scroll width 1440, 22 footer
+links, six controls/four required fields, no development badge, and no console
+errors. Root reviewed the original-resolution Pathways pair and full board. Current
+evidence is `round1j-*`; board `contact-adapted-target-current-round1j.png`. Round 1K
+adds only two 3px CSS continuation segments; the passing 380px 3C raster and slot are
+unchanged. The upper stroke now reaches the right edge at Hero y151-153 and the lower
+stroke reaches the bottom at x1091. Focused ESLint, typecheck, production build, and
+diff-check pass on build `cD-xya59KIzgcMDOmO-91`, running on port 3100. Exact runtime
+and every route invariant remain unchanged. Root reviewed the native Hero pair and
+full board. Current accepted evidence is `round1k-*`; board
+`contact-adapted-target-current-round1k.png`. Do not reopen Contact.
+
+PUBLIC-SITE GOAL COMPLETE: all seven locked 1440px public pages are approved and
+frozen in order: Home, About, Culture, Services, Careers, Contact, and Apply. Jacob's
+verbatim Apply Round 1 verdict is `Approve`. No public page or shared surface is
+active. No commit or deployment was requested or performed. NEXT ACTION: none; wait
+for Jacob to explicitly authorize a new goal, commit, or deployment.
+
+APPLY APPROVED/FROZEN: Correction 6. Locked source:
+`docs/redesign/concepts/public-pages-2026-08-25/apply/displayed-option-1.png`; live
+route `/apply`. Source prep and the exact 1440x3022 band map are complete under
+`docs/redesign/qa/visual-remediation-2026-08-26/round21/apply-round1/`. Correction 2
+passes focused ESLint, production build, and diff-check on build
+`S2r3fa2UaWjD8UwZtp5tx`; its exact production capture preserves document 1440x3022,
+bands 108/940/227/415/238/402/239/453, scroll width 1440, 22 footer anchors, the full
+form contract, no development badge, and no console errors. Root and the independent
+original-resolution reviewer still reject its painted pairs. The remaining causes are
+localized: the Hero uses dotted 3C art instead of the smooth outlined `30`, topology is
+2.74x too dense, proof icons/body wraps differ, Process retains a 16px column gap and
+wrong copy rhythm, Metrics dividers are positioned from 102px content boxes, Good-to-
+know copy is too small/high, CTA copy/diagonal are narrowly off, and the frozen compact
+footer opacity/transforms/link heights leak into Apply. Correction 3 passed focused
+ESLint/build/diff-check on build `VrlazfQnW933iHUt4IME0`; its exact 1440x3022 capture
+preserves all structure and DOM invariants. Root's fresh full-board/original-pair review
+freezes Benefits and the outer geometry but rejects the remaining paint: Hero `30`
+must be the locked smooth outlined `3C` and move down; Process icon/type rhythm remains
+off; Metrics labels are too wide/miscentered; Good-to-know wraps differ; and CTA/footer
+have narrow type residuals. Correction 4 passed focused ESLint/build/diff-check on
+build `LTYN_iPDc4u4ymU09RI77` and preserves all exact structural/DOM invariants, but
+root rejects its failed paint pairs: 3C is 24px high, Process icon/rhythm was
+overcorrected, Metrics labels are too light/small, Good card 4 still wraps four lines,
+and CTA/footer label paint is underscaled. Correction 5 is dispatched to the same
+Apply Luna with direct numeric edits in only the two Apply files. Correction 5 keeps
+the exact structure/DOM gate but is internally rejected because its no-wrap selector
+leaked across all four Good-to-know bodies. Existing failed-pair review leaves only
+card-4 wrapping, Metrics label scale, small Process offsets, and thin Hero-outline
+paint. Correction 5A passes focused gates/build and its exact capture fixes those
+rows. Root freezes Hero, Benefits, Metrics, Good, CTA/footer geometry, and all DOM
+invariants. The final native-pair residual is Process number scale and two icon
+drawings, plus sampled submit-gradient/CTA-label/footer-wordmark paint. Correction 6
+passes focused gates/build and keeps every invariant. Jacob accepted this Correction 6
+state. Accepted evidence is `apply-target-current-correction6.png` plus
+`current-correction6/` and `pairs-correction6/`. The capture is exactly 1440x3022 with
+bands 108/940/227/415/238/402/239/453, scroll width 1440, 22 footer anchors, seven
+form controls/four required, no development badge, and no console errors. Focused
+ESLint, production build, and diff-check passed on build
+`a3pfjKXI1kUK8Vemk0NI-`. A Process-only Correction 6A edit landed concurrently after
+the verdict and was immediately reverted, preserving the user-seen Correction 6 state.
+Do not reopen Apply, the shared shell, shared public CSS, or any approved page.
 
 CURRENT MILESTONE (supersedes the older Home chronology below): Home is approved
 and frozen. Jacob rejected About Round 2 R11. Root audited it, dispatched About

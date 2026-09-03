@@ -111,7 +111,10 @@ const FIELD_MANAGER_PERMISSIONS = [
 const ADMIN_PERMISSIONS = [
   ...BASE_PERMISSIONS,
   'users:read', 'users:write', 'users:delete',
-  'sales:read', 'sales:write', 'sales:approve', 'sales:delete',
+  // sales:read:all is the "sees the whole company book" switch. It used to be
+  // sales:approve doing double duty; approval was removed in Sep 2026 and this
+  // took over that half of the job, so visibility stayed exactly where it was.
+  'sales:read', 'sales:write', 'sales:read:all', 'sales:delete',
   'training:write', 'training:delete',
   'leaderboard:manage',
   'settings:read', 'settings:write',
@@ -134,11 +137,9 @@ export const RolePermissions: Record<PlatformRole | FieldRole, string[]> = {
   operations: [
     ...BASE_PERMISSIONS,
     'users:read',
-    // Deliberately NOT sales:approve: operations sees only their OWN sales
-    // (rep-style ledger + fiber view); reviewing and approving other reps'
-    // sales is admin/owner only. sales:approve doubles as the UI's
-    // "sees the whole book" switch, so granting it back here would also
-    // reopen cross-rep sales visibility.
+    // Deliberately NOT sales:read:all: operations sees only their OWN sales
+    // (rep-style ledger + fiber view). Granting it here would open the whole
+    // company book — every rep's customers, values and pay — to operations.
     'sales:read', 'sales:write',
     'training:write',
     'leaderboard:manage',

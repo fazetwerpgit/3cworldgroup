@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Check, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Sale, SaleStatus, FIBER_COMPANIES, PAY_DELAY_DAYS } from '@/types';
-import type { FiberOrder, FiberStatusResponse } from '@/types';
+import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
@@ -19,34 +18,25 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { FiberRows, FiberStatusPill, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 
+// A rep's own ledger. Management no longer renders this at all — they get
+// AdminSalesBoard, which groups the whole company by rep. Splitting the two
+// removed the `canApprove` forks that used to run through every branch here.
 interface SalesTableProps {
   sales: Sale[];
-  statusFilter: SaleStatus | '';
-  onStatusFilterChange: (status: SaleStatus | '') => void;
-  onApprove?: (saleId: string, status: 'approved' | 'rejected', reason?: string) => void | Promise<boolean>;
   onDelete?: (saleId: string) => void | Promise<boolean>;
   loading?: boolean;
-  /** Reps only: the [All | Pay] selection, held by the page (never in ?status=). */
+  /** The [All | Pay] selection, held by the page. */
   payView?: boolean;
   onPayViewChange?: (payView: boolean) => void;
-  /** The viewer's own comp-plan slice. Absent/planless reps see no dollar figures. */
+  /** The viewer's own comp-plan slice. A planless rep sees no dollar figures. */
   payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
-  /** Reps only: provider install status, fetched once by the page. */
+  /** Provider install status, fetched once by the page. */
   fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
 }
-
-const STATUS_TABS: { value: SaleStatus | ''; label: string }[] = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
 
 function formatMoney(value: number) {
   return `$${Math.round(value).toLocaleString('en-US')}`;
@@ -73,20 +63,6 @@ function productSummary(sale: Sale) {
     .join(' · ');
 }
 
-function ageDays(sale: Sale) {
-  return Math.max(0, Math.floor((Date.now() - new Date(sale.saleDate).getTime()) / 86_400_000));
-}
-
-function ageLabel(sale: Sale) {
-  const days = ageDays(sale);
-  return days === 0 ? 'Today' : `${days}d idle`;
-}
-
-function ageTone(sale: Sale) {
-  const days = ageDays(sale);
-  return days >= 14 ? 'red' : days >= 7 ? 'amber' : '';
-}
-
 function expectedLabel(value: number | null | undefined) {
   return typeof value === 'number' ? formatMoney(value) : '—';
 }
@@ -97,9 +73,6 @@ function StatusBadge({ status }: { status: SaleStatus }) {
 
 export function SalesTable({
   sales,
-  statusFilter,
-  onStatusFilterChange,
-  onApprove,
   onDelete,
   loading = false,
   payView = false,
@@ -107,29 +80,18 @@ export function SalesTable({
   payPlan,
   fiber,
 }: SalesTableProps) {
-  const { user, hasPermission, isRole } = useAuth();
-  const canApprove = hasPermission('sales:approve');
+  const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
-  // Everything below the ledger head forks here: management keeps the five
-  // status tabs and the approval queue, reps get [All | Pay].
-  const repMode = !canApprove;
-  const showPay = repMode && payView;
+  const showPay = payView;
   const rates = payPlan?.rates ?? null;
   const hasPlan = !!payPlan?.hasPlan;
   const payDelayDays = payPlan?.payDelayDays ?? PAY_DELAY_DAYS;
-  const { paidBySale, togglePaid } = useSalePaid(repMode ? user?.uid : null);
+  const { paidBySale, togglePaid } = useSalePaid(user?.uid ?? null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [toastMessage, setToastMessage] = useState('');
   const [fiberView, setFiberView] = useState<FiberBucket | null>(null);
 
-  // Reps have no status tabs to filter with, so their ledger is always the whole book.
-  const visibleSales = useMemo(
-    () => (statusFilter && canApprove ? sales.filter((sale) => sale.status === statusFilter) : sales),
-    [canApprove, sales, statusFilter]
-  );
+  // A rep's ledger is always their whole book — there is nothing to filter by.
   // Pay is owed off the install, so a sale without an install date has nothing
   // to show yet, and a dead sale never will. Newest install first — that is the
   // money arriving soonest.
@@ -141,34 +103,26 @@ export function SalesTable({
   );
   const expectedBySale = useMemo(() => {
     const map: Record<string, number | null> = {};
-    if (!repMode) return map;
     for (const sale of sales) {
       map[sale.id || ''] = isPayableSale(sale) ? expectedPayForSale(sale, rates) : null;
     }
     return map;
-  }, [rates, repMode, sales]);
+  }, [rates, sales]);
 
-  const pendingSales = useMemo(
-    () => [...sales].filter((sale) => sale.status === 'pending').sort((a, b) => ageDays(b) - ageDays(a)),
-    [sales]
-  );
-  // The rows actually on screen — the ledger, or the rep's pay list.
-  const listSales = showPay ? paySales : visibleSales;
+  // The rows actually on screen — the ledger, or the pay list.
+  const listSales = showPay ? paySales : sales;
   const selectedIndex = selectedId ? listSales.findIndex((sale) => sale.id === selectedId) : -1;
   const selectedSale = selectedIndex >= 0 ? listSales[selectedIndex] : null;
   const totalValue = listSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
-  const commissionValues = listSales.flatMap((sale) => typeof sale.commission === 'number' ? [sale.commission] : []);
-  const totalCommission = commissionValues.reduce((sum, value) => sum + value, 0);
-  const commissionLabel = commissionValues.length ? formatMoney(totalCommission) : '—';
   const expectedTotal = hasPlan
     ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
   const expectedTotalLabel = expectedLabel(expectedTotal);
   const fiberOrders = useMemo(() => fiber?.data?.orders ?? [], [fiber?.data?.orders]);
-  const fiberBySale = useMemo(() => {
-    if (!repMode) return new Map<string, FiberOrder>();
-    return matchFiberOrdersToSales(sales, fiberOrders);
-  }, [fiberOrders, repMode, sales]);
+  const fiberBySale = useMemo(
+    () => matchFiberOrdersToSales(sales, fiberOrders),
+    [fiberOrders, sales]
+  );
   const fiberBucketCounts = useMemo(() => {
     const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };
     fiberOrders.forEach((order) => {
@@ -188,7 +142,7 @@ export function SalesTable({
       return order.status === 'breakage';
     }));
   }, [fiberOrders, fiberView]);
-  const showFiberView = repMode && fiberView !== null;
+  const showFiberView = fiberView !== null;
 
   const moveSelection = useCallback((direction: number) => {
     if (!listSales.length) return;
@@ -215,26 +169,6 @@ export function SalesTable({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [moveSelection, selectedSale]);
 
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    window.setTimeout(() => setToastMessage(''), 1800);
-  };
-
-  const decide = async (saleId: string, status: 'approved' | 'rejected', reason?: string): Promise<boolean> => {
-    if (!onApprove) return false;
-    const result = await onApprove(saleId, status, reason);
-    if (result !== false) showToast(status === 'approved' ? 'Sale approved' : 'Sale rejected');
-    return result !== false;
-  };
-
-  const handleReject = async () => {
-    if (!rejectingId || !rejectionReason.trim()) return;
-    const id = rejectingId;
-    setRejectingId(null);
-    setRejectionReason('');
-    await decide(id, 'rejected', rejectionReason.trim());
-  };
-
   const handleDelete = async () => {
     if (!deletingId || !onDelete) return;
     const id = deletingId;
@@ -243,19 +177,6 @@ export function SalesTable({
   };
 
   const rowActions = (sale: Sale) => {
-    if (canApprove && sale.status === 'pending') {
-      return (
-        <span className="sales-line-row-actions" onClick={(event) => event.stopPropagation()}>
-          <button className="approve" type="button" disabled={loading} onClick={() => void decide(sale.id || '', 'approved')}>
-            <Check className="sales-line-action-icon" />Approve
-          </button>
-          <button className="reject" type="button" disabled={loading} onClick={() => setRejectingId(sale.id || null)}>
-            <X className="sales-line-action-icon" />Reject
-          </button>
-        </span>
-      );
-    }
-
     if (!isAdmin) return null;
     return (
       <span className="sales-line-row-actions sales-line-quiet-actions" onClick={(event) => event.stopPropagation()}>
@@ -271,72 +192,23 @@ export function SalesTable({
 
   return (
     <>
-      {/* Reps get the richer "Submitted / in review" section on the page above
-          instead of this queue — rendering both would duplicate the list. */}
-      {canApprove && (
-      <section className="sales-line-flow">
-        <div className="sales-line-section-head">
-          <div>
-            <p className="sales-line-eyebrow">Pending sales</p>
-            <h2>Needs your attention</h2>
-          </div>
-          <p>{pendingSales.length} pending · oldest first</p>
-        </div>
-
-        <div className="sales-line-priority-list">
-          {pendingSales.length ? pendingSales.map((sale, index) => (
-            <div className="sales-line-priority-row" key={sale.id} role="button" tabIndex={0} onClick={() => setSelectedId(sale.id || null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}>
-              <span className="sales-line-tick">{index + 1}</span>
-              <FileText className="sales-line-priority-icon" aria-hidden="true" />
-              <div className="sales-line-priority-copy">
-                <strong>{sale.customerName || sale.customerAddress || 'Customer pending'} · {sale.salesRepName}</strong>
-                <span>{productSummary(sale)} · {formatMoney(sale.totalValue || 0)}/mo · {sale.totalPoints || 0} pts</span>
-              </div>
-              <span className={`sales-line-age ${ageTone(sale)}`}>{ageLabel(sale)}</span>
-              {canApprove && (
-                <span className="sales-line-priority-actions" onClick={(event) => event.stopPropagation()}>
-                  <button className="approve" type="button" disabled={loading} onClick={() => void decide(sale.id || '', 'approved')}>Approve</button>
-                  <button className="reject" type="button" disabled={loading} onClick={() => setRejectingId(sale.id || null)}>Reject</button>
-                </span>
-              )}
-            </div>
-          )) : <div className="sales-line-empty-priority">No pending sales in your book.</div>}
-        </div>
-        <p className="sales-line-flow-note">Select a row to review it. Approve or reject without leaving this page.</p>
-      </section>
-      )}
-
       <section className="sales-line-ledger">
         <div className="sales-line-ledger-head">
           <div>
-            {!canApprove && <p className="sales-line-eyebrow">{showPay ? 'Your pay' : 'Your sales'}</p>}
-            <h2>{canApprove ? 'All sales' : showPay ? 'What you get paid' : 'Your sales'}</h2>
+            <p className="sales-line-eyebrow">{showPay ? 'Your pay' : 'Your sales'}</p>
+            <h2>{showPay ? 'What you get paid' : 'Your sales'}</h2>
           </div>
           <p>{showPay
             ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
             : `${listSales.length} recent records · select a row to inspect`}</p>
         </div>
 
-        {repMode ? (
-          <nav className="sales-line-tabs" aria-label="Sales views">
+        <nav className="sales-line-tabs" aria-label="Sales views">
             <button className="sales-line-tab" role="tab" type="button" aria-selected={!showPay} onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(false); }}>All</button>
             <button className="sales-line-tab" role="tab" type="button" aria-selected={showPay} onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(true); }}>Pay</button>
-          </nav>
-        ) : (
-        <nav className="sales-line-tabs" aria-label="Sale status filters">
-          {STATUS_TABS.map((tab) => {
-            const active = statusFilter === tab.value;
-            const count = tab.value === 'pending' ? pendingSales.length : 0;
-            return (
-              <button key={tab.label} className="sales-line-tab" role="tab" type="button" aria-selected={active} onClick={() => { setSelectedId(null); onStatusFilterChange(tab.value); }}>
-                {tab.label}{tab.value === 'pending' && <span className="sales-line-count-chip">{count}</span>}
-              </button>
-            );
-          })}
         </nav>
-        )}
 
-        {repMode && fiberOrders.length > 0 && (
+        {fiberOrders.length > 0 && (
           <div className="sales-line-fiber-chips" role="group" aria-label="Fiber status views">
             <button
               type="button"
@@ -434,7 +306,7 @@ export function SalesTable({
         ) : (
         <div className="sales-line-table-wrap">
           <div className="sales-line-sale-row thead">
-            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>{repMode ? 'Expected pay' : 'Commission'}</span><span>Status</span><span>Actions</span>
+            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>Expected pay</span><span>Status</span><span>Actions</span>
           </div>
           <div className="sales-line-sale-list">
             {listSales.length ? listSales.map((sale) => (
@@ -450,18 +322,17 @@ export function SalesTable({
                 <div className="sales-line-rep-cell"><span className="sales-line-avatar">{repInitials(sale.salesRepName)}</span>{sale.salesRepName}</div>
                 <div className="sales-line-date-cell"><strong>Install {sale.installDate ? formatDate(sale.installDate) : '—'}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
                 <div className="sales-line-money">{formatMoney(sale.totalValue || 0)}<small>/mo</small></div>
-                <div className="sales-line-money">{repMode ? expectedLabel(expectedBySale[sale.id || '']) : typeof sale.commission === 'number' ? formatMoney(sale.commission) : '—'}</div>
+                <div className="sales-line-money">{expectedLabel(expectedBySale[sale.id || ''])}</div>
                 <div className="sales-line-status-cell">
                   <StatusBadge status={sale.status} />
                   {fiberBySale.get(sale.id || '') && <FiberStatusPill status={fiberBySale.get(sale.id || '')!.status} />}
-                  {sale.status === 'pending' && <span className={`sales-line-stale ${ageTone(sale)}`}>{ageLabel(sale)}</span>}
                 </div>
                 <div className="sales-line-actions-cell">{rowActions(sale)}</div>
               </div>
-            )) : <div className="sales-line-ledger-empty">{statusFilter && canApprove ? `No ${statusFilter} sales in this view.` : 'No sales found.'}</div>}
+            )) : <div className="sales-line-ledger-empty">No sales found.</div>}
           </div>
           <div className="sales-line-totals">
-            <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>{repMode ? 'Expected pay' : 'Commission'}</b>{repMode ? expectedTotalLabel : commissionLabel}</span><span /><span />
+            <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>Expected pay</b>{expectedTotalLabel}</span><span /><span />
           </div>
         </div>
         )}
@@ -475,27 +346,10 @@ export function SalesTable({
         onOpenChange={(open) => { if (!open) setSelectedId(null); }}
         onPrev={() => moveSelection(-1)}
         onNext={() => moveSelection(1)}
-        canApprove={canApprove}
         isAdmin={isAdmin}
         loading={loading}
-        onApprove={(id) => decide(id, 'approved')}
-        onRequestReject={(id) => setRejectingId(id)}
         onRequestDelete={(id) => setDeletingId(id)}
       />
-
-      <Dialog open={!!rejectingId} onOpenChange={(open) => { if (!open) { setRejectingId(null); setRejectionReason(''); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject sale</DialogTitle>
-            <DialogDescription>Please provide a reason for rejection. This will be shared with the sales rep.</DialogDescription>
-          </DialogHeader>
-          <Textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} rows={3} placeholder="Enter rejection reason..." />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setRejectingId(null); setRejectionReason(''); }}>Cancel</Button>
-            <Button type="button" variant="destructive" disabled={!rejectionReason.trim() || loading} onClick={() => void handleReject()}>Reject Sale</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
         <DialogContent>
@@ -510,16 +364,6 @@ export function SalesTable({
         </DialogContent>
       </Dialog>
 
-      {/* Portaled out of the <main> scroller: iOS WebKit mis-renders
-          position:fixed inside it (see SaleDetailSheet). The .sales-line
-          wrapper re-supplies the palette vars the toast reads. */}
-      {typeof document !== 'undefined' &&
-        createPortal(
-          <div className="sales-line" style={{ display: 'contents' }}>
-            <div className={`sales-line-toast ${toastMessage ? 'show' : ''}`} role="status">{toastMessage}</div>
-          </div>,
-          document.body
-        )}
     </>
   );
 }
