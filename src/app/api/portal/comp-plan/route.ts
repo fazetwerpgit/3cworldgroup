@@ -89,12 +89,17 @@ export async function GET(request: NextRequest) {
       updatedByName,
     };
 
-    // Platform users administer the plan, so they see every role's rates.
+    // Platform users administer the plan, so they see every role's rates. They
+    // also get their OWN slice alongside it: an admin or owner who sells is paid
+    // on the Internal Rep scale, and their pay view reads `ownRates`.
     if (gate.role) {
+      const ownCompRole = resolveCompRole(gate.fieldRole, gate.role);
       return NextResponse.json({
         ...base,
         scope: 'all',
         rates,
+        compRole: ownCompRole,
+        ownRates: ownCompRole ? rates[ownCompRole] ?? null : null,
         ...(gate.role === 'owner' ? { margin: await loadMargin() } : {}),
       });
     }

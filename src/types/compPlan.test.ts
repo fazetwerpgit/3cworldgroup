@@ -43,6 +43,22 @@ describe('resolveCompRole', () => {
     expect(resolveCompRole(null)).toBeNull();
     expect(resolveCompRole('not_a_role')).toBeNull();
   });
+
+  it('pays an admin or owner on the Internal Rep scale', () => {
+    // Assigning a platform role clears fieldRole, so this fallback is the only
+    // thing standing between a back-office seller and an empty pay plan.
+    expect(resolveCompRole(undefined, 'admin')).toBe('internal_rep');
+    expect(resolveCompRole(undefined, 'owner')).toBe('internal_rep');
+  });
+
+  it('gives operations no comp role of its own', () => {
+    expect(resolveCompRole(undefined, 'operations')).toBeNull();
+  });
+
+  it('prefers a field role over the platform fallback', () => {
+    expect(resolveCompRole('director', 'admin')).toBe('director');
+    expect(resolveCompRole('entry_rep', 'owner')).toBe('ae_tier_1');
+  });
 });
 
 describe('rateFor', () => {

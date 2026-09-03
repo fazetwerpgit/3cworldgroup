@@ -24,12 +24,12 @@ const EMPTY: Omit<CompPlanResult, 'loading'> & { uid: string | null } = {
 };
 
 /**
- * The signed-in field user's own slice of the comp plan, fetched once per login.
+ * The signed-in user's own slice of the comp plan, fetched once per login.
  *
  * Management callers get `scope: 'all'` from the route — a role-keyed table, not
- * a rate table for anyone in particular — so this hook reports no plan for them:
- * the Pay view and the expected-pay tile are personal, and a manager has no
- * personal rate to show.
+ * a rate table for anyone in particular — plus `ownRates`, their personal slice.
+ * Admins and owners are paid on the Internal Rep scale, so they do get a plan
+ * here; operations resolves to one only if they carry a field role.
  */
 export function useCompPlan(): CompPlanResult {
   const { user } = useAuth();
@@ -59,12 +59,19 @@ export function useCompPlan(): CompPlanResult {
         const data = (await response.json()) as CompPlanResponse & { error?: string };
         if (cancelled) return;
 
-        if (!response.ok || data.scope !== 'own') {
+        if (!response.ok) {
           setPlan({ ...EMPTY, uid, payDelayDays: data?.payDelayDays ?? PAY_DELAY_DAYS });
           return;
         }
 
-        const rates = (data.rates as CompPlanCompanyRates | null) ?? null;
+        // `scope: 'all'` hands back the role-keyed table, which is nobody's
+        // personal rate card — a platform caller's own slice arrives as
+        // `ownRates` instead. Reading `rates` there would hand the pay view a
+        // table keyed by role where it expects one keyed by company.
+        const rates =
+          data.scope === 'all'
+            ? (data.ownRates as CompPlanCompanyRates | null) ?? null
+            : (data.rates as CompPlanCompanyRates | null) ?? null;
         setPlan({
           uid,
           rates,
