@@ -195,6 +195,14 @@ function SalesContent() {
                     fiber={fiber}
                     payPlan={payPlan}
                   />
+
+                  {/* The carrier report from the morning email — Pending
+                      install / Active / Cancelled-Churned / Attention. It is a
+                      DIFFERENT feed from the board above: the board is what
+                      reps logged, this is what the carrier says actually
+                      happened, so management needs both. It is not month-
+                      scoped; the picker above only moves the board. */}
+                  {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
                 </>
               ) : (
                 <>
