@@ -161,15 +161,34 @@ DONE 2026-09-03 (after the live check):
    always a human's call: the data cannot say which plan the customer got, so
    never infer it and never pick by price.
 
-NEXT ACTION: ask Jacob before committing. Everything in item 3 (the one-plan
-rule) is uncommitted, and the public-site redesign is uncommitted in the SAME
-tree — stage the sales paths explicitly, never `git add -A`.
-Paths to stage: src/lib/sales/planSelection.ts, src/lib/sales/planSelection.test.ts,
-src/components/sales/SaleForm.tsx, src/components/sales/PlanPicker.tsx,
-src/app/portal/sales/[id]/edit/page.tsx, src/app/api/portal/sales/route.ts,
-src/app/api/portal/sales/[id]/route.ts, src/app/globals.css,
-scripts/link-typo-address-orders.mjs, scripts/repair-double-plan-sale.mjs,
-docs/superpowers/specs/2026-09-03-one-book-live-check.md, docs/redesign/RESUME.md.
+DEPLOYED TO PRODUCTION 2026-09-03. master is 50160f7; Vercel production
+Ready; www.3cworldgroup.com and /portal/sales both 200.
+This was the FIRST production deploy of the One Book merge as well as the
+one-plan rule — master went 485ebc8 -> 8cb7ed5 (one book) -> 50160f7 (one plan).
+
+HOW THIS REPO DEPLOYS — read before the next one:
+  Do NOT merge onboarding/completion into master. The branch is ~33 commits
+  ahead and carries public-site page changes (page.tsx, about, apply, contact,
+  services, Navbar, Footer, PageWrapper) that master does not have and that
+  Jacob has not released. Merging it would ship the redesign by accident.
+  Deploy by CHERRY-PICKING the specific commits onto origin/master in a
+  throwaway worktree, verifying there, then `git push origin HEAD:master`.
+  Vercel builds master automatically.
+  Every earlier deploy was done this way, which is why branch commits and
+  master commits share titles under different SHAs.
+  The only conflict to expect is docs/redesign/RESUME.md — take the picked
+  version. Verify in a worktree placed INSIDE /home/fazetwerpnerd69/dev/
+  (a symlinked node_modules from a /tmp worktree breaks the Turbopack build
+  with "Symlink node_modules is invalid, it points out of the filesystem
+  root" — that error is the harness, not the code).
+
+NEXT ACTION: nothing is queued. Jacob should open the live board and confirm
+the merged view looks right against real production data — this is the first
+time he sees it outside localhost. Then the open items are, in order:
+  1. The redesign track (Services reopen Round 1 was mid-flight; then Careers
+     hero sharpness, Contact fidelity, minor Apply fidelity — Culture frozen).
+  2. The truncation banner has still never fired against real data (needs 500
+     sales, there are 124). Prop-driven test only.
 
 W4 ROOT CAUSE (verified, do not re-investigate): the leaderboard is CORRECT,
 it already buckets on saleDate. SaleForm.tsx has no saleDate input, so
