@@ -471,23 +471,37 @@
 
 .portal-scope .sales-board-month > span {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.62rem;
-  letter-spacing: 0.16em;
+  /* Bumped from 0.62rem. Connor, 2026-09-03, could not find his August sales:
+     the list is month-sliced and defaults to the current month, so an empty
+     September read as "it did not go in any". The month a rep is looking at
+     has to be the loudest thing on the control. */
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink);
 }
 
 .portal-scope .sales-board-month button {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  /* 26px was under the iOS 44px target and read as decoration. Every rep is on
+     a phone (see the rep device baseline), so this is a thumb control. */
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .portal-scope .sales-board-month button {
+    width: 44px;
+    height: 44px;
+    font-size: 1.35rem;
+  }
 }
 
 .portal-scope .sales-board-month button:hover:not(:disabled) {

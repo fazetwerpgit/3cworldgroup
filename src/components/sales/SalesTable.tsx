@@ -9,7 +9,7 @@ import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
-import { salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
+import { monthLabel, salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import {
   Dialog,
   DialogContent,
@@ -319,7 +319,11 @@ export function SalesTable({
                   </div>
                 </div>
               );
-            }) : <div className="sales-line-ledger-empty">Nothing installed in this month. Pay shows up here once a sale has an install date.</div>}
+            }) : <div className="sales-line-ledger-empty">
+                {month ? `Nothing installed in ${monthLabel(month)}.` : 'Nothing installed yet.'}
+                {' '}Pay shows up here once a sale has an install date.
+                {month && <><br />Earlier months are behind the &lsquo;&lsaquo;&rsquo; arrow above.</>}
+              </div>}
           </div>
           <div className={`sales-line-totals sales-line-pay-totals${hasPlan ? '' : ' no-money'}`}>
             <span><b>Sales</b><strong>{paySales.length}</strong></span>{hasPlan && <span className="sales-line-total-commission"><b>Estimated pay</b>{expectedTotalLabel}</span>}<span /><span /><span />
@@ -351,7 +355,10 @@ export function SalesTable({
                 </div>
                 <div className="sales-line-actions-cell">{rowActions(sale)}</div>
               </div>
-            )) : <div className="sales-line-ledger-empty">No sales in this month.</div>}
+            )) : <div className="sales-line-ledger-empty">
+                {month ? `No sales sold in ${monthLabel(month)}.` : 'No sales yet.'}
+                {month && <><br />Your earlier sales are still here — tap &lsquo;&lsaquo;&rsquo; above to go back a month.</>}
+              </div>}
           </div>
           <div className="sales-line-totals">
             <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>Estimated pay</b>{expectedTotalLabel}</span><span /><span />
