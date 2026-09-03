@@ -103,6 +103,28 @@ describe('GET /api/portal/comp-plan', () => {
     expect('margin' in json).toBe(false);
   });
 
+  it('gives an admin their own Internal Rep slice alongside the full table', async () => {
+    mockRequester.mockResolvedValue({
+      ok: true, uid: 'a1', name: 'Admin', email: 'a@x.com',
+      role: 'admin', isManagement: true, isAdmin: true, isManagerOrAbove: true,
+    });
+    const json = await (await GET(get())).json();
+    expect(json.compRole).toBe('internal_rep');
+    // Company -> plan -> dollars, not the role-keyed table.
+    expect(json.ownRates.att['att-1gig']).toBe(400);
+    expect(json.ownRates).toEqual(json.rates.internal_rep);
+  });
+
+  it('gives operations no own slice', async () => {
+    mockRequester.mockResolvedValue({
+      ok: true, uid: 'op1', name: 'Ops', email: 'op@x.com',
+      role: 'operations', isManagement: true, isAdmin: false, isManagerOrAbove: true,
+    });
+    const json = await (await GET(get())).json();
+    expect(json.compRole).toBeNull();
+    expect(json.ownRates).toBeNull();
+  });
+
   it('gives the owner the margin', async () => {
     mockRequester.mockResolvedValue({
       ok: true, uid: 'o1', name: 'Owner', email: 'o@x.com',

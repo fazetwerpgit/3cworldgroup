@@ -1,4 +1,4 @@
-import type { FieldRole } from './auth';
+import type { FieldRole, PlatformRole } from './auth';
 
 // Comp plan: what a rep is paid per installed product, by field role. Separate
 // from the legacy percentage-based `commission` config (config/commission),
@@ -63,18 +63,39 @@ export const LEGACY_ROLE_RATE_FALLBACK: Partial<Record<FieldRole, CompPlanRole>>
 /** Reps are paid roughly two weeks after the install. */
 export const PAY_DELAY_DAYS = 14;
 
+/**
+ * Back-office roles that also sell. Assigning a platform role clears `fieldRole`
+ * (see PATCH /api/portal/auth/users/[id]), so an admin or owner has no field
+ * role to be paid from — they are paid on the Internal Rep scale. Operations is
+ * deliberately absent: they are paid from their own field role or not at all.
+ */
+export const PLATFORM_ROLE_COMP_FALLBACK: Partial<Record<PlatformRole, CompPlanRole>> = {
+  admin: 'internal_rep',
+  owner: 'internal_rep',
+};
+
 export function isCompPlanRole(value: string | undefined | null): value is CompPlanRole {
   return !!value && (COMP_PLAN_ROLES as readonly string[]).includes(value);
 }
 
 /**
- * The rate table a field role is paid from: its own when the comp sheet has one,
- * otherwise the legacy fallback, otherwise null ("no pay plan assigned").
+ * The rate table a user is paid from: their field role's own when the comp sheet
+ * has one, otherwise the legacy fallback, otherwise the platform-role fallback
+ * (admin/owner are paid as Internal Rep), otherwise null ("no pay plan assigned").
+ *
+ * Field role wins over platform role: if a back-office user ever carries both,
+ * the role they actually sell under is the one they are paid on.
  */
-export function resolveCompRole(fieldRole: FieldRole | string | undefined | null): CompPlanRole | null {
-  if (!fieldRole) return null;
-  if (isCompPlanRole(fieldRole)) return fieldRole;
-  return LEGACY_ROLE_RATE_FALLBACK[fieldRole as FieldRole] ?? null;
+export function resolveCompRole(
+  fieldRole: FieldRole | string | undefined | null,
+  role?: PlatformRole | string | null
+): CompPlanRole | null {
+  if (fieldRole) {
+    if (isCompPlanRole(fieldRole)) return fieldRole;
+    const legacy = LEGACY_ROLE_RATE_FALLBACK[fieldRole as FieldRole];
+    if (legacy) return legacy;
+  }
+  return role ? PLATFORM_ROLE_COMP_FALLBACK[role as PlatformRole] ?? null : null;
 }
 
 /**
@@ -93,10 +114,18 @@ export function rateFor(
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-/** GET /api/portal/comp-plan. `margin` is present only for an owner. */
+/**
+ * GET /api/portal/comp-plan. `margin` is present only for an owner.
+ *
+ * On `scope: 'all'` (a platform caller), `rates` is the whole role-keyed table —
+ * they administer the plan. `ownRates` is that caller's personal slice, present
+ * whenever they resolve to a comp role, so an admin who sells sees their own
+ * expected pay without giving up the full table.
+ */
 export interface CompPlanResponse {
   scope: 'own' | 'all';
   rates: CompPlanCompanyRates | Partial<CompPlanRates> | null;
+  ownRates?: CompPlanCompanyRates | null;
   margin?: CompPlanMargin;
   fieldRole?: FieldRole | null;
   compRole?: CompPlanRole | null;
