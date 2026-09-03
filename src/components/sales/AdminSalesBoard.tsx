@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { FIBER_COMPANIES, PAY_DELAY_DAYS, RoleDisplayNames, isOwner } from '@/types';
+import { FIBER_COMPANIES, RoleDisplayNames, isOwner } from '@/types';
 import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
-import { expectedPayDate, expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,6 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isInMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
-import { SubmittedSales } from './SubmittedSales';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
 // reps logged and the carrier's morning report merged into a single list, so the
@@ -261,8 +260,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   const { paidBySale, togglePaid } = useSalePaid(user?.uid ?? null);
   const hasPlan = !!payPlan?.hasPlan;
 
-  const [tab, setTab] = useState<'company' | 'pay' | 'submitted'>('company');
-  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [tab, setTab] = useState<'company' | 'pay'>('company');
   const [openRepId, setOpenRepId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -387,47 +385,15 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     () => book.cancelled.map((row) => row.sale).filter((sale): sale is Sale => !!sale),
     [book.cancelled]
   );
-  // The submitted list is the raw feed and nothing else: same month default and
-  // the same "+N older / +N newer" promise as the rest of the board, but no
-  // merge, no carrier data and no derived state. A sale with no sale date is in
-  // every month rather than nowhere — a submission that cannot be dated is the
-  // one most likely to be the answer somebody is hunting for.
-  const submitted = useMemo(() => {
-    const needle = submittedQuery.trim().toLowerCase();
-    const rows: Sale[] = [];
-    let olderCount = 0;
-    let newerCount = 0;
-
-    for (const sale of sales) {
-      const key = monthOf(sale.saleDate);
-      if (key && month) {
-        const side = key.year - month.year || key.month - month.month;
-        if (side < 0) { olderCount += 1; continue; }
-        if (side > 0) { newerCount += 1; continue; }
-      }
-      if (needle) {
-        const haystack = `${sale.customerAddress ?? ''} ${sale.customerName ?? ''}`.toLowerCase();
-        if (!haystack.includes(needle)) continue;
-      }
-      rows.push(sale);
-    }
-
-    rows.sort((a, b) => saleTime(b) - saleTime(a));
-    return { rows, olderCount, newerCount };
-  }, [month, sales, submittedQuery]);
-
   // A tab the viewer is no longer entitled to must not keep rendering because
   // it happens to be the one in state.
-  const activeTab: 'company' | 'pay' | 'submitted' =
-    (tab === 'submitted' && !ownerView) || (tab === 'pay' && !hasPlan) ? 'company' : tab;
+  const activeTab: 'company' | 'pay' = tab === 'pay' && !hasPlan ? 'company' : tab;
 
   const sheetSales =
-    activeTab === 'submitted'
-      ? submitted.rows
-      : activeTab === 'pay'
-        ? mySales
-        : cancelledSaleRows.some((sale) => sale.id === selectedId)
-          ? cancelledSaleRows
+    activeTab === 'pay'
+      ? mySales
+      : cancelledSaleRows.some((sale) => sale.id === selectedId)
+        ? cancelledSaleRows
           : repSales;
   const selectedIndex = selectedId ? sheetSales.findIndex((sale) => sale.id === selectedId) : -1;
   const selectedSale = selectedIndex >= 0 ? sheetSales[selectedIndex] : null;
@@ -629,34 +595,10 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
               My pay
             </button>
           )}
-          {/* Owners only. Admins never see this tab. */}
-          {ownerView && (
-            <button
-              className="sales-line-tab"
-              role="tab"
-              type="button"
-              aria-selected={activeTab === 'submitted'}
-              onClick={() => { setTab('submitted'); setSelectedId(null); }}
-            >
-              Submitted
-            </button>
-          )}
         </nav>
       )}
 
-      {activeTab === 'submitted' ? (
-        <section className="sales-board" aria-label="Submitted sales">
-          <SubmittedSales
-            sales={submitted.rows}
-            query={submittedQuery}
-            onQueryChange={setSubmittedQuery}
-            onSelect={setSelectedId}
-            monthLabel={month ? monthLabel(month) : 'all time'}
-            olderCount={submitted.olderCount}
-            newerCount={submitted.newerCount}
-          />
-        </section>
-      ) : activeTab === 'company' ? (
+      {activeTab === 'company' ? (
         <section className="sales-board" aria-label="Company sales by rep">
           {truncated && (
             <p className="sales-board-warning" role="alert">
@@ -833,11 +775,13 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             <div className="sales-board-figs">
               <div className="sales-board-fig">
                 <strong className="portal-metallic-num">{formatMoney(myExpected)}</strong>
-                <span>Expected this month</span>
+                <span>Estimated this month</span>
               </div>
             </div>
             <p className="sales-board-note">
-              Paid about {payPlan?.payDelayDays ?? PAY_DELAY_DAYS} days after each install.
+              An estimate off your installs — not a statement of pay. Chargebacks,
+              claims and cancellations are not in the portal, and the carrier&rsquo;s
+              final report decides what actually pays.
             </p>
           </div>
 
@@ -848,7 +792,6 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           ) : (
             mySales.map((sale) => {
               const expected = expectedPayForSale(sale, payPlan?.rates ?? null);
-              const due = expectedPayDate(sale, payPlan?.payDelayDays ?? PAY_DELAY_DAYS);
               return (
                 <div
                   className="sales-board-payrow"
@@ -874,7 +817,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                   <span className="sales-board-sale-prod">
                     {productSummary(sale) || '—'} · installed {formatDate(sale.installDate)}
                   </span>
-                  <span className="sales-board-when">{due ? `Pays ${formatDate(due)}` : 'Pay date —'}</span>
+                  <span className="sales-board-when">Sold {formatDate(sale.saleDate)}</span>
                   {/* Stops the row's own click so ticking Paid doesn't also
                       open the detail sheet over the top of it. */}
                   <span

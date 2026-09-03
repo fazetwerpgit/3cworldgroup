@@ -390,60 +390,18 @@ function tabLabels() {
   return [...container.querySelectorAll('.sales-line-tab')].map((tab) => tab.textContent);
 }
 
-async function openSubmitted() {
-  const tab = [...container.querySelectorAll('.sales-line-tab')]
-    .find((node) => node.textContent === 'Submitted') as HTMLButtonElement;
-  await act(async () => tab.click());
-}
-
-describe('Submitted tab (owners only)', () => {
-  const other = {
-    ...backDatedSale,
-    id: 's9',
-    customerName: 'Marcus Hale',
-    customerAddress: '77 Cedar Lane',
-    saleDate: monthsAgo(0, 6),
-  } as unknown as Sale;
+describe('the raw submitted feed is no longer a tab', () => {
+  // It moved under each rep in Install status (Jacob, 2026-09-03: the flat
+  // owner-only list was cluttered). Owners outrank admins, so if the tab ever
+  // comes back it will come back for owners first — hence the owner case here.
   const inMonth = { ...backDatedSale, id: 's8', saleDate: monthsAgo(0, 2) } as unknown as Sale;
 
-  it('is not offered to an admin', async () => {
-    viewer.role = 'admin';
-    await render([inMonth], [], thisMonth());
-
-    expect(tabLabels()).not.toContain('Submitted');
-    expect(container.querySelector('.sales-board-sub-row')).toBeNull();
-  });
-
-  it('is offered to an owner and lists the raw submissions', async () => {
-    viewer.role = 'owner';
-    // backDatedSale was sold LAST month, so it is out of view and must be counted.
-    await render([inMonth, other, backDatedSale], [], thisMonth());
-
-    expect(tabLabels()).toContain('Submitted');
-    await openSubmitted();
-
-    const rows = container.querySelectorAll('.sales-board-sub-row');
-    expect(rows).toHaveLength(2);
-    // Address leads the row: it is the column Jacob reads down.
-    expect(rows[0].querySelector('.sales-board-sub-addr')?.textContent).toBe('77 Cedar Lane');
-    // Out-of-month submissions are reported, never dropped.
-    expect(container.querySelector('.sales-board-scope')?.textContent).toContain('+1 older');
-  });
-
-  it('filters on address and customer name', async () => {
-    viewer.role = 'owner';
-    await render([inMonth, other], [], thisMonth());
-    await openSubmitted();
-
-    const search = container.querySelector<HTMLInputElement>('.sales-board-search input')!;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-    await act(async () => {
-      setter.call(search, 'cedar');
-      search.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-
-    const rows = container.querySelectorAll('.sales-board-sub-row');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].textContent).toContain('Marcus Hale');
+  it('is offered to neither an admin nor an owner', async () => {
+    for (const role of ['admin', 'owner'] as const) {
+      viewer.role = role;
+      await render([inMonth], [], thisMonth());
+      expect(tabLabels()).not.toContain('Submitted');
+      expect(container.querySelector('.sales-board-sub-row')).toBeNull();
+    }
   });
 });

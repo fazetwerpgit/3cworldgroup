@@ -1,5 +1,4 @@
 import type { CompPlanCompanyRates, Sale } from '@/types';
-import { PAY_DELAY_DAYS } from '@/types';
 
 // What a rep should expect to be paid for one sale, and when. Pure so the Pay
 // view, the MTD tile and the tests all read the same numbers.
@@ -44,23 +43,10 @@ export function expectedPayForSale(
   }, 0);
 }
 
-/**
- * Install date + the pay delay (~2 weeks). Null until the sale has an install
- * date — nothing is owed before the install happens.
- *
- * Install dates are stored at local noon, so adding days with setDate can never
- * cross a day boundary on a DST shift.
- */
-export function expectedPayDate(
-  sale: Pick<Sale, 'installDate'>,
-  payDelayDays: number = PAY_DELAY_DAYS
-): Date | null {
-  if (!sale.installDate) return null;
-  // Sales arrive from the API as JSON, so installDate is a string at runtime
-  // even though the Sale type calls it a Date.
-  const installed = new Date(sale.installDate as Date | string);
-  if (Number.isNaN(installed.getTime())) return null;
-  const due = new Date(installed.getTime());
-  due.setDate(due.getDate() + payDelayDays);
-  return due;
-}
+// There is deliberately NO expected pay DATE here.
+//
+// Jacob, 2026-09-03: the portal used to print "pays on the 25th". The carrier's
+// owner reads a printed pay date as a statement of pay, and a statement of pay
+// that the final claims/chargeback report later contradicts is a liability. The
+// portal shows the ESTIMATED AMOUNT off installs and nothing about when it
+// lands; the rep ticks the sale off themselves once the money actually arrives.
