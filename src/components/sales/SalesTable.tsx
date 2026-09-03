@@ -9,6 +9,7 @@ import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayDate, expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,8 @@ interface SalesTableProps {
   /** The [All | Pay] selection, held by the page. */
   payView?: boolean;
   onPayViewChange?: (payView: boolean) => void;
+  /** The month the page's picker is on. Omitted, the whole book is listed. */
+  month?: MonthKey;
   /** The viewer's own comp-plan slice. A planless rep sees no dollar figures. */
   payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
   /** Provider install status, fetched once by the page. */
@@ -77,6 +80,7 @@ export function SalesTable({
   loading = false,
   payView = false,
   onPayViewChange,
+  month,
   payPlan,
   fiber,
 }: SalesTableProps) {
@@ -95,11 +99,19 @@ export function SalesTable({
   // Pay is owed off the install, so a sale without an install date has nothing
   // to show yet, and a dead sale never will. Newest install first — that is the
   // money arriving soonest.
+  // The two tabs slice the month by DIFFERENT dates on purpose. The ledger
+  // lists what was sold; the pay list lists what installed, because pay is owed
+  // off the install — a sale sold in August that installs in September is
+  // August's record and September's money, and it has to appear in both.
+  const monthSales = useMemo(
+    () => (month ? salesSoldIn(sales, month) : sales),
+    [month, sales]
+  );
   const paySales = useMemo(
-    () => sales
+    () => (month ? salesInstalledIn(sales, month) : sales)
       .filter((sale) => !!sale.installDate && isPayableSale(sale))
       .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
-    [sales]
+    [month, sales]
   );
   const expectedBySale = useMemo(() => {
     const map: Record<string, number | null> = {};
@@ -110,7 +122,7 @@ export function SalesTable({
   }, [rates, sales]);
 
   // The rows actually on screen — the ledger, or the pay list.
-  const listSales = showPay ? paySales : sales;
+  const listSales = showPay ? paySales : monthSales;
   const selectedIndex = selectedId ? listSales.findIndex((sale) => sale.id === selectedId) : -1;
   const selectedSale = selectedIndex >= 0 ? listSales[selectedIndex] : null;
   const totalValue = listSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
@@ -200,7 +212,7 @@ export function SalesTable({
           </div>
           <p>{showPay
             ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
-            : `${listSales.length} recent records · select a row to inspect`}</p>
+            : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · select a row to inspect`}</p>
         </div>
 
         <nav className="sales-line-tabs" aria-label="Sales views">
@@ -216,7 +228,7 @@ export function SalesTable({
               aria-pressed={fiberView === null}
               onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(false); }}
             >
-              <span>Sent in</span>{' '}<strong>{sales.length}</strong>
+              <span>Sent in</span>{' '}<strong>{monthSales.length}</strong>
             </button>
             {([
               ['pending', 'Pending install'],
@@ -297,7 +309,7 @@ export function SalesTable({
                   </div>
                 </div>
               );
-            }) : <div className="sales-line-ledger-empty">Nothing installed yet. Pay shows up here once a sale has an install date.</div>}
+            }) : <div className="sales-line-ledger-empty">Nothing installed in this month. Pay shows up here once a sale has an install date.</div>}
           </div>
           <div className={`sales-line-totals sales-line-pay-totals${hasPlan ? '' : ' no-money'}`}>
             <span><b>Sales</b><strong>{paySales.length}</strong></span>{hasPlan && <span className="sales-line-total-commission"><b>Expected pay</b>{expectedTotalLabel}</span>}<span /><span /><span />
@@ -329,7 +341,7 @@ export function SalesTable({
                 </div>
                 <div className="sales-line-actions-cell">{rowActions(sale)}</div>
               </div>
-            )) : <div className="sales-line-ledger-empty">No sales found.</div>}
+            )) : <div className="sales-line-ledger-empty">No sales in this month.</div>}
           </div>
           <div className="sales-line-totals">
             <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>Expected pay</b>{expectedTotalLabel}</span><span /><span />
