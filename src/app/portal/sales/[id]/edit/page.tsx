@@ -20,6 +20,7 @@ import { PlanPicker } from '@/components/sales/PlanPicker';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { addPlanToProducts } from '@/lib/sales/planSelection';
 import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
@@ -119,23 +120,9 @@ export default function EditSalePage() {
   };
 
   const addPlan = (plan: FiberPlan) => {
-    if (products.some((p) => p.productId === plan.id)) {
-      setFormError('This plan is already added');
-      return;
-    }
-
-    setProducts((prev) => [
-      ...prev,
-      {
-        productId: plan.id,
-        productName: `${plan.name} (${plan.speed})`,
-        company: plan.company,
-        quantity: 1,
-        unitPrice: plan.price,
-        totalPrice: plan.price,
-        points: plan.points,
-      },
-    ]);
+    // One internet plan per sale — picking a second one swaps, it does not add.
+    // See src/lib/sales/planSelection.ts for why.
+    setProducts((prev) => addPlanToProducts(prev, plan));
     setFormError('');
   };
 

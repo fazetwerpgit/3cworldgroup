@@ -2,9 +2,10 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
-import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
+import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleProduct, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
+import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 
 // Helper function to create a notification
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -219,6 +220,14 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: customerAddress, products' },
         { status: 400 }
       );
+    }
+
+    // One internet plan per address (Jacob, 2026-09-03). The form makes a
+    // second one unreachable; this makes it unwritable, including from a rep's
+    // phone still running the old client.
+    const planError = validateOnePlanPerSale(products as SaleProduct[]);
+    if (planError) {
+      return NextResponse.json({ error: planError }, { status: 400 });
     }
 
     if (!productSold || !String(productSold).trim()) {

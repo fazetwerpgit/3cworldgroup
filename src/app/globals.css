@@ -14524,6 +14524,22 @@ body.portal-scope {
   margin-top: 8px;
 }
 
+/* The one-plan-per-address rule, said once above the list. It sits where the
+   old "This plan is already added" error used to appear, so the rep learns the
+   rule before they trip it instead of after. */
+.sales-line-subgroup-hint {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* The hint is a <p>, so it takes :first-of-type from the "Internet" label
+   above. Hand the tight top margin back. */
+.sales-line-subgroup-hint + .sales-line-subgroup-label {
+  margin-top: 8px;
+}
+
 .sales-line-row-list {
   display: grid;
   gap: 5px;

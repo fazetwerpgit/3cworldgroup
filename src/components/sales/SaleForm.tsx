@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
 import { FiberPlan, SaleType, SaleProduct, SALE_TYPES } from '@/types';
 import { PlanPicker } from '@/components/sales/PlanPicker';
+import { addPlanToProducts } from '@/lib/sales/planSelection';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
@@ -77,24 +78,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   };
 
   const addPlan = (plan: FiberPlan) => {
-    // Check if plan already added
-    if (products.some(p => p.productId === plan.id)) {
-      setFormError('This plan is already added');
-      return;
-    }
-
-    setProducts((prev) => [
-      ...prev,
-      {
-        productId: plan.id,
-        productName: `${plan.name} (${plan.speed})`,
-        company: plan.company,
-        quantity: 1,
-        unitPrice: plan.price,
-        totalPrice: plan.price,
-        points: plan.points,
-      },
-    ]);
+    // One internet plan per sale — picking a second one swaps, it does not add.
+    // See src/lib/sales/planSelection.ts for why.
+    setProducts((prev) => addPlanToProducts(prev, plan));
     setFormError('');
   };
 
