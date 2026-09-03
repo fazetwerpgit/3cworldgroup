@@ -678,8 +678,23 @@
 .portal-scope .sales-board-sale.attention { border-left-color: var(--red); }
 
 .portal-scope .sales-board-payrow {
+  grid-template-columns: minmax(0, 1fr) auto auto;
   padding-left: 0;
   border-bottom: 1px solid var(--soft);
+}
+
+/* The Paid tick spans both rows on the right, so it reads as belonging to the
+   whole sale rather than to the pay date it sits beside. */
+.portal-scope .sales-board-paid {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  padding-left: 14px;
+}
+
+/* The rep ledger hides this word behind a column header; the board has no
+   header row, so the tick has to say what it means. */
+.portal-scope .sales-board-paid .sales-line-paid-label {
+  display: inline;
 }
 
 .portal-scope .sales-board-sale:hover,
@@ -848,4 +863,5 @@
   .portal-scope .sales-board-fig strong { font-size: 1.45rem; }
   .portal-scope .sales-board-sale { margin-left: 15px; }
   .portal-scope .sales-board-key { gap: 10px; font-size: 0.56rem; }
+  .portal-scope .sales-board-paid { padding-left: 10px; }
 }

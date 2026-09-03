@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { FIBER_COMPANIES, PAY_DELAY_DAYS, RoleDisplayNames } from '@/types';
 import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayDate, expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
@@ -88,6 +89,9 @@ function installChip(sale: Sale, bucket: InstallBucket) {
 export function AdminSalesBoard({ sales, loading, onDelete, onSetCancelled, fiber, payPlan }: AdminSalesBoardProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
+  // The viewer's own private "I've been paid for this" ticks — the same
+  // reconciliation checkbox the rep ledger has. Nobody else can see them.
+  const { paidBySale, togglePaid } = useSalePaid(user?.uid ?? null);
   const hasPlan = !!payPlan?.hasPlan;
 
   const [tab, setTab] = useState<'company' | 'pay'>('company');
@@ -368,6 +372,23 @@ export function AdminSalesBoard({ sales, loading, onDelete, onSetCancelled, fibe
                     {productSummary(sale) || '—'} · installed {formatDate(sale.installDate)}
                   </span>
                   <span className="sales-board-when">{due ? `Pays ${formatDate(due)}` : 'Pay date —'}</span>
+                  {/* Stops the row's own click so ticking Paid doesn't also
+                      open the detail sheet over the top of it. */}
+                  <span
+                    className="sales-board-paid sales-line-paid-cell"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <label className="sales-line-paid-toggle">
+                      <input
+                        type="checkbox"
+                        checked={!!paidBySale[sale.id || '']}
+                        onChange={() => void togglePaid(sale.id || '')}
+                        aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
+                      />
+                      <span className="sales-line-paid-label">Paid</span>
+                    </label>
+                  </span>
                 </div>
               );
             })
