@@ -3,7 +3,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
-import type { FiberOrder, FiberOrderStatus, FiberStatusResponse } from '@/types';
+import type { FiberOrder, FiberOrderStatus, FiberStatusResponse, Sale } from '@/types';
+import { SubmittedRows } from './SubmittedSales';
+import { submittedByRep, submissionMatches } from '@/lib/sales/submittedByRep';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
 export type FiberBucket = Exclude<FiberFilter, 'all'>;
@@ -42,6 +44,29 @@ const SUMMARY_LABELS: Record<Exclude<FiberFilter, 'all'>, string> = {
 };
 
 type PortalUser = { uid: string; displayName?: string | null };
+
+// What a rep logged in the portal, shown beside what the carrier says that same
+// rep did. Jacob, 2026-09-03: the flat owner-only "Submitted" tab was cluttered
+// and this is the comparison it was really being used for.
+//
+// `ownerView` decides WHOSE submissions are legible: an owner sees every rep's,
+// an admin sees only their own — the same line the old tab drew, kept because
+// the raw feed is evidence about other people's work, not a management view.
+export type InstallStatusProps = {
+  /** Every sale the page has loaded. Grouped here by rep; not month-scoped, the way this whole section is not. */
+  sales?: Sale[];
+  ownerView?: boolean;
+  /** The signed-in user, so an admin can still see their own submissions. */
+  viewerId?: string | null;
+};
+
+type RepGroup = {
+  key: string;
+  repName: string;
+  /** The portal user the carrier's rep name resolved to, or null when nothing matched. */
+  userId: string | null;
+  orders: FiberOrder[];
+};
 
 type AssignmentGroup = {
   key: string;
@@ -195,9 +220,10 @@ function groupDomId(groupKey: string) {
   return `sales-line-fiber-group-${encodeURIComponent(groupKey).replace(/%/g, '-')}`;
 }
 
-function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }) {
+function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, viewerId = null }: InstallStatusProps & { fiber: FiberStatusHookResult }) {
   const { data, loading, error, refetch } = fiber;
   const [filter, setFilter] = useState<FiberFilter>('all');
+  const [find, setFind] = useState('');
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -231,14 +257,66 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
     () => sortFiberOrders((data?.unmatched ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [data?.unmatched, filter]
   );
+  // Keyed on the matched portal user rather than the carrier's spelling of the
+  // rep's name, so the same person's orders and the same person's submissions
+  // land in one group even when the report writes "Noah St John" and the portal
+  // holds "Noah st john". An order with no matched user falls back to the name.
   const matchedGroups = useMemo(() => {
-    const groups = new Map<string, FiberOrder[]>();
+    const groups = new Map<string, RepGroup>();
     matchedOrders.forEach((order) => {
-      const name = order.repName || 'Unknown rep';
-      groups.set(name, [...(groups.get(name) ?? []), order]);
+      const userId = order.matchedUserId || null;
+      const repName = order.repName || 'Unknown rep';
+      const key = userId ? `uid:${userId}` : `name:${repName}`;
+      const existing = groups.get(key);
+      if (existing) existing.orders.push(order);
+      else groups.set(key, { key, repName, userId, orders: [order] });
     });
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+    return [...groups.values()].sort((a, b) => a.repName.localeCompare(b.repName));
   }, [matchedOrders]);
+  const submissions = useMemo(() => submittedByRep(sales), [sales]);
+  const needle = find.trim().toLowerCase();
+
+  // An owner reads every rep's raw feed; an admin reads only their own.
+  const canSeeSubmissions = useCallback(
+    (userId: string | null) => Boolean(userId) && (ownerView || userId === viewerId),
+    [ownerView, viewerId],
+  );
+  const submissionsFor = useCallback(
+    (userId: string | null) => {
+      if (!userId || !canSeeSubmissions(userId)) return [];
+      const rows = submissions.get(userId) ?? [];
+      return needle ? rows.filter((sale) => submissionMatches(sale, needle)) : rows;
+    },
+    [canSeeSubmissions, needle, submissions],
+  );
+
+  // A rep who logged sales the carrier has not reported would otherwise have no
+  // group at all, and their submissions would be invisible here. They get one,
+  // with no orders in it — which is itself worth seeing.
+  const submissionOnlyGroups = useMemo(() => {
+    const withOrders = new Set(matchedGroups.map((group) => group.userId).filter(Boolean));
+    const out: RepGroup[] = [];
+    for (const [userId, rows] of submissions) {
+      if (withOrders.has(userId) || !canSeeSubmissions(userId)) continue;
+      out.push({ key: `uid:${userId}`, repName: rows[0]?.salesRepName || 'Unknown rep', userId, orders: [] });
+    }
+    return out.sort((a, b) => a.repName.localeCompare(b.repName));
+  }, [canSeeSubmissions, matchedGroups, submissions]);
+
+  // One list: the reps the carrier reported, plus the reps who only logged.
+  // A search narrows it to the groups that actually contain the street, on
+  // either side, so typing an address answers "did anybody log this?" in one
+  // move — the job the old flat Submitted tab existed to do.
+  const repGroups = useMemo(() => {
+    const all = [...matchedGroups, ...submissionOnlyGroups]
+      .sort((a, b) => a.repName.localeCompare(b.repName));
+    if (!needle) return all;
+    return all.filter((group) =>
+      group.orders.some((order) =>
+        `${order.address ?? ''} ${order.customerName ?? ''}`.toLowerCase().includes(needle))
+      || submissionsFor(group.userId).length > 0);
+  }, [matchedGroups, needle, submissionOnlyGroups, submissionsFor]);
+
   const unmatchedAssignmentGroups = useMemo(() => {
     const groups = new Map<string, AssignmentGroup>();
     unmatchedOrders.forEach((order) => {
@@ -370,7 +448,7 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
         </div>
       ) : error ? (
         <p className="sales-line-fiber-message" role="alert">Install status is unavailable right now.</p>
-      ) : allOrders.length === 0 ? (
+      ) : allOrders.length === 0 && repGroups.length === 0 ? (
         <p className="sales-line-fiber-message">No install report data for you yet. Statuses appear here once the daily provider report includes your sales.</p>
       ) : (
         isAdmin ? (
@@ -389,35 +467,70 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
             ))}
           </div>
 
-          {filteredOrders.length === 0 ? (
+          <label className="sales-board-search sales-line-fiber-search">
+            <span className="sr-only">Find an address across install status and what reps logged</span>
+            <input
+              type="search"
+              value={find}
+              placeholder="Find an address or customer"
+              onChange={(event) => setFind(event.target.value)}
+            />
+          </label>
+
+          {filteredOrders.length === 0 && repGroups.length === 0 ? (
             <p className="sales-line-fiber-message">No install statuses match this filter.</p>
+          ) : needle && repGroups.length === 0 ? (
+            <p className="sales-line-fiber-message">
+              Nothing matches that — no carrier order and nothing logged in the portal.
+            </p>
           ) : (
             <div className="sales-line-fiber-groups">
-              {matchedGroups.map(([repName, orders]) => (
-                <section className="sales-line-fiber-group" key={repName} aria-label={`${repName}, ${orders.length} orders`}>
-                  <button
-                    type="button"
-                    className="sales-line-fiber-group-head"
-                    aria-expanded={openGroups.has(`matched:${repName}`)}
-                    aria-controls={groupDomId(`matched:${repName}`)}
-                    onClick={() => toggleGroup(`matched:${repName}`)}
-                  >
-                    <span className="sales-line-fiber-group-head-main">
-                      <strong>{repName}</strong>
-                      <span className="sales-line-fiber-group-count">{orders.length} orders</span>
-                    </span>
-                    <span className="sales-line-fiber-group-head-side">
-                      <span className="sales-line-fiber-summary">{statusSummary(orders)}</span>
-                      <span className="sales-line-fiber-chevron" aria-hidden="true">⌄</span>
-                    </span>
-                  </button>
-                  {openGroups.has(`matched:${repName}`) && (
-                    <div id={groupDomId(`matched:${repName}`)}>
-                      <FiberRows orders={orders} />
-                    </div>
-                  )}
-                </section>
-              ))}
+              {repGroups.map((group) => {
+                const groupKey = `matched:${group.key}`;
+                // A search opens what it matched: nothing is found by typing an
+                // address and then having to remember to expand a row.
+                const open = needle ? true : openGroups.has(groupKey);
+                const logged = submissionsFor(group.userId);
+                const showLogged = canSeeSubmissions(group.userId);
+                return (
+                  <section className="sales-line-fiber-group" key={group.key} aria-label={`${group.repName}, ${group.orders.length} orders`}>
+                    <button
+                      type="button"
+                      className="sales-line-fiber-group-head"
+                      aria-expanded={open}
+                      aria-controls={groupDomId(groupKey)}
+                      onClick={() => toggleGroup(groupKey)}
+                    >
+                      <span className="sales-line-fiber-group-head-main">
+                        <strong>{group.repName}</strong>
+                        <span className="sales-line-fiber-group-count">
+                          {group.orders.length} orders{showLogged ? ` · ${logged.length} logged` : ''}
+                        </span>
+                      </span>
+                      <span className="sales-line-fiber-group-head-side">
+                        <span className="sales-line-fiber-summary">{statusSummary(group.orders)}</span>
+                        <span className="sales-line-fiber-chevron" aria-hidden="true">⌄</span>
+                      </span>
+                    </button>
+                    {open && (
+                      <div id={groupDomId(groupKey)}>
+                        <FiberRows orders={group.orders} />
+                        {showLogged && (
+                          <div className="sales-line-fiber-submitted">
+                            {/* The carrier's account is above; this is the rep's
+                                own. Kept plainly apart so nobody reads one as
+                                confirming the other. */}
+                            <p className="sales-line-fiber-submitted-head">
+                              Logged in the portal <span>{logged.length}</span>
+                            </p>
+                            <SubmittedRows sales={logged} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
               {unmatchedAssignmentGroups.length > 0 && (
                 <>
                   <div className="sales-line-fiber-unmatched-divider">
@@ -500,11 +613,13 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
   );
 }
 
-function InstallStatusSectionFallback() {
+function InstallStatusSectionFallback(props: InstallStatusProps) {
   const fiber = useFiberStatus();
-  return <InstallStatusSectionContent fiber={fiber} />;
+  return <InstallStatusSectionContent {...props} fiber={fiber} />;
 }
 
-export function InstallStatusSection({ fiber }: { fiber?: FiberStatusHookResult }) {
-  return fiber ? <InstallStatusSectionContent fiber={fiber} /> : <InstallStatusSectionFallback />;
+export function InstallStatusSection({ fiber, ...props }: InstallStatusProps & { fiber?: FiberStatusHookResult }) {
+  return fiber
+    ? <InstallStatusSectionContent {...props} fiber={fiber} />
+    : <InstallStatusSectionFallback {...props} />;
 }

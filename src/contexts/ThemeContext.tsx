@@ -28,7 +28,11 @@ function getInitialTheme(): Theme {
     // Fall through to the device-size default when storage is unavailable.
   }
 
-  return window.matchMedia('(max-width: 767px)').matches ? 'dark' : 'system';
+  // Dark everywhere until the user says otherwise. Desktop used to default to
+  // 'system', which handed most laptops the light palette; Jacob, 2026-09-03:
+  // "make the default mode on desktop dark mode as well... we can keep it the
+  // way it is but still" — light stays available, it just is not the default.
+  return 'dark';
 }
 
 function getInitialSystemDark() {
@@ -40,12 +44,12 @@ function getInitialSystemDark() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Scoped to the portal: the `dark` class lives on the wrapper below (not <html>),
-  // so the public marketing site is never affected. Default follows the DEVICE
-  // setting ('system') on desktop; phones start dark until the user makes an
-  // explicit choice in Settings, which overrides and persists as before.
+  // so the public marketing site is never affected. The portal starts DARK on
+  // every device; light and 'follow my device' are still there in Settings, and
+  // an explicit choice overrides and persists as before.
   // Server renders light; the real preference is applied on mount (a lazy
   // initializer would make the server and first client render differ).
-  const [theme, setThemeState] = useState<Theme>('system');
+  const [theme, setThemeState] = useState<Theme>('dark');
   const [systemDark, setSystemDark] = useState(false);
 
   useEffect(() => {

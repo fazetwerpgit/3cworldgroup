@@ -14,6 +14,7 @@ import { useSales } from '@/hooks/useSales';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
+import { isOwner } from '@/types';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import {
   currentMonth,
@@ -64,7 +65,7 @@ function SalesLineSkeleton() {
           <span className="sales-skeleton sales-skeleton-hero" />
         </div>
         <div className="sales-line-broadcast">
-          {[1, 2, 3, 4].map((item) => <span key={item} className="sales-skeleton sales-skeleton-metric" />)}
+          {[1, 2, 3].map((item) => <span key={item} className="sales-skeleton sales-skeleton-metric" />)}
         </div>
       </div>
       <div className="sales-skeleton-section">
@@ -189,7 +190,14 @@ function SalesContent() {
                       reps logged, this is what the carrier says actually
                       happened, so management needs both. It is not month-
                       scoped; the picker above only moves the board. */}
-                  {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
+                  {fiber.data?.scope === 'all' && (
+                    <InstallStatusSection
+                      fiber={fiber}
+                      sales={sales}
+                      ownerView={isOwner(user?.role)}
+                      viewerId={user?.uid ?? null}
+                    />
+                  )}
                 </>
               ) : (
                 <>
@@ -210,13 +218,13 @@ function SalesContent() {
                         <span className="sales-line-metric-note">{sales.length} on your board all time</span>
                       </div>
                       <div className="sales-line-metric">
-                        <span className="sales-line-metric-label">Expected pay MTD</span>
+                        <span className="sales-line-metric-label">Estimated pay MTD</span>
                         <strong className="sales-line-metric-value portal-metallic-num">
                           {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ expected</small></>}
                         </strong>
                         <span className="sales-line-metric-note">{expectedPayMtd === null
                           ? 'No pay plan assigned yet'
-                          : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} in ${monthLabel(month)}`}</span>
+                          : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} in ${monthLabel(month)} · before chargebacks`}</span>
                       </div>
                     </section>
                   </section>

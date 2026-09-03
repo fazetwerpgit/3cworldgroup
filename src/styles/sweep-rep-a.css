@@ -1199,3 +1199,53 @@
   .portal-scope .sales-board-assign-row select { flex: 1 1 100%; }
   .portal-scope .sales-board-rowact-btn { width: 100%; }
 }
+
+/* ---- What the rep logged, under the carrier's account of the same rep ----
+   The old flat "Submitted" tab was cluttered (Jacob, 2026-09-03), so the raw
+   feed moved in here, one rep at a time. It is set apart from the carrier rows
+   above it by a rule and a label and nothing else — no card, no panel — because
+   the two feeds must never look like one merged list. */
+.portal-scope .sales-line-fiber-submitted {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--soft);
+}
+
+.portal-scope .sales-line-fiber-submitted-head {
+  margin: 0 0 2px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-scope .sales-line-fiber-submitted-head span {
+  color: var(--lime);
+}
+
+/* The rows are links now — they open the sale — but they must still read as
+   rows, not as a wall of underlined blue. */
+.portal-scope a.sales-board-sub-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Searches both feeds at once, which is why it sits above the groups rather
+   than inside one. */
+.portal-scope .sales-line-fiber-search {
+  margin: 12px 0 4px;
+}
+
+/* The pay estimate carries a legal weight the rest of the page does not: the
+   portal holds no chargebacks and no claims, so a figure here can never be
+   read as "this is your check". Amber, above the money, never a footnote. */
+.portal-scope .sales-line-pay-disclaimer {
+  margin: 10px 0 14px;
+  padding: 10px 0 10px 12px;
+  border-left: 2px solid var(--amber, #d99a2b);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--muted);
+}

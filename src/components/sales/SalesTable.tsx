@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Pencil, Trash2 } from 'lucide-react';
-import { Sale, SaleStatus, FIBER_COMPANIES, PAY_DELAY_DAYS } from '@/types';
+import { Sale, SaleStatus, FIBER_COMPANIES } from '@/types';
 import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
-import { expectedPayDate, expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import {
   Dialog,
@@ -89,7 +89,6 @@ export function SalesTable({
   const showPay = payView;
   const rates = payPlan?.rates ?? null;
   const hasPlan = !!payPlan?.hasPlan;
-  const payDelayDays = payPlan?.payDelayDays ?? PAY_DELAY_DAYS;
   const { paidBySale, togglePaid } = useSalePaid(user?.uid ?? null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -208,10 +207,16 @@ export function SalesTable({
         <div className="sales-line-ledger-head">
           <div>
             <p className="sales-line-eyebrow">{showPay ? 'Your pay' : 'Your sales'}</p>
-            <h2>{showPay ? 'What you get paid' : 'Your sales'}</h2>
+            {/* NOT "What you get paid". The owner's words, via Jacob
+                (2026-09-03): "if claims and final chargebacks are not accounted
+                for I will have to pay that out", and "if final reports don't
+                show that on the site I can be sued". The portal does not hold
+                chargebacks or claims, so it must never state a rep's pay — only
+                estimate it, and say so where the figure is. */}
+            <h2>{showPay ? 'Estimated pay' : 'Your sales'}</h2>
           </div>
           <p>{showPay
-            ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
+            ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · estimate — tick one off once it lands`
             : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · select a row to inspect`}</p>
         </div>
 
@@ -264,13 +269,18 @@ export function SalesTable({
           {!hasPlan && (
             <p className="sales-line-pay-note">No pay plan assigned yet — ask an admin to set your role.</p>
           )}
+          {/* Stated once, above the money, rather than as a footnote under it. */}
+          <p className="sales-line-pay-disclaimer">
+            An estimate, not a statement of pay. Chargebacks, claims and cancellations are
+            not included here, and the carrier&rsquo;s final report decides what actually pays.
+            Tick a sale off yourself once the money lands.
+          </p>
           <div className={`sales-line-sale-row sales-line-pay-row thead${hasPlan ? '' : ' no-money'}`}>
-            <span>Customer</span>{hasPlan && <span className="sales-line-pay-head-money">Expected pay</span>}<span>Expected pay date</span><span>Status</span><span>Paid</span>
+            <span>Customer</span>{hasPlan && <span className="sales-line-pay-head-money">Estimated pay</span>}<span>Installed</span><span>Status</span><span>Paid</span>
           </div>
           <div className="sales-line-sale-list">
             {paySales.length ? paySales.map((sale) => {
               const expected = expectedBySale[sale.id || ''] ?? null;
-              const due = expectedPayDate(sale, payDelayDays);
               const paid = !!paidBySale[sale.id || ''];
               return (
                 <div
@@ -287,7 +297,7 @@ export function SalesTable({
                       {formatMoney(expected || 0)}{!expected && <small>rate pending</small>}
                     </div>
                   )}
-                  <div className="sales-line-date-cell"><strong>{due ? formatDate(due) : '—'}</strong><span>Install {formatDate(sale.installDate)}</span></div>
+                  <div className="sales-line-date-cell"><strong>{formatDate(sale.installDate)}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
                   <div className="sales-line-status-cell">
                     <StatusBadge status={sale.status} />
                     {fiberBySale.get(sale.id || '') && <FiberStatusPill status={fiberBySale.get(sale.id || '')!.status} />}
@@ -312,13 +322,13 @@ export function SalesTable({
             }) : <div className="sales-line-ledger-empty">Nothing installed in this month. Pay shows up here once a sale has an install date.</div>}
           </div>
           <div className={`sales-line-totals sales-line-pay-totals${hasPlan ? '' : ' no-money'}`}>
-            <span><b>Sales</b><strong>{paySales.length}</strong></span>{hasPlan && <span className="sales-line-total-commission"><b>Expected pay</b>{expectedTotalLabel}</span>}<span /><span /><span />
+            <span><b>Sales</b><strong>{paySales.length}</strong></span>{hasPlan && <span className="sales-line-total-commission"><b>Estimated pay</b>{expectedTotalLabel}</span>}<span /><span /><span />
           </div>
         </div>
         ) : (
         <div className="sales-line-table-wrap">
           <div className="sales-line-sale-row thead">
-            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>Expected pay</span><span>Status</span><span>Actions</span>
+            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>Estimated pay</span><span>Status</span><span>Actions</span>
           </div>
           <div className="sales-line-sale-list">
             {listSales.length ? listSales.map((sale) => (
@@ -344,7 +354,7 @@ export function SalesTable({
             )) : <div className="sales-line-ledger-empty">No sales in this month.</div>}
           </div>
           <div className="sales-line-totals">
-            <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>Expected pay</b>{expectedTotalLabel}</span><span /><span />
+            <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>Estimated pay</b>{expectedTotalLabel}</span><span /><span />
           </div>
         </div>
         )}

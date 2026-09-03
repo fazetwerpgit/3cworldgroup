@@ -94,22 +94,22 @@ function KpiCell({
   loading: boolean;
 }) {
   return (
-    <div className="min-h-[86px] bg-[#0A1F44]/90 p-[13px_15px] dark:bg-[#0A1F44]/80">
+    <div className="portal-strip-cell min-h-[86px] p-[13px_15px]">
       {loading ? (
         <>
-          <Skeleton className="h-2.5 w-24 rounded-none bg-white/10" />
-          <Skeleton className="mt-[13px] h-7 w-20 rounded-none bg-white/10" />
-          <Skeleton className="mt-2 h-2.5 w-28 rounded-none bg-white/10" />
+          <Skeleton className="h-2.5 w-24 rounded-none bg-[color:var(--soft)]" />
+          <Skeleton className="mt-[13px] h-7 w-20 rounded-none bg-[color:var(--soft)]" />
+          <Skeleton className="mt-2 h-2.5 w-28 rounded-none bg-[color:var(--soft)]" />
         </>
       ) : (
         <>
-          <span className="block truncate font-sans text-[11px] font-bold text-[#9caabd]">
+          <span className="block truncate font-sans text-[11px] font-bold text-[color:var(--muted)]">
             {label}
           </span>
-          <strong className="portal-display portal-num mt-[13px] flex items-baseline gap-[5px] text-[22px] font-black leading-none tracking-[-.02em] text-[#f4f7fa]">
+          <strong className="portal-display portal-num portal-strip-num mt-[13px] flex items-baseline gap-[5px] text-[22px] font-black leading-none tracking-[-.02em]">
             {children}
           </strong>
-          <span className="mt-1 block font-sans text-[9px] text-[#9caabd]">{note}</span>
+          <span className="mt-1 block font-sans text-[9px] text-[color:var(--muted)]">{note}</span>
         </>
       )}
     </div>
@@ -133,12 +133,12 @@ function QueueSkeleton({ count }: { count: number }) {
           key={index}
           className="grid min-h-[78px] grid-cols-[28px_minmax(0,1fr)_17px] items-center gap-3 border-b border-[#0A1F44]/[.14] dark:border-white/[.08] max-[700px]:grid-cols-[23px_minmax(0,1fr)_13px] max-[700px]:gap-[7px]"
         >
-          <Skeleton className="size-4 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
+          <Skeleton className="size-4 rounded-none bg-[color:var(--soft)]" />
           <span className="min-w-0">
-            <Skeleton className="h-3.5 w-40 max-w-full rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-            <Skeleton className="mt-1.5 h-2.5 w-28 max-w-full rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
+            <Skeleton className="h-3.5 w-40 max-w-full rounded-none bg-[color:var(--soft)]" />
+            <Skeleton className="mt-1.5 h-2.5 w-28 max-w-full rounded-none bg-[color:var(--soft)]" />
           </span>
-          <Skeleton className="size-4 rounded-none bg-[#0A1F44]/10 dark:bg-white/10 max-[700px]:col-start-3 max-[700px]:row-start-1" />
+          <Skeleton className="size-4 rounded-none bg-[color:var(--soft)] max-[700px]:col-start-3 max-[700px]:row-start-1" />
         </div>
       ))}
     </div>
@@ -192,12 +192,12 @@ function QueueSection({
 
 function TickerSkeleton() {
   return (
-    <div className="grid grid-cols-5 gap-px border border-[#0A1F44]/[.14] bg-[#0A1F44]/[.14] dark:border-white/[.14] dark:bg-white/[.14] max-[430px]:grid-cols-2">
+    <div className="portal-strip">
       {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className="min-w-0 bg-[#0A1F44]/70 p-[13px_12px] max-[700px]:p-3 max-[430px]:p-[12px_10px]">
-          <Skeleton className="h-2.5 w-5 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-          <Skeleton className="mt-2.5 h-3 w-24 max-w-full rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-          <Skeleton className="mt-1 h-2.5 w-16 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
+        <div key={index} className="portal-strip-cell p-[13px_12px] max-[700px]:p-3 max-[430px]:p-[12px_10px]">
+          <Skeleton className="h-2.5 w-5 rounded-none bg-[color:var(--soft)]" />
+          <Skeleton className="mt-2.5 h-3 w-24 max-w-full rounded-none bg-[color:var(--soft)]" />
+          <Skeleton className="mt-1 h-2.5 w-16 rounded-none bg-[color:var(--soft)]" />
         </div>
       ))}
     </div>
@@ -232,22 +232,22 @@ function LeaderboardTicker({
           No points yet this month. The first sale takes #1.
         </div>
       ) : (
-        <div className="grid grid-cols-5 gap-px border border-[#0A1F44]/[.14] bg-[#0A1F44]/[.14] dark:border-white/[.14] dark:bg-white/[.14] max-[430px]:grid-cols-2">
+        <div className="portal-strip">
           {tickerEntries.map((entry) => {
             const mine = entry.salesRepId === userId;
             return (
               <div
                 key={entry.salesRepId}
-                className={`min-w-0 bg-[#0A1F44]/70 p-[13px_12px] max-[700px]:p-3 max-[430px]:p-[12px_10px] ${mine ? 'bg-[#8dc63f] text-[#0A1F44]' : ''}`}
+                className={`portal-strip-cell p-[13px_12px] max-[700px]:p-3 max-[430px]:p-[12px_10px] ${mine ? 'bg-[#8dc63f] text-[#0A1F44]' : ''}`}
               >
-                <span className={`portal-display block text-[9px] font-black ${mine ? 'text-[#0A1F44]/[.65]' : 'text-[#9caabd]'}`}>
+                <span className={`portal-display block text-[9px] font-black ${mine ? 'text-[#0A1F44]/[.65]' : 'text-[color:var(--muted)]'}`}>
                   {String(entry.rank).padStart(2, '0')}
                 </span>
                 <strong className="mt-[9px] block truncate text-[11px] font-black max-[430px]:whitespace-normal max-[430px]:leading-[1.25]">
                   {entry.salesRepName}
                   {mine && <em className="ml-1 bg-[#0A1F44] px-1 py-0.5 text-[7px] not-italic text-white">You</em>}
                 </strong>
-                <span className={`portal-display mt-1 block text-[10px] ${mine ? 'text-[#0A1F44]/[.72]' : 'text-[#9caabd]'}`}>
+                <span className={`portal-display mt-1 block text-[10px] ${mine ? 'text-[#0A1F44]/[.72]' : 'text-[color:var(--muted)]'}`}>
                   {formatNumber(entry.totalPoints)} pts
                 </span>
               </div>
@@ -446,23 +446,23 @@ export default function DashboardPage() {
           </p>
       </div>
 
-      <dl className="mt-7 grid grid-cols-2 gap-px border border-[#0A1F44]/[.14] bg-[#0A1F44]/[.14] dark:border-white/[.14] dark:bg-white/[.14] lg:grid-cols-4">
+      <dl className="portal-strip mt-7">
         <KpiCell label="Approved points" loading={statsLoading} note={pointsChange === 0 ? changeLabel : <><span className="text-[#8dc63f]">{changeLabel.split(' vs')[0]}</span>{changeLabel.includes(' vs') ? ` vs${changeLabel.split(' vs')[1]}` : ''}</>}>
           <CountUpNumber value={approvedPoints} />
-          <small className="font-sans text-[8px] text-[#9caabd]">pts</small>
+          <small className="font-sans text-[8px] text-[color:var(--muted)]">pts</small>
         </KpiCell>
         <KpiCell label="Sales this month" loading={statsLoading} note={`${stats?.approvedCount ?? 0} approved / ${stats?.rejectedCount ?? 0} rejected`}>
           <CountUpNumber value={stats?.totalSales ?? 0} />
-          <small className="font-sans text-[8px] text-[#9caabd]">sales</small>
+          <small className="font-sans text-[8px] text-[color:var(--muted)]">sales</small>
         </KpiCell>
         <KpiCell label="Pending approvals" loading={statsLoading} note={pendingCount > 0 ? 'Awaiting manager review' : 'No pending sales'}>
           <CountUpNumber value={pendingCount} />
-          <small className="font-sans text-[8px] text-[#9caabd]">open</small>
+          <small className="font-sans text-[8px] text-[color:var(--muted)]">open</small>
         </KpiCell>
         <KpiCell label="Leaderboard rank" loading={leaderboardLoading} note={rank && rank <= 10 ? <><span className="text-[#8dc63f]">Top 10</span> · {formatNumber(rankPoints)} pts</> : `${formatNumber(rankPoints)} pts this month`}>
           <span>#</span>
           {rank !== null ? formatNumber(rank) : '—'}
-          <small className="font-sans text-[8px] text-[#9caabd]">{totalRanked ? `of ${totalRanked}` : 'rank'}</small>
+          <small className="font-sans text-[8px] text-[color:var(--muted)]">{totalRanked ? `of ${totalRanked}` : 'rank'}</small>
         </KpiCell>
       </dl>
       <div className="grid gap-0">

@@ -3014,18 +3014,105 @@ body.portal-scope {
 }
 
 .sales-line-broadcast {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* auto-fit, not repeat(4, 1fr): the strip renders however many metrics the
+     viewer is entitled to (a rep with no pay plan sees fewer), and a fixed
+     four-column track left the leftovers as a solid var(--line) block that read
+     as a mis-themed empty box. */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 1px;
   margin-top: 28px;
-  border: 1px solid var(--line);
+  /* Ruled, not boxed — see .portal-strip. */
+  border-block: 1px solid var(--line);
   background: var(--line);
 }
 
 .sales-line-metric {
   min-height: 86px;
   padding: 13px 15px;
-  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  background: var(--stage);
+}
+
+/* Dashboard KPI + leaderboard strips.
+   Jacob, 2026-09-03: these read as "wrong theme" because they were painted
+   navy (#0A1F44/90) while the same instrument strip on the Sales page is
+   var(--panel). One portal, one treatment — the palette tokens decide, so both
+   themes follow the page they sit on. */
+.portal-strip {
+  /* The palette tokens live on .sales-line, which is the Sales page only. The
+     dashboard has no such scope, so the strip carries its own copy and its
+     children inherit them. --stage is the PAGE ground: the cells sit on it, so
+     the strip reads as ruled rows of the page rather than a box dropped on it. */
+  --stage: #f7f8f5;
+  --panel: #ffffff;
+  --ink: #0a1f44;
+  --muted: #627187;
+  --line: rgba(10, 31, 68, 0.16);
+  --soft: rgba(10, 31, 68, 0.09);
+  --metal: linear-gradient(180deg, #24406e, #0a1f44 38%, #16294a 80%, #2b4a7d);
+  position: relative;
+  display: grid;
+  /* auto-fit, never a fixed column count: the strips render however many cells
+     there are (two reps on the board, three metrics), and fixed tracks left the
+     remainder as a solid var(--line) block that looked like a broken box. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  /* Jacob, 2026-09-03: "the boxes didn't fit the rest of site". The rest of the
+     portal is ruled, not boxed — hairlines under headings, rows divided by a
+     single line, nothing enclosed. So: no outer border and no panel fill, just
+     a rule above and below and hairlines between the cells. The 1px gap over a
+     var(--line) ground draws those dividers; the cells are painted the page's
+     own --stage so only the lines show. */
+  border-block: 1px solid var(--line);
+  background: var(--line);
+}
+
+.portal-strip-cell {
+  min-width: 0;
+  background: var(--stage);
+  color: var(--ink);
+}
+
+/* Jacob, 2026-09-03: "the boxes have no aura." Ruled-not-boxed made them fit
+   and made them flat. The band gets the portal's one gradient — a lime glow
+   anchored bottom-left — and its numbers get the metal fill the Sales figures
+   already use. Overlay, so it crosses the hairlines instead of restarting in
+   every cell. */
+.portal-strip::after,
+.sales-line-broadcast::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 44% 95% at 9% 100%, rgba(141, 198, 63, 0.1), transparent 70%);
+}
+
+.portal-strip-num {
+  color: transparent;
+  background: var(--metal);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.dark .portal-strip {
+  --stage: #030916;
+  --panel: #0a1f44;
+  --metal: linear-gradient(180deg, #fff, #dbe4ed 38%, #7f8c9b 80%, #f5f7f8);
+  --ink: #f4f7fa;
+  --muted: #9caabd;
+  --line: rgba(231, 237, 244, 0.14);
+  --soft: rgba(231, 237, 244, 0.08);
+}
+
+@media (max-width: 430px) {
+  .portal-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .portal-strip-cell:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 .sales-line-metric-label,
@@ -3907,6 +3994,12 @@ body.portal-scope {
 
   .sales-line-broadcast {
     grid-template-columns: 1fr 1fr;
+  }
+
+  /* An odd number of metrics would leave the last cell of the row empty and
+     showing the divider colour; let the last one run the full width instead. */
+  .sales-line-metric:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .sales-line-metric {
