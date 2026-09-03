@@ -15,29 +15,16 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
-import { dateToSaleDateInput } from '@/lib/sales/saleDate';
+import {
+  currentMonth,
+  isCurrentMonth,
+  monthBounds,
+  monthLabel,
+  salesSoldIn,
+  shiftMonth,
+  type MonthKey,
+} from '@/lib/sales/monthWindow';
 import '@/styles/sweep-rep-a.css';
-
-// A month, as the page tracks it. Sales are fetched a month at a time now: the
-// old unbounded `limit: 100` silently truncated a busy month, and every figure
-// on the admin board is a monthly figure anyway.
-interface MonthKey { year: number; month: number; }
-
-function monthBounds({ year, month }: MonthKey) {
-  // Local-noon bounds, matching how install and sale dates are stored.
-  const start = new Date(year, month, 1, 12, 0, 0);
-  const end = new Date(year, month + 1, 0, 12, 0, 0);
-  return { startDate: dateToSaleDateInput(start), endDate: dateToSaleDateInput(end) };
-}
-
-function monthLabel({ year, month }: MonthKey) {
-  return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-}
-
-function shiftMonth({ year, month }: MonthKey, by: number): MonthKey {
-  const shifted = new Date(year, month + by, 1);
-  return { year: shifted.getFullYear(), month: shifted.getMonth() };
-}
 
 function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
@@ -104,41 +91,29 @@ function SalesContent() {
   const canViewAll = hasPermission('sales:read:all');
 
   const [payView, setPayView] = useState(false);
-  const [month, setMonth] = useState<MonthKey>(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
-  });
+  const [month, setMonth] = useState<MonthKey>(() => currentMonth());
   const { rates, payDelayDays, hasPlan, compRole } = useCompPlan();
   const payPlan = useMemo(
     () => ({ rates, payDelayDays, hasPlan, compRole }),
     [compRole, hasPlan, payDelayDays, rates]
   );
 
-  const isCurrentMonth = useMemo(() => {
-    const now = new Date();
-    return month.year === now.getFullYear() && month.month === now.getMonth();
-  }, [month]);
+  const atCurrentMonth = useMemo(() => isCurrentMonth(month), [month]);
 
   useEffect(() => {
     if (!user) return;
-    // Management fetches one month at a time; a rep's book is small enough to
-    // read whole, and their pay list has to reach back past the current month
-    // to sales that installed earlier.
+    // Management fetches one month at a time. A rep's book is fetched whole and
+    // sliced by month in the browser instead: their pay list is keyed on the
+    // INSTALL date, so a month-bounded fetch on saleDate would drop a sale sold
+    // in August that installs in September — money they are actually owed.
     const filters: { salesRepId?: string; limit?: number; startDate?: string; endDate?: string } =
-      canViewAll ? { limit: 500, ...monthBounds(month) } : { limit: 200, salesRepId: user.uid };
+      canViewAll ? { limit: 500, ...monthBounds(month) } : { limit: 500, salesRepId: user.uid };
     fetchSales(filters);
   }, [canViewAll, fetchSales, month, user]);
 
-  // Rep KPIs stay month-to-date over their own book.
-  const now = useMemo(() => new Date(), []);
-  const mtdSales = useMemo(
-    () =>
-      sales.filter((sale) => {
-        const date = new Date(sale.saleDate);
-        return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
-      }),
-    [now, sales]
-  );
+  // Rep KPIs follow the month picker rather than always reading "this month",
+  // so the figures and the list underneath can never describe different months.
+  const mtdSales = useMemo(() => salesSoldIn(sales, month), [month, sales]);
   const payableMtd = useMemo(() => mtdSales.filter(isPayableSale), [mtdSales]);
   const expectedPayMtd = hasPlan
     ? payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0)
@@ -155,7 +130,7 @@ function SalesContent() {
             <div className="sales-line">
               <PageTitle
                 title="Sales"
-                meta={canViewAll ? monthLabel(month) : `${mtdSales.length} this month`}
+                meta={monthLabel(month)}
                 actions={(
                   <Link className="sales-line-primary" href="/portal/sales/new">
                     <Plus className="sales-line-icon" aria-hidden="true" />
@@ -166,27 +141,30 @@ function SalesContent() {
 
               {error && <div className="sales-line-error" role="alert">{error}</div>}
 
+              {/* One picker for both views. A rep's ledger is month-sliced in
+                  the browser rather than in the fetch — see the fetch comment
+                  above — but the control and the label are the same one. */}
+              <div className="sales-board-month" role="group" aria-label="Month">
+                <button
+                  type="button"
+                  onClick={() => setMonth((current) => shiftMonth(current, -1))}
+                  aria-label="Previous month"
+                >
+                  ‹
+                </button>
+                <span>{monthLabel(month)}</span>
+                <button
+                  type="button"
+                  onClick={() => setMonth((current) => shiftMonth(current, 1))}
+                  disabled={atCurrentMonth}
+                  aria-label="Next month"
+                >
+                  ›
+                </button>
+              </div>
+
               {canViewAll ? (
                 <>
-                  <div className="sales-board-month" role="group" aria-label="Month">
-                    <button
-                      type="button"
-                      onClick={() => setMonth((current) => shiftMonth(current, -1))}
-                      aria-label="Previous month"
-                    >
-                      ‹
-                    </button>
-                    <span>{monthLabel(month)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setMonth((current) => shiftMonth(current, 1))}
-                      disabled={isCurrentMonth}
-                      aria-label="Next month"
-                    >
-                      ›
-                    </button>
-                  </div>
-
                   <AdminSalesBoard
                     sales={sales}
                     loading={loading}
@@ -215,7 +193,7 @@ function SalesContent() {
                       <div className="sales-line-metric">
                         <span className="sales-line-metric-label">Value MTD</span>
                         <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardValue} /><small>$ / mo</small></strong>
-                        <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records this month</span>
+                        <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records in {monthLabel(month)}</span>
                       </div>
                       <div className="sales-line-metric">
                         <span className="sales-line-metric-label">Sales this month</span>
@@ -229,7 +207,7 @@ function SalesContent() {
                         </strong>
                         <span className="sales-line-metric-note">{expectedPayMtd === null
                           ? 'No pay plan assigned yet'
-                          : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} this month`}</span>
+                          : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} in ${monthLabel(month)}`}</span>
                       </div>
                     </section>
                   </section>
@@ -239,6 +217,7 @@ function SalesContent() {
                   {(loading || sales.length > 0) && (
                     <SalesTable
                       sales={sales}
+                      month={month}
                       onDelete={deleteSale}
                       loading={loading}
                       payView={payView}
