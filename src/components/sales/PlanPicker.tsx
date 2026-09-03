@@ -3,15 +3,35 @@
 import { useState } from 'react';
 import { Check, Plus } from 'lucide-react';
 import { FiberPlan, SaleProduct, FIBER_COMPANIES, getPlansByCompany } from '@/types';
+import { selectedInternetProduct } from '@/lib/sales/planSelection';
 
 interface PlanPickerProps {
   products: SaleProduct[];
   onAdd: (plan: FiberPlan) => void;
 }
 
-function PlanRow({ plan, added, onAdd }: { plan: FiberPlan; added: boolean; onAdd: (plan: FiberPlan) => void }) {
+// Internet plans are a CHOICE, extras are a LIST. One internet plan can be sold
+// at an address (see src/lib/sales/planSelection.ts), so those rows behave like
+// radio buttons: picking another one swaps. The extras stack, so they keep the
+// add affordance. The two groups look the same on purpose — only the icon and
+// the announced role differ — because a rep is scanning prices, not controls.
+function PlanRow({
+  plan,
+  selected,
+  asChoice,
+  onAdd,
+}: {
+  plan: FiberPlan;
+  selected: boolean;
+  asChoice: boolean;
+  onAdd: (plan: FiberPlan) => void;
+}) {
+  const label = asChoice
+    ? selected ? `${plan.name} selected` : `Choose ${plan.name}`
+    : selected ? 'Already added' : `Add ${plan.name}`;
+
   return (
-    <div className={`sales-line-plan-row ${added ? 'added' : ''}`}>
+    <div className={`sales-line-plan-row ${selected ? 'added' : ''}`}>
       <div className="sales-line-plan-row-name">
         {plan.name} <span className="sales-line-plan-row-speed">{plan.speed}</span>
       </div>
@@ -20,11 +40,15 @@ function PlanRow({ plan, added, onAdd }: { plan: FiberPlan; added: boolean; onAd
       <button
         type="button"
         className="sales-line-plan-row-add"
-        disabled={added}
-        aria-label={added ? 'Already added' : 'Add plan'}
+        // A chosen internet plan stays clickable-looking but does nothing; an
+        // extra that is already on the sale is removed from the list below.
+        disabled={selected}
+        role={asChoice ? 'radio' : undefined}
+        aria-checked={asChoice ? selected : undefined}
+        aria-label={label}
         onClick={() => onAdd(plan)}
       >
-        {added ? <Check className="sales-line-icon" aria-hidden="true" /> : <Plus className="sales-line-icon" aria-hidden="true" />}
+        {selected ? <Check className="sales-line-icon" aria-hidden="true" /> : <Plus className="sales-line-icon" aria-hidden="true" />}
       </button>
     </div>
   );
@@ -37,6 +61,7 @@ export function PlanPicker({ products, onAdd }: PlanPickerProps) {
   const hasExtras = plans.some((p) => p.category === 'extra');
   const internetPlans = hasExtras ? plans.filter((p) => p.category !== 'extra') : plans;
   const extraPlans = hasExtras ? plans.filter((p) => p.category === 'extra') : [];
+  const chosenInternetId = selectedInternetProduct(products)?.productId ?? null;
 
   return (
     <div>
@@ -57,15 +82,17 @@ export function PlanPicker({ products, onAdd }: PlanPickerProps) {
       {selectedCompany ? (
         <div className="sales-line-plan-picker">
           <label className="sales-line-field-label" style={{ marginTop: 14 }}>Choose plan</label>
+          <p className="sales-line-subgroup-hint">One plan per address — picking another swaps it.</p>
           {hasExtras ? (
             <>
               <p className="sales-line-subgroup-label">Internet</p>
-              <div className="sales-line-row-list">
+              <div className="sales-line-row-list" role="radiogroup" aria-label="Internet plan">
                 {internetPlans.map((plan) => (
                   <PlanRow
                     key={plan.id}
                     plan={plan}
-                    added={products.some((p) => p.productId === plan.id)}
+                    selected={plan.id === chosenInternetId}
+                    asChoice
                     onAdd={onAdd}
                   />
                 ))}
@@ -76,19 +103,21 @@ export function PlanPicker({ products, onAdd }: PlanPickerProps) {
                   <PlanRow
                     key={plan.id}
                     plan={plan}
-                    added={products.some((p) => p.productId === plan.id)}
+                    selected={products.some((p) => p.productId === plan.id)}
+                    asChoice={false}
                     onAdd={onAdd}
                   />
                 ))}
               </div>
             </>
           ) : (
-            <div className="sales-line-row-list">
+            <div className="sales-line-row-list" role="radiogroup" aria-label="Internet plan">
               {plans.map((plan) => (
                 <PlanRow
                   key={plan.id}
                   plan={plan}
-                  added={products.some((p) => p.productId === plan.id)}
+                  selected={plan.id === chosenInternetId}
+                  asChoice
                   onAdd={onAdd}
                 />
               ))}

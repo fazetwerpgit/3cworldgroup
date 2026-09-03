@@ -30,7 +30,12 @@ the MONEY.
 Codex is OUT OF CREDITS until 2026-09-06 21:24. Workers are Opus subagents
 (never Sonnet, never Fable); main loop specs and reviews the diffs itself.
 
-ONE BOOK MERGE: BUILT AND COMPLETE (2026-09-03, final round 20:4x). ALL UNCOMMITTED.
+ONE BOOK MERGE: BUILT, COMPLETE AND COMMITTED (2026-09-03).
+Commit 73863b1 on branch onboarding/completion, 35 files, +4982/-224.
+Jacob's public-site redesign was deliberately LEFT UNCOMMITTED in the same
+tree (public pages, *.module.css, public.css, src/components/public/, fonts,
+public/redesign/, screenshots) — it is still his to review. Never sweep it in
+with `git add -A`; stage One Book / portal paths explicitly.
 Gates verified by the main loop, not taken on worker report:
   npx tsc --noEmit  clean
   npm test          993 passed / 108 files
@@ -92,18 +97,79 @@ sales, no carrier join, address-first, searchable. Gated on isOwner() so
 admins do not see it. It exists because Jacob cannot verify a red
 "Never logged" row from memory; this is the list he checks it against.
 
-STILL UNVERIFIED AGAINST REAL DATA:
-- Jacob asked ME to do the testing ("i don't feel like it"). A read-only
-  analysis run of buildMergedBook over the real 123 sales + 947 orders is
-  IN FLIGHT; results go to scratchpad/merge-live-check.md. The key question
-  is whether never_logged rows are real or the address join is silently
-  missing matches.
-- The truncation banner has never fired against real data (needs 500 sales,
-  there are 123). Prop-driven test only.
+LIVE DATA CHECK: DONE (2026-09-03, read-only, nothing written).
+Full report: docs/superpowers/specs/2026-09-03-one-book-live-check.md.
+Ran buildMergedBook over the real 124 sales + 947 fiberOrders.
+  957 rows: agreed 114, waiting 10, never_logged 213, unassigned 27,
+  historic 593, dismissed/cancelled 0. Counted rows 124, totalValue $8020.
+  Join is healthy: 114 joined (all by address guess, 0 manual saleLinks,
+  0 linkBroken). Value gaps at the $25 threshold: 1 row (12150 Parkside Cir,
+  $130 sale vs $70 MRC).
+  ADDRESS JOIN MISSES: exactly 2, both rep typos on Noah St John rows —
+  "58030 JEWELL RD" vs sale "58030 Jewwel Rd." and "7204 SW 14TH ST" vs sale
+  "7204 dw 14th st". Jacob (or an admin) fixes these with the link dialog on
+  the board; no code change. Everything else in never_logged is a genuine
+  carrier row nobody logged.
+  Of the 213 never_logged: 177 predate the first portal sale (2026-07) and
+  only 36 fall inside the months reps were logging. never_logged dated before
+  the 2026-04-01 cutoff: 0 (cutoff works).
+  27 unassigned rows have no rep matched (carrier repNames Nolan Morrison,
+  Colton Gordon, mason Tran, Gavin McCrory) — needs dealer mapping, separate work.
 
-NEXT ACTION: get Jacob's eyes on the board. Then ask before committing —
-the public-site redesign is uncommitted in the same tree and must not be
-swept into a commit.
+STILL UNVERIFIED: the truncation banner has never fired against real data
+(needs 500 sales, there are 124). Prop-driven test only.
+
+DONE 2026-09-03 (after the live check):
+1. The 2 typo rows are LINKED in prod. scripts/link-typo-address-orders.mjs
+   (dry-run default, --apply writes) wrote explicit saleLinks:
+     order TMO20260817SGOA0 "58030 JEWELL RD" -> sale rgxWdFbMcuI4rwJTIEaT
+     order TMO20260815AZJZK "7204 SW 14TH ST" -> sale 9RXkB8k8iWCzcErHUZLc
+   Both Noah St John, $60 each. never_logged should now read 211.
+   The board caches fiberOrders on lastReportAt — open it once with ?fresh=1.
+2. The 27 unassigned orders STAY unassigned. Jacob's call: those carrier
+   repNames (Nolan Morrison, Colton Gordon, mason Tran, Gavin McCrory) are reps
+   who are not with us yet but will be, and they must stay their own thing until
+   they have portal logins. Do NOT map them in config/fiberRepMap. No code
+   change — the unassigned drawer is already the correct behaviour.
+3. ONE INTERNET PLAN PER SALE — built, gates green.
+   Cause of the Parkside $130-vs-$70 gap: Will tapped TFiber 1 Gig ($60), changed
+   his mind, tapped 2 Gig ($70), and the form ADDED a second plan. Jacob: T-Mobile
+   cannot sell two plans at one address, so it must be impossible to enter.
+   src/lib/sales/planSelection.ts  the rule + 15 tests
+     addPlanToProducts   an internet plan REPLACES the internet plan already
+                         there (swap in place); re-picking is a no-op
+     validateOnePlanPerSale  server guard
+   Extras are NOT plans: the 5 Xfinity add-ons (TV, mobile lines, EERO, home
+   phone) still stack. That is why the rule is "one internet plan", not "one
+   product".
+   Wired into: SaleForm.tsx, portal/sales/[id]/edit/page.tsx (both had their own
+   copy of addPlan), PlanPicker.tsx (internet rows are now role=radio in a
+   radiogroup + "One plan per address — picking another swaps it." hint,
+   .sales-line-subgroup-hint in globals.css), POST /api/portal/sales, and
+   PUT /api/portal/sales/[id] (only when the edit actually sends products, so an
+   old two-plan sale can still be corrected field by field).
+   Gates: npx tsc --noEmit clean | npm test 1008 passed / 109 files | build exit 0.
+   UNCOMMITTED as of this writing.
+
+4. PARKSIDE SALE REPAIRED (Jacob said go, 2026-09-03).
+   scripts/repair-double-plan-sale.mjs (dry-run default, --apply writes).
+   Sale 3OWM4xPfzZZqHnJizabE, 12150 PARKSIDE CIR, rep "Wil Teasdale":
+   dropped TFiber 1 Gig, kept TFiber 2 Gig. $130 -> $70, 18 pts -> 10 pts.
+   Re-running is a no-op (it reports SKIP). The script also lists ANY other
+   sale carrying two internet plans; there are none — 1 of 124 was the only one.
+   Which plan survives is named explicitly in the script's REPAIRS table and is
+   always a human's call: the data cannot say which plan the customer got, so
+   never infer it and never pick by price.
+
+NEXT ACTION: ask Jacob before committing. Everything in item 3 (the one-plan
+rule) is uncommitted, and the public-site redesign is uncommitted in the SAME
+tree — stage the sales paths explicitly, never `git add -A`.
+Paths to stage: src/lib/sales/planSelection.ts, src/lib/sales/planSelection.test.ts,
+src/components/sales/SaleForm.tsx, src/components/sales/PlanPicker.tsx,
+src/app/portal/sales/[id]/edit/page.tsx, src/app/api/portal/sales/route.ts,
+src/app/api/portal/sales/[id]/route.ts, src/app/globals.css,
+scripts/link-typo-address-orders.mjs, scripts/repair-double-plan-sale.mjs,
+docs/superpowers/specs/2026-09-03-one-book-live-check.md, docs/redesign/RESUME.md.
 
 W4 ROOT CAUSE (verified, do not re-investigate): the leaderboard is CORRECT,
 it already buckets on saleDate. SaleForm.tsx has no saleDate input, so

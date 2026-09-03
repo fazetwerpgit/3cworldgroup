@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
-import { Sale } from '@/types';
+import { Sale, SaleProduct } from '@/types';
 import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
+import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -156,6 +157,16 @@ export async function PUT(
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
       updateData.installDate = parsed.date;
+    }
+
+    // One internet plan per address. Only checked when the edit actually sends
+    // products: a sale logged before this rule existed can still be corrected
+    // field by field without the route rejecting an edit that never touched it.
+    if (Array.isArray(body.products)) {
+      const planError = validateOnePlanPerSale(body.products as SaleProduct[]);
+      if (planError) {
+        return NextResponse.json({ error: planError }, { status: 400 });
+      }
     }
 
     await docRef.update(updateData);
