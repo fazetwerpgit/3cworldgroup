@@ -209,7 +209,7 @@ cluttered, and it belongs as a section under install-status-by-rep.
   src/styles/sweep-rep-a.css.
   Gates: tsc clean | npm test 1019 passed / 111 files | build exit 0.
 
-NO PAY DATES ANYWHERE (2026-09-03, BUILT, NOT DEPLOYED). REVERSED an earlier
+NO PAY DATES ANYWHERE (2026-09-03, DEPLOYED, master a86e9bf). REVERSED an earlier
 decision in the same session. The portal briefly printed a real pay date (the
 25th of the month after the install, from the carrier's owner via Jacob).
 Jacob then: "Let's ditch the real pay dates as well. I don't want him to be all
@@ -230,7 +230,7 @@ ADMINS STILL SEE THE WHOLE COMPANY BOOK. Only the raw Submitted feed was
 scoped (owner sees every rep's, admin sees only their own, under Install status
 by rep). The Company tab in AdminSalesBoard was never touched.
 
-BOXES THAT DIDN'T FIT (2026-09-03, BUILT, NOT DEPLOYED). Three rounds with
+BOXES THAT DIDN'T FIT (2026-09-03, DEPLOYED, master a86e9bf). Three rounds with
 Jacob, in his words:
   1. "boxes ... don't look right. Wrong theme or something" (dashboard home
      page, and the top of the rep Pay section).
@@ -255,9 +255,22 @@ Jacob, in his words:
   Under 430px a last odd cell spans full width.
   src/components/portal/DashboardStats.tsx is DEAD CODE — imported nowhere. The
   dashboard's own KpiCell is the live one. Do not "fix" DashboardStats.
-  NOT YET ACCEPTED by Jacob — screenshots sent, no verdict.
+  Jacob, 2026-09-03: "nah it's fine you can ship & deploy" — shipped without
+  a look at the owner view. He has still never seen it rendered.
 
-DARK IS THE DEFAULT EVERYWHERE (2026-09-03, BUILT, NOT DEPLOYED). Jacob: "make
+MONTH PICKER WAS INVISIBLE (2026-09-03, DEPLOYED, master 929f0be). Connor
+texted Jacob: "it won't show anything to me on the all submissions... it did
+not go in any." Nothing was lost. The rep ledger is sliced by the month picker,
+which defaults to the CURRENT month, and all 19 of his sales are July/August —
+so September was empty and read as a swallowed submission.
+  Arrows 26px -> 40px (44px under 700px, the iOS target); month label 0.62rem
+  muted -> 0.78rem var(--ink). Both empty states now name the month they are
+  empty for and say the earlier sales are behind the '<' arrow.
+  src/styles/sweep-rep-a.css, src/components/sales/SalesTable.tsx.
+  WATCH FOR THIS AGAIN: any month-sliced view a rep reads on a phone needs the
+  month stated in its empty state, not just "this month".
+
+DARK IS THE DEFAULT EVERYWHERE (2026-09-03, DEPLOYED, master a86e9bf). Jacob: "make
 the default mode on desktop dark mode as well. That light mode looks like shit.
 We can keep it the way it is but still" — so light stays available, it is just
 not the default. src/contexts/ThemeContext.tsx getInitialTheme() returns 'dark'
