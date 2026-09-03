@@ -36,8 +36,14 @@ https://www.3cworldgroup.com/portal/sales
   a0916a4  month picker actually refetches (range pushed into the query)
   febf218  cancel a sale (+ restore)
   edd6b13  restored the carrier report + the Paid tick for admins
-Branch shas on onboarding/completion: 539826a cancel, d59ec32 restore.
-All four gates green (tsc, vitest 885/885, eslint touched, build).
+  485ebc8  rep month picker (branch fc9882e)
+Branch shas on onboarding/completion: 539826a cancel, d59ec32 restore,
+fc9882e rep month picker.
+All four gates green (tsc, vitest 896/896, eslint touched, build).
+Month helpers now live in src/lib/sales/monthWindow.ts (+11 tests) and drive
+BOTH views. Rep ledger slices by saleDate, rep pay list by installDate — a
+sale sold in Aug that installs in Sep is Aug's record and Sep's money. A rep's
+book is still fetched whole (limit 500, no date bound) for that reason.
 Deploy worktree: ~/dev/3cwg-deploy (detached, hard-linked node_modules).
 Ship with: git -C ~/dev/3cwg-deploy push origin <sha>:master
 
