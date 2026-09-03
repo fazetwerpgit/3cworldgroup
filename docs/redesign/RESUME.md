@@ -20,9 +20,102 @@ Jacob. Codex transcript (1.3 GB): ~/.codex/sessions/2026/08/30/rollout-2026-08-3
 To continue: resume that Codex thread in the app, or hand Claude the
 HANDOFF + RESUME next action and let it orchestrate Luna/Sol workers.
 
-NEXT ACTION (2026-09-03): Jacob is deciding TWO CALLS on the sales/carrier
-merge (below). Nothing is being built until he answers. If he says "both as
-recommended", build the merge (~4h). Do NOT start it before that.
+NEXT ACTION (2026-09-03): One Book merge IS BEING BUILT. Jacob approved
+"both as recommended". Spec is FROZEN at
+docs/superpowers/specs/2026-09-03-one-book-merge.md — read it, do not re-derive.
+CALL 1 = a carrier order nobody logged does NOT count as a sale/pay (red,
+chase, pay once logged). CALL 2 = carrier wins the STATUS, the sale keeps
+the MONEY.
+
+Codex is OUT OF CREDITS until 2026-09-06 21:24. Workers are Opus subagents
+(never Sonnet, never Fable); main loop specs and reviews the diffs itself.
+
+ONE BOOK MERGE: BUILT AND COMPLETE (2026-09-03, final round 20:4x). ALL UNCOMMITTED.
+Gates verified by the main loop, not taken on worker report:
+  npx tsc --noEmit  clean
+  npm test          993 passed / 108 files
+  npm run build     exit 0
+
+FINAL ROUND (Jacob said "both"): (1) every implication of unpaid money removed
+from the copy — "Not logged" is now "Not in the portal" everywhere (figure, row
+chip, rep sub-line, truncation banner); drawer 1 head is "Carrier installed it —
+not logged here" / "May already have been paid outside the portal."; historic
+note is "there is nothing to do with these". (2) Drawer 1 is SPLIT into "Since
+reps started logging · N" (red, first) and "Before that · N" (dimmed,
+.sales-board-group-quiet, src/styles/sweep-rep-a.css:1052), each with its own
+"+N older / +N newer". Boundary is REPS_STARTED_LOGGING = '2026-07-01' exported
+from AdminSalesBoard — presentational ONLY, do NOT conflate it with
+PORTAL_LOGGING_START = '2026-04-01' in mergeBook (the counting cutoff Jacob set).
+An undated carrier row goes in the FIRST group on purpose (can't be proven old,
+so don't file it quietly).
+
+FIRESTORE INDEXES: DEPLOYED to cworldgroup-cca68 on 2026-09-03 20:5x. Both
+`sales` composites (salesRepId ASC + saleDate ASC, and + saleDate DESC) are
+live — the code is now safe to ship without FAILED_PRECONDITION.
+  How: the firebase-adminsdk service account can LIST indexes but gets 403 on
+  create (no datastore.indexes.create). Deploy ran through Jacob's own stored
+  CLI login: `npx -y firebase-tools deploy --only firestore:indexes
+  --project cworldgroup-cca68 --non-interactive` (no --force, ever).
+  TRAP FIXED FIRST: prod had an `alertTasks status ASC + createdAt ASC` index
+  that was NOT in firestore.indexes.json, so a plain CLI deploy would have
+  offered to DELETE it. It has been added to the file.
+  GUARD (now permanent): `npm run indexes:check` ->
+  scripts/firestore-indexes-check.mjs. Lists prod, diffs the file both ways,
+  exits 1 and prints paste-ready JSON for anything prod has that the file
+  would delete. RUN IT BEFORE EVERY INDEX DEPLOY. Never pass --force.
+  firestore.indexes.json is the DESIRED STATE, not an add-list — an index made
+  from the console "create index" link in a Firestore error is exactly how
+  prod drifts from it.
+
+Two review rounds happened. Round 1 (main loop) found 4 bugs; Round 2 (Fable
+subagent, adversarial) found 5 more. All 9 fixed. Round 2 findings and the
+accepted-not-fixed list are in the spec's "ROUND 2" section — READ IT before
+touching this code, so nobody re-finds them.
+
+What shipped, by area:
+  src/lib/sales/mergeBook.ts (+34 tests)   the row model, 6 states
+  src/lib/fiberReport/ordersCache.ts       lastReportAt-keyed, ?fresh=1 bypass
+  /api/portal/sales/status/link            3 forms: link / dismiss / clear
+  /api/portal/sales                        orderBy saleDate desc + `truncated`
+  /api/portal/sales/[id] DELETE            clears stranded saleLinks first
+  AdminSalesBoard + UnloggedOrders         merged board, 3 drawers, link dialog
+  SaleForm + company-stats                 sale-date at source, install inference
+  scripts/repair-mis-stamped-sale-dates.mjs  dry-run default
+
+VISUALS ACCEPTED by Jacob 2026-09-03 19:35: he opened the board himself and
+said "visually good tho". That is his acceptance on the merged board AND the
+owner-only Submitted tab. Do not re-litigate the visuals.
+
+ALSO BUILT (his request, same session): owner-only "Submitted" tab on
+AdminSalesBoard — src/components/sales/SubmittedSales.tsx. Raw rep-logged
+sales, no carrier join, address-first, searchable. Gated on isOwner() so
+admins do not see it. It exists because Jacob cannot verify a red
+"Never logged" row from memory; this is the list he checks it against.
+
+STILL UNVERIFIED AGAINST REAL DATA:
+- Jacob asked ME to do the testing ("i don't feel like it"). A read-only
+  analysis run of buildMergedBook over the real 123 sales + 947 orders is
+  IN FLIGHT; results go to scratchpad/merge-live-check.md. The key question
+  is whether never_logged rows are real or the address join is silently
+  missing matches.
+- The truncation banner has never fired against real data (needs 500 sales,
+  there are 123). Prop-driven test only.
+
+NEXT ACTION: get Jacob's eyes on the board. Then ask before committing —
+the public-site redesign is uncommitted in the same tree and must not be
+swept into a commit.
+
+W4 ROOT CAUSE (verified, do not re-investigate): the leaderboard is CORRECT,
+it already buckets on saleDate. SaleForm.tsx has no saleDate input, so
+POST /api/portal/sales falls back to saleDate = now and every portal-created
+sale is stamped with its upload time. Fix is the create form + company-stats
+(which buckets on approvedAt ?? createdAt). No counter backfill needed —
+nothing in the repo uses FieldValue.increment. Repairing already-mis-stamped
+rows is a HUMAN correction via the existing edit page; raise with Jacob.
+
+Investigation maps (do not re-run): scratchpad/code-map.md, data-map.md,
+leaderboard-map.md under
+/tmp/claude-1000/-home-fazetwerpnerd69-dev-3cworldgroup/faaadfaf-af67-4b13-99f4-8c0ee3f8fef2/scratchpad/
 
 ADHD MODE IS ON (he ran /i-have-adhd this session). Persist it: lead with the
 action, number multi-step work, cap lists at 5, restate state every turn, one

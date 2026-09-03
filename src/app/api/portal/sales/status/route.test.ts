@@ -29,6 +29,7 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 }));
 
 import { GET } from './route';
+import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 
 function request() {
   return new NextRequest('http://localhost/api/portal/sales/status');
@@ -40,6 +41,9 @@ function doc(id: string, data: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The all-scope fiberOrders read is served from a module-level cache, which
+  // outlives a test. Clear it so each test sees its own mocked docs.
+  invalidateFiberOrdersCache();
   gateMock.mockResolvedValue({
     ok: true,
     uid: 'caller-1',
@@ -214,5 +218,40 @@ describe('GET /api/portal/sales/status', () => {
       .toBeNull();
     expect(json.unmatched[0]).not.toHaveProperty('loggedCustomerName');
     expect(allSalesGetMock).toHaveBeenCalledOnce();
+  });
+
+  it('serves the second all-scope load from cache, and re-reads once the cache is dropped', async () => {
+    await GET(request());
+    await GET(request());
+    expect(allOrdersGetMock).toHaveBeenCalledOnce();
+
+    invalidateFiberOrdersCache();
+    await GET(request());
+    expect(allOrdersGetMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('bypasses the cache for ?fresh=1 so a post-write refetch cannot be served stale', async () => {
+    await GET(request());
+    await GET(request());
+    expect(allOrdersGetMock).toHaveBeenCalledOnce();
+
+    // The write happened on another instance, so this one's cache was never
+    // invalidated — fresh=1 is the only thing that gets past it.
+    await GET(new NextRequest('http://localhost/api/portal/sales/status?fresh=1'));
+    expect(allOrdersGetMock).toHaveBeenCalledTimes(2);
+
+    // and the fresh read repopulated the cache, so the next ordinary load hits it.
+    await GET(request());
+    expect(allOrdersGetMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-reads when a new carrier report lands, without waiting for the TTL', async () => {
+    await GET(request());
+    configGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ lastReportAt: '2026-08-26T12:00:00.000Z' }),
+    });
+    await GET(request());
+    expect(allOrdersGetMock).toHaveBeenCalledTimes(2);
   });
 });

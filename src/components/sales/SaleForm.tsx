@@ -10,6 +10,7 @@ import { PlanPicker } from '@/components/sales/PlanPicker';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
 interface SaleFormProps {
@@ -27,19 +28,51 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
     customerEmail: '',
     customerAddress: '',
     saleType: 'new_service' as SaleType,
+    saleDate: todaySaleDateInput(),
     installDate: '',
     notes: '',
     orderNumberOrBtn: '',
     proofScreenshotPath: '',
   });
   const [products, setProducts] = useState<SaleProduct[]>([]);
+  // Once the rep sets the sale date themselves the install date stops driving
+  // it; `saleDateFromInstall` only controls which hint is shown.
+  const [saleDateTouched, setSaleDateTouched] = useState(false);
+  const [saleDateFromInstall, setSaleDateFromInstall] = useState(false);
   const [formError, setFormError] = useState('');
   const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
+
+  /** True for a YYYY-MM-DD value on a day earlier than today. */
+  const isBeforeToday = (value: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(value) && value < todaySaleDateInput();
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+
+    if (name === 'saleDate') {
+      setSaleDateTouched(true);
+      setSaleDateFromInstall(false);
+      setFormData((prev) => ({ ...prev, saleDate: value }));
+      return;
+    }
+
+    // An install that already happened means the sale happened by then too — an
+    // install never precedes its sale — so date the sale to it. Same rule the
+    // server applies when no sale date is sent. A today or future install is the
+    // normal "sold now, installs later" case and leaves the sale date on today.
+    if (name === 'installDate' && !saleDateTouched) {
+      const backdated = isBeforeToday(value);
+      setSaleDateFromInstall(backdated);
+      setFormData((prev) => ({
+        ...prev,
+        installDate: value,
+        saleDate: backdated ? value : todaySaleDateInput(),
+      }));
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -91,8 +124,25 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       return;
     }
 
+    if (!formData.saleDate) {
+      setFormError('Please select the sale date');
+      return;
+    }
+
+    if (formData.saleDate > todaySaleDateInput()) {
+      setFormError('Sale date cannot be in the future');
+      return;
+    }
+
     if (!formData.installDate) {
       setFormError('Please select the install date');
+      return;
+    }
+
+    // An install can never precede its own sale; catch it here so the rep sees
+    // it inline rather than as the server's 400 on submit.
+    if (formData.saleDate > formData.installDate) {
+      setFormError('Sale date cannot be after the install date');
       return;
     }
 
@@ -227,6 +277,15 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                   <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="sales-line-field-label" htmlFor="saleDate">Sale date <span className="req">*</span></label>
+              <input id="saleDate" className="sales-line-input" type="date" name="saleDate" value={formData.saleDate} onChange={handleChange} max={todaySaleDateInput()} required />
+              <p className="sales-line-field-hint">
+                {saleDateFromInstall
+                  ? 'Dated to the install day — change it if the sale happened earlier.'
+                  : 'The day the customer signed up, not the install day.'}
+              </p>
             </div>
             <div>
               <label className="sales-line-field-label" htmlFor="installDate">Install date <span className="req">*</span></label>

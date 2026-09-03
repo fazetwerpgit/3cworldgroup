@@ -13,7 +13,8 @@ export type FiberStatusHookResult = {
   loading: boolean;
   refreshing?: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  /** `fresh` bypasses the server's fiberOrders cache — for post-write reads only. */
+  refetch: (opts?: { fresh?: boolean }) => Promise<void>;
 };
 
 const FILTERS: Array<{ key: FiberFilter; label: string }> = [
@@ -310,7 +311,10 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
     setRematchError(null);
     try {
       await postAssignmentAction({ action: 'rematch' });
-      await refetch();
+      // Fresh: the order cache is invalidated only on the instance that served
+      // the write, so a cached read here can hand back the pre-write snapshot
+      // and make the action look like it did nothing.
+      await refetch({ fresh: true });
     } catch (err) {
       setRematchError(err instanceof Error ? err.message : 'Failed to re-run matching');
     } finally {
@@ -332,7 +336,7 @@ function InstallStatusSectionContent({ fiber }: { fiber: FiberStatusHookResult }
     });
     try {
       await postAssignmentAction({ action: 'assign', dealerId: assignment.dealerId, userId });
-      await refetch();
+      await refetch({ fresh: true });
       setSelectedUsers((current) => {
         const next = { ...current };
         delete next[assignment.key];

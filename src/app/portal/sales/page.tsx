@@ -18,7 +18,6 @@ import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import {
   currentMonth,
   isCurrentMonth,
-  monthBounds,
   monthLabel,
   salesSoldIn,
   shiftMonth,
@@ -82,7 +81,7 @@ function SalesLineSkeleton() {
 
 function SalesContent() {
   const { user, hasPermission } = useAuth();
-  const { sales, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
+  const { sales, truncated, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
   const fiber = useFiberStatus();
 
   // Admins and owners read the whole company book; everyone else reads their own.
@@ -102,14 +101,22 @@ function SalesContent() {
 
   useEffect(() => {
     if (!user) return;
-    // Management fetches one month at a time. A rep's book is fetched whole and
-    // sliced by month in the browser instead: their pay list is keyed on the
-    // INSTALL date, so a month-bounded fetch on saleDate would drop a sale sold
-    // in August that installs in September — money they are actually owed.
-    const filters: { salesRepId?: string; limit?: number; startDate?: string; endDate?: string } =
-      canViewAll ? { limit: 500, ...monthBounds(month) } : { limit: 500, salesRepId: user.uid };
+    // Both books are fetched WHOLE and sliced by month in the browser.
+    //
+    // A rep's pay list is keyed on the INSTALL date, so a month-bounded fetch on
+    // saleDate would drop a sale sold in August that installs in September —
+    // money they are actually owed.
+    //
+    // Management's book is merged against the carrier report, which arrives
+    // all-time. A month-bounded fetch made the two feeds asymmetric: a sale
+    // whose saleDate sat outside the picked month left its carrier order with
+    // nothing to join to, and the order rendered red as "never logged" — the
+    // board accusing somebody of not logging a sale they had logged. The month
+    // is applied to the merged book instead, where both sides see it.
+    const filters: { salesRepId?: string; limit?: number } =
+      canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
     fetchSales(filters);
-  }, [canViewAll, fetchSales, month, user]);
+  }, [canViewAll, fetchSales, user]);
 
   // Rep KPIs follow the month picker rather than always reading "this month",
   // so the figures and the list underneath can never describe different months.
@@ -167,6 +174,8 @@ function SalesContent() {
                 <>
                   <AdminSalesBoard
                     sales={sales}
+                    month={month}
+                    truncated={truncated}
                     loading={loading}
                     onDelete={deleteSale}
                     onSetCancelled={setSaleCancelled}

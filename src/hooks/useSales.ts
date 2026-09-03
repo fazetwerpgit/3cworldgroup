@@ -26,6 +26,10 @@ interface SalesStats {
 
 export function useSales() {
   const [sales, setSales] = useState<Sale[]>([]);
+  // The list query hit its cap and this book is short. Rows cut this way are
+  // missing from every month AND their carrier orders come back as red "never
+  // logged" rows, so the board has to be able to say the figures are partial.
+  const [truncated, setTruncated] = useState(false);
   const [stats, setStats] = useState<SalesStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +37,7 @@ export function useSales() {
   const fetchSales = useCallback(async (filters?: SalesFilters) => {
     setLoading(true);
     setError(null);
+    setTruncated(false);
 
     try {
       const params = new URLSearchParams();
@@ -54,6 +59,7 @@ export function useSales() {
       }
 
       setSales(data.sales);
+      setTruncated(data.truncated === true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch sales';
       setError(message);
@@ -268,6 +274,7 @@ export function useSales() {
 
   return {
     sales,
+    truncated,
     stats,
     loading,
     error,

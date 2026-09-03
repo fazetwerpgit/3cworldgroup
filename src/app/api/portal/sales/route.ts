@@ -23,6 +23,11 @@ function parseDayBound(value: string | null, edge: 'start' | 'end'): Date | null
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** A Date reduced to its local calendar day, for day-resolution comparisons. */
+function startOfDayMs(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
 async function createNotification(
   userId: string,
   type: string,
@@ -91,22 +96,37 @@ export async function GET(request: NextRequest) {
     // Add limit to prevent memory issues with large datasets
     const maxFetch = Math.min(limit * 2, 500); // Cap at 500 to prevent memory issues
 
-    // The admin board asks for one month at a time. That range HAS to go into
-    // the query: an in-memory filter would be applied to an arbitrary maxFetch
-    // slice of the collection, so an older month would come back mostly empty
-    // once the company has more than a few hundred sales. A range on saleDate
-    // alone needs no composite index; pairing it with the salesRepId equality
-    // would, so when both are present the rep filter wins the query and the
-    // dates are narrowed in memory (a single rep's book fits in maxFetch).
-    const useDateQuery = !salesRepId && !!(startDate || endDate);
+    // The admin board asks for one month at a time. Both predicates go into the
+    // query. They used to be mutually exclusive — the rep filter won and the
+    // dates were re-applied in memory over the maxFetch slice — to avoid a
+    // composite index, but that quietly cut a long-booked rep's older months
+    // off the board. The index now exists (firestore.indexes.json,
+    // `sales`: salesRepId ASC + saleDate ASC), so both can run in Firestore.
     let query: FirebaseFirestore.Query = salesRef;
     if (salesRepId) {
       query = query.where('salesRepId', '==', salesRepId);
-    } else if (useDateQuery) {
-      if (startDate) query = query.where('saleDate', '>=', startDate);
-      if (endDate) query = query.where('saleDate', '<=', endDate);
     }
+    if (startDate) query = query.where('saleDate', '>=', startDate);
+    if (endDate) query = query.where('saleDate', '<=', endDate);
+    // The limit HAS to cut deterministically. Without an orderBy Firestore
+    // returns maxFetch docs in DOCUMENT ID order and the createdAt sort below
+    // runs after the cut, so once the company passes maxFetch sales an
+    // arbitrary set of them stops existing for the board — and a sale lost that
+    // way also leaves its carrier order unjoined, which the merged book renders
+    // as a red "Never logged" row blaming a rep for a sale that IS in Firestore.
+    // saleDate is the only field this may order by: it is the inequality field
+    // above, and Firestore requires the inequality field to sort first.
+    // Verified against production (2026-09-03): all 123 sales carry a Timestamp
+    // saleDate and orderBy('saleDate') returns all 123, so ordering on it drops
+    // nothing — a doc missing the orderBy field would be silently excluded.
+    query = query.orderBy('saleDate', 'desc');
     const snapshot = await query.limit(maxFetch).get();
+    // Truncation must be VISIBLE. A full page off the query means the cap was
+    // reached and rows may have been cut, so the book on screen is short and the
+    // UI has to say so rather than quietly showing fewer sales. A plain flag on
+    // purpose: knowing HOW MANY were cut needs a second read, and a wrong count
+    // is worse than no count.
+    const truncated = snapshot.size === maxFetch;
     let sales: Sale[] = [];
 
     snapshot.forEach((doc) => {
@@ -115,13 +135,6 @@ export async function GET(request: NextRequest) {
       // Filter by status in memory if needed
       if (status && data.status !== status) {
         return;
-      }
-
-      if (!useDateQuery && (startDate || endDate)) {
-        const saleDate: Date | null = data.saleDate?.toDate?.() ?? null;
-        if (!saleDate) return;
-        if (startDate && saleDate < startDate) return;
-        if (endDate && saleDate > endDate) return;
       }
 
       sales.push({
@@ -146,7 +159,10 @@ export async function GET(request: NextRequest) {
     // Apply limit
     sales = sales.slice(0, limit);
 
-    return NextResponse.json({ sales });
+    // `truncated` says the QUERY hit its cap — that is the silent one the UI must
+    // surface. `sales.length === limit` is the ordinary page-size cut and is not
+    // reported as truncation. Always present, false on the normal path.
+    return NextResponse.json({ sales, truncated });
   } catch (error) {
     console.error('Error fetching sales:', error);
     return NextResponse.json(
@@ -216,19 +232,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sale date is user-editable but optional for backward compatibility with
-    // older clients — fall back to now when omitted, reject when malformed.
-    let resolvedSaleDate = new Date();
-    if (saleDate !== undefined && saleDate !== null && saleDate !== '') {
-      const parsed = parseSaleDateInput(saleDate);
-      if (!parsed.ok) {
-        return NextResponse.json({ error: parsed.error }, { status: 400 });
-      }
-      resolvedSaleDate = parsed.date;
-    }
-
     // Install date is required on the form but optional server-side for
     // backward compatibility with older clients — stored null when omitted.
+    // Resolved before the sale date because it can stand in for a missing one.
     let resolvedInstallDate: Date | null = null;
     if (installDate !== undefined && installDate !== null && installDate !== '') {
       const parsed = parseInstallDateInput(installDate);
@@ -236,6 +242,38 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
       resolvedInstallDate = parsed.date;
+    }
+
+    // Sale date is user-editable but optional for backward compatibility with
+    // older clients — fall back when omitted, reject when malformed.
+    let resolvedSaleDate = new Date();
+    if (saleDate !== undefined && saleDate !== null && saleDate !== '') {
+      const parsed = parseSaleDateInput(saleDate);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      resolvedSaleDate = parsed.date;
+
+      // An install can never happen before the sale it came from, so this
+      // pairing is physically impossible — reject it rather than store a row
+      // that dates the sale into a month it could not have happened in.
+      if (
+        resolvedInstallDate &&
+        startOfDayMs(resolvedSaleDate) > startOfDayMs(resolvedInstallDate)
+      ) {
+        return NextResponse.json(
+          { error: 'Sale date cannot be after the install date' },
+          { status: 400 }
+        );
+      }
+    } else if (resolvedInstallDate && startOfDayMs(resolvedInstallDate) < startOfDayMs(new Date())) {
+      // No sale date sent (an older client, or a rep who left it alone) and the
+      // install already happened on an earlier day: the sale is at least that
+      // old, so date it to the install instead of to the upload. Only the past
+      // direction is safe — a today/future install is the normal "sold now,
+      // installs later" case and must stay dated now, or the sale would move
+      // into a month it did not happen in.
+      resolvedSaleDate = resolvedInstallDate;
     }
 
     if (proofScreenshotPath) {

@@ -11,13 +11,18 @@ export function useFiberStatus() {
   const [error, setError] = useState<string | null>(null);
   const activeRef = useRef(true);
 
-  const fetchStatus = useCallback(async (initial = false) => {
+  const fetchStatus = useCallback(async (initial = false, fresh = false) => {
     if (initial) setLoading(true);
     else setRefreshing(true);
 
     try {
       const token = await getIdToken();
-      const response = await fetch('/api/portal/sales/status', {
+      // `fresh` bypasses the server's fiberOrders cache. It is only for the
+      // refetch that follows a write: invalidation clears the serverless
+      // instance that served the write, so a plain refetch can land on another
+      // warm instance and return the pre-write snapshot for minutes — the row
+      // stays unchanged with no error, and the admin clicks again.
+      const response = await fetch(`/api/portal/sales/status${fresh ? '?fresh=1' : ''}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const responseData = await response.json();
@@ -51,7 +56,10 @@ export function useFiberStatus() {
     };
   }, [fetchStatus]);
 
-  const refetch = useCallback(() => fetchStatus(), [fetchStatus]);
+  const refetch = useCallback(
+    (opts?: { fresh?: boolean }) => fetchStatus(false, opts?.fresh === true),
+    [fetchStatus]
+  );
 
   return { data, loading, refreshing, error, refetch };
 }

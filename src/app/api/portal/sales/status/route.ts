@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { FiberOrder, FiberStatusResponse } from '@/types';
 import { attachLoggedCustomerNames, LoggedSale } from '@/lib/fiberReport/matchSales';
+import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 
 function sortByOrderDate(orders: FiberOrder[]): FiberOrder[] {
   return [...orders].sort((a, b) => {
@@ -77,8 +78,14 @@ export async function GET(request: NextRequest) {
       } satisfies FiberStatusResponse);
     }
 
-    const snapshot = await adminDb.collection('fiberOrders').get();
-    const allOrders = snapshot.docs.map((doc) => toFiberOrder(doc.id, doc.data()));
+    // The admin scope needs every order (see ordersCache for why no bound is
+    // safe), so the whole-collection read is cached against lastReportAt rather
+    // than narrowed. Per-instance on serverless: fewer reads, not zero.
+    // `?fresh=1` — set by the client on the refetch that immediately follows a
+    // link/assign/rematch write, so the answer cannot come from another
+    // instance's pre-write snapshot. Ordinary loads stay cached.
+    const fresh = request.nextUrl.searchParams.get('fresh') === '1';
+    const allOrders = await getAllFiberOrders(lastReportAt, { fresh });
     const matchedOrders = allOrders.filter((order) => order.matchedUserId !== null);
     const salesSnapshot = await adminDb.collection('sales').get();
     const sales = salesSnapshot.docs.map((doc) => toLoggedSale(doc.data()));

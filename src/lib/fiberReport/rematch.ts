@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
+import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 
 const BATCH_SIZE = 450;
 
@@ -55,5 +56,7 @@ export async function rematchUnmatchedOrders(): Promise<{ updated: number; still
   // mappings when rematch learns a new dealer id.
   if (learnedDealerMap) await configRef.set({ map: dealerMap }, { merge: true });
 
+  // Same reason as assignDealerToUser: matchedUserId moved under the cache.
+  if (updates.size > 0) invalidateFiberOrdersCache();
   return { updated: updates.size, stillUnmatched: snapshot.docs.length - updates.size };
 }

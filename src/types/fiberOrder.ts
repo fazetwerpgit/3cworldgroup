@@ -43,6 +43,16 @@ export interface FiberOrder {
   // Attached at read time only (never stored): customer name from a portal Sale
   // the matched rep logged THEMSELVES, cross-matched by street address.
   loggedCustomerName?: string | null;
+  // PERSISTED (unlike loggedCustomerName above, which is read-time only): an
+  // admin's explicit decision about which portal Sale this carrier order is.
+  // Its presence OVERRIDES the address join entirely — when saleLink is set the
+  // address-prefix guess in matchFiberOrdersToSales is never consulted for this
+  // order, and the named sale is removed from the address-matching pool so no
+  // other order can claim it.
+  //   saleId: '<id>'  -> this order IS that sale
+  //   saleId: null    -> explicitly NOT any sale (suppresses the address guess)
+  // Written only by POST /api/portal/sales/status/link (admin/owner).
+  saleLink?: { saleId: string | null; by: string; byName: string; at: string } | null;
 }
 
 // Import log entry, one per received report email (collection: fiberReportImports).
