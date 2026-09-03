@@ -20,11 +20,15 @@ Jacob. Codex transcript (1.3 GB): ~/.codex/sessions/2026/08/30/rollout-2026-08-3
 To continue: resume that Codex thread in the app, or hand Claude the
 HANDOFF + RESUME next action and let it orchestrate Luna/Sol workers.
 
-NEXT ACTION (2026-09-03): Sales rebuild is CODE-COMPLETE and UNCOMMITTED on
-onboarding/completion. All four gates pass (tsc, vitest 871/871, eslint on
-touched files, npm run build). Jacob has NOT eyeballed it yet — he is the
-acceptance gate. Ask him to open http://localhost:3000/portal/sales as an admin
-(dev server already running on :3000) and give a verdict, then commit.
+NEXT ACTION (2026-09-03): Ask Jacob whether to DEPLOY the sale-cancel action.
+It is committed on onboarding/completion as 539826a and cherry-picked into the
+deploy worktree ~/dev/3cwg-deploy as febf218 (on top of live master a0916a4),
+NOT pushed. All four gates pass (tsc, vitest 885/885, eslint on touched files,
+npm run build). To ship: `git -C ~/dev/3cwg-deploy push origin febf218:master`.
+
+The sales rebuild itself is LIVE on https://www.3cworldgroup.com — master
+a0916a4 = pay linkage af41e23 + sales rebuild d376b9a + month-filter fix.
+Jacob verified the board; the month picker bug he found is fixed and deployed.
 
 Spec: docs/superpowers/specs/2026-09-03-sales-rep-grouped-no-approval-design.md
 Approved visual board: https://claude.ai/code/artifact/902fd8ef-22b2-4d6e-bdf4-a147a3ede4d0
@@ -57,18 +61,34 @@ WHAT SHIPPED (three phases, all done):
   page.tsx now fetches a month at a time for management (limit 500 + startDate/
   endDate) instead of the old unbounded limit:100.
 
+- Month-filter fix (a0916a4): GET /api/portal/sales accepted startDate/endDate
+  but never read them, so the picker changed the label and nothing else. The
+  range now goes into the Firestore query (a range on saleDate alone needs no
+  composite index; pairing it with the salesRepId equality would, so when both
+  are present the rep filter wins the query and dates narrow in memory).
+  Tests: src/app/api/portal/sales/route.test.ts.
+- Cancel action (539826a, NOT DEPLOYED): admin-only POST/DELETE
+  /api/portal/sales/[id]/cancel writes status cancelled/approved plus
+  cancelledAt/By/cancellerName/cancelReason. `status` stays OFF the PUT
+  allowlist on purpose — an edit must not become the back door that resurrects
+  approval. UI: "Cancel sale" in SaleDetailSheet (before Delete) with an
+  optional-reason dialog, "Restore" on a cancelled one, and a collapsed
+  "Cancelled this month" section at the foot of the Company tab.
+  cancelledSales() in src/lib/sales/installBucket.ts is the complement of
+  countedSales, so a cancelled sale is in exactly one list.
+
 OPEN ITEMS FOR JACOB:
 1. Existing `pending` sales in production are NOT backfilled to `approved`
    (a data write — his call). They render fine either way.
-2. There is now no UI path to CANCEL a sale — reject used to be it. Admin Delete
-   is the only removal. Ask whether cancel should come back as its own action.
-3. Visual sign-off. Claude could not screenshot it: seeing the admin board needs
-   an admin login, and scripts/e2e-create-test-user.mjs deliberately creates
-   non-admin bots ("a leaked test login should not be powerful").
+2. Deploy the cancel action (see NEXT ACTION) — he has not seen it yet.
+3. Visual sign-off on the cancel UI. Claude could not screenshot it: seeing the
+   admin board needs an admin login, and scripts/e2e-create-test-user.mjs
+   deliberately creates non-admin bots ("a leaked test login should not be
+   powerful").
 
-NOT COMMITTED. My changes are disjoint from Jacob's uncommitted public-site
-redesign (about/apply/contact/culture/opportunities/services/page/Navbar/
-PageWrapper) — do not sweep those into a commit.
+My changes are disjoint from Jacob's uncommitted public-site redesign
+(about/apply/contact/culture/opportunities/services/page/Navbar/PageWrapper) —
+do not sweep those into a commit.
 
 PRIOR TRACK: UX sweep fixes are LIVE and
 verified on https://www.3cworldgroup.com (master cbeb4f0 = sweep ab7d89d +
