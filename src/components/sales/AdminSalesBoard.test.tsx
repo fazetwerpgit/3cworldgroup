@@ -373,16 +373,26 @@ describe('not-logged rows split at the month reps started logging', () => {
     expect(quiet.textContent).not.toContain('18 Marbury Court');
   });
 
-  it("reports each group's own out-of-month rows rather than hiding them", async () => {
+  // The month picker used to reach in here, which made every head read 0 with
+  // the real number hidden in a "+211 older outside this month" aside. A
+  // not-logged install is a backlog, not a September figure.
+  it('ignores the month picker — the backlog is the backlog', async () => {
     await render([], [since, before], { year: 2026, month: 8 });
-    await openNeverDrawer();
+    const head = await openNeverDrawer();
+
+    expect(head.textContent).not.toContain('outside this month');
+    expect(head.querySelector('.sales-board-drawer-count')?.textContent).toBe('2');
 
     const groups = [...container.querySelectorAll('.sales-board-drawer-sub')]
       .map((node) => node.textContent ?? '');
     expect(groups[0]).toContain('Since reps started logging');
-    expect(groups[0]).toContain('+1 older');
+    expect(groups[0]).toContain('1');
     expect(groups[1]).toContain('Before that');
-    expect(groups[1]).toContain('+1 older');
+    expect(groups[1]).toContain('1');
+
+    // Both rows are on screen, not counted-then-hidden.
+    expect(container.textContent).toContain('18 Marbury Court');
+    expect(container.textContent).toContain('204 Halsey Street');
   });
 });
 
