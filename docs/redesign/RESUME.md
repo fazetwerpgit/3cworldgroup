@@ -161,15 +161,171 @@ DONE 2026-09-03 (after the live check):
    always a human's call: the data cannot say which plan the customer got, so
    never infer it and never pick by price.
 
-NEXT ACTION: ask Jacob before committing. Everything in item 3 (the one-plan
-rule) is uncommitted, and the public-site redesign is uncommitted in the SAME
-tree — stage the sales paths explicitly, never `git add -A`.
-Paths to stage: src/lib/sales/planSelection.ts, src/lib/sales/planSelection.test.ts,
-src/components/sales/SaleForm.tsx, src/components/sales/PlanPicker.tsx,
-src/app/portal/sales/[id]/edit/page.tsx, src/app/api/portal/sales/route.ts,
-src/app/api/portal/sales/[id]/route.ts, src/app/globals.css,
-scripts/link-typo-address-orders.mjs, scripts/repair-double-plan-sale.mjs,
-docs/superpowers/specs/2026-09-03-one-book-live-check.md, docs/redesign/RESUME.md.
+DEPLOYED TO PRODUCTION 2026-09-03. master is 50160f7; Vercel production
+Ready; www.3cworldgroup.com and /portal/sales both 200.
+This was the FIRST production deploy of the One Book merge as well as the
+one-plan rule — master went 485ebc8 -> 8cb7ed5 (one book) -> 50160f7 (one plan).
+
+HOW THIS REPO DEPLOYS — read before the next one:
+  Do NOT merge onboarding/completion into master. The branch is ~33 commits
+  ahead and carries public-site page changes (page.tsx, about, apply, contact,
+  services, Navbar, Footer, PageWrapper) that master does not have and that
+  Jacob has not released. Merging it would ship the redesign by accident.
+  Deploy by CHERRY-PICKING the specific commits onto origin/master in a
+  throwaway worktree, verifying there, then `git push origin HEAD:master`.
+  Vercel builds master automatically.
+  Every earlier deploy was done this way, which is why branch commits and
+  master commits share titles under different SHAs.
+  The only conflict to expect is docs/redesign/RESUME.md — take the picked
+  version. Verify in a worktree placed INSIDE /home/fazetwerpnerd69/dev/
+  (a symlinked node_modules from a /tmp worktree breaks the Turbopack build
+  with "Symlink node_modules is invalid, it points out of the filesystem
+  root" — that error is the harness, not the code).
+
+SUBMITTED MOVED UNDER INSTALL STATUS (2026-09-03, BUILT, NOT YET DEPLOYED,
+NOT YET ACCEPTED BY JACOB). His call: the flat owner-only "Submitted" tab was
+cluttered, and it belongs as a section under install-status-by-rep.
+  Gone: the top-level Submitted tab on AdminSalesBoard (state, memo, gate, body).
+  Now: each rep group in "Install status by rep" carries "Logged in the portal"
+  under the carrier rows, and the collapsed head reads "N orders · M logged".
+  WHOSE submissions are legible: owner sees every rep's, an admin sees only
+  their own — the same line the old owner-only tab drew. That is Jacob's
+  "for the admin we need to have his own submitted sales".
+  A rep who logged sales the carrier never reported gets a group with 0 orders,
+  so nothing is invisible.
+  Groups are now keyed on matchedUserId, NOT the carrier's spelling of the rep
+  name, so "Noah St John" and "Noah st john" are one rep.
+  New search box above the groups searches BOTH feeds at once and auto-expands
+  what it matched — it replaces the search that died with the tab, which was
+  the one job that list did.
+  Rows are now <Link> to /portal/sales/<id> (the tab used the board's detail
+  sheet, which does not exist over in this section).
+  NOT month-scoped, deliberately: Install status never was, and the month
+  picker only moves the board. Tell Jacob if he expects the month to bite here.
+  Files: src/components/sales/SubmittedSales.tsx (now exports SubmittedRows),
+  src/lib/sales/submittedByRep.ts (+8 tests),
+  src/components/sales/InstallStatusSection.tsx (+ InstallStatusSection.test.tsx,
+  5 tests), AdminSalesBoard.tsx + .test.tsx, src/app/portal/sales/page.tsx,
+  src/styles/sweep-rep-a.css.
+  Gates: tsc clean | npm test 1019 passed / 111 files | build exit 0.
+
+NO PAY DATES ANYWHERE (2026-09-03, BUILT, NOT DEPLOYED). REVERSED an earlier
+decision in the same session. The portal briefly printed a real pay date (the
+25th of the month after the install, from the carrier's owner via Jacob).
+Jacob then: "Let's ditch the real pay dates as well. I don't want him to be all
+bitchy about it." A printed pay date reads as a statement of pay, which is the
+exact liability the owner named.
+  DELETED: src/lib/pay/payPeriod.ts and its test, expectedPayDate() and its
+  tests. src/lib/pay/expectedPay.ts carries a comment saying why there is no
+  date function and that nobody should add one back without asking Jacob.
+  The pay AMOUNT estimate stays, unchanged, with its disclaimer.
+  The rep Pay tab's date column is now "Installed" (install date, "Sold <date>"
+  underneath) — a fact, not a promise. The admin pay row says
+  "Sold <date>" instead of "Pays <date>".
+  The carrier's four-window schedule (1-7 pays 14-17, 8-14 pays 21-25, 15-21
+  pays 28-3rd, 22-end pays 7th-11) is recorded HERE only and drives nothing.
+  Do not wire it in.
+
+ADMINS STILL SEE THE WHOLE COMPANY BOOK. Only the raw Submitted feed was
+scoped (owner sees every rep's, admin sees only their own, under Install status
+by rep). The Company tab in AdminSalesBoard was never touched.
+
+BOXES THAT DIDN'T FIT (2026-09-03, BUILT, NOT DEPLOYED). Three rounds with
+Jacob, in his words:
+  1. "boxes ... don't look right. Wrong theme or something" (dashboard home
+     page, and the top of the rep Pay section).
+  2. "the issue was the boxes didn't fit the rest of site not the color."
+  3. "The boxes have no aura."
+  What was actually wrong, in that order:
+  - Geometry: both strips used fixed column counts (grid-cols-4, grid-cols-5)
+    while rendering however many cells exist — 2 reps on the leaderboard, 3
+    metrics on Sales — so the remainder showed as a solid var(--line) block.
+  - Language: the rest of the portal is RULED, not boxed — hairlines under
+    headings, rows divided by a single line, nothing enclosed. These were
+    enclosed, filled panels. Now: no outer border, no panel fill, a rule above
+    and below, hairlines between cells, cells painted the page's own --stage.
+  - Presence: ruled-and-flat had no life. The band carries the portal's one
+    gradient (lime, anchored bottom-left, via ::after so it crosses the
+    hairlines) and its numbers take the --metal fill the Sales figures use.
+  Files: .portal-strip / .portal-strip-cell / .portal-strip-num in
+  src/app/globals.css (own copy of the palette tokens + a .dark override,
+  because the tokens live on .sales-line, which is the Sales page only);
+  .sales-line-broadcast got the same treatment;
+  src/app/portal/dashboard/page.tsx (KpiCell, LeaderboardTicker, TickerSkeleton).
+  Under 430px a last odd cell spans full width.
+  src/components/portal/DashboardStats.tsx is DEAD CODE — imported nowhere. The
+  dashboard's own KpiCell is the live one. Do not "fix" DashboardStats.
+  NOT YET ACCEPTED by Jacob — screenshots sent, no verdict.
+
+DARK IS THE DEFAULT EVERYWHERE (2026-09-03, BUILT, NOT DEPLOYED). Jacob: "make
+the default mode on desktop dark mode as well. That light mode looks like shit.
+We can keep it the way it is but still" — so light stays available, it is just
+not the default. src/contexts/ThemeContext.tsx getInitialTheme() returns 'dark'
+instead of the old (max-width:767px ? 'dark' : 'system'), and the provider's
+initial state is 'dark'. An explicit choice in Settings still overrides and
+persists in localStorage '3c-theme'; 'system' is still selectable there.
+  Gates: tsc clean | npm test 1014 passed / 111 files | build exit 0.
+
+PAY IS AN ESTIMATE, NEVER A STATEMENT (2026-09-03, same session, BUILT).
+The owner's words, relayed by Jacob: "if claims and final chargebacks are not
+accounted for I will have to pay that out"; "when it comes to saying this is
+what you are getting paid"; "if final reports don't show that on the site I can
+be sued". The portal holds NO chargebacks and NO claims, so a pay figure here
+can never read as a rep's check.
+  "What you get paid" -> "Estimated pay". "Expected pay"/"Expected pay date" ->
+  "Estimated pay"/"Estimated pay date". "Expected pay MTD" -> "Estimated pay
+  MTD · before chargebacks". "tick one off once it lands" -> "estimate, before
+  chargebacks". Admin note gained "An estimate — chargebacks and claims are not
+  in the portal."
+  New standing line above the money on the rep Pay tab
+  (.sales-line-pay-disclaimer, amber left rule, src/styles/sweep-rep-a.css):
+  "An estimate, not a statement of pay. Chargebacks, claims and cancellations
+  are not included here, and the carrier's final report decides what actually
+  pays."
+  KEEP THIS FRAMING. If chargebacks/claims ever land in the portal, that is the
+  moment to revisit the wording — not before. Do not let a future tidy-up turn
+  "Estimated" back into "Expected".
+
+CLAIMS INGESTION: DECIDED AGAINST (Jacob, 2026-09-03). "How about we just
+leave the sale estimate with how it is if they payed on it then they mark it. I
+don't wanna do all that."
+  So: the portal does NOT ingest pending claims or a final cancel report, and
+  no work should start on that. The model is — the portal estimates, the rep
+  ticks the sale off when the money actually lands (the Paid column already on
+  the rep Pay tab, useSalePaid). The estimate wording carries the liability the
+  owner raised; the tick carries the truth.
+  Investigated first, so nobody re-derives it: the daily T-Mobile report from
+  Dakota.Russell72@t-mobile.com already gives 4 sheets (Orders To Date,
+  Pre-Sale to Schedule, Unconfirmed to Cancelled Orders, Customer Driven
+  Breakage) via the Gmail poller -> POST /api/webhooks/inbound-report. Pending
+  claims appear in NONE of them — there is no claims data anywhere in the
+  system. A claims sheet would need parseReport.ts taught the new sheet name.
+  Do not build it unless Jacob asks again.
+
+CONNOR'S SEPTEMBER LEADERBOARD ROW — DIAGNOSED, REPAIR NOT YET RUN.
+Jacob: "Connor's sale is still on leaderboard." It is the W4 mis-stamp, and it
+is the ONLY one left in the book:
+  sale 7G9Dy2IkxkYbAq3nKYNE  Connor Crouse / margaret fay / 5610 ada dr se
+  saleDate 2026-09-03 but installDate 2026-08-14 — an install cannot precede
+  its sale, so the sale date is the create-form default (upload time).
+It is an AUGUST sale sitting on September's leaderboard (8 pts). The leaderboard
+itself is correct; it buckets on saleDate, which is wrong on this row.
+FIX: `node scripts/repair-mis-stamped-sale-dates.mjs --apply` (dry run verified:
+1 sale, 2026-09-03 -> 2026-08-14, nothing else touched). The main loop was
+BLOCKED from running --apply by the auto-mode classifier, so Jacob or a human
+runs it. Nothing else in the book is mis-stamped (125 scanned).
+
+OPEN, NOT STARTED: Jacob reports "boxes around the portal that look wrong —
+wrong theme or something". Not yet identified. Ask him which page/box before
+hunting; the palette lives in src/styles/sweep-*.css + src/app/globals.css.
+
+NEXT ACTION: three things need Jacob, in this order:
+  1. Run the mis-stamp repair above (one command) to clear Connor's row.
+  2. Look at Install status by rep on localhost:3000/portal/sales and give a
+     verdict on the moved Submitted section — he is the acceptance gate and it
+     is NOT accepted yet.
+  3. Point at one of the wrongly-themed boxes so it can be fixed.
+Then commit + cherry-pick onto master (deploy recipe above).
 
 W4 ROOT CAUSE (verified, do not re-investigate): the leaderboard is CORRECT,
 it already buckets on saleDate. SaleForm.tsx has no saleDate input, so
