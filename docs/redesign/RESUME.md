@@ -20,15 +20,29 @@ Jacob. Codex transcript (1.3 GB): ~/.codex/sessions/2026/08/30/rollout-2026-08-3
 To continue: resume that Codex thread in the app, or hand Claude the
 HANDOFF + RESUME next action and let it orchestrate Luna/Sol workers.
 
-NEXT ACTION (2026-09-03): Ask Jacob whether to DEPLOY the sale-cancel action.
-It is committed on onboarding/completion as 539826a and cherry-picked into the
-deploy worktree ~/dev/3cwg-deploy as febf218 (on top of live master a0916a4),
-NOT pushed. All four gates pass (tsc, vitest 885/885, eslint on touched files,
-npm run build). To ship: `git -C ~/dev/3cwg-deploy push origin febf218:master`.
+NEXT ACTION (2026-09-03): Await Jacob's verdict on the three fixes just
+deployed (master edd6b13). Ask him to check /portal/sales as an owner on
+https://www.3cworldgroup.com: (a) the carrier report is back under the board
+with its Pending install / Active / Cancelled-Churned / Attention tabs,
+(b) the Paid tick is on each row of the My pay tab, (c) Cancel sale + Restore
+are in the sale detail sheet and cancelled sales collect in a collapsed
+"Cancelled this month" section.
 
-The sales rebuild itself is LIVE on https://www.3cworldgroup.com — master
-a0916a4 = pay linkage af41e23 + sales rebuild d376b9a + month-filter fix.
-Jacob verified the board; the month picker bug he found is fixed and deployed.
+LIVE on https://www.3cworldgroup.com — master edd6b13 = pay linkage af41e23 +
+sales rebuild d376b9a + month-filter fix a0916a4 + cancel action febf218 +
+carrier-report/Paid-tick restore edd6b13. (Branch shas on onboarding/completion:
+539826a cancel, d59ec32 restore.)
+
+TWO FEEDS, DO NOT CONFLATE (Jacob asked): the board's counts, value, rep rows
+and pipeline colours come from what reps LOG in the portal (Firestore `sales`).
+The morning-email carrier workbook is a separate feed — parsed by
+src/lib/fiberReport/parseReport.ts off the sheets "Orders To Date",
+"Pre-Sale to Schedule" and "Unconfirmed to Cancelled Orders" into `fiberOrders`
+(pending_install / active / pre_sale / cancelled / churned / breakage), served
+by GET /api/portal/sales/status and shown by InstallStatusSection. That report
+is where Pending / Cancelled / Churned live; it also sharpens the board's own
+install chips where an order matches a sale (active -> installed, breakage ->
+needs a date). Pending/cancelled/churned are NOT sale statuses on the board.
 
 Spec: docs/superpowers/specs/2026-09-03-sales-rep-grouped-no-approval-design.md
 Approved visual board: https://claude.ai/code/artifact/902fd8ef-22b2-4d6e-bdf4-a147a3ede4d0
