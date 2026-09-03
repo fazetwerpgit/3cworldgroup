@@ -7,6 +7,22 @@ import { hasSaleProof } from '@/lib/sales/proof';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 
 // Helper function to create a notification
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A YYYY-MM-DD query param as an inclusive day boundary. Anything unparseable
+ * reads as "no bound" rather than throwing: a malformed date must widen the
+ * result set, never silently return an empty month that looks like real data.
+ */
+function parseDayBound(value: string | null, edge: 'start' | 'end'): Date | null {
+  if (!value || !DATE_ONLY_RE.test(value)) return null;
+  const [, year, month, day] = DATE_ONLY_RE.exec(value)!;
+  const date = edge === 'start'
+    ? new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0)
+    : new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59, 999);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 async function createNotification(
   userId: string,
   type: string,
@@ -62,6 +78,11 @@ export async function GET(request: NextRequest) {
       ? searchParams.get('salesRepId')
       : gate.uid;
     const limit = parseInt(searchParams.get('limit') || '50');
+    // Sale dates are stored at local noon, so a plain YYYY-MM-DD boundary taken
+    // at midnight/end-of-day has ~12 hours of slack either side of whatever
+    // timezone the server runs in — the day a sale lands on can't flip.
+    const startDate = parseDayBound(searchParams.get('startDate'), 'start');
+    const endDate = parseDayBound(searchParams.get('endDate'), 'end');
 
     // Build query - avoid compound indexes by filtering in memory
     const salesRef = adminDb.collection('sales');
@@ -69,9 +90,23 @@ export async function GET(request: NextRequest) {
     // Use only one filter in the query, filter rest in memory
     // Add limit to prevent memory issues with large datasets
     const maxFetch = Math.min(limit * 2, 500); // Cap at 500 to prevent memory issues
-    const snapshot = salesRepId
-      ? await salesRef.where('salesRepId', '==', salesRepId).limit(maxFetch).get()
-      : await salesRef.limit(maxFetch).get();
+
+    // The admin board asks for one month at a time. That range HAS to go into
+    // the query: an in-memory filter would be applied to an arbitrary maxFetch
+    // slice of the collection, so an older month would come back mostly empty
+    // once the company has more than a few hundred sales. A range on saleDate
+    // alone needs no composite index; pairing it with the salesRepId equality
+    // would, so when both are present the rep filter wins the query and the
+    // dates are narrowed in memory (a single rep's book fits in maxFetch).
+    const useDateQuery = !salesRepId && !!(startDate || endDate);
+    let query: FirebaseFirestore.Query = salesRef;
+    if (salesRepId) {
+      query = query.where('salesRepId', '==', salesRepId);
+    } else if (useDateQuery) {
+      if (startDate) query = query.where('saleDate', '>=', startDate);
+      if (endDate) query = query.where('saleDate', '<=', endDate);
+    }
+    const snapshot = await query.limit(maxFetch).get();
     let sales: Sale[] = [];
 
     snapshot.forEach((doc) => {
@@ -80,6 +115,13 @@ export async function GET(request: NextRequest) {
       // Filter by status in memory if needed
       if (status && data.status !== status) {
         return;
+      }
+
+      if (!useDateQuery && (startDate || endDate)) {
+        const saleDate: Date | null = data.saleDate?.toDate?.() ?? null;
+        if (!saleDate) return;
+        if (startDate && saleDate < startDate) return;
+        if (endDate && saleDate > endDate) return;
       }
 
       sales.push({
