@@ -95,7 +95,7 @@ function SalesLineSkeleton() {
 
 function SalesContent() {
   const { user, hasPermission } = useAuth();
-  const { sales, loading, error, fetchSales, deleteSale } = useSales();
+  const { sales, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
   const fiber = useFiberStatus();
 
   // Admins and owners read the whole company book; everyone else reads their own.
@@ -191,6 +191,7 @@ function SalesContent() {
                     sales={sales}
                     loading={loading}
                     onDelete={deleteSale}
+                    onSetCancelled={setSaleCancelled}
                     fiber={fiber}
                     payPlan={payPlan}
                   />

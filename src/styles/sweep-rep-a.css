@@ -756,6 +756,92 @@
 .portal-scope .sales-board-chip.installed { color: var(--lime); }
 .portal-scope .sales-board-chip.scheduled { color: var(--amber); }
 .portal-scope .sales-board-chip.attention { color: var(--red); }
+.portal-scope .sales-board-chip.cancelled { color: var(--muted); }
+
+/* Cancellations: a record, not a task. They sit below everything else, dimmed
+   and struck through, so the eye reads them as history and never as pipeline. */
+.portal-scope .sales-board-cancelled {
+  margin-top: 18px;
+}
+
+.portal-scope .sales-board-cancelled-head {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.portal-scope .sales-board-cancelled-head:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
+}
+
+.portal-scope .sales-board-cancelled-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-scope .sales-board-sale.cancelled {
+  border-left-color: var(--line);
+  opacity: 0.6;
+}
+
+.portal-scope .sales-board-sale.cancelled .sales-board-sale-cust,
+.portal-scope .sales-board-sale.cancelled .sales-board-sale-val {
+  text-decoration: line-through;
+}
+
+/* The cancel dialog's reason field. */
+.portal-scope .sales-board-reason,
+.sales-board-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sales-board-reason span {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.sales-board-reason input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.sales-board-reason input:focus-visible {
+  outline: 2px solid var(--lime, #b6f24a);
+  outline-offset: -1px;
+}
+
+/* Why a sale is off the books, inside the detail sheet. */
+.portal-scope .sales-line-cancelled-note,
+.sales-line-cancelled-note {
+  margin: 0 0 4px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--muted, rgba(128, 128, 128, 0.9));
+}
 
 @media (max-width: 460px) {
   .portal-scope .sales-board-figs { gap: 20px; }

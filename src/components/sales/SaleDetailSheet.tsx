@@ -11,7 +11,9 @@ import {
   MapPin,
   Pencil,
   Phone,
+  RotateCcw,
   Trash2,
+  Ban,
   X,
 } from 'lucide-react';
 import { Sale, FIBER_COMPANIES } from '@/types';
@@ -30,6 +32,9 @@ interface SaleDetailSheetProps {
   isAdmin: boolean;
   loading?: boolean;
   onRequestDelete: (saleId: string) => void;
+  /** Admin-only. Omitted on the rep view, where the buttons never render. */
+  onRequestCancel?: (saleId: string) => void;
+  onRestore?: (saleId: string) => void;
 }
 
 function formatMoney(value: number) {
@@ -77,6 +82,8 @@ export function SaleDetailSheet({
   isAdmin,
   loading,
   onRequestDelete,
+  onRequestCancel,
+  onRestore,
 }: SaleDetailSheetProps) {
   const [proofLoading, setProofLoading] = useState(false);
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
@@ -190,6 +197,14 @@ export function SaleDetailSheet({
             <span className={`sales-line-stale ${tone}`}>{sale.status === 'pending' ? ageLabel(sale) : formatDate(sale.saleDate)}</span>
           </div>
 
+          {sale.status === 'cancelled' && (
+            <p className="sales-line-cancelled-note">
+              Cancelled {sale.cancelledAt ? formatDate(sale.cancelledAt) : ''}
+              {sale.cancellerName ? ` by ${sale.cancellerName}` : ''}
+              {sale.cancelReason ? ` — ${sale.cancelReason}` : '. No reason given.'}
+            </p>
+          )}
+
           <section className="sales-line-sheet-block">
             <span className="sales-line-sheet-label">Customer</span>
             <div className="sales-line-customer-detail">
@@ -255,6 +270,21 @@ export function SaleDetailSheet({
                 <Link className="admin" href={`/portal/sales/${saleId}/edit`} onClick={disownHistoryEntry}>
                   <Pencil className="sales-line-icon" />Edit
                 </Link>
+                {/* Cancel sits before Delete deliberately: it is the answer to
+                    "the customer backed out" almost every time, and it keeps
+                    the record. Delete is for a row that should never have
+                    existed. */}
+                {sale.status === 'cancelled'
+                  ? onRestore && (
+                      <button className="admin" type="button" disabled={loading} onClick={() => onRestore(saleId)}>
+                        <RotateCcw className="sales-line-icon" />Restore
+                      </button>
+                    )
+                  : onRequestCancel && (
+                      <button className="admin" type="button" disabled={loading} onClick={() => onRequestCancel(saleId)}>
+                        <Ban className="sales-line-icon" />Cancel sale
+                      </button>
+                    )}
                 <button className="admin" type="button" disabled={loading} onClick={() => onRequestDelete(saleId)}>
                   <Trash2 className="sales-line-icon" />Delete
                 </button>

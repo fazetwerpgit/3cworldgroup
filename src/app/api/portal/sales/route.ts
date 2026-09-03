@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         approvedAt: data.approvedAt?.toDate(),
+        cancelledAt: data.cancelledAt?.toDate(),
       } as Sale);
     });
 

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
+  cancelledSales,
   countInstallBuckets,
   countedSales,
   installBucketForSale,
@@ -35,6 +36,8 @@ interface AdminSalesBoardProps {
   sales: Sale[];
   loading?: boolean;
   onDelete?: (saleId: string) => void | Promise<boolean>;
+  /** Cancel a sale the customer backed out of, or undo that cancellation. */
+  onSetCancelled?: (saleId: string, cancelled: boolean, reason?: string) => void | Promise<boolean>;
   fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
   /** The viewer's own comp-plan slice. Admin/owner resolve to the Internal Rep scale. */
   payPlan?: {
@@ -82,7 +85,7 @@ function installChip(sale: Sale, bucket: InstallBucket) {
   return `${bucket === 'installed' ? 'Installed' : 'Installs'} ${formatDate(sale.installDate)}`;
 }
 
-export function AdminSalesBoard({ sales, loading, onDelete, fiber, payPlan }: AdminSalesBoardProps) {
+export function AdminSalesBoard({ sales, loading, onDelete, onSetCancelled, fiber, payPlan }: AdminSalesBoardProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
   const hasPlan = !!payPlan?.hasPlan;
@@ -91,6 +94,9 @@ export function AdminSalesBoard({ sales, loading, onDelete, fiber, payPlan }: Ad
   const [openRepId, setOpenRepId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelled, setShowCancelled] = useState(false);
 
   // `now` is frozen per render pass so the bar, the sub-lines and the chips
   // can never straddle midnight and disagree about what "installed" means.
@@ -125,8 +131,21 @@ export function AdminSalesBoard({ sales, loading, onDelete, fiber, payPlan }: Ad
     [mySales, payPlan?.rates]
   );
 
-  // The rows the detail sheet arrows through: whichever list is on screen.
-  const sheetSales = tab === 'pay' ? mySales : openRepId ? reps.find((r) => r.repId === openRepId)?.sales ?? [] : [];
+  // The month's cancellations, kept out of every figure above but not out of
+  // sight — the record of a customer who backed out is the whole point of
+  // cancelling instead of deleting.
+  const cancelled = useMemo(() => cancelledSales(sales), [sales]);
+
+  // The rows the detail sheet arrows through: whichever list is on screen. A
+  // cancelled sale is never inside a rep rollup, so "which list holds it"
+  // answers itself.
+  const repSales = openRepId ? reps.find((r) => r.repId === openRepId)?.sales ?? [] : [];
+  const sheetSales =
+    tab === 'pay'
+      ? mySales
+      : cancelled.some((sale) => sale.id === selectedId)
+        ? cancelled
+        : repSales;
   const selectedIndex = selectedId ? sheetSales.findIndex((sale) => sale.id === selectedId) : -1;
   const selectedSale = selectedIndex >= 0 ? sheetSales[selectedIndex] : null;
   const moveSelection = (direction: number) => {
@@ -251,6 +270,54 @@ export function AdminSalesBoard({ sales, loading, onDelete, fiber, payPlan }: Ad
               </div>
             );
           })}
+
+          {cancelled.length > 0 && (
+            <div className="sales-board-cancelled">
+              <button
+                className={`sales-board-cancelled-head${showCancelled ? ' open' : ''}`}
+                type="button"
+                aria-expanded={showCancelled}
+                onClick={() => setShowCancelled((open) => !open)}
+              >
+                <span className="sales-board-caret" aria-hidden="true">{showCancelled ? '▾' : '▸'}</span>
+                Cancelled this month
+                <span className="sales-board-cancelled-count">{cancelled.length}</span>
+              </button>
+
+              {showCancelled && (
+                <div className="sales-board-sales">
+                  {cancelled.map((sale) => (
+                    <div
+                      className="sales-board-sale cancelled"
+                      key={sale.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedId(sale.id || null)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedId(sale.id || null);
+                        }
+                      }}
+                    >
+                      <span className="sales-board-sale-cust">
+                        {sale.customerName || sale.customerAddress || 'Customer pending'}
+                      </span>
+                      <span className="sales-board-sale-val">
+                        {formatMoney(sale.totalValue || 0)}<small>/mo</small>
+                      </span>
+                      <span className="sales-board-sale-prod">
+                        {sale.salesRepName || 'Unassigned'}{sale.cancelReason ? ` · ${sale.cancelReason}` : ''}
+                      </span>
+                      <span className="sales-board-chip cancelled">
+                        Cancelled {formatDate(sale.cancelledAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       ) : (
         <section className="sales-board" aria-label="My expected pay">
@@ -319,7 +386,51 @@ export function AdminSalesBoard({ sales, loading, onDelete, fiber, payPlan }: Ad
         isAdmin={isAdmin}
         loading={loading}
         onRequestDelete={(id) => setDeletingId(id)}
+        onRequestCancel={onSetCancelled ? (id) => { setCancelReason(''); setCancellingId(id); } : undefined}
+        onRestore={onSetCancelled ? (id) => { void onSetCancelled(id, false); } : undefined}
       />
+
+      <Dialog
+        open={!!cancellingId}
+        onOpenChange={(open) => { if (!open) setCancellingId(null); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel sale</DialogTitle>
+            <DialogDescription>
+              The customer backed out. The sale stays on the books as a record but drops out of
+              this month&apos;s totals, the install pipeline and everyone&apos;s pay. You can undo it later.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="sales-board-reason">
+            <span>Reason (optional)</span>
+            <input
+              type="text"
+              value={cancelReason}
+              maxLength={300}
+              placeholder="Customer changed their mind"
+              onChange={(event) => setCancelReason(event.target.value)}
+            />
+          </label>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCancellingId(null)}>Keep sale</Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={loading}
+              onClick={() => {
+                const id = cancellingId;
+                const reason = cancelReason.trim();
+                setCancellingId(null);
+                setSelectedId(null);
+                if (id) void onSetCancelled?.(id, true, reason);
+              }}
+            >
+              Cancel sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
         <DialogContent>

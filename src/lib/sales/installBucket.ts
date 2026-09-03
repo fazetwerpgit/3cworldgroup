@@ -45,6 +45,16 @@ export function countedSales<T extends Pick<Sale, 'status'>>(sales: T[]): T[] {
   return sales.filter(isPayableSale);
 }
 
+/**
+ * The other half of countedSales: the month's cancellations. They are kept out
+ * of every figure on the board but not out of sight — a cancelled sale is the
+ * paper trail for a customer who backed out, and losing it is exactly what
+ * deleting the row would do.
+ */
+export function cancelledSales<T extends Pick<Sale, 'status'>>(sales: T[]): T[] {
+  return sales.filter((sale) => sale.status === 'cancelled');
+}
+
 export function emptyInstallCounts(): InstallCounts {
   return { attention: 0, scheduled: 0, installed: 0 };
 }

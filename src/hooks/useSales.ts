@@ -180,6 +180,59 @@ export function useSales() {
     }
   }, []);
 
+  /**
+   * Cancel a sale the customer backed out of, or undo that cancellation.
+   * The row stays on the books either way — this only moves its status, which
+   * is what drops it out of totals, the install pipeline and pay.
+   */
+  const setSaleCancelled = useCallback(async (
+    id: string,
+    cancelled: boolean,
+    reason?: string
+  ): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const token = await getIdToken();
+      const response = await fetch(`/api/portal/sales/${id}/cancel`, {
+        method: cancelled ? 'POST' : 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        ...(cancelled ? { body: JSON.stringify({ reason: reason || '' }) } : {}),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || (cancelled ? 'Failed to cancel sale' : 'Failed to restore sale'));
+      }
+
+      // Patch in place rather than refetching: the board is scoped to a month
+      // and a refetch would flash the whole list for a one-field change.
+      setSales((prev) =>
+        prev.map((sale) =>
+          sale.id === id
+            ? {
+                ...sale,
+                status: cancelled ? 'cancelled' : 'approved',
+                cancelledAt: cancelled ? new Date() : undefined,
+                cancelReason: cancelled ? reason || '' : undefined,
+              }
+            : sale
+        )
+      );
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update sale';
+      setError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchStats = useCallback(async (
     period?: 'day' | 'week' | 'month' | 'year',
     salesRepId?: string
@@ -223,6 +276,7 @@ export function useSales() {
     createSale,
     updateSale,
     deleteSale,
+    setSaleCancelled,
     fetchStats,
   };
 }
