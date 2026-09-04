@@ -258,6 +258,26 @@ Jacob, in his words:
   Jacob, 2026-09-03: "nah it's fine you can ship & deploy" — shipped without
   a look at the owner view. He has still never seen it rendered.
 
+BACKLOG DRAWERS ARE NOT MONTHLY (2026-09-03, DEPLOYED, master e9593ba).
+Second instance of the same bug in one hour. "Carrier installed it — not logged
+here", "Orders with no rep matched" and "From before the portal" were scoped to
+the month picker, so on September every head read 0 with the real figure in a
+"+211 older outside this month" aside. None of the three is a monthly question,
+so they now ignore the picker entirely — whole count, whole list. "Cancelled
+this month" still keeps the month; its label promises one.
+  src/components/sales/AdminSalesBoard.tsx (neverView, sinceView, earlierView,
+  dismissedView, unassignedView, historicView all take undefined, not month).
+
+MERGE NUMBERS VERIFIED AGAINST PRODUCTION (2026-09-03, read-only). Jacob asked
+whether the drawers were accurate. They are:
+  947 fiberOrders · 126 sales · 957 merged rows
+  agreed 116 · waiting 10 · never_logged 211 · unassigned 27 · historic 593
+  historic date range 2025-11-01 -> 2026-03-31 (the 2026-04-01 cutoff holds)
+  The 27 unassigned are the reps who are away and coming back — LEAVE THEM.
+  Re-run: a throwaway vitest file importing buildMergedBook + bookForMonth and
+  reading sales/fiberOrders through firebase-admin. Reads nothing else, writes
+  nothing.
+
 MONTH PICKER WAS INVISIBLE (2026-09-03, DEPLOYED, master 929f0be). Connor
 texted Jacob: "it won't show anything to me on the all submissions... it did
 not go in any." Nothing was lost. The rep ledger is sliced by the month picker,
