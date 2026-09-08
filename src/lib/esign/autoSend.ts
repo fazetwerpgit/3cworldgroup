@@ -11,6 +11,7 @@ import { getEsignProvider } from './provider';
 import type { EsignDocKey, EsignProvider } from './provider';
 
 const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+const CLAIM_STALE_MS = 2 * 60 * 1000;
 const MAX_ERROR_LENGTH = 500;
 const ALERT_KIND = 'review_needed' as const;
 
@@ -75,6 +76,47 @@ async function recordFailure(
   } catch (recordError) {
     console.error(`[esign] failed to record dispatch failure for ${userId}/${pending.item.id}`, recordError);
     return null;
+  }
+}
+
+/**
+ * Two checklist reads for the same rep can arrive at once — the portal issues
+ * them together on login — and each used to create its own envelope for every
+ * item: ten envelopes instead of five, and the "ready to sign" email twice.
+ *
+ * Each item is now claimed in a transaction before its envelope is created.
+ * The transaction re-reads the document, so the loser of the race sees either
+ * the winner's envelope id or its 'sending' marker and skips the item.
+ *
+ * A 'sending' marker older than two minutes counts as free: a dispatch that
+ * crashed mid-flight must not brick the item forever.
+ */
+async function claimForDispatch(pending: PendingItem, userId: string): Promise<boolean> {
+  try {
+    return await adminDb!.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(pending.ref);
+      if (fresh.get('esignEnvelopeId')) return false;
+
+      const state = dispatchState(fresh);
+      if (state.state === 'sending') {
+        const lastAttemptAt = asDate(state.lastAttemptAt);
+        if (lastAttemptAt && Date.now() - lastAttemptAt.getTime() < CLAIM_STALE_MS) return false;
+      }
+
+      transaction.set(
+        pending.ref,
+        {
+          userId,
+          itemId: pending.item.id,
+          esignDispatch: { state: 'sending', lastAttemptAt: new Date() },
+        },
+        { merge: true }
+      );
+      return true;
+    });
+  } catch (error) {
+    console.error(`[esign] failed to claim ${userId}/${pending.item.id} for dispatch`, error);
+    return false;
   }
 }
 
@@ -342,6 +384,9 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
     let recovered = false;
     const sentLabels: string[] = [];
     for (const item of pending) {
+      // Another caller is already dispatching this item; it sends the email.
+      if (!(await claimForDispatch(item, userId))) continue;
+
       const result = await sendOne(provider, item, userId, signerName, signerEmail);
       if (result.sent) {
         sent.push(item.item.id);

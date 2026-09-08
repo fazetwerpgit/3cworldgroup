@@ -45,6 +45,9 @@
 .pages {
   max-height: 60vh;
   overflow-y: auto;
+  /* The zoom scroller inside PdfPages owns the horizontal overflow, so this
+     one never scrolls sideways and nothing widens the page body. */
+  overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding-right: 2px;
@@ -63,6 +66,7 @@
 .fieldLabel {
   display: flex;
   align-items: center;
+  min-height: 22px;
   justify-content: space-between;
   gap: 10px;
   color: var(--member-line-muted);
@@ -101,8 +105,12 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
-  /* Comfortable tap target without pushing the label row taller. */
-  padding: 6px 2px;
+  /* 44px is the iOS minimum; the label row grows to match, which is fine. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  margin-right: -10px;
 }
 
 .checkboxRow,

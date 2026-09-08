@@ -10,6 +10,11 @@ import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 const MAX_PIXEL_RATIO = 2;
 /** Ignore sub-pixel container jitter; only a real width change re-renders. */
 const WIDTH_CHANGE_THRESHOLD = 8;
+/**
+ * A Letter page inside a phone-width panel lands near 320 CSS px, which is not
+ * readable. Zoomed, the pages are laid out at twice that and the rep pans.
+ */
+const ZOOM_SCALE = 2;
 
 interface Props {
   /** URL of the blank source PDF; fetched as bytes, never handed to an iframe. */
@@ -26,26 +31,31 @@ type LoadState = 'loading' | 'ready' | 'error';
  * import time and this component is rendered by a server-rendered route.
  */
 export function PdfPages({ src, authHeaders }: Props) {
+  /** The horizontal scroller. Its width is the fit-width measurement. */
+  const frameRef = useRef<HTMLDivElement>(null);
+  /** Holds the canvases; grows past the frame when zoomed. */
   const hostRef = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
   const [state, setState] = useState<LoadState>('loading');
   const [message, setMessage] = useState('');
 
-  // Track the container width so a rotation re-renders at the new size instead
-  // of leaving the rep with a stretched, blurry document.
+  // Track the frame width so a rotation re-renders at the new size instead of
+  // leaving the rep with a stretched, blurry document. Measuring the frame and
+  // not the host keeps zooming from feeding its own width back in.
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
+    const frame = frameRef.current;
+    if (!frame) return;
     const measure = () => {
-      const next = Math.round(host.clientWidth);
+      const next = Math.round(frame.clientWidth);
       setContainerWidth((current) =>
         Math.abs(next - current) >= WIDTH_CHANGE_THRESHOLD ? next : current
       );
     };
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(host);
+    observer.observe(frame);
     return () => observer.disconnect();
   }, []);
 
@@ -98,6 +108,9 @@ export function PdfPages({ src, authHeaders }: Props) {
 
     let cancelled = false;
     const tasks: RenderTask[] = [];
+    // Zoomed, the pages are laid out wider than the frame and the frame scrolls.
+    const layoutWidth = zoomed ? containerWidth * ZOOM_SCALE : containerWidth;
+    host.style.width = zoomed ? `${layoutWidth}px` : '100%';
 
     const renderPages = async () => {
       const ratio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
@@ -108,7 +121,7 @@ export function PdfPages({ src, authHeaders }: Props) {
         if (cancelled) return;
 
         const unscaled = page.getViewport({ scale: 1 });
-        const viewport = page.getViewport({ scale: (containerWidth / unscaled.width) * ratio });
+        const viewport = page.getViewport({ scale: (layoutWidth / unscaled.width) * ratio });
 
         const canvas = document.createElement('canvas');
         canvas.width = Math.floor(viewport.width);
@@ -142,17 +155,37 @@ export function PdfPages({ src, authHeaders }: Props) {
       cancelled = true;
       for (const task of tasks) task.cancel();
     };
-  }, [doc, containerWidth]);
+  }, [doc, containerWidth, zoomed]);
 
   return (
     <div>
+      {/* Sticky: the pages sit in their own 60vh scroller, so a static toolbar
+          would scroll out of reach on the second page. */}
+      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-3 bg-[color:var(--member-line-panel,#ffffff)] py-1">
+        <p className="text-sm text-[color:var(--member-line-muted,#5b6b7d)]">
+          {zoomed ? 'Scroll sideways to read across the page.' : 'Too small to read?'}
+        </p>
+        <button
+          type="button"
+          onClick={() => setZoomed((current) => !current)}
+          aria-pressed={zoomed}
+          disabled={state !== 'ready'}
+          className="min-h-11 shrink-0 rounded-md border border-[color:var(--member-line-line,#26364a)] px-4 text-sm font-semibold text-[color:var(--member-line-ink,#0a1f44)] disabled:opacity-50"
+        >
+          {zoomed ? 'Fit width' : 'Zoom in'}
+        </button>
+      </div>
       {state === 'loading' && <p className="member-line-note">Loading the document...</p>}
       {state === 'error' && (
         <p role="alert" className="member-line-note warn">
           {message} Reload the page to try again.
         </p>
       )}
-      <div ref={hostRef} />
+      {/* The scroller owns the horizontal overflow, so a zoomed page never
+          widens the page body on a phone. */}
+      <div ref={frameRef} className="max-w-full overflow-x-auto overscroll-x-contain">
+        <div ref={hostRef} />
+      </div>
     </div>
   );
 }

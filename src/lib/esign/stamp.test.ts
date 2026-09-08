@@ -1,11 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PDFDocument, PDFPage } from 'pdf-lib';
-import { formatSignDate, sha256Hex, stampDocument } from './stamp';
+import { formatSignDate, formatSignTimestamp, sha256Hex, stampDocument } from './stamp';
 import { DOCUMENTS, boxToPdfRect } from './documents';
 import type { EsignDocKey } from './provider';
-
-// ZapfDingbats a20 heavy check mark, addressed by Unicode code point.
-const CHECK_MARK = '\u2714';
 
 // 2x2 opaque PNG.
 const PNG = Buffer.from(
@@ -85,7 +82,7 @@ describe('stampDocument', () => {
     ).rejects.toThrow();
   });
 
-  it('scales the signature to fit inside its box', async () => {
+  it('scales the signature to fit its box and left-aligns it', async () => {
     const drawImage = vi.spyOn(PDFPage.prototype, 'drawImage');
 
     await stampDocument({
@@ -104,17 +101,19 @@ describe('stampDocument', () => {
       width: number;
       height: number;
     };
-    // A square source image in a wider box: height fills, width is centred.
+    // A square source image in a wider box: height fills, width is left-aligned
+    // against a 2pt inset rather than centred.
     expect(options.width).toBeCloseTo(box.height, 6);
     expect(options.height).toBeCloseTo(box.height, 6);
-    expect(options.x).toBeGreaterThanOrEqual(box.x);
+    expect(options.x).toBeCloseTo(box.x + 2, 6);
+    expect(options.x).toBeLessThan(box.x + (box.width - options.width) / 2);
     expect(options.x + options.width).toBeLessThanOrEqual(box.x + box.width + 1e-6);
     expect(options.y).toBeGreaterThanOrEqual(box.y - 1e-6);
     expect(options.y + options.height).toBeLessThanOrEqual(box.y + box.height + 1e-6);
   });
 
-  it('draws a dingbat check for a ticked box and nothing for an unticked one', async () => {
-    const drawText = vi.spyOn(PDFPage.prototype, 'drawText');
+  it('strokes a vector check for a ticked box and nothing for an unticked one', async () => {
+    const drawLine = vi.spyOn(PDFPage.prototype, 'drawLine');
 
     await stampDocument({
       docKey: 'direct_deposit',
@@ -128,12 +127,47 @@ describe('stampDocument', () => {
       DOCUMENTS.direct_deposit.extra!.find((f) => f.key === 'checking')!,
       792
     );
-    const checks = drawText.mock.calls.filter(([text]) => text === CHECK_MARK);
-    expect(checks).toHaveLength(1);
-    const options = checks[0][1] as { x: number; y: number; size: number };
-    expect(options.x).toBeGreaterThanOrEqual(checkBox.x);
-    expect(options.y).toBeGreaterThanOrEqual(checkBox.y);
-    expect(options.size).toBeCloseTo(checkBox.height * 0.8, 6);
+
+    // One ticked box means exactly two segments, and no font glyph is involved.
+    expect(drawLine).toHaveBeenCalledTimes(2);
+    const segments = drawLine.mock.calls.map(
+      ([options]) =>
+        options as {
+          start: { x: number; y: number };
+          end: { x: number; y: number };
+          thickness: number;
+        }
+    );
+
+    for (const segment of segments) {
+      for (const point of [segment.start, segment.end]) {
+        expect(point.x).toBeGreaterThanOrEqual(checkBox.x);
+        expect(point.x).toBeLessThanOrEqual(checkBox.x + checkBox.width);
+        expect(point.y).toBeGreaterThanOrEqual(checkBox.y);
+        expect(point.y).toBeLessThanOrEqual(checkBox.y + checkBox.height);
+      }
+      expect(segment.thickness).toBeCloseTo(Math.max(1.2, checkBox.height * 0.09), 6);
+    }
+
+    // The two segments meet at the elbow, low and left of centre.
+    expect(segments[0].end).toEqual(segments[1].start);
+    expect(segments[0].end.y).toBeLessThan(segments[0].start.y);
+    expect(segments[1].end.y).toBeGreaterThan(segments[1].start.y);
+    expect(segments[1].end.x).toBeGreaterThan(segments[0].start.x);
+  });
+
+  it('draws no check strokes when every box is unticked', async () => {
+    const drawLine = vi.spyOn(PDFPage.prototype, 'drawLine');
+
+    await stampDocument({
+      docKey: 'direct_deposit',
+      fields: { checking: false, savings: false },
+      signaturePng: PNG,
+      signedAt: new Date('2026-09-08T15:00:00Z'),
+      audit,
+    });
+
+    expect(drawLine).not.toHaveBeenCalled();
   });
 
   it('writes each text field and the sign date onto the document', async () => {
@@ -184,6 +218,31 @@ describe('stampDocument', () => {
     for (const line of auditText) {
       expect(line.length).toBeLessThan(140);
     }
+  });
+});
+
+describe('formatSignTimestamp', () => {
+  it('prints a full local timestamp with its zone abbreviation', () => {
+    expect(formatSignTimestamp(new Date('2026-09-08T18:15:07Z'))).toBe(
+      '09/08/2026 1:15:07 PM CDT'
+    );
+  });
+
+  it('lands on the audit page instead of a bare date', async () => {
+    const drawText = vi.spyOn(PDFPage.prototype, 'drawText');
+    const signedAt = new Date('2026-09-08T18:15:07Z');
+
+    await stampDocument({
+      docKey: 'fcra_auth',
+      fields: {},
+      signaturePng: PNG,
+      signedAt,
+      audit,
+    });
+
+    const drawn = drawText.mock.calls.map(([text]) => text as string);
+    expect(drawn).toContain(`Signed at (America/Chicago): ${formatSignTimestamp(signedAt)}`);
+    expect(drawn).not.toContain(`Signed at (America/Chicago): ${formatSignDate(signedAt)}`);
   });
 });
 

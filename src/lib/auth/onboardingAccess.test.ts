@@ -231,7 +231,15 @@ describe('page and api allowlists agree', () => {
   it('allows no api whose only consumer would be a blocked page', () => {
     // Shell-wide APIs are reachable from every page and so have no single
     // consumer; everything else must be justified by the map above.
-    const SHELL_WIDE = ['/api/portal/notifications', '/api/portal/presence', '/api/portal/push/register'];
+    const SHELL_WIDE = [
+      '/api/portal/notifications',
+      '/api/portal/presence',
+      '/api/portal/push/register',
+      // push/health has requireVerifiedUser and writes pushHealth only onto the
+      // verified caller's own users/{uid} document. The shell posts it on every
+      // load, so a hire without it takes a 403 on every page.
+      '/api/portal/push/health',
+    ];
     const depended = new Set(Object.values(PAGE_API_DEPENDENCIES).flat());
     for (const api of ONBOARDING_ALLOWED_APIS) {
       if (SHELL_WIDE.includes(api)) continue;

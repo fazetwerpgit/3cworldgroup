@@ -10,6 +10,7 @@ import { PageTitle } from '@/components/portal/PageTitle';
 import '@/styles/sweep-rep-b.css';
 import { Skeleton } from '@/components/ui/skeleton';
 import PdfPages from '@/components/esign/PdfPages';
+import { fieldLabelWithOptional } from '@/components/esign/fieldLabel';
 import SignaturePad from '@/components/esign/SignaturePad';
 import {
   clearSignature,
@@ -224,10 +225,7 @@ export default function EsignSignPage() {
     return (
       <div key={field.key} className={styles.field}>
         <label className={styles.fieldLabel} htmlFor={`esign-${field.key}`}>
-          <span>
-            {field.label}
-            {field.required ? '' : ' (optional)'}
-          </span>
+          <span>{fieldLabelWithOptional(field.label, field.required)}</span>
           {readOnly && (
             <button
               type="button"

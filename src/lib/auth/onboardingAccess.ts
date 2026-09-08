@@ -32,6 +32,7 @@ export const ONBOARDING_ALLOWED_APIS = [
   '/api/portal/profile',
   '/api/portal/presence',
   '/api/portal/push/register',
+  '/api/portal/push/health',
   '/api/portal/chat/channels',
   '/api/portal/chat/gifs',
   '/api/portal/chat/media',

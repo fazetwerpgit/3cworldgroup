@@ -9,6 +9,9 @@ const {
   getEsignProviderMock,
   createAlertTaskMock,
   resolveAlertTasksMock,
+  runTransactionMock,
+  applyTransaction,
+  claimItem,
   writes,
   setOptions,
   setMock,
@@ -17,6 +20,7 @@ const {
 } = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>();
   const writes: Array<{ path: string; data: Record<string, unknown> }> = [];
+  const txWrites: Array<{ path: string; data: Record<string, unknown> }> = [];
   const setOptions: Array<{ merge?: boolean } | undefined> = [];
   const DELETE_SENTINEL = '__FIELD_VALUE_DELETE__';
   const setMock = vi.fn(async (
@@ -32,15 +36,66 @@ const {
     });
     store.set(path, next);
   });
+  // Snapshots capture the document as it stood when it was read, the way a real
+  // DocumentSnapshot does. `setMock` always stores a fresh object, so the
+  // captured reference never sees a later write — which is what makes the
+  // "read, then someone else claims it" race testable.
+  const snapshotOf = (path: string) => {
+    const data = store.get(path);
+    return {
+      exists: data !== undefined,
+      get: (f: string) => data?.[f],
+      data: () => data,
+    };
+  };
   const docMock = vi.fn((path: string) => ({
-    get: async () => ({
-      exists: store.has(path),
-      get: (f: string) => store.get(path)?.[f],
-      data: () => store.get(path),
-    }),
+    path,
+    get: async () => snapshotOf(path),
     set: (data: Record<string, unknown>, options?: { merge?: boolean }) =>
       setMock(path, data, options),
   }));
+
+  // Firestore merges nested maps rather than replacing them, which is what lets
+  // the dispatch claim set esignDispatch.state without dropping attempts.
+  const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+  const mergeInto = (path: string, data: Record<string, unknown>) => {
+    const previous = store.get(path) ?? {};
+    const next: Record<string, unknown> = { ...previous };
+    for (const [key, value] of Object.entries(data)) {
+      if (value === DELETE_SENTINEL) {
+        delete next[key];
+      } else if (isPlainObject(value) && isPlainObject(previous[key])) {
+        next[key] = { ...(previous[key] as Record<string, unknown>), ...value };
+      } else {
+        next[key] = value;
+      }
+    }
+    store.set(path, next);
+  };
+
+  // Writes a competing 'sending' claim straight into the store, standing in for
+  // a second concurrent caller.
+  const claimItem = (path: string, lastAttemptAt: Date) => {
+    mergeInto(path, { esignDispatch: { state: 'sending', lastAttemptAt } });
+  };
+
+  type TransactionRef = { path: string; get: () => Promise<unknown> };
+  type Transaction = {
+    get: (ref: TransactionRef) => Promise<unknown>;
+    set: (ref: TransactionRef, data: Record<string, unknown>, options?: { merge?: boolean }) => void;
+  };
+  // Transaction writes deliberately bypass `setMock`: they are a different API
+  // path, and the tests that count plain `set` calls must not see them.
+  const applyTransaction = async <T,>(body: (transaction: Transaction) => Promise<T>): Promise<T> =>
+    body({
+      get: async (ref: TransactionRef) => ref.get(),
+      set: (ref: TransactionRef, data: Record<string, unknown>) => {
+        txWrites.push({ path: ref.path, data });
+        mergeInto(ref.path, data);
+      },
+    });
+  const runTransactionMock = vi.fn(applyTransaction);
   const createEnvelopeMock = vi.fn(
     async (request: { itemId: string }): Promise<{ envelopeId: string; embeddedSigningUrl?: string }> => {
       if (!request.itemId) throw new Error('item id required');
@@ -72,6 +127,9 @@ const {
     createEnvelopeMock,
     dispatchMock,
     getEsignProviderMock,
+    runTransactionMock,
+    applyTransaction,
+    claimItem,
     createAlertTaskMock: vi.fn(async () => 'alert_1'),
     resolveAlertTasksMock: vi.fn(async (...args: [string, string[]?]) => {
       void args;
@@ -84,7 +142,9 @@ const {
   };
 });
 
-vi.mock('@/lib/firebase/admin', () => ({ adminDb: { doc: docMock, collection: collectionMock } }));
+vi.mock('@/lib/firebase/admin', () => ({
+  adminDb: { doc: docMock, collection: collectionMock, runTransaction: runTransactionMock },
+}));
 vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { delete: vi.fn(() => DELETE_SENTINEL) },
 }));
@@ -119,6 +179,8 @@ beforeEach(() => {
     });
     store.set(path, next);
   });
+  runTransactionMock.mockReset();
+  runTransactionMock.mockImplementation(applyTransaction);
   createEnvelopeMock.mockReset();
   // Default: envelope creation succeeds AND returns an embedded signing url.
   // Tests about the missing-url path override this explicitly per-call.
@@ -640,5 +702,110 @@ describe('sendPendingEsignDocs', () => {
     expect(createEnvelopeMock).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
     expect(writes).toEqual([]);
+  });
+});
+
+// Two checklist reads land together on login. Both build the same pending list
+// before either writes, so only the transactional claim can stop the second
+// from creating a duplicate envelope and sending a second "ready to sign" email.
+describe('sendPendingEsignDocs concurrent dispatch', () => {
+  // Lets a rival caller claim `items` in the window between our pending read
+  // and our own claim transaction, which is exactly where the race lives.
+  const rivalClaims = (items: string[], claimedAt: Date) => {
+    let injected = false;
+    runTransactionMock.mockImplementation(async (body) => {
+      if (!injected) {
+        injected = true;
+        for (const itemId of items) claimItem(`userOnboarding/u1_${itemId}`, claimedAt);
+      }
+      return applyTransaction(body);
+    });
+  };
+
+  it('skips the items another caller claimed after the pending list was read', async () => {
+    rivalClaims(['contract', 'w9'], new Date());
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent.sort()).toEqual(['direct_deposit', 'fcra_auth', 'pay_structure']);
+    expect(createEnvelopeMock).toHaveBeenCalledTimes(3);
+    for (const itemId of createEnvelopeMock.mock.calls.map(([request]) => request.itemId)) {
+      expect(['contract', 'w9']).not.toContain(itemId);
+    }
+    // The rival owns those items: this caller leaves their records alone.
+    expect(store.get('userOnboarding/u1_contract')).not.toHaveProperty('esignEnvelopeId');
+    expect(store.get('userOnboarding/u1_w9')).not.toHaveProperty('esignEnvelopeId');
+  });
+
+  it('names only its own documents in the one email it sends', async () => {
+    rivalClaims(['contract', 'w9'], new Date());
+
+    await sendPendingEsignDocs('u1');
+
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    expect(dispatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Ready to sign: Background Check Authorization (FCRA), Direct Deposit, Compensation',
+      })
+    );
+  });
+
+  it('sends no email at all when every item belongs to another caller', async () => {
+    rivalClaims(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure', 'w9'], new Date());
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('claims an item whose claim is older than two minutes', async () => {
+    // A dispatch that crashed mid-flight must not brick the item forever.
+    rivalClaims(['contract'], new Date(Date.now() - 3 * 60 * 1000));
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toContain('contract');
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({ esignEnvelopeId: 'env_1' });
+  });
+
+  it('re-dispatches an item left marked sending by an abandoned attempt', async () => {
+    // Six minutes old: past the retry throttle as well as the claim window.
+    store.set('userOnboarding/u1_contract', {
+      status: 'not_started',
+      esignDispatch: { state: 'sending', lastAttemptAt: new Date(Date.now() - 6 * 60 * 1000) },
+    });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toContain('contract');
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({ esignEnvelopeId: 'env_1' });
+    // A clean send clears the claim rather than leaving it behind.
+    expect(store.get('userOnboarding/u1_contract')).not.toHaveProperty('esignDispatch');
+  });
+
+  it('marks an item as sending before its envelope is created', async () => {
+    let claimAtCreateTime: unknown;
+    createEnvelopeMock.mockImplementation(async (request: { itemId: string }) => {
+      if (request.itemId === 'contract') {
+        claimAtCreateTime = store.get('userOnboarding/u1_contract')?.esignDispatch;
+      }
+      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/abc' };
+    });
+
+    await sendPendingEsignDocs('u1');
+
+    expect(claimAtCreateTime).toMatchObject({ state: 'sending' });
+  });
+
+  it('skips the item rather than double-sending when the claim itself fails', async () => {
+    runTransactionMock.mockRejectedValue(new Error('transaction failed'));
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
   });
 });

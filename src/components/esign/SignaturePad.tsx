@@ -242,7 +242,12 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             aria-selected={tab === method}
             variant={tab === method ? 'default' : 'outline'}
             onClick={() => setTab(method)}
-            className={tab === method ? 'bg-[#0A1F44] text-white hover:bg-[#0A1F44]/90' : ''}
+            // min-h-11 is the 44px iOS tap target; it overrides the variant's h-9.
+            className={`min-h-11 px-5 ${
+              tab === method
+                ? 'border border-white/25 bg-[#0A1F44] text-white hover:bg-[#0A1F44]/90'
+                : ''
+            }`}
           >
             {method === 'draw' ? 'Draw' : 'Type'}
           </Button>
@@ -263,15 +268,28 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             onPointerLeave={endStroke}
           />
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">Sign with your finger.</p>
-            <Button type="button" variant="outline" size="sm" onClick={clearDrawing} disabled={!hasInk}>
+            {/* The panel behind this is navy in the portal's dark theme, so the
+                copy takes its colour from the shell rather than a fixed slate. */}
+            <p className="text-sm text-[color:var(--member-line-muted,#5b6b7d)]">
+              Sign with your finger.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={clearDrawing}
+              disabled={!hasInk}
+              className="min-h-11 px-5"
+            >
               Clear
             </Button>
           </div>
         </div>
       ) : (
         <div className="grid gap-2">
-          <label className="grid gap-1 text-sm font-medium text-slate-700" htmlFor="esign-typed-name">
+          <label
+            className="grid gap-1 text-sm font-medium text-[color:var(--member-line-ink,#0a1f44)]"
+            htmlFor="esign-typed-name"
+          >
             Type your full name
           </label>
           <input
@@ -281,11 +299,14 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
               typedTouched.current = true;
               setTypedName(event.target.value);
             }}
+            placeholder="Your full name"
             autoComplete="name"
             autoCapitalize="words"
             spellCheck={false}
+            // The field is white, so the ink has to be stated: inheriting the
+            // shell's light foreground left the text invisible in dark mode.
             // 16px keeps iOS from zooming the page when the field is focused.
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base"
+            className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base text-[#0A1F44] placeholder:text-slate-500"
           />
           <div
             aria-hidden="true"
@@ -298,15 +319,22 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
       )}
 
       {value ? (
-        <figure className="grid gap-1">
-          <figcaption className="text-sm text-slate-500">Signature to be applied</figcaption>
-          {/* Client-generated data URL, so next/image would add nothing here. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={value.png}
-            alt="Your signature"
-            className="h-16 w-auto max-w-full self-start object-contain"
-          />
+        <figure className="grid gap-1.5">
+          <figcaption className="text-sm text-[color:var(--member-line-muted,#5b6b7d)]">
+            Signature to be applied
+          </figcaption>
+          {/* The ink is black on a transparent PNG, so it needs the same white
+              plate it will land on in the document. On the navy panel alone it
+              was invisible. */}
+          <div className="flex min-h-20 items-center rounded-md border border-slate-300 bg-white px-3 py-2">
+            {/* Client-generated data URL, so next/image would add nothing here. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={value.png}
+              alt="Your signature"
+              className="h-16 w-auto max-w-full object-contain"
+            />
+          </div>
         </figure>
       ) : null}
     </div>

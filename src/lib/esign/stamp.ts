@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { LineCapStyle, PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { DOCUMENTS, boxToPdfRect, type EsignFieldValues, type PdfRect } from './documents';
 import type { EsignDocKey } from './provider';
 
@@ -56,9 +56,26 @@ export function formatSignDate(d: Date): string {
   }).format(d);
 }
 
+/** Full local timestamp for the audit page, e.g. "09/08/2026 1:15:07 PM CDT". */
+export function formatSignTimestamp(d: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  })
+    .format(d)
+    .replace(/,\s+/g, ' ');
+}
+
 const MAX_FIELD_FONT_SIZE = 11;
 const MIN_FIELD_FONT_SIZE = 6;
 const FIELD_PADDING = 2;
+const SIGNATURE_INSET = 2;
 
 const AUDIT_PAGE_SIZE: [number, number] = [612, 792];
 const AUDIT_MARGIN = 48;
@@ -104,21 +121,35 @@ function drawFieldText(page: PDFPage, font: PDFFont, value: string, rect: PdfRec
   });
 }
 
-// ZapfDingbats glyph a20, the heavy check mark. pdf-lib addresses standard-font
-// glyphs by Unicode code point, so this is U+2714 rather than the '4' byte that
-// selects a20 in the raw ZapfDingbats encoding.
-const CHECK_MARK = '\u2714';
+// The tick is drawn as vector geometry rather than a ZapfDingbats glyph:
+// U+2714 in a non-embedded standard font renders blank in viewers that do not
+// ship that font (Poppler, and therefore most Linux previewers), so a signed
+// checkbox looked unticked. Two stroked segments always draw.
+const CHECK_INSET = 0.15;
+const CHECK_STROKE_RATIO = 0.09;
+const CHECK_MIN_STROKE = 1.2;
 
-function drawCheckMark(page: PDFPage, dingbats: PDFFont, rect: PdfRect): void {
-  const size = rect.height * 0.8;
-  const width = dingbats.widthOfTextAtSize(CHECK_MARK, size);
-  page.drawText(CHECK_MARK, {
-    x: rect.x + (rect.width - width) / 2,
-    y: rect.y + (rect.height - size) / 2,
-    size,
-    font: dingbats,
+function drawCheckMark(page: PDFPage, rect: PdfRect): void {
+  const inset = CHECK_INSET;
+  const x = rect.x + rect.width * inset;
+  const y = rect.y + rect.height * inset;
+  const width = rect.width * (1 - inset * 2);
+  const height = rect.height * (1 - inset * 2);
+
+  // Short down-stroke into the elbow, then the long up-stroke to the top right.
+  const start = { x, y: y + height * 0.5 };
+  const elbow = { x: x + width * 0.38, y };
+  const end = { x: x + width, y: y + height };
+
+  const thickness = Math.max(CHECK_MIN_STROKE, rect.height * CHECK_STROKE_RATIO);
+  const stroke = {
+    thickness,
     color: rgb(0, 0, 0),
-  });
+    lineCap: LineCapStyle.Round,
+  };
+
+  page.drawLine({ start, end: elbow, ...stroke });
+  page.drawLine({ start: elbow, end, ...stroke });
 }
 
 /** Greedy word wrap so long audit values (consent, user agent) stay on the page. */
@@ -150,7 +181,7 @@ function auditLines(input: StampInput, sourceSha256: string, stampedSha256: stri
     `Signer: ${audit.signerName} <${audit.signerEmail}>`,
     `User id: ${audit.userId}`,
     `Signed at (UTC): ${input.signedAt.toISOString()}`,
-    `Signed at (America/Chicago): ${formatSignDate(input.signedAt)}`,
+    `Signed at (America/Chicago): ${formatSignTimestamp(input.signedAt)}`,
     `Consent: ${audit.consentText}`,
     `Consent at (UTC): ${audit.consentAt.toISOString()}`,
     `IP address: ${audit.ip}`,
@@ -190,7 +221,6 @@ export async function stampDocument(input: StampInput): Promise<StampResult> {
 
   const doc = await PDFDocument.load(sourceBytes);
   const helvetica = await doc.embedFont(StandardFonts.Helvetica);
-  const dingbats = await doc.embedFont(StandardFonts.ZapfDingbats);
 
   for (const field of config.extra ?? []) {
     const value = input.fields[field.key];
@@ -199,7 +229,7 @@ export async function stampDocument(input: StampInput): Promise<StampResult> {
     const page = doc.getPage(field.page - 1);
     const rect = boxToPdfRect(field, page.getHeight());
     if (field.type === 'checkbox') {
-      drawCheckMark(page, dingbats, rect);
+      drawCheckMark(page, rect);
     } else {
       drawFieldText(page, helvetica, String(value), rect);
     }
@@ -214,8 +244,11 @@ export async function stampDocument(input: StampInput): Promise<StampResult> {
   const scale = Math.min(signatureRect.width / image.width, signatureRect.height / image.height);
   const drawnWidth = image.width * scale;
   const drawnHeight = image.height * scale;
+  // Left-aligned rather than centred: reviewing the stamped contract, a centred
+  // signature read as floating away from the line it belongs to. The inset is
+  // clamped so a signature that fills the box's width still cannot spill out.
   signaturePage.drawImage(image, {
-    x: signatureRect.x + (signatureRect.width - drawnWidth) / 2,
+    x: signatureRect.x + Math.min(SIGNATURE_INSET, signatureRect.width - drawnWidth),
     y: signatureRect.y + (signatureRect.height - drawnHeight) / 2,
     width: drawnWidth,
     height: drawnHeight,
