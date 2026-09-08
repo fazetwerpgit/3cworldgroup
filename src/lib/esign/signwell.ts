@@ -2,12 +2,18 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { EsignProvider, EsignDocKey, EnvelopeRequest, EnvelopeResult, EsignWebhookEvent } from './provider';
+import { DOCUMENTS, selectedCheckboxKey, type EsignDocumentConfig } from './documents';
 
 const SIGNWELL_BASE = 'https://www.signwell.com/api/v1';
 export const SIGNER_RECIPIENT_ID = 'signer';
 
 type SignWellFieldType = 'signature' | 'date' | 'text' | 'checkbox';
 
+/**
+ * Field payload SignWell expects. The geometry is an `EsignBox` verbatim —
+ * SignWell's 96-DPI top-left pixels are the coordinate system `DOCUMENTS` is
+ * written in — so only the recipient wiring, api_id, and type are added here.
+ */
 interface SignWellField {
   x: number;
   y: number;
@@ -23,87 +29,6 @@ interface SignWellField {
   lock_sign_date?: boolean;
 }
 
-type SignWellFieldSpec = Omit<SignWellField, 'recipient_id' | 'api_id' | 'type'>;
-
-interface SignWellDocumentConfig {
-  file: string;
-  name: string;
-  signature: SignWellFieldSpec;
-  date: SignWellFieldSpec;
-  // Additional fill-in fields (text/checkbox) keyed by api_id suffix.
-  extra?: Array<SignWellFieldSpec & { key: string; type: 'text' | 'checkbox' }>;
-}
-
-// SignWell field x/y are 96dpi pixels from the page's TOP-LEFT (not PDF points,
-// which are 72dpi from bottom-left): sw = pt * 4/3, y measured from the top.
-// Positions below are visually verified against the assets/esign PDFs.
-const DOCUMENTS: Record<EsignDocKey, SignWellDocumentConfig> = {
-  contract: {
-    file: 'contract.pdf',
-    name: 'Independent Agent Agreement',
-    signature: { x: 184, y: 584, page: 3, required: true, width: 312, height: 34 },
-    date: { x: 534, y: 584, page: 3, required: true, width: 148, height: 34, date_format: 'MM/DD/YYYY', lock_sign_date: true },
-    extra: [
-      { key: 'agent_name', type: 'text', x: 168, y: 636, page: 3, required: true, width: 532, height: 30 },
-      { key: 'business_name', type: 'text', x: 184, y: 684, page: 3, required: false, width: 516, height: 30 },
-      { key: 'ein', type: 'text', x: 132, y: 728, page: 3, required: false, width: 564, height: 30 },
-      { key: 'street_address', type: 'text', x: 180, y: 772, page: 3, required: true, width: 520, height: 34 },
-      { key: 'city_state_zip', type: 'text', x: 212, y: 820, page: 3, required: true, width: 488, height: 32 },
-      { key: 'office_phone', type: 'text', x: 168, y: 868, page: 3, required: false, width: 224, height: 32 },
-      { key: 'cell_phone', type: 'text', x: 460, y: 868, page: 3, required: true, width: 236, height: 32 },
-      { key: 'email', type: 'text', x: 180, y: 916, page: 3, required: true, width: 212, height: 32 },
-      { key: 'website', type: 'text', x: 452, y: 916, page: 3, required: false, width: 244, height: 32 },
-    ],
-  },
-  direct_deposit: {
-    file: 'direct_deposit.pdf',
-    name: 'Direct Deposit Authorization',
-    signature: { x: 112, y: 576, page: 1, required: true, width: 500, height: 34 },
-    date: { x: 676, y: 576, page: 1, required: true, width: 100, height: 34, date_format: 'MM/DD/YYYY', lock_sign_date: true },
-    extra: [
-      { key: 'legal_name', type: 'text', x: 132, y: 536, page: 1, required: true, width: 644, height: 34 },
-      { key: 'bank_name', type: 'text', x: 128, y: 164, page: 2, required: true, width: 644, height: 26 },
-      { key: 'routing_number', type: 'text', x: 124, y: 192, page: 2, required: true, width: 252, height: 26 },
-      { key: 'account_number', type: 'text', x: 468, y: 192, page: 2, required: true, width: 304, height: 26 },
-      { key: 'checking', type: 'checkbox', x: 43, y: 259, page: 2, required: false, width: 22, height: 22 },
-      { key: 'savings', type: 'checkbox', x: 197, y: 259, page: 2, required: false, width: 22, height: 22 },
-      { key: 'deposit_amount', type: 'text', x: 404, y: 258, page: 2, required: false, width: 120, height: 20 },
-      { key: 'full_net_amount', type: 'checkbox', x: 566, y: 262, page: 2, required: false, width: 16, height: 16 },
-    ],
-  },
-  pay_structure: {
-    file: 'pay_structure.pdf',
-    name: 'Pay Structure Acknowledgment',
-    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
-    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
-  },
-  w9: {
-    file: 'w9.pdf',
-    name: 'Form W-9 (Request for Taxpayer Identification Number)',
-    signature: { x: 200, y: 770, page: 1, required: true, width: 304, height: 32 },
-    date: { x: 552, y: 770, page: 1, required: true, width: 208, height: 32, date_format: 'MM/DD/YYYY', lock_sign_date: true },
-    extra: [
-      { key: 'name', type: 'text', x: 98, y: 152, page: 1, required: true, width: 640, height: 18 },
-      { key: 'business_name', type: 'text', x: 98, y: 187, page: 1, required: false, width: 640, height: 18 },
-      { key: 'individual_sole_prop', type: 'checkbox', x: 93, y: 236, page: 1, required: false, width: 22, height: 22 },
-      { key: 'llc', type: 'checkbox', x: 93, y: 255, page: 1, required: false, width: 22, height: 22 },
-      { key: 'llc_classification', type: 'text', x: 512, y: 254, page: 1, required: false, width: 80, height: 16 },
-      { key: 'address', type: 'text', x: 84, y: 383, page: 1, required: true, width: 424, height: 20 },
-      { key: 'city_state_zip', type: 'text', x: 84, y: 417, page: 1, required: true, width: 424, height: 20 },
-      // TIN is one-of SSN/EIN — SignWell can't express either/or, so both are
-      // optional; admin review catches a missing TIN.
-      { key: 'ssn', type: 'text', x: 560, y: 498, page: 1, required: false, width: 200, height: 24 },
-      { key: 'ein', type: 'text', x: 560, y: 562, page: 1, required: false, width: 200, height: 24 },
-    ],
-  },
-  fcra_auth: {
-    file: 'fcra_auth.pdf',
-    name: 'FCRA Background Check Authorization',
-    signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
-    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
-  },
-};
-
 function requireApiKey(): string {
   const key = process.env.SIGNWELL_API_KEY;
   if (!key) throw new Error('SIGNWELL_API_KEY is not set');
@@ -117,23 +42,10 @@ async function readDocumentBase64(file: string): Promise<string> {
 
 function fieldsFor(
   docKey: EsignDocKey,
-  config: SignWellDocumentConfig,
+  config: EsignDocumentConfig,
   prefill?: EnvelopeRequest['prefill']
 ): SignWellField[][] {
-  const selectedCheckboxKey =
-    docKey === 'direct_deposit'
-      ? prefill?.accountType === 'checking'
-        ? 'checking'
-        : prefill?.accountType === 'savings'
-          ? 'savings'
-          : undefined
-      : docKey === 'w9'
-        ? prefill?.taxClassification === 'individual'
-          ? 'individual_sole_prop'
-          : prefill?.taxClassification === 'llc'
-            ? 'llc'
-            : undefined
-        : undefined;
+  const selected = selectedCheckboxKey(docKey, prefill);
 
   return [
     [
@@ -151,7 +63,7 @@ function fieldsFor(
       },
       ...(config.extra ?? []).map(({ key, ...spec }) => ({
         ...spec,
-        ...(spec.type === 'checkbox' && key === selectedCheckboxKey ? { value: true } : {}),
+        ...(spec.type === 'checkbox' && key === selected ? { value: true } : {}),
         recipient_id: SIGNER_RECIPIENT_ID,
         api_id: `${docKey}_${key}`,
       })),

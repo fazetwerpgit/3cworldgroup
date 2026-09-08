@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { loadSignWellEmbed } from '@/lib/esign/embedClient';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ESIGN_FAILURE_HELPER_TEXT } from '@/lib/onboarding/esign';
@@ -38,6 +39,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 // approved. This component just shows a confirming note and polls the
 // checklist so the approved state appears without a manual refresh.
 export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
+  const router = useRouter();
   const [state, setState] = useState<EsignActionState>('idle');
   const polls = useRef(0);
   const pollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,6 +97,13 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
 
   const open = useCallback(async () => {
     safeSetState('opening');
+    // The in-house provider returns an in-app path instead of a vendor URL.
+    // Route to it client-side; there is no embed to load and no signing-url
+    // refresh to make, because the path never expires.
+    if (signingUrl.startsWith('/')) {
+      router.push(signingUrl);
+      return;
+    }
     try {
       let url = signingUrl;
       try {
@@ -132,7 +141,7 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
     } catch {
       void reportFailure();
     }
-  }, [signingUrl, beginConfirmPolling, reportFailure, safeSetState]);
+  }, [signingUrl, router, beginConfirmPolling, reportFailure, safeSetState]);
 
   if (state === 'confirming') {
     return (

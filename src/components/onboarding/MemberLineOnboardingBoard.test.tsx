@@ -12,6 +12,12 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// EsignSignAction now routes in-app for in-house signing paths, so it calls
+// useRouter - which needs an app-router context this bare render does not have.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 import MemberLineOnboardingBoard from './MemberLineOnboardingBoard';
 import type { WizardItem } from './OnboardingWizard';
 import { ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
