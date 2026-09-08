@@ -73,7 +73,11 @@ export function formatSignTimestamp(d: Date): string {
 }
 
 const MAX_FIELD_FONT_SIZE = 11;
-const MIN_FIELD_FONT_SIZE = 6;
+// 6pt made a long email in the contract's email box unreadable next to its
+// 11pt neighbours. Below 7pt the answer stops being legible on paper, so the
+// overflow is taken out of the text instead of out of the type size.
+const MIN_FIELD_FONT_SIZE = 7;
+const FIELD_ELLIPSIS = '...';
 const FIELD_PADDING = 2;
 const SIGNATURE_INSET = 2;
 
@@ -98,7 +102,7 @@ function toWinAnsi(text: string): string {
     .replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 }
 
-/** Largest size at or below 11pt that fits the box, floored at 6pt. */
+/** Largest size at or below 11pt that fits the box, floored at 7pt. */
 function fitFontSize(font: PDFFont, text: string, rect: PdfRect): number {
   let size = Math.min(MAX_FIELD_FONT_SIZE, rect.height * 0.7);
   const maxWidth = rect.width - FIELD_PADDING * 2;
@@ -108,11 +112,28 @@ function fitFontSize(font: PDFFont, text: string, rect: PdfRect): number {
   return size;
 }
 
+/**
+ * Drops characters from the end until the text plus an ellipsis fits.
+ *
+ * Only reached by a value too long to fit even at the 7pt floor, which in
+ * practice means an absurd one. Truncating loses nothing the reader could have
+ * read anyway: the alternative was type too small to make out.
+ */
+function truncateToWidth(font: PDFFont, text: string, size: number, maxWidth: number): string {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  for (let end = text.length - 1; end > 0; end -= 1) {
+    const candidate = `${text.slice(0, end)}${FIELD_ELLIPSIS}`;
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) return candidate;
+  }
+  return FIELD_ELLIPSIS;
+}
+
 function drawFieldText(page: PDFPage, font: PDFFont, value: string, rect: PdfRect): void {
   const text = toWinAnsi(value);
   if (!text) return;
   const size = fitFontSize(font, text, rect);
-  page.drawText(text, {
+  const maxWidth = rect.width - FIELD_PADDING * 2;
+  page.drawText(truncateToWidth(font, text, size, maxWidth), {
     x: rect.x + FIELD_PADDING,
     y: rect.y + (rect.height - size) / 2,
     size,

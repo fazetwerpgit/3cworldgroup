@@ -12,6 +12,7 @@ import type { EsignDocKey, EsignProvider } from './provider';
 
 const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 const CLAIM_STALE_MS = 2 * 60 * 1000;
+const READY_EMAIL_INTERVAL_MS = 10 * 60 * 1000;
 const MAX_ERROR_LENGTH = 500;
 const ALERT_KIND = 'review_needed' as const;
 
@@ -116,6 +117,38 @@ async function claimForDispatch(pending: PendingItem, userId: string): Promise<b
     });
   } catch (error) {
     console.error(`[esign] failed to claim ${userId}/${pending.item.id} for dispatch`, error);
+    return false;
+  }
+}
+
+/**
+ * The per-item claim stops duplicate envelopes, but not duplicate email: two
+ * concurrent callers each claim a subset of the items and each would then tell
+ * the rep their documents are ready. One notice per rep per ten minutes is
+ * enough, because the message points at the checklist rather than listing the
+ * whole set — the winner names only the documents it sent, and the checklist is
+ * the source of truth for the rest.
+ *
+ * Ten minutes rather than forever: a rejected document is re-sent later, and
+ * that resend has to be able to reach the rep.
+ */
+async function claimReadyEmail(userId: string, now: Date): Promise<boolean> {
+  try {
+    const ref = adminDb!.doc(`users/${userId}`);
+    return await adminDb!.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(ref);
+      const lastSentAt = asDate(fresh.get('esignReadyEmailAt'));
+      if (lastSentAt && now.getTime() - lastSentAt.getTime() < READY_EMAIL_INTERVAL_MS) {
+        return false;
+      }
+      transaction.set(ref, { esignReadyEmailAt: now }, { merge: true });
+      return true;
+    });
+  } catch (error) {
+    // The envelopes are already created and the checklist already shows them.
+    // A failed claim costs the rep a notification, never a document, so it is
+    // logged and swallowed rather than risking a second email.
+    console.error(`[esign] failed to claim the ready-to-sign notice for ${userId}`, error);
     return false;
   }
 }
@@ -406,7 +439,7 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
       await resolveDispatchAlert(userId);
     }
 
-    if (sentLabels.length > 0) {
+    if (sentLabels.length > 0 && (await claimReadyEmail(userId, new Date()))) {
       try {
         await dispatchToUser({
           userId,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PDFDocument, PDFPage } from 'pdf-lib';
+import { PDFDocument, PDFPage, StandardFonts } from 'pdf-lib';
 import { formatSignDate, formatSignTimestamp, sha256Hex, stampDocument } from './stamp';
 import { DOCUMENTS, boxToPdfRect } from './documents';
 import type { EsignDocKey } from './provider';
@@ -187,6 +187,60 @@ describe('stampDocument', () => {
     expect(drawn).toContain('09/08/2026');
     // Fields the rep left out are not stamped as empty or "undefined".
     expect(drawn).not.toContain('undefined');
+  });
+
+  // The email box on the contract sits beside 11pt neighbours, so a value that
+  // shrank into the 5-6pt range read as a misprint rather than an answer.
+  describe('the email box on the contract', () => {
+    const emailBox = boxToPdfRect(
+      DOCUMENTS.contract.extra!.find((field) => field.key === 'email')!,
+      792
+    );
+    const maxWidth = emailBox.width - 4;
+
+    const stampEmail = async (email: string) => {
+      const drawText = vi.spyOn(PDFPage.prototype, 'drawText');
+      await stampDocument({
+        docKey: 'contract',
+        fields: { email },
+        signaturePng: PNG,
+        signedAt: new Date('2026-09-08T15:00:00Z'),
+        audit,
+      });
+      const call = drawText.mock.calls.find(
+        ([, options]) => (options as { x: number }).x === emailBox.x + 2
+      );
+      if (!call) throw new Error('the email field was not drawn');
+      return { text: call[0] as string, size: (call[1] as { size: number }).size };
+    };
+
+    const helvetica = async () => {
+      const doc = await PDFDocument.create();
+      return doc.embedFont(StandardFonts.Helvetica);
+    };
+
+    it('fits an ordinary email whole, at a size that matches its neighbours', async () => {
+      const email = 'sam.johnson@example.co.uk'; // 25 characters.
+      const { text, size } = await stampEmail(email);
+
+      expect(text).toBe(email);
+      expect(size).toBeGreaterThanOrEqual(9);
+    });
+
+    it('truncates an absurd email instead of shrinking it below 7pt', async () => {
+      const email = 'jonathan.q.hendersoniii@verylongexamplemail.co.uk'; // 49 characters.
+      const { text, size } = await stampEmail(email);
+
+      // The floor holds: the old 6pt minimum is what made this unreadable.
+      expect(size).toBe(7);
+      expect(text).not.toBe(email);
+      expect(text.endsWith('...')).toBe(true);
+      expect(email.startsWith(text.slice(0, -3))).toBe(true);
+      // And what is drawn genuinely fits the box rather than running past it.
+      const font = await helvetica();
+      expect(font.widthOfTextAtSize(text, size)).toBeLessThanOrEqual(maxWidth);
+      expect(font.widthOfTextAtSize(email, size)).toBeGreaterThan(maxWidth);
+    });
   });
 
   it('survives characters the standard fonts cannot encode', async () => {

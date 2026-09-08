@@ -87,14 +87,30 @@ const {
   };
   // Transaction writes deliberately bypass `setMock`: they are a different API
   // path, and the tests that count plain `set` calls must not see them.
-  const applyTransaction = async <T,>(body: (transaction: Transaction) => Promise<T>): Promise<T> =>
-    body({
-      get: async (ref: TransactionRef) => ref.get(),
-      set: (ref: TransactionRef, data: Record<string, unknown>) => {
-        txWrites.push({ path: ref.path, data });
-        mergeInto(ref.path, data);
-      },
-    });
+  //
+  // Bodies run one at a time. A real Firestore transaction is atomic against
+  // other transactions, and without that guarantee here two callers awaiting
+  // inside `get` would both read the pre-claim document and both "win" —
+  // making every concurrency test pass or fail on await ordering rather than
+  // on the code under test.
+  let transactionQueue: Promise<unknown> = Promise.resolve();
+  const applyTransaction = <T,>(body: (transaction: Transaction) => Promise<T>): Promise<T> => {
+    const run = transactionQueue.then(() =>
+      body({
+        get: async (ref: TransactionRef) => ref.get(),
+        set: (ref: TransactionRef, data: Record<string, unknown>) => {
+          txWrites.push({ path: ref.path, data });
+          mergeInto(ref.path, data);
+        },
+      })
+    );
+    // Swallow here only: the caller still sees the rejection through `run`.
+    transactionQueue = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  };
   const runTransactionMock = vi.fn(applyTransaction);
   const createEnvelopeMock = vi.fn(
     async (request: { itemId: string }): Promise<{ envelopeId: string; embeddedSigningUrl?: string }> => {
@@ -807,5 +823,109 @@ describe('sendPendingEsignDocs concurrent dispatch', () => {
     expect(sent).toEqual([]);
     expect(createEnvelopeMock).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+  });
+});
+
+// The per-item claim splits the work between concurrent callers without
+// duplicating envelopes, but each caller then wants to tell the rep their
+// documents are ready. The rep should hear it once.
+describe('sendPendingEsignDocs ready-to-sign email', () => {
+  const ALL_ITEMS = ['contract', 'direct_deposit', 'fcra_auth', 'pay_structure', 'w9'];
+
+  it('sends one email when two callers dispatch at the same time', async () => {
+    // Hold the first caller inside its very first envelope creation. It already
+    // owns that item's claim, so the second caller picks up the other four,
+    // finishes, and emails. The first caller then returns with something of its
+    // own to report — which is where the second email used to come from.
+    let firstCallerReachedProvider: () => void = () => {};
+    let releaseFirstCaller: () => void = () => {};
+    const reachedProvider = new Promise<void>((resolve) => {
+      firstCallerReachedProvider = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      releaseFirstCaller = resolve;
+    });
+    let firstEnvelope = true;
+    createEnvelopeMock.mockImplementation(async () => {
+      if (firstEnvelope) {
+        firstEnvelope = false;
+        firstCallerReachedProvider();
+        await held;
+      }
+      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/abc' };
+    });
+
+    const firstCaller = sendPendingEsignDocs('u1');
+    await reachedProvider;
+    const second = await sendPendingEsignDocs('u1');
+    releaseFirstCaller();
+    const first = await firstCaller;
+
+    // Both callers really did send, and between them every document went out
+    // exactly once.
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(4);
+    expect([...first, ...second].sort()).toEqual(ALL_ITEMS);
+    expect(createEnvelopeMock).toHaveBeenCalledTimes(5);
+    // The rep hears about it once, not once per caller.
+    expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not email again for a resend inside the ten minute window', async () => {
+    await sendPendingEsignDocs('u1');
+    expect(dispatchMock).toHaveBeenCalledOnce();
+
+    vi.setSystemTime(new Date(Date.now() + 5 * 60 * 1000));
+    store.set('userOnboarding/u1_contract', { userId: 'u1', itemId: 'contract', status: 'rejected' });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    // The envelope is still created; only the duplicate notice is suppressed.
+    expect(sent).toEqual(['contract']);
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({ esignEnvelopeId: 'env_1' });
+    expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('emails again for a resend once the window has passed', async () => {
+    await sendPendingEsignDocs('u1');
+    expect(dispatchMock).toHaveBeenCalledOnce();
+
+    // A rejected document is re-sent much later, and the rep has to hear about
+    // it: the dedupe window closes rather than silencing the rep for good.
+    vi.setSystemTime(new Date(Date.now() + 15 * 60 * 1000));
+    store.set('userOnboarding/u1_contract', { userId: 'u1', itemId: 'contract', status: 'rejected' });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual(['contract']);
+    expect(dispatchMock).toHaveBeenCalledTimes(2);
+    expect(dispatchMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ message: 'Ready to sign: Contract' })
+    );
+  });
+
+  it('creates the envelopes and stays quiet when the email claim fails', async () => {
+    runTransactionMock.mockImplementation((body) =>
+      applyTransaction((transaction) =>
+        body({
+          get: async (ref) => {
+            if (ref.path.startsWith('users/')) throw new Error('users transaction failed');
+            return transaction.get(ref);
+          },
+          set: transaction.set,
+        })
+      )
+    );
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    // A failed claim costs a notification, never a document, and never a throw.
+    expect(sent.sort()).toEqual(ALL_ITEMS);
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({ esignEnvelopeId: 'env_1' });
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(consoleErrorMock).toHaveBeenCalledWith(
+      '[esign] failed to claim the ready-to-sign notice for u1',
+      expect.any(Error)
+    );
   });
 });

@@ -306,7 +306,14 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             // The field is white, so the ink has to be stated: inheriting the
             // shell's light foreground left the text invisible in dark mode.
             // 16px keeps iOS from zooming the page when the field is focused.
-            className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base text-[#0A1F44] placeholder:text-slate-500"
+            className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base placeholder:text-slate-500"
+            // Inline rather than a `text-[#0A1F44]` utility: globals.css has
+            // `.portal-scope input { color: var(--foreground) }`, which outranks
+            // the utility class and left the typed name light-on-white. An
+            // inline style wins regardless of selector specificity. The
+            // placeholder has no competing portal-scope rule, so its utility
+            // class still applies.
+            style={{ color: '#0A1F44', caretColor: '#0A1F44' }}
           />
           <div
             aria-hidden="true"
