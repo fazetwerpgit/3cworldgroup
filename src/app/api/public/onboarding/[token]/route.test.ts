@@ -6,6 +6,7 @@ const {
   batchCommitMock,
   createUserMock,
   getUserByEmailMock,
+  userDocGetMock,
   updateUserMock,
   deleteUserMock,
   sendPendingEsignDocsMock,
@@ -16,6 +17,7 @@ const {
   batchCommitMock: vi.fn(),
   createUserMock: vi.fn(),
   getUserByEmailMock: vi.fn(),
+  userDocGetMock: vi.fn(),
   updateUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
   sendPendingEsignDocsMock: vi.fn(),
@@ -86,7 +88,7 @@ vi.mock('@/lib/firebase/admin', () => ({
       }
 
       return {
-        doc: vi.fn((id: string) => ({ id, set: vi.fn(), get: vi.fn(async () => ({ exists: false, data: () => undefined })) })),
+        doc: vi.fn((id: string) => ({ id, set: vi.fn(), get: userDocGetMock })),
         add: vi.fn(async () => undefined),
       };
     }),
@@ -122,7 +124,7 @@ vi.mock('@/lib/onboarding/sensitiveFields', () => ({ buildSensitiveDoc: vi.fn() 
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignDocsMock }));
 
 import { NextRequest } from 'next/server';
-import { POST } from './route';
+import { GET, POST } from './route';
 
 function request(references: Record<string, string>, password = 'password', extra: Record<string, unknown> = {}) {
   return new NextRequest('http://localhost/api/public/onboarding/token-1', {
@@ -149,6 +151,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   createUserMock.mockResolvedValue({ uid: 'user-1' });
   getUserByEmailMock.mockRejectedValue({ code: 'auth/user-not-found' });
+  userDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
   deleteUserMock.mockResolvedValue(undefined);
   batchCommitMock.mockResolvedValue(undefined);
   sendPendingEsignDocsMock.mockResolvedValue([]);
@@ -162,6 +165,37 @@ beforeEach(() => {
     status: 'in_progress',
     tokenHash: 'hashed-token-1',
     expiresAt: undefined,
+  });
+});
+
+describe('GET /api/public/onboarding/[token]', () => {
+  it('returns the onboarding form for an email without an active portal account', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      locked: false,
+      items: expect.any(Array),
+    });
+  });
+
+  it('locks the invite before the form loads when the email has an active portal account', async () => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'active-user' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'active' }) });
+
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      invite: expect.objectContaining({
+        id: 'invite-1',
+        candidateEmail: 'candidate@example.com',
+      }),
+      items: [],
+      locked: true,
+      existingAccount: true,
+    });
+    expect(inviteRef.set).not.toHaveBeenCalled();
   });
 });
 

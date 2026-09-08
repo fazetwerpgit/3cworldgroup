@@ -39,6 +39,7 @@ interface OnboardingResponse {
   invite: InviteView;
   items: OnboardingItem[];
   locked: boolean;
+  existingAccount?: boolean;
 }
 
 // Kicker line shared by every state on this pre-auth page (masthead + the
@@ -220,18 +221,30 @@ export default function PublicOnboardingPage() {
         <div className="w-full max-w-xl border border-[#0A1F44]/[.14] bg-white p-8 text-center dark:border-white/[.14] dark:bg-[#08101d]">
           <OnboardKicker />
           <CheckCircle2 className="mx-auto mt-4 mb-4 size-12 text-[#5a8f1f] dark:text-[#8dc63f]" />
-          <span className="inline-flex rounded-full border border-[#8dc63f] bg-[#8dc63f]/15 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[.12em] text-[#4f7f1e] dark:text-[#8dc63f]">
-            Submitted
-          </span>
+          {!data?.existingAccount && (
+            <span className="inline-flex rounded-full border border-[#8dc63f] bg-[#8dc63f]/15 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[.12em] text-[#4f7f1e] dark:text-[#8dc63f]">
+              Submitted
+            </span>
+          )}
           <h1 className="mt-4 text-2xl font-semibold text-[#0A1F44] dark:text-[#f4f7fa]">
-            Your onboarding packet is in review
+            {data?.existingAccount ? 'You already have a portal account' : 'Your onboarding packet is in review'}
           </h1>
           <p className="mt-3 text-sm leading-6 text-[#687384] dark:text-[#9caabd]">
-            Your manager can review this in the 3C portal. Your portal account is pending until management activates it.
+            {data?.existingAccount
+              ? `Sign in with ${data.invite.candidateEmail}. If you forgot your password, reset it from the login page.`
+              : 'Your manager can review this in the 3C portal. Your portal account is pending until management activates it.'}
           </p>
           <Button asChild className="mt-6 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-            <Link href="/portal">Go to Portal Login</Link>
+            <Link href="/portal">{data?.existingAccount ? 'Sign in to the portal' : 'Go to Portal Login'}</Link>
           </Button>
+          {data?.existingAccount && (
+            <Link
+              href="/portal"
+              className="mt-4 inline-block text-sm font-medium text-[#0A1F44] underline decoration-[#8dc63f] underline-offset-4 hover:text-[#5a8f1f] dark:text-[#f4f7fa] dark:hover:text-[#8dc63f]"
+            >
+              Use Forgot password on the login page
+            </Link>
+          )}
         </div>
       </main>
     );

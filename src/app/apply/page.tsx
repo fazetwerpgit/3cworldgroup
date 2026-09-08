@@ -60,6 +60,7 @@ function ApplyPageContent() {
     }
   }, [searchParams]);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<{ message: string; code: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -74,6 +75,7 @@ function ApplyPageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
     if (formData.website || Date.now() - formStartedAtRef.current < 3000) {
       setSubmitted(true);
@@ -96,7 +98,14 @@ function ApplyPageContent() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as { error?: string; code?: string };
+        if (response.status === 409 && data.code === "account_exists") {
+          setSubmitError({
+            message: data.error || "You already have a 3C portal account. Sign in instead of re-applying.",
+            code: data.code,
+          });
+          return;
+        }
         throw new Error(data.error || "Failed to submit application");
       }
 
@@ -369,6 +378,12 @@ function ApplyPageContent() {
                       placeholder="Name of person who referred you (optional)"
                     />
                   </div>
+
+                  {submitError?.code === "account_exists" ? (
+                    <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                      {submitError.message} <Link className="font-semibold underline" href="/portal">Sign in</Link>
+                    </div>
+                  ) : null}
 
                   <button
                     type="submit"

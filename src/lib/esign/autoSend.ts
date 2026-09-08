@@ -289,9 +289,10 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
     const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
     if (!fieldRole) return sent;
 
-    // Last line of defence for every call site, including the public token
-    // route: only a hire still in the pending stage may have documents sent.
-    if (userSnap.get('status') !== 'pending') return sent;
+    // Last line of defence for every call site: only a pending or active hire
+    // may have documents sent. Decommissioned, suspended, and other statuses
+    // must never trigger provider dispatch.
+    if (!['pending', 'active'].includes(userSnap.get('status') as string)) return sent;
     if (!roleRequiresOnboarding(fieldRole)) return sent;
 
     const signerName = (userSnap.get('displayName') as string | undefined) ?? 'Rep';

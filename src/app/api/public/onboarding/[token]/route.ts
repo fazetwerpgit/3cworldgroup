@@ -9,6 +9,7 @@ import { validateAddress } from '@/lib/validation/address';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { isEsignItem } from '@/lib/onboarding/esign';
+import { findActivePortalAccount } from '@/lib/auth/existingAccount';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -68,6 +69,27 @@ export async function GET(
         },
         items: [],
         locked: true,
+      });
+    }
+
+    const existingAccount = await findActivePortalAccount(data.candidateEmail);
+    if (existingAccount) {
+      return NextResponse.json({
+        invite: {
+          id: invite.id,
+          candidateName: data.candidateName,
+          candidateEmail: data.candidateEmail,
+          candidatePhone: data.candidatePhone,
+          candidateCity: data.candidateCity ?? '',
+          intendedFieldRole: data.intendedFieldRole,
+          isIBO: data.isIBO ?? false,
+          status: data.status,
+          ownerName: data.ownerName,
+          expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() ?? null,
+        },
+        items: [],
+        locked: true,
+        existingAccount: true,
       });
     }
 

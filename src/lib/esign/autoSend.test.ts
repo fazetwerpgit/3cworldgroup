@@ -586,13 +586,35 @@ describe('sendPendingEsignDocs', () => {
     expect(resolveAlertTasksMock).not.toHaveBeenCalled();
   });
 
-  it('is a no-op for a user who is no longer pending', async () => {
+  it('sends an unsent e-sign item for an active user', async () => {
     store.set('users/u1', {
       fieldRole: 'entry_rep',
       isIBO: false,
       displayName: 'Sam Rep',
       email: 'sam@x.com',
       status: 'active',
+    });
+    for (const itemId of ['fcra_auth', 'contract', 'direct_deposit', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual(['w9']);
+    expect(createEnvelopeMock).toHaveBeenCalledWith(expect.objectContaining({ itemId: 'w9' }));
+    expect(store.get('userOnboarding/u1_w9')).toMatchObject({
+      status: 'submitted',
+      esignEnvelopeId: 'env_1',
+    });
+  });
+
+  it('is a no-op for a decommissioned user', async () => {
+    store.set('users/u1', {
+      fieldRole: 'entry_rep',
+      isIBO: false,
+      displayName: 'Sam Rep',
+      email: 'sam@x.com',
+      status: 'inactive',
     });
 
     const sent = await sendPendingEsignDocs('u1');
