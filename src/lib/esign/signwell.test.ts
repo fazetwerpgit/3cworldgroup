@@ -84,6 +84,64 @@ describe('signwellProvider.createEnvelope', () => {
     expect((init.headers as Record<string, string>)['X-Api-Key']).toBe('sw_key');
   });
 
+  const prefillCases: Array<{
+    name: string;
+    docKey: 'direct_deposit' | 'w9';
+    prefill: Record<string, string>;
+    selectedApiId: string;
+    otherApiId: string;
+  }> = [
+    {
+      name: 'direct deposit checking',
+      docKey: 'direct_deposit',
+      prefill: { accountType: 'checking' },
+      selectedApiId: 'direct_deposit_checking',
+      otherApiId: 'direct_deposit_savings',
+    },
+    {
+      name: 'direct deposit savings',
+      docKey: 'direct_deposit',
+      prefill: { accountType: 'savings' },
+      selectedApiId: 'direct_deposit_savings',
+      otherApiId: 'direct_deposit_checking',
+    },
+    {
+      name: 'W-9 individual',
+      docKey: 'w9',
+      prefill: { taxClassification: 'individual' },
+      selectedApiId: 'w9_individual_sole_prop',
+      otherApiId: 'w9_llc',
+    },
+    {
+      name: 'W-9 LLC',
+      docKey: 'w9',
+      prefill: { taxClassification: 'llc' },
+      selectedApiId: 'w9_llc',
+      otherApiId: 'w9_individual_sole_prop',
+    },
+  ];
+
+  it.each(prefillCases)('maps $name prefill to the matching checkbox', async ({ docKey, prefill, selectedApiId, otherApiId }) => {
+    await signwellProvider.createEnvelope({
+      ...baseRequest,
+      docKey,
+      itemId: docKey,
+      prefill,
+    });
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string) as {
+      fields: Array<Array<Record<string, unknown>>>;
+    };
+    const fields = body.fields.flat();
+    const selected = fields.find((field) => field.api_id === selectedApiId);
+    const other = fields.find((field) => field.api_id === otherApiId);
+
+    expect(selected).toEqual(expect.objectContaining({ value: true, width: 22, height: 22 }));
+    expect(other).toEqual(expect.objectContaining({ width: 22, height: 22 }));
+    expect(other).not.toHaveProperty('value');
+  });
+
   it('throws a descriptive error when the API key env is missing', async () => {
     vi.stubEnv('SIGNWELL_API_KEY', '');
     await expect(

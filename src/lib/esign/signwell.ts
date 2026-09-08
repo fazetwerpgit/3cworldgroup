@@ -18,6 +18,7 @@ interface SignWellField {
   api_id: string;
   width: number;
   height: number;
+  value?: string | boolean;
   date_format?: 'MM/DD/YYYY';
   lock_sign_date?: boolean;
 }
@@ -64,8 +65,8 @@ const DOCUMENTS: Record<EsignDocKey, SignWellDocumentConfig> = {
       { key: 'bank_name', type: 'text', x: 128, y: 164, page: 2, required: true, width: 644, height: 26 },
       { key: 'routing_number', type: 'text', x: 124, y: 192, page: 2, required: true, width: 252, height: 26 },
       { key: 'account_number', type: 'text', x: 468, y: 192, page: 2, required: true, width: 304, height: 26 },
-      { key: 'checking', type: 'checkbox', x: 46, y: 262, page: 2, required: false, width: 16, height: 16 },
-      { key: 'savings', type: 'checkbox', x: 200, y: 262, page: 2, required: false, width: 16, height: 16 },
+      { key: 'checking', type: 'checkbox', x: 43, y: 259, page: 2, required: false, width: 22, height: 22 },
+      { key: 'savings', type: 'checkbox', x: 197, y: 259, page: 2, required: false, width: 22, height: 22 },
       { key: 'deposit_amount', type: 'text', x: 404, y: 258, page: 2, required: false, width: 120, height: 20 },
       { key: 'full_net_amount', type: 'checkbox', x: 566, y: 262, page: 2, required: false, width: 16, height: 16 },
     ],
@@ -84,8 +85,8 @@ const DOCUMENTS: Record<EsignDocKey, SignWellDocumentConfig> = {
     extra: [
       { key: 'name', type: 'text', x: 98, y: 152, page: 1, required: true, width: 640, height: 18 },
       { key: 'business_name', type: 'text', x: 98, y: 187, page: 1, required: false, width: 640, height: 18 },
-      { key: 'individual_sole_prop', type: 'checkbox', x: 96, y: 239, page: 1, required: false, width: 14, height: 14 },
-      { key: 'llc', type: 'checkbox', x: 96, y: 258, page: 1, required: false, width: 14, height: 14 },
+      { key: 'individual_sole_prop', type: 'checkbox', x: 93, y: 236, page: 1, required: false, width: 22, height: 22 },
+      { key: 'llc', type: 'checkbox', x: 93, y: 255, page: 1, required: false, width: 22, height: 22 },
       { key: 'llc_classification', type: 'text', x: 512, y: 254, page: 1, required: false, width: 80, height: 16 },
       { key: 'address', type: 'text', x: 84, y: 383, page: 1, required: true, width: 424, height: 20 },
       { key: 'city_state_zip', type: 'text', x: 84, y: 417, page: 1, required: true, width: 424, height: 20 },
@@ -114,7 +115,26 @@ async function readDocumentBase64(file: string): Promise<string> {
   return bytes.toString('base64');
 }
 
-function fieldsFor(docKey: EsignDocKey, config: SignWellDocumentConfig): SignWellField[][] {
+function fieldsFor(
+  docKey: EsignDocKey,
+  config: SignWellDocumentConfig,
+  prefill?: EnvelopeRequest['prefill']
+): SignWellField[][] {
+  const selectedCheckboxKey =
+    docKey === 'direct_deposit'
+      ? prefill?.accountType === 'checking'
+        ? 'checking'
+        : prefill?.accountType === 'savings'
+          ? 'savings'
+          : undefined
+      : docKey === 'w9'
+        ? prefill?.taxClassification === 'individual'
+          ? 'individual_sole_prop'
+          : prefill?.taxClassification === 'llc'
+            ? 'llc'
+            : undefined
+        : undefined;
+
   return [
     [
       {
@@ -131,6 +151,7 @@ function fieldsFor(docKey: EsignDocKey, config: SignWellDocumentConfig): SignWel
       },
       ...(config.extra ?? []).map(({ key, ...spec }) => ({
         ...spec,
+        ...(spec.type === 'checkbox' && key === selectedCheckboxKey ? { value: true } : {}),
         recipient_id: SIGNER_RECIPIENT_ID,
         api_id: `${docKey}_${key}`,
       })),
@@ -189,7 +210,7 @@ export const signwellProvider: EsignProvider = {
         recipients: [
           { id: SIGNER_RECIPIENT_ID, name: req.signerName, email: req.signerEmail },
         ],
-        fields: fieldsFor(req.docKey, config),
+        fields: fieldsFor(req.docKey, config, req.prefill),
       }),
     });
     if (!res.ok) {
