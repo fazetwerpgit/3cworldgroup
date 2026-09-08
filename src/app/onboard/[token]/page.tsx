@@ -76,6 +76,10 @@ export default function PublicOnboardingPage() {
     password: '',
   });
   const [zipError, setZipError] = useState(false);
+  const [accountType, setAccountType] = useState('');
+  const [taxClassification, setTaxClassification] = useState('');
+  const [accountTypeError, setAccountTypeError] = useState(false);
+  const [taxClassificationError, setTaxClassificationError] = useState(false);
   const [references, setReferences] = useState<Record<string, string>>({});
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. We only read the slots inside the setter's updater, so the value
@@ -131,6 +135,17 @@ export default function PublicOnboardingPage() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!data) return;
+
+    const requiresAccountType = data.items.some((item) => item.id === 'direct_deposit');
+    const requiresTaxClassification = data.items.some((item) => item.id === 'w9');
+    const missingAccountType = requiresAccountType && !accountType;
+    const missingTaxClassification = requiresTaxClassification && !taxClassification;
+    if (missingAccountType || missingTaxClassification) {
+      setAccountTypeError(missingAccountType);
+      setTaxClassificationError(missingTaxClassification);
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -141,6 +156,8 @@ export default function PublicOnboardingPage() {
         body: JSON.stringify({
           ...profile,
           references,
+          ...(accountType ? { accountType } : {}),
+          ...(taxClassification ? { taxClassification } : {}),
         }),
       });
       const json = await response.json();
@@ -513,6 +530,64 @@ export default function PublicOnboardingPage() {
                               E-signature
                             </span>
                             <p className="member-line-sub">{ESIGN_HELPER_TEXT}</p>
+                            {item.id === 'direct_deposit' && (
+                              <div className="member-line-field">
+                                <Label>Account type</Label>
+                                <NativeSelect
+                                  value={accountType}
+                                  onChange={(event) => {
+                                    setAccountType(event.target.value);
+                                    if (event.target.value) setAccountTypeError(false);
+                                  }}
+                                  onBlur={() => setAccountTypeError(!accountType)}
+                                  onInvalid={(event) => {
+                                    event.preventDefault();
+                                    setAccountTypeError(true);
+                                  }}
+                                  required
+                                  aria-invalid={accountTypeError}
+                                  className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
+                                >
+                                  <NativeSelectOption value="">Select account type</NativeSelectOption>
+                                  <NativeSelectOption value="checking">Checking</NativeSelectOption>
+                                  <NativeSelectOption value="savings">Savings</NativeSelectOption>
+                                </NativeSelect>
+                                {accountTypeError && (
+                                  <p className="text-xs" style={{ color: 'var(--member-line-red)' }}>
+                                    Select an account type
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {item.id === 'w9' && (
+                              <div className="member-line-field">
+                                <Label>Federal tax classification</Label>
+                                <NativeSelect
+                                  value={taxClassification}
+                                  onChange={(event) => {
+                                    setTaxClassification(event.target.value);
+                                    if (event.target.value) setTaxClassificationError(false);
+                                  }}
+                                  onBlur={() => setTaxClassificationError(!taxClassification)}
+                                  onInvalid={(event) => {
+                                    event.preventDefault();
+                                    setTaxClassificationError(true);
+                                  }}
+                                  required
+                                  aria-invalid={taxClassificationError}
+                                  className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
+                                >
+                                  <NativeSelectOption value="">Select tax classification</NativeSelectOption>
+                                  <NativeSelectOption value="individual">Individual / sole proprietor</NativeSelectOption>
+                                  <NativeSelectOption value="llc">LLC</NativeSelectOption>
+                                </NativeSelect>
+                                {taxClassificationError && (
+                                  <p className="text-xs" style={{ color: 'var(--member-line-red)' }}>
+                                    Select a federal tax classification
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <Textarea

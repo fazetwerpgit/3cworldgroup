@@ -138,6 +138,14 @@ export async function POST(
     }
     const addressFields = addressCheck.clean;
     const password = clean(body.password, 200);
+    const accountType = body.accountType || undefined;
+    const taxClassification = body.taxClassification || undefined;
+    if (accountType !== undefined && !['checking', 'savings'].includes(accountType)) {
+      return NextResponse.json({ error: 'Invalid accountType' }, { status: 400 });
+    }
+    if (taxClassification !== undefined && !['individual', 'llc'].includes(taxClassification)) {
+      return NextResponse.json({ error: 'Invalid taxClassification' }, { status: 400 });
+    }
     const references = body.references && typeof body.references === 'object'
       ? (body.references as Record<string, unknown>)
       : {};
@@ -215,11 +223,23 @@ export async function POST(
     }
 
     const now = new Date();
-    const userRecord = await adminAuth.createUser({
-      email: data.candidateEmail,
-      password,
-      displayName,
-    });
+    let userRecord: { uid: string };
+    let createdAuthUser = false;
+    let existingUserData: Record<string, unknown> | undefined;
+    try {
+      userRecord = await adminAuth.getUserByEmail(data.candidateEmail);
+      const existingDoc = await adminDb.collection('users').doc(userRecord.uid).get();
+      existingUserData = existingDoc.exists ? existingDoc.data() : undefined;
+      const reusable = !existingDoc.exists || existingUserData?.status === 'pending' || !!existingUserData?.onboardingInviteId;
+      if (!reusable) {
+        return NextResponse.json({ error: 'This email already has an active portal account. Sign in at the portal instead, or contact your manager.' }, { status: 409 });
+      }
+      await adminAuth.updateUser(userRecord.uid, { password, displayName });
+    } catch (error: unknown) {
+      if (!(error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'auth/user-not-found')) throw error;
+      userRecord = await adminAuth.createUser({ email: data.candidateEmail, password, displayName });
+      createdAuthUser = true;
+    }
 
     const userProfile = {
       email: data.candidateEmail,
@@ -233,7 +253,7 @@ export async function POST(
       status: 'pending',
       onboardingInviteId: invite.id,
       hireDate: now,
-      createdAt: now,
+      createdAt: existingUserData?.createdAt ?? now,
       updatedAt: now,
     };
 
@@ -251,7 +271,13 @@ export async function POST(
 
     const candidateItems = items.map((item) =>
       isEsignItem(item.id)
-        ? { itemId: item.id, label: item.label, status: 'not_started' as const }
+        ? {
+            itemId: item.id,
+            label: item.label,
+            status: 'not_started' as const,
+            ...(item.id === 'direct_deposit' && accountType ? { prefill: { accountType } } : {}),
+            ...(item.id === 'w9' && taxClassification ? { prefill: { taxClassification } } : {}),
+          }
         : {
             itemId: item.id,
             label: item.label,
@@ -291,6 +317,13 @@ export async function POST(
       );
     }
 
+    if (accountType !== undefined) {
+      batch.set(adminDb.collection('userOnboarding').doc(`${userRecord.uid}_direct_deposit`), { userId: userRecord.uid, itemId: 'direct_deposit', status: 'not_started', prefill: { accountType }, updatedAt: now }, { merge: true });
+    }
+    if (taxClassification !== undefined) {
+      batch.set(adminDb.collection('userOnboarding').doc(`${userRecord.uid}_w9`), { userId: userRecord.uid, itemId: 'w9', status: 'not_started', prefill: { taxClassification }, updatedAt: now }, { merge: true });
+    }
+
     batch.set(
       invite.ref,
       {
@@ -324,7 +357,7 @@ export async function POST(
     try {
       await batch.commit();
     } catch (commitError) {
-      await adminAuth.deleteUser(userRecord.uid).catch((rollbackError) => {
+      if (createdAuthUser) await adminAuth.deleteUser(userRecord.uid).catch((rollbackError) => {
         console.error(
           'Failed to roll back orphaned Auth user after batch commit failure:',
           rollbackError
@@ -339,15 +372,19 @@ export async function POST(
       )
     );
 
-    await adminDb.collection('notifications').add({
-      userId: data.ownerId,
-      type: 'onboarding_submitted',
-      title: 'Recruit onboarding submitted',
-      message: `${displayName} completed the website onboarding flow.`,
-      link: '/portal/admin/recruiting',
-      read: false,
-      createdAt: now,
-    });
+    try {
+      await adminDb.collection('notifications').add({
+        userId: data.ownerId,
+        type: 'onboarding_submitted',
+        title: 'Recruit onboarding submitted',
+        message: `${displayName} completed the website onboarding flow.`,
+        link: '/portal/admin/recruiting',
+        read: false,
+        createdAt: now,
+      });
+    } catch (notificationError) {
+      console.error('Failed to create onboarding notification:', notificationError);
+    }
 
     return NextResponse.json({ success: true, status: 'submitted' });
   } catch (error: unknown) {

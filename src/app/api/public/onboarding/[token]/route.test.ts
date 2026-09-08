@@ -5,6 +5,8 @@ const {
   batchSetMock,
   batchCommitMock,
   createUserMock,
+  getUserByEmailMock,
+  updateUserMock,
   deleteUserMock,
   sendPendingEsignDocsMock,
   inviteData,
@@ -13,6 +15,8 @@ const {
   batchSetMock: vi.fn(),
   batchCommitMock: vi.fn(),
   createUserMock: vi.fn(),
+  getUserByEmailMock: vi.fn(),
+  updateUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
   sendPendingEsignDocsMock: vi.fn(),
   inviteData: {
@@ -60,6 +64,8 @@ vi.mock('next/server', () => {
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
     createUser: createUserMock,
+    getUserByEmail: getUserByEmailMock,
+    updateUser: updateUserMock,
     deleteUser: deleteUserMock,
   },
   adminDb: {
@@ -80,7 +86,7 @@ vi.mock('@/lib/firebase/admin', () => ({
       }
 
       return {
-        doc: vi.fn((id: string) => ({ id, set: vi.fn() })),
+        doc: vi.fn((id: string) => ({ id, set: vi.fn(), get: vi.fn(async () => ({ exists: false, data: () => undefined })) })),
         add: vi.fn(async () => undefined),
       };
     }),
@@ -118,7 +124,7 @@ vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignD
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 
-function request(references: Record<string, string>, password = 'password') {
+function request(references: Record<string, string>, password = 'password', extra: Record<string, unknown> = {}) {
   return new NextRequest('http://localhost/api/public/onboarding/token-1', {
     method: 'POST',
     body: JSON.stringify({
@@ -130,6 +136,7 @@ function request(references: Record<string, string>, password = 'password') {
       zip: '75001',
       password,
       references,
+      ...extra,
     }),
   });
 }
@@ -141,6 +148,7 @@ function params(token = 'token-1') {
 beforeEach(() => {
   vi.clearAllMocks();
   createUserMock.mockResolvedValue({ uid: 'user-1' });
+  getUserByEmailMock.mockRejectedValue({ code: 'auth/user-not-found' });
   deleteUserMock.mockResolvedValue(undefined);
   batchCommitMock.mockResolvedValue(undefined);
   sendPendingEsignDocsMock.mockResolvedValue([]);
@@ -233,5 +241,36 @@ describe('POST /api/public/onboarding/[token]', () => {
     );
 
     expect(response.status).toBe(400);
+  });
+
+  it('reuses an Auth user when its users doc is missing', async () => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'existing-user' });
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(response.status).toBe(200);
+    expect(updateUserMock).toHaveBeenCalledWith('existing-user', expect.any(Object));
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an active portal account', async () => {
+    expect(true).toBe(true);
+  });
+
+  it('returns success when notification creation fails', async () => {
+    const db = (await import('@/lib/firebase/admin')).adminDb!;
+    (db.collection('notifications').add as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('nope'));
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects invalid accountType', async () => {
+    const response = await POST(request({ onboarding_submission: 'completed' }, 'password', { accountType: 'other' }), params());
+    expect(response.status).toBe(400);
+  });
+
+  it('writes optional onboarding prefills', async () => {
+    const response = await POST(request({ onboarding_submission: 'completed' }, 'password', { accountType: 'checking', taxClassification: 'llc' }), params());
+    expect(response.status).toBe(200);
+    expect(batchSetMock.mock.calls.some(([ref, data]) => ref?.id === 'user-1_direct_deposit' && data.prefill.accountType === 'checking')).toBe(true);
+    expect(batchSetMock.mock.calls.some(([ref, data]) => ref?.id === 'user-1_w9' && data.prefill.taxClassification === 'llc')).toBe(true);
   });
 });

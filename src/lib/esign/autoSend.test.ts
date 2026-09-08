@@ -258,6 +258,28 @@ describe('sendPendingEsignDocs', () => {
     expect(sent).toEqual(['w9', 'contract']);
   });
 
+  it('sends an existing not-started item without a reference and forwards its prefill', async () => {
+    for (const itemId of ['w9', 'contract', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
+    }
+    store.set('userOnboarding/u1_direct_deposit', {
+      status: 'not_started',
+      prefill: { accountType: 'checking' },
+    });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual(['direct_deposit']);
+    expect(createEnvelopeMock).toHaveBeenCalledWith({
+      docKey: 'direct_deposit',
+      userId: 'u1',
+      itemId: 'direct_deposit',
+      signerName: 'Sam Rep',
+      signerEmail: 'sam@x.com',
+      prefill: { accountType: 'checking' },
+    });
+  });
+
   it('resends a rejected esign item when it has no envelope or dispatch state', async () => {
     for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
       store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });

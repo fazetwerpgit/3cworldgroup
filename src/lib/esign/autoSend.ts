@@ -211,12 +211,18 @@ async function sendOne(
   let envelopeId: string;
   let embeddedSigningUrl: string | undefined;
   try {
+    const rawPrefill = pending.snap.get('prefill');
+    const prefill =
+      rawPrefill && typeof rawPrefill === 'object' && !Array.isArray(rawPrefill)
+        ? (rawPrefill as Record<string, string>)
+        : undefined;
     ({ envelopeId, embeddedSigningUrl } = await provider.createEnvelope({
       docKey: pending.item.id as EsignDocKey,
       userId,
       itemId: pending.item.id,
       signerName,
       signerEmail,
+      ...(prefill ? { prefill } : {}),
     }));
   } catch (error) {
     console.error(`[esign] envelope creation failed for ${userId}/${pending.item.id}`, error);
