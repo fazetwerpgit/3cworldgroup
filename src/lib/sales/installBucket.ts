@@ -28,6 +28,11 @@ export function installBucketForSale(
   // Breakage means the customer missed, rescheduled or cancelled at the door —
   // the date on the sale is stale and somebody has to chase it.
   if (fiberOrder?.status === 'breakage') return 'attention';
+  // The carrier is the record of what actually happened (CALL 2). A cancelled
+  // or churned order never installed, or no longer is, so the install date on
+  // the sale is stale — without this the row reads 'installed' off its own past
+  // date and a rep's month counts a cancellation as a completed install.
+  if (fiberOrder?.status === 'cancelled' || fiberOrder?.status === 'churned') return 'attention';
   if (fiberOrder?.status === 'active') return 'installed';
 
   const installed = new Date(sale.installDate as Date | string);
@@ -37,12 +42,42 @@ export function installBucketForSale(
 }
 
 /**
+ * Jacob, 2026-09-10: a carrier cancellation drops the MONEY too.
+ *
+ * CALL 2 originally said the carrier won the status while the sale kept its
+ * value. The result was a rep's month reading "15 installs" with three of those
+ * customers cancelled — the carrier's word changed a chip somewhere and nothing
+ * else. A carrier 'cancelled' or 'churned' now settles the row exactly like a
+ * cancellation typed into the portal: out of the count, out of the value, out of
+ * expected pay. The reverse still never happens — a carrier status cannot
+ * un-cancel what a human cancelled.
+ */
+export function isCarrierCancelled(order: FiberOrder | null | undefined): boolean {
+  return order?.status === 'cancelled' || order?.status === 'churned';
+}
+
+type SaleForCount = Pick<Sale, 'status'> & { id?: string };
+
+/** The order matched to a sale, when the caller has the map to look it up. */
+function orderFor(
+  sale: SaleForCount,
+  fiberBySale?: Map<string, FiberOrder>
+): FiberOrder | undefined {
+  return fiberBySale?.get(sale.id || '');
+}
+
+/**
  * Sales worth counting. A rejected or cancelled sale is not money and not work:
  * it drops out of the pipeline bar, the rep sub-lines and the month totals
- * rather than sitting in a bucket nobody will ever act on.
+ * rather than sitting in a bucket nobody will ever act on. Pass `fiberBySale`
+ * wherever the carrier report is on hand, so a carrier cancellation drops out
+ * of the same figures.
  */
-export function countedSales<T extends Pick<Sale, 'status'>>(sales: T[]): T[] {
-  return sales.filter(isPayableSale);
+export function countedSales<T extends SaleForCount>(
+  sales: T[],
+  fiberBySale?: Map<string, FiberOrder>
+): T[] {
+  return sales.filter((sale) => isPayableSale(sale) && !isCarrierCancelled(orderFor(sale, fiberBySale)));
 }
 
 /**
@@ -51,8 +86,13 @@ export function countedSales<T extends Pick<Sale, 'status'>>(sales: T[]): T[] {
  * paper trail for a customer who backed out, and losing it is exactly what
  * deleting the row would do.
  */
-export function cancelledSales<T extends Pick<Sale, 'status'>>(sales: T[]): T[] {
-  return sales.filter((sale) => sale.status === 'cancelled');
+export function cancelledSales<T extends SaleForCount>(
+  sales: T[],
+  fiberBySale?: Map<string, FiberOrder>
+): T[] {
+  return sales.filter(
+    (sale) => sale.status === 'cancelled' || isCarrierCancelled(orderFor(sale, fiberBySale))
+  );
 }
 
 export function emptyInstallCounts(): InstallCounts {
@@ -65,7 +105,7 @@ export function countInstallBuckets(
   now: Date = new Date()
 ): InstallCounts {
   const counts = emptyInstallCounts();
-  for (const sale of countedSales(sales)) {
+  for (const sale of countedSales(sales, fiberBySale)) {
     counts[installBucketForSale(sale, fiberBySale?.get(sale.id || ''), now)] += 1;
   }
   return counts;
@@ -105,7 +145,7 @@ export function rollupSalesByRep(
 ): RepRollup[] {
   const byRep = new Map<string, RepRollup>();
 
-  for (const sale of countedSales(sales)) {
+  for (const sale of countedSales(sales, fiberBySale)) {
     const repId = sale.salesRepId || sale.salesRepName || 'unassigned';
     let rollup = byRep.get(repId);
     if (!rollup) {

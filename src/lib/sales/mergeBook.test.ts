@@ -217,6 +217,47 @@ describe('CALL 2 — the carrier wins the status, the sale keeps the money', () 
   });
 });
 
+// Jacob 2026-09-10 amended CALL 2: the carrier taking a customer away takes the
+// money with it. Until this, Will's August read 15 installs with three of those
+// customers cancelled by the carrier.
+describe('CALL 2 amended — a carrier cancellation takes the money', () => {
+  const cancelled = () =>
+    build(
+      [sale({ installDate: new Date('2026-09-08T12:00:00'), totalValue: 60 })],
+      [order({ status: 'cancelled', cancellationDate: '2026-09-10' })]
+    );
+
+  it('settles the row like a cancellation typed in here', () => {
+    const merged = row(cancelled(), 's1');
+    expect(merged.state).toBe('cancelled');
+    expect(merged.counted).toBe(false);
+  });
+
+  it('never reads as installed off the past date on the sale', () => {
+    expect(row(cancelled(), 's1').bucket).toBe('attention');
+  });
+
+  it('leaves the month total and the counts', () => {
+    const book = cancelled();
+    expect(book.totalValue).toBe(0);
+    expect(book.counts).toEqual({ attention: 0, scheduled: 0, installed: 0 });
+    expect(book.cancelled.map((r) => r.key)).toEqual(['s1']);
+  });
+
+  it('is not an accusation — the row never counts as "never logged"', () => {
+    expect(cancelled().notLoggedCount).toBe(0);
+  });
+
+  it('does the same on a churn', () => {
+    const book = build(
+      [sale({ installDate: new Date('2026-09-08T12:00:00') })],
+      [order({ status: 'churned', deactivationDate: '2026-09-10' })]
+    );
+    expect(row(book, 's1').state).toBe('cancelled');
+    expect(book.totalValue).toBe(0);
+  });
+});
+
 describe('join precedence', () => {
   it('lets a manual link beat a conflicting address match', () => {
     const linked = order({

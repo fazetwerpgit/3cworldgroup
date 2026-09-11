@@ -15,7 +15,9 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOwner } from '@/types';
-import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { expectedPayForSale } from '@/lib/pay/expectedPay';
+import { countedSales } from '@/lib/sales/installBucket';
+import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
   currentMonth,
   isCurrentMonth,
@@ -122,11 +124,21 @@ function SalesContent() {
   // Rep KPIs follow the month picker rather than always reading "this month",
   // so the figures and the list underneath can never describe different months.
   const mtdSales = useMemo(() => salesSoldIn(sales, month), [month, sales]);
-  const payableMtd = useMemo(() => mtdSales.filter(isPayableSale), [mtdSales]);
+  // Every KPI here counts MONEY, so a cancelled customer leaves all three —
+  // including one the carrier cancelled (Jacob 2026-09-10). The sale itself
+  // stays in the list underneath, marked, because it is still the paper trail.
+  const fiberBySale = useMemo(
+    () => matchFiberOrdersToSales(sales, fiber.data?.orders ?? []),
+    [fiber.data?.orders, sales]
+  );
+  const payableMtd = useMemo(
+    () => countedSales(mtdSales, fiberBySale),
+    [fiberBySale, mtdSales]
+  );
   const expectedPayMtd = hasPlan
     ? payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0)
     : null;
-  const boardValue = mtdSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+  const boardValue = payableMtd.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
 
   return (
     <ProtectedRoute permissions={['sales:read']}>
@@ -210,11 +222,11 @@ function SalesContent() {
                       <div className="sales-line-metric">
                         <span className="sales-line-metric-label">Value MTD</span>
                         <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardValue} /><small>$ / mo</small></strong>
-                        <span className="sales-line-metric-note"><span className="sales-line-lime">{mtdSales.length}</span> records in {monthLabel(month)}</span>
+                        <span className="sales-line-metric-note"><span className="sales-line-lime">{payableMtd.length}</span> records in {monthLabel(month)}</span>
                       </div>
                       <div className="sales-line-metric">
                         <span className="sales-line-metric-label">Sales this month</span>
-                        <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={mtdSales.length} /><small>sales</small></strong>
+                        <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={payableMtd.length} /><small>sales</small></strong>
                         <span className="sales-line-metric-note">{sales.length} on your board all time</span>
                       </div>
                       <div className="sales-line-metric">

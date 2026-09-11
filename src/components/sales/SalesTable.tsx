@@ -9,6 +9,7 @@ import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
 import { monthLabel, salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import {
   Dialog,
@@ -102,38 +103,41 @@ export function SalesTable({
   // lists what was sold; the pay list lists what installed, because pay is owed
   // off the install — a sale sold in August that installs in September is
   // August's record and September's money, and it has to appear in both.
+  const fiberOrders = useMemo(() => fiber?.data?.orders ?? [], [fiber?.data?.orders]);
+  const fiberBySale = useMemo(
+    () => matchFiberOrdersToSales(sales, fiberOrders),
+    [fiberOrders, sales]
+  );
   const monthSales = useMemo(
     () => (month ? salesSoldIn(sales, month) : sales),
     [month, sales]
   );
   const paySales = useMemo(
     () => (month ? salesInstalledIn(sales, month) : sales)
-      .filter((sale) => !!sale.installDate && isPayableSale(sale))
+      .filter((sale) => !!sale.installDate && isPayableSale(sale) && !isCarrierCancelled(fiberBySale.get(sale.id || '')))
       .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
-    [month, sales]
+    [fiberBySale, month, sales]
   );
   const expectedBySale = useMemo(() => {
     const map: Record<string, number | null> = {};
     for (const sale of sales) {
-      map[sale.id || ''] = isPayableSale(sale) ? expectedPayForSale(sale, rates) : null;
+      const cancelled = !isPayableSale(sale) || isCarrierCancelled(fiberBySale.get(sale.id || ''));
+      map[sale.id || ''] = cancelled ? null : expectedPayForSale(sale, rates);
     }
     return map;
-  }, [rates, sales]);
+  }, [fiberBySale, rates, sales]);
 
   // The rows actually on screen — the ledger, or the pay list.
   const listSales = showPay ? paySales : monthSales;
   const selectedIndex = selectedId ? listSales.findIndex((sale) => sale.id === selectedId) : -1;
   const selectedSale = selectedIndex >= 0 ? listSales[selectedIndex] : null;
-  const totalValue = listSales.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+  // The total under the list is MONEY, so a cancellation leaves it — whoever
+  // cancelled it, us or the carrier. The row itself stays on screen, marked.
+  const totalValue = countedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
   const expectedTotal = hasPlan
     ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
   const expectedTotalLabel = expectedLabel(expectedTotal);
-  const fiberOrders = useMemo(() => fiber?.data?.orders ?? [], [fiber?.data?.orders]);
-  const fiberBySale = useMemo(
-    () => matchFiberOrdersToSales(sales, fiberOrders),
-    [fiberOrders, sales]
-  );
   const fiberBucketCounts = useMemo(() => {
     const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };
     fiberOrders.forEach((order) => {

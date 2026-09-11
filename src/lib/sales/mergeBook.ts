@@ -2,6 +2,7 @@ import type { Sale } from '@/types/sales';
 import type { FiberOrder } from '@/types/fiberOrder';
 import {
   cancelledSales,
+  isCarrierCancelled,
   countedSales,
   emptyInstallCounts,
   installBucketForSale,
@@ -20,9 +21,11 @@ import type { MonthKey } from '@/lib/sales/monthWindow';
 //   CALL 1 — a carrier order nobody logged is NOT a sale. It renders red in the
 //            matched rep's list and feeds "Not logged" only: never count, never
 //            value, never pay.
-//   CALL 2 — the carrier wins the STATUS, the sale keeps the MONEY. A carrier
-//            status can sharpen a row's bucket but can never un-cancel a sale
-//            somebody here cancelled.
+//   CALL 2 — the carrier wins the STATUS. A carrier status can sharpen a row's
+//            bucket but can never un-cancel a sale somebody here cancelled.
+//            AMENDED 2026-09-10 (Jacob): a carrier 'cancelled' or 'churned'
+//            takes the MONEY too. It used to leave value and pay untouched, so
+//            a rep's month read "15 installs" with three of them cancelled.
 
 /**
  * How far back Jacob wants to be SHOWN carrier orders with no matching sale.
@@ -440,14 +443,19 @@ export function buildMergedBook(
     claimedOrders.add(order);
   }
 
-  const rows: MergedRow[] = sales.map((sale, index) =>
-    saleRow(sale, orderBySale.get(sale) ?? null, index, {
+  // The carrier half of the verdict can only be read once the join is done, so
+  // it lands here rather than in the sets above: a carrier cancellation settles
+  // the row like a cancellation typed in, and never the other way round.
+  const rows: MergedRow[] = sales.map((sale, index) => {
+    const order = orderBySale.get(sale) ?? null;
+    const carrierCancelled = isCarrierCancelled(order);
+    return saleRow(sale, order, index, {
       linkedManually: linkedManually.has(sale),
-      cancelled: cancelled.has(sale),
-      counted: payable.has(sale),
+      cancelled: cancelled.has(sale) || carrierCancelled,
+      counted: payable.has(sale) && !carrierCancelled,
       now,
-    })
-  );
+    });
+  });
 
   const NO_LINK: OrderVerdict = { dismissed: false, linkBroken: false };
   for (const order of orders) {
