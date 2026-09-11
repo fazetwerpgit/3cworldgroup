@@ -202,6 +202,17 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
 });
 
 describe('DELETE /api/portal/auth/users/[id]', () => {
+  it('closes the account\'s open alerts, so a deleted signup stops nagging', async () => {
+    firestore.users.set('pending-user', { status: 'pending' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+    expect(mockResolveAlertTasks).toHaveBeenCalledWith('pending-user');
+  });
+
   it('rejects an operations caller deleting a platform-role account', async () => {
     firestore.users.set('pending-user', { status: 'active', role: 'operations' });
     mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });

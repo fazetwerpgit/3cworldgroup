@@ -72,7 +72,7 @@ vi.mock('@/lib/email/templates', () => ({
   }),
 }));
 
-import { createAlertTask, dismissAlertTask, shouldRenag } from './alertTasks';
+import { createAlertTask, dismissAlertTask, renagStaleTasks, shouldRenag } from './alertTasks';
 
 const HOUR = 3600 * 1000;
 
@@ -197,5 +197,41 @@ describe('dismissAlertTask', () => {
 
     await expect(dismissAlertTask('alert-1', 'manager-1', 'Manager One')).resolves.toBe('dismissed');
     expect(txUpdateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('renagStaleTasks', () => {
+  it('closes a task whose subject account no longer exists instead of nagging about it', async () => {
+    // One deleted bot signup emailed every admin daily for ten days because
+    // nothing that deletes an account knew the alert existed.
+    const now = new Date('2026-09-11T14:00:00Z');
+    const update = vi.fn(async () => undefined);
+    getExistingTasksMock.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 'alert-ghost',
+          ref: { update },
+          get: (field: string) =>
+            ({
+              status: 'open',
+              kind: 'pending_assignment',
+              subjectUserId: 'ghost-uid',
+              subjectName: 'ghost',
+              title: 'ghost self-registered and needs a position',
+              message: 'Assign their role.',
+              link: '/portal/admin',
+              createdAt: new Date('2026-09-01T00:00:00Z'),
+              lastNaggedAt: undefined,
+            })[field],
+        },
+      ],
+    });
+    getUserDocMock.mockResolvedValueOnce({ exists: false });
+
+    const count = await renagStaleTasks(now);
+
+    expect(count).toBe(0);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: 'resolved' }));
+    expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

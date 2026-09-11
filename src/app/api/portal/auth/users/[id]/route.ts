@@ -412,6 +412,11 @@ export async function DELETE(
     // Delete user document from Firestore
     await docRef.delete();
 
+    // Their open alerts go with them. A "needs a position" task re-nags every
+    // admin daily until resolved, and nothing else resolves it once the
+    // account is gone — one deleted bot signup emailed Jacob for ten days.
+    await resolveAlertTasks(id);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting user:', error);

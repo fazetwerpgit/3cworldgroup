@@ -204,9 +204,19 @@ export async function renagStaleTasks(now: Date): Promise<number> {
     };
     if (!shouldRenag(task, now)) continue;
 
+    // A subject that no longer exists has nothing left to assign. Close the
+    // task instead of nagging about a ghost — the account may have been
+    // deleted by a path that never knew about alerts.
+    const subjectUserId = doc.get('subjectUserId') as string;
+    const subject = await db.collection('users').doc(subjectUserId).get();
+    if (!subject.exists) {
+      await doc.ref.update({ status: 'resolved', resolvedAt: now, resolvedReason: 'subject account no longer exists' });
+      continue;
+    }
+
     await broadcast({
       kind: doc.get('kind') as AlertTaskKind,
-      subjectUserId: doc.get('subjectUserId') as string,
+      subjectUserId,
       subjectName: doc.get('subjectName') as string,
       title: `Still unclaimed: ${doc.get('title')}`,
       message: doc.get('message') as string,
