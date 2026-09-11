@@ -1,5 +1,19 @@
 # RESUME — read this and continue without being asked
 
+## 2026-09-11 — both portal fixes LIVE on master. Redesign still uncommitted.
+
+master 7b58855b = carrier cancellation takes the money (cb973b40 on this branch).
+master 03c8eeb8 = a deleted account stops nagging (8665b590 on this branch):
+deleting a user resolves their alerts; the daily reminder closes any task whose
+subject account no longer exists. The gHnyob zombie alert was resolved by hand
+first. Henry Daniel Fandey's alert is real and still open on purpose — Jacob
+has not assigned him a position yet.
+
+Deploys go through the /home/fazetwerpnerd69/dev/3cwg-deploy worktree:
+detach on origin/master, cherry-pick, gate there, push HEAD:master. Never
+check out master in the main tree — Jacob's redesign is dirty there.
+NEXT: redesign track (see CURRENT below).
+
 ## PORTAL BUG (2026-09-10) — carrier cancellations now take the money. UNCOMMITTED.
 
 Jacob: "on Will's it was showing that he had 15 installs but he had 3 cancels."
