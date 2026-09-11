@@ -48,6 +48,12 @@ describe('installBucketForSale', () => {
     expect(installBucketForSale(scheduled, order('breakage'), NOW)).toBe('attention');
   });
 
+  it('does not call a cancelled or churned order installed off the sale date', () => {
+    const past = sale({ installDate: new Date('2026-09-08T12:00:00') });
+    expect(installBucketForSale(past, order('cancelled'), NOW)).toBe('attention');
+    expect(installBucketForSale(past, order('churned'), NOW)).toBe('attention');
+  });
+
   it('trusts an active fiber order over a future date', () => {
     const scheduled = sale({ installDate: new Date('2026-09-20T12:00:00') });
     expect(installBucketForSale(scheduled, order('active'), NOW)).toBe('installed');
@@ -67,6 +73,25 @@ describe('countedSales', () => {
       sale({ id: 'd', status: 'pending' }),
     ]);
     expect(kept.map((s) => s.id)).toEqual(['a', 'd']);
+  });
+});
+
+describe('a carrier cancellation', () => {
+  // Jacob 2026-09-10: the carrier taking a customer away takes the money with
+  // it. Before this, a rep's month counted a cancelled customer as a sale.
+  const all = [sale({ id: 'a', status: 'approved' }), sale({ id: 'b', status: 'approved' })];
+  const fiberBySale = new Map<string, FiberOrder>([['b', order('cancelled')]]);
+
+  it('leaves the counted sales', () => {
+    expect(countedSales(all, fiberBySale).map((s) => s.id)).toEqual(['a']);
+  });
+
+  it('joins the cancellations instead', () => {
+    expect(cancelledSales(all, fiberBySale).map((s) => s.id)).toEqual(['b']);
+  });
+
+  it('is ignored when the caller has no report to read', () => {
+    expect(countedSales(all).map((s) => s.id)).toEqual(['a', 'b']);
   });
 });
 

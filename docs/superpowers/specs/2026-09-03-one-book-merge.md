@@ -14,6 +14,15 @@ CALL 2 — the carrier wins the STATUS; the sale keeps the MONEY.
   Row status/bucket comes from the FiberOrder. Row dollars always come from
   Sale.totalValue. A carrier status NEVER un-cancels a sale cancelled by us.
 
+  AMENDED 2026-09-10 (Jacob): a carrier 'cancelled' or 'churned' takes the
+  MONEY too. It settles the row exactly like a cancellation typed into the
+  portal — out of count, out of value, out of expected pay, into the cancelled
+  drawer — on the rep's page as well as the board. The reverse still never
+  happens. Found because Will Teasdale's August read 15 sales with three of
+  those customers cancelled by the carrier: installBucketForSale only knew
+  'breakage' and 'active', so a cancelled order with a past install date on the
+  sale came back 'installed'.
+
 ## Row model (the whole feature in one type)
 
 One row per customer. Precedence is evaluated top-down; first match wins.
@@ -21,6 +30,7 @@ One row per customer. Precedence is evaluated top-down; first match wins.
 | # | Sale | Order | state | notes |
 |---|---|---|---|---|
 | 1 | cancelled by us | any | `cancelled` | Settled. Cancelled drawer. Carrier cannot override. |
+| 1b | any | `cancelled`/`churned` | `cancelled` | 2026-09-10. Carrier cancellation, settled like ours. Not counted, not paid. |
 | 2 | yes | yes | `agreed` | Name/plan/value from sale, status from carrier. `valueGap` set when sale value and carrier MRC differ. |
 | 3 | yes | no | `waiting` | "Not in the report yet". Keeps the sale's own install date. |
 | 4 | no | yes, `matchedUserId != null` | `never_logged` | Red, in that rep's list, under the address. Counts to "Not logged" only. |

@@ -335,6 +335,12 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   // My pay: the viewer's own installed work, soonest money first. The month is
   // applied here now that the page hands over the whole book — this tab has
   // always meant the month on the picker and still does.
+  // A row the book does not count is not pay — that covers a sale cancelled
+  // here and, since 2026-09-10, one the carrier cancelled.
+  const uncountedSaleIds = useMemo(
+    () => new Set(book.rows.filter((row) => row.sale && !row.counted).map((row) => row.sale!.id)),
+    [book.rows]
+  );
   const mySales = useMemo(
     () =>
       sales
@@ -342,9 +348,10 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           sale.salesRepId === user?.uid &&
           !!sale.installDate &&
           isPayableSale(sale) &&
+          !uncountedSaleIds.has(sale.id) &&
           (!month || isInMonth(sale.saleDate, month)))
         .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
-    [month, sales, user?.uid]
+    [month, sales, uncountedSaleIds, user?.uid]
   );
   const myExpected = useMemo(
     () => mySales.reduce((sum, sale) => sum + (expectedPayForSale(sale, payPlan?.rates ?? null) ?? 0), 0),
