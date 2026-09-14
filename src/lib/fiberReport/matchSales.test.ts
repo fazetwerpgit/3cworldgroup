@@ -170,3 +170,16 @@ describe('matchFiberOrdersToSales', () => {
     expect(result).toEqual(new Map());
   });
 });
+
+describe('same-day re-order at one address', () => {
+  it('prefers the live order over the cancelled one, whichever came first', () => {
+    // Rosaria Lepo, 54806 Ashley Lauren Dr: the carrier opened two orders on
+    // Jul 31, cancelled one the same day, and installed the other on Sep 12.
+    const sale = { id: 's1', customerAddress: '54806 Ashley Lauren Dr Macomb, MI' };
+    const dead = { id: 'dead', status: 'cancelled', orderDate: '2026-07-31', address: '54806 ASHLEY LAUREN DR' } as FiberOrder;
+    const live = { id: 'live', status: 'active', orderDate: '2026-07-31', address: '54806 ASHLEY LAUREN DR' } as FiberOrder;
+
+    expect(matchFiberOrdersToSales([sale], [dead, live]).get('s1')?.id).toBe('live');
+    expect(matchFiberOrdersToSales([sale], [live, dead]).get('s1')?.id).toBe('live');
+  });
+});
