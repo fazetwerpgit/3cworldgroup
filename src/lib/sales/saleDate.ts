@@ -109,3 +109,66 @@ export function parseInstallDateInput(input: unknown): ParsedDateInput {
     futureError: 'Install date too far in the future',
   });
 }
+
+/**
+ * The timezone the business (and the carrier's report) means by "a day". Install
+ * dates are stored at LOCAL noon, so a bare getTime() comparison between a
+ * report day and a stored date answers the wrong question near midnight; every
+ * "is this the same day" check goes through installDayKey below instead.
+ */
+export const INSTALL_DATE_TIME_ZONE = 'America/Chicago';
+
+const DAY_KEY_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: INSTALL_DATE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Accepts a Date, a Firestore Timestamp, or an ISO/`YYYY-MM-DD` string. */
+function asDate(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    if (DATE_INPUT_RE.test(value)) {
+      const parsed = parseDateInput(value, {
+        invalidError: 'invalid',
+        allowFuture: true,
+        futureError: 'future',
+      });
+      return parsed.ok ? parsed.date : null;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const maybe = value as { toDate?: () => Date } | null | undefined;
+  if (maybe && typeof maybe.toDate === 'function') {
+    const parsed = maybe.toDate();
+    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * The calendar day an install date falls on, as `YYYY-MM-DD` in
+ * INSTALL_DATE_TIME_ZONE. null when there is no usable date. Two values with
+ * the same key are the same install day however they were stored.
+ */
+export function installDayKey(value: unknown): string | null {
+  const date = asDate(value);
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const parts = DAY_KEY_FORMATTER.formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  if (!year || !month || !day) return null;
+  return `${year}-${month}-${day}`;
+}
+
+/** MM/DD/YYYY in INSTALL_DATE_TIME_ZONE, for anything a rep reads. */
+export function formatInstallDay(value: unknown): string | null {
+  const key = installDayKey(value);
+  if (!key) return null;
+  const [year, month, day] = key.split('-');
+  return `${month}/${day}/${year}`;
+}

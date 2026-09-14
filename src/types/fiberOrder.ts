@@ -55,6 +55,22 @@ export interface FiberOrder {
   saleLink?: { saleId: string | null; by: string; byName: string; at: string } | null;
 }
 
+// What the install-date sync did with one report (see lib/sales/installDateSync).
+// Lives here so the import log can carry it: the token-gated health check on the
+// inbound webhook is where anyone asks "did that report move anybody's date?".
+export interface InstallDateSyncCounts {
+  /** Orders in the report that carried an est install date and were considered. */
+  checked: number;
+  updated: number;
+  /** The order matched no single sale, so nothing was safe to write. */
+  skippedAmbiguous: number;
+  skippedCancelled: number;
+  /** Matched a sale that already sat on that day (the ordinary case). */
+  unchanged: number;
+  /** Per-sale failures. Counted and logged, never thrown at the webhook. */
+  errors: number;
+}
+
 // Import log entry, one per received report email (collection: fiberReportImports).
 export interface FiberReportImport {
   receivedAt: string;
@@ -66,6 +82,7 @@ export interface FiberReportImport {
   matchedReps: number;
   unmatchedRepNames: string[];
   error: string | null;
+  installDateSync?: InstallDateSyncCounts | null;
 }
 
 export interface FiberStatusResponse {

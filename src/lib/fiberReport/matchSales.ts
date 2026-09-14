@@ -24,7 +24,12 @@ export function normalizeAddress(value: string | null | undefined): string {
     .trim();
 }
 
-function isAddressPrefixPair(a: string, b: string): boolean {
+/**
+ * The address predicate behind every carrier↔sale join. Exported so a writer
+ * (installDateSync) can ask the SAME question the read-time join asks, rather
+ * than growing a second, subtly different idea of what "same address" means.
+ */
+export function isAddressPrefixPair(a: string, b: string): boolean {
   const shorter = a.length <= b.length ? a : b;
   const longer = a.length <= b.length ? b : a;
   return shorter.length >= 6 && longer.startsWith(shorter);

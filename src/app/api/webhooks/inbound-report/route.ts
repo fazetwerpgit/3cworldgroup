@@ -4,7 +4,8 @@ import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
-import type { FiberOrder, FiberReportImport } from '@/types/fiberOrder';
+import { syncInstallDatesFromOrders } from '@/lib/sales/installDateSync';
+import type { FiberOrder, FiberReportImport, InstallDateSyncCounts } from '@/types/fiberOrder';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -26,7 +27,7 @@ function importLog(
   filename: string,
   fromEmail: string,
   subject: string,
-  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error'>>
+  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync'>>
 ): FiberReportImport {
   return {
     receivedAt,
@@ -38,6 +39,7 @@ function importLog(
     matchedReps: values.matchedReps ?? 0,
     unmatchedRepNames: values.unmatchedRepNames ?? [],
     error: values.error ?? null,
+    installDateSync: values.installDateSync ?? null,
   };
 }
 
@@ -192,6 +194,22 @@ export async function POST(request: NextRequest) {
       await batch.commit();
     }
 
+    // The orders are stored, so the report is safe. Everything below is a
+    // follow-up: the carrier's date is pushed onto the matching sales and the
+    // reps are told. It runs AFTER the upsert and inside its own try — a
+    // failure here must not fail a report that already landed, or the next
+    // delivery would be the only way to recover data we already have.
+    let installDateSync: InstallDateSyncCounts | null = null;
+    try {
+      const { changes, ...counts } = await syncInstallDatesFromOrders({ orders, now: new Date() });
+      installDateSync = counts;
+      if (changes.length) {
+        console.log(`[inbound-report] moved ${changes.length} install date(s) from the report`);
+      }
+    } catch (error) {
+      console.error('[inbound-report] install date sync failed', error);
+    }
+
     await adminDb.collection('config').doc('fiberReportStatus').set(
       { lastReportAt: receivedAt, lastFilename: filename, lastUpserted: orders.length },
       { merge: true }
@@ -203,10 +221,11 @@ export async function POST(request: NextRequest) {
         matchedReps,
         unmatchedRepNames: [...unmatchedRepNames],
         error: null,
+        installDateSync,
       })
     );
 
-    return NextResponse.json({ ok: true, upserted: orders.length });
+    return NextResponse.json({ ok: true, upserted: orders.length, installDateSync });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[inbound-report]', message);

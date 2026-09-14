@@ -1,0 +1,327 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { salesGetMock, updateMock, docMock, collectionMock, dispatchMock } = vi.hoisted(() => {
+  const salesGetMock = vi.fn();
+  const updateMock = vi.fn();
+  const docMock = vi.fn((id: string) => ({
+    update: (data: Record<string, unknown>) => updateMock(id, data),
+  }));
+  const collectionMock = vi.fn(() => ({ get: salesGetMock, doc: docMock }));
+  const dispatchMock = vi.fn();
+  return { salesGetMock, updateMock, docMock, collectionMock, dispatchMock };
+});
+
+vi.mock('@/lib/firebase/admin', () => ({
+  adminDb: { collection: collectionMock },
+}));
+vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
+
+import { syncInstallDatesFromOrders } from './installDateSync';
+import { dateToSaleDateInput, installDayKey } from './saleDate';
+import type { FiberOrder } from '@/types/fiberOrder';
+
+const NOW = new Date('2026-09-14T17:00:00.000Z');
+
+/** A date at local noon, `offsetDays` from today — inside the one-year cap. */
+function noon(offsetDays: number): Date {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + offsetDays);
+  return date;
+}
+
+/** The report writes a plain calendar day; read it off the same helper the sync does. */
+function reportDay(offsetDays: number): string {
+  return installDayKey(noon(offsetDays))!;
+}
+
+function order(overrides: Partial<FiberOrder> & Pick<FiberOrder, 'id'>): FiberOrder {
+  return {
+    status: 'pending_install',
+    rawStatus: 'Pending Installation',
+    repDealerId: '4721016',
+    repName: 'Rep One',
+    matchedUserId: 'rep-1',
+    orderDate: '2026-09-01',
+    estInstallDate: null,
+    activationDate: null,
+    cancellationDate: null,
+    deactivationDate: null,
+    fiberPlan: null,
+    mrc: null,
+    address: '123 Main St',
+    unit: null,
+    city: null,
+    state: null,
+    zip: null,
+    breakageReason: null,
+    breakageNotes: null,
+    customerName: null,
+    sourceSheet: 'Orders',
+    reportReceivedAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+    ...overrides,
+  };
+}
+
+type SaleDoc = {
+  id: string;
+  salesRepId?: string;
+  customerName?: string;
+  customerAddress?: string;
+  installDate?: Date | null;
+  status?: string;
+};
+
+function setSales(sales: SaleDoc[]): void {
+  salesGetMock.mockResolvedValue({
+    docs: sales.map(({ id, ...data }) => ({ id, data: () => data })),
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  updateMock.mockResolvedValue(undefined);
+  dispatchMock.mockResolvedValue(undefined);
+  setSales([]);
+});
+
+describe('syncInstallDatesFromOrders', () => {
+  it('moves the sale to the carrier day at local noon and tells the rep once', async () => {
+    const previous = noon(3);
+    setSales([
+      {
+        id: 'sale-1',
+        salesRepId: 'rep-1',
+        customerName: 'Dana Reyes',
+        customerAddress: '123 Main St',
+        installDate: previous,
+        status: 'approved',
+      },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(10) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 1, unchanged: 0, errors: 0 });
+    expect(updateMock).toHaveBeenCalledOnce();
+    const [saleId, written] = updateMock.mock.calls[0];
+    expect(saleId).toBe('sale-1');
+    expect(written.installDateSource).toBe('report');
+    expect(written.installDatePreviousDate).toBe(previous);
+    expect(written.installDateChangedAt).toBe(NOW);
+    expect(written.updatedAt).toBe(NOW);
+    expect(dateToSaleDateInput(written.installDate as Date)).toBe(reportDay(10));
+    expect((written.installDate as Date).getHours()).toBe(12);
+    // Nothing else on the sale is the report's business.
+    expect(Object.keys(written).sort()).toEqual([
+      'installDate',
+      'installDateChangedAt',
+      'installDatePreviousDate',
+      'installDateSource',
+      'updatedAt',
+    ]);
+
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    expect(dispatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'rep-1',
+        type: 'install_date_changed',
+        title: 'Install date changed',
+        link: '/portal/sales/sale-1',
+      })
+    );
+    const message = dispatchMock.mock.calls[0][0].message as string;
+    expect(message).toContain("Dana Reyes's install to");
+    expect(message).toContain('(was ');
+    expect(result.changes).toEqual([
+      { saleId: 'sale-1', salesRepId: 'rep-1', previous, next: written.installDate },
+    ]);
+  });
+
+  it('leaves the sale alone when the carrier names the same calendar day', async () => {
+    const installDate = noon(5);
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: installDayKey(installDate)! })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 0, unchanged: 1 });
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when two sales share the order address', async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+      { id: 'sale-2', salesRepId: 'rep-2', customerAddress: '123 Main Street', installDate: noon(2) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 0, skippedAmbiguous: 1 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when two dated orders claim the same sale', async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({ id: 'o-1', estInstallDate: reportDay(9) }),
+        order({ id: 'o-2', estInstallDate: reportDay(11) }),
+      ],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 2, updated: 0, skippedAmbiguous: 2 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('skips a cancelled sale', async () => {
+    setSales([
+      {
+        id: 'sale-1',
+        salesRepId: 'rep-1',
+        customerAddress: '123 Main St',
+        installDate: noon(2),
+        status: 'cancelled',
+      },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 0, skippedCancelled: 1 });
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('follows saleLink instead of the address guess', async () => {
+    setSales([
+      { id: 'sale-address', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+      { id: 'sale-linked', salesRepId: 'rep-2', customerAddress: '900 Other Rd', installDate: noon(2) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({
+          id: 'o-1',
+          estInstallDate: reportDay(9),
+          saleLink: { saleId: 'sale-linked', by: 'admin-1', byName: 'Admin', at: NOW.toISOString() },
+        }),
+      ],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 1 });
+    expect(updateMock).toHaveBeenCalledOnce();
+    expect(updateMock.mock.calls[0][0]).toBe('sale-linked');
+    expect(dispatchMock.mock.calls[0][0].userId).toBe('rep-2');
+  });
+
+  it('respects an admin saying the order is not a sale', async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({
+          id: 'o-1',
+          estInstallDate: reportDay(9),
+          saleLink: { saleId: null, by: 'admin-1', byName: 'Admin', at: NOW.toISOString() },
+        }),
+      ],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 0, skippedAmbiguous: 0, unchanged: 0 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('counts a failed write and keeps going', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+      { id: 'sale-2', salesRepId: 'rep-2', customerAddress: '77 Oak Ave', installDate: noon(2) },
+    ]);
+    updateMock.mockImplementation((id: string) =>
+      id === 'sale-1' ? Promise.reject(new Error('firestore down')) : Promise.resolve(undefined)
+    );
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({ id: 'o-1', address: '123 Main St', estInstallDate: reportDay(9) }),
+        order({ id: 'o-2', address: '77 Oak Ave', estInstallDate: reportDay(9) }),
+      ],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 2, updated: 1, errors: 1 });
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0].saleId).toBe('sale-2');
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
+  });
+
+  it('counts a failed notification without unwinding the date it already wrote', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+    ]);
+    dispatchMock.mockRejectedValue(new Error('no bell'));
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 1, errors: 1 });
+    expect(updateMock).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
+  });
+
+  it('ignores orders with no est install date', async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: null })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 0, updated: 0 });
+    expect(salesGetMock).toHaveBeenCalledOnce();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('sets a first install date on a sale that never had one', async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: null },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 1 });
+    expect(updateMock.mock.calls[0][1].installDatePreviousDate).toBeNull();
+    expect(dispatchMock.mock.calls[0][0].message).not.toContain('(was ');
+  });
+});

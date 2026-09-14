@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -102,7 +102,7 @@ function SalesContent() {
 
   const atCurrentMonth = useMemo(() => isCurrentMonth(month), [month]);
 
-  useEffect(() => {
+  const refreshSales = useCallback(() => {
     if (!user) return;
     // Both books are fetched WHOLE and sliced by month in the browser.
     //
@@ -120,6 +120,10 @@ function SalesContent() {
       canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
     fetchSales(filters);
   }, [canViewAll, fetchSales, user]);
+
+  useEffect(() => {
+    refreshSales();
+  }, [refreshSales]);
 
   // Rep KPIs follow the month picker rather than always reading "this month",
   // so the figures and the list underneath can never describe different months.
@@ -194,6 +198,7 @@ function SalesContent() {
                     onSetCancelled={setSaleCancelled}
                     fiber={fiber}
                     payPlan={payPlan}
+                    onSaleUpdated={refreshSales}
                   />
 
                   {/* The carrier report from the morning email — Pending
@@ -253,6 +258,7 @@ function SalesContent() {
                       onPayViewChange={setPayView}
                       payPlan={payPlan}
                       fiber={fiber}
+                      onSaleUpdated={refreshSales}
                     />
                   )}
                 </>

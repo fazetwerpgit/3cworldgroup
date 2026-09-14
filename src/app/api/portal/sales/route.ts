@@ -143,6 +143,8 @@ export async function GET(request: NextRequest) {
         ...data,
         saleDate: data.saleDate?.toDate(),
         installDate: data.installDate?.toDate(),
+        installDatePreviousDate: data.installDatePreviousDate?.toDate() ?? null,
+        installDateChangedAt: data.installDateChangedAt?.toDate(),
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         approvedAt: data.approvedAt?.toDate(),
