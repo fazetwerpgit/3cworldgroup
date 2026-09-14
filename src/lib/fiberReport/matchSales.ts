@@ -24,6 +24,10 @@ export function normalizeAddress(value: string | null | undefined): string {
     .trim();
 }
 
+function isDead(order: FiberOrder): boolean {
+  return order.status === 'cancelled' || order.status === 'churned';
+}
+
 function isAddressPrefixPair(a: string, b: string): boolean {
   const shorter = a.length <= b.length ? a : b;
   const longer = a.length <= b.length ? b : a;
@@ -61,6 +65,10 @@ export function matchFiberOrdersToSales(
         const selectedDate = selectedOrder.orderDate ?? selectedOrder.estInstallDate ?? '';
         const orderDate = order.orderDate ?? order.estInstallDate ?? '';
         if (orderDate > selectedDate) selectedOrder = order;
+        // Same day, one live and one dead: the carrier re-ordered at the same
+        // address and cancelled the first. The live one is the customer's
+        // order; picking the dead one by input order would cancel a real sale.
+        else if (orderDate === selectedDate && isDead(selectedOrder) && !isDead(order)) selectedOrder = order;
       }
     }
 

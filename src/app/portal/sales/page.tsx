@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isOwner } from '@/types';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
 import { countedSales } from '@/lib/sales/installBucket';
+import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
   currentMonth,
@@ -84,7 +85,7 @@ function SalesLineSkeleton() {
 
 function SalesContent() {
   const { user, hasPermission } = useAuth();
-  const { sales, truncated, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
+  const { sales: loggedSales, truncated, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
   const fiber = useFiberStatus();
 
   // Admins and owners read the whole company book; everyone else reads their own.
@@ -123,14 +124,21 @@ function SalesContent() {
 
   // Rep KPIs follow the month picker rather than always reading "this month",
   // so the figures and the list underneath can never describe different months.
-  const mtdSales = useMemo(() => salesSoldIn(sales, month), [month, sales]);
   // Every KPI here counts MONEY, so a cancelled customer leaves all three —
   // including one the carrier cancelled (Jacob 2026-09-10). The sale itself
   // stays in the list underneath, marked, because it is still the paper trail.
   const fiberBySale = useMemo(
-    () => matchFiberOrdersToSales(sales, fiber.data?.orders ?? []),
-    [fiber.data?.orders, sales]
+    () => matchFiberOrdersToSales(loggedSales, fiber.data?.orders ?? []),
+    [fiber.data?.orders, loggedSales]
   );
+  // The carrier's activation date wins over the install date the rep typed
+  // (Jacob 2026-09-14). Applied once here so the KPIs, the ledger, the pay
+  // list and the board all see one install date — see carrierInstall.ts.
+  const sales = useMemo(
+    () => applyCarrierInstallDates(loggedSales, fiberBySale),
+    [fiberBySale, loggedSales]
+  );
+  const mtdSales = useMemo(() => salesSoldIn(sales, month), [month, sales]);
   const payableMtd = useMemo(
     () => countedSales(mtdSales, fiberBySale),
     [fiberBySale, mtdSales]
