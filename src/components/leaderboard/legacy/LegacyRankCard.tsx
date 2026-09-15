@@ -4,13 +4,13 @@ import { Award, BarChart3, CheckCircle2, Trophy } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 
-interface RankCardProps {
+interface LegacyRankCardProps {
   rank: number | null;
   totalSales: number;
   totalPoints: number;
 }
 
-export function RankCard({ rank, totalSales, totalPoints }: RankCardProps) {
+export function LegacyRankCard({ rank, totalSales, totalPoints }: LegacyRankCardProps) {
   const formatPoints = (points: number) => new Intl.NumberFormat('en-US').format(points);
 
   const rankLabel = rank ? `#${rank}` : '--';

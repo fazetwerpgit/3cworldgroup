@@ -7,6 +7,7 @@ import {
   type HistoryEnrichment,
   type SaleRecord,
 } from '@/lib/leaderboard/history';
+import { periodBounds } from '@/lib/leaderboard/periods';
 
 // How many ranked rows a non-management caller may pull in one request. The
 // most any rep-facing view asks for is 100 (dashboard); the mini widget asks 5.
@@ -47,26 +48,8 @@ export async function GET(request: NextRequest) {
 
     // Calculate date range
     const now = new Date();
-    let startDate: Date;
-
-    switch (period) {
-      case 'week':
-        const dayOfWeek = now.getDay();
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - dayOfWeek);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        break;
-      case 'all':
-        startDate = new Date(0);
-        break;
-      case 'month':
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-    }
+    const bounds = periodBounds(period === 'week' || period === 'year' || period === 'all' ? period : 'month', now);
+    const startDate = bounds?.start ?? new Date(0);
 
     // Get approved sales - filter by date in code to avoid compound index requirement
     // Limit to prevent memory issues with large datasets
