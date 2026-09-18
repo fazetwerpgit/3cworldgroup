@@ -1,5 +1,236 @@
 # RESUME — read this and continue without being asked
 
+## CURRENT (2026-09-18) — Home + About + Services pass ACCEPTED by Jacob and committed
+
+NEXT ACTION: Jacob is starting a new round on "the next sections I have
+problems with". Wait for him to name the page/section and paste screenshots;
+translate each into a fix, apply directly, verify at 1440 + 390, screenshot
+back. Same loop as this pass. Branch codex/services-home-alignment-20260916.
+Dev server: `npm run dev -- -p 3000` (log /tmp/claude-1000/dev3000.log).
+Standing facts from this pass:
+- public.css (~line 4652) forces .public-closing-cta-panel with !important;
+  page-level overrides need !important too. About now has the white step-in
+  CTA panel; other pages still show the global tinted panel (roll-out is a
+  candidate for the next round if Jacob likes it).
+- Market cards must be accurate to the real city; generate with
+  ~/.claude/skills/openai-image-gen script (gpt-5.6-terra) from Wikimedia
+  reference photos + the Atlanta card for grade. CLIProxyAPI image lane is
+  broken (auth_not_found). Next image optimizer caches by filename: rename
+  after regenerating.
+- Services bundle map: bundle-map-q3-1536.webp, contain, panel bg #012c5d.
+- Unused old assets still in repo: home-r5-market-{savannah,tallahassee,
+  birmingham}-hd.png, home-r4-market-*, market-*.png.
+
+Previous CURRENT: Services new Bundle map art
+
+Bundle map replaced: flat vector map -> generated night-satellite US with amber
+city lights + lime arcs (public/redesign/services-r3/bundle-map.png + bundle-map-q2-1600/-800
+webp; source prompt in session scratchpad prompts/map-night.txt; background
+level-matched to #061735 with magick level-colors). Wired as object-fit contain
+with padding so it clears the diagonal; navy fades on the panel edges.
+services-bundle-map-source.png is now unused (drop from the commit list).
+Everything else from the 33-43 round stands (bigger row type, section-level
+zigzag lines, textured TV section, tighter CTA).
+
+Previous CURRENT: round after images 33-43
+
+Claude changed directly (services.module.css): row type bumped (title
+clamp(3rem,5vw,5rem), number, accent, body, bullets; copy width 40rem);
+lime lines now drawn on the section (::before, centered on 50% +/- art-shift)
+instead of the photo panels, so the zigzag joints are exact; map panel
+carries the footer's topo texture + lime glow (Jacob: "bland asf") so the
+Bundle -> CTA edge is texture-continuous; map image inset clear of the
+diagonal (via padding on .bundleImage: next/image fill inline styles beat
+inset/width). Map panel: grid + lime glow only, rings dropped (fought the
+map). Verified 1920 + 390, tsc/eslint clean, 0 console errors.
+
+Previous CURRENT: round after images 26-32
+
+Claude changed directly (services.module.css): hero lime line removed
+(.mapPanel::before display:none); rows now split at 50vw +/- --art-shift so
+every row's lime line is one continuous zigzag (right rows lean left going
+down, left rows lean right, meeting at each boundary); TV section got the
+footer's topo texture + lime glow (was flat navy); CTA padding-top cut to
+slant + 1.25rem. Hero: shelf + full-navy fades + eyebrow/lead from the
+previous round stay. Verified 1920 + 390, tsc/eslint clean, 0 console errors.
+
+Previous CURRENT: hero polish round on art H
+
+Jacob rejected the first H wiring ("still doesn't look right"). Claude fixed
+three things directly in services.module.css + page.tsx: navy shelf under the
+art (--hero-shelf = slant + 2.5rem, so row 01's slant only ever cuts navy),
+art fades to full section navy at the diagonal and at the shelf, Home-scale
+eyebrow + bold heroLead line. Verified 1920/1440/390. If Jacob accepts ->
+the commit below. If not -> ask him to point at the exact thing.
+
+Previous CURRENT: Services DONE (Claude-verified, Jacob picked hero H); awaiting Jacob's commit
+
+Final state on localhost:3000/services, verified 1920/1440/390, tsc + eslint
+clean, zero console errors (npm run build not run: dev server holds .next):
+- Hero = composite art H (public/redesign/services-r3/hero-h-*.webp), Home's
+  "hero is art, sections are photos" rule; lime line chains into row 01;
+  headline crosses the diagonal at >=1600; two buttons.
+- Rows 01/02/03 alternate with mirrored diagonals; one clean slanted edge
+  at every boundary; Bundle row owns the diagonal into the CTA (CTA has no
+  bg of its own, shares the footer surface) — Claude fixed this, not Sol.
+- Phone stacks straight with navy gaps.
+Unused candidates (hero-a..g) moved to the session scratchpad, not in repo.
+
+NEXT ACTION: Jacob commits:
+git add src/app/services/page.tsx src/components/public/services/ docs/redesign/RESUME.md docs/redesign/DESIGN-SYSTEM.md docs/redesign/SERVICES-COPY-R1.md docs/redesign/SERVICES-ART-BRIEF.md public/redesign/services-r3/ public/redesign/v2/photos/
+git commit -m "feat(services): premium Services page"
+Then Services is the reference page; next page (About or Careers, Jacob
+picks) via the same process: handoff + no-people art brief + rep-facing
+copy written here, executed by Sol, verified by Claude on 3000.
+
+Previous state:
+
+Services page is finished and verified by Claude on localhost:3000 at 1440 and
+390: hero "THREE SERVICES./ONE CONNECTION.", intro band removed, three rows with
+dusk photography (no people), rep-facing copy with no numbers/carriers, one
+"Start selling" button per row to /apply, whole-row slanted boundaries on one
+angle from hero through CTA, Bundle styled like the rows, CTA+footer one navy
+surface. Sol did the last three fixes. Uncommitted; Jacob was given the commit
+command. Minor non-blocker: phone hero map renders small inside its box.
+
+NEXT ACTION: once Jacob commits, Services is the reference page. Next page
+rounds (About, Careers) follow the same process: DESIGN-SYSTEM.md + a page
+handoff + art brief (no people) + copy draft, executed by Sol, verified here.
+
+Key files: docs/redesign/DESIGN-SYSTEM.md, SERVICES-ART-BRIEF.md,
+SERVICES-COPY-R1.md, SOL-SERVICES-HANDOFF.md, public/redesign/services-r2/.
+Rules: no generated people; no numbers or carrier names; Home locked; Jacob is
+the acceptance gate; Jacob commits.
+
+docs/redesign/DESIGN-SYSTEM.md now holds the Home-extracted system (tokens, type,
+layout, components, responsive, 8-point premium checklist, per-page process).
+Every future public-page prompt cites it. Handoff and launch message reference it
+and the design-taste-frontend skill.
+
+Note: localhost:3000 is the 3C dev server. localhost:3001 is a different project
+(My WiFi Wizard); never screenshot it as 3C.
+
+## CURRENT (2026-09-16) — Services preview close; awaiting annotations before lock
+
+Jacob is not satisfied with Services layout B and asked to use frontend-design guidance.
+He approved making one Fiber section comparison against the original, using the existing
+professional photograph, before considering any further live-page changes. This approval
+is for a mockup only, not for adopting the proposal or reverting the current page.
+
+Jacob found the isolated Fiber comparison hard to judge. He approved a separate browser
+preview showing Fiber, TV, and Security together at normal size, with Original/Proposal
+switching. This remains mockup-only; no visual direction has final approval.
+
+Latest feedback: the three-section flow feels better, but there is too much white space.
+Jacob approved a preview-only density/palette pass: desktop rows 580→500px, gaps 48→16px,
+smaller intro and copy padding, and navy behind the TV section with white text/lime accents.
+This pass is implemented in flow.css and desktop/mobile captures refreshed. Existing
+photography, wording, and live Services files remain unchanged. The previous density CSS
+is preserved as flow-before-density.css. Await feedback on this tighter version; do not
+interpret agreement to try it as approval to modify the live page.
+
+Latest response: Jacob says "yeah it looks better." Treat compact spacing plus navy TV
+as the preferred visual direction, not authorization to port to the live Services page.
+Jacob then approved extending this same preview through the bottom of Services: clean
+bundle/map without stray lines, natural recruiting typography, and a continuous patterned
+navy surface shared by recruiting CTA and footer. Preserve existing assets and copy.
+Contrast triage: declared the TV navy background directly (in addition to its full-width
+pseudo-element), clearing three analyzer false positives. Intentional pale-blue body text
+has 14.38:1 contrast on navy; a gray-on-color exception is scoped to flow.html only.
+
+Latest feedback: "its close, i think once i am able anotate it we will have it locked."
+Hold the current preview unchanged while Jacob annotates. It is not locked yet. Make only
+the agreed annotation-driven corrections next; do not start animation or live integration.
+
+NEXT ACTION: receive and review Jacob's annotations on the completed preview at
+http://127.0.0.1:3012/flow.html#bundle. Bundle uses the clean existing source map with no
+connector overlay; recruiting headline is naturally proportioned; recruiting and footer
+share one uninterrupted existing topographic background. Existing wording/assets retained.
+The preferred top three sections are unchanged. Bottom desktop/mobile captures:
+docs/redesign/concepts/services-section-review-2026-09-16/bottom-{desktop,mobile}.png.
+Checked 390/768/1080/1440/1920 for overflow, loaded assets/fonts, preview-only CTA notices,
+and browser errors. Contrast and leading corrections are scoped to new bottom content;
+Impeccable now returns no findings. Live Services and Footer source hashes unchanged.
+No live implementation, commit, push, or deployment authorized. Preview base address:
+http://127.0.0.1:3012/flow.html (separate static preview, NOT the live Services route).
+Files: docs/redesign/concepts/services-section-review-2026-09-16/flow.{html,css,js}.
+Original/Proposal switches work; proposal is open in the in-app browser. Existing photos
+and brand fonts are retained. Desktop rail stays in its own margin and ends at Security;
+tablet/mobile stack through 1200px. No animation yet. At 390/768/1080/1440/1920 no
+horizontal overflow was detected; desktop/mobile captures inspected and controls checked
+over HTTP. Live Services source hashes match before/after. Keep preview server on 3012
+available for review. No implementation or reversal of live layout B has been approved.
+Preserve the previous single-section comparison unchanged for reference:
+docs/redesign/concepts/services-section-review-2026-09-16/comparison.png. Top is the
+original before layout B; bottom is the new static proposal. It preserves the existing
+fiber photo and diagonal frame, with simpler type spacing and a contained left rail.
+index.html is the separate review artifact; proposed-mobile.png shows the 390px version.
+Both desktop (1440px) and mobile were rendered and visually inspected. No live Services
+file changed during this comparison; the three source hashes matched before/after.
+Keep src/ and public/ unchanged; preserve all dirty work. Home remains locked except its
+separately identified pending issues. Do not revive the rejected generated image boards.
+
+## Previous implementation (2026-09-16) — Services layout B; not visually accepted
+
+Jacob approved the preference for Services layout B: consistent copy-left/photo-right
+alignment, a continuous offwhite canvas, clean numbered connector stops, and restrained
+scroll progression/reveals. Keep existing professional photographs; preserve the hero,
+shared header/footer, copy, and link destinations. Fix connector/photo collisions, contain
+the bundle map, and remove squeezed closing-CTA typography. Mobile stays simple and
+reduced-motion/no-JS content remains immediately readable. No pinning or scroll hijacking.
+
+NEXT ACTION: Jacob reviews http://localhost:3000/services#fiber in the in-app browser.
+Collect his visual feedback before making further layout changes. The local implementation
+is verified, but automated checks are not Jacob's final visual acceptance.
+Tablet/mobile use stacked layout and no continuous connector through 1080px.
+Desktop keeps the scroll-drawn rail ending at Apply; reduced motion draws immediately.
+Existing clean services-bundle-map-source.png replaces the old baked diagonal map.
+No commit, push, or deployment.
+Files: src/app/services/page.tsx and src/components/public/services/{services.module.css,
+ServicesConnector.tsx}. Preserve all unrelated dirty work.
+
+Baseline copies: /tmp/services-layout-b.bdvGXo. Independent QA captures and reports:
+/tmp/services-qa-20260916/. Final desktop/mobile evidence: final-stable-r4/; final tablet
+correction: tablet-correction/. Checked 390, 768, 1080, 1282, 1440, 1920 plus continuous
+resize; reduced-motion/no-JS visibility; section anchors clear fixed header. Desktop rail
+has zero sampled text/artwork collisions and ends at Apply without a dangling tail.
+1057 tests pass. Scoped ESLint, typecheck, and production build passed, including the final
+tablet adjustment. Build isolated at /tmp/services-build-20260916-IOAVmn; live .next/dev
+untouched. Only the three Services files and this resume document changed in this task.
+
+Home remains unchanged. Pending separately: unify Home closing CTA background with the
+patterned footer; replacement city for duplicate Georgia market cards still needs a choice.
+
+## Previous decision (2026-09-16) — generated image sprint rejected
+
+Jacob rejected every Careers, Fiber, TV, and Security option from the September 11/16
+visual package. The exercise was only a test of the new image generator. None of those
+cartoon-like options match the professional assets and visual standard of the current
+site, none may be refined or implemented, and no winner will be selected. Treat the
+current working-tree site and its existing professional assets as the design baseline.
+
+The generated package remains archived outside production for now; rejection does not
+authorize destructive file deletion. Production `src/` and `public/` remain untouched by
+this decision. Preserve the dirty repository: no reset, clean, stash, broad staging,
+commit, push, deployment, or overwrite.
+
+DEV SERVER VERIFIED: `http://localhost:3000/` is the current repository working tree,
+served by Next 16.1.1 from `/home/fazetwerpnerd69/dev/3cworldgroup`; `/` returns HTTP 200
+with title `3C World Group | Fiber Internet, TV & Security Solutions`. Home is open in the
+in-app browser for live inspection.
+
+NEXT ACTION: discuss and inspect the current public site route by route, agree on the
+remaining professional design work and priorities, then make new mockups or source edits
+only for directions Jacob explicitly approves. Do not return to the rejected image set.
+
+HOME ANNOTATION (2026-09-16): browser comments now work. Home remains locked except
+for one identified market-strip content issue: Atlanta and Savannah create two Georgia
+cards. Recommend preserving Atlanta and replacing Savannah with a real active market and
+an equally professional, non-generated city photograph. The Home list is hardcoded and
+the repository has no authoritative current-market feed or unused sixth-city asset.
+WAITING: Jacob names the replacement city/state (or says to replace Atlanta instead).
+No Home source or production asset has been changed.
+
 ## 2026-09-11 — both portal fixes LIVE on master. Redesign still uncommitted.
 
 master 7b58855b = carrier cancellation takes the money (cb973b40 on this branch).
@@ -45,6 +276,45 @@ with a Cancelled pill and date, because no name for it exists anywhere.
 Gates: tsc clean, 1048 tests / 115 files, npm run build exit 0.
 NEXT: commit these 6 files by explicit path. Jacob's public-site redesign and
 the onboarding/e-sign changes are in the same tree — never `git add -A`.
+
+## CURRENT (2026-09-11) — Careers hero four-variation mockup round; no code
+
+Jacob does not want to discard the prior Careers hero exploration, but asked for four additional,
+extremely different variations and a strict senior art-director/frontend review at 390, 1282, 1440,
+and 1920. He clarified: mockups only, no production code. Production `src/` and `public/` are locked.
+Use Product Design ideation plus frontend-design and frontend-design-imagegen skills.
+
+Fresh current-run captures are in `/tmp/3c-careers-mockups-2026-09-11/audit/live-{390,1282,1440,1920}.png`.
+Initial evidence: mobile hero is 759px below a 71px header and consumes almost the whole first 844px
+viewport; desktop hero is fixed at 677px; at wide sizes the capped content and large right-shifted map
+create awkward balance/cropping. Preserve exact current Careers copy and existing 3C brand DNA.
+Generate four independent high-fidelity raster mockup directions outside the project, grounded in
+fresh captures and current-site references. No generated people. Review the set with Opus, revise
+only concrete failures, and ask Jacob to choose or refine. Do not implement anything.
+
+Milestone: the evidence-based audit and first four Careers hero variants are complete. Opus reviewed
+the first generation and the two weaker axes were replaced. The current decision set is stored outside
+production at `/tmp/3c-full-image-sprint-2026-09-11/options/careers/`: three-market editorial triptych,
+revised documentary aerial, tactile territory blueprint, and type-as-territory.
+
+The site-wide image inventory is complete at
+`/tmp/3c-full-image-sprint-2026-09-11/inventory/site-image-inventory.{md,json}`. Locked Home, About,
+Services photography, Contact vector direction, and Services artifact-only maps are excluded.
+
+The Careers Fiber, TV, and Security illustration queue is complete: four deliberately different options
+per product were generated, Opus-reviewed, and revised where the first outputs were misleading, fragile
+at card size, or visibly broken. Final review boards are
+`/tmp/3c-full-image-sprint-2026-09-11/boards/{careers,fiber,tv,security}-2x2.png`.
+
+Persistent GPT App handoff package:
+`/home/fazetwerpnerd69/Documents/3cworldgroup-visual-handoff-2026-09-16/HANDOFF.md`.
+It contains stable copies of the four boards, all 16 final option images, inventory, captures, review
+evidence, user boundaries, dirty-worktree warnings, and the exact next prompt.
+
+No production UI or image asset was changed.
+
+NEXT ACTION: wait for Jacob to choose Option 1-4 independently for Careers, Fiber, TV, and Security, or
+request a targeted refinement. Keep everything outside production until he explicitly approves a winner.
 
 ## CURRENT (2026-09-08) — first public-site board rejected; production code locked
 
@@ -220,6 +490,30 @@ for direct deposit / W9". Root causes + fixes (uncommitted in working tree):
   on master got only the account_exists hunks. Was: autoSend gated to status==='pending' (active reps
   never get docs); no admin 'Send for signature'; reject of esign item should clear+resend;
   'already have an account' screens on onboard link load / signup / apply.
+
+## LEADERBOARD RESTYLE — LIVE: master f4e198f8, Vercel prod gzssxd41v Ready (2026-09-15 17:27 CDT)
+Jacob approved: phones (<1024px) get the new podium page (round 9: 330x100 charcoal 3D blocks, metallic
+numerals, muted laurel, solid crown, 52px rows, sticky "You" bar, week default). Desktop (>=1024) keeps the OLD
+board, restored pixel-identical under src/components/leaderboard/legacy/ (he rejected both desktop attempts).
+One fetch in LeaderboardRoute feeds both; useWideViewport + routeSplit.module.css do the switch.
+periods.ts gives Sunday-start Chicago weeks to API and countdown. Gates at push: tsc, 30 leaderboard tests,
+build OK. Board artifact: https://claude.ai/code/artifact/ad421a6c-73d6-4956-a6ad-85d8cd4fc845.
+Shipped from worktree ~/dev/3cwg-esign (rebased on 59a6d396). Main tree redesign untouched.
+NEXT: nothing pending on leaderboard; Jacob to eyeball www on his phone. Optional later: rotate the
+Vercel bypass secret (it was pasted in chat).
+
+## INSTALL DATE FEATURE (2026-09-14, rep request) — SHIPPED master 1a0b836f (gates: vitest 1199, tsc, build OK)
+Vercel prod build aw39vfv2p started from the push; verify Ready. Rep-facing: Sales tab > tap a sale > Install row
+"Change" (owning rep or admin, not cancelled). Report-driven: inbound-report webhook now calls
+syncInstallDatesFromOrders; counts appear in the webhook JSON/log. Known looseness: address-prefix match
+("12 Oak" vs "12 Oakwood") is guarded only by two-way uniqueness. Not yet verified live with a real report.
+Ask: rep changes install date on own sale from Sales tab; carrier report date change updates the sale.
+Findings: PUT /api/portal/sales/[id] already lets owning rep set installDate (UI hid it); inbound report
+(Postmark -> fiberOrders) never touches sales; match is read-time address-prefix (matchSales.ts) + admin saleLink.
+Lanes (Opus): `install-ui` SaleDetailSheet Change/Save control; `install-sync` src/lib/sales/installDateSync.ts
+called from inbound-report webhook (unambiguous match only, noon local, installDateSource/PreviousDate/ChangedAt,
+notification type install_date_changed). Commit msg: scratchpad/esign/commitmsg-installdate.txt. Ship: gates in
+worktree, commit -F, push HEAD:master, Vercel auto-deploys. Redesign untouched (Jacob's rule).
 
 ## IN-HOUSE E-SIGN — SHIPPED 2026-09-08 (master b9bea5e5, on top of f0ae5220 deps commit)
 Plan: docs/superpowers/plans/2026-09-08-inhouse-esign.md. Spec: docs/superpowers/specs/2026-09-08-inhouse-esign-design.md.
