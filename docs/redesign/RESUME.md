@@ -1,23 +1,40 @@
 # RESUME — read this and continue without being asked
 
-## CURRENT (2026-09-18) — Home + About + Services pass ACCEPTED by Jacob and committed
+## CURRENT (2026-09-18) — Careers round 2 built, UNCOMMITTED, awaiting Jacob's verdict
 
-NEXT ACTION: Jacob is starting a new round on "the next sections I have
-problems with". Wait for him to name the page/section and paste screenshots;
-translate each into a fix, apply directly, verify at 1440 + 390, screenshot
-back. Same loop as this pass. Branch codex/services-home-alignment-20260916.
-Dev server: `npm run dev -- -p 3000` (log /tmp/claude-1000/dev3000.log).
-Standing facts from this pass:
-- public.css (~line 4652) forces .public-closing-cta-panel with !important;
-  page-level overrides need !important too. About now has the white step-in
-  CTA panel; other pages still show the global tinted panel (roll-out is a
-  candidate for the next round if Jacob likes it).
+NEXT ACTION: Jacob checks localhost:3000/opportunities (100% and zoomed
+out). If accepted -> commit:
+  git add src/app/opportunities/ docs/redesign/careers-r2-spec.md docs/redesign/RESUME.md
+  git commit -m "feat(careers): one-pass Careers page, no repeated sections; hero map contained"
+If rejected -> fix only what he points at, verify 1440/1920/2560/390, screenshot back.
+Then: open question to Jacob, site-wide repetition. Home repeats the benefits
+list + four steps that Careers now owns; products trio is on About + Services.
+Options given: (a) trim Home's benefits/steps to one line + link each, or
+(b) keep Home as the full pitch and only trim About/Services repeats. He
+has not answered yet. Ask again, then do what he picks.
+Branch codex/services-home-alignment-20260916. Dev server `npm run dev -- -p 3000`.
+Last commit 62babf5d = Home/About/Services pass + accurate market cards (accepted).
+
+Careers round 2 (spec: docs/redesign/careers-r2-spec.md, Jacob approved the
+design in conversation):
+- Page is now hero / why (pale, 2x2 benefits) / path+pay split (white steps,
+  navy tiers, one diagonal) / apply (navy topo, bullets + placeholder line
+  removed). Cut: "How you get started", "Three products", closing CTA.
+- opportunities-page.module.css: 1364 -> ~830 lines. All nth-of-type(3..6),
+  .glance, .sell rules removed (backup in session scratchpad opps.css.bak).
+  New styles appended under "Careers round 2". Hero map: heroMap max-height
+  min(58vh,500px), cell centred, container min-height capped (it used to be
+  47.22vw and outgrew the 677px section past ~1500px -> map slid down).
+- Verified 1440/1920/2560/390, 0 console errors, tsc + eslint clean.
+
+Standing facts (still true):
+- public.css ~4652 forces .public-closing-cta-panel with !important; page
+  overrides need !important. About has the white step-in CTA panel.
 - Market cards must be accurate to the real city; generate with
   ~/.claude/skills/openai-image-gen script (gpt-5.6-terra) from Wikimedia
-  reference photos + the Atlanta card for grade. CLIProxyAPI image lane is
-  broken (auth_not_found). Next image optimizer caches by filename: rename
-  after regenerating.
-- Services bundle map: bundle-map-q3-1536.webp, contain, panel bg #012c5d.
+  refs + the Atlanta card for grade. CLIProxyAPI image lane broken
+  (auth_not_found). Next image optimizer caches by filename: rename after
+  regenerating.
 - Unused old assets still in repo: home-r5-market-{savannah,tallahassee,
   birmingham}-hd.png, home-r4-market-*, market-*.png.
 
