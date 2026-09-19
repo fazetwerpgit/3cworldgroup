@@ -207,9 +207,7 @@
   grid-template-columns: minmax(20rem, 0.72fr) minmax(0, 1.28fr);
 }
 
-.sectionTitle,
-.closingTitle { color: var(--ink); font-size: var(--public-section-heading-size); }
-.closingTitle { color: white; }
+.sectionTitle{ color: var(--ink); font-size: var(--public-section-heading-size); }
 .marketsGrid .sectionTitle { text-transform: none; }
 .marketTitleLine { display: block; }
 .navy .sectionTitle { color: white; }
@@ -287,19 +285,7 @@
 .section:nth-of-type(6) .startTitle { font-size: .92rem; margin-top: .5rem; }
 .section:nth-of-type(6) .startBody { font-size: .76rem; line-height: 1.3; margin-top: .25rem; }
 
-.closing {
-  background: var(--navy) !important;
-  color: white;
-  padding-block: 3.5rem;
-  position: relative;
-}
-.closing::before { background: radial-gradient(circle at 80% 40%, rgba(141, 198, 63, 0.16), transparent 36%); content: ""; inset: 0; pointer-events: none; position: absolute; }
-.closingGrid { align-items: center; display: grid; gap: 2rem; grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr) auto; position: relative; }
-.closingTitle { color: white; font-weight: 800; line-height: 0.9 !important; margin: 0; text-transform: uppercase; }
-.closingTitle span { color: var(--lime); }
-.closingBody { color: rgba(255, 255, 255, 0.76); font-size: var(--public-section-body-size); line-height: 1.6; margin: 0; max-width: 28rem; }
-
-/* The shared ClosingCta is replaced by the route-owned Home closing surface. */
+/* The rasterized legacy ending is replaced by the shared ClosingCta panel. */
 .page :global(.public-locked-ending) { display: none !important; }
 
 @media (max-width: 1023px) {
@@ -313,8 +299,6 @@
   .pathStepTop { align-items: flex-start; flex-direction: column; gap: 0.65rem; }
   .pathIcon { height: 4.6rem; width: 4.6rem; }
   .pathNumber { font-size: 3rem; }
-  .closingGrid { grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.65fr); }
-  .closingGrid > .button { grid-column: 1 / -1; justify-self: start; }
 }
 
 @media (max-width: 720px) {
@@ -340,8 +324,6 @@
   .startStep:nth-child(odd) { border-left: 0; padding-left: 0; }
   .startLeader { display: none; }
   .startStep:nth-child(n + 3) { border-top: 1px dashed rgba(10, 31, 68, 0.38); padding-top: 1.25rem; }
-  .closingGrid { display: flex; flex-direction: column; align-items: flex-start; }
-  .closingGrid > .button { align-self: stretch; }
   .pathSteps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pathStep .cardBody { max-width: none; }
 }
@@ -395,7 +377,6 @@
   .section:nth-of-type(4) { padding-block: .5rem; }
   .section:nth-of-type(5) { padding-block: .5rem; }
   .section:nth-of-type(6) { margin-bottom: 0; }
-  .closing { padding-block: calc(3.5rem - .3125px); }
 }
 
 @media (min-width: 1020px) and (max-width: 1023px) {
@@ -406,8 +387,6 @@
   .pathSteps::before { display: block; }
   .pathStepTop { align-items: center; flex-direction: row; gap: 1rem; }
   .pathIcon { height: 5.4rem; width: 5.4rem; }
-  .closingGrid { grid-template-columns: minmax(0, 1fr) minmax(16rem, .7fr) auto; }
-  .closingGrid > .button { grid-column: auto; justify-self: auto; }
 }
 
 @media (min-width: 1079px) and (max-width: 1080px) {
@@ -479,8 +458,8 @@
     min-height: 0;
     padding-block: 42px;
   }
+  /* C7: height lock retired — this band now holds the two-line brief. */
   .section:nth-of-type(5) {
-    height: 310px;
     min-height: 0;
     padding-block: 46px;
   }
@@ -514,29 +493,8 @@
   .section:nth-of-type(6) .startTitle { font-size: 0.95rem; }
   .section:nth-of-type(6) .startBody { font-size: 0.88rem; line-height: 1.25; }
 
-  .section:nth-of-type(6) {
-    height: auto;
-    min-height: 164px;
-  }
   .startGrid { gap: 3.5rem; }
   .startLeader { left: calc(100% + 0.25rem); width: 3rem; }
-
-  .closing {
-    height: 124px;
-    overflow: visible;
-    padding-block: 0;
-  }
-  .closingGrid { height: 124px; }
-  .page .closingTitle { line-height: 0.95 !important; }
-  .closingBody { font-size: var(--public-section-body-size); line-height: 1.3; }
-  .closingGrid > .button { min-height: 4.25rem; padding-inline: 1.4rem; }
-}
-
-/* The approved 1440px composition keeps the footer at its original flow
-   position after the start band grows to fit all four descriptions. */
-@media (min-width: 1400px) {
-  .closing { height: 124px; }
-  .closingGrid { height: 124px; }
 }
 
 @media (min-width: 1440px) {
@@ -559,10 +517,7 @@
   .reasonBody, .startBody { max-width: 12rem; }
   .startStep { text-align: left; }
   .startTop { justify-content: flex-start; }
-  .closing { min-height: 18rem; }
 }
-
-
 
 /* Final cascade for the accepted 1440px source geometry. */
 @media (min-width: 1081px) {
@@ -590,7 +545,9 @@
   .actions .button:first-child { min-width: 305px; }
   .actions .button:nth-child(2) { min-width: 382px; width: 382px; }
   .actions .buttonSecondary { border: 2px solid #fafafa; }
-  .actions .buttonPrimary { color: #fff; }
+  /* Review correction C: #fff on #8dc63f is ~2.1:1. Navy on lime is ~7.8:1 and
+   * matches every other lime control in the funnel. */
+  .actions .buttonPrimary { color: var(--ink); }
 
   .section:nth-of-type(2) { background: linear-gradient(to bottom,#fafafa 0%,#fafafa calc(100% - 9px),#eef1f5 calc(100% - 5px),#d8e0ea calc(100% - 2px),#011d42 100%); box-sizing: border-box; height: 391px; padding: 60px 0 64px; }
   .section:nth-of-type(2) .sectionInner { padding-left: 50px; padding-right: 58px; }
@@ -598,9 +555,9 @@
   .marketsGrid > div:first-child { width: 347px; }
   .marketsGrid .sectionEyebrow { color: #6d9f2d; font-family: var(--public-display-font); font-size: 18px; letter-spacing: 2.88px; line-height: 22px; margin: 0 0 24px; transform: translate(2px,2px) scale(1.04,1.073); transform-origin: left top; }
   .marketsGrid .sectionTitle { color: #0a1f44; font-family: "Home Open Sans Condensed", sans-serif !important; font-size: 40px; font-weight: 700 !important; line-height: 48px !important; text-transform: none; transform: translate(1px,-3px) scale(.943,1.023); transform-origin: left top; }
-  .marketsGrid .sectionIntro { color: #60728d; font-family: "Home Open Sans Condensed", sans-serif; font-size: 15px; font-weight: 600; line-height: 26px; margin: 24px 0 0; max-width: 347px; transform: translateY(-2px) scale(1.157,1.031); transform-origin: left top; }
+  .marketsGrid .sectionIntro { color: #4d5f78; font-family: "Home Open Sans Condensed", sans-serif; font-size: 18px; font-weight: 600; line-height: 27px; margin: 20px 0 0; max-width: 347px; }
   .marketsGrid .sectionIntro span { display: block; }
-  .marketsGrid .textLink { color: #2d6aa6; font-size: 14px; letter-spacing: .8px; line-height: 18px; margin-top: 18px; transform: translate(2px,-5px) scale(.889,1.119); transform-origin: left top; }
+  .marketsGrid .textLink { font-size: 16px; letter-spacing: 0.06em; line-height: 20px; margin-top: 22px; }
   .marketGrid { column-gap: 27px; grid-template-columns: repeat(5, 165px); }
   .marketImage { aspect-ratio: 165 / 190; border: 0; }
   .marketImage img { bottom: 5px; height: auto; object-fit: fill; top: 0; }
@@ -671,10 +628,11 @@
   .checkList svg { color: #78ac2d; height: 24px; margin-top: 0; width: 24px; }
   .choiceButton { font-family: "Home Open Sans Condensed", sans-serif; font-size: 20px; font-weight: 700; height: 65px; margin-top: 26px; min-height: 65px; padding: 0 22px; }
   .choiceButton > svg { flex: 0 0 17px; }
-  .choice:first-child .choiceButton { background: #77a822; color: #fafafa; letter-spacing: -.05px; margin-left: 42px; padding-left: 28px; padding-right: 22px; width: 334px; }
+  /* Review correction C: #fafafa on #77a822 is ~2.8:1; navy is ~5.7:1. */
+  .choice:first-child .choiceButton { background: #77a822; color: #0a1f44; letter-spacing: -.05px; margin-left: 42px; padding-left: 28px; padding-right: 22px; width: 334px; }
   .choice:last-child .choiceButton { border-width: 2px; letter-spacing: -.68px; margin-left: 16px; padding-left: 30px; padding-right: 22px; width: 399px; }
 
-  .section:nth-of-type(5) { background: linear-gradient(to bottom,#fafafa 0,#fafafa 5px,#eef1f5 8px,rgba(238,241,245,0) 9px),radial-gradient(ellipse 360px 60px at 50% 80px,#f6f7fa 0%,#eef1f5 100%); box-sizing: border-box; height: 314px; padding: 42px 0 0; }
+  .section:nth-of-type(5) { box-sizing: border-box; padding: 42px 0 0; }
   .sectionHeadingCenter .sectionTitle { color: #0a1f44; font-family: var(--public-display-font) !important; font-size: 44px; font-weight: 400 !important; line-height: 48px !important; transform: translate(-15px,-3px) scaleX(.951) scaleY(1.065); transform-origin: center top; }
   .section:nth-of-type(5) .reasonGrid { margin-top: 11px; }
   .reasonGrid { gap: 0; grid-template-columns: repeat(4,1fr); margin-top: 5px; max-width: none; }
@@ -711,8 +669,7 @@
   .reason:nth-child(4) .reasonBody { transform: translate(1px,-6px) scaleX(.921); transform-origin: left top; }
   .reason:nth-child(3) .reasonBody, .reason:nth-child(4) .reasonBody { max-width: 190px; }
 
-  .section:nth-of-type(6) { background: linear-gradient(to bottom,#f5f6f8 0,#f5f6f8 .5px,#f8f8f9 1.5px,#fafafa 2.5px,#fafafa 100%); box-sizing: border-box; height: 167px; min-height: 167px; padding: 20px 0 0; }
-  .section:nth-of-type(6) .sectionHeadingCenter { transform: translateY(-10px); }
+    .section:nth-of-type(6) .sectionHeadingCenter { transform: translateY(-10px); }
   .section:nth-of-type(6) .sectionHeadingCenter .sectionTitle { font-size: 43px; line-height: 48px !important; transform: translate(-4.5px,2px) scaleX(.959) scaleY(1.097); transform-origin: center top; }
   .startGrid { display: block; height: 100px; margin-top: -8px; position: relative; }
   .startStep { height: 100px; padding-left: 0; position: absolute; text-align: left; top: 0; }
@@ -721,7 +678,8 @@
   .startStep:nth-child(3) { left: 745px; width: 250px; }
   .startStep:nth-child(4) { left: 1054px; width: 240px; }
   .startTop { display: block; height: 42px; position: relative; }
-  .startNumber { background: #8dc63f; color: #fafafa; font-size: 20px; height: 34px; line-height: 34px; width: 34px; }
+  /* Review correction C: same white-on-lime pair as the buttons (~2.1:1). */
+  .startNumber { background: #8dc63f; color: #0a1f44; font-size: 20px; height: 34px; line-height: 34px; width: 34px; }
   .section:nth-of-type(6) .startIcon { color: #0a1f44; height: 50px; margin: 0; position: absolute; width: 50px; }
   .section:nth-of-type(6) .startTitle { color: #0a1f44; font-family: "Home Open Sans Condensed", sans-serif !important; font-size: 16px; font-weight: 700 !important; line-height: 19px !important; margin: 0; position: absolute; white-space: nowrap; }
   .startNumber { left: 0; position: absolute; top: 1px; }
@@ -745,16 +703,6 @@
   .startStep:nth-child(1) .startLeader { left: 280px; width: 61px; }
   .startStep:nth-child(2) .startLeader { left: 274px; width: 59px; }
   .startStep:nth-child(3) .startLeader { left: 251px; width: 59px; }
-
-  .closing, .closingGrid { box-sizing: border-box; height: 129px; }
-  .closing { background: #011d42 !important; overflow: visible; padding: 0; }
-  .closing::before { background: url('/redesign/home-footer-topo.svg') center / cover no-repeat; opacity: .22; }
-  .closingGrid { display: block; padding-inline: 0; position: relative; }
-  .closingTitle { color: #fafafa; font-family: var(--public-display-font) !important; font-size: 48px; font-weight: 400 !important; left: 126px; line-height: 40px !important; margin: 0; position: absolute; top: 29px; transform: scaleX(.81); transform-origin: left top; white-space: nowrap; }
-  .closingTitle span { color: #8dc63f; display: inline-block; transform: translateY(-3px) scale(1.604,1.526); transform-origin: left top; }
-  .closingBody { color: #d3d8e1; font-size: 20px; left: 563px; line-height: 33px; margin: 0; max-width: 340px; position: absolute; top: 41px; transform: scale(.943,1.06); transform-origin: left top; }
-  .closingGrid > .button { font-size: 20px; height: 73px; left: 987px; min-height: 73px; min-width: 0; padding: 0; position: absolute; top: 36px; width: 309px; }
-  .closingCtaLabel { align-items: center; color: #fafafa; display: inline-flex; font-family: "Home Open Sans Condensed", sans-serif; font-size: 20px; font-weight: 400; gap: 8px; justify-content: center; line-height: 15px; transform: translate(4px,-2px) scale(1.206,1.07); transform-origin: center; white-space: nowrap; }
 }
 
 @media (min-width: 1282px) and (max-width: 1439.98px) {
@@ -785,7 +733,6 @@
   .startStep:nth-child(1) .startLeader,
   .startStep:nth-child(2) .startLeader,
   .startStep:nth-child(3) .startLeader { left: calc(100% - 6px); width: 12px; }
-  .closingGrid > .button { left: auto; right: 48px; }
 }
 
 @media (min-width: 1081px) and (max-width: 1281px) {
@@ -797,8 +744,6 @@
   .marketName, .marketState { overflow-wrap: anywhere; white-space: normal; }
   .pathSteps { grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; width: 100%; }
   .pathStep:nth-child(n) .cardBody { margin-inline: auto; max-width: 16ch; }
-  .closingGrid { padding-inline: clamp(1rem, 4vw, 3rem); }
-  .closingGrid > .button { left: auto; margin-left: auto; max-width: 100%; position: relative; top: auto; width: min(100%, 309px); }
 }
 /* Responsive A: independently injected and measured correction. */
 @media (min-width:1081px) and (max-width:1281px) {
@@ -818,11 +763,6 @@
   .startBody { margin-top:8px !important; }
   .startStep:nth-child(n) .startLeader { left:calc(100% - 12px) !important;width:12px !important;top:28px !important; }
   .section:nth-of-type(6) { height:auto !important;min-height:167px;padding-bottom:24px !important; }
-  .closing { height:auto !important; }
-  .closingGrid { display:grid !important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(240px,.9fr) !important;gap:32px;height:auto !important;align-items:center;padding:32px 48px !important; }
-  .closingTitle,.closingBody,.closingGrid>.button { position:relative !important;left:auto !important;right:auto !important;top:auto !important;transform:none !important;max-width:100% !important;width:auto !important;margin:0 !important; }
-  .closingTitle { font-size:40px !important;line-height:1.08 !important;white-space:normal !important; }
-  .closingTitle span { transform:none !important;font-size:1.25em; }
 }
 
 @media (min-width:1081px) and (max-width:1281px) {
@@ -868,20 +808,13 @@
  * ------------------------------------------------------------------------ */
 @media (min-width: 1081px) {
   /* --- Why sales pros choose 3C ------------------------------------- */
+  /* C7: this band used to hold the four-up "why" grid and was traced as a
+   * fixed 314px strip. It now holds the two-line brief, so 112px of padding
+   * above a 200px group read as an empty band. Rhythm, not a pixel lock. */
   .section:nth-of-type(5) {
-    /* Flat pale band. The comp trace carried a radial ellipse highlight
-     * calibrated to the old 314px strip; in a taller band it read as a
-     * white haze floating above the heading. Top edge hairline kept. */
-    background: linear-gradient(
-      to bottom,
-      #fafafa 0,
-      #fafafa 5px,
-      #eef1f5 8px,
-      #eef1f5 100%
-    ) !important;
     height: auto !important;
     min-height: 0 !important;
-    padding: 112px 0 !important;
+    padding: 80px 0 !important;
   }
 
   .section:nth-of-type(5) .sectionHeadingCenter { transform: none; }
@@ -1066,8 +999,7 @@
 }
 
 @media (min-width: 1282px) {
-  .section:nth-of-type(5),
-  .section:nth-of-type(6) { padding: 128px 0 !important; }
+  .section:nth-of-type(5) { padding: 96px 0 !important; }
 
   .section:nth-of-type(5) .reasonGrid,
   .reasonGrid,
@@ -1083,8 +1015,7 @@
 
 /* Tablet: same presence, tighter rhythm. */
 @media (min-width: 721px) and (max-width: 1080px) {
-  .section:nth-of-type(5),
-  .section:nth-of-type(6) { padding-block: 72px !important; }
+  .section:nth-of-type(5) { padding-block: 64px !important; }
 
   .section:nth-of-type(6) { border-top: 1px solid rgba(10, 31, 68, 0.14); }
 
@@ -1106,8 +1037,7 @@
 
 /* Phone. */
 @media (max-width: 720px) {
-  .section:nth-of-type(5),
-  .section:nth-of-type(6) { padding-block: 56px !important; }
+  .section:nth-of-type(5) { padding-block: 48px !important; }
 
   .section:nth-of-type(6) { border-top: 1px solid rgba(10, 31, 68, 0.14); }
 
@@ -1130,9 +1060,14 @@
 /* ---- Section transitions (board 2026-09-17). Hero untouched. ---- */
 
 /* 03 Dissolve: markets (white) -> path (navy). Navy fades in, texture fades in with it. */
+/* C6 (2026-09-18): this was `linear-gradient(180deg,#fff 0,var(--navy) 120px)`
+ * against a #fafafa neighbour — 120px of desaturated grey plus a hairline.
+ * The page's committed transition is a hard diagonal cut, so use that. */
 .section.navy {
-  background: linear-gradient(180deg, #fff 0, var(--navy) 120px);
-  padding-top: calc(5.5rem + 90px);
+  background: var(--navy);
+  clip-path: polygon(0 var(--seam), 100% 0, 100% 100%, 0 100%);
+  margin-top: calc(var(--seam) * -1);
+  padding-top: calc(5.5rem + var(--seam));
   position: relative;
 }
 
@@ -1184,12 +1119,215 @@
     position: relative;
   }
 
-  /* 05 Diagonal: the page's one cut, how -> closing + footer. */
-  .closing {
-    clip-path: polygon(0 3.5vw, 100% 0, 100% 100%, 0 100%);
-    height: auto;
-    margin-top: -3.5vw;
-    padding-top: 3.5vw;
-    z-index: 3;
-  }
+}
+
+/* Home option A (2026-09-18): the benefits grid and the four "get started" steps
+   collapsed into one line each + a link. Careers owns the detail. */
+.brief { padding-block: 3.5rem; }
+.briefGrid { display: grid; gap: 2.5rem; }
+.briefRow { display: flex; flex-direction: column; }
+.briefRow .eyebrow { margin: 0; }
+.briefLine {
+  color: var(--ink);
+  font-family: var(--public-display-font);
+  font-size: clamp(1.35rem, 2.2vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0.75rem 0 0;
+  max-width: 24ch;
+  text-transform: uppercase;
+}
+.briefLine::first-letter { text-transform: uppercase; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (min-width: 900px) {
+  .brief { padding-block: 4.5rem; }
+  .briefGrid { gap: clamp(2rem, 5vw, 5rem); grid-template-columns: 1fr 1fr; }
+}
+
+/* ===========================================================================
+ * Design polish 2026-09-18 — C1 / C5 / C6 / C7.
+ * ======================================================================== */
+
+/* --- C1: the display faces survive below 1081px --------------------------
+ * Every display-face declaration on this page sat inside
+ * `@media (min-width: 1081px)`, so at 390px the h1 fell back to Geist while
+ * the button beside it stayed condensed. Declare the two faces the page
+ * already owns at base level; the media queries above carry size only.
+ * Body copy stays in the readable Geist body face at every width. */
+.page .heroTitle,
+.page .pathHead .sectionTitle {
+  font-family: var(--public-display-font);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.page .marketsGrid .sectionTitle,
+.page .cardTitle,
+.page .choiceTitle,
+.page .marketName,
+.page .briefLine {
+  font-family: "Home Open Sans Condensed", sans-serif;
+  font-weight: 700;
+}
+
+.page .marketState { font-family: "Home Open Sans Condensed", sans-serif; }
+
+/* The markets intro is authored as two sentences on two lines; the block
+ * display only existed in the desktop lock, so at 390px they ran together. */
+.marketsGrid .sectionIntro span { display: block; }
+
+@media (max-width: 720px) {
+  /* The hero body carries desktop line breaks. At 390px they double-wrap. */
+  .heroBody br,
+  .heroLead br { display: none; }
+}
+
+@media (max-width: 1080px) {
+  /* Bebas carries no lowercase and sets far narrower than the grotesque the
+   * mobile sizes were tuned against, so the hero can take its real scale. */
+  .page .heroTitle { font-size: clamp(3.6rem, 16vw, 5.4rem); line-height: 0.88 !important; }
+  .page .pathHead .sectionTitle { letter-spacing: -0.01em; }
+}
+
+@media (max-width: 420px) {
+  .page .heroTitle { font-size: 3.9rem; }
+}
+
+.page :global(.public-closing-cta-title) {
+  font-family: var(--public-display-font) !important;
+}
+
+/* --- C6: the seam angle. Shared by the cut and its pull-up. --------------- */
+.page { --seam: 2.75rem; }
+
+@media (min-width: 1081px) {
+  .page { --seam: 3.5vw; }
+
+  /* The markets band used to hand off to the navy with a stepped hairline
+   * tail because the navy faded in over it. The cut needs a flat neighbour. */
+  .section:nth-of-type(2) { background: #fafafa; }
+}
+
+/* --- C7: the markets column reads as a column, not as fine print ---------- */
+.sectionIntro { font-size: max(1rem, var(--public-section-body-size)); }
+
+.textLink {
+  font-size: 1rem;
+  gap: 0.55rem;
+  letter-spacing: 0.06em;
+  text-decoration: underline;
+  text-decoration-color: var(--lime);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.55rem;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.textLink:hover { color: #1f4f80; text-decoration-color: #6d9f2d; }
+.navy .textLink { color: #fff; }
+
+/* --- C7: the brief band. Two statements and two links, given room. -------- */
+.brief { padding-block: 3.5rem; }
+.briefRow { border-top: 1px solid rgba(10, 31, 68, 0.14); padding-top: 1.5rem; }
+.briefRow .eyebrow { color: #6d9f2d; }
+
+.briefLine {
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin: 0.85rem 0 1.5rem;
+  max-width: 26ch;
+}
+
+.briefRow .textLink { margin-top: auto; }
+
+@media (min-width: 900px) {
+  .brief { padding-block: 4.5rem; }
+}
+
+/* --- C5: the shared white step-in closer, as accepted on About and Careers.
+ * The global sheet forces the panel with !important, so these must too. */
+.page :global(.public-closing-cta) {
+  padding: 0 0 40px !important;
+  position: relative;
+  z-index: 3;
+}
+
+.page :global(.public-closing-cta-panel) {
+  align-items: center;
+  background: #fff !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 24px 56px rgba(3, 29, 66, 0.32);
+  display: grid;
+  gap: 1.5rem 3rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: -64px;
+  min-height: 0 !important;
+  padding: 36px 48px !important;
+  position: relative;
+}
+
+.page :global(.public-closing-cta-panel)::before,
+.page :global(.public-closing-cta-panel)::after { content: none; display: none !important; }
+
+.page :global(.public-closing-cta-panel .public-eyebrow) {
+  color: #5f8f1f !important;
+  font-family: var(--public-body-font);
+  letter-spacing: 0.16em;
+  margin: 0 0 10px;
+}
+
+.page :global(.public-closing-cta-panel .public-closing-cta-title) {
+  color: #031d42 !important;
+  font-size: clamp(2.1rem, 3.4vw, 3.4rem) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 0.95 !important;
+  margin: 0;
+  max-width: none !important;
+  text-transform: uppercase;
+}
+
+.page :global(.public-closing-cta-copy) { max-width: none; }
+.page :global(.public-closing-cta-body),
+.page :global(.public-closing-cta-secondary) { display: none; }
+.page :global(.public-closing-cta-actions) { margin: 0; }
+
+.page :global(.public-closing-cta-actions .public-button) {
+  background: var(--lime) !important;
+  border: 0 !important;
+  color: #061735 !important;
+  font-family: var(--public-body-font);
+  font-size: 1.05rem !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  min-height: 56px !important;
+  padding: 0 34px !important;
+  text-transform: uppercase;
+}
+
+.page :global(.public-closing-cta-actions .public-button:focus-visible) {
+  outline: 3px solid #031d42;
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .page :global(.public-closing-cta) { padding: 0 16px 32px !important; }
+  .page :global(.public-closing-cta-panel) { grid-template-columns: minmax(0, 1fr); margin-top: -40px; padding: 28px 24px !important; }
+  .page :global(.public-closing-cta-actions .public-button) { width: 100%; }
+}
+
+/* --- Review correction C: a focus ring that stays visible on the light bands.
+ * The shared lime ring is ~2.1:1 against #fafafa, and it disappears altogether
+ * when the control it rings is itself lime. On the light surfaces use a navy
+ * ring drawn flush to the control (7.8:1 against lime, 16:1 against #fafafa)
+ * with a light halo outside it. The navy hero keeps its lime ring, which is
+ * already ~8:1 against #011d42. */
+.page .white .button:focus-visible,
+.page .choiceButton:focus-visible,
+.page :global(.public-closing-cta-actions .public-button:focus-visible) {
+  box-shadow: 0 0 0 6px rgba(250, 250, 250, 0.95);
+  outline: 3px solid #031d42;
+  outline-offset: 0;
 }

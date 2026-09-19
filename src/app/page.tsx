@@ -6,6 +6,7 @@ import {
   Check,
 } from "lucide-react";
 import PageWrapper from "@/components/PageWrapper";
+import ClosingCta from "@/components/public/ClosingCta";
 import styles from "./home-page.module.css";
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };
@@ -223,6 +224,11 @@ const startSteps = [
   ["4", "Get started", "Complete onboarding and step into the field with your team.", StartFlagIcon],
 ] as const;
 
+const joinTitles = (titles: readonly string[], last: "and" | "then") => {
+  const lower = titles.map((title) => title.toLowerCase());
+  return `${lower.slice(0, -1).join(", ")}, ${last} ${lower[lower.length - 1]}`;
+};
+
 const Arrow = () => <ArrowRight aria-hidden="true" size={17} strokeWidth={2.1} />;
 
 export default function Home() {
@@ -234,11 +240,14 @@ export default function Home() {
             <div className={styles.heroCopy}>
               <p className={styles.eyebrow}>Real markets. Real people. Real opportunity.</p>
               <h1 id="home-title" className={styles.heroTitle}>Your market.<br /><span>Your momentum.</span></h1>
-              <p className={styles.heroLead}>Join a 3C sales team, learn the work,<br /> perform, and grow—on your terms.</p>
-              <p className={styles.heroBody}>We connect leading telecom providers with communities<br />across the country. You’ll represent trusted products,<br />build real relationships, and build a future.</p>
+              {/* The breaks below are desktop line-shaping only and are hidden at
+                  <=720px. Each carries an explicit space so the words stay
+                  separated once the break stops rendering. */}
+              <p className={styles.heroLead}>Join a 3C sales team, learn the work,{" "}<br />perform, and grow—on your terms.</p>
+              <p className={styles.heroBody}>We connect leading telecom providers with communities{" "}<br />across the country. You’ll represent trusted products,{" "}<br />build real relationships, and build a future.</p>
               <div className={styles.actions}>
                 <Link href="#markets" className={`${styles.button} ${styles.buttonPrimary}`}>Find your market <Arrow /></Link>
-                <Link href="/opportunities#contractor" className={`${styles.button} ${styles.buttonSecondary}`}>Explore the contractor path</Link>
+                <Link href="/opportunities" className={`${styles.button} ${styles.buttonSecondary}`}>Explore the opportunity</Link>
               </div>
             </div>
             <div className={styles.heroArt}>
@@ -249,7 +258,7 @@ export default function Home() {
 
         <section id="markets" className={`${styles.section} ${styles.white}`} aria-labelledby="markets-title">
           <div className={styles.sectionInner}><div className={styles.marketsGrid}>
-            <div><p className={styles.sectionEyebrow}>Where you can start</p><h2 id="markets-title" className={styles.sectionTitle}><span className={styles.marketTitleLine}>Open markets.</span><span className={styles.marketTitleLine}>New opportunities.</span></h2><p className={styles.sectionIntro}><span>Openings change by market based on client demand.</span><span>Find a location and take the first step.</span></p><Link href="/opportunities" className={styles.textLink}>View all open markets <Arrow /></Link></div>
+            <div><p className={styles.sectionEyebrow}>Where you can start</p><h2 id="markets-title" className={styles.sectionTitle}><span className={styles.marketTitleLine}>Open markets.</span><span className={styles.marketTitleLine}>New opportunities.</span></h2><p className={styles.sectionIntro}><span>Openings change by market based on client demand.</span><span>Find a location and take the first step.</span></p><Link href="/opportunities" className={styles.textLink}>Explore sales opportunities <Arrow /></Link></div>
             <div className={styles.marketGrid}>{markets.map(([city, state, image]) => <Link key={city} href="/opportunities" className={styles.marketCard}><div className={styles.marketImage}><Image src={image} alt={`${city} skyline`} fill sizes="(max-width: 720px) 42vw, (max-width: 1023px) 27vw, 14vw" /></div><span className={styles.marketName}>{city}</span><span className={styles.marketState}>{state}</span></Link>)}</div>
           </div></div>
         </section>
@@ -260,14 +269,28 @@ export default function Home() {
 
         <section className={`${styles.section} ${styles.white}`} aria-labelledby="choices-title"><div className={styles.sectionInner}><h2 id="choices-title" className="sr-only">Choose your path</h2><div className={styles.choiceGrid}>
           <article className={styles.choice}><div className={styles.choiceHeading}><JoinMapPinIcon className={styles.choiceIcon} /><h3 className={styles.choiceTitle}>Join a 3C sales team</h3></div><ul className={styles.checkList}>{["Start as a sales representative in your market", "Get trained, supported, and set up for success", "Grow into leadership as you prove your results", "Build a long-term career with 3C"].map((item) => <li key={item}><Check aria-hidden="true" size={17} strokeWidth={2.5} /><span>{item}</span></li>)}</ul><Link href="/opportunities" className={`${styles.button} ${styles.buttonPrimary} ${styles.choiceButton}`}>Find your market <Arrow /></Link></article>
-          <article className={styles.choice}><div className={styles.choiceHeading}><InterlockingRingsIcon className={styles.choiceIcon} /><h3 className={styles.choiceTitle}>Bring or build an independent team</h3></div><ul className={styles.checkList}>{["Operate as an independent contractor", "Build and lead your own team", "Keep more of what you earn", "Scale across open markets"].map((item) => <li key={item}><Check aria-hidden="true" size={17} strokeWidth={2.5} /><span>{item}</span></li>)}</ul><Link href="/opportunities#contractor" className={`${styles.button} ${styles.buttonSecondary} ${styles.choiceButton}`} style={{ borderColor: "#0a1f44", color: "#0a1f44" }}>Explore the contractor path <Arrow /></Link></article>
+          <article className={styles.choice}><div className={styles.choiceHeading}><InterlockingRingsIcon className={styles.choiceIcon} /><h3 className={styles.choiceTitle}>Bring or build an independent team</h3></div><ul className={styles.checkList}>{["Operate as an independent contractor", "Build and lead your own team", "Keep more of what you earn", "Scale across open markets"].map((item) => <li key={item}><Check aria-hidden="true" size={17} strokeWidth={2.5} /><span>{item}</span></li>)}</ul><Link href="/contact" className={`${styles.button} ${styles.buttonSecondary} ${styles.choiceButton}`} style={{ borderColor: "#0a1f44", color: "#0a1f44" }}>Talk about building a team <Arrow /></Link></article>
         </div></div></section>
 
-        <section className={`${styles.section} ${styles.pale}`} aria-labelledby="reasons-title"><div className={styles.sectionInner}><div className={styles.sectionHeadingCenter}><h2 id="reasons-title" className={styles.sectionTitle}>Why sales pros choose 3C</h2></div><div className={styles.reasonGrid}>{reasons.map(([title, body, Icon]) => <article key={title} className={styles.reason}><Icon aria-hidden="true" className={`${styles.reasonIcon} ${Icon === USOutlineIcon ? styles.usOutlineIcon : ""}`} size={40} strokeWidth={1.6} /><h3 className={styles.reasonTitle}>{title}</h3><p className={styles.reasonBody}>{body}</p></article>)}</div></div></section>
+        <section className={`${styles.section} ${styles.pale} ${styles.brief}`} aria-labelledby="brief-title">
+          <div className={styles.sectionInner}>
+            <h2 id="brief-title" className={styles.srOnly}>Why 3C and how to get started</h2>
+            <div className={styles.briefGrid}>
+              <div className={styles.briefRow}>
+                <p className={styles.eyebrow}>Why sales pros choose 3C</p>
+                <p className={styles.briefLine}>{joinTitles(reasons.map(([title]) => title), "and")}.</p>
+                <Link href="/opportunities#why" className={styles.textLink}>See the full opportunity <Arrow /></Link>
+              </div>
+              <div className={styles.briefRow}>
+                <p className={styles.eyebrow}>How to get started</p>
+                <p className={styles.briefLine}>{joinTitles(startSteps.map(([, title]) => title), "then")}.</p>
+                <Link href="/opportunities#how-it-works" className={styles.textLink}>See how it works <Arrow /></Link>
+              </div>
+            </div>
+          </div>
+        </section>
 
-        <section className={`${styles.section} ${styles.white}`} aria-labelledby="start-title"><div className={styles.sectionInner}><div className={styles.sectionHeadingCenter}><h2 id="start-title" className={styles.sectionTitle}>How to get started</h2></div><ol className={styles.startGrid}>{startSteps.map(([number, title, body, Icon], index) => <li key={title} className={styles.startStep}><div className={styles.startTop}><span className={styles.startNumber}>{number}</span><Icon aria-hidden="true" className={styles.startIcon} /><h3 className={styles.startTitle}>{title}</h3></div><p className={styles.startBody}>{body}</p>{index < startSteps.length - 1 && <span className={styles.startLeader} aria-hidden="true" />}</li>)}</ol></div></section>
-
-        <section className={styles.closing} aria-labelledby="closing-title"><div className={`${styles.sectionInner} ${styles.closingGrid}`}><div><h2 id="closing-title" className={styles.closingTitle}>Your market is out there.<br /><span>Let’s go get it.</span></h2></div><p className={styles.closingBody}>Take the first step toward a career with freedom, purpose, and upside.</p><Link href="/opportunities" className={`${styles.button} ${styles.buttonPrimary}`}><span className={styles.closingCtaLabel}>Find your market <Arrow /></span></Link></div></section>
+        <ClosingCta eyebrow="Your next move" title="Your market is out there." body="" primaryLabel="Find your market" primaryHref="/opportunities" secondaryLabel="" secondaryHref="" />
       </div>
     </PageWrapper>
   );

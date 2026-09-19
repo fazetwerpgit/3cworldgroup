@@ -1,0 +1,366 @@
+/* The Careers display face. Contact used to inherit --public-display-font, but
+ * that variable no longer resolves inside these route-scoped rules, so the page
+ * fell back to system-ui. Same family name and files Careers loads. */
+@font-face {
+  font-display: swap;
+  font-family: "Careers Barlow Condensed";
+  font-style: normal;
+  font-weight: 400;
+  src: url("../fonts/BarlowCondensed-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Careers Barlow Condensed";
+  font-style: normal;
+  font-weight: 600;
+  src: url("../fonts/BarlowCondensed-SemiBold.ttf") format("truetype");
+}
+
+/* Contact route styles.
+ * Round 1 (2026-09-18): the 1px-comp era pixel locks are deleted. Nothing in
+ * here hard-codes a height, a font size in px, or a transform-scaled glyph.
+ * Layout comes from page.tsx utilities; this file only carries the route-scoped
+ * type scale, the fast-path diagonal, and the white step-in closing panel. */
+
+.route {
+  min-width: 0;
+}
+
+/* ---------- Display type ----------
+ * Every display element on the route resolves to the SemiBold Barlow Condensed
+ * face at weight 600. Nothing here depends on --public-display-font. */
+
+.route :global(.contact-eyebrow),
+.route :global(.contact-hero-title),
+.route :global(.contact-split-title),
+.route :global(.contact-fast-path-link-title),
+.route :global(.contact-success-title),
+.route :global(.contact-form-heading),
+.route :global(.contact-form-submit),
+.route :global(.public-closing-cta-panel .public-eyebrow),
+.route :global(.public-closing-cta-panel .public-closing-cta-title),
+.route :global(.public-closing-cta-actions .public-button) {
+  font-family: "Careers Barlow Condensed", "Arial Narrow", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* ---------- Shared type ---------- */
+
+.route :global(.contact-eyebrow) {
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.9rem;
+}
+
+/* ---------- Hero ---------- */
+
+.route :global(.contact-hero) {
+  overflow: hidden;
+}
+
+.route :global(.contact-hero-title) {
+  font-size: clamp(3rem, 6.4vw, 6rem);
+  letter-spacing: -0.015em !important; /* public.css .public-site .contact-hero h1 forces -0.1em !important */
+  word-spacing: 0.04em;
+  line-height: 0.9;
+  margin: 0;
+  max-width: 15ch;
+}
+
+.route :global(.contact-hero-body) {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  max-width: 46ch;
+}
+
+/* Hero art: the original italic lime-outline street-map 3C, Real-ESRGAN x4 of the
+ * 380px source (1520x1520, opaque navy, blended lighten). Placement = old comp. */
+.route :global(.contact-hero-art) {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  mix-blend-mode: lighten;
+  position: relative;
+}
+
+.route :global(.contact-hero-art img) {
+  height: auto;
+  max-height: 340px;
+  max-width: 100%;
+  object-fit: contain;
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+
+/* Desktop: the mark is oversized and clipped by the hero, as the accepted comp
+ * had it (1266px wide, left 29.7% of the container, lifted 2.5rem). */
+@media (min-width: 1024px) {
+  .route :global(.contact-hero-grid) {
+    min-height: 647px;
+    position: relative;
+  }
+
+  .route :global(.contact-hero-art) {
+    display: block;
+    left: var(--art-left);
+    position: absolute;
+    top: 18px;
+    width: 828px;
+  }
+
+  .route :global(.contact-hero-art img) {
+    height: auto;
+    max-height: none;
+    max-width: none;
+    width: 828px;
+  }
+
+  .route :global(.contact-hero-copy) {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .route :global(.contact-hero-grid) {
+    min-height: 600px;
+  }
+
+  .route :global(.contact-hero-art img) {
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 767px) {
+  .route :global(.contact-hero-art img) {
+    max-height: 260px;
+  }
+}
+
+/* ---------- Fast-path split ---------- */
+
+.route :global(.contact-fast-path) {
+  background: #f7f9fc;
+  min-width: 0;
+}
+
+.route :global(.contact-general-panel) {
+  background: #f7f9fc;
+}
+
+.route :global(.contact-split-title) {
+  font-size: clamp(1.8rem, 2.6vw, 2.4rem);
+  line-height: 0.95;
+  margin: 0;
+}
+
+.route :global(.contact-split-title)::after {
+  background: #8dc63f;
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 0.9rem;
+  width: 42px;
+}
+
+.route :global(.contact-split-title-dark) {
+  color: #102649;
+}
+
+.route :global(.contact-fast-path a) {
+  min-width: 0;
+}
+
+.route :global(.contact-fast-path-link-title) {
+  font-size: clamp(1.35rem, 1.6vw, 1.6rem);
+  line-height: 1.05;
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* The split's diagonal continues the hero art's lime line. --line-x is where that
+ * line crosses the hero's bottom edge: grid left + --art-left of the grid width +
+ * the line's offset inside the 828px-wide art. The pale panel is a skewed overlay
+ * at the line's angle (dx/dy 0.7033 = 35.11deg) starting at --line-x. Percentages
+ * here are of the full-bleed section, which equals the page width. */
+.route {
+  --pad: clamp(1.25rem, 3.333vw, 3rem);
+  --art-left: 46%;
+  --line-x: calc(max(0px, (100% - 1440px) / 2) + var(--pad) + 0.46 * (min(100%, 1440px) - 2 * var(--pad)) + 416.4px);
+}
+
+.route :global(.contact-fast-path-pale) { display: none; }
+
+/* Under 1200px the pale panel would get too narrow if it chased the line, so the
+ * diagonal keeps the angle but starts at the old 67.5% column edge instead. */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .route { --line-x: 67.5%; }
+}
+
+@media (min-width: 900px) {
+  .route :global(.contact-fast-path) {
+    background: #061735;
+    grid-template-columns: var(--line-x) minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .route :global(.contact-general-panel) { background: transparent; padding-left: clamp(2.5rem, 4vw, 4rem); position: relative; z-index: 2; }
+
+  /* Hard-stop gradient at 125.11deg: for angles in 90-180deg the gradient starts
+   * at the box's top-left corner, so the edge passes through (line-x, 0) at
+   * exactly the line's angle. No transform (the public sheet neutralises them). */
+  .route :global(.contact-fast-path-pale) {
+    /* Box starts 400px left of the line so the slant has room; the boundary
+     * through (400px, 0) sits 400 * sin(125.11deg) = 327.2px along the gradient. */
+    background: linear-gradient(125.11deg, transparent 0, transparent 326.7px, #f7f9fc 327.7px);
+    bottom: 0;
+    display: block;
+    left: calc(var(--line-x) - 400px);
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 1;
+  }
+
+  .route :global(.contact-fast-path-navy) { position: relative; z-index: 0; }
+
+  .route :global(.contact-fast-path-rows) {
+    max-width: 34rem;
+  }
+}
+
+@media (max-width: 899px) {
+  .route :global(.contact-fast-path) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Form ---------- */
+
+.route :global(.contact-form-grid),
+.route :global(.contact-form-grid > div) {
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.route :global(.contact-form-heading) {
+  font-size: clamp(1.8rem, 2.6vw, 2.4rem);
+  line-height: 0.95;
+}
+
+.route :global(.contact-form-grid form) {
+  min-width: 0;
+}
+
+/* The narrow-desktop handoff leaves ~150px per nested field; stack the rows
+ * rather than clipping values. */
+@media (min-width: 1024px) and (max-width: 1080px) {
+  .route :global(.contact-form-grid form > div) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999px) {
+  .route :global(.contact-form-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Closer ----------
+ * The About/Careers white step-in panel. public.css forces the title white, so
+ * the recolour needs the three-class selector plus !important. */
+
+.route :global(.public-closing-cta) {
+  padding: 0 0 40px !important;
+  position: relative;
+  z-index: 3;
+}
+
+.route :global(.public-closing-cta-panel) {
+  align-items: center;
+  background: #fff !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 24px 56px rgba(3, 29, 66, 0.32);
+  display: grid;
+  gap: 1.5rem 3rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 0;
+  min-height: 0 !important;
+  padding: 36px 48px !important;
+  position: relative;
+}
+
+.route :global(.public-closing-cta-panel)::before,
+.route :global(.public-closing-cta-panel)::after {
+  content: none;
+  display: none !important;
+}
+
+.route :global(.public-closing-cta-panel .public-eyebrow) {
+  color: #5f8f1f !important;
+  margin: 0 0 10px;
+}
+
+.route :global(.public-closing-cta-panel .public-closing-cta-title) {
+  color: #031d42 !important;
+  font-size: clamp(2rem, 3.2vw, 3.25rem);
+  line-height: 0.95;
+  margin: 0;
+  max-width: none;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
+.route :global(.public-closing-cta-copy) {
+  max-width: none;
+}
+
+.route :global(.public-closing-cta-body),
+.route :global(.public-closing-cta-secondary) {
+  display: none;
+}
+
+.route :global(.public-closing-cta-actions) {
+  margin: 0;
+}
+
+.route :global(.public-closing-cta-actions .public-button) {
+  background: #8dc63f !important;
+  border: 0 !important;
+  color: #061735 !important;
+  min-height: 56px;
+  padding: 0 34px;
+  text-transform: uppercase;
+}
+
+@media (min-width: 900px) {
+  .route :global(.public-closing-cta) {
+    padding-top: 24px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .route :global(.public-closing-cta) {
+    padding: 8px 16px 32px !important;
+  }
+
+  .route :global(.public-closing-cta-panel) {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 28px 24px !important;
+  }
+
+  .route :global(.public-closing-cta-actions .public-button) {
+    width: 100%;
+  }
+}
+
+/* Headings: the site sheet tightens h1/h2 tracking hard; Barlow needs air. */
+.route :global(.contact-split-title),
+.route :global(.contact-fast-path-link-title),
+.route :global(.contact-form-heading),
+.route :global(.public-closing-cta-panel .public-closing-cta-title) { letter-spacing: -0.01em; }

@@ -9,13 +9,10 @@ import {
   Clock3,
   Link2,
   Mail,
-  MessagesSquare,
   Phone,
-  UserRound,
-  UsersRound,
 } from "lucide-react";
 import PageWrapper from "@/components/PageWrapper";
-import { PublicContainer, PublicSection } from "@/components/public";
+import { ClosingCta, PublicContainer, PublicSection } from "@/components/public";
 import styles from "./contact-page.module.css";
 
 const inputClassName =
@@ -59,21 +56,31 @@ export default function ContactPage() {
 
   return (
     <PageWrapper>
-      <div className={`${styles.route} public-contact`}>
+      {/* The global `public-contact` hook is deliberately gone: public.css keys ~240
+          lines of retired 1px-comp pixel locks off it (hero 647px, h1 128px, 3.2rem
+          link titles, the 258px closing band). The route styles itself now. */}
+      <div className={styles.route}>
       <section className="contact-hero public-topo-surface text-white">
         <PublicContainer>
-          <div className="relative grid min-h-[390px] items-center gap-8 py-14 md:grid-cols-[1.05fr_0.95fr] md:py-20 lg:min-h-[650px] lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="relative z-10 max-w-xl lg:self-start lg:pl-10 lg:pt-16">
-              <p className="public-eyebrow text-[#8dc63f] lg:hidden">Get in touch</p>
-              <h1 className="mt-4 max-w-[16ch] font-[var(--public-display-font)] text-5xl font-extrabold uppercase leading-[0.84] tracking-[-0.07em] sm:text-6xl md:max-w-[18ch] md:text-7xl lg:text-[7.2rem] lg:tracking-[-0.1em] lg:[word-spacing:0.08em]">
-                <span className="contact-hero-line-start">LET’S START</span><span className="contact-hero-line-conversation block text-[#8dc63f]">THE RIGHT<span className="contact-mobile-break"><br /></span>{' '}CONVERSATION.</span>
+          <div className="contact-hero-grid grid items-center gap-10 py-14 md:grid-cols-[0.92fr_1.08fr] md:py-[72px]">
+            <div className="contact-hero-copy max-w-xl">
+              <p className="public-eyebrow contact-eyebrow text-[#8dc63f]">Get in touch</p>
+              <h1 className="contact-hero-title uppercase tracking-[-0.01em]">
+                LET’S START <span className="block text-[#8dc63f]">THE RIGHT CONVERSATION.</span>
               </h1>
-              <p className="contact-hero-body mt-7 max-w-[46ch] text-base leading-7 text-white/85 sm:text-lg">
+              <p className="contact-hero-body mt-6 text-white/85">
                 Questions about joining 3C, building a contractor team, or the services we represent? Choose a path and we&apos;ll point you in the right direction.
               </p>
             </div>
-            <div aria-hidden="true" className="pointer-events-none relative mx-auto flex h-[260px] w-full max-w-[380px] items-center justify-center md:ml-auto md:h-full md:min-h-[280px] md:max-w-[640px]">
-              <Image src="/redesign/three-c-map-mark-transparent-2x.png" alt="" fill priority sizes="(max-width: 767px) 100vw, (max-width: 1023px) 60vw, (max-width: 1279px) 633px, 1266px" className="object-contain object-center opacity-100 mix-blend-lighten" />
+            <div aria-hidden="true" className="contact-hero-art">
+              <Image
+                src="/redesign/contact-three-c-hd-x4f.png"
+                alt=""
+                width={1860}
+                height={1520}
+                priority
+                sizes="(max-width: 767px) 90vw, 46vw"
+              />
             </div>
           </div>
         </PublicContainer>
@@ -81,27 +88,30 @@ export default function ContactPage() {
 
       <section className="relative bg-white">
         <div className="contact-fast-path relative z-0 grid md:grid-cols-[1.35fr_0.65fr]">
-          <div className="public-topo-surface px-5 py-10 text-white sm:px-10 md:px-12 md:py-24 lg:px-[max(3rem,calc((100vw-1240px)/2))] lg:pr-16">
-            <p className="public-eyebrow text-[#8dc63f] lg:!text-[clamp(2rem,3vw,3rem)] lg:!leading-none lg:!tracking-[0.01em] lg:after:mt-4 lg:after:block lg:after:h-1 lg:after:w-10 lg:after:bg-[#8dc63f] lg:after:content-['']">The fastest path</p>
-            <div className="mt-10 grid gap-0 md:mt-12">
-              <Link href="/apply" className="group flex min-h-20 items-center gap-4 border-b border-white/20 py-4 text-white focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#8dc63f] md:min-h-24 md:py-4">
-                <UserRound aria-hidden="true" className="h-8 w-8 shrink-0 text-[#8dc63f] md:h-11 md:w-11 lg:h-12 lg:w-12" strokeWidth={1.6} />
-                <span className="contact-fast-path-link-title font-[var(--public-display-font)] text-2xl font-extrabold uppercase tracking-[-0.03em] sm:text-3xl lg:text-4xl">Join as a sales rep</span>
-                <ArrowRight aria-hidden="true" className="ml-auto h-7 w-7 shrink-0 text-[#8dc63f] transition-transform group-hover:translate-x-1 md:h-9 md:w-9" />
+          <span aria-hidden="true" className="contact-fast-path-pale" />
+          <div className="contact-fast-path-navy public-topo-surface px-5 py-14 text-white sm:px-10 md:px-12 md:py-[72px] lg:px-[max(3rem,calc((100vw-1240px)/2))] lg:pr-16">
+            <p className="public-eyebrow contact-eyebrow text-[#8dc63f]">Choose a path</p>
+            <h2 className="contact-split-title uppercase tracking-[-0.01em]">The fastest path</h2>
+            <div className="contact-fast-path-rows mt-7 grid gap-0">
+              <Link href="/apply" className="group flex min-h-[72px] items-center gap-4 border-b border-white/20 py-3 text-white focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#8dc63f]">
+                <PathwayPersonIcon className="h-9 w-9 shrink-0 text-[#8dc63f] md:h-10 md:w-10" />
+                <span className="contact-fast-path-link-title uppercase tracking-[-0.01em]">Join as a sales rep</span>
+                <ArrowRight aria-hidden="true" className="ml-auto h-6 w-6 shrink-0 text-[#8dc63f] transition-transform group-hover:translate-x-1" />
               </Link>
-              <Link href="/opportunities" className="group flex min-h-20 items-center gap-4 py-4 text-white focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#8dc63f] md:min-h-24 md:py-4">
-                <UsersRound aria-hidden="true" className="h-8 w-8 shrink-0 text-[#8dc63f] md:h-11 md:w-11 lg:h-12 lg:w-12" strokeWidth={1.6} />
-                <span className="contact-fast-path-link-title font-[var(--public-display-font)] text-2xl font-extrabold uppercase tracking-[-0.03em] sm:text-3xl lg:text-4xl">Bring or build a team</span>
-                <ArrowRight aria-hidden="true" className="ml-auto h-7 w-7 shrink-0 text-[#8dc63f] transition-transform group-hover:translate-x-1 md:h-9 md:w-9" />
+              <Link href="/opportunities" className="group flex min-h-[72px] items-center gap-4 py-3 text-white focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#8dc63f]">
+                <PathwayTeamIcon className="h-9 w-9 shrink-0 text-[#8dc63f] md:h-10 md:w-10" />
+                <span className="contact-fast-path-link-title uppercase tracking-[-0.01em]">Bring or build a team</span>
+                <ArrowRight aria-hidden="true" className="ml-auto h-6 w-6 shrink-0 text-[#8dc63f] transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
           </div>
-          <div className="bg-[#f7f9fc] px-5 py-10 sm:px-10 md:min-h-[500px] md:px-12 md:py-24 lg:px-16">
-            <p className="public-eyebrow lg:!text-[clamp(2rem,3vw,3rem)] lg:!leading-none lg:!tracking-[0.01em] lg:!text-[#102649] lg:after:mt-4 lg:after:block lg:after:h-1 lg:after:w-10 lg:after:bg-[#8dc63f] lg:after:content-['']">General questions</p>
-            <Link href="/services" className="group mt-10 flex min-h-20 items-center gap-4 text-[#102649] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#8dc63f] md:mt-12 md:min-h-28">
-              <MessagesSquare aria-hidden="true" className="h-10 w-10 shrink-0 text-[#102649] md:h-14 md:w-14" strokeWidth={1.6} />
-              <span className="contact-general-link-title font-[var(--public-display-font)] text-2xl font-extrabold uppercase tracking-[-0.03em] sm:text-3xl lg:text-4xl">Services &amp; support</span>
-              <ArrowRight aria-hidden="true" className="ml-auto h-7 w-7 shrink-0 text-[#102649] transition-transform group-hover:translate-x-1 md:h-9 md:w-9" />
+          <div className="contact-general-panel relative z-[1] px-5 py-14 sm:px-10 md:px-12 md:py-[72px] lg:px-16">
+            <p className="public-eyebrow contact-eyebrow text-[#5f8f1f]">Anything else</p>
+            <h2 className="contact-split-title contact-split-title-dark uppercase tracking-[-0.01em]">General questions</h2>
+            <Link href="/services" className="group mt-7 flex min-h-[72px] items-center gap-4 text-[#102649] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#8dc63f]">
+              <PathwayChatIcon className="h-10 w-10 shrink-0 text-[#102649]" />
+              <span className="contact-fast-path-link-title uppercase tracking-[-0.01em]">Services &amp; support</span>
+              <ArrowRight aria-hidden="true" className="ml-auto h-6 w-6 shrink-0 text-[#102649] transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
         </div>
@@ -117,7 +127,7 @@ export default function ContactPage() {
                     <div className="flex h-12 w-12 items-center justify-center bg-[#8dc63f] text-[#102649]">
                       <Check aria-hidden="true" className="h-7 w-7" strokeWidth={3} />
                     </div>
-                    <h3 className="mt-5 font-[var(--public-display-font)] text-3xl font-extrabold uppercase tracking-[-0.04em] text-[#102649]">Message sent!</h3>
+                    <h3 className="contact-success-title mt-5 text-3xl uppercase tracking-[-0.01em] text-[#102649]">Message sent!</h3>
                     <p className="mt-2 leading-7 text-[#60728d]">Thank you for reaching out. We&apos;ll get back to you within 24-48 hours.</p>
                   </div>
                 ) : (
@@ -139,7 +149,7 @@ export default function ContactPage() {
                       </label>
                       <label className="block text-sm font-bold text-[#102649] lg:text-xl" htmlFor="contact-subject">
                         Subject *
-                        <select className={`${inputClassName} appearance-none text-lg lg:min-h-[4.5rem] lg:px-5 lg:py-5`} id="contact-subject" name="subject" required value={formData.subject} onChange={handleChange}>
+                        <select className={`${inputClassName} text-lg lg:min-h-[4.5rem] lg:px-5 lg:py-5`} id="contact-subject" name="subject" required value={formData.subject} onChange={handleChange}>
                           <option value="">Select a subject</option>
                           <option value="services">Service Inquiry</option>
                           <option value="careers">Career Opportunity</option>
@@ -155,7 +165,7 @@ export default function ContactPage() {
                     </label>
                     {error ? <p className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p> : null}
                     <button type="submit" disabled={submitting} className="contact-form-submit public-button public-button-lime mt-1 w-full text-lg sm:w-fit lg:min-h-20 lg:px-10 disabled:cursor-not-allowed disabled:opacity-60">
-                      {submitting ? "Sending..." : "Send message"}
+                      <span className="contact-form-submit-label">{submitting ? "Sending..." : "Send message"}</span>
                       {!submitting ? <ArrowRight aria-hidden="true" size={17} strokeWidth={2.2} /> : null}
                     </button>
                   </form>
@@ -184,20 +194,14 @@ export default function ContactPage() {
         </PublicContainer>
       </PublicSection>
 
-      <section className="public-closing-cta public-closing-cta-contact public-topo-surface lg:py-4" aria-labelledby="contact-closing-heading">
-        <div className="public-container">
-          <div className="public-closing-cta-panel">
-            <div className="public-closing-cta-copy">
-              <p className="public-eyebrow public-eyebrow-dark">Your next move</p>
-          <h2 id="contact-closing-heading" className="public-closing-cta-title">Don&apos;t need to wait? Apply today.</h2>
-              <p className="public-closing-cta-body">Take the next step toward your future with 3C World Group.</p>
-            </div>
-            <div className="public-closing-cta-actions">
-              <Link href="/apply" className="public-button public-button-navy">Start your application <ArrowRight aria-hidden="true" size={17} strokeWidth={2.2} /></Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ClosingCta
+        eyebrow="Your next move"
+        title="Don’t need to wait? Apply today."
+        body=""
+        primaryLabel="Start your application"
+        primaryHref="/apply"
+        secondaryLabel=""
+      />
       </div>
     </PageWrapper>
   );
@@ -220,5 +224,38 @@ function ContactDetail({
         <div>{children}</div>
       </div>
     </div>
+  );
+}
+
+function PathwayPersonIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 64 64">
+      <circle cx="32" cy="17" r="10" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 52c0-11 8.8-20 20-20s20 9 20 20v3H12v-3Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function PathwayTeamIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 64 64">
+      <circle cx="32" cy="18" r="9" stroke="currentColor" strokeWidth="2" />
+      <circle cx="13" cy="24" r="7" stroke="currentColor" strokeWidth="2" />
+      <circle cx="51" cy="24" r="7" stroke="currentColor" strokeWidth="2" />
+      <path d="M17 54c0-10 6.7-18 15-18s15 8 15 18v2H17v-2Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M1 53c0-8 5.1-14 12-14 3.2 0 6 1.2 8.1 3.3M63 53c0-8-5.1-14-12-14-3.2 0-6 1.2-8.1 3.3" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function PathwayChatIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 80 80">
+      <path d="M8 12h42c4.4 0 8 3.6 8 8v24c0 4.4-3.6 8-8 8H31L19 64V52H8c-4.4 0-8-3.6-8-8V20c0-4.4 3.6-8 8-8Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M35 28h37c4.4 0 8 3.6 8 8v20c0 4.4-3.6 8-8 8h-8v10L52 64H35c-4.4 0-8-3.6-8-8" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" />
+      <circle cx="18" cy="32" r="2" fill="currentColor" />
+      <circle cx="29" cy="32" r="2" fill="currentColor" />
+      <circle cx="40" cy="32" r="2" fill="currentColor" />
+    </svg>
   );
 }

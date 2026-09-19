@@ -27,7 +27,7 @@ const footerGroups = [
     links: [
       { href: "/opportunities", label: "Why 3C" },
       { href: "/opportunities", label: "Sales Opportunity" },
-      { href: "/opportunities#contractor", label: "Contractor Opportunity" },
+      { href: "/opportunities", label: "Contractor Opportunity" },
       { href: "/apply", label: "Apply Now" },
     ],
   },
@@ -36,7 +36,7 @@ const footerGroups = [
     links: [
       { href: "/contact", label: "Contact Us" },
       { href: "/portal", label: "Employee Login" },
-      { href: "/opportunities#contractor", label: "Partner With Us" },
+      { href: "/contact", label: "Partner With Us" },
     ],
   },
 ];

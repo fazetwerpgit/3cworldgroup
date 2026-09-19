@@ -705,7 +705,7 @@
   margin: 0 0 8px;
   text-transform: uppercase;
 }
-.whyItemBody { color: #60728d; font-size: 0.95rem; line-height: 1.5; margin: 0; max-width: 34ch; }
+.whyItemBody { color: #60728d; font-size: 1rem; line-height: 1.55; margin: 0; max-width: 34ch; }
 
 @media (min-width: 900px) {
   .whyInner {
@@ -785,7 +785,7 @@
   margin: 0 0 6px;
   text-transform: uppercase;
 }
-.stepBody { color: #60728d; font-size: 0.95rem; line-height: 1.55; margin: 0; max-width: 40ch; }
+.stepBody { color: #60728d; font-size: 1rem; line-height: 1.6; margin: 0; max-width: 40ch; }
 
 .pathPay { color: #fff; display: flex; }
 .pathPayInner { align-self: center; width: 100%; }
@@ -819,7 +819,7 @@
   margin: 0 0 4px;
   text-transform: uppercase;
 }
-.bandBody { color: rgba(255, 255, 255, 0.65); font-size: 0.9rem; line-height: 1.5; margin: 0; max-width: 28ch; }
+.bandBody { color: rgba(255, 255, 255, 0.72); font-size: 1rem; line-height: 1.5; margin: 0; max-width: 28ch; }
 .bandRange {
   color: #c3ed4d;
   font-family: var(--public-display-font);
@@ -831,7 +831,9 @@
   white-space: nowrap;
 }
 .bandRange span { display: block; font-size: 0.5em; letter-spacing: 0.12em; text-transform: uppercase; }
-.payNote { color: rgba(255, 255, 255, 0.55); font-size: 0.85rem; margin: 18px 0 0; }
+/* C2: the earnings disclaimer has to be readable next to the tiers it
+ * qualifies. Raised from 13.6px / 0.55 alpha (~5:1) to 15.2px / 0.78 (~11:1). */
+.payNote { color: rgba(255, 255, 255, 0.78); font-size: 0.95rem; line-height: 1.5; margin: 20px 0 0; max-width: 44ch; }
 
 @media (min-width: 1023px) {
   .path { display: grid; grid-template-columns: calc(50% + var(--slant)) calc(50% - var(--slant)); }
@@ -875,4 +877,133 @@
     min-height: 0 !important;
     height: 100%;
   }
+}
+
+/* 04d Closer (Jacob 9/18): no apply band at all. The pay column is transparent so
+   the ending-surface topo navy runs from the pay panel through the white step-in
+   CTA panel into the footer with no seam. Panel styling mirrors About. */
+.path { background: transparent; }
+.route :global(.public-closing-cta) { padding: 0 0 40px !important; position: relative; z-index: 3; }
+.route :global(.public-closing-cta-panel) {
+  align-items: center;
+  background: #fff !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 24px 56px rgba(3, 29, 66, 0.32);
+  display: grid;
+  gap: 1.5rem 3rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 0;
+  min-height: 0 !important;
+  padding: 36px 48px !important;
+  position: relative;
+}
+.route :global(.public-closing-cta-panel)::before,
+.route :global(.public-closing-cta-panel)::after { content: none; display: none !important; }
+.route :global(.public-closing-cta-panel .public-eyebrow) { color: #5f8f1f !important; margin: 0 0 10px; }
+.route :global(.public-closing-cta-panel .public-closing-cta-title) {
+  color: #031d42 !important;
+  font-size: clamp(2rem, 3.2vw, 3.25rem);
+  line-height: 0.95;
+  margin: 0;
+  text-transform: uppercase;
+}
+.route :global(.public-closing-cta-copy) { max-width: none; }
+.route :global(.public-closing-cta-body),
+.route :global(.public-closing-cta-secondary) { display: none; }
+.route :global(.public-closing-cta-actions) { margin: 0; }
+.route :global(.public-closing-cta-actions .public-button) {
+  background: #8dc63f !important;
+  border: 0 !important;
+  color: #061735 !important;
+  min-height: 56px;
+  padding: 0 34px;
+  text-transform: uppercase;
+}
+@media (min-width: 900px) {
+  .route :global(.public-closing-cta) { padding-top: 24px !important; }
+}
+@media (max-width: 720px) {
+  .route :global(.public-closing-cta) { padding: 8px 16px 32px !important; }
+  .route :global(.public-closing-cta-panel) { grid-template-columns: minmax(0, 1fr); padding: 28px 24px !important; }
+  .route :global(.public-closing-cta-actions .public-button) { width: 100%; }
+}
+
+/* ===========================================================================
+ * Design polish 2026-09-18 — C1.
+ * Every display-face declaration on this route sat inside
+ * `@media (min-width: 1023px)`, so at 390px the h1 resolved to system-ui
+ * while the button beside it stayed condensed. Declare the family at base
+ * level; the media queries above continue to carry size only.
+ * Body paragraphs deliberately keep the readable Geist body face below the
+ * desktop breakpoint — only the display hierarchy is condensed here.
+ * ======================================================================== */
+.route:global(#opportunities-route) :global(h1),
+.route:global(#opportunities-route) :global(h2) {
+  /* Family only. Correction B2: this selector outranks the whole legacy
+   * cascade, so any `font-weight` here silently replaced the weight the
+   * baseline actually resolves. Measured on the untouched original, this
+   * route's h1 and h2 compute `800` at 390, 1024 and 1440 alike — the low
+   * specificity `400` rules further up never win there. Declaring nothing
+   * lets that original hierarchy stand; only the phone is overridden below. */
+  font-family: "Careers Barlow Condensed", sans-serif !important;
+}
+
+@media (max-width: 1022px) {
+  /* Retained from correction B: the phone hero keeps SemiBold. Barlow ships
+   * only 400/600, so `800` selects the same SemiBold face here — this pins
+   * the weight the reviewer measured without touching desktop. */
+  .route:global(#opportunities-route) :global(h1),
+  .route:global(#opportunities-route) :global(h2) {
+    font-weight: 600 !important;
+  }
+}
+
+.route:global(#opportunities-route) :global(h3) {
+  font-family: "Careers Barlow Condensed", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+.route:global(#opportunities-route) :global(.public-button),
+.route:global(#opportunities-route) :global(.public-eyebrow) {
+  font-family: "Careers Open Sans Condensed", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+@media (max-width: 1022px) {
+  /* Barlow sets far narrower than the grotesque this hero fell back to, so the
+   * 10ch measure that used to hold the line now breaks it into four. */
+  .route > section:first-of-type :global(h1) {
+    letter-spacing: -0.03em;
+    line-height: 0.88;
+    max-width: 15ch;
+  }
+
+  /* Review correction B. 0.78rem condensed semibold is not comfortably
+   * legible on a phone; the hero CTAs are the route's primary action. */
+  .route:global(#opportunities-route) :global(.public-button) {
+    font-size: 1rem !important;
+    letter-spacing: 0.05em !important;
+    padding-inline: 1.25rem !important;
+  }
+
+  /* Review correction B. The hero's secondary CTA carries Tailwind's
+   * `border-white`, but `.public-site .public-button` outranks it with
+   * `border: 1px solid transparent`, so below 1023px the button lost its
+   * outline entirely and read as floating text. Desktop already forces the
+   * border with `lg:!border-2 lg:!border-white`; this restores the phone. */
+  .route:global(#opportunities-route)
+    > section:first-of-type
+    :global(.public-button:not(.public-button-lime)) {
+    border-color: #fff !important;
+  }
+}
+
+/* --- Review correction C: the white closer panel turns the shared lime focus
+ * ring into a ~2.1:1 indicator. Navy flush to the control reads 7.8:1 against
+ * the lime fill; the navy hero keeps its lime ring (~8:1 on #061735). */
+.route :global(.public-closing-cta-actions .public-button:focus-visible) {
+  box-shadow: 0 0 0 6px rgba(250, 250, 250, 0.95);
+  outline: 3px solid #031d42;
+  outline-offset: 0;
 }

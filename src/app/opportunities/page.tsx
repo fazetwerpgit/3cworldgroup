@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import PageWrapper from "@/components/PageWrapper";
+import ClosingCta from "@/components/public/ClosingCta";
 import USMap from "@/components/art/USMap";
 import styles from "./opportunities-page.module.css";
 
@@ -60,7 +61,7 @@ export default function OpportunitiesPage() {
         </div>
       </section>
 
-      <section className={styles.why} aria-labelledby="why-title">
+      <section id="why" className={styles.why} aria-labelledby="why-title">
         <div className={styles.whyInner}>
           <div className={styles.whyHead}>
             <p className={styles.whyEyebrow}>Now hiring nationwide</p>
@@ -119,28 +120,8 @@ export default function OpportunitiesPage() {
         </div>
       </section>
 
-      <section className={styles.ending} aria-labelledby="ending-title">
-        <div className={styles.endingInner}>
-          <div className={styles.endingCopy}>
-            <p className={styles.endingEyebrow}>What we offer</p>
-            <h2 id="ending-title" className={styles.endingTitle}>Your next market <span>starts here.</span></h2>
-            <p className={styles.endingLede}>Uncapped pay, a protected territory, real training, and a team that answers the phone.</p>
-          </div>
-          <div className={styles.endingCard}>
-            <h3 className={styles.endingCardTitle}>Apply in 30 seconds</h3>
-            <p className={styles.endingCardBody}>No resume needed. We&apos;ll call within 48 hours.</p>
-            <div className={styles.endingStats}>
-              {endingStats.map(({ figure, label }) => (
-                <div key={label}>
-                  <b>{figure}</b>
-                  <span>{label}</span>
-                </div>
-              ))}
-            </div>
-            <Link href="/apply" className={styles.endingButton}>Start your application <ArrowRight aria-hidden="true" size={16} strokeWidth={2.2} /></Link>
-          </div>
-        </div>
-      </section>
+      <ClosingCta eyebrow="Ready when you are" title="Your next market starts here." body="" primaryLabel="Start your application" primaryHref="/apply" secondaryLabel="" secondaryHref="" />
+
 
 
       </div>

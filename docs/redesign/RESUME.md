@@ -1,19 +1,75 @@
 # RESUME — read this and continue without being asked
 
-## CURRENT (2026-09-18) — Careers round 2 built, UNCOMMITTED, awaiting Jacob's verdict
+## CURRENT (2026-09-18 ~20:00) — Codex snapshots reviewed; partial merge on :3000
+Jacob ran Codex ("Astra") in two isolated copies (no .git, never touched this tree):
+- ~/dev/3cworldgroup-polish-20260918 (preview :3118, .codex/RESUME.md, final.patch = 7 files):
+  mobile hero fixes, navy-on-lime buttons, Apply claims removed, footer anchors, PLUS overreach
+  (white Home closer, moved Home seam, Careers eyebrow "Ready when you are", brief-row rules).
+- ~/dev/3cworldgroup-cinematic-20260918 (preview :3120, .Codex/RESUME.md): full Home rewrite that
+  bypasses PageWrapper (own header/footer, 1814-line module). Opus review: show with caveats, not mergeable.
+Jacob 9/18 ~20:10: "build off what codex did, keep what you have going" -> Codex's FULL polish pass
+(all 7 files) copied WHOLESALE from the polish snapshot into this tree on top of my Contact/Careers/Home
+work. :3000 now = Codex polish + my Contact rebuild + connected hero line. (Home has Codex's white closer
+and the seam moved to markets->path; Careers eyebrow now "Ready when you are".) Partial hunk-picking
+was tried first and broke Apply; don't repeat, take whole files.
+Cinematic Home (:3120) NOT taken; Jacob hasn't said.
+NEXT ACTION: Jacob checks :3000 (/, /opportunities, /apply, /contact) and says commit or what to change;
+ask him about the cinematic Home separately.
+Gates after merge: tsc 0, eslint 0 errors, 0 console errors, no overflow 390/1440.
 
-NEXT ACTION: Jacob checks localhost:3000/opportunities (100% and zoomed
-out). If accepted -> commit:
-  git add src/app/opportunities/ docs/redesign/careers-r2-spec.md docs/redesign/RESUME.md
-  git commit -m "feat(careers): one-pass Careers page, no repeated sections; hero map contained"
-If rejected -> fix only what he points at, verify 1440/1920/2560/390, screenshot back.
-Then: open question to Jacob, site-wide repetition. Home repeats the benefits
-list + four steps that Careers now owns; products trio is on About + Services.
-Options given: (a) trim Home's benefits/steps to one line + link each, or
-(b) keep Home as the full pitch and only trim About/Services repeats. He
-has not answered yet. Ask again, then do what he picks.
+## Previous (2026-09-18) — Contact round 1 in progress; Careers closer + Home A UNCOMMITTED
+
+NEXT ACTION: Jacob checks localhost:3000/contact (Contact round 1 built,
+UNCOMMITTED, spec docs/redesign/contact-r1-spec.md). Done: pixel-lock CSS
+gone (module 771 -> ~300 lines, rewritten). Hero art: Jacob wants the ORIGINAL italic lime-outline street-map 3C
+(contact-three-c-source.png, 380px) "exactly the same but not blurry".
+Image-gen recreations (2 rounds) drifted and were rejected. Final: Real-ESRGAN
+x4 of the source (portable build in .playwright/tools/re, realesrgan-x4plus,
+RTX 4080) -> public/redesign/contact-three-c-hd-x4f.png (1860x1520, opaque navy).
+Post-process (magick, one command): green-dominant mask -> modulate
+150,135,108 (olive -> site lime), RGB floor level 7% so it vanishes under
+mix-blend lighten, canvas extended 400px right and ONE continuous diagonal drawn over the
+original (stroke #8dc63f 7px + dim 12px blurred glow, from 920,1520 to
+1918,101; the piecewise extension showed a seam, Jacob caught it), 60px trimmed
+off the left (stray tick). Jacob 9/18: "damn close" after placement; then
+asked for the line extended + right green -> this file. Placement measured from Jacob's
+old screenshot: desktop >=1024 absolute left 52.7% of the grid, top 18px,
+width 828px (letters same size as before the 400px extension), hero min-height 647px, overflow hidden; blend on the wrapper
+(NOT the img: a z-indexed wrapper made its own stacking context and the
+blend showed a dark square). Below 1024 in-flow, max-height 260px on phone.
+Jacob 9/18: the hero line must CONNECT to the split's diagonal. Done:
+.route defines --line-x (where the line crosses the hero bottom: grid left +
+--art-left 46% of grid width + 416.4px inside the 828px art); the split's
+navy column is var(--line-x) wide and a .contact-fast-path-pale overlay
+(span, absolute, left = line-x - 400px) paints the pale panel with a hard-stop
+linear-gradient at 125.11deg (= the line's 35.11deg) so the edge continues
+the line exactly. Verified 1280/1440/1920. 900-1199px: --line-x falls back
+to 67.5% (panel would be too narrow). Transforms are neutralised by the
+public sheet, hence gradient not skew. Barlow Condensed via @font-face (same files as
+Careers) on all display text, fast-path split at normal scale (402px),
+closer = About-style white step-in ClosingCta. The global `public-contact`
+class was removed from the route root so ~240 lines of dead
+`.public-contact` locks in public.css no longer match (sweep later).
+Verified 1440/390, 0 console errors, tsc + eslint clean.
+Commit on accept:
+  git add src/app/contact public/redesign/contact-three-c-hd-x4f.png docs/redesign/contact-r1-spec.md docs/redesign/RESUME.md
+  git commit -m "feat(contact): drop the pixel-locked comp; crisp hero mark, normal scale, white step-in closer"
+
+Uncommitted, NOT yet accepted by Jacob (he moved on to Contact without a
+verdict; ask when Contact lands):
+1. Careers closer: apply section gone; About-style white step-in ClosingCta
+   panel; .path transparent so topo navy runs pay column -> footer (block
+   "04d"). Old .ending* CSS unused, delete on accept. id="why" on why section.
+2. Home option A: reasons + start sections replaced by one pale band, two
+   rows, one line each + link (page.tsx .brief, home-page.module.css block
+   "Home option A").
+Commit on accept:
+  git add src/app/opportunities/ src/app/page.tsx src/app/home-page.module.css docs/redesign/RESUME.md
+  git commit -m "feat(public): Careers white step-in closer; Home hands benefits and steps to Careers"
+Still open: products trio repeated on About + Services.
 Branch codex/services-home-alignment-20260916. Dev server `npm run dev -- -p 3000`.
-Last commit 62babf5d = Home/About/Services pass + accurate market cards (accepted).
+Screenshot scripts: .playwright/shots/{careers-apply,home-brief,contact}.mjs.
+Careers committed 6398c307.
 
 Careers round 2 (spec: docs/redesign/careers-r2-spec.md, Jacob approved the
 design in conversation):
