@@ -1,0 +1,6463 @@
+/*
+ * Public marketing shell
+ *
+ * Every selector is scoped to .public-site (or a public component class) so
+ * these layout and brand rules cannot leak into the employee portal.
+ */
+
+.public-site {
+  --public-navy: #0a1f44;
+  --public-navy-deep: #061735;
+  --public-navy-soft: #122b53;
+  --public-lime: #8dc63f;
+  --public-lime-dark: #6d9f2d;
+  --public-pale: #eef3f8;
+  --public-cool: #dbe6f1;
+  --public-ink: #102649;
+  --public-muted: #60728d;
+  --public-line: rgba(10, 31, 68, 0.14);
+  --public-section-heading-size: clamp(1.25rem, 2.5vw, 2.35rem);
+  --public-section-body-size: clamp(1.05rem, 1.25vw, 1.2rem);
+  --public-display-font: "Bebas Neue", "Arial Narrow", "Roboto Condensed", "Liberation Sans Narrow", var(--font-geist-sans), Arial, sans-serif;
+  --public-body-font: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--public-pale);
+  color: var(--public-ink);
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  overflow: clip;
+}
+
+/* Final Contact mobile hero readability pass. Keep the locked desktop
+   composition untouched while giving the lime phrase a deliberate break. */
+@media (max-width: 1080px) {
+  body .public-site .public-contact .contact-hero h1 {
+    letter-spacing: 0 !important;
+    line-height: 0.9 !important;
+  }
+
+  body .public-site .public-contact .contact-hero h1 .contact-hero-line-start,
+  body .public-site .public-contact .contact-hero h1 .contact-hero-line-conversation {
+    transform: none !important;
+  }
+
+  body .public-site .public-contact .contact-hero h1 .contact-mobile-break {
+    display: inline !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    /* The mobile/tablet image is a normal grid item. The former locked
+       placement pushed the isolated mark outside the viewport. */
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+  }
+}
+
+@media (min-width: 1081px) {
+  body .public-site .public-contact .contact-hero h1 .contact-mobile-break {
+    display: none !important;
+  }
+}
+
+/* Round 16 measured source geometry: desktop middle content only. */
+@media (min-width: 1081px) {
+  /* The locked home source diagonal runs from approximately (730, 109) to
+     (436, 927) at 1440px.  Keep the art crop separate from this boundary. */
+  body .public-site .public-home .home-hero-copy {
+    width: 52% !important;
+    clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%) !important;
+  }
+
+  body .public-site .public-home .home-hero-inner > :last-child {
+    left: 40.5% !important;
+    rotate: 20deg !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div {
+    gap: 1.125rem !important;
+    margin-top: 4rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button {
+    align-items: center !important;
+    border-width: 1px !important;
+    display: inline-flex !important;
+    font-size: 1.125rem !important;
+    height: 4.75rem !important;
+    justify-content: center !important;
+    min-height: 4.75rem !important;
+    padding-inline: 1.5rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button:first-child {
+    min-width: 18.9rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button:nth-child(2) {
+    border-color: rgba(255, 255, 255, 0.82) !important;
+    min-width: 23.9rem !important;
+  }
+
+  body .public-site .public-home .home-choice-icon {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  body .public-site .public-home .home-choice h2 {
+    font-size: 2.2rem !important;
+    line-height: 1 !important;
+  }
+
+  body .public-site .public-home .home-choice ul {
+    font-size: 1.2rem !important;
+    line-height: 1.25 !important;
+  }
+
+  body .public-site .public-home .home-choice .public-button {
+    font-size: 1.2rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article > svg {
+    height: 3.75rem !important;
+    width: 3.75rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article h3 {
+    font-size: 1.15rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article p {
+    font-size: 1.25rem !important;
+    line-height: 1.16 !important;
+    margin-top: 0.2rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li > div svg {
+    height: 3.3rem !important;
+    width: 3.3rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li h3 {
+    font-size: 1.15rem !important;
+    margin-top: 0.1rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 1.1rem !important;
+    line-height: 1.08 !important;
+  }
+
+  /* The source crop is 380px square at native x=430,y=70. At 1440px that
+     is x=717,y=117,w=633; keep the crop mechanically placed in the hero. */
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    transform: translate(-3.25rem, 0) !important;
+    max-width: none !important;
+    overflow: visible !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) {
+    height: 633.333px !important;
+    left: 0 !important;
+    max-width: none !important;
+    top: 0 !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a {
+    gap: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a > svg:first-child {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a span {
+    font-size: 3.4rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a {
+    gap: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child {
+    height: 6rem !important;
+    width: 6rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a span {
+    font-size: 3.2rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid label {
+    font-size: 1.375rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid input,
+  body .public-site .public-contact .contact-form-grid select,
+  body .public-site .public-contact .contact-form-grid textarea {
+    font-size: 1.3rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child .text-sm {
+    font-size: 1.2rem !important;
+    line-height: 1.5 !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child h3 {
+    font-size: 1.375rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid form > button.contact-form-submit {
+    font-size: 1.45rem !important;
+  }
+}
+
+/* Round 12 source geometry pass: Home + Contact middle content only. */
+@media (min-width: 1081px) {
+  body .public-site .public-home .home-hero-copy h1:is(h1) {
+    transform: scaleX(0.9) scaleY(1.24) !important;
+  }
+
+  body .public-site .public-home .home-hero-copy h1 .text-\[\#8dc63f\] {
+    display: inline-block !important;
+    transform: scaleX(0.86) !important;
+    transform-origin: left top !important;
+  }
+
+  body .public-site .public-home .home-markets .public-section-intro {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  body .public-site .public-home .home-choice h2:is(h2) {
+    font-size: 2.15rem !important;
+  }
+
+  body .public-site .public-home .home-choice ul:is(ul) {
+    font-size: 1.15rem !important;
+  }
+
+  body .public-site .public-home .home-choice .public-button {
+    min-height: 4.2rem !important;
+    padding-inline: 2.4rem !important;
+    font-size: 1.15rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article p {
+    font-size: 1.15rem !important;
+    line-height: 1.24 !important;
+  }
+
+  /* The locked Home source puts the navy wedge at about 52% of the viewport at
+     the top and 42% at the bottom. Keep the art spanning the center behind it. */
+  body .public-site .public-home .home-hero-copy {
+    clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%) !important;
+    width: 52% !important;
+  }
+
+  body .public-site .public-home .home-hero-art {
+    border-left-width: 0 !important;
+    left: 42% !important;
+    right: auto !important;
+    width: 58% !important;
+  }
+
+  body .public-site .public-home .home-hero-environment:is(.home-hero-environment) {
+    left: 0 !important;
+    object-fit: fill !important;
+    object-position: center top !important;
+    width: 100% !important;
+  }
+
+  body .public-site .public-home .home-hero-inner > :last-child:is(:last-child) {
+    left: 51.6% !important;
+    transform: rotate(10deg) !important;
+  }
+
+  body .public-site .public-home .home-path-step-number {
+    font-size: 3.35rem !important;
+  }
+
+  body .public-site .public-home .home-start ol {
+    top: -1.15rem !important;
+  }
+
+  /* Contact title links use the same condensed display face as the source. */
+  body .public-site .public-contact .contact-fast-path-link-title,
+  body .public-site .public-contact .contact-general-link-title,
+  body .public-site .public-contact .contact-form-heading {
+    font-family: var(--public-display-font) !important;
+    font-weight: 400 !important;
+    font-size: 3.2rem !important;
+    letter-spacing: 0 !important;
+    line-height: 0.95 !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a .contact-fast-path-link-title {
+    font-size: 2.85rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a:nth-of-type(2) .contact-fast-path-link-title {
+    font-size: 2.9rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a .contact-general-link-title {
+    font-size: 2.1rem !important;
+  }
+
+  body .public-site .public-contact .contact-hero-body {
+    max-width: 36rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child {
+    clip-path: polygon(0 0, 100% 0, 80.4% 100%, 0 100%) !important;
+  }
+
+  body .public-site .public-contact > section.relative > span[aria-hidden="true"] {
+    clip-path: polygon(58.6% 0, 59.05% 0, 47.1% 100%, 46.65% 100%) !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a {
+    position: relative !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:last-child {
+    flex: 0 0 auto !important;
+    margin-left: auto !important;
+  }
+
+  body .public-site .public-contact .contact-form-submit {
+    min-width: 17rem !important;
+    font-size: 1.3rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid .contact-form-heading:is(.contact-form-heading) {
+    font-size: 3.2rem !important;
+    letter-spacing: 0 !important;
+    line-height: 0.95 !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid .contact-form-submit:is(.contact-form-submit) {
+    font-size: 1.3rem !important;
+  }
+}
+
+/* Round 9 source-left content pass: scale the route-owned middle content
+ * inside the already calibrated desktop frames. Shared shell remains outside
+ * this block. */
+@media (min-width: 1081px) {
+  .public-site .public-home .home-hero-environment {
+    object-fit: fill !important;
+    object-position: center top !important;
+  }
+
+  body .public-site .public-home .home-hero-copy h1 {
+    transform: scaleX(0.78) scaleY(1.24) !important;
+  }
+
+  .public-site .public-home .home-path-heading .public-section-title {
+    font-size: 3.9rem !important;
+    line-height: 0.9 !important;
+  }
+
+  .public-site .public-home .home-path-heading > p:last-child {
+    font-size: 1.1rem !important;
+    line-height: 1.32 !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .public-site .public-home .home-path > .public-container > ol {
+    gap: 0.9rem !important;
+    margin-top: 1.25rem !important;
+  }
+
+  .public-site .public-home .home-path-step-icon {
+    height: 6.7rem !important;
+    width: 6.7rem !important;
+  }
+
+  .public-site .public-home .home-path-step-icon svg {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+
+  .public-site .public-home .home-path-step-number {
+    font-size: 4.1rem !important;
+    top: 6.35rem !important;
+  }
+
+  .public-site .public-home .home-path-step h3 {
+    font-size: 1.4rem !important;
+    margin-top: 1.05rem !important;
+  }
+
+  .public-site .public-home .home-path-step p {
+    font-size: 1.1rem !important;
+    line-height: 1.32 !important;
+    margin-top: 0.35rem !important;
+  }
+
+  .public-site .public-home .home-path > .public-container > p:last-child {
+    font-size: 0.9rem !important;
+    margin-top: 0.9rem !important;
+  }
+
+  .public-site .public-home .home-choice-icon {
+    height: 4.2rem !important;
+    width: 4.2rem !important;
+  }
+
+  .public-site .public-home .home-choice h2 {
+    font-size: 2rem !important;
+    line-height: 1.05 !important;
+    margin-top: 0.35rem !important;
+  }
+
+  .public-site .public-home .home-choice ul {
+    gap: 0.18rem !important;
+    margin-top: 0.55rem !important;
+  }
+
+  .public-site .public-home .home-choice ul,
+  .public-site .public-home .home-choice .public-button {
+    font-size: 1.1rem !important;
+    line-height: 1.28 !important;
+  }
+
+  .public-site .public-home .home-choice .public-button {
+    margin-top: 0.75rem !important;
+    min-height: 4rem !important;
+  }
+
+  .public-site .public-home .home-reasons-heading {
+    margin-bottom: 0.9rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article > svg {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+
+  .public-site .public-home .home-reasons article h3 {
+    font-size: 1.1rem !important;
+    margin-top: 0.65rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article p {
+    font-size: 1.05rem !important;
+    line-height: 1.3 !important;
+    margin-top: 0.25rem !important;
+  }
+
+  .public-site .public-home .home-start-heading {
+    margin-bottom: 0.15rem !important;
+  }
+
+  .public-site .public-home .home-start ol {
+    gap: 0.35rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li > div svg {
+    height: 2.65rem !important;
+    width: 2.65rem !important;
+  }
+
+  .public-site .public-home .home-start ol li h3 {
+    font-size: 1.05rem !important;
+    margin-top: 0.1rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 0.95rem !important;
+    line-height: 1.1 !important;
+    margin-top: 0.15rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child {
+    padding-bottom: 3.75rem !important;
+    padding-top: 3.75rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child a {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .public-site .public-contact .contact-fast-path .public-eyebrow {
+    font-size: 2.7rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path a {
+    gap: 1rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path a span {
+    font-size: 3rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:last-child a span {
+    font-size: 3.2rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path a svg {
+    height: 3.25rem !important;
+    width: 3.25rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid > div {
+    padding-inline: 2.6rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid form > div {
+    gap: 1.25rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid input,
+  .public-site .public-contact .contact-form-grid select {
+    min-height: 4.5rem !important;
+  }
+}
+
+/* Round 16 final measured overrides. */
+@media (min-width: 1081px) {
+  body .public-site .public-home .home-hero-copy {
+    width: 52% !important;
+    clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%) !important;
+  }
+
+  body .public-site .public-home .home-hero-inner > :last-child {
+    left: 40.5% !important;
+    rotate: 20deg !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div {
+    gap: 1.125rem !important;
+    margin-top: 4rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button {
+    align-items: center !important;
+    border-width: 1px !important;
+    display: inline-flex !important;
+    font-size: 1.125rem !important;
+    height: 4.75rem !important;
+    justify-content: center !important;
+    min-height: 4.75rem !important;
+    padding-inline: 1.5rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button:first-child {
+    min-width: 18.9rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button:nth-child(2) {
+    border-color: rgba(255, 255, 255, 0.82) !important;
+    min-width: 23.9rem !important;
+  }
+
+  body .public-site .public-home .home-choice-icon {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  body .public-site .public-home .home-choice h2 {
+    font-size: 2.2rem !important;
+    line-height: 1 !important;
+  }
+
+  body .public-site .public-home .home-choice ul {
+    font-size: 1.2rem !important;
+    line-height: 1.25 !important;
+  }
+
+  body .public-site .public-home .home-choice .public-button {
+    font-size: 1.2rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article > svg {
+    height: 3.75rem !important;
+    width: 3.75rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article h3 {
+    font-size: 1.15rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article p {
+    font-size: 1.25rem !important;
+    line-height: 1.16 !important;
+    margin-top: 0.2rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li > div svg {
+    height: 3.3rem !important;
+    width: 3.3rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li h3 {
+    font-size: 1.15rem !important;
+    margin-top: 0.1rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 1.1rem !important;
+    line-height: 1.08 !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    transform: translate(-3.25rem, 0) !important;
+    max-width: none !important;
+    overflow: visible !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) {
+    height: 633.333px !important;
+    left: 0 !important;
+    max-width: none !important;
+    top: 0 !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a {
+    gap: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a > svg:first-child {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a span {
+    font-size: 3.4rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a {
+    gap: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child {
+    height: 6rem !important;
+    width: 6rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a span {
+    font-size: 3.2rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid label {
+    font-size: 1.375rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid input,
+  body .public-site .public-contact .contact-form-grid select,
+  body .public-site .public-contact .contact-form-grid textarea {
+    font-size: 1.3rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child .text-sm {
+    font-size: 1.2rem !important;
+    line-height: 1.5 !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child h3 {
+    font-size: 1.375rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid form > button.contact-form-submit {
+    font-size: 1.45rem !important;
+  }
+}
+
+/* Round 16 final measured overrides. */
+@media (min-width: 1081px) {
+  body .public-site .public-home .home-hero-copy {
+    width: 52% !important;
+    clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%) !important;
+  }
+
+  body .public-site .public-home .home-hero-inner > :last-child {
+    left: 40.5% !important;
+    rotate: 20deg !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div {
+    gap: 1.125rem !important;
+    margin-top: 4rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button {
+    align-items: center !important;
+    border-width: 1px !important;
+    display: inline-flex !important;
+    font-size: 1.125rem !important;
+    height: 4.75rem !important;
+    justify-content: center !important;
+    min-height: 4.75rem !important;
+    padding-inline: 1.5rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button:first-child {
+    min-width: 18.9rem !important;
+  }
+
+  body .public-site .public-home .home-hero-copy > div .public-button:nth-child(2) {
+    border-color: rgba(255, 255, 255, 0.82) !important;
+    min-width: 23.9rem !important;
+  }
+
+  body .public-site .public-home .home-choice-icon {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  body .public-site .public-home .home-choice h2 {
+    font-size: 2.2rem !important;
+    line-height: 1 !important;
+  }
+
+  body .public-site .public-home .home-choice ul {
+    font-size: 1.2rem !important;
+    line-height: 1.25 !important;
+  }
+
+  body .public-site .public-home .home-choice .public-button {
+    font-size: 1.2rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article > svg {
+    height: 3.75rem !important;
+    width: 3.75rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article h3 {
+    font-size: 1.15rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article p {
+    font-size: 1.25rem !important;
+    line-height: 1.16 !important;
+    margin-top: 0.2rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li > div svg {
+    height: 3.3rem !important;
+    width: 3.3rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li h3 {
+    font-size: 1.15rem !important;
+    margin-top: 0.1rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 1.1rem !important;
+    line-height: 1.08 !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    transform: translate(-3.25rem, 0) !important;
+    max-width: none !important;
+    overflow: visible !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) {
+    height: 633.333px !important;
+    left: 0 !important;
+    max-width: none !important;
+    top: 0 !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a {
+    gap: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a > svg:first-child {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a span {
+    font-size: 3.4rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a {
+    gap: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child {
+    height: 6rem !important;
+    width: 6rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a span {
+    font-size: 3.2rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid label {
+    font-size: 1.375rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid input,
+  body .public-site .public-contact .contact-form-grid select,
+  body .public-site .public-contact .contact-form-grid textarea {
+    font-size: 1.3rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child .text-sm {
+    font-size: 1.2rem !important;
+    line-height: 1.5 !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child h3 {
+    font-size: 1.375rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid form > button.contact-form-submit {
+    font-size: 1.45rem !important;
+  }
+}
+
+/* Round 15 final precedence for the source-bound desktop composition. */
+@media (min-width: 1081px) {
+  body .public-site .public-home .home-start ol li p:is(p) {
+    font-size: 1rem !important;
+    line-height: 1.2 !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) {
+    transform: scale(1) !important;
+    scale: 1 !important;
+  }
+}
+
+/* Round 12 final precedence adjustments. */
+@media (min-width: 1081px) {
+  body .public-site .public-home .home-hero-environment:is(.home-hero-environment) {
+    left: 0 !important;
+    object-fit: fill !important;
+    object-position: center top !important;
+    width: 100% !important;
+  }
+
+  body .public-site .public-home .home-hero-inner > :last-child:is(:last-child) {
+    left: 46.7% !important;
+    transform: rotate(3.5deg) !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid label {
+    font-size: 1.2rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid input,
+  body .public-site .public-contact .contact-form-grid select,
+  body .public-site .public-contact .contact-form-grid textarea {
+    font-size: 1.15rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child > div > div {
+    font-size: 1.3rem !important;
+    line-height: 1.65 !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a .contact-general-link-title {
+    font-size: 2.6rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child {
+    height: 4.2rem !important;
+    width: 4.2rem !important;
+  }
+}
+
+/* Round 14 source-boundary pass. Keep the calibrated frames and shared chrome
+ * intact; these offsets only recompose route-owned art and middle content. */
+@media (min-width: 1081px) {
+  /* The approved art crop is the source's native 403px right-hand panel
+     (460px from the left at 863px). Preserve that aspect instead of widening
+     it into the copy wedge. */
+  body .public-site .public-home .home-hero-art:is(.home-hero-art) {
+    left: 53.4% !important;
+    right: auto !important;
+    width: 46.6% !important;
+  }
+
+  body .public-site .public-home .home-hero-environment:is(.home-hero-environment) {
+    object-fit: fill !important;
+    object-position: center top !important;
+  }
+
+  /* Source heading/icons sit higher in the fixed path frame; the note remains
+     at the source's lower baseline after the row is raised. */
+  body .public-site .public-home .home-path-heading:is(.home-path-heading) {
+    transform: translateY(-2.9rem) !important;
+  }
+
+  body .public-site .public-home .home-path-heading .public-section-title:is(.public-section-title) {
+    max-width: none !important;
+    font-size: 3.3rem !important;
+    letter-spacing: 0 !important;
+    line-height: 0.92 !important;
+  }
+
+  body .public-site .public-home .home-path > .public-container > ol:is(ol) {
+    transform: translateY(-1.8rem) !important;
+  }
+
+  body .public-site .public-home .home-path > .public-container > p:last-child:is(p) {
+    transform: translateY(1.7rem) !important;
+  }
+
+  body .public-site .public-home .home-path-step-number {
+    font-size: 3.8rem !important;
+  }
+
+  body .public-site .public-home .home-path-step h3 {
+    font-size: 1.4rem !important;
+  }
+
+  body .public-site .public-home .home-path-step p {
+    font-size: 1.15rem !important;
+    line-height: 1.35 !important;
+  }
+
+  /* The locked choices row pairs each route icon with its title. Keep the
+     list and CTA spanning the full column beneath that compact header. */
+  body .public-site .public-home .home-choice:is(.home-choice) {
+    display: grid !important;
+    grid-template-columns: 4.7rem minmax(0, 1fr) !important;
+    column-gap: 1rem !important;
+    align-items: center !important;
+  }
+
+  body .public-site .public-home .home-choice .home-choice-icon {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    margin: 0 !important;
+  }
+
+  body .public-site .public-home .home-choice h2:is(h2) {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    margin-top: 0 !important;
+  }
+
+  body .public-site .public-home .home-choice ul:is(ul) {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    margin-top: 1.15rem !important;
+  }
+
+  body .public-site .public-home .home-choice .public-button {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    justify-self: start !important;
+    margin-top: 0.75rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article > svg {
+    height: 3.2rem !important;
+    width: 3.2rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li > div svg {
+    height: 2.8rem !important;
+    width: 2.8rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 0.98rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* The source's 3C art is a 380px square crop in the hero. Remove the
+     previous 1.08 enlargement and align its containing square to that crop. */
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    transform: translate(-2.5rem, -0.5rem) !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img {
+    transform: none !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:first-child:is(div) {
+    padding-top: 5.1rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a .contact-fast-path-link-title {
+    font-size: 3.2rem !important;
+    letter-spacing: -0.015em !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a:is(a) {
+    gap: 1.5rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a:nth-of-type(2) .contact-fast-path-link-title {
+    font-size: 3.2rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a .contact-general-link-title {
+    font-size: 2.75rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a:is(a) {
+    gap: 0.5rem !important;
+    transform: translateX(-1rem) !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child {
+    height: 5.5rem !important;
+    width: 5.5rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid label {
+    font-size: 1.3rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid input,
+  body .public-site .public-contact .contact-form-grid select,
+  body .public-site .public-contact .contact-form-grid textarea {
+    font-size: 1.25rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div:last-child > div > div {
+    font-size: 1.45rem !important;
+    line-height: 1.55 !important;
+  }
+
+  body .public-site .public-contact .contact-form-submit {
+    font-size: 1.38rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid .contact-form-submit:is(.contact-form-submit) {
+    font-size: 1.38rem !important;
+  }
+}
+
+@media (max-width: 1080px) {
+  /* Keep the semantic two-line contact headline readable on narrow screens;
+     the source-scaled transforms are desktop-only. */
+  body .public-site .public-contact .contact-hero h1 .contact-hero-line-start {
+    display: block !important;
+    transform: none !important;
+  }
+
+  body .public-site .public-contact .contact-hero h1 .contact-hero-line-conversation {
+    display: block !important;
+    transform: none !important;
+  }
+}
+
+.public-site,
+.public-site *,
+.public-site *::before,
+.public-site *::after {
+  box-sizing: border-box;
+}
+
+.public-site :is(.public-button, .public-eyebrow) {
+  font-family: var(--public-display-font);
+  font-weight: 400 !important;
+}
+
+.public-site .contact-hero h1 {
+  letter-spacing: -0.1em !important;
+}
+
+/* Keep the Services route rail centered on its 44px service nodes at every viewport. */
+.public-site div:has(> #fiber) > div[aria-hidden="true"]:first-child,
+.public-site section[aria-labelledby="recruiting-heading"] > div[aria-hidden="true"]:first-child {
+  left: calc(max((100% - 1240px) / 2, 0px) + clamp(1.25rem, 4vw, 3.5rem) + 22px) !important;
+}
+
+.public-site .public-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.public-site .public-container {
+  margin-inline: auto;
+  max-width: 1240px;
+  padding-inline: clamp(1.25rem, 4vw, 3.5rem);
+  width: 100%;
+}
+
+.public-site .public-nav {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid rgba(10, 31, 68, 0.1);
+  position: sticky;
+  top: 0;
+  transition: box-shadow 180ms ease, background-color 180ms ease;
+  z-index: 50;
+}
+
+.public-site .public-nav.is-scrolled {
+  background: rgba(255, 255, 255, 0.985);
+  box-shadow: 0 10px 28px rgba(10, 31, 68, 0.11);
+}
+
+.public-site .public-nav-row {
+  align-items: center;
+  display: flex;
+  gap: 1.25rem;
+  justify-content: space-between;
+  min-height: 78px;
+}
+
+.public-site .public-brand,
+.public-site .public-footer-brand {
+  align-items: center;
+  color: var(--public-navy);
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.75rem;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.public-site .public-brand:focus-visible,
+.public-site .public-footer-brand:focus-visible,
+.public-site .public-nav-link:focus-visible,
+.public-site .public-nav-login:focus-visible,
+.public-site .public-footer-link:focus-visible,
+.public-site .public-footer-legal-link:focus-visible,
+.public-site .public-footer-cta-link:focus-visible,
+.public-site .public-closing-cta-secondary:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid var(--public-lime);
+  outline-offset: 4px;
+}
+
+.public-site .public-brand-logo,
+.public-site .public-footer-logo {
+  border-radius: 999px;
+  display: block;
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
+.public-site .public-brand-logo {
+  height: 44px;
+  width: 44px;
+}
+
+.public-site .public-brand-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.public-site .public-brand-name,
+.public-site .public-footer-wordmark {
+  font-family: var(--public-display-font);
+  font-size: 1.16rem;
+  font-stretch: condensed;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.public-site .public-brand-tagline {
+  color: var(--public-muted);
+  font-family: var(--public-display-font);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.public-site .public-desktop-nav {
+  align-items: center;
+  display: flex;
+  gap: clamp(0.8rem, 1.8vw, 1.5rem);
+}
+
+.public-site .public-nav-link,
+.public-site .public-nav-login {
+  align-items: center;
+  color: var(--public-ink);
+  display: inline-flex;
+  font-family: var(--public-display-font);
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.4rem;
+  letter-spacing: 0.075em;
+  min-height: 44px;
+  position: relative;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.public-site .public-nav-link::after {
+  background: var(--public-lime);
+  bottom: 7px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
+  width: 100%;
+}
+
+.public-site .public-nav-link:hover,
+.public-site .public-nav-link.is-active,
+.public-site .public-nav-login:hover {
+  color: var(--public-navy);
+}
+
+.public-site .public-nav-link:hover::after,
+.public-site .public-nav-link.is-active::after {
+  transform: scaleX(1);
+}
+
+.public-site .public-nav-login {
+  border-left: 1px solid var(--public-line);
+  margin-left: 0.15rem;
+  padding-left: 1.25rem;
+}
+
+.public-site .public-button {
+  align-items: center;
+  border: 1px solid transparent;
+  display: inline-flex;
+  font-family: var(--public-display-font);
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.5rem;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  min-height: 44px;
+  padding: 0.72rem 1.15rem;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  white-space: nowrap;
+}
+
+.public-site .public-button:hover {
+  transform: translateY(-1px);
+}
+
+.public-site .public-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.public-site .public-button:focus-visible,
+.public-site .public-icon-button:focus-visible {
+  outline: 3px solid var(--public-lime);
+  outline-offset: 3px;
+}
+
+.public-site .public-button-lime {
+  background: var(--public-lime);
+  border-color: var(--public-lime);
+  color: var(--public-navy);
+}
+
+.public-site .public-button-lime:hover {
+  background: #a1d94e;
+  border-color: #a1d94e;
+  color: var(--public-navy);
+}
+
+.public-site .public-button-navy {
+  background: var(--public-navy);
+  border-color: var(--public-navy);
+  color: #fff;
+}
+
+.public-site .public-button-navy:hover {
+  background: var(--public-navy-deep);
+  border-color: var(--public-navy-deep);
+  color: #fff;
+}
+
+.public-site .public-mobile-actions {
+  align-items: center;
+  display: none;
+  gap: 0.45rem;
+}
+
+.public-site .public-icon-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--public-line);
+  color: var(--public-navy);
+  cursor: pointer;
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  min-width: 44px;
+  padding: 0;
+}
+
+.public-site .public-icon-button:hover {
+  background: var(--public-pale);
+}
+
+.public-site .public-mobile-nav-shell {
+  display: none;
+}
+
+.public-site .public-topo-surface {
+  background-color: var(--public-navy-deep);
+  background-image:
+    radial-gradient(circle at 18% 0%, rgba(141, 198, 63, 0.12), transparent 35%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: auto, 88px 88px, 88px 88px;
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+}
+
+.public-site .public-topo-surface::before {
+  background-image: repeating-radial-gradient(
+    ellipse at 72% 38%,
+    transparent 0 34px,
+    rgba(151, 182, 221, 0.11) 35px 36px,
+    transparent 37px 62px
+  );
+  content: "";
+  inset: -20% -10%;
+  opacity: 0.55;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(-8deg);
+  z-index: -1;
+}
+
+/*
+ * The final CTA and footer share this parent surface so the navy and contour
+ * pattern are painted once. Individual ending sections become transparent,
+ * which removes the visible background restart at their join.
+ */
+.public-site .public-ending-surface {
+  background-color: var(--public-navy-deep);
+  background-image:
+    radial-gradient(circle at 18% 0%, rgba(141, 198, 63, 0.12), transparent 35%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: auto, 88px 88px, 88px 88px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  isolation: isolate;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.public-site .public-ending-surface::before {
+  background-image: repeating-radial-gradient(
+    ellipse at 72% 38%,
+    transparent 0 34px,
+    rgba(151, 182, 221, 0.11) 35px 36px,
+    transparent 37px 62px
+  );
+  content: "";
+  inset: -20% -10%;
+  opacity: 0.55;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(-8deg);
+  z-index: 0;
+}
+
+.public-site .public-ending-surface > .public-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.public-site .public-ending-surface > .public-main > :last-child,
+.public-site .public-ending-surface .public-closing-cta,
+.public-site .public-ending-surface .public-footer {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+.public-site .public-ending-surface .public-closing-cta::before,
+.public-site .public-ending-surface .public-footer::before {
+  display: none;
+}
+
+.public-site .public-footer,
+.public-site .public-closing-cta {
+  color: #f6f9fc;
+}
+
+.public-site .public-footer > .public-container,
+.public-site .public-closing-cta > .public-container {
+  position: relative;
+  z-index: 1;
+}
+
+.public-site .public-footer {
+  margin-top: auto;
+}
+
+.public-site .public-footer-grid {
+  display: grid;
+  gap: clamp(1.75rem, 3.5vw, 3.25rem);
+  grid-template-columns: minmax(15rem, 1.45fr) repeat(4, minmax(8rem, 1fr));
+  padding-bottom: 1.25rem;
+  padding-top: 1.5rem;
+}
+
+.public-site .public-footer-intro {
+  max-width: 22rem;
+}
+
+.public-site .public-footer-brand {
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.public-site .public-footer-logo {
+  height: 48px;
+  width: 48px;
+}
+
+.public-site .public-footer-copy {
+  color: rgba(239, 246, 255, 0.72);
+  font-family: var(--public-body-font);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+  max-width: 31ch;
+}
+
+.public-site .public-footer-socials {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.public-site .public-footer-social {
+  align-items: center;
+  border: 1px solid rgba(239, 246, 255, 0.72);
+  border-radius: 999px;
+  color: rgba(239, 246, 255, 0.86);
+  display: inline-flex;
+  font-family: Arial, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 44px;
+  justify-content: center;
+  line-height: 1;
+  min-height: 44px;
+  min-width: 44px;
+  text-decoration: none;
+  transition: border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  width: 44px;
+}
+
+.public-site .public-footer-social:hover,
+.public-site .public-footer-social:focus-visible {
+  border-color: var(--public-lime);
+  color: var(--public-lime);
+  transform: translateY(-1px);
+}
+
+.public-site .public-footer-cta-link {
+  align-items: center;
+  color: var(--public-lime);
+  display: inline-flex;
+  font-family: var(--public-display-font);
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.5rem;
+  letter-spacing: 0.075em;
+  min-height: 30px;
+  text-transform: uppercase;
+  transition: color 180ms ease, gap 180ms ease;
+}
+
+.public-site .public-footer-cta-link:hover {
+  color: #b6e969;
+  gap: 0.75rem;
+}
+
+.public-site .public-footer-heading {
+  color: var(--public-lime);
+  font-family: var(--public-display-font);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  margin: 0 0 0.7rem;
+  text-transform: uppercase;
+}
+
+.public-site .public-footer-links {
+  display: grid;
+  gap: 0.2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.public-site .public-footer-link {
+  align-items: center;
+  color: rgba(239, 246, 255, 0.75);
+  display: inline-flex;
+  font-family: var(--public-body-font);
+  font-size: 0.9rem;
+  gap: 0.28rem;
+  min-height: 26px;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.public-site .public-footer-link:hover {
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.public-site .public-footer-bottom {
+  align-items: center;
+  border-top: 1px solid rgba(221, 234, 250, 0.16);
+  color: rgba(239, 246, 255, 0.58);
+  display: flex;
+  font-family: var(--public-body-font);
+  font-size: 0.76rem;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  padding-top: 0.65rem;
+}
+
+.public-site .public-footer-bottom p {
+  margin: 0;
+}
+
+.public-site .public-footer-legal {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.public-site .public-footer-legal-link {
+  color: inherit;
+  align-items: center;
+  display: inline-flex;
+  min-height: 30px;
+  padding-block: 0.4rem;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.public-site .public-footer-legal-link:hover {
+  color: #fff;
+}
+
+.public-site .public-section {
+  padding-block: clamp(4rem, 8vw, 7rem);
+}
+
+.public-site .public-section-white {
+  background: #fff;
+}
+
+.public-site .public-section-pale {
+  background: var(--public-pale);
+}
+
+.public-site .public-section-navy {
+  background: var(--public-navy);
+  color: #fff;
+}
+
+.public-site .public-section-heading {
+  margin-bottom: clamp(2rem, 4vw, 3.5rem);
+  max-width: 44rem;
+}
+
+.public-site .public-section-heading-center {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.public-site .public-eyebrow {
+  color: var(--public-lime-dark);
+  font-family: var(--public-display-font);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+  margin: 0 0 0.8rem;
+  text-transform: uppercase;
+}
+
+.public-site .public-eyebrow-dark {
+  color: var(--public-navy);
+}
+
+.public-site .public-section-title,
+.public-site .public-closing-cta-title {
+  font-family: var(--public-display-font);
+  font-size: var(--public-section-heading-size);
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  margin: 0;
+  max-width: 12ch;
+  text-transform: uppercase;
+}
+
+.public-site .public-section-intro {
+  color: var(--public-muted);
+  font-family: var(--public-body-font);
+  font-size: var(--public-section-body-size);
+  line-height: 1.7;
+  margin: 1.25rem 0 0;
+  max-width: 58ch;
+}
+
+.public-site .public-closing-cta {
+  padding-block: 2rem;
+}
+
+.public-site .public-closing-cta-panel {
+  background: transparent;
+  border-left: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  color: var(--public-navy);
+  display: flex;
+  gap: 2.5rem;
+  justify-content: space-between;
+  min-height: 10rem;
+  overflow: hidden;
+  padding: 1.5rem clamp(1.5rem, 5vw, 5rem);
+  position: relative;
+}
+
+.public-site .public-closing-cta-panel::before {
+  background: linear-gradient(180deg, rgba(141, 198, 63, 0.98) 0%, rgba(141, 198, 63, 0.9) 38%, rgba(141, 198, 63, 0.22) 78%, transparent 100%);
+  clip-path: polygon(70% 0, 100% 0, 100% 100%, 54% 100%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.public-site .public-closing-cta-panel::after {
+  background: linear-gradient(150deg, transparent 22%, rgba(141, 198, 63, 0.08) 100%);
+  content: "";
+  inset: 0 0 0 58%;
+  pointer-events: none;
+  position: absolute;
+}
+
+.public-site .public-closing-cta-copy,
+.public-site .public-closing-cta-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.public-site .public-closing-cta-title {
+  color: #fff;
+  font-size: clamp(2rem, 3.25vw, 3rem);
+  line-height: 0.98;
+  max-width: 13ch;
+}
+
+.public-site .public-closing-cta .public-eyebrow-dark {
+  color: var(--public-lime);
+}
+
+.public-site .public-closing-cta-body {
+  color: rgba(239, 246, 255, 0.75);
+  font-family: var(--public-body-font);
+  line-height: 1.5;
+  margin: 0.75rem 0 0;
+  max-width: 45ch;
+}
+
+.public-site .public-closing-cta-actions {
+  align-items: flex-start;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0.75rem;
+  justify-content: center;
+  min-width: 10rem;
+}
+
+.public-site .public-closing-cta-secondary {
+  align-items: center;
+  color: var(--public-lime);
+  display: inline-flex;
+  font-family: var(--public-display-font);
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  letter-spacing: 0.08em;
+  min-height: 44px;
+  text-transform: uppercase;
+}
+
+.public-site .public-closing-cta-secondary:hover {
+  color: #b6e969;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+
+/* About page composition: keep the authored visual hierarchy intact at every
+ * width instead of letting the utility grid collapse into a text-only page. */
+.public-site .about-hero {
+  background: var(--public-navy-deep);
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+}
+
+.public-site .about-hero::before {
+  background: radial-gradient(circle at 20% 48%, rgba(141, 198, 63, 0.14), transparent 32%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.public-site .about-hero-grid {
+  align-items: center;
+  display: grid;
+  gap: clamp(1.5rem, 3.5vw, 3.25rem);
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  min-height: 440px;
+  padding-block: clamp(2.75rem, 5vw, 4rem);
+  position: relative;
+}
+
+.public-site .about-hero-art {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  position: relative;
+}
+
+.public-site .about-hero-art::after {
+  border: 1px solid rgba(141, 198, 63, 0.22);
+  border-radius: 50%;
+  content: "";
+  display: none;
+  height: 78%;
+  left: 11%;
+  position: absolute;
+  top: 11%;
+  width: 78%;
+}
+
+.public-site .about-hero-art-image {
+  display: block;
+  height: auto;
+  max-width: 780px;
+  position: relative;
+  transform: scale(1.14);
+  width: 145%;
+  z-index: 1;
+}
+
+.public-site .about-hero-copy {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.public-site .about-hero-title,
+.public-site .about-display-title {
+  font-family: var(--public-display-font);
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.93;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.public-site .about-hero-title {
+  font-size: clamp(3rem, 4.5vw, 4.6rem);
+  max-width: none;
+}
+
+.public-site .about-hero-title span,
+.public-site .about-display-title span {
+  color: var(--public-lime);
+  display: block;
+}
+
+.public-site .about-hero-intro {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  line-height: 1.65;
+  margin: 1.45rem 0 0;
+  max-width: 47ch;
+}
+
+.public-site .about-stat-grid {
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 2.15rem 0 0;
+  padding-top: 1.25rem;
+}
+
+.public-site .about-stat dt {
+  color: var(--public-lime);
+  font-family: var(--public-display-font);
+  font-size: clamp(1.85rem, 3vw, 2.65rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.public-site .about-stat dd {
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--public-display-font);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  margin: 0.4rem 0 0;
+  text-transform: uppercase;
+}
+
+.public-site .about-mission {
+  background: var(--public-pale);
+  overflow: hidden;
+  position: relative;
+}
+
+.public-site .about-mission-grid {
+  align-items: center;
+  display: grid;
+  gap: clamp(1.5rem, 3.5vw, 3.25rem);
+  grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr);
+  padding-block: clamp(3rem, 5vw, 4.5rem) 0;
+}
+
+.public-site .about-mission-copy {
+  padding-block: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+.public-site .about-mission-copy .about-display-title {
+  font-size: clamp(2rem, 2.65vw, 2.65rem);
+  max-width: 16ch;
+}
+
+.public-site .about-display-title {
+  color: var(--public-navy);
+  font-size: clamp(2.3rem, 4vw, 4.25rem);
+  max-width: 12ch;
+}
+
+.public-site .about-mission-detail {
+  color: var(--public-muted);
+  line-height: 1.7;
+  margin: 1.25rem 0 0;
+  max-width: 47ch;
+}
+
+.public-site .about-mission-map {
+  background: var(--public-navy-deep);
+  min-height: clamp(380px, 32vw, 470px);
+  overflow: visible;
+  position: relative;
+}
+
+.public-site .about-mission-map::after {
+  background: linear-gradient(180deg, transparent 62%, var(--public-pale) 100%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.public-site .about-mission-map-image {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  object-position: 58% center;
+  width: 100%;
+}
+
+.public-site .about-mission-route {
+  border-left: 2px solid var(--public-lime);
+  bottom: -14rem;
+  height: 16rem;
+  left: 66%;
+  position: absolute;
+  z-index: 2;
+}
+
+.public-site .about-values {
+  background: var(--public-pale);
+  padding-block: clamp(2rem, 3.5vw, 3rem) clamp(3rem, 5vw, 4.5rem);
+  position: relative;
+}
+
+.public-site .about-values::before {
+  border-top: 1px solid rgba(10, 31, 68, 0.16);
+  content: "";
+  left: max(calc((100% - 1240px) / 2 + 3.5rem), 1.25rem);
+  position: absolute;
+  right: max(calc((100% - 1240px) / 2 + 3.5rem), 1.25rem);
+  top: 0;
+}
+
+.public-site .about-values-heading {
+  margin: 0 auto clamp(1.5rem, 2.5vw, 2.25rem);
+  text-align: center;
+}
+
+.public-site .about-values-heading .public-eyebrow {
+  margin-bottom: 0.65rem;
+}
+
+.public-site .about-values-heading .about-display-title {
+  margin-inline: auto;
+  max-width: none;
+}
+
+.public-site .about-values-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  position: relative;
+}
+
+.public-site .about-values-grid::before {
+  background: var(--public-lime);
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 2.4rem;
+  z-index: 0;
+}
+
+.public-site .about-value-card {
+  padding: 0 clamp(1rem, 3vw, 3.5rem);
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+.public-site .about-value-card + .about-value-card {
+  border-left: 1px dashed rgba(10, 31, 68, 0.25);
+}
+
+.public-site .about-value-icon {
+  align-items: center;
+  border: 2px solid var(--public-lime);
+  border-radius: 50%;
+  color: var(--public-lime-dark);
+  display: inline-flex;
+  height: 4.8rem;
+  justify-content: center;
+  position: relative;
+  width: 4.8rem;
+  z-index: 1;
+}
+
+.public-site .about-value-card h3,
+.public-site .about-leader h3 {
+  font-family: var(--public-display-font);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.public-site .about-value-card h3 {
+  color: var(--public-navy);
+  font-size: clamp(1.6rem, 2.4vw, 2.3rem);
+  letter-spacing: -0.03em;
+  margin: 1.2rem 0 0;
+}
+
+.public-site .about-value-card p {
+  color: var(--public-muted);
+  line-height: 1.65;
+  margin: 0.75rem auto 0;
+  max-width: 29ch;
+}
+
+.public-site .about-leadership {
+  padding-block: clamp(1.75rem, 3vw, 2.5rem);
+}
+
+.public-site .about-leadership .public-eyebrow {
+  color: var(--public-lime);
+}
+
+.public-site .about-leadership .about-display-title {
+  color: #fff;
+  max-width: none;
+}
+
+.public-site .about-leaders-grid {
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+}
+
+.public-site .about-leader {
+  align-items: center;
+  display: flex;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.public-site .about-leader + .about-leader {
+  border-left: 1px solid rgba(255, 255, 255, 0.24);
+  padding-left: 1.25rem;
+}
+
+.public-site .about-leader-initials {
+  align-items: center;
+  border: 2px solid var(--public-lime);
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: var(--public-display-font);
+  font-size: 1.35rem;
+  font-weight: 800;
+  height: 3.2rem;
+  justify-content: center;
+  width: 3.2rem;
+}
+
+.public-site .about-leader h3 {
+  color: #fff;
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.public-site .about-leader p {
+  color: var(--public-lime);
+  font-family: var(--public-display-font);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0.3rem 0 0;
+  text-transform: uppercase;
+}
+
+.public-site .about-audience {
+  padding-block: 1.5rem;
+}
+
+.public-site .about-audience-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.public-site .about-audience-card {
+  padding-inline: clamp(0rem, 3vw, 3.25rem);
+}
+
+.public-site .about-audience-card:first-child {
+  padding-left: 0;
+}
+
+.public-site .about-audience-card + .about-audience-card {
+  border-left: 1px solid var(--public-line);
+}
+
+.public-site .about-audience-card:last-child {
+  padding-right: 0;
+}
+
+.public-site .about-audience-card .about-display-title {
+  font-size: clamp(1.9rem, 2.75vw, 2.85rem);
+  max-width: 14ch;
+}
+
+.public-site .about-audience-card .public-section-intro {
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.public-site .about-service-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.75rem;
+  margin-top: 1rem;
+}
+
+.public-site .about-service-list span {
+  align-items: center;
+  color: var(--public-navy);
+  display: inline-flex;
+  font-family: var(--public-display-font);
+  font-size: 0.8rem;
+  font-weight: 800;
+  gap: 0.4rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-site .about-service-list svg,
+.public-site .about-check-list svg {
+  color: var(--public-lime-dark);
+  flex: 0 0 auto;
+}
+
+.public-site .about-check-list {
+  color: var(--public-muted);
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.public-site .about-check-list li {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+@media (max-width: 1080px) {
+  .public-site .public-desktop-nav {
+    display: none;
+  }
+
+  .public-site .public-mobile-actions {
+    display: flex;
+  }
+
+  .public-site .public-mobile-nav-shell {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 220ms ease;
+  }
+
+  .public-site .public-mobile-nav-shell.is-open {
+    grid-template-rows: 1fr;
+  }
+
+  .public-site .public-mobile-nav {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .public-site .public-mobile-nav-shell.is-open .public-mobile-nav {
+    padding-bottom: 1.25rem;
+  }
+
+  .public-site .public-mobile-link {
+    align-items: center;
+    border-top: 1px solid var(--public-line);
+    color: var(--public-ink);
+    display: flex;
+    font-family: var(--public-display-font);
+    font-size: 0.86rem;
+    font-weight: 800;
+    gap: 0.55rem;
+    letter-spacing: 0.1em;
+    min-height: 48px;
+    padding-inline: 0.15rem;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .public-site .public-mobile-link.is-active,
+  .public-site .public-mobile-link:hover {
+    color: var(--public-lime-dark);
+  }
+
+  .public-site .public-mobile-login {
+    color: var(--public-navy);
+  }
+
+  .public-site .public-mobile-cta {
+    margin-top: 0.5rem;
+    width: 100%;
+  }
+}
+
+/* Final cascade for the locked desktop chrome. This follows the legacy
+ * desktop composition rules above so the raster layer owns the visible frame. */
+@media (min-width: 1024px) {
+  .public-site .public-nav {
+    height: var(--locked-header-height);
+    min-height: 0;
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-nav > .public-container,
+  .public-site .public-nav-row {
+    height: 100%;
+    min-height: 0;
+    position: relative;
+  }
+
+  .public-site .public-closing-cta {
+    height: var(--locked-ending-height);
+    margin-top: var(--locked-ending-offset, 0px);
+    overflow: hidden;
+    padding-block: 0;
+    position: relative;
+  }
+
+  .public-site .public-closing-cta > .public-container {
+    height: 100%;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-site .public-closing-cta-panel {
+    inset: 0;
+    min-height: 0;
+    opacity: 1;
+    padding: 0;
+    position: absolute;
+  }
+
+  .public-site .public-closing-cta:focus-within .public-closing-cta-panel {
+    opacity: 1;
+  }
+
+  .public-site .public-footer-inner {
+    height: 0;
+    margin-top: 0;
+    min-height: 0;
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-footer-inner > .public-container {
+    height: 0;
+    opacity: 1;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 2;
+  }
+
+  .public-site .public-footer-inner:focus-within > .public-container {
+    opacity: 1;
+  }
+
+  .public-site .public-footer-home,
+  .public-site .public-footer-services {
+    height: var(--locked-footer-height);
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-footer-home > .public-container,
+  .public-site .public-footer-services > .public-container {
+    opacity: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-site .public-footer-home:focus-within > .public-container,
+  .public-site .public-footer-services:focus-within > .public-container {
+    opacity: 1;
+  }
+}
+
+/* Round 7 route overrides must remain last so they win over the locked
+ * desktop composition block above. */
+@media (min-width: 1081px) {
+  .public-site .public-home .home-hero-copy { justify-content: flex-start; left: 0; padding: 5rem 2rem 4rem 3rem; top: 0; }
+  .public-site .public-home .home-hero-copy .public-eyebrow { margin-bottom: 1.8rem; }
+  .public-site .public-home .home-hero-copy h1 { font-size: 7.5rem; line-height: 0.88; margin-bottom: 0; }
+  .public-site .public-home .home-hero-copy > p:nth-of-type(2) { font-size: 1.4rem; line-height: 1.38; margin-top: 6rem; max-width: 38rem; }
+  .public-site .public-home .home-hero-copy > p:nth-of-type(3) { font-size: 1.1rem; line-height: 1.5; margin-top: 1.5rem; max-width: 39rem; }
+  .public-site .public-home .home-hero-copy > div { gap: 0.9rem; margin-top: 4rem; }
+  .public-site .public-home .home-hero-copy > div .public-button { font-size: 1.05rem; min-height: 4.5rem; padding-inline: 1.45rem; }
+  .public-site .public-home .home-markets > .public-container > div { gap: 1.5rem; grid-template-columns: 354px minmax(0, 1fr) !important; }
+  .public-site .public-home .home-markets > .public-container > div > div:first-child { min-width: 0; }
+  .public-site .public-home .home-markets .public-section-title { font-size: 3.25rem !important; letter-spacing: 0.02em !important; }
+  .public-site .public-home .home-markets .grid-cols-2 { gap: 1.6rem !important; }
+  .public-site .public-home .home-markets { padding-block: 3.8rem !important; }
+  .public-site .public-home .home-path { padding-block: 5.2rem !important; }
+  .public-site .public-home .home-path-step p { font-size: 1rem; line-height: 1.45; }
+  .public-site .public-home .home-choices { padding-block: 3.3rem !important; }
+  .public-site .public-home .home-choice ul, .public-site .public-home .home-choice .public-button { font-size: 1rem; }
+  .public-site .public-home .home-reasons { padding-block: 3.45rem !important; }
+  .public-site .public-home .home-reasons article h3 { font-size: 1rem; }
+  .public-site .public-home .home-reasons article p { font-size: 0.95rem; line-height: 1.42; }
+  .public-site .public-home .home-start { padding-block: 0.25rem !important; }
+  .public-site .public-home .home-start ol li p { font-size: 0.82rem; line-height: 1.2; }
+  .public-site .public-home .home-cta { padding-block: 1.25rem !important; }
+
+  .public-site .public-contact .contact-hero h1 { font-size: 8rem; letter-spacing: -0.04em !important; line-height: 0.95; max-width: none; }
+  .public-site .public-contact .contact-hero h1 .contact-hero-line-start { display: block; transform: scaleX(0.8); transform-origin: left top; }
+  .public-site .public-contact .contact-hero h1 .contact-hero-line-conversation { transform: scaleX(0.71); transform-origin: left top; }
+  .public-site .public-contact .contact-hero > .public-container > div { padding-block: 0; }
+  .public-site .public-contact .contact-hero > .public-container > div > div:first-child { padding-top: 5.7rem; }
+  .public-site .public-contact .contact-hero p:not(.public-eyebrow) { font-size: 1.25rem; line-height: 1.6; margin-top: 2.2rem; max-width: 38rem; }
+  .public-site .public-contact .contact-hero { min-height: 646px !important; }
+  .public-site .public-contact .contact-hero > .public-container > div { min-height: 646px !important; }
+  .public-site .public-contact .contact-fast-path { min-height: 508px !important; }
+  .public-site .public-contact .contact-fast-path > div:first-child { padding-bottom: 4.4rem; padding-top: 4.4rem; }
+  .public-site .public-contact .public-section-white { padding-bottom: 1.8rem !important; }
+  .public-site .public-contact .contact-form-section { padding-block: 3.5rem 1.8rem !important; }
+  .public-site .public-contact .contact-form-grid > div { min-height: 56.3rem; padding: 3.1rem 2.4rem 3.5rem; }
+  .public-site .public-contact .contact-form-grid .public-section-title { font-size: 4.8rem !important; }
+  .public-site .public-contact .contact-form-grid .public-section-intro { font-size: 1rem; line-height: 1.5; }
+  .public-site .public-contact .contact-form-grid form { gap: 1.5rem; margin-top: 1rem; }
+  .public-site .public-contact .contact-form-grid form > div { gap: 1.5rem; }
+  .public-site .public-contact .contact-form-grid label { font-size: 1.15rem; }
+  .public-site .public-contact .contact-form-grid input, .public-site .public-contact .contact-form-grid select, .public-site .public-contact .contact-form-grid textarea { font-size: 1.05rem; }
+  .public-site .public-contact .contact-form-grid textarea { min-height: 13.25rem; }
+  .public-site .public-contact .contact-form-grid .public-button { min-height: 4.5rem; }
+  .public-site .public-contact .contact-form-grid .mt-7 { margin-top: 1.5rem; }
+  .public-site .public-contact .contact-form-grid .lg\:py-9 { padding-block: 1.7rem; }
+}
+
+/* Round 7 source-calibrated route corrections. These rules are intentionally
+ * route-scoped so the shared shell and the other locked pages remain owned by
+ * their respective implementation lanes. */
+@media (min-width: 1081px) {
+  .public-site .public-home .home-hero-copy {
+    justify-content: flex-start;
+    left: 0;
+    padding: 5rem 2rem 4rem 3rem;
+    top: 0;
+  }
+
+  .public-site .public-home .home-hero-copy .public-eyebrow {
+    margin-bottom: 1.8rem;
+  }
+
+  .public-site .public-home .home-hero-copy h1 {
+    font-size: 7.5rem;
+    line-height: 0.88;
+    margin-bottom: 0;
+    transform: scaleX(0.78) scaleY(1.14) !important;
+    transform-origin: left top;
+  }
+
+  .public-site .public-home .home-hero-copy > p:nth-of-type(2) {
+    font-size: 1.4rem;
+    line-height: 1.38;
+    margin-top: 3.5rem;
+    max-width: 38rem;
+  }
+
+  .public-site .public-home .home-hero-copy > p:nth-of-type(3) {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    margin-top: 1.5rem;
+    max-width: 39rem;
+  }
+
+  .public-site .public-home .home-hero-copy > div {
+    gap: 0.9rem;
+    margin-top: 2.25rem;
+  }
+
+  .public-site .public-home .home-hero-copy > div .public-button {
+    font-size: 1.05rem;
+    min-height: 4.5rem;
+    padding-inline: 1.45rem;
+  }
+
+  .public-site .public-home .home-markets {
+    padding-block: 3.8rem !important;
+  }
+
+  .public-site .public-home .home-markets > .public-container > div {
+    gap: 1.5rem;
+    grid-template-columns: 0.4fr 1.6fr;
+  }
+
+  .public-site .public-home .home-market-image {
+    aspect-ratio: 0.82;
+  }
+
+  .public-site .public-home .home-path {
+    padding-block: 5.2rem !important;
+  }
+
+  .public-site .public-home .home-path-step p {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .public-site .public-home .home-choices {
+    padding-block: 3.3rem !important;
+  }
+
+  .public-site .public-home .home-choice ul,
+  .public-site .public-home .home-choice .public-button {
+    font-size: 1rem;
+  }
+
+  .public-site .public-home .home-reasons {
+    padding-block: 3.45rem !important;
+  }
+
+  .public-site .public-home .home-reasons article h3 {
+    font-size: 1rem;
+  }
+
+  .public-site .public-home .home-reasons article p {
+    font-size: 0.95rem;
+    line-height: 1.42;
+  }
+
+  .public-site .public-home .home-start {
+    padding-block: 0.25rem !important;
+  }
+
+  .public-site .public-home .home-start ol li p {
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
+  .public-site .public-home .home-cta {
+    padding-block: 0.95rem;
+  }
+
+  .public-site .public-contact .contact-hero h1 {
+    font-size: 8rem;
+    letter-spacing: 0.1em !important;
+    line-height: 0.95;
+    max-width: none;
+  }
+
+  .public-site .public-contact .contact-hero > .public-container > div {
+    padding-block: 0;
+  }
+
+  .public-site .public-contact .contact-hero > .public-container > div > div:first-child {
+    padding-top: 5.7rem;
+  }
+
+  .public-site .public-contact .contact-hero p:not(.public-eyebrow) {
+    font-size: 1.25rem;
+    line-height: 1.6;
+    margin-top: 2.2rem;
+    max-width: 38rem;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child {
+    padding-bottom: 4.4rem;
+    padding-top: 4.4rem;
+  }
+
+  .public-site .public-contact .contact-form-grid > div {
+    min-height: 56.3rem;
+    padding: 3.1rem 2.4rem 3.5rem;
+  }
+
+  .public-site .public-contact .contact-form-grid .public-section-intro { display: none; }
+
+  .public-site .public-contact .contact-form-grid .public-section-title {
+    font-size: 4.8rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid .public-section-intro {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .public-site .public-contact .contact-form-grid form {
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .public-site .public-contact .contact-form-grid form > div {
+    gap: 1.5rem;
+  }
+
+  .public-site .public-contact .contact-form-grid label {
+    font-size: 1.15rem;
+  }
+
+  .public-site .public-contact .contact-form-grid .inputClassName,
+  .public-site .public-contact .contact-form-grid input,
+  .public-site .public-contact .contact-form-grid select,
+  .public-site .public-contact .contact-form-grid textarea {
+    font-size: 1.05rem;
+  }
+
+  .public-site .public-contact .contact-form-grid textarea {
+    min-height: 13.25rem;
+  }
+
+  .public-site .public-contact .contact-form-grid .public-button {
+    min-height: 4.5rem;
+  }
+
+  .public-site .public-contact .contact-form-grid .mt-7 {
+    margin-top: 1.5rem;
+  }
+
+  .public-site .public-contact .contact-form-grid .lg\:py-9 {
+    padding-block: 1.7rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .public-site .public-brand-tagline {
+    display: none;
+  }
+
+  .public-site .public-brand-name {
+    font-size: 1rem;
+  }
+
+  .public-site .public-nav-row {
+    min-height: 70px;
+  }
+
+  .public-site .public-mobile-apply {
+    font-size: 0.68rem;
+    padding-inline: 0.75rem;
+  }
+
+  .public-site .public-footer-grid {
+    gap: 1rem 1.1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-bottom: 1.25rem;
+    padding-top: 1.5rem;
+  }
+
+  .public-site .public-footer-intro {
+    grid-column: 1 / -1;
+    max-width: 30rem;
+  }
+
+  .public-site .public-footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .public-site .public-closing-cta-panel {
+    clip-path: polygon(0 5%, 100% 0, 100% 95%, 0 100%);
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 3.2rem 1.5rem;
+  }
+
+  .public-site .public-closing-cta-panel::before {
+    clip-path: polygon(38% 0, 100% 0, 100% 100%, 25% 100%);
+  }
+
+  .public-site .public-closing-cta-actions {
+    align-items: flex-start;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 960px) {
+  .public-site .public-footer-grid {
+    gap: 2.5rem 2rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .public-site .public-footer-intro {
+    grid-column: 1 / -1;
+    max-width: 30rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .public-site .public-brand-copy {
+    display: grid;
+  }
+
+  .public-site .public-brand-name {
+    font-size: 0.88rem;
+  }
+
+  .public-site .public-mobile-apply {
+    font-size: 0.67rem;
+    gap: 0.25rem;
+    padding-inline: 0.58rem;
+  }
+
+  .public-site .public-mobile-apply svg {
+    height: 14px;
+    width: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .public-site .about-hero-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 0;
+    padding-block: 1.35rem 2.65rem;
+  }
+
+  .public-site .about-hero-art {
+    min-height: 16rem;
+    order: 1;
+    width: 100%;
+  }
+
+  .public-site .about-hero-art::after {
+    height: 80%;
+    left: 10%;
+    top: 10%;
+    width: 80%;
+  }
+
+  .public-site .about-hero-art-image {
+    max-width: none;
+    transform: scale(1.14);
+    width: 165%;
+  }
+
+  .public-site .about-hero-copy {
+    order: 2;
+  }
+
+  .public-site .about-hero-title {
+    font-size: clamp(3rem, 14vw, 4.2rem);
+    max-width: 10ch;
+  }
+
+  .public-site .about-hero-intro {
+    font-size: 0.98rem;
+    line-height: 1.58;
+    margin-top: 1rem;
+  }
+
+  .public-site .about-stat-grid {
+    gap: 1rem 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .public-site .about-stat dt {
+    font-size: 2.1rem;
+  }
+
+  .public-site .about-stat dd {
+    font-size: 0.62rem;
+    margin-top: 0.25rem;
+  }
+
+  .public-site .about-mission-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-block: 3.25rem 0;
+  }
+
+  .public-site .about-mission-copy {
+    padding-block: 0;
+  }
+
+  .public-site .about-display-title {
+    font-size: clamp(2.25rem, 10vw, 3.4rem);
+  }
+
+  .public-site .about-mission-detail {
+    line-height: 1.6;
+    margin-top: 0.9rem;
+  }
+
+  .public-site .about-mission-map {
+    min-height: 18rem;
+    width: 100%;
+  }
+
+  .public-site .about-mission-map-image {
+    object-position: 58% center;
+    transform: scale(1.1);
+  }
+
+  .public-site .about-mission-route {
+    bottom: -3.3rem;
+    height: 4.2rem;
+    left: 1.35rem;
+  }
+
+  .public-site .about-values {
+    padding-block: 2.5rem 3.25rem;
+  }
+
+  .public-site .about-values::before {
+    border-left: 2px solid var(--public-lime);
+    border-top: 0;
+    bottom: 3.25rem;
+    left: 1.35rem;
+    right: auto;
+    top: 2.5rem;
+  }
+
+  .public-site .about-values-heading {
+    margin-bottom: 1.5rem;
+    padding-left: 1.6rem;
+    text-align: left;
+  }
+
+  .public-site .about-values-grid {
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: 1fr;
+    padding-left: 1.6rem;
+  }
+
+  .public-site .about-values-grid::before {
+    display: none;
+  }
+
+  .public-site .about-value-card,
+  .public-site .about-value-card + .about-value-card {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(10, 31, 68, 0.08);
+    border-left: 2px solid var(--public-lime);
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: 2.6rem minmax(0, 1fr);
+    padding: 0.8rem 0.85rem;
+    text-align: left;
+  }
+
+  .public-site .about-value-icon {
+    border-width: 1px;
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+
+  .public-site .about-value-icon svg {
+    height: 1.25rem;
+    width: 1.25rem;
+  }
+
+  .public-site .about-value-card h3 {
+    font-size: 1.45rem;
+    margin: 0;
+  }
+
+  .public-site .about-value-card p {
+    grid-column: 2;
+    line-height: 1.45;
+    margin: -0.35rem 0 0;
+  }
+
+  .public-site .about-leadership {
+    padding-block: 2.8rem;
+  }
+
+  .public-site .about-leadership .about-display-title {
+    font-size: clamp(2.3rem, 10vw, 3.3rem);
+  }
+
+  .public-site .about-leaders-grid {
+    gap: 0.85rem 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 1.5rem;
+    padding-top: 1.2rem;
+  }
+
+  .public-site .about-leader {
+    gap: 0.55rem;
+  }
+
+  .public-site .about-leader:nth-child(odd) {
+    border-right: 1px solid rgba(255, 255, 255, 0.24);
+    padding-right: 0.65rem;
+  }
+
+  .public-site .about-leader:nth-child(even) {
+    border-left: 0;
+    padding-left: 0.65rem;
+  }
+
+  .public-site .about-leader-initials {
+    font-size: 1rem;
+    height: 2.55rem;
+    width: 2.55rem;
+  }
+
+  .public-site .about-leader h3 {
+    font-size: 0.72rem;
+  }
+
+  .public-site .about-leader p {
+    font-size: 0.54rem;
+    letter-spacing: 0.05em;
+  }
+
+  .public-site .about-audience {
+    padding-block: 3rem;
+  }
+
+  .public-site .about-audience-grid {
+    gap: 2.25rem;
+    grid-template-columns: 1fr;
+  }
+
+  .public-site .about-audience-card,
+  .public-site .about-audience-card:first-child,
+  .public-site .about-audience-card:last-child {
+    padding: 0;
+  }
+
+  .public-site .about-audience-card + .about-audience-card {
+    border-left: 0;
+    border-top: 1px solid var(--public-line);
+    padding-top: 2.25rem;
+  }
+
+  .public-site .about-audience-card .about-display-title {
+    font-size: clamp(2rem, 9vw, 3rem);
+  }
+
+  .public-site .about-service-list {
+    gap: 0.8rem 1.15rem;
+    margin-top: 1.2rem;
+  }
+
+  .public-site .about-service-list span {
+    font-size: 0.72rem;
+  }
+
+  .public-site .about-check-list {
+    margin-top: 1.2rem;
+  }
+
+  .public-site .public-closing-cta {
+    padding-block: 2.5rem;
+  }
+
+  .public-site .public-closing-cta-panel {
+    gap: 1.35rem;
+    min-height: 0;
+    padding: 0.25rem 1.15rem;
+  }
+
+  .public-site .public-closing-cta-title {
+    font-size: clamp(2.4rem, 10vw, 3.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-site *,
+  .public-site *::before,
+  .public-site *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Locked desktop chrome: these are measured crops of the approved source
+ * boards. The semantic HTML remains in the DOM as transparent hit targets;
+ * the responsive HTML treatment below 1024px is unchanged. */
+.public-locked-header,
+.public-locked-ending {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .public-site .public-nav {
+    height: var(--locked-header-height);
+    min-height: 0;
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-nav > .public-container,
+  .public-site .public-nav-row {
+    height: 100%;
+    min-height: 0;
+    position: relative;
+  }
+
+  .public-site .public-locked-header {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    display: block;
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+
+  .public-site .public-nav-row > .public-brand,
+  .public-site .public-nav-row > .public-desktop-nav {
+    opacity: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-site .public-nav-row:focus-within > .public-brand,
+  .public-site .public-nav-row:focus-within > .public-desktop-nav {
+    opacity: 1;
+  }
+
+  .public-site .public-nav-home {
+    --locked-header-height: calc(100vw * 65 / 863);
+  }
+
+  .public-site .public-nav-about {
+    --locked-header-height: calc(100vw * 73 / 893);
+  }
+
+  .public-site .public-nav-services {
+    --locked-header-height: calc(100vw * 57 / 829);
+  }
+
+  .public-site .public-nav-careers {
+    --locked-header-height: calc(100vw * 60 / 793);
+  }
+
+  .public-site .public-nav-culture {
+    --locked-header-height: calc(100vw * 58 / 750);
+  }
+
+  .public-site .public-nav-contact,
+  .public-site .public-nav-apply {
+    --locked-header-height: calc(100vw * 70 / 864);
+  }
+
+  .public-site .public-locked-header-home {
+    background-image: url("/redesign/locked-chrome/home-header.png");
+  }
+
+  .public-site .public-locked-header-about {
+    background-image: url("/redesign/locked-chrome/about-header.png");
+  }
+
+  .public-site .public-locked-header-services {
+    background-image: url("/redesign/locked-chrome/services-header.png");
+  }
+
+  .public-site .public-locked-header-careers {
+    background-image: url("/redesign/locked-chrome/careers-header.png");
+  }
+
+  .public-site .public-locked-header-culture {
+    background-image: url("/redesign/locked-chrome/culture-header.png");
+  }
+
+  .public-site .public-locked-header-contact {
+    background-image: url("/redesign/locked-chrome/contact-header.png");
+  }
+
+  .public-site .public-locked-header-apply {
+    background-image: url("/redesign/locked-chrome/apply-header.png");
+  }
+
+  .public-site .public-closing-cta {
+    height: var(--locked-ending-height);
+    margin-top: var(--locked-ending-offset, 0px);
+    overflow: hidden;
+    padding-block: 0;
+    position: relative;
+  }
+
+  .public-site .public-locked-ending {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    display: block;
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+
+  .public-site .public-closing-cta > .public-container {
+    height: 100%;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-site .public-closing-cta-panel {
+    inset: 0;
+    min-height: 0;
+    opacity: 1;
+    position: absolute;
+  }
+
+  .public-site .public-closing-cta:focus-within .public-closing-cta-panel {
+    opacity: 1;
+  }
+
+  .public-site .public-closing-cta-about {
+    --locked-ending-height: calc(100vw * 199 / 893);
+    --locked-ending-offset: 47px;
+  }
+
+  .public-site .public-closing-cta-careers {
+    --locked-ending-height: calc(100vw * 199 / 793);
+    --locked-ending-offset: 126px;
+  }
+
+  .public-site .public-closing-cta-culture {
+    --locked-ending-height: calc(100vw * 389 / 750);
+    --locked-ending-offset: 109px;
+  }
+
+  .public-site .public-closing-cta-contact {
+    --locked-ending-height: calc(100vw * 322 / 864);
+    --locked-ending-offset: 228px;
+  }
+
+  .public-site .public-closing-cta-apply {
+    --locked-ending-height: calc(100vw * 415 / 864);
+    --locked-ending-offset: 14px;
+  }
+
+  .public-site .public-locked-ending-about {
+    background-image: url("/redesign/locked-chrome/about-ending.png");
+  }
+
+  .public-site .public-locked-ending-careers {
+    background-image: url("/redesign/locked-chrome/careers-ending.png");
+  }
+
+  .public-site .public-locked-ending-culture {
+    background-image: url("/redesign/locked-chrome/culture-ending.png");
+  }
+
+  .public-site .public-locked-ending-contact {
+    background-image: url("/redesign/locked-chrome/contact-ending.png");
+  }
+
+  .public-site .public-locked-ending-apply {
+    background-image: url("/redesign/locked-chrome/apply-ending.png");
+  }
+
+  .public-site .public-footer-inner {
+    height: 0;
+    margin-top: 0;
+    min-height: 0;
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-footer-inner > .public-container {
+    height: 0;
+    opacity: 1;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 2;
+  }
+
+  .public-site .public-footer-inner:focus-within > .public-container {
+    opacity: 1;
+  }
+
+  .public-site .public-footer-home,
+  .public-site .public-footer-services {
+    height: var(--locked-footer-height);
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-footer-home {
+    --locked-footer-height: calc(100vw * 172 / 1440);
+  }
+
+  .public-site .public-footer-services {
+    --locked-footer-height: calc(100vw * 181 / 1440);
+  }
+
+  .public-site .public-footer-home .public-locked-ending-footer,
+  .public-site .public-footer-services .public-locked-ending-footer {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    display: block;
+    height: var(--locked-ending-height);
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: var(--locked-footer-offset);
+    width: 100%;
+    z-index: 0;
+  }
+
+  .public-site .public-footer-home .public-locked-ending-footer {
+    --locked-ending-height: calc(100vw * 177 / 863);
+    --locked-footer-offset: -123px;
+    background-image: url("/redesign/locked-chrome/home-ending.png");
+  }
+
+  .public-site .public-footer-services .public-locked-ending-footer {
+    --locked-ending-height: calc(100vw * 223 / 829);
+    --locked-footer-offset: -207px;
+    background-image: url("/redesign/locked-chrome/services-ending.png");
+  }
+
+  .public-site .public-footer-contact {
+    --locked-footer-height: calc(100vw * 14 / 1440);
+    height: var(--locked-footer-height);
+    overflow: visible;
+    position: relative;
+  }
+
+  .public-site .public-footer-contact .public-locked-ending-footer {
+    --locked-ending-height: calc(100vw * 467 / 864);
+    --locked-footer-offset: -764px;
+    background-image: url("/redesign/locked-chrome/contact-ending.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    display: block;
+    height: var(--locked-ending-height);
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: var(--locked-footer-offset);
+    width: 100%;
+    z-index: 0;
+  }
+
+  .public-site .public-footer-contact > .public-container {
+    opacity: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-site .public-footer-contact:focus-within > .public-container {
+    opacity: 1;
+  }
+
+  .public-site .public-footer-home > .public-container,
+  .public-site .public-footer-services > .public-container {
+    opacity: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .public-site .public-footer-home:focus-within > .public-container,
+  .public-site .public-footer-services:focus-within > .public-container {
+    opacity: 1;
+  }
+}
+
+/* Locked Home desktop composition. The mobile rules above remain the source
+ * of truth below 1081px; this block only restores the measured desktop frame. */
+@media (min-width: 1081px) {
+  .public-site .public-container {
+    max-width: 1440px;
+    padding-inline: clamp(1.5rem, 3vw, 3rem);
+  }
+
+  .public-site .public-nav-row {
+    min-height: 106px;
+  }
+
+  .public-site .public-brand {
+    gap: 0.65rem;
+  }
+
+  .public-site .public-brand-logo {
+    height: 80px;
+    width: 80px;
+  }
+
+  .public-site .public-brand-copy {
+    display: block;
+  }
+
+  .public-site .public-brand-name {
+    font-size: 1.78rem;
+    letter-spacing: -0.015em;
+    text-transform: none;
+  }
+
+  .public-site .public-brand-tagline {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    margin-top: 0.2rem;
+  }
+
+  .public-site .public-desktop-nav {
+    gap: clamp(0.75rem, 1.2vw, 1.35rem);
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    font-size: 1rem;
+    letter-spacing: 0.015em;
+    text-transform: none;
+  }
+
+  .public-site .public-nav-link::after {
+    bottom: 5px;
+  }
+
+  .public-site .public-nav-login {
+    padding-left: 0.9rem;
+  }
+
+  .public-site .public-button {
+    font-size: 0.94rem;
+    letter-spacing: 0.035em;
+    min-height: 58px;
+    padding: 0.72rem 1.35rem;
+  }
+
+  .public-site .home-hero-inner {
+    min-height: 819px;
+  }
+
+  .public-site .home-hero-copy {
+    min-height: 819px;
+    position: relative;
+    top: -3.5rem;
+    padding: 4.5rem clamp(2rem, 4vw, 4.5rem) 4rem clamp(3.5rem, 6vw, 5.5rem);
+  }
+
+  .public-site .home-hero-copy .public-eyebrow {
+    font-size: 0.72rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .public-site .home-hero-copy h1 {
+    font-size: clamp(4.5rem, 6.3vw, 6.25rem);
+    line-height: 0.88;
+    max-width: none;
+    white-space: nowrap;
+    letter-spacing: -0.09em;
+    transform: scaleY(1.14);
+    transform-origin: left top;
+    margin-bottom: 1.4rem;
+  }
+
+  .public-site .home-hero-copy h1 span {
+    color: #fff !important;
+  }
+
+  .public-site .home-hero-copy > p:not(.public-eyebrow) {
+    max-width: 35rem;
+  }
+
+  .public-site .home-hero-copy > p:nth-of-type(2) {
+    font-size: 1.16rem;
+    line-height: 1.35;
+    margin-top: 1.2rem;
+  }
+
+  .public-site .home-hero-copy > p:nth-of-type(3) {
+    font-size: 0.98rem;
+    line-height: 1.55;
+    margin-top: 0.8rem;
+  }
+
+  .public-site .home-hero-copy > div {
+    margin-top: 1.5rem;
+  }
+
+  .public-site .home-hero-art {
+    width: 50%;
+  }
+
+  .public-site .home-hero-inner > :last-child {
+    left: 49% !important;
+  }
+
+  .public-site .home-hero-environment {
+    filter: brightness(1.36) saturate(1.16) contrast(1.05);
+  }
+
+  .public-site .home-hero-map {
+    height: auto !important;
+    inset: auto -5% -12% auto !important;
+    max-width: none;
+    filter: brightness(1.55) saturate(1.25);
+    opacity: 0.9;
+    width: 76% !important;
+  }
+
+  .public-site .home-hero-art > div:nth-last-child(2) {
+    background: linear-gradient(90deg, rgba(6, 23, 53, 0.56) 0%, rgba(6, 23, 53, 0.12) 27%, transparent 68%) !important;
+  }
+
+  .public-site .home-hero-art > div:nth-last-child(1) {
+    background: linear-gradient(0deg, rgba(6, 23, 53, 0.36), transparent 44%) !important;
+  }
+
+  .public-site .home-markets {
+    padding-block: 3.2rem;
+  }
+
+  .public-site .home-markets > .public-container > div {
+    align-items: center;
+    gap: 2rem;
+    grid-template-columns: 0.62fr 1.38fr;
+  }
+
+  .public-site .home-markets .public-section-title {
+    font-size: clamp(2.55rem, 3.6vw, 3.75rem);
+    line-height: 0.9;
+    max-width: none;
+    white-space: nowrap;
+  }
+
+  .public-site .home-markets .public-section-intro {
+    font-size: 0.82rem;
+    line-height: 1.5;
+    margin-top: 1rem;
+  }
+
+  .public-site .home-markets .public-eyebrow {
+    margin-bottom: 0.65rem;
+  }
+
+  .public-site .home-market-image {
+    aspect-ratio: 0.82;
+  }
+
+  .public-site .home-markets .grid-cols-2 {
+    gap: 1rem;
+  }
+
+  .public-site .home-markets .grid-cols-2 > a > span:first-of-type {
+    font-size: 0.98rem;
+    margin-top: 0.65rem;
+  }
+
+  .public-site .home-markets .grid-cols-2 > a > span:last-of-type {
+    font-size: 0.76rem;
+  }
+
+  .public-site .home-path {
+    padding-block: 5.9rem;
+  }
+
+  .public-site .home-path-heading .public-eyebrow,
+  .public-site .home-reasons-heading .public-eyebrow,
+  .public-site .home-start-heading .public-eyebrow,
+  .public-site .home-cta > .bg-\[radial-gradient\(circle_at_85\%_40\%\,rgba\(141\,198\,63\,0\.12\)\,transparent_35\%\)\] {
+    margin-bottom: 0;
+  }
+
+  .public-site .home-path-heading .public-eyebrow,
+  .public-site .home-reasons-heading .public-eyebrow,
+  .public-site .home-start-heading .public-eyebrow {
+    display: none;
+  }
+
+  .public-site .home-path-heading .public-section-title {
+    font-size: clamp(2.55rem, 3.6vw, 3.65rem);
+    line-height: 0.92;
+    white-space: nowrap;
+  }
+
+  .public-site .home-path-heading > p:last-child {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    margin-top: 0.8rem;
+  }
+
+  .public-site .home-path > .public-container > ol {
+    gap: 1.25rem;
+    margin-top: 2rem;
+  }
+
+  .public-site .home-path > .public-container > ol > div {
+    left: 10%;
+    right: 10%;
+    top: 2.3rem;
+  }
+
+  .public-site .home-path-step {
+    min-width: 0;
+  }
+
+  .public-site .home-path-step-top {
+    align-items: center;
+    gap: 0;
+  }
+
+  .public-site .home-path-step-icon {
+    height: 6.25rem;
+    order: 1;
+    width: 6.25rem;
+  }
+
+  .public-site .home-path-step-icon svg {
+    height: 2.55rem;
+    width: 2.55rem;
+  }
+
+  .public-site .home-path-step-number {
+    font-size: 3.8rem;
+    left: 0;
+    margin-top: 0;
+    order: 2;
+    position: absolute;
+    top: 6rem;
+  }
+
+  .public-site .home-path-step h3 {
+    font-size: 1.22rem;
+    margin-top: 1.35rem;
+    padding-left: 2.5rem;
+  }
+
+  .public-site .home-path-step p {
+    font-size: 0.9rem;
+    line-height: 1.45;
+    margin-left: 2.5rem;
+    max-width: 13rem;
+  }
+
+  .public-site .home-path > .public-container > p:last-child {
+    font-size: 0.8rem;
+    margin-top: 1.4rem;
+  }
+
+  .public-site .home-choices {
+    padding-block: 4rem;
+  }
+
+  .public-site .home-choices > .public-container {
+    align-items: start;
+  }
+
+  .public-site .home-choice {
+    padding-block: 0;
+  }
+
+  .public-site .home-choice-icon {
+    height: 3.5rem;
+    width: 3.5rem;
+  }
+
+  .public-site .home-choice h2 {
+    font-size: 1.7rem;
+    margin-top: 0.6rem;
+  }
+
+  .public-site .home-choice ul {
+    gap: 0.25rem;
+    margin-top: 0.7rem;
+  }
+
+  .public-site .home-choice ul,
+  .public-site .home-choice .public-button {
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .public-site .home-choice .public-button {
+    margin-top: 1rem;
+  }
+
+  .public-site .home-reasons {
+    padding-block: 4rem;
+  }
+
+  .public-site .home-reasons-heading {
+    margin-bottom: 1.25rem;
+  }
+
+  .public-site .home-reasons-heading .public-section-title {
+    font-size: clamp(2.45rem, 3.5vw, 3.4rem);
+  }
+
+  .public-site .home-reasons article {
+    padding-inline: 1rem;
+  }
+
+  .public-site .home-reasons article h3 {
+    font-size: 0.88rem;
+  }
+
+  .public-site .home-reasons article p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .public-site .home-reasons article > svg {
+    height: 2.65rem;
+    width: 2.65rem;
+  }
+
+  .public-site .home-start {
+    padding-block: 0.9rem;
+  }
+
+  .public-site .home-start-heading {
+    margin-bottom: 0.5rem;
+  }
+
+  .public-site .home-start-heading .public-section-title {
+    font-size: clamp(2.2rem, 3.1vw, 3.1rem);
+  }
+
+  .public-site .home-start ol {
+    gap: 0.5rem;
+  }
+
+  .public-site .home-start ol li {
+    padding-left: 1rem;
+  }
+
+  .public-site .home-start ol li h3 {
+    font-size: 0.95rem;
+    margin-top: 0.25rem;
+  }
+
+  .public-site .home-start ol li p {
+    font-size: 0.75rem;
+    line-height: 1.15;
+    margin-top: 0.15rem;
+  }
+
+  .public-site .home-start ol li > div svg {
+    height: 2.15rem;
+    width: 2.15rem;
+  }
+
+  .public-site .home-cta {
+    padding-block: 1.4rem;
+  }
+
+  .public-site .home-cta .public-eyebrow {
+    display: none;
+  }
+
+  .public-site .home-cta h2 {
+    font-size: clamp(2.15rem, 3.2vw, 3.1rem);
+    line-height: 0.9;
+  }
+
+  .public-site .home-cta > .public-container {
+    gap: 2.5rem;
+  }
+
+  .public-site .home-cta > .public-container > p {
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .public-site .public-footer-grid {
+    gap: 1.25rem;
+    grid-template-columns: 1.55fr repeat(4, 1fr);
+    padding-bottom: 0.35rem;
+    padding-top: 0.4rem;
+  }
+
+  .public-site .public-footer-brand {
+    gap: 0.55rem;
+  }
+
+  .public-site .public-footer-logo {
+    height: 48px;
+    width: 48px;
+  }
+
+  .public-site .public-footer-wordmark {
+    font-size: 1.2rem;
+    text-transform: none;
+  }
+
+  .public-site .public-footer-tagline {
+    color: var(--public-lime);
+    font-family: var(--public-display-font);
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin: -0.18rem 0 0.2rem 3rem;
+    text-transform: uppercase;
+  }
+
+  .public-site .public-footer-copy {
+    font-size: 0.6rem;
+    line-height: 1.18;
+    max-width: 31ch;
+  }
+
+  .public-site .public-footer-socials {
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
+    margin-top: 0.55rem;
+  }
+
+  .public-site .public-footer-social {
+    align-items: center;
+    border: 1px solid rgba(239, 246, 255, 0.4);
+    border-radius: 50%;
+    color: rgba(239, 246, 255, 0.78);
+    display: inline-flex;
+    height: 1.8rem;
+    justify-content: center;
+    transition: border-color 180ms ease, color 180ms ease, transform 180ms ease;
+    width: 1.8rem;
+  }
+
+  .public-site .public-footer-social:hover {
+    border-color: var(--public-lime);
+    color: var(--public-lime);
+    transform: translateY(-1px);
+  }
+
+  .public-site .public-footer-heading {
+    font-size: 0.66rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .public-site .public-footer-link {
+    font-size: 0.62rem;
+    min-height: 13px;
+  }
+
+  .public-site .public-footer-links li {
+    height: 15px;
+  }
+
+  .public-site .public-footer-bottom {
+    font-size: 0.52rem;
+    padding-block: 0.25rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-grid {
+    gap: 2rem;
+    padding-bottom: 2.5rem;
+    padding-top: 4rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-intro {
+    max-width: 25rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-logo {
+    height: 64px;
+    width: 64px;
+  }
+
+  .public-site .public-footer-inner .public-footer-wordmark {
+    font-size: 1.5rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-tagline {
+    font-size: 0.78rem;
+    margin-left: 4rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-copy {
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .public-site .public-footer-inner .public-footer-heading {
+    font-size: 0.82rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-link {
+    font-size: 0.78rem;
+    min-height: 24px;
+  }
+
+  .public-site .public-footer-inner .public-footer-links {
+    gap: 0.35rem;
+  }
+
+  .public-site .public-footer-inner .public-footer-bottom {
+    font-size: 0.68rem;
+    padding-block: 0.65rem;
+  }
+
+  .public-site .public-footer-home .public-footer-grid {
+    gap: 1.5rem;
+    padding-bottom: 0.8rem;
+    padding-top: 0.8rem;
+  }
+
+  .public-site .public-footer-home .public-footer-logo {
+    height: 58px;
+    width: 58px;
+  }
+
+  .public-site .public-footer-home .public-footer-wordmark {
+    font-size: 1.4rem;
+  }
+
+  .public-site .public-footer-home .public-footer-copy {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .public-site .public-footer-home .public-footer-heading {
+    font-size: 0.76rem;
+  }
+
+  .public-site .public-footer-home .public-footer-link {
+    font-size: 0.74rem;
+    min-height: 20px;
+  }
+
+  .public-site .public-closing-cta-about .public-closing-cta-panel::before,
+  .public-site .public-closing-cta-culture .public-closing-cta-panel::before {
+    clip-path: polygon(62% 0, 100% 0, 100% 100%, 45% 100%);
+  }
+
+  .public-site .public-closing-cta-services .public-closing-cta-panel::before,
+  .public-site .public-closing-cta-opportunities .public-closing-cta-panel::before,
+  .public-site .public-closing-cta-careers .public-closing-cta-panel::before {
+    clip-path: polygon(68% 0, 100% 0, 100% 100%, 51% 100%);
+  }
+
+  .public-site .public-closing-cta-contact .public-closing-cta-panel::before,
+  .public-site .public-closing-cta-apply .public-closing-cta-panel::before {
+    clip-path: polygon(60% 0, 100% 0, 100% 100%, 43% 100%);
+  }
+
+  /* The locked boards use a different closing/footer rhythm on every route.
+   * Keep these desktop calibrations explicit; the compact mobile composition
+   * above remains unchanged. */
+  .public-site .public-footer-about,
+  .public-site .public-footer-services,
+  .public-site .public-footer-careers {
+    --public-footer-copy-size: 0.66rem;
+  }
+
+  .public-site .public-footer-about .public-footer-grid,
+  .public-site .public-footer-services .public-footer-grid,
+  .public-site .public-footer-careers .public-footer-grid {
+    gap: 1.2rem;
+    padding-bottom: 1rem;
+    padding-top: 1rem;
+  }
+
+  .public-site .public-footer-about .public-footer-logo,
+  .public-site .public-footer-services .public-footer-logo,
+  .public-site .public-footer-careers .public-footer-logo {
+    height: 52px;
+    width: 52px;
+  }
+
+  .public-site .public-footer-about .public-footer-wordmark,
+  .public-site .public-footer-services .public-footer-wordmark,
+  .public-site .public-footer-careers .public-footer-wordmark {
+    font-size: 1.22rem;
+  }
+
+  .public-site .public-footer-about .public-footer-tagline,
+  .public-site .public-footer-services .public-footer-tagline,
+  .public-site .public-footer-careers .public-footer-tagline {
+    font-size: 0.64rem;
+    margin-left: 3.25rem;
+  }
+
+  .public-site .public-footer-about .public-footer-copy,
+  .public-site .public-footer-services .public-footer-copy,
+  .public-site .public-footer-careers .public-footer-copy {
+    font-size: var(--public-footer-copy-size);
+    line-height: 1.2;
+  }
+
+  .public-site .public-footer-about .public-footer-heading,
+  .public-site .public-footer-services .public-footer-heading,
+  .public-site .public-footer-careers .public-footer-heading {
+    font-size: 0.66rem;
+    margin-bottom: 0.42rem;
+  }
+
+  .public-site .public-footer-about .public-footer-link,
+  .public-site .public-footer-services .public-footer-link,
+  .public-site .public-footer-careers .public-footer-link {
+    font-size: 0.64rem;
+    min-height: 16px;
+  }
+
+  .public-site .public-footer-about .public-footer-links,
+  .public-site .public-footer-services .public-footer-links,
+  .public-site .public-footer-careers .public-footer-links {
+    gap: 0.12rem;
+  }
+
+  .public-site .public-footer-about .public-footer-bottom,
+  .public-site .public-footer-services .public-footer-bottom,
+  .public-site .public-footer-careers .public-footer-bottom {
+    font-size: 0.54rem;
+    padding-block: 0.35rem;
+  }
+
+  .public-site .public-footer-services .public-footer-grid {
+    padding-bottom: 0.95rem;
+    padding-top: 0.95rem;
+  }
+
+  .public-site .public-footer-services .public-footer-logo {
+    height: 28px;
+    width: 28px;
+  }
+
+  .public-site .public-footer-services .public-footer-wordmark {
+    font-size: 0.8rem;
+  }
+
+  .public-site .public-footer-services .public-footer-tagline {
+    font-size: 0.44rem;
+    margin-left: 1.75rem;
+  }
+
+  .public-site .public-footer-services .public-footer-copy {
+    font-size: 0.42rem;
+    line-height: 1.1;
+    max-width: 29ch;
+  }
+
+  .public-site .public-footer-services .public-footer-socials {
+    margin-top: 0.2rem;
+  }
+
+  .public-site .public-footer-services .public-footer-brand {
+    margin-bottom: 0;
+    min-height: 36px;
+  }
+
+  .public-site .public-footer-services .public-footer-social-image {
+    height: 24px;
+    width: auto;
+  }
+
+  .public-site .public-footer-services .public-footer-bottom {
+    font-size: 0.42rem;
+    padding-block: 0;
+  }
+
+  .public-site .public-footer-services .public-footer-legal-link {
+    min-height: 20px;
+    padding-block: 0;
+  }
+
+  .public-site .public-footer-about .public-footer-grid {
+    padding-bottom: 0;
+    padding-top: 0;
+  }
+
+  .public-site .public-footer-about .public-footer-bottom {
+    padding-block: 0.5rem;
+  }
+
+  .public-site .public-footer-home .public-footer-grid {
+    padding-bottom: 0;
+    padding-top: 0;
+  }
+
+  .public-site .public-footer-home .public-footer-bottom {
+    line-height: 1.8;
+    padding-block: 0;
+  }
+
+  .public-site .public-footer-home .public-footer-legal-link {
+    min-height: 14px;
+    padding-block: 0;
+  }
+
+  .public-site .public-footer-careers .public-footer-grid {
+    padding-bottom: 3rem;
+    padding-top: 2.5rem;
+  }
+
+  .public-site .public-footer-culture .public-footer-grid {
+    padding-bottom: 5.5rem;
+    padding-top: 7rem;
+  }
+
+  .public-site .public-footer-contact .public-footer-grid {
+    padding-bottom: 4.9rem;
+    padding-top: 5.5rem;
+  }
+
+  .public-site .public-footer-apply .public-footer-grid {
+    padding-bottom: 2.3rem;
+    padding-top: 4rem;
+  }
+
+  /* Final Round 7 route corrections after the shared desktop sizing rules. */
+  .public-site .public-home .home-hero-copy { justify-content: flex-start; left: 0; padding: 5rem 2rem 4rem 3rem; top: 0; }
+  .public-site .public-home .home-hero-copy .public-eyebrow { margin-bottom: 1.8rem; }
+  .public-site .public-home .home-hero-copy h1 { font-size: 7.5rem; line-height: 0.88; margin-bottom: 0; }
+  .public-site .public-home .home-hero-copy > p:nth-of-type(2) { font-size: 1.4rem; line-height: 1.38; margin-top: 6rem; max-width: 38rem; }
+  .public-site .public-home .home-hero-copy > p:nth-of-type(3) { font-size: 1.1rem; line-height: 1.5; margin-top: 1.5rem; max-width: 39rem; }
+  .public-site .public-home .home-hero-copy > div { gap: 0.9rem; margin-top: 4rem; }
+  .public-site .public-home .home-hero-copy > div .public-button { font-size: 1.05rem; min-height: 4.5rem; padding-inline: 1.45rem; }
+  .public-site .public-home .home-markets > .public-container > div { gap: 1.5rem; grid-template-columns: 0.4fr 1.6fr; }
+  .public-site .public-home .home-path { padding-block: 5.4rem; }
+  .public-site .public-home .home-path-step p { font-size: 1rem; line-height: 1.45; }
+  .public-site .public-home .home-choices { padding-block: 3.6rem; }
+  .public-site .public-home .home-choice ul, .public-site .public-home .home-choice .public-button { font-size: 1rem; }
+  .public-site .public-home .home-reasons { padding-block: 3.8rem; }
+  .public-site .public-home .home-reasons article h3 { font-size: 1rem; }
+  .public-site .public-home .home-reasons article p { font-size: 0.95rem; line-height: 1.42; }
+  .public-site .public-home .home-start { padding-block: 0; }
+  .public-site .public-home .home-start ol li p { font-size: 0.82rem; line-height: 1.2; }
+  .public-site .public-home .home-cta { padding-block: 1.25rem !important; }
+  .public-site .public-contact .contact-hero h1 { font-size: 8rem; letter-spacing: -0.04em !important; line-height: 0.95; max-width: none; }
+  .public-site .public-contact .contact-hero > .public-container > div { padding-block: 0; }
+  .public-site .public-contact .contact-hero > .public-container > div > div:first-child { padding-top: 5.7rem; }
+  .public-site .public-contact .contact-hero p:not(.public-eyebrow) { font-size: 1.25rem; line-height: 1.6; margin-top: 2.2rem; max-width: 38rem; }
+  .public-site .public-contact .contact-fast-path > div:first-child { padding-bottom: 4.4rem; padding-top: 4.4rem; }
+  .public-site .public-contact .contact-form-grid > div { min-height: 56.3rem; padding: 3.1rem 2.4rem 3.5rem; }
+  .public-site .public-contact .contact-form-grid .public-section-title { font-size: 4.8rem !important; }
+  .public-site .public-contact .contact-form-grid .public-section-intro { font-size: 1rem; line-height: 1.5; }
+  .public-site .public-contact .contact-form-grid form { gap: 1.5rem; margin-top: 1rem; }
+  .public-site .public-contact .contact-form-grid form > div { gap: 1.5rem; }
+  .public-site .public-contact .contact-form-grid label { font-size: 1.15rem; }
+  .public-site .public-contact .contact-form-grid input, .public-site .public-contact .contact-form-grid select, .public-site .public-contact .contact-form-grid textarea { font-size: 1.05rem; }
+  .public-site .public-contact .contact-form-grid textarea { min-height: 13.25rem; }
+  .public-site .public-contact .contact-form-grid .public-button { min-height: 4.5rem; }
+  .public-site .public-contact .contact-form-grid .mt-7 { margin-top: 1.5rem; }
+  .public-site .public-contact .contact-form-grid .lg\:py-9 { padding-block: 1.7rem; }
+
+  .public-site .public-footer-contact .public-footer-bottom,
+  .public-site .public-footer-apply .public-footer-bottom,
+  .public-site .public-footer-culture .public-footer-bottom {
+    padding-block: 0.8rem;
+  }
+
+  .public-site .public-closing-cta-about,
+  .public-site .public-closing-cta-careers {
+    padding-block: 0.25rem;
+  }
+
+  .public-site .public-closing-cta-about .public-closing-cta-panel,
+  .public-site .public-closing-cta-careers .public-closing-cta-panel {
+    min-height: 6rem;
+    padding-block: 0.25rem;
+  }
+
+  .public-site .public-closing-cta-about .public-closing-cta-title,
+  .public-site .public-closing-cta-careers .public-closing-cta-title {
+    font-size: clamp(1.6rem, 2.3vw, 2.1rem);
+  }
+
+  .public-site .public-closing-cta-about .public-closing-cta-body,
+  .public-site .public-closing-cta-careers .public-closing-cta-body {
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .public-site .public-closing-cta-culture .public-closing-cta-title {
+    max-width: 20ch;
+  }
+
+  .public-site .public-closing-cta-culture .public-closing-cta-panel {
+    min-height: 17.75rem;
+  }
+
+  .public-site .public-closing-cta-contact {
+    padding-block: 2.5rem;
+  }
+
+  .public-site .public-closing-cta-apply {
+    padding-block: 2.5rem;
+  }
+}
+
+@media (max-width: 1080px) {
+  .public-site .public-footer-socials {
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+  }
+
+  .public-site .public-footer-social {
+    align-items: center;
+    border: 1px solid rgba(239, 246, 255, 0.4);
+    border-radius: 50%;
+    color: rgba(239, 246, 255, 0.78);
+    display: inline-flex;
+    height: 1.8rem;
+    justify-content: center;
+    width: 1.8rem;
+  }
+}
+
+/* Round 9 final route-owned middle pass. */
+@media (min-width: 1081px) {
+  .public-site .public-home .home-hero,
+  .public-site .public-home .home-markets,
+  .public-site .public-home .home-path,
+  .public-site .public-home .home-choices,
+  .public-site .public-home .home-reasons,
+  .public-site .public-home .home-start,
+  .public-site .public-home .home-cta {
+    min-height: 0 !important;
+  }
+
+  .public-site .public-home .home-hero { height: 819px !important; }
+  .public-site .public-home .home-markets { height: 389px !important; }
+  .public-site .public-home .home-path { height: 564px !important; }
+  .public-site .public-home .home-choices { height: 394px !important; }
+  .public-site .public-home .home-reasons { height: 309px !important; }
+  .public-site .public-home .home-start { height: 165px !important; }
+  .public-site .public-home .home-cta { height: 124px !important; }
+
+  /* Round 10 measured refinements. */
+  body .public-site .public-home .home-hero-copy h1 {
+    transform: scaleX(0.78) scaleY(1.34) !important;
+  }
+
+  body .public-site .public-home .home-hero-environment {
+    height: 100% !important;
+    left: -100px !important;
+    max-width: none !important;
+    object-fit: fill !important;
+    object-position: center top !important;
+    right: auto !important;
+    width: 820px !important;
+  }
+
+  body .public-site .public-home .home-reasons article > svg {
+    height: 3.5rem !important;
+    width: 3.5rem !important;
+  }
+
+  body .public-site .public-home .home-path-mountain-icon {
+    display: grid;
+    height: 100%;
+    place-items: center;
+    position: relative;
+    width: 100%;
+  }
+
+  body .public-site .public-home .home-path-mountain-icon > svg:first-child {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+
+  body .public-site .public-home .home-path-mountain-icon > svg:last-child {
+    bottom: 0.7rem;
+    height: 1.35rem !important;
+    position: absolute;
+    right: 0.95rem;
+    width: 1.35rem !important;
+  }
+
+  body .public-site .public-home .home-reasons article p {
+    font-size: 1.2rem !important;
+    line-height: 1.22 !important;
+  }
+
+  body .public-site .public-home .home-start ol li > div svg {
+    height: 3.15rem !important;
+    width: 3.15rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 1rem !important;
+    line-height: 0.95 !important;
+    margin-top: 0.15rem !important;
+  }
+
+  body .public-site .public-home .home-choice-icon {
+    height: 4.7rem !important;
+    width: 4.7rem !important;
+  }
+
+  body .public-site .public-home .home-choice h2 {
+    font-size: 2.1rem !important;
+  }
+
+  body .public-site .public-home .home-choice ul {
+    font-size: 1.15rem !important;
+  }
+
+  body .public-site .public-home .home-start ol li p {
+    font-size: 1.1rem !important;
+    line-height: 1.2 !important;
+  }
+
+  body .public-site .public-home .home-start ol {
+    position: relative;
+    top: -0.6rem;
+  }
+
+  body .public-site .public-home .home-start ol li {
+    padding-top: 0.25rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child a {
+    gap: 0 !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a span {
+    font-size: 2.65rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:first-child a:nth-of-type(2) span {
+    font-size: 2.4rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child a > svg:first-child {
+    height: 4rem !important;
+    width: 4rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child a > svg:last-child {
+    height: 2.75rem !important;
+    margin-right: 5.5rem !important;
+    width: 2.75rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:last-child a {
+    gap: 0 !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child {
+    height: 3.4rem !important;
+    width: 3.4rem !important;
+  }
+
+  body .public-site .public-contact .contact-fast-path > div:last-child a span {
+    font-size: 2.4rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:last-child a > svg:last-child {
+    height: 2.5rem !important;
+    width: 2.5rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid form {
+    gap: 3.5rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid form > div {
+    gap: 3.5rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid form > button {
+    min-width: 17rem !important;
+    font-size: 1.1rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid {
+    height: 56.3rem !important;
+  }
+
+  body .public-site .public-contact .contact-form-grid > div {
+    height: 56.3rem !important;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .public-site .public-contact .contact-fast-path {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child a {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child a span {
+    font-size: 2.35rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:last-child a span {
+    font-size: 2rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:last-child a svg {
+    height: 2.75rem !important;
+    width: 2.75rem !important;
+  }
+
+  .public-site .public-home .home-hero-environment {
+    object-fit: fill !important;
+    object-position: center top !important;
+  }
+
+  .public-site .public-home .home-hero-copy h1 {
+    transform: scaleX(0.78) scaleY(1.24) !important;
+  }
+
+  .public-site .public-home .home-path-heading .public-section-title {
+    font-size: 3.9rem !important;
+    line-height: 0.9 !important;
+  }
+
+  .public-site .public-home .home-path-heading > p:last-child {
+    font-size: 1.1rem !important;
+    line-height: 1.32 !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .public-site .public-home .home-path > .public-container > ol {
+    gap: 0.9rem !important;
+    margin-top: 1.25rem !important;
+  }
+
+  .public-site .public-home .home-path-step-icon {
+    height: 6.7rem !important;
+    width: 6.7rem !important;
+  }
+
+  .public-site .public-home .home-path-step-icon svg {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+
+  .public-site .public-home .home-path-step-number {
+    font-size: 4.1rem !important;
+    top: 6.35rem !important;
+  }
+
+  .public-site .public-home .home-path-step h3 {
+    font-size: 1.4rem !important;
+    margin-top: 1.05rem !important;
+  }
+
+  .public-site .public-home .home-path-step p {
+    font-size: 1.1rem !important;
+    line-height: 1.32 !important;
+    margin-top: 0.35rem !important;
+  }
+
+  .public-site .public-home .home-path > .public-container > p:last-child {
+    font-size: 0.9rem !important;
+    margin-top: 0.9rem !important;
+  }
+
+  .public-site .public-home .home-choice-icon {
+    height: 4.2rem !important;
+    width: 4.2rem !important;
+  }
+
+  .public-site .public-home .home-choice h2 {
+    font-size: 2rem !important;
+    line-height: 1.05 !important;
+    margin-top: 0.35rem !important;
+  }
+
+  .public-site .public-home .home-choice ul {
+    gap: 0.18rem !important;
+    margin-top: 0.55rem !important;
+  }
+
+  .public-site .public-home .home-choice ul,
+  .public-site .public-home .home-choice .public-button {
+    font-size: 1.1rem !important;
+    line-height: 1.28 !important;
+  }
+
+  .public-site .public-home .home-choice .public-button {
+    margin-top: 0.75rem !important;
+    min-height: 4rem !important;
+  }
+
+  .public-site .public-home .home-reasons-heading {
+    margin-bottom: 0.9rem !important;
+  }
+
+  .public-site .public-home .home-reasons article > svg {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+
+  .public-site .public-home .home-reasons article h3 {
+    font-size: 1.1rem !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .public-site .public-home .home-reasons article p {
+    font-size: 1.05rem !important;
+    line-height: 1.3 !important;
+    margin-top: 0.25rem !important;
+  }
+
+  .public-site .public-home .home-start-heading {
+    margin-bottom: 0.15rem !important;
+  }
+
+  .public-site .public-home .home-start ol {
+    gap: 0.35rem !important;
+  }
+
+  .public-site .public-home .home-start ol li > div svg {
+    height: 2.65rem !important;
+    width: 2.65rem !important;
+  }
+
+  .public-site .public-home .home-start ol li h3 {
+    font-size: 1.05rem !important;
+    margin-top: 0.1rem !important;
+  }
+
+  .public-site .public-home .home-start ol li p {
+    font-size: 0.95rem !important;
+    line-height: 1.1 !important;
+    margin-top: 0.15rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path > div:first-child {
+    padding-bottom: 3.75rem !important;
+    padding-top: 3.75rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path .public-eyebrow {
+    font-size: 2.7rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path a {
+    gap: 1rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path a span {
+    font-size: 4.25rem !important;
+  }
+
+  .public-site .public-contact .contact-fast-path a svg {
+    height: 3.25rem !important;
+    width: 3.25rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid > div {
+    padding-inline: 2.6rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid form > div {
+    gap: 1.25rem !important;
+  }
+
+  .public-site .public-contact .contact-form-grid input,
+  .public-site .public-contact .contact-form-grid select {
+    min-height: 4.5rem !important;
+  }
+}
+
+/* Round 16 final measured overrides. */
+@media (min-width: 1081px) {
+  body .public-site .public-home .home-hero-copy { width: 52% !important; clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%) !important; }
+  body .public-site .public-home .home-hero-inner > :last-child { left: 40.5% !important; rotate: 20deg !important; }
+  body .public-site .public-home .home-hero-copy > div { gap: 1.125rem !important; margin-top: 4rem !important; }
+  body .public-site .public-home .home-hero-copy > div .public-button { align-items: center !important; border-width: 1px !important; display: inline-flex !important; font-size: 1.125rem !important; height: 4.75rem !important; justify-content: center !important; min-height: 4.75rem !important; padding-inline: 1.5rem !important; }
+  body .public-site .public-home .home-hero-copy > div .public-button:first-child { min-width: 18.9rem !important; }
+  body .public-site .public-home .home-hero-copy > div .public-button:nth-child(2) { border-color: rgba(255, 255, 255, 0.82) !important; min-width: 23.9rem !important; }
+  body .public-site .public-home .home-choice-icon { height: 5rem !important; width: 5rem !important; }
+  body .public-site .public-home .home-choice h2 { font-size: 2.2rem !important; line-height: 1 !important; }
+  body .public-site .public-home .home-choice ul { font-size: 1.2rem !important; line-height: 1.25 !important; }
+  body .public-site .public-home .home-choice .public-button { font-size: 1.2rem !important; }
+  body .public-site .public-home .home-reasons article > svg { height: 3.75rem !important; width: 3.75rem !important; }
+  body .public-site .public-home .home-reasons article h3 { font-size: 1.15rem !important; margin-top: 0.5rem !important; }
+  body .public-site .public-home .home-reasons article p { font-size: 1.25rem !important; line-height: 1.16 !important; margin-top: 0.2rem !important; }
+  body .public-site .public-home .home-start ol li > div svg { height: 3.3rem !important; width: 3.3rem !important; }
+  body .public-site .public-home .home-start ol li h3 { font-size: 1.15rem !important; margin-top: 0.1rem !important; }
+  body .public-site .public-home .home-start ol li p { font-size: 1.1rem !important; line-height: 1.08 !important; }
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) { transform: translate(-3.25rem, 0) !important; max-width: none !important; overflow: visible !important; width: 633.333px !important; }
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) { height: 633.333px !important; left: 0 !important; max-width: none !important; top: 0 !important; width: 633.333px !important; }
+  body .public-site .public-contact .contact-fast-path > div:first-child a { gap: 1.25rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:first-child a > svg:first-child { height: 5rem !important; width: 5rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:first-child a span { font-size: 3.4rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:last-child a { gap: 1.25rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:last-child a > svg:first-child { height: 6rem !important; width: 6rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:last-child a span { font-size: 3.2rem !important; }
+  body .public-site .public-contact .contact-form-grid label { font-size: 1.375rem !important; }
+  body .public-site .public-contact .contact-form-grid input,
+  body .public-site .public-contact .contact-form-grid select,
+  body .public-site .public-contact .contact-form-grid textarea { font-size: 1.3rem !important; }
+  body .public-site .public-contact .contact-form-grid > div:last-child .text-sm { font-size: 1.2rem !important; line-height: 1.5 !important; }
+  body .public-site .public-contact .contact-form-grid > div:last-child h3 { font-size: 1.375rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:first-child a .contact-fast-path-link-title { font-size: 3.4rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:last-child a .contact-general-link-title { font-size: 3.2rem !important; }
+  body .public-site .public-contact .contact-form-grid .contact-form-submit:is(.contact-form-submit) { font-size: 1.45rem !important; }
+  body .public-site .public-contact .contact-fast-path > div:first-child a:nth-of-type(2) .contact-fast-path-link-title { font-size: 3.4rem !important; }
+  body .public-site .public-home .home-hero-copy { clip-path: none !important; overflow: visible !important; }
+  body .public-site .public-home .home-hero-copy::before { background: #061735; clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%); content: ""; inset: 0; position: absolute; z-index: -1; }
+  body .public-site .public-home .home-hero-inner > :last-child { left: 38.4% !important; }
+  body .public-site .public-home .home-hero-inner > :last-child:last-child { left: 38.4% !important; }
+  body .public-site .public-home .home-hero-inner > :last-child:last-child { left: 63% !important; }
+  body .public-site .public-home .home-hero-inner > :last-child:last-child { z-index: 1 !important; }
+  body .public-site .public-home .home-hero-inner > :last-child:last-child { z-index: 11 !important; }
+  body .public-site .public-home .home-hero-copy > * { position: relative; z-index: 12 !important; }
+  body .public-site .public-home .home-hero-art { left: 41.7% !important; right: auto !important; width: 58.3% !important; }
+  body .public-site .public-home .home-hero-environment { filter: brightness(1.12) saturate(1.06); transform: translateX(-4.25rem) scale(1.03) !important; transform-origin: center top !important; }
+  body .public-site .public-home .home-hero-copy::before { clip-path: polygon(0 0, 100% 0, 39.5% 100%, 0 100%) !important; }
+  /* Round 20: move the hero image boundary left while keeping the copy stack clear. */
+  body .public-site .public-home .home-hero-art:is(.home-hero-art) {
+    left: 41.7% !important;
+    right: auto !important;
+    width: 58.3% !important;
+  }
+  /* Round 21: put the lime stroke on the clipped photo edge. */
+  body .public-site .public-home .home-hero-inner > :last-child:last-child {
+    left: 40.1% !important;
+    --home-hero-diagonal-angle: 23.8deg;
+    rotate: var(--home-hero-diagonal-angle) !important;
+    transform: none !important;
+  }
+  /* Round 24: one continuous lime edge beneath the semantic copy layer. */
+  body .public-site .public-home .home-hero-inner > :last-child:last-child {
+    display: none !important;
+  }
+  body .public-site .public-home .home-hero-copy::before {
+    background: #8dc63f !important;
+    clip-path: polygon(0 0, 100% 0, 54.4% 100%, 0 100%) !important;
+    content: "";
+    inset: 0;
+    position: absolute;
+    z-index: -1;
+  }
+  body .public-site .public-home .home-hero-copy::after {
+    background: #061735 !important;
+    clip-path: polygon(0 0, 99.5% 0, 53.9% 100%, 0 100%) !important;
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+  }
+  /* Round 25: shift the approved art crop left while the matching source layer fills the right edge. */
+  body .public-site .public-home .home-hero-art {
+    background: url('/redesign/home-hero-art-source-crop.png') center / 100% 100% no-repeat !important;
+  }
+  body .public-site .public-home .home-hero-environment {
+    filter: brightness(1.62) saturate(1.2) contrast(1.1) !important;
+    mask-image: linear-gradient(90deg, #000 0%, #000 55%, transparent 90%) !important;
+    mix-blend-mode: screen !important;
+    opacity: 0.42 !important;
+    transform: translateX(-23rem) scale(1.03) !important;
+  }
+  body .public-site .public-home .home-hero-art > div:nth-last-child(2) {
+    background: linear-gradient(90deg, rgba(6, 23, 53, 0.28) 0%, rgba(6, 23, 53, 0.05) 27%, transparent 68%) !important;
+  }
+  body .public-site .public-home .home-hero-art > div:nth-last-child(1) {
+    background: linear-gradient(0deg, rgba(6, 23, 53, 0.18), transparent 44%) !important;
+  }
+  body .public-site .public-home .home-hero-art > div:nth-of-type(1) {
+    background: linear-gradient(90deg, rgba(6, 23, 53, 0.28) 0%, rgba(6, 23, 53, 0.05) 27%, transparent 68%) !important;
+  }
+  body .public-site .public-home .home-hero-art > div:nth-of-type(2) {
+    background: linear-gradient(0deg, rgba(6, 23, 53, 0.18), transparent 44%) !important;
+  }
+  body .public-site .public-home .home-hero-copy {
+    z-index: 13 !important;
+  }
+
+  /* Round 28: make the photograph follow the same continuous diagonal as
+     the navy wedge. The art box starts at the accepted lower anchor, while
+     its right-aligned background/image dimensions preserve the Round 27 crop.
+     Source/render board anchors: x≈373 top and x≈203 bottom in the 720px half. */
+  body .public-site .public-home .home-hero-art:is(.home-hero-art) {
+    background-position: right center !important;
+    background-size: 81.2% 100% !important;
+    clip-path: polygon(32.88% 0, 100% 0, 100% 100%, 0 100%) !important;
+    left: 28.2% !important;
+    right: auto !important;
+    width: 71.8% !important;
+  }
+
+  body .public-site .public-home .home-hero-environment:is(.home-hero-environment) {
+    left: 18.8% !important;
+    right: auto !important;
+    width: 81.2% !important;
+  }
+}
+
+/* Round 1: semantic shared shell. Keep the public header, CTA, and footer
+ * code-rendered so their geometry and text stay sharp at every viewport. */
+.public-site .public-locked-header,
+.public-site .public-locked-ending {
+  display: none !important;
+}
+
+.public-site .public-nav {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-bottom: 1px solid rgba(10, 31, 68, 0.12) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 50 !important;
+}
+
+.public-site .public-nav > .public-container {
+  height: auto !important;
+  position: relative !important;
+}
+
+.public-site .public-nav-row {
+  align-items: center !important;
+  display: flex !important;
+  gap: clamp(0.75rem, 2vw, 1.5rem) !important;
+  justify-content: space-between !important;
+  min-height: 76px !important;
+  height: auto !important;
+}
+
+.public-site .public-brand {
+  flex: 0 0 auto !important;
+  gap: 0.7rem !important;
+  min-height: 48px !important;
+}
+
+.public-site .public-brand-logo {
+  height: auto !important;
+  object-fit: contain !important;
+  width: 46px !important;
+}
+
+.public-site .public-brand-copy {
+  display: grid !important;
+  gap: 0.18rem !important;
+}
+
+.public-site .public-brand-name {
+  color: var(--public-navy) !important;
+  font-size: 1.15rem !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.public-site .public-brand-tagline {
+  color: var(--public-muted) !important;
+  display: block !important;
+  font-size: 0.58rem !important;
+  letter-spacing: 0.14em !important;
+  line-height: 1.1 !important;
+}
+
+.public-site .public-desktop-nav {
+  align-items: center !important;
+  display: flex !important;
+  flex: 1 1 auto !important;
+  gap: clamp(0.25rem, 1.15vw, 1.1rem) !important;
+  justify-content: flex-end !important;
+  min-width: 0 !important;
+}
+
+.public-site .public-nav-link,
+.public-site .public-nav-login {
+  align-items: center !important;
+  color: var(--public-ink) !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  font-size: 0.75rem !important;
+  justify-content: center !important;
+  letter-spacing: 0.06em !important;
+  min-height: 48px !important;
+  padding-inline: 0.3rem !important;
+  text-decoration: none !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+
+.public-site .public-nav-link::after {
+  bottom: 8px !important;
+  height: 2px !important;
+}
+
+.public-site .public-nav-link:hover,
+.public-site .public-nav-link.is-active,
+.public-site .public-nav-login:hover {
+  color: var(--public-navy) !important;
+}
+
+.public-site .public-nav-login {
+  border-left: 1px solid var(--public-line) !important;
+  margin-left: 0.2rem !important;
+  padding-left: clamp(0.7rem, 1vw, 1rem) !important;
+}
+
+.public-site .public-nav-apply {
+  min-height: 48px !important;
+  padding-inline: 1rem !important;
+}
+
+.public-site .public-nav-apply.is-active,
+.public-site .public-mobile-apply.is-active {
+  box-shadow: inset 0 -3px 0 var(--public-navy) !important;
+}
+
+.public-site .public-nav-link svg,
+.public-site .public-nav-login svg,
+.public-site .public-nav-apply svg,
+.public-site .public-mobile-apply svg {
+  color: currentColor !important;
+  opacity: 1 !important;
+}
+
+.public-site :is(.public-brand, .public-nav-link, .public-nav-login,
+.public-nav-apply, .public-mobile-link, .public-footer-link,
+.public-footer-legal-link, .public-closing-cta-secondary):focus-visible {
+  border-radius: 3px !important;
+  outline: 3px solid var(--public-lime) !important;
+  outline-offset: 3px !important;
+}
+
+.public-site .public-mobile-actions {
+  align-items: center !important;
+  display: none !important;
+  flex: 0 0 auto !important;
+  gap: 0.45rem !important;
+}
+
+.public-site .public-mobile-nav-shell {
+  display: none !important;
+}
+
+.public-site .public-icon-button {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+.public-site .public-closing-cta {
+  height: auto !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  padding-block: clamp(2.5rem, 5vw, 4.5rem) !important;
+  position: relative !important;
+}
+
+.public-site .public-closing-cta > .public-container {
+  height: auto !important;
+  position: relative !important;
+  width: 100% !important;
+}
+
+.public-site .public-closing-cta-panel {
+  background: rgba(255, 255, 255, 0.035) !important;
+  clip-path: none !important;
+  min-height: 15rem !important;
+  opacity: 1 !important;
+  overflow: hidden !important;
+  padding: clamp(2rem, 4vw, 3.5rem) clamp(1.25rem, 5vw, 5rem) !important;
+  position: relative !important;
+}
+
+.public-site .public-closing-cta-panel::before,
+.public-site .public-closing-cta-panel::after {
+  display: block !important;
+}
+
+.public-site .public-closing-cta-copy,
+.public-site .public-closing-cta-actions {
+  opacity: 1 !important;
+}
+
+.public-site .public-closing-cta-panel .public-eyebrow {
+  color: var(--public-lime) !important;
+}
+
+.public-site .public-closing-cta-panel .public-closing-cta-title {
+  color: #fff !important;
+}
+
+.public-site .public-closing-cta-panel .public-closing-cta-body {
+  color: rgba(239, 246, 255, 0.78) !important;
+}
+
+.public-site .public-closing-cta-panel .public-button-lime {
+  background: var(--public-lime) !important;
+  border-color: var(--public-lime) !important;
+  color: var(--public-navy) !important;
+}
+
+.public-site .public-closing-cta-panel .public-button-navy {
+  background: var(--public-navy) !important;
+  border-color: var(--public-navy) !important;
+  color: #fff !important;
+}
+
+.public-site .public-closing-cta-panel .public-closing-cta-secondary {
+  color: var(--public-lime) !important;
+}
+
+.public-site .public-closing-cta-panel svg {
+  color: currentColor !important;
+  opacity: 1 !important;
+}
+
+.public-site .public-footer {
+  color: #f6f9fc !important;
+  height: auto !important;
+  margin-top: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+
+.public-site .public-footer > .public-container {
+  height: auto !important;
+  opacity: 1 !important;
+  position: relative !important;
+  width: 100% !important;
+  z-index: 1 !important;
+}
+
+.public-site .public-footer-grid {
+  display: grid !important;
+  gap: clamp(1.5rem, 3vw, 3rem) !important;
+  grid-template-columns: minmax(15rem, 1.5fr) repeat(4, minmax(8rem, 1fr)) !important;
+  padding-block: clamp(2.5rem, 5vw, 4rem) 2rem !important;
+}
+
+.public-site .public-footer-intro {
+  max-width: 24rem !important;
+}
+
+.public-site .public-footer-brand {
+  color: #fff !important;
+  min-height: 48px !important;
+}
+
+.public-site .public-footer-brand * {
+  color: inherit !important;
+}
+
+.public-site .public-footer-logo {
+  height: auto !important;
+  object-fit: contain !important;
+  opacity: 1 !important;
+  width: 48px !important;
+}
+
+.public-site .public-footer-wordmark {
+  color: #fff !important;
+  font-size: 1.2rem !important;
+  text-transform: uppercase !important;
+}
+
+.public-site .public-footer-tagline {
+  color: var(--public-lime) !important;
+  font-family: var(--public-display-font) !important;
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.13em !important;
+  margin: 0.15rem 0 0.7rem 3.15rem !important;
+  text-transform: uppercase !important;
+}
+
+.public-site .public-footer-copy {
+  color: rgba(239, 246, 255, 0.74) !important;
+  font-size: 0.84rem !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  max-width: 32ch !important;
+}
+
+.public-site .public-footer-heading {
+  color: var(--public-lime) !important;
+  font-size: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.public-site .public-footer-links {
+  gap: 0.15rem !important;
+}
+
+.public-site .public-footer-links > li {
+  height: auto !important;
+  min-height: 44px !important;
+}
+
+.public-site .public-footer-link {
+  color: rgba(239, 246, 255, 0.78) !important;
+  min-height: 44px !important;
+  padding-block: 0.35rem !important;
+  text-decoration: none !important;
+}
+
+.public-site .public-footer-link:hover,
+.public-site .public-footer-link:focus-visible {
+  color: #fff !important;
+}
+
+.public-site .public-footer-link svg,
+.public-site .public-footer-legal-link svg {
+  opacity: 1 !important;
+}
+
+.public-site .public-footer-bottom {
+  color: rgba(239, 246, 255, 0.62) !important;
+  font-size: 0.76rem !important;
+  min-height: 3.5rem !important;
+  padding-block: 0.75rem !important;
+}
+
+.public-site .public-footer-bottom p,
+.public-site .public-footer-legal {
+  color: inherit !important;
+}
+
+.public-site .public-footer-legal-link {
+  color: inherit !important;
+  min-height: 44px !important;
+  padding-block: 0.65rem !important;
+  text-decoration: none !important;
+}
+
+.public-site .public-footer-legal-link:hover,
+.public-site .public-footer-legal-link:focus-visible {
+  color: #fff !important;
+}
+
+@media (max-width: 1080px) {
+  .public-site .public-desktop-nav {
+    display: none !important;
+  }
+
+  .public-site .public-mobile-actions {
+    display: flex !important;
+  }
+
+  .public-site .public-mobile-nav-shell {
+    display: grid !important;
+    grid-template-rows: 0fr !important;
+    transition: grid-template-rows 220ms ease !important;
+  }
+
+  .public-site .public-mobile-nav-shell.is-open {
+    grid-template-rows: 1fr !important;
+  }
+
+  .public-site .public-mobile-nav-shell.is-open .public-mobile-nav {
+    padding-bottom: 1.25rem !important;
+  }
+
+  .public-site .public-mobile-link {
+    align-items: center !important;
+    border-top: 1px solid var(--public-line) !important;
+    color: var(--public-ink) !important;
+    display: flex !important;
+    min-height: 48px !important;
+    padding-inline: 0.15rem !important;
+    text-decoration: none !important;
+  }
+
+  .public-site .public-mobile-link.is-active,
+  .public-site .public-mobile-link:hover {
+    color: var(--public-lime-dark) !important;
+  }
+
+  .public-site .public-mobile-login {
+    color: var(--public-navy) !important;
+  }
+
+  .public-site .public-mobile-apply {
+    font-size: 0.72rem !important;
+    min-height: 44px !important;
+    padding-inline: 0.85rem !important;
+  }
+
+  .public-site .public-footer-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .public-site .public-footer-intro {
+    grid-column: 1 / -1 !important;
+    max-width: 34rem !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .public-site .public-nav-row {
+    min-height: 70px !important;
+  }
+
+  .public-site .public-brand-logo {
+    height: auto !important;
+    width: 42px !important;
+  }
+
+  .public-site .public-brand-name {
+    font-size: 0.98rem !important;
+  }
+
+  .public-site .public-brand-tagline {
+    display: none !important;
+  }
+
+  .public-site .public-footer-grid {
+    gap: 0.75rem 1rem !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    padding-block: 2.5rem 0.75rem !important;
+  }
+
+  .public-site .public-footer-link {
+    font-size: 0.83rem !important;
+  }
+
+  .public-site .public-footer-bottom {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+    padding-block: 0.25rem !important;
+  }
+
+  .public-site .public-closing-cta-panel {
+    flex-direction: column !important;
+    gap: 1.5rem !important;
+    min-height: 0 !important;
+    padding: 2.5rem 1.25rem !important;
+  }
+
+  .public-site .public-closing-cta-actions {
+    align-items: flex-start !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .public-site .public-brand-name {
+    font-size: 0.88rem !important;
+  }
+
+  .public-site .public-mobile-apply {
+    font-size: 0.66rem !important;
+    gap: 0.25rem !important;
+    padding-inline: 0.6rem !important;
+  }
+}
+
+/* Contact hero media uses the asset's native 1586:992 ratio.  The previous
+ * desktop square made the contain image spend its vertical budget on
+ * transparent letterbox space (992:633 = 1.566x). */
+@media (min-width: 1081px) {
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    aspect-ratio: 1586 / 992 !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 633.333px !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) {
+    aspect-ratio: 1586 / 992 !important;
+    bottom: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    right: auto !important;
+    width: 633.333px !important;
+  }
+}
+
+/* Shared shell stays desktop at the approved 1024px handoff. The legacy
+ * locked-chrome layer above only provided a raster fallback; semantic content
+ * must remain fully painted and keyboard/pointer usable at every desktop size. */
+@media (min-width: 1024px) {
+  .public-site .public-nav-row > .public-brand,
+  .public-site .public-nav-row > .public-desktop-nav {
+    opacity: 1 !important;
+  }
+
+  .public-site .public-desktop-nav {
+    display: flex !important;
+  }
+
+  .public-site .public-mobile-actions,
+  .public-site .public-mobile-nav-shell {
+    display: none !important;
+  }
+}
+
+/* Round 3 shell calibration: the approved desktop board uses a taller,
+ * roomier masthead and footer than the compact semantic fallback. Keep this
+ * calibration desktop-only so the 1024px handoff and mobile targets retain
+ * their 44px controls and existing menu behavior. */
+@media (min-width: 1081px) {
+  .public-site .public-nav,
+  .public-site .public-nav-row {
+    min-height: 108px !important;
+  }
+
+  .public-site .public-brand {
+    gap: 0.85rem !important;
+    min-height: 68px !important;
+  }
+
+  .public-site .public-brand-logo {
+    width: clamp(64px, 5.3vw, 76px) !important;
+  }
+
+  .public-site .public-brand-copy {
+    gap: 0.28rem !important;
+  }
+
+  .public-site .public-brand-name {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(1.4rem, 2vw, 2rem) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.045em !important;
+  }
+
+  .public-site .public-brand-tagline {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(0.7rem, 0.9vw, 1rem) !important;
+    letter-spacing: 0.12em !important;
+  }
+
+  .public-site .public-desktop-nav {
+    gap: clamp(0.65rem, 1.7vw, 1.6rem) !important;
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(0.82rem, 1.1vw, 1.05rem) !important;
+    letter-spacing: 0.015em !important;
+    min-height: 60px !important;
+    padding-inline: 0.45rem !important;
+  }
+
+  .public-site .public-nav-link::after {
+    bottom: 12px !important;
+  }
+
+  .public-site .public-nav-login {
+    margin-left: 0.3rem !important;
+    padding-left: clamp(0.5rem, 0.8vw, 0.8rem) !important;
+  }
+
+  .public-site .public-nav-apply {
+    min-height: 60px !important;
+    min-width: clamp(8rem, 10.5vw, 10rem) !important;
+    padding-inline: clamp(1rem, 1.8vw, 1.7rem) !important;
+    transform: translateX(clamp(0px, 1.3vw, 1.2rem)) !important;
+  }
+
+  .public-site .public-footer > .public-container {
+    max-width: 1272px !important;
+    padding-inline: 0 !important;
+  }
+
+  .public-site .public-footer-grid {
+    gap: clamp(1.5rem, 2.2vw, 2rem) !important;
+    grid-template-columns: minmax(22rem, 1.45fr) repeat(4, minmax(8rem, 1fr)) !important;
+    padding-block: 5.75rem 3.5rem !important;
+  }
+
+  .public-site .public-footer-intro {
+    max-width: 22rem !important;
+    transform: translateY(-0.75rem) !important;
+  }
+
+  .public-site .public-footer-brand {
+    min-height: 64px !important;
+  }
+
+  .public-site .public-footer-logo {
+    width: 64px !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(1.4rem, 2vw, 2rem) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.045em !important;
+  }
+
+  .public-site .public-footer-tagline {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(0.7rem, 0.9vw, 1rem) !important;
+    letter-spacing: 0.12em !important;
+    margin-left: 5.1rem !important;
+  }
+
+  .public-site .public-footer-copy {
+    font-size: clamp(1rem, 1.15vw, 1.12rem) !important;
+    line-height: 1.5 !important;
+  }
+
+  .public-site .public-footer-socials {
+    gap: 0.7rem !important;
+    margin-top: 1.35rem !important;
+  }
+
+  .public-site .public-footer-heading {
+    font-size: clamp(1.05rem, 1.4vw, 1.35rem) !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .public-site .public-footer-links {
+    gap: 0.1rem !important;
+  }
+
+  .public-site .public-footer-links > li,
+  .public-site .public-footer-link {
+    min-height: 48px !important;
+  }
+
+  .public-site .public-footer-link {
+    font-size: clamp(1rem, 1.1vw, 1.1rem) !important;
+  }
+
+  .public-site .public-footer-bottom {
+    font-size: clamp(0.82rem, 0.95vw, 0.92rem) !important;
+    min-height: 5.5rem !important;
+    padding-block: 1rem !important;
+  }
+
+  /* Contact's approved board uses a full-bleed, compact closing band. */
+  body .public-site .public-contact .public-closing-cta {
+    padding-block: 0 !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta > .public-container {
+    max-width: none !important;
+    padding-inline: 0 !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta-panel {
+    height: 260px !important;
+    min-height: 260px !important;
+    padding-inline: clamp(3rem, 6.7vw, 6rem) !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta-title {
+    font-size: clamp(3rem, 4vw, 3.6rem) !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta .public-button {
+    font-size: 1.2rem !important;
+    min-height: 5.5rem !important;
+    min-width: min(28rem, 34vw) !important;
+    padding-inline: 2rem !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:first-child {
+    max-width: 40rem !important;
+  }
+}
+
+/* At the approved 1440px composition the transparent map mark is a broad
+ * right-side hero plate, not a small centered square. Its source alpha bounds
+ * occupy roughly 56% of the asset, so render the purpose-fit asset at 1266px
+ * to retain the measured visible 3C silhouette without a raster section. */
+@media (min-width: 1280px) {
+  body .public-site .public-contact .contact-hero {
+    overflow: hidden !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) {
+    left: 29.7% !important;
+    position: absolute !important;
+    top: -2.5rem !important;
+    transform: none !important;
+    width: 1266px !important;
+  }
+
+  body .public-site .public-contact .contact-hero > .public-container > div > div:last-child:is(div) img:is(img) {
+    height: auto !important;
+    width: 1266px !important;
+  }
+
+  body .public-site .public-contact .contact-hero-line-conversation {
+    white-space: nowrap !important;
+    width: 100% !important;
+  }
+
+  body .public-site .public-contact .contact-hero-body {
+    margin-top: 5.25rem !important;
+  }
+}
+
+/* Round 4 shell calibration: keep the semantic masthead and footer fluid
+ * through the tablet/desktop seam. The previous max1080/min1081 pair changed
+ * both layout and scale in one pixel, which made live resizing visibly jump. */
+@media (min-width: 1000px) {
+  .public-site .public-nav {
+    min-height: clamp(77px, 7.6vw, 109px) !important;
+  }
+
+  .public-site .public-nav > .public-container,
+  .public-site .public-footer > .public-container {
+    margin-inline: auto !important;
+    max-width: 1272px !important;
+    padding-inline: 0 !important;
+    width: calc(100% - clamp(2rem, 8vw, 6rem)) !important;
+  }
+
+  .public-site .public-nav-row {
+    min-height: clamp(77px, 7.6vw, 109px) !important;
+  }
+
+  .public-site .public-nav-row > .public-brand,
+  .public-site .public-nav-row > .public-desktop-nav {
+    opacity: 1 !important;
+  }
+
+  .public-site .public-brand {
+    gap: clamp(0.55rem, 0.85vw, 0.85rem) !important;
+    min-height: clamp(48px, 4.8vw, 68px) !important;
+  }
+
+  .public-site .public-brand-logo {
+    width: clamp(46px, 5.3vw, 76px) !important;
+  }
+
+  .public-site .public-brand-copy {
+    gap: clamp(0.14rem, 0.28vw, 0.28rem) !important;
+  }
+
+  .public-site .public-brand-name {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(1.15rem, 2vw, 2rem) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.045em !important;
+  }
+
+  .public-site .public-brand-tagline {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(0.58rem, 0.9vw, 1rem) !important;
+    letter-spacing: 0.12em !important;
+  }
+
+  .public-site .public-desktop-nav {
+    display: flex !important;
+    gap: clamp(0.35rem, 1.7vw, 1.6rem) !important;
+  }
+
+  .public-site .public-mobile-actions,
+  .public-site .public-mobile-nav-shell {
+    display: none !important;
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(0.72rem, 1.1vw, 1.05rem) !important;
+    letter-spacing: 0.015em !important;
+    min-height: clamp(48px, 4.2vw, 60px) !important;
+    padding-inline: clamp(0.2rem, 0.45vw, 0.45rem) !important;
+  }
+
+  .public-site .public-nav-link::after {
+    bottom: clamp(8px, 0.85vw, 12px) !important;
+  }
+
+  .public-site .public-nav-login {
+    margin-left: clamp(0.15rem, 0.3vw, 0.3rem) !important;
+    padding-left: clamp(0.5rem, 0.8vw, 0.8rem) !important;
+  }
+
+  .public-site .public-nav-apply {
+    min-height: clamp(48px, 4.2vw, 60px) !important;
+    min-width: clamp(7rem, 10.5vw, 10rem) !important;
+    padding-inline: clamp(0.8rem, 1.8vw, 1.7rem) !important;
+    transform: none !important;
+  }
+
+  .public-site .public-footer-grid {
+    gap: clamp(0.65rem, 2.2vw, 2rem) !important;
+    grid-template-columns: minmax(clamp(12rem, 22vw, 22rem), 1.45fr) repeat(4, minmax(0, 1fr)) !important;
+    padding-block: clamp(2.5rem, 6.39vw, 5.75rem) clamp(1.75rem, 3.89vw, 3.5rem) !important;
+  }
+
+  .public-site .public-footer-intro {
+    grid-column: auto !important;
+    max-width: clamp(12rem, 22rem, 22rem) !important;
+    transform: none !important;
+  }
+
+  .public-site .public-footer-brand {
+    min-height: clamp(48px, 4.4vw, 64px) !important;
+  }
+
+  .public-site .public-footer-logo {
+    width: clamp(48px, 5.3vw, 64px) !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    font-family: var(--public-body-font) !important;
+    font-size: clamp(1.15rem, 2vw, 2rem) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.045em !important;
+  }
+
+  .public-site .public-footer-tagline {
+    font-size: clamp(0.65rem, 0.9vw, 1rem) !important;
+    margin-left: clamp(3.15rem, 5.1vw, 5.1rem) !important;
+  }
+
+  .public-site .public-footer-copy {
+    font-size: clamp(0.84rem, 1.15vw, 1.12rem) !important;
+    line-height: 1.5 !important;
+  }
+
+  .public-site .public-footer-socials {
+    gap: clamp(0.5rem, 0.7vw, 0.7rem) !important;
+    margin-top: clamp(0.85rem, 1.35vw, 1.35rem) !important;
+  }
+
+  .public-site .public-footer-heading {
+    font-size: clamp(0.85rem, 1.4vw, 1.35rem) !important;
+    margin-bottom: clamp(0.65rem, 1vw, 1rem) !important;
+  }
+
+  .public-site .public-footer-links {
+    gap: 0.1rem !important;
+  }
+
+  .public-site .public-footer-links > li,
+  .public-site .public-footer-link {
+    min-height: 48px !important;
+  }
+
+  .public-site .public-footer-link {
+    font-size: clamp(0.8rem, 1.1vw, 1.1rem) !important;
+  }
+
+  .public-site .public-footer-bottom {
+    font-size: clamp(0.76rem, 0.95vw, 0.92rem) !important;
+    min-height: clamp(3.5rem, 6.1vw, 5.5rem) !important;
+    padding-block: clamp(0.75rem, 1vw, 1rem) !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta {
+    padding-block: 0 !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta > .public-container {
+    max-width: none !important;
+    padding-inline: 0 !important;
+    width: 100% !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta-panel {
+    height: clamp(220px, 18.1vw, 260px) !important;
+    min-height: clamp(220px, 18.1vw, 260px) !important;
+    padding-inline: clamp(2rem, 6.7vw, 6rem) !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta-title {
+    font-size: clamp(2.5rem, 4vw, 3.6rem) !important;
+  }
+
+  body .public-site .public-contact .public-closing-cta .public-button {
+    font-size: clamp(1rem, 1.2vw, 1.2rem) !important;
+    min-height: clamp(4.5rem, 5.5vw, 5.5rem) !important;
+    min-width: min(28rem, 34vw) !important;
+    padding-inline: clamp(1.25rem, 2vw, 2rem) !important;
+  }
+}
+
+/* Round 4 shared footer contract: every desktop-sized route gets the same
+ * 320px semantic footer. Route modules may tune their page content, but the
+ * shared shell owns footer height, rows, links, and social/legal controls. */
+@media (min-width: 900px) {
+  .public-site .public-footer {
+    height: 320px !important;
+    max-height: 320px !important;
+    min-height: 320px !important;
+    z-index: 2 !important;
+  }
+
+  .public-site .public-footer > .public-container {
+    height: 320px !important;
+  }
+
+  .public-site .public-footer-grid {
+    box-sizing: border-box !important;
+    height: 260px !important;
+    max-height: 260px !important;
+    min-height: 260px !important;
+    overflow: visible !important;
+    padding-block: 6px 0 !important;
+  }
+
+  .public-site .public-footer-intro {
+    max-height: 238px !important;
+    overflow: visible !important;
+  }
+
+  .public-site .public-footer-brand {
+    min-height: 52px !important;
+  }
+
+  .public-site .public-footer-logo {
+    height: 52px !important;
+    width: 52px !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    font-size: clamp(1.4rem, 2.05vw, 1.85rem) !important;
+    white-space: nowrap !important;
+  }
+
+  .public-site .public-footer-tagline {
+    font-size: 0.68rem !important;
+    margin-block: 0 0.25rem !important;
+  }
+
+  .public-site .public-footer-copy {
+    font-size: clamp(0.96rem, 1.1vw, 1.05rem) !important;
+    line-height: 1.28 !important;
+    max-width: 32ch !important;
+  }
+
+  .public-site .public-footer-socials {
+    gap: 0.35rem !important;
+    margin-top: 0.45rem !important;
+  }
+
+  .public-site .public-footer-social {
+    height: 44px !important;
+    min-height: 44px !important;
+    min-width: 44px !important;
+    width: 44px !important;
+  }
+
+  .public-site .public-footer-social svg {
+    height: 1.25rem !important;
+    width: 1.25rem !important;
+  }
+
+  .public-site .public-footer-heading {
+    font-size: clamp(1.03rem, 1.45vw, 1.25rem) !important;
+    line-height: 1 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .public-site .public-footer-links {
+    gap: 0 !important;
+  }
+
+  .public-site .public-footer-links > li,
+  .public-site .public-footer-link {
+    height: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .public-site .public-footer-link {
+    font-size: clamp(0.98rem, 1.3vw, 1.12rem) !important;
+    line-height: 1.15 !important;
+    min-width: 44px !important;
+    padding-block: 0 !important;
+  }
+
+  .public-site .public-footer-bottom {
+    box-sizing: border-box !important;
+    height: 60px !important;
+    max-height: 60px !important;
+    min-height: 60px !important;
+    padding-block: 8px !important;
+  }
+
+  .public-site .public-footer-legal-link {
+    min-height: 44px !important;
+    padding-block: 0 !important;
+  }
+
+  .public-site .public-footer-bottom {
+    font-size: clamp(0.88rem, 1.05vw, 1rem) !important;
+  }
+}
+
+/* The three-column tablet footer needs to be content-driven. The 320px
+ * desktop contract starts at 1000px, where the five-column grid has enough
+ * width for its labels; below that seam, let the wrapped links add height in
+ * normal flow instead of clipping the last row at a fixed canvas edge. */
+@media (min-width: 900px) and (max-width: 999px) {
+  .public-site .public-footer,
+  .public-site .public-footer > .public-container,
+  .public-site .public-footer-grid,
+  .public-site .public-footer-bottom {
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .public-site .public-footer {
+    min-height: 0 !important;
+  }
+
+  .public-site .public-footer > .public-container,
+  .public-site .public-footer-grid,
+  .public-site .public-footer-bottom {
+    min-height: 0 !important;
+  }
+
+  .public-site .public-footer-grid {
+    overflow: visible !important;
+    padding-block: 1.25rem 0.75rem !important;
+  }
+
+  .public-site .public-footer-intro {
+    max-height: none !important;
+  }
+
+  .public-site .public-footer-logo {
+    aspect-ratio: 550 / 516 !important;
+    height: auto !important;
+    width: 52px !important;
+  }
+
+  .public-site .public-footer-links > li,
+  .public-site .public-footer-link {
+    height: auto !important;
+    min-height: 44px !important;
+  }
+
+  .public-site .public-footer-bottom {
+    min-height: 60px !important;
+    padding-block: 0.75rem !important;
+  }
+}
+
+/* Preserve the source logo's 550:516 ratio at every desktop footer slot. */
+@media (min-width: 1000px) {
+  .public-site .public-footer-logo {
+    aspect-ratio: 550 / 516 !important;
+    height: auto !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    font-size: clamp(1rem, 1.65vw, 1.85rem) !important;
+  }
+}
+
+/* Home's longer, semantic navigation labels need an explicit allocation
+ * budget. Keep every desktop item inside the flex track so the first label
+ * cannot backflow beneath the brand at 1023px or wider. The small constant
+ * gap is compensated by each target's inline padding and preserves 44px
+ * vertical hit areas. */
+@media (min-width: 1000px) {
+  .public-site .public-desktop-nav {
+    gap: 2px !important;
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    font-size: clamp(0.68rem, 0.85vw, 0.85rem) !important;
+    padding-inline: 0.2rem !important;
+  }
+
+  .public-site .public-nav-apply {
+    min-width: clamp(6.5rem, 9.5vw, 9rem) !important;
+    padding-inline: clamp(0.55rem, 1.2vw, 1.2rem) !important;
+  }
+}
+
+/* Opportunities/Apply route modules previously declared their own footer
+ * heights. These higher-specificity guards keep the footer a shared shell
+ * while leaving their route-owned main compositions untouched. */
+@media (min-width: 1000px) {
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer,
+  body:has(#apply-route-root#apply-route-root) .public-site .public-footer {
+    height: 320px !important;
+    max-height: 320px !important;
+    min-height: 320px !important;
+  }
+
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer > .public-container,
+  body:has(#apply-route-root#apply-route-root) .public-site .public-footer > .public-container {
+    height: 320px !important;
+  }
+
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer-grid,
+  body:has(#apply-route-root#apply-route-root) .public-site .public-footer-grid {
+    height: 260px !important;
+    max-height: 260px !important;
+    min-height: 260px !important;
+    padding-block: 6px 0 !important;
+  }
+
+body:has(#opportunities-route#opportunities-route) .public-site .public-footer-bottom,
+body:has(#apply-route-root#apply-route-root) .public-site .public-footer-bottom {
+    height: 60px !important;
+    max-height: 60px !important;
+    min-height: 60px !important;
+  }
+}
+
+/* Home Round 4: measured shared shell geometry from the locked 1440 crops.
+ * Keep the implementation semantic while matching the source header and its
+ * compact 172px footer field.  This final block intentionally supersedes the
+ * older fluid calibration blocks above. */
+@media (min-width: 1081px) {
+  .public-site .public-ending-surface {
+    background-color: #011d41 !important;
+    background-image: none !important;
+  }
+
+  .public-site .public-ending-surface::before {
+    background-image: url("/redesign/home-footer-topo-art.png") !important;
+    background-position: center bottom;
+    background-repeat: no-repeat;
+    background-size: 100% 217px;
+    inset: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .public-site .public-nav {
+    background: #fafafa !important;
+    border-bottom-color: rgba(1, 29, 65, 0.12) !important;
+    box-shadow: 0 2px 4px rgba(1, 29, 65, 0.2) !important;
+  }
+
+  .public-site .public-nav,
+  .public-site .public-nav-row {
+    height: 108px !important;
+    min-height: 108px !important;
+  }
+
+  .public-site .public-nav > .public-container {
+    max-width: 1366px !important;
+    padding-inline: 0 !important;
+    width: 100% !important;
+  }
+
+  .public-site .public-brand {
+    gap: 12px !important;
+    min-height: 72px !important;
+  }
+
+  .public-site .public-brand-logo {
+    height: auto !important;
+    margin-left: -6px !important;
+    width: 80px !important;
+  }
+
+  .public-site .public-brand-copy {
+    gap: 2px !important;
+  }
+
+  .public-site .public-brand-name {
+    font-family: var(--public-body-font) !important;
+    font-size: 34px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.06em !important;
+    line-height: 1 !important;
+    text-transform: none !important;
+    position: relative !important;
+    top: 0 !important;
+    left: -1px !important;
+    transform: translateY(1px) scaleX(0.974) scaleY(1.2) !important;
+    transform-origin: left center !important;
+    white-space: nowrap !important;
+  }
+
+  .public-site .public-brand-tagline {
+    display: none !important;
+  }
+
+  .public-site .public-desktop-nav {
+    gap: 32px !important;
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    font-family: var(--public-body-font) !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    letter-spacing: -1px !important;
+    min-height: 56px !important;
+    padding-inline: 0 !important;
+    text-transform: none !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(1) {
+    letter-spacing: -0.583px !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(2) {
+    letter-spacing: -0.5px !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(3) {
+    letter-spacing: -0.727px !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(4) {
+    letter-spacing: -0.875px !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(5) {
+    letter-spacing: -0.8px !important;
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    line-height: 20px !important;
+  }
+
+  .public-site .public-nav-link::after {
+    bottom: 4px !important;
+  }
+
+  .public-site .public-nav-login {
+    border-left-color: rgba(10, 31, 68, 0.14) !important;
+    margin-left: 0 !important;
+    padding-left: 12px !important;
+    letter-spacing: 0 !important;
+    transform: translate(14px, 2px) scaleX(0.97) scaleY(1.25) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(1) {
+    transform: translate(6px, 2px) scaleY(1.28) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(2) {
+    transform: translate(10px, 2px) scaleY(1.28) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(3) {
+    transform: translate(14px, 2px) scaleY(1.28) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(4) {
+    transform: translate(17px, 2px) scaleY(1.28) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(5) {
+    transform: translate(22px, 2px) scaleY(1.28) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-nav-login svg {
+    transform: translateX(-3px) scale(1.35, 1.25) !important;
+    transform-origin: center !important;
+  }
+
+  .public-site .public-nav-apply {
+    font-family: var(--public-body-font) !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    background: #77a923 !important;
+    border-color: #77a923 !important;
+    transform: translate(2px, -2px) scaleY(0.964) !important;
+    transform-origin: center !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    min-width: 166px !important;
+    padding-inline: 16px !important;
+    text-transform: uppercase !important;
+  }
+
+  .public-site .public-footer {
+    background-color: transparent !important;
+    background-image: none !important;
+    height: 172px !important;
+    max-height: 172px !important;
+    min-height: 172px !important;
+  }
+
+  .public-site .public-footer > .public-container {
+    height: 172px !important;
+    max-width: 1194px !important;
+    padding-inline: 0 !important;
+    width: 100% !important;
+  }
+
+  .public-site .public-footer-grid {
+    box-sizing: border-box !important;
+    column-gap: 36px !important;
+    grid-template-columns: 2.45fr 1fr 1.03fr 1.2fr 0.82fr !important;
+    height: 132px !important;
+    max-height: 132px !important;
+    min-height: 132px !important;
+    overflow: visible !important;
+    padding: 22px 0 0 !important;
+  }
+
+  .public-site .public-footer-intro {
+    align-self: start !important;
+    max-width: 399px !important;
+    overflow: visible !important;
+    position: relative !important;
+    transform: none !important;
+  }
+
+  .public-site .public-footer-group {
+    align-self: start !important;
+    min-height: 0 !important;
+    position: relative !important;
+    top: 2px !important;
+  }
+
+  .public-site .public-footer-brand {
+    gap: 5px !important;
+    margin-bottom: 0 !important;
+    min-height: 42px !important;
+  }
+
+  .public-site .public-footer-logo {
+    height: auto !important;
+    width: 50px !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    font-family: var(--public-body-font) !important;
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.09em !important;
+    text-transform: none !important;
+    position: relative !important;
+    top: -1px !important;
+    transform: scaleX(0.99) !important;
+    transform-origin: left center !important;
+    white-space: nowrap !important;
+  }
+
+  .public-site .public-footer-tagline {
+    color: rgba(239, 246, 255, 0.78) !important;
+    font-family: var(--public-body-font) !important;
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    letter-spacing: 0.08em !important;
+    line-height: 1 !important;
+    margin: -13px 0 4px 55px !important;
+    text-transform: uppercase !important;
+  }
+
+  .public-site .public-footer-copy {
+    font-family: var(--public-body-font) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.25px !important;
+    line-height: 16px !important;
+    margin: 9px 0 0 !important;
+    max-width: 260px !important;
+  }
+
+  .public-site .public-footer-socials {
+    gap: 0 !important;
+    margin: 0 !important;
+    height: 1px !important;
+    width: 1px !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .public-site .public-footer-social {
+    border: 0 !important;
+    height: 1px !important;
+    min-height: 1px !important;
+    min-width: 1px !important;
+    opacity: 0 !important;
+    padding: 0 !important;
+    width: 1px !important;
+  }
+
+  .public-site .public-footer-social svg {
+    height: 1px !important;
+    width: 1px !important;
+  }
+
+  .public-site .public-footer-heading {
+    font-family: var(--public-body-font) !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    line-height: 16px !important;
+    margin: 0 0 6px !important;
+    transform: scaleY(1.3) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-footer-links {
+    gap: 0 !important;
+  }
+
+  .public-site .public-footer-links > li,
+  .public-site .public-footer-link {
+    height: 22px !important;
+    min-height: 22px !important;
+  }
+
+  .public-site .public-footer-link {
+    font-family: var(--public-body-font) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 22px !important;
+    padding-block: 0 !important;
+    transform: scaleX(1.04) scaleY(1.2) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) {
+    transform: translateX(4px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3),
+  .public-site .public-footer-group:nth-child(4) {
+    transform: translateX(2px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-link {
+    height: 23px !important;
+    min-height: 23px !important;
+    line-height: 23px !important;
+  }
+
+  .public-site .public-footer-bottom {
+    align-items: flex-end !important;
+    border-top: 0 !important;
+    box-sizing: border-box !important;
+    color: rgba(239, 246, 255, 0.78) !important;
+    height: 40px !important;
+    max-height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 0 12px !important;
+  }
+
+  .public-site .public-footer-bottom,
+  .public-site .public-footer-legal-link {
+    font-family: var(--public-body-font) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 15px !important;
+  }
+
+  .public-site .public-footer-legal {
+    flex-wrap: nowrap !important;
+    gap: 46px !important;
+    min-width: max-content !important;
+    position: relative !important;
+    white-space: nowrap !important;
+    width: 210px !important;
+    transform: translateY(-1px) scaleY(1.08) !important;
+    transform-origin: right bottom !important;
+  }
+
+  .public-site .public-footer-legal-link {
+    font-size: 13px !important;
+    min-height: 15px !important;
+    padding: 0 !important;
+  }
+
+  .public-site .public-footer-legal-link + .public-footer-legal-link::before {
+    color: inherit;
+    content: "|";
+    position: absolute;
+    right: 100%;
+    margin-right: 20px;
+  }
+
+  .public-site .public-footer-legal-link + .public-footer-legal-link {
+    position: relative !important;
+  }
+}
+
+/* Correction 17: native-crop paint calibration.  These overrides preserve the
+ * shared DOM/flex geometry while correcting only measured glyph paint. */
+@media (min-width: 1081px) {
+  .public-site .public-brand-name {
+    font-weight: 675 !important;
+    transform: translateY(2px) scaleX(0.974) scaleY(1.25) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(1) {
+    transform: translate(6px, 2px) scaleX(1.019) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(2) {
+    transform: translate(10px, 2px) scaleX(1.015) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(3) {
+    transform: translate(13px, 2px) scaleX(1.023) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(4) {
+    transform: translate(16px, 2px) scaleX(1.032) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(5) {
+    transform: translate(21px, 2px) scaleX(1.01) scaleY(1.28) !important;
+  }
+
+  .public-site .public-nav-login {
+    transform: translate(14px, 2px) scaleX(0.97) scaleY(1.25) !important;
+  }
+
+  .public-site .public-nav-login svg {
+    height: 20px !important;
+    width: 20px !important;
+    transform: translate(-2px, 0) scale(1.4, 0.96) !important;
+  }
+
+  .public-site .public-nav-apply {
+    transform: translate(2px, -3px) scaleY(0.964) !important;
+  }
+
+  .public-site .public-footer-brand {
+    gap: 11px !important;
+  }
+
+  .public-site .public-footer-logo {
+    width: 44px !important;
+    transform: scale(1.17, 1.08) !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    top: -2px !important;
+  }
+
+  .public-site .public-footer-group {
+    top: 0 !important;
+  }
+
+  .public-site .public-footer-heading {
+    transform: scaleY(1.15) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) {
+    transform: translate(4px, 2px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) .public-footer-links > li:first-child .public-footer-link {
+    position: relative !important;
+    top: 1px !important;
+  }
+
+  .public-site .public-footer-copy > span {
+    display: block !important;
+    height: 16px !important;
+    line-height: 16px !important;
+    margin: 0 !important;
+    transform-origin: left center !important;
+  }
+
+  .public-site .public-footer-copy > span:nth-child(1) {
+    transform: scaleX(0.996) scaleY(1.16) !important;
+  }
+
+  .public-site .public-footer-copy > span:nth-child(2) {
+    transform: translateX(1px) scaleX(0.992) scaleY(0.92) !important;
+  }
+
+  .public-site .public-footer-copy > span:nth-child(3) {
+    transform: translateX(1px) scaleX(0.99) !important;
+  }
+
+  .public-site .public-footer-copy > span:nth-child(4) {
+    transform: scaleX(1.074) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) {
+    transform: translate(2px, 1px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) {
+    transform: translate(2px, 0) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) {
+    transform: translate(0, 1px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-link {
+    position: relative !important;
+    top: 1px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(3) .public-footer-link {
+    top: 0 !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-links > li:nth-child(1) .public-footer-link {
+    position: relative !important;
+    top: 2px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-links > li:nth-child(n + 2) .public-footer-link {
+    position: relative !important;
+    top: 0 !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(1) {
+    height: 24px !important;
+    min-height: 24px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(2) {
+    height: 23px !important;
+    min-height: 23px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(3) {
+    height: 22px !important;
+    min-height: 22px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(1) .public-footer-link,
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(2) .public-footer-link {
+    position: relative !important;
+    top: 1px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(3) .public-footer-link {
+    position: relative !important;
+    top: 3px !important;
+  }
+
+  .public-site .public-footer-legal {
+    transform: translateY(-1px) scaleX(0.995) scaleY(1.18) !important;
+  }
+}
+
+/* Correction 20: target-crop paint calibration. DOM tracks and hit areas stay
+ * unchanged; only measured glyph paint and local contour geometry are tuned. */
+@media (min-width: 1081px) {
+  .public-site .public-brand-logo {
+    transform: translateY(-0.5px) scaleX(1.014) scaleY(1.014) !important;
+    transform-origin: center !important;
+  }
+
+  .public-site .public-brand-name {
+    transform: translateY(2.5px) scaleX(0.983) scaleY(1.14) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(1) {
+    transform: translate(5px, 2px) scaleX(1.019) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(2) {
+    transform: translate(11px, 2px) scaleX(0.98) scaleY(1.18) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(3) {
+    transform: translate(12px, 2px) scaleX(1.023) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(4) {
+    transform: translate(15px, 2px) scaleX(1.04) scaleY(1.28) !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link:nth-child(5) {
+    transform: translate(21px, 2px) scaleX(1.01) scaleY(1.04) !important;
+  }
+
+  .public-site .public-nav-login {
+    transform: translate(15px, 3px) scaleX(0.945) scaleY(1.25) !important;
+  }
+
+  .public-site .public-nav-login svg {
+    transform: translate(-3px, -2px) scale(1.32, 0.95) !important;
+  }
+
+  .public-site .public-nav-apply {
+    box-sizing: border-box !important;
+    color: #fff !important;
+    gap: 0.5rem !important;
+    letter-spacing: 0.03em !important;
+    width: 166px !important;
+    min-width: 166px !important;
+    padding-left: 12px !important;
+    padding-right: 22px !important;
+    padding-bottom: 9.5px !important;
+    padding-top: 12.5px !important;
+    text-indent: 0 !important;
+  }
+
+  .public-site .public-nav-apply svg {
+    transform: none !important;
+  }
+
+  .public-site .public-footer-wordmark {
+    left: -1px !important;
+    top: 0 !important;
+    transform: scaleX(0.998) scaleY(1.05) !important;
+  }
+
+  .public-site .public-footer-copy {
+    letter-spacing: -0.2px !important;
+    position: relative !important;
+    left: 1px !important;
+    top: 1px !important;
+  }
+
+  .public-site .public-footer-heading {
+    transform: scaleY(1.22) !important;
+    position: relative !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) {
+    transform: translate(4px, 2px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) .public-footer-heading {
+    top: 0 !important;
+    transform: scaleX(1) scaleY(1.45) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) {
+    transform: translate(2px, 1px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-heading {
+    top: 1px !important;
+    transform: scaleY(1.45) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) {
+    transform: translate(1px, 0) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-heading {
+    top: 2px !important;
+    transform: scaleX(1) scaleY(1.28) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) {
+    transform: translate(-1px, 1px) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-heading {
+    top: 1px !important;
+    transform: scaleX(1) scaleY(1.28) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-link {
+    transform: scaleX(1) scaleY(1.2) !important;
+    left: 1px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) .public-footer-links > li:nth-child(1) .public-footer-link {
+    position: relative !important;
+    left: 1px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) .public-footer-links > li:nth-child(n + 2) .public-footer-link {
+    position: relative !important;
+    left: -1px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) .public-footer-links > li:nth-child(2) .public-footer-link {
+    transform: scaleX(1.027) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(2) .public-footer-links > li:nth-child(3) .public-footer-link {
+    transform: scaleX(1.015) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-link {
+    transform: scaleX(1.04) scaleY(1.2) !important;
+    position: relative !important;
+    left: -1px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-links > li:nth-child(1) .public-footer-link {
+    transform: scaleX(1.085) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-links > li:nth-child(3) .public-footer-link {
+    transform: scaleX(1.007) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(4) .public-footer-links > li:nth-child(4) .public-footer-link {
+    left: 0 !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(1) .public-footer-link {
+    transform: scaleX(1.025) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(2) .public-footer-link {
+    position: relative !important;
+    left: 1px !important;
+    transform: scaleX(0.986) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(3) .public-footer-link {
+    position: relative !important;
+    left: -1px !important;
+    transform: scaleX(1.01) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(4) .public-footer-link {
+    position: relative !important;
+    left: -1px !important;
+    transform: scaleX(1.047) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(1) .public-footer-link,
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(2) .public-footer-link,
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(3) .public-footer-link,
+  .public-site .public-footer-group:nth-child(3) .public-footer-links > li:nth-child(4) .public-footer-link {
+    position: relative !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(2) {
+    height: 22px !important;
+    min-height: 22px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(1) {
+    height: 23px !important;
+    min-height: 23px !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(1) .public-footer-link {
+    transform: scaleX(0.985) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(2) .public-footer-link {
+    transform: scaleX(1) scaleY(1.35) !important;
+  }
+
+  .public-site .public-footer-group:nth-child(5) .public-footer-links > li:nth-child(3) .public-footer-link {
+    top: 1px !important;
+    transform: scaleX(1) scaleY(1.2) !important;
+  }
+
+  .public-site .public-footer-bottom > p {
+    transform: translate(2px, 7px) scaleX(0.996) scaleY(1.18) !important;
+    transform-origin: left bottom !important;
+  }
+
+  .public-site .public-footer-legal {
+    transform: translate(-1px, 0) scaleX(0.995) scaleY(1.35) !important;
+  }
+}
+
+/* Keep public shell surfaces full bleed while bounded route stages preserve
+ * their design coordinates without compensating for browser zoom. The
+ * medium-width route rules below keep 1282–1439 usable. */
+.public-site {
+  container-type: inline-size;
+}
+
+@media (min-width: 1282px) {
+  .public-site > .public-scale {
+    margin-inline: 0;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .public-site > .public-scale > .public-nav,
+  .public-site > .public-scale > .public-ending-surface {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (min-width: 1282px) and (max-width: 1439.98px) {
+  .public-site .public-nav-apply {
+    margin-right: 2px !important;
+  }
+}
+
+/* Responsive repair A: keep the calibrated desktop shell readable while the
+ * available canvas is narrower than the canonical 1440 composition. */
+@media (min-width: 1081px) and (max-width: 1281px) {
+  .public-site .public-nav > .public-container,
+  .public-site .public-nav-row {
+    box-sizing: border-box !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .public-site .public-nav > .public-container {
+    padding-inline: clamp(20px, 3.4vw, 48px) !important;
+  }
+
+  .public-site .public-brand {
+    flex: 0 1 auto !important;
+    min-width: 210px !important;
+  }
+
+  .public-site .public-desktop-nav {
+    flex: 1 1 auto !important;
+    gap: clamp(16px, 1.8vw, 26px) !important;
+    min-width: 0 !important;
+  }
+
+  .public-site .public-desktop-nav > .public-nav-link,
+  .public-site .public-nav-login,
+  .public-site .public-nav-apply {
+    transform: none !important;
+  }
+
+  .public-site .public-nav-link,
+  .public-site .public-nav-login {
+    font-size: 15px !important;
+    letter-spacing: -0.35px !important;
+  }
+
+  .public-site .public-nav-apply {
+    flex: 0 0 auto !important;
+    min-width: 150px !important;
+  }
+
+  .public-site .public-closing-cta-panel {
+    box-sizing: border-box !important;
+    gap: clamp(1.25rem, 3vw, 3rem) !important;
+    padding-inline: clamp(1.25rem, 4vw, 3rem) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .public-site .public-contact .contact-hero h1 {
+    font-size: clamp(2.8rem, 13vw, 4.6rem) !important;
+    letter-spacing: -0.055em !important;
+    line-height: .92 !important;
+    max-width: 100% !important;
+  }
+
+  .public-site .public-contact .contact-hero h1 .contact-hero-line-start,
+  .public-site .public-contact .contact-hero h1 .contact-hero-line-conversation {
+    transform: none !important;
+    white-space: normal !important;
+  }
+}
+
+/* Responsive A: independently injected and measured correction. */
+@media (min-width:1081px) and (max-width:1281px) {
+  .public-site header.public-nav .public-brand { flex:0 0 auto !important; }
+  .public-site header.public-nav .public-nav-row { gap:16px !important; }
+  .public-site header.public-nav .public-desktop-nav { gap:14px !important;justify-content:flex-end !important; }
+}
+
+@media (max-width:1281px) {
+  .public-site header.public-nav,.public-site header.public-nav * { transition-property:color,background-color,border-color,box-shadow !important; }
+}
+
+@media (max-width:720px) {
+  body .public-site .public-contact .contact-hero > .public-container > div { grid-template-columns:minmax(0,1fr) !important; }
+  body .public-site .public-contact .contact-hero > .public-container > div > div:first-child { min-width:0 !important;width:100% !important;max-width:100% !important; }
+  body .public-site .public-contact .contact-hero h1 { font-size:clamp(36px,10vw,64px) !important;line-height:1.04 !important;letter-spacing:-.03em !important;width:100% !important;max-width:100% !important; }
+  body .public-site .public-contact .contact-hero h1 span { transform:none !important;width:auto !important;max-width:100% !important;white-space:normal !important; }
+  body .public-site .public-contact .contact-hero p:not(.public-eyebrow) { width:auto !important;max-width:100% !important;transform:none !important; }
+  body .public-site .public-contact .contact-form-grid .contact-form-heading { font-size:32px !important;line-height:1.12 !important;letter-spacing:0 !important;transform:none !important; }
+  body .public-site .public-contact .public-closing-cta-panel { display:flex !important;flex-direction:column !important;align-items:stretch !important;height:auto !important;gap:24px !important; }
+  body .public-site .public-contact .public-closing-cta-copy { width:auto !important;max-width:100% !important; }
+  body .public-site .public-contact .public-closing-cta-title { font-size:36px !important;line-height:1.15 !important;letter-spacing:0 !important;width:auto !important;max-width:100% !important; }
+  body .public-site .public-contact .public-closing-cta-title-text { font-size:inherit !important;line-height:inherit !important;letter-spacing:inherit !important;transform:none !important; }
+}
