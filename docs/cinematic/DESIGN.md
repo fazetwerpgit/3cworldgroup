@@ -17,19 +17,44 @@ Declared on `.page` in `src/app/cinematic-home.module.css`.
 | `--ink-raise` | `#0c2049` | raised panels on navy, hairline fills |
 | `--lime` | `#8dc63f` | the only accent. Apply, route line, active state |
 | `--lime-bright` | `#a6e052` | hover/active lift only |
-| `--paper` | `#f4f0e6` | warm off-white, the light chapters |
-| `--paper-raise` | `#fbf8f1` | raised cells on paper |
+| `--lime-ink` | `#47700f` | the same green at ink weight, for lime on paper |
+| `--paper` | `#eef3f8` | cool pale, the light chapters |
+| `--paper-raise` | `#f7f9fc` | raised cells on paper |
 | `--on-ink` | `#ffffff` | text on navy |
 | `--on-ink-dim` | `#b5c4da` | secondary on navy — hue-tinted, 9.1:1, never gray |
 | `--on-paper` | `#101f38` | text on paper |
-| `--on-paper-dim` | `#4a5a71` | secondary on paper, 7.4:1 |
+| `--on-paper-dim` | `#4a5a71` | secondary on paper, 6.3:1 |
 | `--rule` | `rgba(255,255,255,.14)` | hairline on navy, 1px only |
 | `--rule-ink` | `rgba(16,31,56,.16)` | hairline on paper, 1px only |
 
-Contrast checks: lime on navy 8.85:1 · navy on lime 8.85:1 · `--on-ink-dim` on
-navy 9.1:1 · `--on-paper-dim` on paper 7.4:1. Large display type clears 3:1
-everywhere it sits on photography because every photo carries an authored scrim
-(see below), not a blanket opacity.
+**Round 2 — paper moved to the cool family.** `--paper` was the warm cream
+`#f4f0e6` and `--paper-raise` `#fbf8f1`, which sat apart from the cool pale
+`#eef3f8` / `#f7f9fc` the rest of the site uses. Both are now the site values.
+Re-measured against the new grounds, no token needed adjusting:
+
+| pair | ratio | floor |
+|---|---|---|
+| `--on-paper` on `--paper` | 14.8:1 | 4.5 |
+| `--on-paper` on `--paper-raise` | 15.6:1 | 4.5 |
+| `--on-paper-dim` on `--paper` | 6.3:1 | 4.5 |
+| `--on-paper-dim` on `--paper-raise` | 6.7:1 | 4.5 |
+| `--lime-ink` on `--paper` | 5.2:1 | 4.5 |
+| `--lime-ink` on `--paper-raise` | 5.5:1 | 3 (marker) |
+
+`--on-paper-dim` fell from 7.4:1 to 6.3:1 with the cooler ground and still
+clears the floor comfortably, so it was left alone.
+
+`--lime-ink` is new. `--lime` on near-white is 1.9:1, which is fine for the
+route's 4 px stroke — a large graphic, and the signature of the page — but not
+for the two small things that carry meaning on paper: the FAQ `+` marker, which
+is a row's only affordance, and the inline link underline. Both now use
+`--lime-ink`. The route line, the route stop dots and every lime button keep
+`--lime`.
+
+Contrast checks on navy are unchanged: lime on navy 8.85:1 · navy on lime
+8.85:1 · `--on-ink-dim` on navy 9.1:1. Large display type clears 3:1 everywhere
+it sits on photography because every photo carries an authored scrim (see
+below), not a blanket opacity.
 
 ## Type
 
@@ -83,6 +108,21 @@ everywhere it sits on photography because every photo carries an authored scrim
    separate vertical path down the left with stops to its right. Both paths are
    driven from a single scroll-progress number via `stroke-dashoffset`.
 
+   **Round 2.** Both paths used to overrun their own sequence — the wide one
+   started 80px before stop 01 and ran ~220px past stop 04 into empty canvas,
+   the stacked one had a 74px stub at each end. Both now begin on stop 01 and
+   end on stop 04. Stop 01 is a filled lime node so the line starts on
+   something; stop 04 is a larger filled node inside its own ring, so the draw
+   arrives rather than stopping. The `at` / `atSm` fractions are measured
+   against these exact coordinates and have to be recomputed if a corner moves.
+
+   The stops were also respread (9.8% / 32.5% / 58.3% / 86.7% of the canvas)
+   and the bottom right — the quadrant the line now finishes over, and
+   previously blank at 1440 — carries `.routeEnd`: a lime-ruled *Step one*
+   panel with the page's Apply. That restores the Apply PRODUCT.md lists for
+   the route sequence. At ≤900px it leaves the absolute layer and rejoins the
+   flow under the last stop.
+
 4. **Where (`#markets`, navy).** Five native `<button>`s — Birmingham, Atlanta,
    Jacksonville, Lansing, Grand Rapids — all visible at once, `aria-pressed`,
    arrow-key and tab operable, with a lime fill on the selected one. Selecting
@@ -96,9 +136,16 @@ everywhere it sits on photography because every photo carries an authored scrim
    status, training, and where 3C operates. Answers are drawn only from the
    facts listed in PRODUCT.md.
 
-6. **Two doors (navy).** Deliberately asymmetric: a dominant lime-edged apply
-   panel for a solo rep, and a quieter outlined line for someone bringing a
-   crew. Not two equal cards.
+6. **Two doors (navy).** Deliberately asymmetric on both axes. Left column: a
+   Bebas display heading (*Two ways / through the door.*), then a dominant
+   lime-edged apply panel for a solo rep — filled, 3px lime left edge — pushed
+   to the foot of the column, with a quieter outlined *Bring a team* panel
+   beneath it. Right column: `fiber-dusk-1600.webp`, a dusk street of lit
+   houses with a lime fibre run through it, under the same two-layer authored
+   scrim the hero uses — a horizontal wash that dissolves its left edge toward
+   the copy, plus a vertical fall top and bottom. Not two equal cards, and no
+   empty half. At ≤900px the copy column becomes `display: contents` so the
+   heading leads, the photograph sits under it, then the two paths.
 
 7. **Closing (ink-deep, full bleed).** Generous display type over a darkened
    crop of the same aerial photograph that opened the page — the route closes
@@ -111,6 +158,29 @@ everywhere it sits on photography because every photo carries an authored scrim
 9. **Mobile apply bar.** ≤820px only. Appears after the hero leaves the
    viewport, sits on `env(safe-area-inset-bottom)`, and the page adds matching
    bottom padding so it never covers the last line of content.
+
+## Seams
+
+Every navy/paper joint on this page is authored. A navy-to-paper gradient was
+built first and thrown out for the reason `home-page.module.css` gives for
+throwing out its own: alpha-blending navy over near-white is a hundred pixels
+of desaturated grey, and it reads as fog rather than as a decision. The rest of
+the site answers this with a diagonal cut. This page is orthogonal — the route
+walks right angles — so its joint is orthogonal too.
+
+Both paper chapters (`.routeSection`, `.faq`) carry one `clip-path` that cuts
+the same offset into both of their edges: the paper starts `--step`
+(`clamp(1.75rem, 3vw, 3rem)`) lower across the left 38% of the top, and
+finishes `--step` higher across the right 38% of the bottom. Each edge is two
+offset horizontals joined by a vertical, never one line straight across, and
+the right-hand side is consistently the higher one so the four joints read as
+one gesture. `.page`'s own background is the navy that shows through the cut,
+so no negative margin or padding compensation is involved, and `--step` is far
+smaller than either section's top padding so nothing is ever clipped.
+
+The one navy/navy joint — two doors into the closing — is not a cut but a hue
+step, so `.closing::after` now opens on `--ink` and falls to `--ink-deep`
+instead of starting flat at `--ink-deep` against a lighter neighbour.
 
 ## Motion
 

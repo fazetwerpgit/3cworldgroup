@@ -209,9 +209,8 @@ export default function Home() {
                   you want to walk.
                 </h2>
                 <p className={styles.sectionLede}>
-                  These are markets where 3C teams work. Choose one to read about it — then
-                  apply and tell us where you want to be. Opportunities vary by market and
-                  change with client demand, so we would rather talk than promise.
+                  These are markets where 3C teams work. Pick the one you would want to walk,
+                  and name it when you apply. What is open anywhere changes with client demand.
                 </p>
               </header>
 
@@ -247,34 +246,55 @@ export default function Home() {
           {/* ---------------------------------------------------------------- */}
           {/* 6 — two doors: rep, or team owner                                */}
           {/* ---------------------------------------------------------------- */}
-          <section className={styles.doors} aria-labelledby="doors-title">
+          <section id="doors" className={styles.doors} aria-labelledby="doors-title">
             <div className={styles.shell}>
-              <h2 id="doors-title" className={styles.srOnly}>
-                Apply as a rep, or bring a team
-              </h2>
+              <div className={styles.doorsLayout}>
+                <div className={styles.doorsBody}>
+                  <h2 id="doors-title" className={styles.doorsTitle}>
+                    Two ways
+                    <br />
+                    <span className={styles.heroLime}>through the door.</span>
+                  </h2>
 
-              <div className={styles.doorPrimary} data-reveal>
-                <p className={styles.doorKind}>Selling for yourself</p>
-                <p className={styles.doorPitch}>
-                  If you want to work a route, get trained on the products, and be paid on what
-                  you close — this is the one. Apply and we will take it from there.
-                </p>
-                <Link href={APPLY_HREF} className={`${styles.btn} ${styles.btnLime} ${styles.btnLg}`}>
-                  Apply
-                  <ArrowRight aria-hidden="true" className={styles.btnArrow} size={19} strokeWidth={2.2} />
-                </Link>
-              </div>
+                  <div className={styles.doorPrimary} data-reveal>
+                    <p className={styles.doorKind}>Selling for yourself</p>
+                    <p className={styles.doorPitch}>
+                      Work a route, get trained on the products, and be paid on what you close.
+                    </p>
+                    <Link href={APPLY_HREF} className={`${styles.btn} ${styles.btnLime} ${styles.btnLg}`}>
+                      Apply
+                      <ArrowRight aria-hidden="true" className={styles.btnArrow} size={19} strokeWidth={2.2} />
+                    </Link>
+                  </div>
 
-              <div className={styles.doorSecondary}>
-                <p className={styles.doorKindQuiet}>Already running a crew?</p>
-                <p className={styles.doorPitchQuiet}>
-                  If you lead a sales team and want to bring it to 3C, that is a different
-                  conversation and it starts with a message, not an application.
-                </p>
-                <Link href="/contact" className={styles.quietLink}>
-                  Contact the team
-                  <ArrowUpRight aria-hidden="true" className={styles.btnArrow} size={16} strokeWidth={2.2} />
-                </Link>
+                  <div className={styles.doorSecondary}>
+                    <p className={styles.doorKindQuiet}>Bring a team</p>
+                    <p className={styles.doorPitchQuiet}>
+                      If you already lead a sales crew, that is a different conversation, and it
+                      starts with a message rather than an application.
+                    </p>
+                    <Link href="/contact" className={styles.quietLink}>
+                      Contact the team
+                      <ArrowUpRight aria-hidden="true" className={styles.btnArrow} size={16} strokeWidth={2.2} />
+                    </Link>
+                  </div>
+                </div>
+
+                {/*
+                  A dusk street from the existing v2 set, under the hero's own
+                  two-layer scrim so the frame dissolves into the copy column
+                  instead of sitting in the navy as a pasted rectangle.
+                */}
+                <div className={styles.doorsArt} aria-hidden="true">
+                  <Image
+                    src="/redesign/v2/photos/fiber-dusk-1600.webp"
+                    alt=""
+                    fill
+                    sizes="(max-width: 900px) 100vw, 44vw"
+                    className={styles.doorsArtImage}
+                  />
+                  <div className={styles.doorsArtScrim} />
+                </div>
               </div>
             </div>
           </section>
@@ -282,7 +302,7 @@ export default function Home() {
           {/* ---------------------------------------------------------------- */}
           {/* 7 — closing                                                      */}
           {/* ---------------------------------------------------------------- */}
-          <section className={styles.closing} aria-labelledby="closing-title">
+          <section id="closing" className={styles.closing} aria-labelledby="closing-title">
             <Image
               src="/redesign/v2/photos/hero-wide-1600.webp"
               alt=""
@@ -297,7 +317,8 @@ export default function Home() {
                 <span className={styles.heroLime}>when you do.</span>
               </h2>
               <p className={styles.closingLede}>
-                Tell us where you want to work. We will tell you what the day looks like there.
+                Tell us where you want to work and what you are looking for. It starts with the
+                application.
               </p>
               <Link href={APPLY_HREF} className={`${styles.btn} ${styles.btnLime} ${styles.btnLg}`}>
                 Apply to sell with 3C
