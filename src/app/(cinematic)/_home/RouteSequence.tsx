@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { APPLY_HREF } from "./nav";
+import { APPLY_HREF } from "../../_cinematic/nav";
+import kit from "../../_cinematic/cinematic.module.css";
 import styles from "../cinematic-home.module.css";
 
 /**
@@ -130,9 +131,9 @@ export default function RouteSequence() {
       <div className={styles.routeEnd}>
         <p className={styles.routeEndKind}>Step one</p>
         <p className={styles.routeEndBody}>Everything above starts with one application.</p>
-        <Link href={APPLY_HREF} className={`${styles.btn} ${styles.btnLime}`}>
+        <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime}`}>
           Apply
-          <ArrowRight aria-hidden="true" className={styles.btnArrow} size={17} strokeWidth={2.2} />
+          <ArrowRight aria-hidden="true" className={kit.btnArrow} size={17} strokeWidth={2.2} />
         </Link>
       </div>
     </div>

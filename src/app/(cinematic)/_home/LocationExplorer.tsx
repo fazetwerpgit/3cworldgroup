@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { APPLY_HREF } from "./nav";
+import { APPLY_HREF } from "../../_cinematic/nav";
+import kit from "../../_cinematic/cinematic.module.css";
 import styles from "../cinematic-home.module.css";
 
 /**
@@ -94,11 +95,11 @@ export default function LocationExplorer() {
             you apply.
           </p>
           <div className={styles.cityPlateActions}>
-            <Link href={APPLY_HREF} className={`${styles.btn} ${styles.btnLime}`}>
-              Apply <ArrowRight aria-hidden="true" className={styles.btnArrow} size={17} strokeWidth={2.2} />
+            <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime}`}>
+              Apply <ArrowRight aria-hidden="true" className={kit.btnArrow} size={17} strokeWidth={2.2} />
             </Link>
-            <Link href="/opportunities" className={styles.quietLink}>
-              See the career path <ArrowRight aria-hidden="true" className={styles.btnArrow} size={15} strokeWidth={2.2} />
+            <Link href="/opportunities" className={kit.quietLink}>
+              See the career path <ArrowRight aria-hidden="true" className={kit.btnArrow} size={15} strokeWidth={2.2} />
             </Link>
           </div>
         </div>

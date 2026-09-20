@@ -1,4 +1,5 @@
 import Image from "next/image";
+import kit from "../../_cinematic/cinematic.module.css";
 import styles from "../cinematic-home.module.css";
 
 /**
@@ -61,7 +62,7 @@ export default function WorkChapters() {
               <Image src="/redesign/v2/photos/tv-square-800.webp" alt="" width={800} height={800} sizes="15vw" />
               <Image src="/redesign/v2/photos/security-square-800.webp" alt="" width={800} height={800} sizes="15vw" />
             </span>
-            <figcaption className={styles.srOnly}>{STAGE_ALT[1]}</figcaption>
+            <figcaption className={kit.srOnly}>{STAGE_ALT[1]}</figcaption>
           </figure>
 
           <figure className={styles.stageLayer} data-layer="2">
@@ -84,7 +85,7 @@ export default function WorkChapters() {
 
       <ol className={styles.chapterList}>
         {CHAPTERS.map((chapter, index) => (
-          <li key={chapter.n} className={styles.chapter} data-chapter data-reveal>
+          <li key={chapter.n} className={`${styles.chapter} ${kit.revealRise}`} data-chapter data-reveal>
             {/* Mobile carries its own image inline; the sticky stage is desktop-only. */}
             <div className={styles.chapterArt} aria-hidden="true">
               {index === 1 ? (

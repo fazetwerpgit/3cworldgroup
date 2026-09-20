@@ -8,7 +8,10 @@ four-identical-card stacks.
 
 ## Tokens
 
-Declared on `.page` in `src/app/cinematic-home.module.css`.
+Declared on `.page` in `src/app/_cinematic/cinematic.module.css`, the shared
+kit every route in the `(cinematic)` group imports. Names and values are
+unchanged from when they lived in the homepage's own module; `PAGE-KIT.md`
+lists what else the kit carries.
 
 | token | value | use |
 |---|---|---|

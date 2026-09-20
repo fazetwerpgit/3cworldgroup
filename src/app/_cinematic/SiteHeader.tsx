@@ -2,29 +2,44 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { APPLY_HREF, NAV_LINKS } from "./nav";
-import styles from "../cinematic-home.module.css";
+import styles from "./cinematic.module.css";
 
 /**
- * The homepage's own header. It sits inside the page rather than in
- * PageWrapper so it can start transparent over the hero photograph and take on
- * a navy backdrop only once the reader has left the opening frame. Every other
- * route keeps the shared Navbar untouched.
+ * The (cinematic) group's header. It lives in the group layout rather than in
+ * PageWrapper so it can start transparent over a full-bleed photograph and take
+ * on its navy backdrop only once the reader has left the opening frame. Every
+ * route outside the group keeps the shared Navbar untouched.
+ *
+ * Only the homepage has that photograph. An interior page opens on `.pageHead`,
+ * a flat navy band, where a transparent header would be transparent over
+ * nothing — so the condense state is simply on from the first paint and the
+ * scroll listener is never attached. The page declares which it is by whether
+ * it renders a `[data-hero]` element, so no route list has to be kept in sync.
  */
 export default function SiteHeader() {
+  const pathname = usePathname();
   const [condensed, setCondensed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const sheetId = useId();
 
+  // Keyed on the pathname, not just on mount: the layout persists across client
+  // navigations inside the group, so leaving the homepage for an interior page
+  // has to re-decide this or the header keeps the hero's behaviour on a page
+  // with no hero.
   useEffect(() => {
-    const onScroll = () => setCondensed(window.scrollY > 24);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    const hero = document.querySelector("[data-hero]");
+    const sync = () => setCondensed(!hero || window.scrollY > 24);
+    sync();
+    // With no hero the answer can never change, so there is nothing to listen to.
+    if (!hero) return;
+    window.addEventListener("scroll", sync, { passive: true });
+    return () => window.removeEventListener("scroll", sync);
+  }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -36,6 +51,8 @@ export default function SiteHeader() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
+
+  const isCurrent = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <header className={styles.header} data-condensed={condensed || undefined} data-open={menuOpen || undefined}>
@@ -58,7 +75,14 @@ export default function SiteHeader() {
 
         <nav className={styles.headerNav} aria-label="Primary">
           {NAV_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className={styles.headerLink}>
+            <Link
+              key={link.href}
+              href={link.href}
+              className={
+                isCurrent(link.href) ? `${styles.headerLink} ${styles.headerLinkCurrent}` : styles.headerLink
+              }
+              aria-current={isCurrent(link.href) ? "page" : undefined}
+            >
               {link.label}
             </Link>
           ))}
@@ -84,7 +108,13 @@ export default function SiteHeader() {
 
       <div id={sheetId} className={styles.menuSheet} hidden={!menuOpen}>
         {NAV_LINKS.map((link) => (
-          <Link key={link.href} href={link.href} className={styles.menuLink} onClick={() => setMenuOpen(false)}>
+          <Link
+            key={link.href}
+            href={link.href}
+            className={isCurrent(link.href) ? `${styles.menuLink} ${styles.menuLinkCurrent}` : styles.menuLink}
+            aria-current={isCurrent(link.href) ? "page" : undefined}
+            onClick={() => setMenuOpen(false)}
+          >
             {link.label}
           </Link>
         ))}

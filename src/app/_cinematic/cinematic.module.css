@@ -1,0 +1,874 @@
+/* ==========================================================================
+   Cinematic page kit — the shared half of the design language
+   --------------------------------------------------------------------------
+   Everything in here is reusable across every route in the (cinematic) group:
+   the tokens, the page shell, the chrome, the two grounds and the seam between
+   them, the section-head pattern, the buttons, and the reveal classes. Page
+   composition — a hero, a route drawing, a market explorer — stays in the
+   page's own module and imports from this one.
+
+   Nothing here extends, patches or overrides public.css. The (cinematic) group
+   bypasses PageWrapper so that cascade never reaches it.
+
+   Token names and values are documented in docs/cinematic/DESIGN.md; authoring
+   notes are in docs/cinematic/PAGE-KIT.md.
+   ========================================================================== */
+
+.page {
+  --ink: #061735;
+  --ink-deep: #030d1f;
+  --ink-raise: #0c2049;
+  --lime: #8dc63f;
+  --lime-bright: #a6e052;
+  --lime-ink: #47700f;
+  --paper: #eef3f8;
+  --paper-raise: #f7f9fc;
+  --on-ink: #ffffff;
+  --on-ink-dim: #b5c4da;
+  --on-paper: #101f38;
+  --on-paper-dim: #4a5a71;
+  --rule: rgba(255, 255, 255, 0.14);
+  --rule-ink: rgba(16, 31, 56, 0.16);
+
+  --display: "Bebas Neue", var(--font-geist-sans), sans-serif;
+  --body: var(--font-geist-sans), system-ui, sans-serif;
+
+  --shell: 78rem;
+  /* 5vw, not 4vw: at 4vw the tablet range sat on a 30px gutter and every
+     section ran nearly edge to edge. 390 and 1440+ are unchanged — the floor
+     and the cap already own those. */
+  --gutter: clamp(1.25rem, 5vw, 3.5rem);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  background: var(--ink);
+  color: var(--on-ink);
+  font-family: var(--body);
+  isolation: isolate;
+  overflow-x: clip;
+  position: relative;
+  scrollbar-color: rgba(141, 198, 63, 0.4) var(--ink-deep);
+}
+
+/* Browser surfaces the design still owns. */
+.page ::selection {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.page :focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+.page input,
+.page textarea {
+  caret-color: var(--lime);
+}
+
+/*
+  No element-level margin reset here on purpose: Tailwind's preflight already
+  zeroes margins globally, and a `.page p { margin: 0 }` rule outranks every
+  single-class rule in this file, silently deleting the spacing set on each
+  paragraph.
+*/
+
+.srOnly {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.skipLink {
+  background: var(--lime);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1rem;
+  left: 1rem;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 1.1rem;
+  position: fixed;
+  top: -4rem;
+  transition: top 0.18s var(--ease-out-expo);
+  z-index: 60;
+}
+
+.skipLink:focus-visible {
+  top: 1rem;
+}
+
+.shell {
+  margin-inline: auto;
+  position: relative;
+  max-width: var(--shell);
+  padding-inline: var(--gutter);
+  width: 100%;
+}
+
+.shellNarrow {
+  composes: shell;
+  max-width: 52rem;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons and links
+   -------------------------------------------------------------------------- */
+
+.btn {
+  align-items: center;
+  border: 1px solid transparent;
+  display: inline-flex;
+  font-family: var(--display);
+  font-size: 1.06rem;
+  gap: 0.55rem;
+  letter-spacing: 0.035em;
+  line-height: 1;
+  padding: 0.85rem 1.4rem 0.75rem;
+  text-decoration: none;
+  transition:
+    transform 0.22s var(--ease-out-expo),
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s var(--ease-out-expo),
+    color 0.22s ease;
+  white-space: nowrap;
+}
+
+.btnArrow {
+  transition: transform 0.28s var(--ease-out-expo);
+}
+
+.btn:hover .btnArrow,
+.quietLink:hover .btnArrow {
+  transform: translateX(4px);
+}
+
+.btnLime {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.btnLime:hover {
+  background: var(--lime-bright);
+  box-shadow: 0 10px 26px -12px rgba(141, 198, 63, 0.75);
+  transform: translateY(-1px);
+}
+
+.btnLime:active {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.btnGhost {
+  background: rgba(6, 23, 53, 0.34);
+  backdrop-filter: blur(6px);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--on-ink);
+}
+
+.btnGhost:hover {
+  background: rgba(6, 23, 53, 0.6);
+  border-color: var(--on-ink);
+}
+
+.btnGhost:active {
+  transform: translateY(1px);
+}
+
+.btnLg {
+  font-size: 1.22rem;
+  padding: 1.05rem 1.85rem 0.92rem;
+}
+
+.btnSm {
+  font-size: 0.95rem;
+  padding: 0.62rem 1rem 0.54rem;
+}
+
+.quietLink {
+  align-items: center;
+  border-bottom: 1px solid var(--rule);
+  color: var(--on-ink);
+  display: inline-flex;
+  font-family: var(--display);
+  font-size: 1.04rem;
+  gap: 0.45rem;
+  letter-spacing: 0.035em;
+  padding-bottom: 0.3rem;
+  text-decoration: none;
+  transition:
+    border-color 0.22s ease,
+    color 0.22s ease;
+}
+
+.quietLink:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.inlineLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--lime-ink);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+  transition: color 0.2s ease;
+}
+
+.inlineLink:hover {
+  color: var(--lime-ink);
+}
+
+/* --------------------------------------------------------------------------
+   Header — transparent over a full-bleed hero, navy everywhere else
+   --------------------------------------------------------------------------
+   `data-condensed` is the whole switch. On a page that opens on a photograph
+   SiteHeader sets it past 24px of scroll; on a page that opens on `.pageHead`
+   there is nothing to be transparent over, so it is set from the first paint
+   and the scroll listener is never attached.
+   -------------------------------------------------------------------------- */
+
+.header {
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease,
+    backdrop-filter 0.3s ease;
+  z-index: 50;
+}
+
+.header[data-condensed],
+.header[data-open] {
+  background: rgba(6, 23, 53, 0.86);
+  backdrop-filter: blur(14px) saturate(130%);
+  box-shadow: 0 1px 0 0 var(--rule);
+}
+
+.headerRow {
+  align-items: center;
+  display: flex;
+  gap: 1.5rem;
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding: 1.05rem var(--gutter);
+  transition: padding 0.3s var(--ease-out-expo);
+  width: 100%;
+}
+
+.header[data-condensed] .headerRow {
+  padding-block: 0.7rem;
+}
+
+.brand {
+  align-items: center;
+  color: var(--on-ink);
+  display: flex;
+  gap: 0.7rem;
+  margin-right: auto;
+  text-decoration: none;
+}
+
+.brandMark {
+  height: auto;
+  transition: transform 0.3s var(--ease-out-expo);
+  width: 42px;
+}
+
+.brand:hover .brandMark {
+  transform: scale(1.06) rotate(-2deg);
+}
+
+.brandCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.brandName {
+  font-family: var(--display);
+  font-size: 1.16rem;
+  letter-spacing: 0.035em;
+  line-height: 1;
+}
+
+.brandTag {
+  color: var(--on-ink-dim);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.headerNav {
+  display: flex;
+  gap: 1.9rem;
+}
+
+.headerLink {
+  color: var(--on-ink);
+  font-family: var(--display);
+  font-size: 1.02rem;
+  letter-spacing: 0.06em;
+  position: relative;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.headerLink::after {
+  background: var(--lime);
+  bottom: -0.45rem;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s var(--ease-out-expo);
+}
+
+.headerLink:hover::after,
+.headerLink:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/*
+  The page you are on wears the underline the others only get on hover, and
+  wears it in lime. Declared after `.headerLink::after` so it wins on order at
+  the same specificity.
+*/
+.headerLinkCurrent {
+  color: var(--lime);
+}
+
+.headerLinkCurrent::after {
+  transform: scaleX(1);
+}
+
+.headerActions {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.menuToggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--on-ink);
+  cursor: pointer;
+  display: none;
+  height: 40px;
+  justify-content: center;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+  width: 40px;
+}
+
+.menuToggle:hover {
+  border-color: var(--on-ink);
+}
+
+.menuToggle:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menuSheet {
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem var(--gutter) 1.25rem;
+}
+
+.menuSheet[hidden] {
+  display: none;
+}
+
+.menuLink {
+  border-bottom: 1px solid var(--rule);
+  color: var(--on-ink);
+  font-family: var(--display);
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  padding: 0.85rem 0;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.menuLink:active {
+  color: var(--lime);
+}
+
+.menuLinkCurrent {
+  color: var(--lime);
+}
+
+.menuLinkApply {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  padding: 0.95rem 0 0;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   Page header — how an interior page opens
+   --------------------------------------------------------------------------
+   Only the homepage has the photographic hero. Every other route in the group
+   opens on this: a navy band deep enough to clear the fixed header, the page
+   name in display type on the left, one lede on the right. Because the band is
+   flat navy, the header being transparent for its first paint is invisible.
+   -------------------------------------------------------------------------- */
+
+.pageHead {
+  background: var(--ink);
+  padding: clamp(7.25rem, 12vw, 11rem) 0 clamp(3rem, 6vw, 5rem);
+  position: relative;
+}
+
+.pageHeadRow {
+  align-items: end;
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.pageHeadEyebrow {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+.pageHeadTitle {
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 6vw, 5.4rem);
+  font-weight: 400;
+  letter-spacing: 0.006em;
+  line-height: 0.88;
+  text-transform: uppercase;
+}
+
+.pageHeadLede {
+  color: var(--on-ink-dim);
+  font-size: clamp(1.05rem, 1.35vw, 1.28rem);
+  line-height: 1.55;
+  max-width: 54ch;
+}
+
+/* --------------------------------------------------------------------------
+   Section furniture
+   -------------------------------------------------------------------------- */
+
+.sectionTitle,
+.sectionTitleInk {
+  font-family: var(--display);
+  font-size: clamp(2.2rem, 4.6vw, 4.2rem);
+  font-weight: 400;
+  letter-spacing: 0.006em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.sectionTitleInk {
+  color: var(--on-paper);
+}
+
+.sectionLede,
+.sectionLedeInk {
+  color: var(--on-ink-dim);
+  font-size: clamp(1rem, 1.1vw, 1.1rem);
+  line-height: 1.66;
+  max-width: 58ch;
+}
+
+.sectionLedeInk {
+  color: var(--on-paper-dim);
+}
+
+/*
+  The section head: display heading left, supporting lede right, on a hairline,
+  with the content of the section beneath it across the full shell. Every
+  section of the homepage uses it and every interior page should too — it is
+  the page's rhythm. It carries `.reveal`, so give the element `data-reveal`
+  and MotionRoot wipes it in once.
+*/
+.sectionHead {
+  composes: reveal;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-top: 1.9rem;
+}
+
+/*
+  The same head on a paper ground: only the hairline changes. `.reveal` is named
+  again rather than inherited through `.sectionHead` — composition is not
+  transitive here, so composing only `.sectionHead` would silently drop the
+  reveal and the head would be painted before it was meant to arrive.
+*/
+.sectionHeadInk {
+  composes: sectionHead reveal;
+  border-top-color: var(--rule-ink);
+}
+
+/* --------------------------------------------------------------------------
+   Grounds and the seam between them
+   --------------------------------------------------------------------------
+   Every navy/paper joint is authored. A navy-to-paper gradient was tried first
+   and thrown out for the same reason home-page.module.css threw out its own:
+   alpha-blending navy over near-white is 100px of desaturated grey, and it
+   reads as fog rather than as a decision. The rest of the site answers this
+   with a diagonal cut. This language is orthogonal — the route walks right
+   angles — so its joint is an orthogonal one: the paper is cut to start lower
+   on the left and finish higher on the right, so each edge is two offset
+   horizontals joined by a vertical instead of one line straight across.
+   `.page`'s own background is the navy that shows through the cut, which is why
+   no negative margin is needed, and `--step` is far smaller than any section's
+   top padding so nothing is ever clipped.
+
+   The rule: every paper section carries `.seam`. Navy sections never do.
+   -------------------------------------------------------------------------- */
+
+.surfaceInk {
+  background: var(--ink);
+  color: var(--on-ink);
+  scroll-margin-top: 5.5rem;
+}
+
+.surfaceInkDeep {
+  background: var(--ink-deep);
+  color: var(--on-ink);
+  scroll-margin-top: 5.5rem;
+}
+
+.surfacePaper {
+  background: var(--paper);
+  color: var(--on-paper);
+  scroll-margin-top: 5.5rem;
+}
+
+.surfacePaperRaise {
+  background: var(--paper-raise);
+  color: var(--on-paper);
+  scroll-margin-top: 5.5rem;
+}
+
+/* Declared after `.page ::selection` so the paper sections win on order. */
+.surfacePaper ::selection,
+.surfacePaperRaise ::selection {
+  background: var(--on-paper);
+  color: var(--paper);
+}
+
+.seam {
+  --step: clamp(1.75rem, 3vw, 3rem);
+
+  clip-path: polygon(
+    0 var(--step),
+    38% var(--step),
+    38% 0,
+    100% 0,
+    100% calc(100% - var(--step)),
+    62% calc(100% - var(--step)),
+    62% 100%,
+    0 100%
+  );
+  position: relative;
+}
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+
+.footer {
+  background: var(--ink-deep);
+  border-top: 1px solid var(--rule);
+  padding: 2.1rem 0 2.4rem;
+}
+
+.footerRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2.5rem;
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding-inline: var(--gutter);
+}
+
+.footerBrand {
+  align-items: center;
+  color: var(--on-ink);
+  display: flex;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  gap: 0.6rem;
+  letter-spacing: 0.04em;
+  margin-right: auto;
+  text-decoration: none;
+}
+
+.footerMark {
+  height: auto;
+  width: 34px;
+}
+
+.footerNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.4rem;
+}
+
+.footerNav a {
+  color: var(--on-ink-dim);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footerNav a:hover {
+  color: var(--lime);
+}
+
+.footerSocial {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.footerSocial a {
+  align-items: center;
+  border: 1px solid var(--rule);
+  color: var(--on-ink-dim);
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  transition:
+    border-color 0.22s ease,
+    color 0.22s ease,
+    transform 0.22s var(--ease-out-expo);
+  width: 34px;
+}
+
+.footerSocial a:hover {
+  border-color: var(--lime);
+  color: var(--lime);
+  transform: translateY(-2px);
+}
+
+.footerLegal {
+  border-top: 1px solid var(--rule);
+  color: #8d9db4;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  gap: 0.6rem 1.5rem;
+  justify-content: space-between;
+  margin: 1.8rem auto 0;
+  max-width: var(--shell);
+  padding: 1.4rem var(--gutter) 0;
+}
+
+.footerLegal a {
+  color: inherit;
+  margin-right: 1.1rem;
+  text-decoration: none;
+}
+
+.footerLegal a:hover {
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   Compact apply bar (small screens only)
+   -------------------------------------------------------------------------- */
+
+.applyBar {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Reveal classes
+   --------------------------------------------------------------------------
+   The contract MotionRoot keeps: the server renders the page in its finished
+   state, and every pre-reveal style lives behind `[data-motion="on"]`, which is
+   set only when `prefers-reduced-motion` is not `reduce` and an
+   IntersectionObserver exists. So with JS off or reduced motion on, nothing is
+   hidden and nothing waits.
+
+   Put `data-reveal` on the element and give it one of these two classes;
+   MotionRoot sets `data-shown` once, the first time it enters.
+
+   Two different reveals on purpose, not one repeated entrance: heads wipe,
+   list items rise.
+   -------------------------------------------------------------------------- */
+
+/*
+  A wipe-down, done with a mask rather than clip-path on purpose: clip-path
+  collapses the element's intersection rect to zero, so an IntersectionObserver
+  watching for the reveal would wait on a condition its own pre-state made
+  impossible. A mask is paint-only and leaves the geometry alone.
+*/
+.reveal {
+  /* Marker class. Everything it does is under [data-motion="on"] below. */
+}
+
+[data-motion="on"] .reveal {
+  mask-image: linear-gradient(to bottom, #000 0, #000 100%);
+  mask-repeat: no-repeat;
+  mask-size: 100% 0%;
+  opacity: 0;
+  transition:
+    mask-size 0.85s var(--ease-out-expo),
+    opacity 0.45s ease;
+}
+
+[data-motion="on"] .reveal[data-shown] {
+  mask-size: 100% 100%;
+  opacity: 1;
+}
+
+.revealRise {
+  /* Marker class. Everything it does is under [data-motion="on"] below. */
+}
+
+[data-motion="on"] .revealRise {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.55s var(--ease-out-expo),
+    transform 0.62s var(--ease-out-expo);
+}
+
+[data-motion="on"] .revealRise[data-shown] {
+  opacity: 1;
+  transform: none;
+}
+
+/* The header's share of the page entrance. */
+[data-motion="on"] .header {
+  opacity: 0;
+  transform: translateY(-12px);
+  transition:
+    opacity 0.55s var(--ease-out-expo) 0.12s,
+    transform 0.55s var(--ease-out-expo) 0.12s,
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+[data-motion="on"][data-entered] .header {
+  opacity: 1;
+  transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .headerNav {
+    gap: 1.3rem;
+  }
+
+  .sectionHead,
+  .pageHeadRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.1rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .headerNav {
+    display: none;
+  }
+
+  .menuToggle {
+    display: inline-flex;
+  }
+
+  .footerRow {
+    gap: 1.25rem;
+  }
+
+  .footerBrand {
+    margin-right: 0;
+    width: 100%;
+  }
+
+  /*
+    Compact apply affordance. The footer reserves matching space below its last
+    line so the bar never sits on top of content — and reserves it only on a
+    page that actually renders one, which is what the `:has` is for.
+  */
+  .page:has([data-apply-bar]) .footer {
+    padding-bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .applyBar {
+    align-items: center;
+    background: rgba(3, 13, 31, 0.93);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--rule);
+    bottom: 0;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    left: 0;
+    padding: 0.7rem var(--gutter) calc(0.7rem + env(safe-area-inset-bottom, 0px));
+    position: fixed;
+    right: 0;
+    transform: translateY(100%);
+    /* Hidden means hidden from the tab order too, or a keyboard user can land
+       on an Apply button parked off the bottom of the screen. */
+    visibility: hidden;
+    transition:
+      transform 0.4s var(--ease-out-expo),
+      visibility 0s linear 0.4s;
+    z-index: 45;
+  }
+
+  .applyBar[data-visible] {
+    transform: none;
+    visibility: visible;
+    transition:
+      transform 0.4s var(--ease-out-expo),
+      visibility 0s;
+  }
+
+  .applyBar > span {
+    color: var(--on-ink-dim);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 560px) {
+  .footerLegal {
+    flex-direction: column;
+  }
+}
+
+/*
+  Reduced motion: MotionRoot never sets data-motion, so every pre-reveal rule
+  above is inert and the page is simply finished. This closes the one remaining
+  gap in the chrome — the apply bar's own slide.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .applyBar {
+    transition: none;
+  }
+}
