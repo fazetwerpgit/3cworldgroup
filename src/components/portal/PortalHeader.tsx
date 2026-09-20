@@ -150,7 +150,7 @@ export function PortalHeader() {
       <header className="portal-shell-header">
         <Link href={brandHref} className="portal-brand">
           <Image
-            src="/logo.png"
+            src="/logo.webp"
             alt="3C World Group"
             width={28}
             height={28}

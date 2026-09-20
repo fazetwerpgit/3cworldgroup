@@ -38,15 +38,18 @@ export default function LocationExplorer() {
   // current selection: every chip is its own tab stop, so a reader can tab onto
   // a chip they have not selected, and stepping from the selection would jump
   // somewhere they are not looking.
+  // A5 — Home and End jump to the ends of the list, which is what a reader who
+  // has learned the arrow keys here will try next.
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
-    if (!step) return;
+    const jump = event.key === "Home" ? 0 : event.key === "End" ? MARKETS.length - 1 : -1;
+    if (!step && jump < 0) return;
     const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
     const focused = (event.target as HTMLElement).closest("button");
     const from = focused ? buttons.indexOf(focused as HTMLButtonElement) : -1;
     if (from < 0) return;
     event.preventDefault();
-    const next = (from + step + MARKETS.length) % MARKETS.length;
+    const next = jump >= 0 ? jump : (from + step + MARKETS.length) % MARKETS.length;
     setIndex(next);
     buttons[next]?.focus();
   };

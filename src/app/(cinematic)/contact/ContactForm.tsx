@@ -37,11 +37,24 @@ export default function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // A4 — which fields the browser has rejected, so the same failure the native
+  // bubble shows is also on the element for assistive tech. Driven by the
+  // form's own `invalid` event (which fires on submit, capture-phase only,
+  // because `invalid` does not bubble) and cleared per field as it is edited.
+  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+
+  const handleInvalid = (
+    e: React.FormEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => {
+    const { name } = e.currentTarget;
+    setInvalid((current) => ({ ...current, [name]: true }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    setInvalid({});
 
     try {
       // Simulated submit behavior is intentionally preserved until a backend is connected.
@@ -60,6 +73,7 @@ export default function ContactForm() {
   ) => {
     const { name, value } = e.target;
     setFormData((current) => ({ ...current, [name]: value }));
+    setInvalid((current) => (current[name] ? { ...current, [name]: false } : current));
   };
 
   if (submitted) {
@@ -88,6 +102,8 @@ export default function ContactForm() {
             type="text"
             id="contact-name"
             name="name"
+            aria-invalid={invalid.name || undefined}
+            onInvalid={handleInvalid}
             required
             value={formData.name}
             onChange={handleChange}
@@ -104,6 +120,8 @@ export default function ContactForm() {
             type="email"
             id="contact-email"
             name="email"
+            aria-invalid={invalid.email || undefined}
+            onInvalid={handleInvalid}
             required
             value={formData.email}
             onChange={handleChange}
@@ -120,6 +138,8 @@ export default function ContactForm() {
             type="tel"
             id="contact-phone"
             name="phone"
+            aria-invalid={invalid.phone || undefined}
+            onInvalid={handleInvalid}
             value={formData.phone}
             onChange={handleChange}
             placeholder="(555) 123-4567"
@@ -134,6 +154,8 @@ export default function ContactForm() {
             className={`${styles.input} ${styles.select}`}
             id="contact-subject"
             name="subject"
+            aria-invalid={invalid.subject || undefined}
+            onInvalid={handleInvalid}
             required
             value={formData.subject}
             onChange={handleChange}
@@ -156,6 +178,8 @@ export default function ContactForm() {
           className={`${styles.input} ${styles.textarea}`}
           id="contact-message"
           name="message"
+          aria-invalid={invalid.message || undefined}
+          onInvalid={handleInvalid}
           required
           rows={5}
           value={formData.message}
@@ -164,11 +188,27 @@ export default function ContactForm() {
         />
       </label>
 
-      {error ? (
-        <p className={styles.formError} role="alert">
-          {error}
+      {/*
+        R1 — with JavaScript off the submit handler never runs and the form has
+        no `action`, so pressing the button would silently reload the page. The
+        notice is the fallback the reader gets instead.
+      */}
+      <noscript>
+        <p className={styles.formNoscript}>
+          This form needs JavaScript to send. Email{" "}
+          <a href="mailto:info@3cworldgroup.com">info@3cworldgroup.com</a> and we will pick
+          it up from there.
         </p>
-      ) : null}
+      </noscript>
+
+      {/*
+        A4 — present from first paint and empty, not mounted on failure: a live
+        region that appears at the same moment its text does is not reliably
+        announced.
+      */}
+      <div className={styles.formError} role="alert" aria-live="assertive">
+        {error}
+      </div>
 
       <div className={styles.formActions}>
         <button

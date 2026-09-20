@@ -36,6 +36,10 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<{ message: string; code: string } | null>(null);
+  // A4 — which fields the browser has rejected, so the same failure the native
+  // bubble shows is also on the element for assistive tech. Driven by the
+  // controls' own `invalid` event, cleared per field as it is edited.
+  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
 
   const applyReferral = useCallback((ref: string) => {
     setFormData((prev) => ({ ...prev, referredBy: ref }));
@@ -44,12 +48,19 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((current) => ({ ...current, [name]: value }));
+    setInvalid((current) => (current[name] ? { ...current, [name]: false } : current));
+  };
+
+  const handleInvalid = (e: React.FormEvent<HTMLInputElement>) => {
+    const { name } = e.currentTarget;
+    setInvalid((current) => ({ ...current, [name]: true }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitError(null);
+    setInvalid({});
 
     if (formData.website || Date.now() - formStartedAtRef.current < 3000) {
       setSubmitted(true);
@@ -230,6 +241,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                       type="text"
                       id="apply-name"
                       name="name"
+                      aria-invalid={invalid.name || undefined}
+                      onInvalid={handleInvalid}
                       autoComplete="name"
                       required
                       value={formData.name}
@@ -245,6 +258,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                       type="tel"
                       id="apply-phone"
                       name="phone"
+                      aria-invalid={invalid.phone || undefined}
+                      onInvalid={handleInvalid}
                       autoComplete="tel"
                       required
                       value={formData.phone}
@@ -261,6 +276,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                     type="email"
                     id="apply-email"
                     name="email"
+                    aria-invalid={invalid.email || undefined}
+                    onInvalid={handleInvalid}
                     autoComplete="email"
                     required
                     value={formData.email}
@@ -276,6 +293,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                     type="text"
                     id="apply-city"
                     name="city"
+                    aria-invalid={invalid.city || undefined}
+                    onInvalid={handleInvalid}
                     autoComplete="address-level2"
                     required
                     value={formData.city}
@@ -319,14 +338,38 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                   <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
                 </button>
 
-                {submitError?.code === "account_exists" ? (
-                  <div className={styles.formError} role="alert">
-                    {submitError.message}{" "}
-                    <Link className={styles.formErrorLink} href="/portal">
-                      Sign in
-                    </Link>
-                  </div>
-                ) : null}
+                {/*
+                  A4 — in the DOM from first paint and empty, not mounted on
+                  failure: a live region that appears at the same moment its
+                  text does is not reliably announced. It also now carries every
+                  rejection, not only `account_exists` — a server error used to
+                  render nothing at all and leave the reader with a button that
+                  had simply stopped doing anything.
+                */}
+                <div className={styles.formError} role="alert" aria-live="assertive">
+                  {submitError ? submitError.message : ""}
+                  {submitError?.code === "account_exists" ? (
+                    <>
+                      {" "}
+                      <Link className={styles.formErrorLink} href="/portal">
+                        Sign in
+                      </Link>
+                    </>
+                  ) : null}
+                </div>
+
+                {/*
+                  R1 — with JavaScript off the submit handler never runs and the
+                  form has no `action`, so pressing the button would silently
+                  reload the page. The notice is the fallback the reader gets.
+                */}
+                <noscript>
+                  <p className={styles.formNoscript}>
+                    This form needs JavaScript to send. Email{" "}
+                    <a href="mailto:careers@3cworldgroup.com">careers@3cworldgroup.com</a> with
+                    your name, phone and city and we will start your application for you.
+                  </p>
+                </noscript>
 
                 <p className={styles.formFine}>
                   By applying, you agree to be contacted about opportunities.

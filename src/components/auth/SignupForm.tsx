@@ -331,7 +331,7 @@ export function SignupForm() {
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 live /
                 <Image
-                  src="/logo.png"
+                  src="/logo.webp"
                   alt="3C World Group"
                   width={20}
                   height={20}

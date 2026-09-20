@@ -55,7 +55,7 @@ export default function Footer() {
           <div className="public-footer-intro">
             <Link href="/" className="public-footer-brand" aria-label="3C World Group home">
               <Image
-                src="/logo.png"
+                src="/logo.webp"
                 alt="3C World Group"
                 width={550}
                 height={516}

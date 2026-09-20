@@ -145,7 +145,7 @@ export default function ServicesPage() {
           cabinet, the television and the keypad under their own scrim.
         */}
         <div className={styles.filmstrip}>
-          {SERVICES.map((service) => (
+          {SERVICES.map((service, i) => (
             <article
               key={service.id}
               id={service.id}
@@ -153,10 +153,17 @@ export default function ServicesPage() {
               aria-labelledby={`${service.id}-title`}
             >
               <div className={styles.bandArt}>
+                {/*
+                  P4 — the first band is already in the viewport at 1440, so it
+                  is the route's LCP candidate and cannot be lazy. The two under
+                  it stay lazy; the page head above carries no image of its own,
+                  which is why the preload lands here rather than higher up.
+                */}
                 <Image
                   src={service.image}
                   alt={service.alt}
                   fill
+                  priority={i === 0}
                   sizes="100vw"
                   className={styles.bandImage}
                   style={{ objectPosition: service.position }}

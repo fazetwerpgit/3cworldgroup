@@ -62,7 +62,7 @@ export default function Navbar() {
             aria-label="3C World Group home"
           >
             <Image
-              src="/logo.png"
+              src="/logo.webp"
               alt="3C World Group"
               width={550}
               height={516}

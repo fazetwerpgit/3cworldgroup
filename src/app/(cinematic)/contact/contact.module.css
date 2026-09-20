@@ -9,7 +9,9 @@
 
    The mark and its line are the one element the owner named on the page this
    replaces, so the geometry is exact rather than eyeballed. Measured off
-   public/redesign/contact-three-c-hd-x4f.png (1860x1520): the lime diagonal
+   public/redesign/contact-three-c-hd-x4f.webp — measured on the 1860x1520
+   master it was encoded from and re-encoded at 1395x1140, exactly 3/4 of it,
+   so every fraction below still holds: the lime diagonal
    passes through (1860, 100) and (864, 1520), i.e. it runs down-left at
    dx/dy = 0.7018 (35.07 deg off vertical) and leaves the bottom edge at
    x = 863.6, which is 0.4643 of the image width from its left edge and so
@@ -266,7 +268,27 @@
 .input:focus {
   background: #fff;
   border-color: var(--lime-ink);
-  outline: none;
+}
+
+/*
+  A1 — the form controls take the site-wide ring instead of suppressing it.
+  `outline: none` used to live on `.input:focus`, which beat the kit's
+  `.page :focus-visible` rule and left the 1px border change as the only
+  indicator (2.82:1 against its own unfocused state — under the 3:1 a focus
+  indicator needs).
+
+  The ring is the kit's, unchanged: 2px lime at a 3px offset. The box-shadow is
+  a 1px ink hairline on the field's own edge — lime alone is 1.8:1 against this
+  near-white plate, under the 3:1 a focus indicator needs, and the hairline is
+  what carries it (ink/paper 16:1, lime/ink 8.7:1). It sits inside the ring
+  rather than filling the offset so the lime still reads as the ring; on a navy
+  surface it disappears and what is left is exactly the documented ring.
+*/
+.input:focus-visible {
+  border-color: var(--lime-ink);
+  box-shadow: 0 0 0 1px var(--ink);
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
 }
 
 /* The native caret is replaced so the control reads as the rest of the set;
@@ -291,6 +313,26 @@
   font-size: 0.96rem;
   line-height: 1.6;
   padding: 0.75rem 0 0.75rem 1rem;
+}
+
+/* The live region is in the DOM from first paint so it is announced when it
+   fills; with nothing in it there is nothing to draw, and nothing to take a
+   row of the form's grid gap either. */
+.formError:empty {
+  display: none;
+}
+
+.formNoscript {
+  border-left: 3px solid var(--lime-ink);
+  color: var(--on-paper);
+  font-size: 0.96rem;
+  line-height: 1.6;
+  padding: 0.75rem 0 0.75rem 1rem;
+}
+
+.formNoscript a {
+  color: var(--lime-ink);
+  text-decoration: underline;
 }
 
 .formActions {

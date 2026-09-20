@@ -75,10 +75,10 @@ export default function ContactPage() {
         */}
         <div className={styles.headArt} aria-hidden="true">
           <Image
-            src="/redesign/contact-three-c-hd-x4f.png"
+            src="/redesign/contact-three-c-hd-x4f.webp"
             alt=""
-            width={1860}
-            height={1520}
+            width={1395}
+            height={1140}
             priority
             sizes="(max-width: 1023px) 34rem, 44vw"
             className={styles.headArtImage}

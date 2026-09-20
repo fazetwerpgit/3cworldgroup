@@ -164,7 +164,27 @@
 .input:focus {
   background: #ffffff;
   border-color: var(--lime-ink);
-  outline: none;
+}
+
+/*
+  A1 — the form controls take the site-wide ring instead of suppressing it.
+  `outline: none` used to live on `.input:focus`, which beat the kit's
+  `.page :focus-visible` rule and left the 1px border change as the only
+  indicator (2.82:1 against its own unfocused state — under the 3:1 a focus
+  indicator needs).
+
+  The ring is the kit's, unchanged: 2px lime at a 3px offset. The box-shadow is
+  a 1px ink hairline on the field's own edge — lime alone is 1.8:1 against this
+  near-white plate, under the 3:1 a focus indicator needs, and the hairline is
+  what carries it (ink/paper 16:1, lime/ink 8.7:1). It sits inside the ring
+  rather than filling the offset so the lime still reads as the ring; on a navy
+  surface it disappears and what is left is exactly the documented ring.
+*/
+.input:focus-visible {
+  border-color: var(--lime-ink);
+  box-shadow: 0 0 0 1px var(--ink);
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
 }
 
 /*
@@ -220,6 +240,29 @@
   font-size: 0.93rem;
   line-height: 1.55;
   padding: 0.85rem 1rem;
+}
+
+/* The live region is in the DOM from first paint so it is announced when it
+   fills; with nothing in it there is nothing to draw, and nothing to take a
+   row of the form's grid gap either. */
+.formError:empty {
+  display: none;
+}
+
+.formNoscript {
+  background: rgba(141, 198, 63, 0.1);
+  border-left: 3px solid var(--lime-ink);
+  color: var(--on-paper);
+  font-size: 0.93rem;
+  line-height: 1.55;
+  padding: 0.85rem 1rem;
+}
+
+.formNoscript a {
+  color: var(--lime-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
 }
 
 .formErrorLink {

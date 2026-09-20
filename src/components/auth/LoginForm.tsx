@@ -340,7 +340,7 @@ export function LoginForm() {
           <div className="flex items-center gap-3 animate-fade-in">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/15">
               <Image
-                src="/logo.png"
+                src="/logo.webp"
                 alt="3C World Group"
                 width={30}
                 height={30}

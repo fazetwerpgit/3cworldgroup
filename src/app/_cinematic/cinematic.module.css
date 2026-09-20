@@ -651,9 +651,18 @@
   gap: 0.35rem 1.4rem;
 }
 
+/*
+  A6 — the row is a set of 0.9rem links, which is a 22px box on a phone. The
+  minimum box a pointer target is allowed is 24px (WCAG 2.2 SC 2.5.8), so the
+  link is given one rather than left to its line box. Nothing moves: the row
+  gap already exceeds the 2px the extra height adds either side.
+*/
 .footerNav a {
+  align-items: center;
   color: var(--on-ink-dim);
+  display: inline-flex;
   font-size: 0.9rem;
+  min-height: 24px;
   text-decoration: none;
   transition: color 0.2s ease;
 }
@@ -805,8 +814,21 @@
     display: none;
   }
 
+  /*
+    A6 — from here down the header is a phone header, and every rep opening it
+    is on an iPhone: the two controls left in the row go to Apple's 44px
+    minimum rather than the 36px and 40px the desktop row uses.
+  */
   .menuToggle {
     display: inline-flex;
+    height: 44px;
+    width: 44px;
+  }
+
+  .headerActions .btnSm {
+    min-height: 44px;
+    padding-bottom: 0.7rem;
+    padding-top: 0.78rem;
   }
 
   .footerRow {

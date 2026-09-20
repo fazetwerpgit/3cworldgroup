@@ -57,9 +57,19 @@ export default function SiteHeader() {
   return (
     <header className={styles.header} data-condensed={condensed || undefined} data-open={menuOpen || undefined}>
       <div className={styles.headerRow}>
-        <Link href="/" className={styles.brand} aria-label="3C World Group home">
+        {/*
+          A2 — the homepage has no "Home" text link, so without this the one
+          route on the site with no current-page cue at all was `/`. The logo
+          is the link that goes there, so it is the link that carries it.
+        */}
+        <Link
+          href="/"
+          className={styles.brand}
+          aria-label="3C World Group home"
+          aria-current={pathname === "/" ? "page" : undefined}
+        >
           <Image
-            src="/logo.png"
+            src="/logo.webp"
             alt=""
             width={550}
             height={516}

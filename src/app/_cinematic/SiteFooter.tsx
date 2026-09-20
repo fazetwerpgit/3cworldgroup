@@ -19,7 +19,7 @@ export default function SiteFooter() {
     <footer className={styles.footer}>
       <div className={styles.footerRow}>
         <Link href="/" className={styles.footerBrand} aria-label="3C World Group home">
-          <Image src="/logo.png" alt="" width={550} height={516} className={styles.footerMark} sizes="34px" />
+          <Image src="/logo.webp" alt="" width={550} height={516} className={styles.footerMark} sizes="34px" />
           <span>3C World Group</span>
         </Link>
 
