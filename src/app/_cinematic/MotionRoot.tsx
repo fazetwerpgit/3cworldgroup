@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 /**
  * Every piece of authored motion on this page, in one bounded client file.
@@ -13,6 +14,12 @@ import { useEffect, useRef } from "react";
  */
 export default function MotionRoot({ children }: { children: React.ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  // This component lives in the shared layout, so it mounts once per visit.
+  // Every client-side navigation swaps the page underneath it, bringing new
+  // [data-reveal] elements that the first run never observed. Re-running on
+  // the pathname tears the old observers down and wires the new page up;
+  // without it, every page reached from the nav stays hidden behind the gate.
+  const pathname = usePathname();
 
   useEffect(() => {
     const root = rootRef.current;
@@ -93,6 +100,18 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       );
       reveals.forEach((el) => io.observe(el));
       cleanups.push(() => io.disconnect());
+      // Belt and braces: if the observer has not reported on something that is
+      // already inside the viewport, show it anyway. Hidden copy is a worse
+      // failure than a missed entrance.
+      const fallback = window.setTimeout(() => {
+        const vh = window.innerHeight;
+        for (const el of reveals) {
+          if (el.dataset.shown) continue;
+          const r = el.getBoundingClientRect();
+          if (r.top < vh && r.bottom > 0) el.dataset.shown = "true";
+        }
+      }, 1200);
+      cleanups.push(() => window.clearTimeout(fallback));
     }
 
     // --- The route line: the page's second authored moment -------------------
@@ -147,7 +166,7 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       delete root.dataset.motion;
       delete root.dataset.entered;
     };
-  }, []);
+  }, [pathname]);
 
   return <div ref={rootRef}>{children}</div>;
 }
