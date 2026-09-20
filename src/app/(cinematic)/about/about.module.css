@@ -1,0 +1,567 @@
+/* ==========================================================================
+   About — composition that belongs to this route only
+   --------------------------------------------------------------------------
+   Tokens, shell, grounds, the seam, section heads, buttons and the reveal
+   classes all come from src/app/_cinematic/cinematic.module.css and are used
+   from the page as `kit.*`. What is here is the five things only this page
+   does: the photographic opening band, the figures rail under it, the mission
+   spread, the three value chapters, the two-audience grid, the leadership row
+   and the closing plate.
+   ========================================================================== */
+
+.lime {
+  color: var(--lime);
+}
+
+/*
+  The page title is two nineteen-character lines and it is authored that way.
+  At the kit's own cap they overrun the head's left column and rewrap into four
+  ragged lines above 1400px, so this page asks for a slightly smaller display
+  size — enough that both lines sit inside the column at every width where the
+  head is still two columns. Scoped to the column element so it outranks
+  `kit.pageHeadTitle` whatever order the sheets load in.
+*/
+.pageHeadCol h1 {
+  font-size: clamp(2.6rem, 5.2vw, 4.8rem);
+}
+
+/* --------------------------------------------------------------------------
+   1 — The opening band and the four figures
+   --------------------------------------------------------------------------
+   Full bleed: the band is the page's photographic opening and it sits inside a
+   navy section, so instead of a border it gets a scrim that dissolves its top
+   edge into the page head above and its bottom edge into the figures below.
+   Nothing is framed; the photograph simply surfaces out of the navy.
+   -------------------------------------------------------------------------- */
+
+.band {
+  height: clamp(16rem, 40vw, 32rem);
+  position: relative;
+  width: 100%;
+}
+
+.bandImage {
+  object-fit: cover;
+  /* The lit door and the keypad sit right of centre in the source, so the crop
+     is weighted that way and survives the narrow viewports. */
+  object-position: 64% 52%;
+}
+
+.bandScrim {
+  background:
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(6, 23, 53, 0.55) 16%,
+      rgba(6, 23, 53, 0.08) 42%,
+      rgba(6, 23, 53, 0.5) 82%,
+      var(--ink) 100%
+    ),
+    linear-gradient(90deg, rgba(3, 13, 31, 0.5) 0%, rgba(3, 13, 31, 0) 46%);
+  inset: 0;
+  position: absolute;
+}
+
+.figures {
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: clamp(2.25rem, 4vw, 3.5rem);
+  padding-bottom: clamp(4rem, 8vw, 7rem);
+}
+
+.figure {
+  border-left: 1px solid var(--rule);
+  padding: clamp(1.4rem, 2.4vw, 2rem) clamp(0.9rem, 1.6vw, 1.6rem);
+}
+
+.figure:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.figure dt {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 4.4vw, 3.9rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.008em;
+  line-height: 0.9;
+}
+
+.figure dd {
+  color: var(--on-ink-dim);
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  margin-top: 0.7rem;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   2 — The mission
+   -------------------------------------------------------------------------- */
+
+.mission {
+  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+}
+
+.missionBody {
+  align-items: center;
+  display: grid;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr);
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.missionLead {
+  font-size: clamp(1.18rem, 1.7vw, 1.5rem);
+  line-height: 1.5;
+  max-width: 34ch;
+}
+
+/*
+  The second half of the old page's mission heading, kept as the line the
+  section closes on rather than folded into the display type above.
+*/
+.missionNote {
+  border-top: 1px solid var(--rule-ink);
+  color: var(--lime-ink);
+  font-family: var(--display);
+  font-size: clamp(1.7rem, 2.6vw, 2.5rem);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  margin-top: clamp(1.8rem, 3vw, 2.6rem);
+  padding-top: clamp(1.4rem, 2.4vw, 2rem);
+  text-transform: uppercase;
+}
+
+.missionFigure {
+  aspect-ratio: 4 / 3;
+  background: var(--ink-deep);
+  overflow: hidden;
+  position: relative;
+}
+
+.missionImage {
+  object-fit: cover;
+  object-position: 38% 50%;
+}
+
+/* --------------------------------------------------------------------------
+   3 — The three C's
+   -------------------------------------------------------------------------- */
+
+.values {
+  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+}
+
+.valueList {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+/*
+  Three short chapters would otherwise float in the middle of a large navy
+  field. Giving each cell a floor and pushing its body to the bottom of it turns
+  them into three tall columns with the words settling at the base — the hairline
+  between them then has something to divide.
+*/
+.value {
+  border-left: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(10rem, 15vw, 13rem);
+  padding: 0 clamp(1.1rem, 2.2vw, 2.1rem);
+}
+
+.value .valueBody {
+  margin-top: auto;
+  padding-top: 1.1rem;
+}
+
+.value:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.valueOrdinal {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2em;
+}
+
+.valueName {
+  font-family: var(--display);
+  font-size: clamp(1.9rem, 3vw, 2.9rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1;
+  margin-top: 0.9rem;
+  text-transform: uppercase;
+}
+
+.valueBody {
+  color: var(--on-ink-dim);
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-top: 1rem;
+  max-width: 38ch;
+}
+
+/* --------------------------------------------------------------------------
+   4 — Who we serve
+   -------------------------------------------------------------------------- */
+
+.serve {
+  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+}
+
+.serveGrid {
+  display: grid;
+  gap: clamp(2.2rem, 4vw, 4rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.serveItem {
+  border-top: 1px solid var(--rule-ink);
+  display: flex;
+  flex-direction: column;
+  padding-top: clamp(1.4rem, 2.4vw, 2rem);
+}
+
+.serveKind {
+  color: var(--lime-ink);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.serveTitle {
+  font-family: var(--display);
+  font-size: clamp(1.9rem, 3vw, 2.9rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1;
+  margin-top: 0.85rem;
+  text-transform: uppercase;
+}
+
+.serveBody {
+  color: var(--on-paper-dim);
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-top: 1.1rem;
+  max-width: 46ch;
+}
+
+/* The three products, as the photographs that already exist for them. */
+.productStrip {
+  display: grid;
+  gap: clamp(0.7rem, 1.4vw, 1.1rem);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: auto;
+  padding-top: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.product {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.productArt {
+  aspect-ratio: 1 / 1;
+  background: var(--ink-deep);
+  display: block;
+  overflow: hidden;
+  position: relative;
+}
+
+.productArt img {
+  object-fit: cover;
+}
+
+.productLabel {
+  color: var(--on-paper);
+  font-family: var(--display);
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.supportList {
+  margin-top: auto;
+  padding-top: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.supportList li {
+  align-items: center;
+  border-top: 1px solid var(--rule-ink);
+  color: var(--on-paper);
+  display: flex;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  padding: 0.85rem 0;
+  text-transform: uppercase;
+}
+
+.supportList li::before {
+  background: var(--lime-ink);
+  content: "";
+  display: block;
+  height: 7px;
+  margin-right: 0.85rem;
+  width: 7px;
+}
+
+/*
+  `kit.quietLink` is authored for navy — white text on a white hairline — so on
+  a paper ground it is invisible. The kit carries no `Ink` variant of it (noted
+  in the report), so this page repaints it locally. Two classes deep so it
+  outranks the kit's single-class rule whatever order the sheets load in.
+*/
+.serveItem .applyLink {
+  border-bottom-color: var(--rule-ink);
+  color: var(--on-paper);
+  margin-top: 1.4rem;
+}
+
+.serveItem .applyLink:hover {
+  border-bottom-color: var(--lime-ink);
+  color: var(--lime-ink);
+}
+
+/* --------------------------------------------------------------------------
+   5 — Leadership
+   -------------------------------------------------------------------------- */
+
+.leadership {
+  padding: clamp(4rem, 8vw, 7rem) 0;
+}
+
+.leaderList {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.leader {
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.3rem, 2.2vw, 1.9rem) clamp(0.9rem, 1.6vw, 1.5rem)
+    clamp(1.3rem, 2.2vw, 1.9rem) 0;
+}
+
+.leader + .leader {
+  border-left: 1px solid var(--rule);
+  padding-left: clamp(0.9rem, 1.6vw, 1.5rem);
+}
+
+.leaderInitials {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: clamp(2rem, 3.2vw, 2.9rem);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.leaderName {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.1rem;
+}
+
+.leaderRole {
+  color: var(--on-ink-dim);
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  margin-top: 0.4rem;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   6 — Closing
+   --------------------------------------------------------------------------
+   Same construction the homepage closes on: the photograph runs at full
+   strength and the darkening is authored where the display type sits, so the
+   lit street still reads at the edges. The vertical fall opens on `--ink` so
+   the navy/ink-deep joint above it is a hue step rather than a hard line.
+   -------------------------------------------------------------------------- */
+
+.closing {
+  composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(5rem, 11vw, 9rem) 0;
+  position: relative;
+}
+
+.closingArt {
+  object-fit: cover;
+  object-position: 50% 55%;
+  z-index: -2;
+}
+
+.closing::after {
+  background:
+    radial-gradient(
+      60% 56% at 50% 46%,
+      rgba(3, 13, 31, 0.9) 0%,
+      rgba(3, 13, 31, 0.82) 52%,
+      rgba(3, 13, 31, 0.26) 86%,
+      rgba(3, 13, 31, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.24) 20%,
+      rgba(3, 13, 31, 0.1) 54%,
+      rgba(3, 13, 31, 0.38) 88%,
+      var(--ink-deep) 100%
+    );
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.closingInner {
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding-inline: var(--gutter);
+  position: relative;
+  text-align: center;
+}
+
+.closingEyebrow {
+  color: var(--on-ink-dim);
+  font-size: clamp(1.02rem, 1.2vw, 1.16rem);
+  line-height: 1.5;
+  margin-bottom: 1.2rem;
+}
+
+.closingTitle {
+  font-family: var(--display);
+  font-size: clamp(2.8rem, 7vw, 6.4rem);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.88;
+  margin-bottom: 2.3rem;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .missionBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .missionFigure {
+    aspect-ratio: 16 / 9;
+    order: -1;
+  }
+
+  .missionLead {
+    max-width: 52ch;
+  }
+}
+
+@media (max-width: 900px) {
+  /*
+    Three into two leaves the third value alone in its row, which reads as a
+    layout accident rather than as a third chapter. Below 900 they stack and the
+    divider moves from the left edge to the top, so they read as three beats
+    down the page instead of a broken grid. Four leaders into two is even, so
+    that one only halves.
+  */
+  .valueList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .leaderList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .value {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    min-height: 0;
+    padding: clamp(1.3rem, 3vw, 1.8rem) 0;
+  }
+
+  .value .valueBody {
+    margin-top: 1rem;
+    padding-top: 0;
+  }
+
+  .value:first-child {
+    padding-left: 0;
+  }
+
+  .leader:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .serveGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .productStrip,
+  .supportList {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .figure {
+    padding: clamp(1.2rem, 4vw, 1.6rem) 0.9rem;
+  }
+
+  .figure:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .figure:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+
+  .valueList,
+  .leaderList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .value,
+  .leader {
+    border-left: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .value {
+    padding-top: clamp(1.3rem, 4vw, 1.7rem);
+  }
+
+  .bandImage {
+    object-position: 70% 52%;
+  }
+}

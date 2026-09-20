@@ -1,0 +1,190 @@
+"use client";
+
+import { useState } from "react";
+import { ArrowRight, Check } from "lucide-react";
+import kit from "../../_cinematic/cinematic.module.css";
+import styles from "./contact.module.css";
+
+/**
+ * The message form, carried over from src/app/contact/page.tsx unchanged in
+ * everything that is not paint: the same five fields, the same five subjects,
+ * the same `required` attributes, the same state shape, the same change
+ * handler, and the same submit handler — including the deliberate simulated
+ * submit, which is what the page this replaces does because no backend has been
+ * connected to it yet. Restyling a form is not the moment to invent an
+ * endpoint, so the comment that says so travels with the code.
+ *
+ * It is a client component only so `page.tsx` can stay a server component and
+ * keep its `metadata` export.
+ */
+
+const SUBJECTS = [
+  { value: "services", label: "Service Inquiry" },
+  { value: "careers", label: "Career Opportunity" },
+  { value: "support", label: "Customer Support" },
+  { value: "partnership", label: "Partnership Inquiry" },
+  { value: "other", label: "Other" },
+];
+
+export default function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+
+    try {
+      // Simulated submit behavior is intentionally preserved until a backend is connected.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("Form submitted:", formData);
+      setSubmitted(true);
+    } catch {
+      setError("Failed to send message. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((current) => ({ ...current, [name]: value }));
+  };
+
+  if (submitted) {
+    return (
+      <div className={styles.sent} aria-live="polite">
+        <span className={styles.sentMark} aria-hidden="true">
+          <Check size={22} strokeWidth={3} />
+        </span>
+        <h3 className={styles.sentTitle}>Message sent.</h3>
+        <p className={styles.sentBody}>
+          Thank you for reaching out. Your message is with the 3C team.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={styles.form} noValidate={false}>
+      <div className={styles.formPair}>
+        <label className={styles.field} htmlFor="contact-name">
+          <span className={styles.fieldLabel}>
+            Full name <span className={styles.req}>*</span>
+          </span>
+          <input
+            className={styles.input}
+            type="text"
+            id="contact-name"
+            name="name"
+            required
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="John Doe"
+          />
+        </label>
+
+        <label className={styles.field} htmlFor="contact-email">
+          <span className={styles.fieldLabel}>
+            Email address <span className={styles.req}>*</span>
+          </span>
+          <input
+            className={styles.input}
+            type="email"
+            id="contact-email"
+            name="email"
+            required
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="john@example.com"
+          />
+        </label>
+      </div>
+
+      <div className={styles.formPair}>
+        <label className={styles.field} htmlFor="contact-phone">
+          <span className={styles.fieldLabel}>Phone number</span>
+          <input
+            className={styles.input}
+            type="tel"
+            id="contact-phone"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            placeholder="(555) 123-4567"
+          />
+        </label>
+
+        <label className={styles.field} htmlFor="contact-subject">
+          <span className={styles.fieldLabel}>
+            Subject <span className={styles.req}>*</span>
+          </span>
+          <select
+            className={`${styles.input} ${styles.select}`}
+            id="contact-subject"
+            name="subject"
+            required
+            value={formData.subject}
+            onChange={handleChange}
+          >
+            <option value="">Select a subject</option>
+            {SUBJECTS.map((subject) => (
+              <option key={subject.value} value={subject.value}>
+                {subject.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className={styles.field} htmlFor="contact-message">
+        <span className={styles.fieldLabel}>
+          Message <span className={styles.req}>*</span>
+        </span>
+        <textarea
+          className={`${styles.input} ${styles.textarea}`}
+          id="contact-message"
+          name="message"
+          required
+          rows={5}
+          value={formData.message}
+          onChange={handleChange}
+          placeholder="How can we help you?"
+        />
+      </label>
+
+      {error ? (
+        <p className={styles.formError} role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div className={styles.formActions}>
+        <button
+          type="submit"
+          disabled={submitting}
+          className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}
+        >
+          {submitting ? "Sending…" : "Send message"}
+          {submitting ? null : (
+            <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+          )}
+        </button>
+        <p className={styles.formNote}>
+          Fields marked <span className={styles.req}>*</span> are required.
+        </p>
+      </div>
+    </form>
+  );
+}

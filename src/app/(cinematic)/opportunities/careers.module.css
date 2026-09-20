@@ -1,0 +1,505 @@
+/* --------------------------------------------------------------------------
+   Careers — composition only this page has.
+
+   Everything structural (the shell, the grounds, the seam, the section head,
+   the buttons, the two reveals) comes from the kit. What is here is the four
+   things this page composes that the kit does not know about: the glance
+   layout, the step rail, the earning bands and the closing frame.
+
+   No colour is restated as a hex value except inside the authored scrims,
+   where a gradient stop needs an alpha the tokens do not carry.
+   -------------------------------------------------------------------------- */
+
+.lime {
+  color: var(--lime);
+}
+
+/* --------------------------------------------------------------------------
+   1 — The opportunity at a glance
+   --------------------------------------------------------------------------
+   Photograph left, four numbered rows right. Deliberately not four equal
+   cards: the rows share one hairline stack, so the four read as one list of
+   terms rather than as four competing tiles.
+   -------------------------------------------------------------------------- */
+
+/*
+  The one section that follows `.pageHead` rather than another chapter. The
+  head already carries its own bottom padding, so the full chapter opening of
+  `clamp(4.5rem, 9vw, 8.5rem)` on top of it stacked into ~210px of empty navy
+  at 1440. This is the lighter opening; every chapter after it keeps the full
+  one, because each of those has a real edge above it.
+*/
+.glance {
+  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
+  padding: clamp(2.25rem, 4.5vw, 4rem) 0 clamp(4rem, 8vw, 7rem);
+}
+
+/*
+  Copy left, photograph right — the same asymmetry the homepage's two-doors
+  block uses, and for the same reason: the numbered terms read directly under
+  the display heading that introduces them, and the photograph's own scrim can
+  dissolve toward the copy instead of away from it.
+*/
+.glanceLayout {
+  align-items: stretch;
+  display: grid;
+  gap: clamp(1.75rem, 3.5vw, 3.25rem);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.glanceArt {
+  border: 1px solid var(--rule);
+  min-height: clamp(21rem, 33vw, 31rem);
+  overflow: hidden;
+  position: relative;
+}
+
+/*
+  The lit doorway, the keypad and the bag on the step are all in the right
+  third of the source. At 62% the crop sat on the brick pillar and the bushes
+  and the subject was outside the box; 76% holds the door in frame at every
+  width this page is answerable for.
+*/
+.glanceArtImage {
+  object-fit: cover;
+  object-position: 76% 54%;
+}
+
+/*
+  The homepage's two-layer scrim: the horizontal wash dissolves the frame's
+  left edge toward the copy column beside it, and the vertical fall sets it
+  down into the navy at top and bottom.
+*/
+.glanceArtScrim {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(6, 23, 53, 0.84) 0%,
+      rgba(6, 23, 53, 0.42) 24%,
+      rgba(6, 23, 53, 0.04) 58%,
+      rgba(6, 23, 53, 0.2) 100%
+    ),
+    linear-gradient(180deg, rgba(3, 13, 31, 0.4) 0%, rgba(3, 13, 31, 0) 34%, rgba(3, 13, 31, 0.5) 100%);
+  inset: 0;
+  position: absolute;
+}
+
+.glanceList {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.glanceItem {
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 0 clamp(0.9rem, 2vw, 1.6rem);
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: clamp(1.15rem, 2.2vw, 1.7rem) 0;
+}
+
+.glanceItem:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.glanceNum {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.16em;
+  padding-top: 0.42rem;
+}
+
+.glanceItemTitle {
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 2.4vw, 2.05rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.glanceItemBody {
+  color: var(--on-ink-dim);
+  font-size: 0.98rem;
+  line-height: 1.62;
+  margin-top: 0.55rem;
+  max-width: 46ch;
+}
+
+/* --------------------------------------------------------------------------
+   2 — The path: one rail, four stations
+   --------------------------------------------------------------------------
+   The one graphic gesture on the page, and it is furniture rather than
+   illustration: a single hairline with a lime node at each station, the last
+   one ringed so the sequence arrives instead of stopping. `--lime` is used for
+   the nodes for the reason DESIGN.md gives for the route dots — they are large
+   graphic marks, not small things carrying meaning, so the paper-weight
+   `--lime-ink` is not needed here.
+   -------------------------------------------------------------------------- */
+
+.path {
+  composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
+  padding: clamp(4.5rem, 9vw, 8.5rem) 0 clamp(4rem, 8vw, 7rem);
+}
+
+.rail {
+  --rail-gap: clamp(1.25rem, 2.5vw, 2.25rem);
+
+  display: grid;
+  gap: var(--rail-gap);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none;
+  margin: clamp(2.75rem, 5.5vw, 4.25rem) 0 0;
+  padding: 0;
+  position: relative;
+}
+
+/*
+  The line begins on station 01 and ends on station 04 — it does not run on
+  into empty paper, for the reason DESIGN.md gives for pulling the homepage's
+  route back onto its own first and last stop. Four equal columns with gap `g`
+  put column four's left edge at `0.75W + 0.75g`, and the node's centre 5px
+  further in, which is exactly what the inset below states.
+*/
+.rail::before {
+  background: var(--rule-ink);
+  content: "";
+  height: 1px;
+  left: 5px;
+  position: absolute;
+  right: calc(25% - 0.75 * var(--rail-gap) - 5px);
+  top: 0;
+}
+
+.railStep {
+  padding-top: clamp(1.9rem, 3vw, 2.5rem);
+  position: relative;
+}
+
+.railNode {
+  background: var(--lime);
+  border-radius: 50%;
+  height: 10px;
+  left: 0;
+  position: absolute;
+  top: -5px;
+  width: 10px;
+}
+
+/* The last station arrives: the node sits inside its own ring. */
+.railStep[data-last] .railNode {
+  box-shadow: 0 0 0 5px var(--paper), 0 0 0 6px var(--lime);
+}
+
+.railNum {
+  color: var(--lime-ink);
+  display: block;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.railTitle {
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 2.5vw, 2.15rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1;
+  margin-top: 0.7rem;
+  text-transform: uppercase;
+}
+
+.railBody {
+  color: var(--on-paper-dim);
+  font-size: 0.97rem;
+  line-height: 1.62;
+  margin-top: 0.65rem;
+  max-width: 34ch;
+}
+
+/* --------------------------------------------------------------------------
+   3 — Earning potential
+   --------------------------------------------------------------------------
+   The restrained chapter: no photograph, because the money is the image. Each
+   band is a hairline row with the range set at display scale on the right, so
+   the three ranges stack into a column you can read down in one pass.
+   -------------------------------------------------------------------------- */
+
+.earnings {
+  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
+  padding: clamp(4.5rem, 9vw, 8.5rem) 0 clamp(4rem, 8vw, 7rem);
+}
+
+.bands {
+  list-style: none;
+  margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  padding: 0;
+}
+
+.band {
+  align-items: baseline;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: clamp(0.9rem, 3vw, 3rem);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: clamp(1.5rem, 3vw, 2.4rem) 0;
+}
+
+.band:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.bandTitle {
+  font-family: var(--display);
+  font-size: clamp(1.7rem, 2.8vw, 2.5rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.bandBody {
+  color: var(--on-ink-dim);
+  font-size: 1rem;
+  line-height: 1.62;
+  margin-top: 0.6rem;
+  max-width: 48ch;
+}
+
+.bandRange {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: clamp(2.5rem, 5.2vw, 4.4rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.006em;
+  line-height: 0.9;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.bandRange span {
+  color: var(--on-ink-dim);
+  display: block;
+  font-size: 0.88rem;
+  letter-spacing: 0.2em;
+  margin-top: 0.6rem;
+  text-transform: uppercase;
+}
+
+.bandNote {
+  color: var(--on-ink-dim);
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  margin-top: 1.4rem;
+}
+
+/* --------------------------------------------------------------------------
+   4 — Closing
+   --------------------------------------------------------------------------
+   The aerial that the homepage opens on, returning here as the last frame.
+   The darkening is the homepage's measured one, unchanged: an ellipse heaviest
+   through the centre the display type occupies, falling to nothing at the left
+   and right edges where the lit street grid reads, over a vertical fall that
+   opens on `--ink` so the joint out of the earnings section is a hue step.
+   -------------------------------------------------------------------------- */
+
+.closing {
+  composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(5rem, 11vw, 10rem) 0;
+  position: relative;
+}
+
+.closingArt {
+  object-fit: cover;
+  object-position: 50% 58%;
+  z-index: -2;
+}
+
+.closing::after {
+  background:
+    radial-gradient(
+      58% 54% at 50% 45%,
+      rgba(3, 13, 31, 0.88) 0%,
+      rgba(3, 13, 31, 0.8) 54%,
+      rgba(3, 13, 31, 0.24) 86%,
+      rgba(3, 13, 31, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.22) 20%,
+      rgba(3, 13, 31, 0.08) 54%,
+      rgba(3, 13, 31, 0.36) 88%,
+      var(--ink-deep) 100%
+    );
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.closingInner {
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding-inline: var(--gutter);
+  position: relative;
+  text-align: center;
+}
+
+.closingEyebrow {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 1.1rem;
+  text-transform: uppercase;
+}
+
+.closingTitle {
+  font-family: var(--display);
+  font-size: clamp(2.8rem, 7vw, 6.4rem);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.88;
+  margin-bottom: 2.4rem;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   Reveal stagger
+   --------------------------------------------------------------------------
+   Each list item carries its own `data-reveal`, so the delay is what turns
+   four independent entrances into one cascade. Behind [data-motion="on"] like
+   every other pre-reveal style, and the last item's delay is small enough that
+   nothing is still arriving after a quarter of a second.
+   -------------------------------------------------------------------------- */
+
+[data-motion="on"] .glanceItem:nth-child(2),
+[data-motion="on"] .railStep:nth-child(2),
+[data-motion="on"] .band:nth-child(2) {
+  transition-delay: 60ms;
+}
+
+[data-motion="on"] .glanceItem:nth-child(3),
+[data-motion="on"] .railStep:nth-child(3),
+[data-motion="on"] .band:nth-child(3) {
+  transition-delay: 120ms;
+}
+
+[data-motion="on"] .glanceItem:nth-child(4),
+[data-motion="on"] .railStep:nth-child(4) {
+  transition-delay: 180ms;
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints
+   -------------------------------------------------------------------------- */
+
+/*
+  1080 and below: four columns of body copy stop being readable, so the rail
+  turns. Same hairline, same nodes, running down the left with the stations to
+  its right — the sequence is unchanged, only its axis is.
+*/
+@media (max-width: 1080px) {
+  .rail {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: clamp(1.6rem, 4vw, 2.3rem);
+  }
+
+  .rail::before {
+    bottom: 0;
+    height: auto;
+    left: 4.5px;
+    right: auto;
+    top: 0.55rem;
+    width: 1px;
+  }
+
+  .railStep {
+    padding: 0 0 0 clamp(1.75rem, 4vw, 2.5rem);
+  }
+
+  /*
+    Turned, the line cannot be given a computed end the way the horizontal one
+    can — the last node's offset depends on the wrapped height of every step
+    above it. So the last station paints the paper back over everything below
+    its own node, which lands the line on station 04 exactly.
+  */
+  .railStep[data-last]::after {
+    background: var(--paper);
+    bottom: -1px;
+    content: "";
+    left: 3px;
+    position: absolute;
+    /* Clear of the node and of the 6px lime ring drawn around it. */
+    top: calc(0.55rem + 12px);
+    width: 4px;
+  }
+
+  .railNode {
+    top: 0.55rem;
+    transform: translateY(-50%);
+  }
+
+  .railBody {
+    max-width: 58ch;
+  }
+}
+
+@media (max-width: 900px) {
+  .glanceLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .glanceArt {
+    min-height: clamp(15rem, 52vw, 22rem);
+  }
+
+  /*
+    Stacked, the photograph is above the list rather than beside it, so the
+    horizontal wash has nothing to dissolve into. Drop it and keep the vertical
+    fall, which is the layer that does the joining in this direction.
+  */
+  .glanceArtScrim {
+    background: linear-gradient(
+      180deg,
+      rgba(3, 13, 31, 0.5) 0%,
+      rgba(3, 13, 31, 0.05) 42%,
+      rgba(3, 13, 31, 0.55) 100%
+    );
+  }
+
+  .glanceArtImage {
+    object-position: 72% 58%;
+  }
+}
+
+/*
+  The range cannot share a row with the title much below this: at 640 the
+  display range and a 48ch body are fighting over the same 380px. It moves
+  under the copy and stops being right-aligned.
+*/
+@media (max-width: 640px) {
+  .band {
+    gap: 1.15rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bandRange {
+    text-align: left;
+  }
+
+  .bandRange span {
+    margin-top: 0.4rem;
+  }
+}

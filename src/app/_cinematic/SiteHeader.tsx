@@ -89,7 +89,11 @@ export default function SiteHeader() {
         </nav>
 
         <div className={styles.headerActions}>
-          <Link href={APPLY_HREF} className={`${styles.btn} ${styles.btnLime} ${styles.btnSm}`}>
+          <Link
+            href={APPLY_HREF}
+            aria-current={pathname === APPLY_HREF ? "page" : undefined}
+            className={`${styles.btn} ${styles.btnLime} ${styles.btnSm}`}
+          >
             Apply
           </Link>
           <button
@@ -118,7 +122,12 @@ export default function SiteHeader() {
             {link.label}
           </Link>
         ))}
-        <Link href={APPLY_HREF} className={styles.menuLinkApply} onClick={() => setMenuOpen(false)}>
+        <Link
+          href={APPLY_HREF}
+          aria-current={pathname === APPLY_HREF ? "page" : undefined}
+          className={styles.menuLinkApply}
+          onClick={() => setMenuOpen(false)}
+        >
           Apply to sell with 3C
         </Link>
       </div>

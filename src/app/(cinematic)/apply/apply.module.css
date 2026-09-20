@@ -1,0 +1,667 @@
+/* ==========================================================================
+   Apply — the composition that is only ever this page
+   --------------------------------------------------------------------------
+   The conversion target of the site, so the rule the whole file follows is
+   that the form outranks everything else on it: it is the widest column at
+   desktop, it is the first thing under the fold on a phone, and it is the one
+   element on the page that never waits on a reveal. Everything shared with the
+   rest of the (cinematic) group — tokens, shell, chrome, grounds, the seam,
+   buttons, section heads — is composed in from
+   src/app/_cinematic/cinematic.module.css.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1 — The form section
+   --------------------------------------------------------------------------
+   The page opens on kit.pageHead, flat navy, like every interior route. The
+   photograph arrives immediately under it as a band across the top of this
+   section — the street the homepage opened on, returning at the door it was
+   pointing at — and the form plate rises out of it. Two layers of scrim, not a
+   flat tint: a vertical fall that starts *on* the navy above so the band has no
+   hard upper edge, and a left-weighted wash so the copy column carries its own
+   darkness.
+   -------------------------------------------------------------------------- */
+
+.applySection {
+  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
+  isolation: isolate;
+  padding-bottom: clamp(3.5rem, 8vw, 7rem);
+  position: relative;
+}
+
+.applyArt {
+  height: 14rem;
+  inset: 0 0 auto 0;
+  overflow: hidden;
+  position: absolute;
+  z-index: -2;
+}
+
+.applyArtImage {
+  object-fit: cover;
+  object-position: 50% 48%;
+}
+
+.applyArtScrim {
+  background: linear-gradient(
+    180deg,
+    var(--ink) 0%,
+    rgba(6, 23, 53, 0.4) 26%,
+    rgba(3, 13, 31, 0.5) 66%,
+    var(--ink) 100%
+  );
+  inset: 0;
+  position: absolute;
+}
+
+.applyLayout {
+  display: grid;
+  gap: clamp(2.25rem, 5vw, 3.25rem);
+  padding-top: 6rem;
+  position: relative;
+}
+
+/* --------------------------------------------------------------------------
+   2 — The plate
+   -------------------------------------------------------------------------- */
+
+.formPanel {
+  background: var(--paper-raise);
+  border-top: 3px solid var(--lime-ink);
+  box-shadow: 0 26px 64px rgba(3, 13, 31, 0.45);
+  color: var(--on-paper);
+  padding: clamp(1.4rem, 5vw, 2.6rem);
+  position: relative;
+  /* The closing button and the header both land here; clear the fixed header. */
+  scroll-margin-top: 5.75rem;
+}
+
+.formTitle {
+  font-family: var(--display);
+  font-size: clamp(2.1rem, 5.2vw, 3.1rem);
+  font-weight: 400;
+  letter-spacing: 0.006em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.formLede {
+  color: var(--on-paper-dim);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-top: 0.7rem;
+  max-width: 44ch;
+}
+
+.form {
+  display: grid;
+  gap: 1.05rem;
+  margin-top: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+.honeypot {
+  height: 1px;
+  left: -10000px;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--on-paper);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+}
+
+.fieldOptional {
+  color: var(--on-paper-dim);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+/*
+  16px is the floor, not a preference: any smaller and iOS zooms the viewport
+  the moment the field takes focus, and the rest of the layout is thrown for
+  the remainder of the session. `scroll-margin-top` is the other half of the
+  same problem — the header is fixed, so a field scrolled to the top of the
+  viewport by the keyboard would otherwise open underneath it.
+*/
+.input {
+  background: var(--paper);
+  border: 1px solid var(--rule-ink);
+  color: var(--on-paper);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.4;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem;
+  scroll-margin: 6.25rem 0 9rem;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+  width: 100%;
+}
+
+.input::placeholder {
+  color: #7b899d;
+}
+
+.input:hover {
+  border-color: rgba(16, 31, 56, 0.34);
+}
+
+.input:focus {
+  background: #ffffff;
+  border-color: var(--lime-ink);
+  outline: none;
+}
+
+/*
+  :user-invalid, not :invalid — a required field is invalid from the first
+  paint, and colouring five empty boxes red before anyone has typed is not a
+  validation state, it is an accusation.
+*/
+.input:user-invalid {
+  background: rgba(180, 35, 24, 0.05);
+  border-color: #b42318;
+}
+
+.input:user-invalid:focus {
+  border-color: #b42318;
+}
+
+.terms {
+  background: var(--paper);
+  border-left: 3px solid var(--lime-ink);
+  display: grid;
+  font-size: 0.95rem;
+  gap: 0.4rem;
+  line-height: 1.55;
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0.95rem 1.1rem;
+}
+
+.terms li {
+  color: var(--on-paper-dim);
+}
+
+.terms strong {
+  color: var(--on-paper);
+  font-weight: 600;
+}
+
+.submit {
+  justify-content: center;
+  min-height: 3.5rem;
+  width: 100%;
+}
+
+.submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.formError {
+  background: rgba(180, 35, 24, 0.08);
+  border-left: 3px solid #b42318;
+  color: #8a1c14;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  padding: 0.85rem 1rem;
+}
+
+.formErrorLink {
+  color: #8a1c14;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+}
+
+.formFine {
+  color: var(--on-paper-dim);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   3 — The copy column beside the plate
+   --------------------------------------------------------------------------
+   Below 901px it sits *under* the form, not above it: on a phone the form is
+   the reason the page exists and nothing gets to stand in front of it.
+   -------------------------------------------------------------------------- */
+
+.applyAside {
+  order: 2;
+  position: relative;
+}
+
+.asideEyebrow {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.asideTitle {
+  font-family: var(--display);
+  font-size: clamp(1.9rem, 3vw, 2.9rem);
+  font-weight: 400;
+  letter-spacing: 0.006em;
+  line-height: 0.92;
+  margin-top: 0.9rem;
+  text-transform: uppercase;
+}
+
+.asideBody {
+  color: var(--on-ink-dim);
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-top: 1.1rem;
+  max-width: 52ch;
+  text-shadow: 0 1px 12px rgba(3, 13, 31, 0.7);
+}
+
+.asideRule {
+  background: var(--rule);
+  border: 0;
+  height: 1px;
+  margin: 1.6rem 0 0;
+}
+
+/* --------------------------------------------------------------------------
+   4 — What happens next (paper, seamed)
+   -------------------------------------------------------------------------- */
+
+.next {
+  composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
+  padding: clamp(4rem, 8vw, 7rem) 0;
+}
+
+.steps {
+  display: grid;
+  gap: 2rem;
+  margin-top: clamp(2.25rem, 4vw, 3.25rem);
+}
+
+.step {
+  border-top: 1px solid var(--rule-ink);
+  padding-top: 1.3rem;
+}
+
+.stepNum {
+  color: var(--lime-ink);
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.stepTitle {
+  color: var(--on-paper);
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 2.1vw, 1.85rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1;
+  margin-top: 0.7rem;
+  text-transform: uppercase;
+}
+
+.stepBody {
+  color: var(--on-paper-dim);
+  font-size: 0.97rem;
+  line-height: 1.6;
+  margin-top: 0.6rem;
+  max-width: 44ch;
+}
+
+/* --------------------------------------------------------------------------
+   5 — Good to know (navy)
+   --------------------------------------------------------------------------
+   A definition list on hairlines rather than a fourth card grid: these are four
+   answers to four questions, and they are not the same shape as the numbered
+   steps above them.
+   -------------------------------------------------------------------------- */
+
+.know {
+  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
+  padding: clamp(4rem, 8vw, 7rem) 0;
+}
+
+.knowList {
+  display: grid;
+  margin: clamp(2.25rem, 4vw, 3.25rem) 0 0;
+}
+
+.knowRow {
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.35rem 0;
+}
+
+.knowTerm {
+  font-family: var(--display);
+  font-size: clamp(1.3rem, 2vw, 1.7rem);
+  font-weight: 400;
+  letter-spacing: 0.008em;
+  line-height: 1.02;
+  text-transform: uppercase;
+}
+
+.knowDef {
+  color: var(--on-ink-dim);
+  font-size: 0.97rem;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* --------------------------------------------------------------------------
+   6 — Closing
+   -------------------------------------------------------------------------- */
+
+.closing {
+  composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(4.5rem, 10vw, 8.5rem) 0;
+  position: relative;
+  text-align: center;
+}
+
+.closingArt {
+  object-fit: cover;
+  object-position: 50% 62%;
+  z-index: -2;
+}
+
+/*
+  The darkening is authored where the type is, the way the homepage closing
+  does it: an ellipse heaviest through the centre column the display line
+  occupies, falling away at the left and right edges so the lit street still
+  reads as a photograph rather than as navy.
+*/
+.closing::after {
+  background:
+    radial-gradient(
+      56% 58% at 50% 46%,
+      rgba(3, 13, 31, 0.9) 0%,
+      rgba(3, 13, 31, 0.82) 52%,
+      rgba(3, 13, 31, 0.28) 86%,
+      rgba(3, 13, 31, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.26) 22%,
+      rgba(3, 13, 31, 0.12) 56%,
+      rgba(3, 13, 31, 0.4) 88%,
+      var(--ink-deep) 100%
+    );
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.closingTitle {
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 6.4vw, 5.6rem);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.88;
+  text-transform: uppercase;
+}
+
+.closingLime {
+  color: var(--lime);
+}
+
+.closingLede {
+  color: #dbe4f0;
+  font-size: clamp(1.02rem, 1.2vw, 1.18rem);
+  line-height: 1.6;
+  margin: 1.2rem auto 2.2rem;
+  max-width: 46ch;
+  text-shadow: 0 1px 14px rgba(3, 13, 31, 0.65);
+}
+
+/* --------------------------------------------------------------------------
+   7 — The success state
+   --------------------------------------------------------------------------
+   It replaces the page rather than appending to it: once the application is in,
+   nothing below it — the steps, the terms, a second Apply — is still addressed
+   to the reader.
+   -------------------------------------------------------------------------- */
+
+.done {
+  align-items: center;
+  composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
+  display: flex;
+  isolation: isolate;
+  min-height: 78svh;
+  overflow: hidden;
+  padding: clamp(8rem, 15vw, 12rem) 0 clamp(4rem, 9vw, 7rem);
+  position: relative;
+}
+
+.doneArt {
+  object-fit: cover;
+  object-position: 50% 56%;
+  z-index: -2;
+}
+
+.done::after {
+  background:
+    radial-gradient(
+      58% 60% at 50% 46%,
+      rgba(3, 13, 31, 0.9) 0%,
+      rgba(3, 13, 31, 0.82) 52%,
+      rgba(3, 13, 31, 0.3) 88%,
+      rgba(3, 13, 31, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.3) 24%,
+      rgba(3, 13, 31, 0.14) 58%,
+      rgba(3, 13, 31, 0.44) 90%,
+      var(--ink-deep) 100%
+    );
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.doneInner {
+  margin-inline: auto;
+  max-width: 44rem;
+  position: relative;
+  text-align: center;
+  width: 100%;
+}
+
+.doneMark {
+  align-items: center;
+  background: var(--lime);
+  color: var(--ink);
+  display: inline-flex;
+  height: 3.5rem;
+  justify-content: center;
+  width: 3.5rem;
+}
+
+.doneEyebrow {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  margin-top: 1.6rem;
+  text-transform: uppercase;
+}
+
+.doneTitle {
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 6.4vw, 5.2rem);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.88;
+  margin-top: 0.8rem;
+  text-transform: uppercase;
+}
+
+.doneLede {
+  color: #dbe4f0;
+  font-size: clamp(1.02rem, 1.2vw, 1.18rem);
+  line-height: 1.6;
+  margin: 1.1rem auto 0;
+  max-width: 40ch;
+  text-shadow: 0 1px 14px rgba(3, 13, 31, 0.65);
+}
+
+.doneNote {
+  background: rgba(12, 32, 73, 0.72);
+  border-left: 3px solid var(--lime);
+  margin: 2.2rem auto 0;
+  max-width: 30rem;
+  padding: 1.1rem 1.2rem;
+  text-align: left;
+}
+
+.doneNoteTitle {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.doneNoteBody {
+  color: var(--on-ink-dim);
+  font-size: 0.93rem;
+  line-height: 1.6;
+  margin-top: 0.4rem;
+}
+
+.doneActions {
+  display: flex;
+  justify-content: center;
+  margin-top: 2.2rem;
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 760px) {
+  .steps {
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .knowRow {
+    gap: clamp(1.25rem, 3vw, 3rem);
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    padding: 1.6rem 0;
+  }
+}
+
+@media (min-width: 901px) {
+  /*
+    On a phone the photograph is a band the form rises out of. With two columns
+    it has to be the whole section instead: the form plate is opaque and covers
+    the left half, so a band would leave the bottom right corner as several
+    hundred pixels of empty navy beside a plate that is taller than it.
+  */
+  .applyArt {
+    height: auto;
+    inset: 0;
+  }
+
+  /*
+    And the horizontal wash flips with the layout. It is weighted to the right
+    here, where the copy column reads over the photograph — the left is already
+    covered by the plate and needs nothing.
+  */
+  .applyArtScrim {
+    background:
+      linear-gradient(
+        266deg,
+        rgba(3, 13, 31, 0.84) 0%,
+        rgba(3, 13, 31, 0.6) 34%,
+        rgba(3, 13, 31, 0.24) 74%,
+        rgba(3, 13, 31, 0.46) 100%
+      ),
+      linear-gradient(
+        180deg,
+        var(--ink) 0%,
+        rgba(6, 23, 53, 0.3) 20%,
+        rgba(3, 13, 31, 0.36) 58%,
+        rgba(3, 13, 31, 0.84) 90%,
+        var(--ink) 100%
+      );
+  }
+
+  .applyLayout {
+    /* The form takes the larger half. It is the page. */
+    align-items: start;
+    grid-template-columns: minmax(27rem, 1.15fr) minmax(0, 0.85fr);
+    padding-top: clamp(4.25rem, 7vw, 6.5rem);
+  }
+
+  .applyAside {
+    order: 0;
+    padding-top: 0.5rem;
+  }
+
+  .formPanel {
+    padding: clamp(2rem, 2.6vw, 2.9rem);
+  }
+
+  .form {
+    gap: 1.15rem;
+  }
+
+  /* Name and phone pair up once there is room for two comfortable columns. */
+  .fieldPair {
+    display: grid;
+    gap: 1.15rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .applyLayout {
+    gap: 4rem;
+  }
+}
+
+/*
+  Reduced motion: every entrance on this page is a kit reveal, which MotionRoot
+  already leaves inert. The only local transitions are the field ones, and they
+  are feedback on a control rather than an entrance — but they are still motion,
+  so they stop too.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}
