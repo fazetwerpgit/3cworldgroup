@@ -26,7 +26,10 @@
   --body: var(--font-geist-sans), system-ui, sans-serif;
 
   --shell: 78rem;
-  --gutter: clamp(1.25rem, 4vw, 3.5rem);
+  /* 5vw, not 4vw: at 4vw the tablet range sat on a 30px gutter and every
+     section ran nearly edge to edge. 390 and 1440+ are unchanged — the floor
+     and the cap already own those. */
+  --gutter: clamp(1.25rem, 5vw, 3.5rem);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   background: var(--ink);
@@ -593,10 +596,19 @@
   position: relative;
 }
 
+/*
+  Round 3. The stage was `4 / 5`, which at 1440 made a 612px frame that started
+  352px into the section and so ran past the fold while the chapter beside it
+  ended around 620px — two columns that never shared a frame. It is now a
+  just-past-square portrait, capped against the viewport so the whole image is
+  inside the fold at every desktop width, and the chapter column opposite it
+  carries a matching beat (see `.chapter` under min-width: 901px).
+*/
 .stage {
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1.06;
   background: var(--ink-raise);
   border: 1px solid var(--rule);
+  max-height: clamp(24rem, calc(100svh - 22rem), 33rem);
   overflow: hidden;
   position: sticky;
   top: 6.5rem;
@@ -698,23 +710,42 @@
 
 .chapterLede {
   color: var(--on-ink);
-  font-size: clamp(1.08rem, 1.3vw, 1.26rem);
+  font-size: clamp(1.12rem, 1.45vw, 1.4rem);
   font-weight: 500;
-  line-height: 1.5;
-  margin-top: 0.85rem;
-  max-width: 34ch;
+  line-height: 1.45;
+  margin-top: 0.95rem;
+  max-width: 30ch;
 }
 
 .chapterBody {
   color: var(--on-ink-dim);
-  font-size: 1rem;
-  line-height: 1.68;
-  margin-top: 0.9rem;
-  max-width: 62ch;
+  font-size: clamp(1rem, 1.06vw, 1.04rem);
+  line-height: 1.72;
+  margin-top: 1rem;
+  max-width: 52ch;
 }
 
 .chapter:last-child {
   padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+/*
+  Desktop only, and the other half of the stage fix above: each chapter is one
+  beat of the same height, with its copy centred in it, so the sticky image on
+  the left and the chapter on the right start and finish together instead of
+  the chapter ending a third of the way down an empty column.
+*/
+@media (min-width: 901px) {
+  .chapter {
+    align-content: center;
+    display: grid;
+    min-height: clamp(21rem, 33vw, 31rem);
+    padding: clamp(1.75rem, 2.6vw, 2.4rem) 0;
+  }
+
+  .chapter:last-child {
+    padding-bottom: clamp(1.75rem, 2.6vw, 2.4rem);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -807,10 +838,16 @@
   position: absolute;
 }
 
+/*
+  The card is centred on its dot, except where centring would push it past the
+  shell: stop 01 sits only 9.8% into the canvas, so at narrower desktop widths
+  a centred card hung outside the page gutter. `max()` stops the pull at the
+  canvas edge and the dot simply sits off-centre in that one card.
+*/
 .routeStop {
   height: 0;
   left: var(--stop-x);
-  margin-left: -7rem;
+  margin-left: max(-7rem, calc(-1 * var(--stop-x)));
   position: absolute;
   top: var(--stop-y);
   width: 14rem;
@@ -860,13 +897,16 @@
 */
 .routeEnd {
   border-left: 2px solid var(--lime);
-  bottom: 0;
   display: grid;
   gap: 0.8rem;
   justify-items: start;
   padding-left: 1.3rem;
   position: absolute;
   right: 0;
+  /* Anchored under the line's own y, not to the bottom of the box: the box
+     shrinks faster than this panel does, and at 1024 a bottom-anchored panel
+     rose far enough to have the route drawn straight through it. */
+  top: calc(63.83% + 1.6rem);
   width: clamp(15rem, 27%, 20rem);
 }
 
@@ -926,12 +966,25 @@
   line-height: 1.55;
 }
 
+/*
+  Round 3. `.route` is exactly as tall as its SVG, but the stop cards and the
+  `Step one` panel are absolutely positioned and hang below the drawn line,
+  which sits at 63.83% of a box that shrinks with the viewport. Below about
+  1100px that overhang ran past the box and straight into this paragraph.
+
+  The clearance is stated here rather than as a margin on `.route`, because
+  adjacent margins collapse and this one is the larger of the two. The figure
+  is the overhang itself: the canvas is 470/1200 of its own width, the line is
+  63.83% down it, and the deepest thing below the line is ~167px — so the part
+  that escapes the box is `10.5rem - 14.2% of the canvas width`, and nothing at
+  all once the canvas is wide enough to contain it.
+*/
 .routeFoot {
   border-top: 1px solid var(--rule-ink);
   color: var(--on-paper-dim);
   font-size: 1rem;
   line-height: 1.66;
-  margin-top: clamp(2rem, 4vw, 3.5rem);
+  margin-top: calc(clamp(2rem, 4vw, 3.5rem) + max(0px, 10.5rem - 14.2%));
   max-width: 58ch;
   padding-top: 1.5rem;
 }
@@ -1128,9 +1181,22 @@
   color: var(--paper);
 }
 
+/*
+  The questions run on the same grid as the work, route and markets sections:
+  heading left, lede right, content across the full shell beneath. The hairline
+  is the ink one rather than the navy one because this chapter is paper.
+*/
+.faqHead {
+  border-top: 1px solid var(--rule-ink);
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-top: 1.9rem;
+}
+
 .faqList {
   border-top: 1px solid var(--rule-ink);
-  margin-top: clamp(1.75rem, 3vw, 2.5rem);
+  margin-top: clamp(2rem, 4vw, 3.25rem);
 }
 
 .faqItem {
@@ -1142,14 +1208,23 @@
   cursor: pointer;
   display: flex;
   font-family: var(--display);
-  font-size: clamp(1.22rem, 1.9vw, 1.55rem);
+  font-size: clamp(1.22rem, 2.1vw, 1.7rem);
   gap: 1.5rem;
   justify-content: space-between;
   letter-spacing: 0.015em;
   list-style: none;
-  padding: 1.15rem 0;
+  padding: 1.3rem 0;
   text-transform: uppercase;
   transition: color 0.2s ease;
+}
+
+/*
+  The row spans the whole shell now, so the question keeps its own measure and
+  the marker keeps the right edge: the hairline carries the width, not the
+  words.
+*/
+.faqSummary > span {
+  max-width: 44ch;
 }
 
 .faqSummary::-webkit-details-marker {
@@ -1312,21 +1387,43 @@
   position: relative;
 }
 
+/*
+  Round 3. The closing is the aerial that opened the page, returning — and at
+  `opacity: .3` under a flat 0.88/0.6 fall it rendered as plain navy, so the
+  return never happened. The photograph now runs at full strength and the
+  darkening is authored where the type is instead: an ellipse heaviest through
+  the centre the display type occupies, falling to nothing at the left and
+  right edges where the lit street grid reads.
+
+  Measured, not eyeballed, at 1440 against the brightest backdrop pixel each
+  line actually covers: lime 6.51:1, white 12.81:1, lede 7.34:1, against a 4.5
+  floor. The outer eighths of the section sit at ~0.17 relative luminance where
+  round 2 left them at 0.016. docs/cinematic/r3-shots.mjs re-measures all of it
+  on every run and fails the run if any of it slips.
+*/
 .closingArt {
   object-fit: cover;
   object-position: 50% 58%;
-  opacity: 0.3;
   z-index: -2;
 }
 
 .closing::after {
-  background: linear-gradient(
-    180deg,
-    var(--ink) 0%,
-    rgba(3, 13, 31, 0.88) 15%,
-    rgba(3, 13, 31, 0.6) 46%,
-    var(--ink-deep) 100%
-  );
+  background:
+    radial-gradient(
+      58% 54% at 50% 45%,
+      rgba(3, 13, 31, 0.88) 0%,
+      rgba(3, 13, 31, 0.8) 54%,
+      rgba(3, 13, 31, 0.24) 86%,
+      rgba(3, 13, 31, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.22) 20%,
+      rgba(3, 13, 31, 0.08) 54%,
+      rgba(3, 13, 31, 0.36) 88%,
+      var(--ink-deep) 100%
+    );
   content: "";
   inset: 0;
   position: absolute;
@@ -1579,7 +1676,7 @@
   watching for the reveal would wait on a condition its own pre-state made
   impossible. A mask is paint-only and leaves the geometry alone.
 */
-[data-motion="on"] :is(.workHead, .routeHead, .marketsHead, .doorPrimary) {
+[data-motion="on"] :is(.workHead, .routeHead, .marketsHead, .faqHead, .doorPrimary) {
   mask-image: linear-gradient(to bottom, #000 0, #000 100%);
   mask-repeat: no-repeat;
   mask-size: 100% 0%;
@@ -1589,22 +1686,9 @@
     opacity 0.45s ease;
 }
 
-[data-motion="on"] :is(.workHead, .routeHead, .marketsHead, .doorPrimary)[data-shown] {
+[data-motion="on"] :is(.workHead, .routeHead, .marketsHead, .faqHead, .doorPrimary)[data-shown] {
   mask-size: 100% 100%;
   opacity: 1;
-}
-
-[data-motion="on"] .sectionTitleInk[data-reveal] {
-  opacity: 0;
-  transform: translateY(12px);
-  transition:
-    opacity 0.5s ease,
-    transform 0.6s var(--ease-out-expo);
-}
-
-[data-motion="on"] .sectionTitleInk[data-shown] {
-  opacity: 1;
-  transform: none;
 }
 
 /* The route line. Default state is fully drawn, so no JS means no blank line. */
@@ -1647,13 +1731,14 @@
 
   .workHead,
   .routeHead,
-  .marketsHead {
+  .marketsHead,
+  .faqHead {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.1rem;
   }
 
   .routeStop {
-    margin-left: -6.25rem;
+    margin-left: max(-6.25rem, calc(-1 * var(--stop-x)));
     width: 12.5rem;
   }
 
@@ -1810,12 +1895,20 @@
     top: auto;
   }
 
+  /* Stacked, everything is in flow and nothing overhangs the canvas. */
+  .routeFoot {
+    margin-top: clamp(2rem, 4vw, 3.5rem);
+  }
+
   .routeEnd {
     bottom: auto;
     grid-column: 1 / -1;
     margin-top: 1.75rem;
     position: relative;
     right: auto;
+    /* It is in normal flow here, so the wide layout's line anchor has to go or
+       it would offset the panel down by 63.83% of its own height. */
+    top: auto;
     width: auto;
   }
 

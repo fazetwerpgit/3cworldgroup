@@ -117,9 +117,8 @@ export default function Home() {
               </h1>
 
               <p className={styles.heroLede}>
-                3C World Group is looking for door-to-door sales reps to sell fiber internet,
-                TV and home security in their own neighborhoods. You knock, you listen, you
-                close — and you get trained to do all three. 1099 independent contractor,
+                Door-to-door sales in your own neighborhood — fiber internet, TV and home
+                security, with the training to sell all three. 1099 independent contractor,
                 commission-only, uncapped.
               </p>
 
@@ -222,10 +221,26 @@ export default function Home() {
           {/* 5 — questions                                                    */}
           {/* ---------------------------------------------------------------- */}
           <section id="questions" className={styles.faq} aria-labelledby="faq-title">
-            <div className={styles.shellNarrow}>
-              <h2 id="faq-title" className={styles.sectionTitleInk} data-reveal>
-                Straight answers.
-              </h2>
+            <div className={styles.shell}>
+              {/*
+                Same grid as every other section on the page: display heading in
+                the left column, supporting lede in the right, content beneath
+                across the full width. Round 2 put this block in a narrow shell
+                of its own, which left the right quarter of the section empty at
+                1440 and broke the page's own rhythm.
+              */}
+              <header className={styles.faqHead} data-reveal>
+                <h2 id="faq-title" className={styles.sectionTitleInk}>
+                  Straight
+                  <br />
+                  answers.
+                </h2>
+                <p className={styles.sectionLedeInk}>
+                  Six questions this role raises before anyone applies — the work itself, the
+                  products, how the pay works, contractor status, the training, and where 3C
+                  operates.
+                </p>
+              </header>
 
               <div className={styles.faqList}>
                 {FAQS.map((item) => (
