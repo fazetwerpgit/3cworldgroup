@@ -5564,30 +5564,30 @@
 
 /* Opportunities/Apply route modules previously declared their own footer
  * heights. These higher-specificity guards keep the footer a shared shell
- * while leaving their route-owned main compositions untouched. */
+ * while leaving their route-owned main compositions untouched.
+ *
+ * The `#apply-route-root` half of each selector list is gone: /apply is served
+ * from the (cinematic) group now, which bypasses PageWrapper entirely, so no
+ * document on this branch carries that id. */
 @media (min-width: 1000px) {
-  body:has(#opportunities-route#opportunities-route) .public-site .public-footer,
-  body:has(#apply-route-root#apply-route-root) .public-site .public-footer {
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer {
     height: 320px !important;
     max-height: 320px !important;
     min-height: 320px !important;
   }
 
-  body:has(#opportunities-route#opportunities-route) .public-site .public-footer > .public-container,
-  body:has(#apply-route-root#apply-route-root) .public-site .public-footer > .public-container {
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer > .public-container {
     height: 320px !important;
   }
 
-  body:has(#opportunities-route#opportunities-route) .public-site .public-footer-grid,
-  body:has(#apply-route-root#apply-route-root) .public-site .public-footer-grid {
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer-grid {
     height: 260px !important;
     max-height: 260px !important;
     min-height: 260px !important;
     padding-block: 6px 0 !important;
   }
 
-body:has(#opportunities-route#opportunities-route) .public-site .public-footer-bottom,
-body:has(#apply-route-root#apply-route-root) .public-site .public-footer-bottom {
+  body:has(#opportunities-route#opportunities-route) .public-site .public-footer-bottom {
     height: 60px !important;
     max-height: 60px !important;
     min-height: 60px !important;

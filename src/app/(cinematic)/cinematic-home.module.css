@@ -1060,6 +1060,22 @@
    Breakpoints
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   Compact apply bar — this page only
+   --------------------------------------------------------------------------
+   It lives here rather than in the kit because it can only ever work here:
+   MotionRoot reveals it once `[data-hero]` has left the viewport, and the
+   photographic hero is the homepage's alone. Every interior page opens on the
+   kit's flat `.pageHead` and closes on its own apply CTA, so there is nothing
+   for a persistent bar to add there and 4.5rem of a 390 viewport for it to
+   cost. The kit keeps only the footer's space reservation, which is keyed to
+   `[data-apply-bar]` and so stays correct whoever renders the bar.
+   -------------------------------------------------------------------------- */
+
+.applyBar {
+  display: none;
+}
+
 @media (max-width: 1080px) {
   .routeStop {
     margin-left: max(-6.25rem, calc(-1 * var(--stop-x)));
@@ -1266,6 +1282,44 @@
     margin-top: 0;
   }
 
+  .applyBar {
+    align-items: center;
+    background: rgba(3, 13, 31, 0.93);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--rule);
+    bottom: 0;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    left: 0;
+    padding: 0.7rem var(--gutter) calc(0.7rem + env(safe-area-inset-bottom, 0px));
+    position: fixed;
+    right: 0;
+    transform: translateY(100%);
+    /* Hidden means hidden from the tab order too, or a keyboard user can land
+       on an Apply button parked off the bottom of the screen. */
+    visibility: hidden;
+    transition:
+      transform 0.4s var(--ease-out-expo),
+      visibility 0s linear 0.4s;
+    z-index: 45;
+  }
+
+  .applyBar[data-visible] {
+    transform: none;
+    visibility: visible;
+    transition:
+      transform 0.4s var(--ease-out-expo),
+      visibility 0s;
+  }
+
+  .applyBar > span {
+    color: var(--on-ink-dim);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+  }
+
 }
 
 @media (max-width: 560px) {
@@ -1313,8 +1367,9 @@
 
 /*
   Reduced motion: MotionRoot never sets data-motion, so every pre-reveal rule
-  above is inert and the page is simply finished. These two rules close the
-  remaining gaps — the drift variables and the crossfade timings.
+  above is inert and the page is simply finished. These rules close the
+  remaining gaps — the drift variables, the crossfade timings and the apply
+  bar's own slide.
 */
 @media (prefers-reduced-motion: reduce) {
   .heroArt {
@@ -1326,6 +1381,10 @@
 
   .stageLayer,
   .cityPlateImage {
+    transition: none;
+  }
+
+  .applyBar {
     transition: none;
   }
 }

@@ -1,0 +1,132 @@
+/* ==========================================================================
+   Legal pages — /privacy and /terms
+   --------------------------------------------------------------------------
+   Two pages, one treatment, so it lives in one file. These are the only routes
+   in the group whose job is to be read start to finish rather than looked at,
+   so nothing here is dramatic: the kit's page head, one paper section with a
+   seam, and typography sized for a long read. No photography, no display-scale
+   headline below the title, no reveal — legal copy should simply be there the
+   moment the page is.
+
+   Everything is a token from `.page`; no colour or family is restated.
+   ========================================================================== */
+
+/* The effective date, sitting under the lede in the page head. */
+.effective {
+  border-top: 1px solid var(--rule);
+  color: var(--on-ink-dim);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  margin-top: 1.5rem;
+  padding-top: 0.9rem;
+  text-transform: uppercase;
+}
+
+.body {
+  padding: clamp(3.5rem, 7vw, 6rem) 0 clamp(4rem, 8vw, 7rem);
+}
+
+/*
+  The measure, and the reason these pages sit in the full `kit.shell` rather
+  than in `kit.shellNarrow`: the shell is the same 78rem the page head above and
+  the footer below use, so the first character of every clause lines up with the
+  `h1` and with the footer's wordmark, and the column below is set by this cap
+  alone rather than by a second, unrelated shell width.
+
+  33rem rather than a `ch` figure: Geist's `0` is unusually wide, so a 66ch cap
+  here measures 726px and runs to about 98 characters a line. 33rem is ~72,
+  which is what DESIGN.md's 62–68 was asking for in the first place.
+*/
+.prose {
+  max-width: 33rem;
+}
+
+.section + .section {
+  margin-top: clamp(2.4rem, 4.5vw, 3.4rem);
+}
+
+.sectionTitle {
+  color: var(--on-paper);
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 2.7vw, 2.15rem);
+  font-weight: 400;
+  letter-spacing: 0.012em;
+  line-height: 1;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  /* The clause numbers are the first thing a reader scans for. */
+  font-variant-numeric: tabular-nums;
+}
+
+.section p {
+  color: var(--on-paper-dim);
+  font-size: 1rem;
+  line-height: 1.72;
+}
+
+.section p + p,
+.section ul + p {
+  margin-top: 1.05rem;
+}
+
+.section strong {
+  color: var(--on-paper);
+  font-weight: 600;
+}
+
+.section ul {
+  margin-top: 1.05rem;
+}
+
+.section li {
+  color: var(--on-paper-dim);
+  font-size: 1rem;
+  line-height: 1.72;
+  padding-left: 1.4rem;
+  position: relative;
+}
+
+.section li + li {
+  margin-top: 0.7rem;
+}
+
+/* The same small square the rest of the site uses for a list mark. */
+.section li::before {
+  background: var(--lime-ink);
+  content: "";
+  height: 6px;
+  left: 0;
+  position: absolute;
+  top: 0.62em;
+  width: 6px;
+}
+
+/*
+  The closing line, below a rule: one sentence on the left and the one real
+  action on the right. On a narrow screen it stacks, sentence first.
+*/
+.close {
+  align-items: center;
+  border-top: 1px solid var(--rule-ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 2rem;
+  justify-content: space-between;
+  margin-top: clamp(3rem, 6vw, 4.5rem);
+  max-width: 33rem;
+  padding-top: 1.8rem;
+}
+
+.close p {
+  color: var(--on-paper-dim);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .close > * {
+    flex: 1 1 100%;
+  }
+}

@@ -1,42 +1,49 @@
 import Link from "next/link";
-import PageWrapper from "@/components/PageWrapper";
+import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
+import kit from "../../_cinematic/cinematic.module.css";
+import LegalSection from "../_legal/LegalSection";
+import styles from "../_legal/legal.module.css";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Privacy Policy | 3C World Group",
   description:
     "How 3C World Group collects, uses, and protects your personal information across our website, contractor applications, and sales portal.",
 };
 
+/**
+ * Privacy, in the cinematic language. The policy text is carried over from the
+ * page it replaces word for word — every clause, in its original order, with
+ * its original numbering. Only the presentation changed: the kit's page head
+ * instead of the old gradient hero, and one paper section set for reading.
+ */
 const LAST_UPDATED = "May 6, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
-    <PageWrapper>
-      {/* Hero */}
-      <section className="bg-[#0A1F44] text-white py-20 md:py-28 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#6A8FE3]/20 to-transparent" />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="inline-block bg-[#8dc63f] text-white px-5 py-2 font-bold text-sm uppercase tracking-wider mb-6">
-            Legal
+    <>
+      <header className={kit.pageHead}>
+        <div className={kit.shell}>
+          <div className={kit.pageHeadRow}>
+            <div>
+              <p className={kit.pageHeadEyebrow}>Legal</p>
+              <h1 className={kit.pageHeadTitle}>Privacy Policy</h1>
+            </div>
+            <div>
+              <p className={kit.pageHeadLede}>
+                We respect your privacy and are committed to protecting your personal information.
+                This policy explains what we collect, how we use it, and the choices you have.
+              </p>
+              <p className={styles.effective}>Last updated: {LAST_UPDATED}</p>
+            </div>
           </div>
-          <h1 className="text-5xl md:text-6xl font-black mb-6 leading-[1.1]">
-            Privacy Policy
-          </h1>
-          <p className="text-lg text-white/80 max-w-2xl">
-            We respect your privacy and are committed to protecting your personal information.
-            This policy explains what we collect, how we use it, and the choices you have.
-          </p>
-          <p className="mt-6 text-sm text-white/60 uppercase tracking-wider font-semibold">
-            Last updated: {LAST_UPDATED}
-          </p>
         </div>
-      </section>
+      </header>
 
-      {/* Content */}
-      <section className="bg-white py-16 md:py-24">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-lg max-w-none">
-            <PolicySection title="1. Introduction">
+      <section className={`${kit.surfacePaper} ${kit.seam} ${styles.body}`} aria-label="Privacy Policy">
+        <div className={kit.shell}>
+          <div className={styles.prose}>
+            <LegalSection id="privacy-1" title="1. Introduction">
               <p>
                 3C World Group (&ldquo;<strong>3C World Group</strong>,&rdquo; &ldquo;<strong>we</strong>,&rdquo;
                 &ldquo;<strong>us</strong>,&rdquo; or &ldquo;<strong>our</strong>&rdquo;) operates this website and the
@@ -48,9 +55,9 @@ export default function PrivacyPolicyPage() {
                 By using our website or services, you agree to the collection and use of information in
                 accordance with this policy.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="2. Information We Collect">
+            <LegalSection id="privacy-2" title="2. Information We Collect">
               <p>We collect the following categories of information:</p>
               <ul>
                 <li>
@@ -69,9 +76,9 @@ export default function PrivacyPolicyPage() {
                   and standard web analytics.
                 </li>
               </ul>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="3. How We Use Your Information">
+            <LegalSection id="privacy-3" title="3. How We Use Your Information">
               <p>We use the information we collect to:</p>
               <ul>
                 <li>Review and process contractor applications.</li>
@@ -81,9 +88,9 @@ export default function PrivacyPolicyPage() {
                 <li>Maintain security, prevent fraud, and comply with legal obligations.</li>
                 <li>Analyze website usage to improve content, performance, and user experience.</li>
               </ul>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="4. How We Share Your Information">
+            <LegalSection id="privacy-4" title="4. How We Share Your Information">
               <p>
                 We do not sell your personal information. We may share information in the following
                 limited circumstances:
@@ -105,34 +112,34 @@ export default function PrivacyPolicyPage() {
                   of that transaction.
                 </li>
               </ul>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="5. Cookies and Analytics">
+            <LegalSection id="privacy-5" title="5. Cookies and Analytics">
               <p>
                 We use cookies and similar technologies to keep you signed in to the portal, remember
                 preferences, and understand how visitors use our site. You can control cookies through
                 your browser settings. Disabling cookies may limit some functionality of the portal.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="6. Data Security">
+            <LegalSection id="privacy-6" title="6. Data Security">
               <p>
                 We use reasonable administrative, technical, and physical safeguards to protect your
                 information, including encrypted connections and access controls on portal data.
                 However, no method of transmission or storage is 100% secure, and we cannot guarantee
                 absolute security.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="7. Data Retention">
+            <LegalSection id="privacy-7" title="7. Data Retention">
               <p>
                 We retain personal information for as long as needed to provide our services, comply
                 with legal obligations, resolve disputes, and enforce agreements. When information is
                 no longer needed, we take steps to securely delete or anonymize it.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="8. Your Rights and Choices">
+            <LegalSection id="privacy-8" title="8. Your Rights and Choices">
               <p>Depending on where you live, you may have the right to:</p>
               <ul>
                 <li>Access the personal information we hold about you.</li>
@@ -144,33 +151,33 @@ export default function PrivacyPolicyPage() {
                 To exercise any of these rights, contact us at the address below. We may need to verify
                 your identity before fulfilling a request.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="9. Children's Privacy">
+            <LegalSection id="privacy-9" title="9. Children's Privacy">
               <p>
                 Our website and services are not directed to children under 16, and we do not knowingly
                 collect personal information from children. If you believe a child has provided us with
                 personal information, please contact us so we can delete it.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="10. Third-Party Links">
+            <LegalSection id="privacy-10" title="10. Third-Party Links">
               <p>
                 Our site may contain links to third-party websites that we do not control. This Privacy
                 Policy does not apply to those sites, and we encourage you to read their privacy
                 policies before providing any information.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="11. Changes to This Policy">
+            <LegalSection id="privacy-11" title="11. Changes to This Policy">
               <p>
                 We may update this Privacy Policy from time to time. When we do, we will revise the
                 &ldquo;Last updated&rdquo; date at the top of this page. Material changes will be
                 communicated through the website or by email where appropriate.
               </p>
-            </PolicySection>
+            </LegalSection>
 
-            <PolicySection title="12. Contact Us">
+            <LegalSection id="privacy-12" title="12. Contact Us">
               <p>
                 If you have questions about this Privacy Policy or how we handle your information,
                 please reach out:
@@ -178,58 +185,29 @@ export default function PrivacyPolicyPage() {
               <ul>
                 <li>
                   <strong>Email:</strong>{" "}
-                  <a
-                    href="mailto:privacy@3cworldgroup.com"
-                    className="text-[#0A1F44] font-semibold hover:text-[#8dc63f]"
-                  >
+                  <a href="mailto:privacy@3cworldgroup.com" className={kit.inlineLink}>
                     privacy@3cworldgroup.com
                   </a>
                 </li>
                 <li>
                   <strong>Contact form:</strong>{" "}
-                  <Link
-                    href="/contact"
-                    className="text-[#0A1F44] font-semibold hover:text-[#8dc63f]"
-                  >
+                  <Link href="/contact" className={kit.inlineLink}>
                     3cworldgroup.com/contact
                   </Link>
                 </li>
               </ul>
-            </PolicySection>
+            </LegalSection>
           </div>
 
-          {/* Back to home CTA */}
-          <div className="mt-16 pt-8 border-t border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-            <p className="text-gray-600 text-sm">
-              Have questions? We&apos;re here to help.
-            </p>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 bg-[#8dc63f] hover:bg-[#7ab234] text-white font-bold px-6 py-3 transition-colors"
-            >
+          <div className={styles.close}>
+            <p>Have questions? We&apos;re here to help.</p>
+            <Link href="/contact" className={`${kit.btn} ${kit.btnLime}`}>
               Contact Us
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
             </Link>
           </div>
         </div>
       </section>
-    </PageWrapper>
-  );
-}
-
-function PolicySection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-10">
-      <h2 className="text-2xl md:text-3xl font-black text-[#0A1F44] mb-4">{title}</h2>
-      <div className="text-gray-700 leading-relaxed space-y-4">{children}</div>
-    </div>
+    </>
   );
 }

@@ -13,6 +13,7 @@ what may be said. This file is how to build a page.
 | `src/app/_cinematic/nav.ts` | `NAV_LINKS`, `APPLY_HREF` — the only place routes are named |
 | `src/app/(cinematic)/<route>/page.tsx` | your page: **sections and nothing else** |
 | `src/app/(cinematic)/<route>/<route>.module.css` | composition only this page has |
+| `src/app/(cinematic)/_legal/` | the shared treatment behind /privacy and /terms |
 
 Put a route in the group and it gets the chrome and the tokens; the URL is
 unchanged. Do not render a header, a footer, a `<main>` or a `.page` — the
@@ -52,16 +53,29 @@ it for every section, not just some.
 
 **Buttons** — `kit.btn` plus one of `kit.btnLime` (primary), `kit.btnGhost`
 (outlined, for use over photography); size with `kit.btnLg` / `kit.btnSm`.
-`kit.quietLink` is the text-with-arrow link, `kit.inlineLink` the underlined
-one inside a paragraph. Arrows take `kit.btnArrow` so they slide on hover.
+`kit.quietLink` is the text-with-arrow link on navy and `kit.quietLinkInk` the
+same link on paper — white on paper is invisible, so on any paper section reach
+for the `Ink` variant, never for `kit.quietLink` plus a local repaint.
+`kit.inlineLink` is the underlined one inside a paragraph and needs no variant:
+it takes its colour from the text around it. Arrows take `kit.btnArrow` so they
+slide on hover.
 
 **Reveals** — `kit.reveal` wipes down, `kit.revealRise` rises 18px. Add the
 class *and* `data-reveal`; MotionRoot fires each once. `kit.sectionHead` already
 carries `kit.reveal`, so a head only needs `data-reveal`. Composing a class that
 composes a reveal does **not** inherit it — name the reveal again.
 
-**Also** — `kit.srOnly`, `kit.applyBar` (a fixed bar with `data-apply-bar` on
-it; the footer reserves space for it automatically).
+**Also** — `kit.srOnly`.
+
+**The compact apply bar is the homepage's, not the kit's.** MotionRoot reveals
+it once `[data-hero]` has left the viewport, and the photographic hero is the
+homepage's alone — so the class lives in `cinematic-home.module.css` and there
+is no `kit.applyBar` to reach for. An interior page opens on the flat
+`kit.pageHead` and closes on its own apply CTA; a persistent bar would add
+nothing there and would cost 4.5rem of a 390-wide viewport on every route. The
+kit keeps one half of it: `.page:has([data-apply-bar]) .footer` reserves matching
+bottom padding, so if a page ever does render a bar the footer already gets out
+of its way.
 
 Tokens (`--ink`, `--lime`, `--paper`, `--on-ink-dim`, `--rule`, `--gutter`,
 `--ease-out-expo`, …) are declared on `.page` and are in scope everywhere. Use

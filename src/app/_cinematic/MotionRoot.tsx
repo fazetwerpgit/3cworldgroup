@@ -183,6 +183,11 @@ function attachStatic(root: HTMLElement): () => void {
     cleanups.push(() => io.disconnect());
   }
 
+  // The compact apply bar is homepage-only by design, and this pairing is the
+  // reason: it is revealed when `[data-hero]` leaves the viewport, and the
+  // photographic hero belongs to the homepage alone. An interior page opens on
+  // the kit's flat `.pageHead` and closes on its own apply CTA, so it renders
+  // no bar; the rule is written down in docs/cinematic/PAGE-KIT.md.
   const hero = root.querySelector<HTMLElement>("[data-hero]");
   const applyBar = root.querySelector<HTMLElement>("[data-apply-bar]");
   if (hero && applyBar) {

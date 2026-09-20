@@ -323,20 +323,11 @@
 }
 
 /*
-  `kit.quietLink` is authored for navy — white text on a white hairline — so on
-  a paper ground it is invisible. The kit carries no `Ink` variant of it (noted
-  in the report), so this page repaints it locally. Two classes deep so it
-  outranks the kit's single-class rule whatever order the sheets load in.
+  Colour is the kit's now — `kit.quietLinkInk` is the paper variant of the quiet
+  link, so all this page still owns is where the link sits.
 */
-.serveItem .applyLink {
-  border-bottom-color: var(--rule-ink);
-  color: var(--on-paper);
+.applyLink {
   margin-top: 1.4rem;
-}
-
-.serveItem .applyLink:hover {
-  border-bottom-color: var(--lime-ink);
-  color: var(--lime-ink);
 }
 
 /* --------------------------------------------------------------------------

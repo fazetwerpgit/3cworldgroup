@@ -314,12 +314,14 @@ export default function Home() {
       </section>
 
       {/*
-        Compact apply affordance — appears once the hero is behind you. It is
-        `position: fixed` at ≤900px and `display: none` above it, so it takes no
-        part in the flow either way. `data-apply-bar` is both what MotionRoot
-        watches and what tells the footer to reserve space for it.
+        Compact apply affordance — appears once the hero is behind you, which is
+        exactly why it is this page's and not the kit's: MotionRoot keys it to
+        `[data-hero]`, and no interior page has one. It is `position: fixed` at
+        ≤900px and `display: none` above it, so it takes no part in the flow
+        either way. `data-apply-bar` is both what MotionRoot watches and what
+        tells the footer to reserve space for it.
       */}
-      <div className={kit.applyBar} data-apply-bar>
+      <div className={styles.applyBar} data-apply-bar>
         <span>Door-to-door sales · 1099, commission-only</span>
         <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnSm}`}>
           Apply

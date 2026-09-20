@@ -209,6 +209,24 @@
   color: var(--lime);
 }
 
+/*
+  The same link on a paper ground. `.quietLink` is authored for navy — white
+  text on a white hairline — so unmodified it is invisible on paper, which is
+  why a page carrying one on paper used to repaint it locally. Composition is
+  what makes this legal: the element keeps both class names, and because this
+  rule is declared after `.quietLink` it wins the single-class tie on order.
+*/
+.quietLinkInk {
+  composes: quietLink;
+  border-bottom-color: var(--rule-ink);
+  color: var(--on-paper);
+}
+
+.quietLinkInk:hover {
+  border-bottom-color: var(--lime-ink);
+  color: var(--lime-ink);
+}
+
 .inlineLink {
   color: inherit;
   text-decoration: underline;
@@ -693,14 +711,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   Compact apply bar (small screens only)
-   -------------------------------------------------------------------------- */
-
-.applyBar {
-  display: none;
-}
-
-/* --------------------------------------------------------------------------
    Reveal classes
    --------------------------------------------------------------------------
    The contract MotionRoot keeps: the server renders the page in its finished
@@ -809,66 +819,20 @@
   }
 
   /*
-    Compact apply affordance. The footer reserves matching space below its last
-    line so the bar never sits on top of content — and reserves it only on a
-    page that actually renders one, which is what the `:has` is for.
+    The one piece of the compact apply bar the kit still owns: the footer
+    reserves matching space below its last line so a fixed bar never sits on
+    top of content, and reserves it only on a page that actually renders one,
+    which is what the `:has` is for. The bar itself is the homepage's — it is
+    keyed to `[data-hero]`, and the homepage is the only route with one. See
+    `.applyBar` in cinematic-home.module.css and the rule in PAGE-KIT.md.
   */
   .page:has([data-apply-bar]) .footer {
     padding-bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px));
-  }
-
-  .applyBar {
-    align-items: center;
-    background: rgba(3, 13, 31, 0.93);
-    backdrop-filter: blur(14px);
-    border-top: 1px solid var(--rule);
-    bottom: 0;
-    display: flex;
-    gap: 1rem;
-    justify-content: space-between;
-    left: 0;
-    padding: 0.7rem var(--gutter) calc(0.7rem + env(safe-area-inset-bottom, 0px));
-    position: fixed;
-    right: 0;
-    transform: translateY(100%);
-    /* Hidden means hidden from the tab order too, or a keyboard user can land
-       on an Apply button parked off the bottom of the screen. */
-    visibility: hidden;
-    transition:
-      transform 0.4s var(--ease-out-expo),
-      visibility 0s linear 0.4s;
-    z-index: 45;
-  }
-
-  .applyBar[data-visible] {
-    transform: none;
-    visibility: visible;
-    transition:
-      transform 0.4s var(--ease-out-expo),
-      visibility 0s;
-  }
-
-  .applyBar > span {
-    color: var(--on-ink-dim);
-    font-size: 0.78rem;
-    letter-spacing: 0.02em;
-    line-height: 1.3;
   }
 }
 
 @media (max-width: 560px) {
   .footerLegal {
     flex-direction: column;
-  }
-}
-
-/*
-  Reduced motion: MotionRoot never sets data-motion, so every pre-reveal rule
-  above is inert and the page is simply finished. This closes the one remaining
-  gap in the chrome — the apply bar's own slide.
-*/
-@media (prefers-reduced-motion: reduce) {
-  .applyBar {
-    transition: none;
   }
 }

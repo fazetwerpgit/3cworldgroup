@@ -269,7 +269,7 @@ export default function AboutPage() {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              <Link href={APPLY_HREF} className={`${kit.quietLink} ${styles.applyLink}`}>
+              <Link href={APPLY_HREF} className={`${kit.quietLinkInk} ${styles.applyLink}`}>
                 Apply to sell with 3C
                 <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
               </Link>
