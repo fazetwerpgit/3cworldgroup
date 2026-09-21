@@ -10,35 +10,28 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1 — Head
-   --------------------------------------------------------------------------
-   `kit.pageHead` is a flat navy band by design, so the two actions are simply
-   set below its row rather than being given a surface of their own.
-   -------------------------------------------------------------------------- */
-
-.headActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem;
-  margin-top: clamp(1.75rem, 3.5vw, 2.75rem);
-}
-
-/* --------------------------------------------------------------------------
    2 — The filmstrip
    -------------------------------------------------------------------------- */
 
 .sell {
   composes: surfaceInk from "../../_cinematic/cinematic.module.css";
-  /*
-    Lighter than a full chapter's top padding on purpose: `kit.pageHead` is navy
-    too and already sets its own bottom padding, so the language's 8.5rem here
-    read as a hole in the page rather than as a gap between two chapters.
-  */
-  padding: clamp(2.5rem, 5vw, 4rem) 0 0;
+  padding: var(--section-pad) 0 0;
+}
+
+/*
+  The page head and band 01 are the same photograph on purpose: the v2 set has
+  exactly one fiber frame with a street in it, and the brief pins the head to
+  it. They are never the same crop. The head sits high (16%) so it holds the
+  sunset, the tree line and the lit houses and cuts the grass entirely; band 01
+  runs the default centre crop, which is the pedestal, the bag and the spool
+  with no sky at all. Two beats of one walk, not a repeat.
+*/
+.head {
+  --head-focus: 48% 16%;
 }
 
 .filmstrip {
-  margin-top: clamp(2.5rem, 5vw, 4.5rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 /*
@@ -71,6 +64,18 @@
 }
 
 /*
+  Band 01 runs the same photograph as the page head. The head is the wide
+  establishing view — sunset, tree line, lit houses, pedestal small at the
+  right. This pushes in on the pedestal, the tool bag and the cable spool so
+  the band is a detail, not a reprint. Origin sits on the pedestal so the
+  subject stays put as the frame grows.
+*/
+.bandArtTight .bandImage {
+  transform: scale(1.4);
+  transform-origin: 66% 64%;
+}
+
+/*
   Two layers, not a blanket tint: a horizontal wash that puts the copy on its
   own darkness and lets the right of the photograph stay lit, over a vertical
   fall so each frame lands on navy at top and bottom and the three stack as a
@@ -80,23 +85,31 @@
   three photographs put their subject on the right: the fiber cabinet, the
   television and the keypad. Alternating the side buried each of them under the
   heavy end of its own scrim.
+
+  Round 5 — the wash is now LOCAL. It used to carry 0.44 ink at 57% and 0.24 at
+  the far edge, with a vertical fall of 0.55/0.62 on top of it, which meant the
+  subject of every photograph sat under roughly half an inch of navy and all
+  three frames read as mud. The horizontal wash now clears completely by 78% and
+  the vertical fall is down to 0.30/0.38, which is what the joints need and
+  nothing more; legibility is carried entirely by the left end of the wash,
+  under the copy column, where it is heavier than it was.
 */
 .bandScrim {
   background:
     linear-gradient(
       90deg,
-      rgba(6, 23, 53, 0.95) 0%,
-      rgba(6, 23, 53, 0.88) 28%,
-      rgba(6, 23, 53, 0.44) 57%,
-      rgba(6, 23, 53, 0.06) 83%,
-      rgba(6, 23, 53, 0.24) 100%
+      rgba(6, 23, 53, 0.93) 0%,
+      rgba(6, 23, 53, 0.85) 34%,
+      rgba(6, 23, 53, 0.5) 52%,
+      rgba(6, 23, 53, 0.1) 68%,
+      rgba(6, 23, 53, 0) 78%
     ),
     linear-gradient(
       180deg,
-      rgba(3, 13, 31, 0.55) 0%,
-      rgba(3, 13, 31, 0) 28%,
-      rgba(3, 13, 31, 0) 64%,
-      rgba(3, 13, 31, 0.62) 100%
+      rgba(3, 13, 31, 0.3) 0%,
+      rgba(3, 13, 31, 0) 20%,
+      rgba(3, 13, 31, 0) 76%,
+      rgba(3, 13, 31, 0.38) 100%
     );
   inset: 0;
   position: absolute;
@@ -179,7 +192,7 @@
 
 .bundle {
   composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0 clamp(4rem, 8vw, 7rem);
+  padding: var(--section-pad) 0 var(--section-pad);
 }
 
 .bundleLayout {
@@ -189,7 +202,7 @@
   display: grid;
   gap: clamp(1.75rem, 3.5vw, 3.25rem);
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-  margin-top: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .bundleCopy {
@@ -259,7 +272,7 @@
   composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(5rem, 11vw, 10rem) 0;
+  padding: clamp(5rem, 9vw, 8rem) 0;
   position: relative;
 }
 
@@ -418,11 +431,6 @@
 }
 
 @media (max-width: 560px) {
-  .headActions > a {
-    flex: 1 1 100%;
-    justify-content: center;
-  }
-
   .bandArt {
     aspect-ratio: 4 / 3;
   }

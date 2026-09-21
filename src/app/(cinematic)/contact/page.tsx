@@ -46,13 +46,12 @@ export default function ContactPage() {
       {/* 1 — the page head, opened by the 3C mark                          */}
       {/* ---------------------------------------------------------------- */}
       <header className={`${kit.pageHead} ${styles.head}`}>
-        <div className={`${kit.shell} ${styles.headInner}`}>
-          <div className={styles.headCopy}>
+        <div className={`${kit.pageHeadInner} ${styles.headInner}`}>
+          <div className={kit.pageHeadCol}>
             <p className={kit.pageHeadEyebrow}>Get in touch</p>
-            <h1 className={kit.pageHeadTitle}>
+            <h1 className={`${kit.pageHeadTitle} ${styles.headTitle}`}>
               Let’s start
-              <br />
-              <span className={styles.headTitleLime}>
+              <span className={kit.pageHeadLime}>
                 the right
                 <br />
                 conversation.
@@ -62,6 +61,15 @@ export default function ContactPage() {
               Questions about joining 3C, building a contractor team, or the services we
               represent? Choose a path and we’ll point you in the right direction.
             </p>
+            <div className={kit.pageHeadActions}>
+              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+                Start your application
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+              </Link>
+              <a href="#message" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                Send us a message
+              </a>
+            </div>
           </div>
         </div>
 

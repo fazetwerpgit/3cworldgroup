@@ -92,19 +92,37 @@ export default function OpportunitiesPage() {
       {/* Page head — navy, deep enough to clear the fixed header          */}
       {/* ---------------------------------------------------------------- */}
       <header className={kit.pageHead}>
-        <div className={kit.shell}>
-          <div className={kit.pageHeadRow}>
-            <div>
-              <p className={kit.pageHeadEyebrow}>Now hiring nationwide</p>
-              <h1 className={kit.pageHeadTitle}>
-                Build a career.
-                <br />
-                <span className={styles.lime}>Not just a job.</span>
-              </h1>
-            </div>
+        <div className={kit.pageHeadArt}>
+          <Image
+            src="/redesign/v2/photos/security-dusk-1600.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={kit.pageHeadImage}
+          />
+        </div>
+        <div className={kit.pageHeadScrim} aria-hidden="true" />
+
+        <div className={kit.pageHeadInner}>
+          <div className={kit.pageHeadCol}>
+            <p className={kit.pageHeadEyebrow}>Now hiring nationwide</p>
+            <h1 className={kit.pageHeadTitle}>
+              Build a career.
+              <span className={kit.pageHeadLime}>Not just a job.</span>
+            </h1>
             <p className={kit.pageHeadLede}>
               Choose your path. Build your market. Grow with real training and support.
             </p>
+            <div className={kit.pageHeadActions}>
+              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+                Start your application
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+              </Link>
+              <a href="#earnings" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                Earning potential
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -145,8 +163,10 @@ export default function OpportunitiesPage() {
             </ol>
 
             {/*
-              A lit front door at dusk with a bag on the step, from the existing
-              v2 set — the thing this job actually is, with no one in the frame.
+              The curb at dusk: an open pedestal, a tool bag in the grass and a
+              lit street behind it — the route this job actually is, with no one
+              in the frame. The lit front door is the page head, so the mid-page
+              frame is a different moment on the same walk.
               The scrim is the homepage's two-layer authored one: a horizontal
               wash that dissolves the frame's left edge into the copy column
               beside it, and a vertical fall so it sits down into the navy
@@ -154,7 +174,7 @@ export default function OpportunitiesPage() {
             */}
             <div className={styles.glanceArt} aria-hidden="true">
               <Image
-                src="/redesign/v2/photos/security-dusk-1600.webp"
+                src="/redesign/v2/photos/fiber-dusk-1600.webp"
                 alt=""
                 fill
                 priority

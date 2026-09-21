@@ -13,18 +13,6 @@
   color: var(--lime);
 }
 
-/*
-  The page title is two nineteen-character lines and it is authored that way.
-  At the kit's own cap they overrun the head's left column and rewrap into four
-  ragged lines above 1400px, so this page asks for a slightly smaller display
-  size — enough that both lines sit inside the column at every width where the
-  head is still two columns. Scoped to the column element so it outranks
-  `kit.pageHeadTitle` whatever order the sheets load in.
-*/
-.pageHeadCol h1 {
-  font-size: clamp(2.6rem, 5.2vw, 4.8rem);
-}
-
 /* --------------------------------------------------------------------------
    1 — The opening band and the four figures
    --------------------------------------------------------------------------
@@ -34,8 +22,17 @@
    Nothing is framed; the photograph simply surfaces out of the navy.
    -------------------------------------------------------------------------- */
 
+/*
+  Round 5 — the head is a photograph now, and this band is a second one. They
+  need a full chapter of navy between them or they read as one image split by a
+  hairline rather than as the opening and the first beat after it.
+*/
+.story {
+  padding-top: var(--section-pad);
+}
+
 .band {
-  height: clamp(16rem, 40vw, 32rem);
+  height: clamp(16rem, 34vw, 28rem);
   position: relative;
   width: 100%;
 }
@@ -47,17 +44,22 @@
   object-position: 64% 52%;
 }
 
+/*
+  Round 5 — the band carries no copy, so nothing on it needs a scrim for
+  legibility; all it has to do is dissolve its own two edges into the navy above
+  and below. The middle is now clear, and the left-hand wash that used to run
+  half the frame at 0.5 ink is gone with it.
+*/
 .bandScrim {
-  background:
-    linear-gradient(
-      180deg,
-      var(--ink) 0%,
-      rgba(6, 23, 53, 0.55) 16%,
-      rgba(6, 23, 53, 0.08) 42%,
-      rgba(6, 23, 53, 0.5) 82%,
-      var(--ink) 100%
-    ),
-    linear-gradient(90deg, rgba(3, 13, 31, 0.5) 0%, rgba(3, 13, 31, 0) 46%);
+  background: linear-gradient(
+    180deg,
+    var(--ink) 0%,
+    rgba(6, 23, 53, 0.34) 11%,
+    rgba(6, 23, 53, 0) 30%,
+    rgba(6, 23, 53, 0) 72%,
+    rgba(6, 23, 53, 0.34) 90%,
+    var(--ink) 100%
+  );
   inset: 0;
   position: absolute;
 }
@@ -67,8 +69,8 @@
   display: grid;
   gap: 1px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: clamp(2.25rem, 4vw, 3.5rem);
-  padding-bottom: clamp(4rem, 8vw, 7rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
+  padding-bottom: var(--section-pad);
 }
 
 .figure {
@@ -103,15 +105,21 @@
    -------------------------------------------------------------------------- */
 
 .mission {
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+  padding: var(--section-pad) 0;
 }
 
+/*
+  Top-aligned, not centred. The figure is a 4:3 block and the copy beside it is
+  short, so centring dropped the first line of the mission a quarter of a
+  thousand pixels below the section head it belongs to. Start-aligned, the copy
+  reads straight on from the head and the figure simply runs longer.
+*/
 .missionBody {
-  align-items: center;
+  align-items: start;
   display: grid;
   gap: clamp(2rem, 5vw, 4.5rem);
   grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr);
-  margin-top: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .missionLead {
@@ -153,14 +161,14 @@
    -------------------------------------------------------------------------- */
 
 .values {
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .valueList {
   display: grid;
   gap: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 /*
@@ -218,14 +226,14 @@
    -------------------------------------------------------------------------- */
 
 .serve {
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .serveGrid {
   display: grid;
   gap: clamp(2.2rem, 4vw, 4rem);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .serveItem {
@@ -335,14 +343,14 @@
    -------------------------------------------------------------------------- */
 
 .leadership {
-  padding: clamp(4rem, 8vw, 7rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .leaderList {
   display: grid;
   gap: 1px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .leader {
@@ -394,7 +402,7 @@
   composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(5rem, 11vw, 9rem) 0;
+  padding: clamp(5rem, 9vw, 8rem) 0;
   position: relative;
 }
 

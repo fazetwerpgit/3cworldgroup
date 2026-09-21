@@ -22,7 +22,7 @@ const LAST_UPDATED = "May 6, 2026";
 export default function PrivacyPolicyPage() {
   return (
     <>
-      <header className={kit.pageHead}>
+      <header className={kit.pageHeadFlat}>
         <div className={kit.shell}>
           <div className={kit.pageHeadRow}>
             <div>
@@ -30,7 +30,7 @@ export default function PrivacyPolicyPage() {
               <h1 className={kit.pageHeadTitle}>Privacy Policy</h1>
             </div>
             <div>
-              <p className={kit.pageHeadLede}>
+              <p className={kit.pageHeadLedeFlat}>
                 We respect your privacy and are committed to protecting your personal information.
                 This policy explains what we collect, how we use it, and the choices you have.
               </p>
@@ -40,7 +40,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </header>
 
-      <section className={`${kit.surfacePaper} ${kit.seam} ${styles.body}`} aria-label="Privacy Policy">
+      <section className={`${kit.surfacePaper} ${kit.seamTopOnly} ${styles.body}`} aria-label="Privacy Policy">
         <div className={kit.shell}>
           <div className={styles.prose}>
             <LegalSection id="privacy-1" title="1. Introduction">

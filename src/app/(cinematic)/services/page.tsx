@@ -83,34 +83,43 @@ export default function ServicesPage() {
   return (
     <>
       {/* ---------------------------------------------------------------- */}
-      {/* 1 — the head: flat navy, because there is no hero to be           */}
-      {/*     transparent over on an interior page                          */}
+      {/* 1 — the head: the curb at dusk, cropped high so it establishes   */}
+      {/*     the street; band 01 below crops the same frame tight on the  */}
+      {/*     pedestal, so the two read as two beats of one walk           */}
       {/* ---------------------------------------------------------------- */}
-      <header className={kit.pageHead}>
-        <div className={kit.shell}>
-          <div className={kit.pageHeadRow}>
-            <div>
-              <p className={kit.pageHeadEyebrow}>What you&apos;ll sell</p>
-              <h1 className={kit.pageHeadTitle}>
-                Three services.
-                <br />
-                One connection.
-              </h1>
-            </div>
+      <header className={`${kit.pageHead} ${styles.head}`}>
+        <div className={kit.pageHeadArt}>
+          <Image
+            src="/redesign/v2/photos/fiber-dusk-1600.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={kit.pageHeadImage}
+          />
+        </div>
+        <div className={kit.pageHeadScrim} aria-hidden="true" />
+
+        <div className={kit.pageHeadInner}>
+          <div className={kit.pageHeadCol}>
+            <p className={kit.pageHeadEyebrow}>What you&apos;ll sell</p>
+            <h1 className={kit.pageHeadTitle}>
+              Three services.
+              <span className={kit.pageHeadLime}>One connection.</span>
+            </h1>
             <p className={kit.pageHeadLede}>
               Fiber, TV, and security for every home on your route. One account,
               one rep.
             </p>
-          </div>
-
-          <div className={styles.headActions}>
-            <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
-              Start selling
-              <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
-            </Link>
-            <a href="#fiber" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
-              See what you&apos;ll sell
-            </a>
+            <div className={kit.pageHeadActions}>
+              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+                Start selling
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+              </Link>
+              <a href="#fiber" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                See what you&apos;ll sell
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -152,18 +161,26 @@ export default function ServicesPage() {
               className={styles.band}
               aria-labelledby={`${service.id}-title`}
             >
-              <div className={styles.bandArt}>
+              <div
+                className={
+                  i === 0 ? `${styles.bandArt} ${styles.bandArtTight}` : styles.bandArt
+                }
+              >
                 {/*
-                  P4 — the first band is already in the viewport at 1440, so it
-                  is the route's LCP candidate and cannot be lazy. The two under
-                  it stay lazy; the page head above carries no image of its own,
-                  which is why the preload lands here rather than higher up.
+                  P4 — the LCP candidate is the page head's photograph now, not
+                  this one, so every band stays lazy and there is one preload on
+                  the route rather than two competing for it.
+
+                  Band 01 shares the head's photograph: the v2 set has exactly
+                  one fiber frame with a street in it. bandArtTight pushes this
+                  copy in to a detail crop of the pedestal, the bag and the
+                  spool, so it reads as the next beat of the same walk rather
+                  than the same picture twice.
                 */}
                 <Image
                   src={service.image}
                   alt={service.alt}
                   fill
-                  priority={i === 0}
                   sizes="100vw"
                   className={styles.bandImage}
                   style={{ objectPosition: service.position }}

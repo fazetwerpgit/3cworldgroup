@@ -25,13 +25,13 @@
 /*
   The one section that follows `.pageHead` rather than another chapter. The
   head already carries its own bottom padding, so the full chapter opening of
-  `clamp(4.5rem, 9vw, 8.5rem)` on top of it stacked into ~210px of empty navy
+  `var(--section-pad)` on top of it stacked into ~210px of empty navy
   at 1440. This is the lighter opening; every chapter after it keeps the full
   one, because each of those has a real edge above it.
 */
 .glance {
   composes: surfaceInk from "../../_cinematic/cinematic.module.css";
-  padding: clamp(2.25rem, 4.5vw, 4rem) 0 clamp(4rem, 8vw, 7rem);
+  padding: var(--section-pad) 0;
 }
 
 /*
@@ -45,7 +45,7 @@
   display: grid;
   gap: clamp(1.75rem, 3.5vw, 3.25rem);
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  margin-top: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .glanceArt {
@@ -56,14 +56,13 @@
 }
 
 /*
-  The lit doorway, the keypad and the bag on the step are all in the right
-  third of the source. At 62% the crop sat on the brick pillar and the bushes
-  and the subject was outside the box; 76% holds the door in frame at every
-  width this page is answerable for.
+  The pedestal, the tool bag and the cable spool occupy the right half of the
+  source (x 0.50-0.95, y 0.37-0.85). The box is close to the source aspect, so
+  the crop is shallow; 62% 58% keeps all three clear of the left wash.
 */
 .glanceArtImage {
   object-fit: cover;
-  object-position: 76% 54%;
+  object-position: 62% 58%;
 }
 
 /*
@@ -145,7 +144,7 @@
 
 .path {
   composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0 clamp(4rem, 8vw, 7rem);
+  padding: var(--section-pad) 0 var(--section-pad);
 }
 
 .rail {
@@ -235,7 +234,7 @@
 
 .earnings {
   composes: surfaceInk from "../../_cinematic/cinematic.module.css";
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0 clamp(4rem, 8vw, 7rem);
+  padding: var(--section-pad) 0 var(--section-pad);
 }
 
 .bands {
@@ -315,7 +314,7 @@
   composes: surfaceInkDeep from "../../_cinematic/cinematic.module.css";
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(5rem, 11vw, 10rem) 0;
+  padding: clamp(5rem, 9vw, 8rem) 0;
   position: relative;
 }
 

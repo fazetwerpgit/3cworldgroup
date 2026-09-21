@@ -13,24 +13,25 @@
 /* --------------------------------------------------------------------------
    1 — The form section
    --------------------------------------------------------------------------
-   The page opens on kit.pageHead, flat navy, like every interior route. The
-   photograph arrives immediately under it as a band across the top of this
-   section — the street the homepage opened on, returning at the door it was
-   pointing at — and the form plate rises out of it. Two layers of scrim, not a
-   flat tint: a vertical fall that starts *on* the navy above so the band has no
-   hard upper edge, and a left-weighted wash so the copy column carries its own
-   darkness.
+   Round 5 — the page now opens on the kit's photographic head, and that head
+   carries the aerial this section used to repeat in a 14rem band across its own
+   top. Two printings of one photograph, a hero's height apart, is not a motif;
+   the band and its scrim are gone and the form plate rises straight out of the
+   navy the head lands on.
    -------------------------------------------------------------------------- */
 
 .applySection {
   composes: surfaceInk from "../../_cinematic/cinematic.module.css";
   isolation: isolate;
-  padding-bottom: clamp(3.5rem, 8vw, 7rem);
+  padding-bottom: var(--section-pad);
   position: relative;
 }
 
+
+
+
 .applyArt {
-  height: 14rem;
+  height: 16rem;
   inset: 0 0 auto 0;
   overflow: hidden;
   position: absolute;
@@ -39,15 +40,22 @@
 
 .applyArtImage {
   object-fit: cover;
-  object-position: 50% 48%;
+  object-position: 58% 46%;
 }
 
+/*
+  The photograph is never under a blanket tint. On a phone it is a band across
+  the top of the section, so the scrim is a vertical fall that opens and closes
+  on the navy either side of it. Above 901px it becomes the whole section and
+  picks up a right-weighted wash instead — the form plate is opaque and already
+  owns the left half, so only the aside column reads over the picture.
+*/
 .applyArtScrim {
   background: linear-gradient(
     180deg,
     var(--ink) 0%,
-    rgba(6, 23, 53, 0.4) 26%,
-    rgba(3, 13, 31, 0.5) 66%,
+    rgba(6, 23, 53, 0.3) 24%,
+    rgba(3, 13, 31, 0.42) 66%,
     var(--ink) 100%
   );
   inset: 0;
@@ -57,7 +65,7 @@
 .applyLayout {
   display: grid;
   gap: clamp(2.25rem, 5vw, 3.25rem);
-  padding-top: 6rem;
+  padding-top: var(--section-pad);
   position: relative;
 }
 
@@ -331,13 +339,13 @@
 
 .next {
   composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
-  padding: clamp(4rem, 8vw, 7rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .steps {
   display: grid;
   gap: 2rem;
-  margin-top: clamp(2.25rem, 4vw, 3.25rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .step {
@@ -384,7 +392,7 @@
 
 .know {
   composes: surfaceInk from "../../_cinematic/cinematic.module.css";
-  padding: clamp(4rem, 8vw, 7rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .knowList {
@@ -501,7 +509,7 @@
   isolation: isolate;
   min-height: 78svh;
   overflow: hidden;
-  padding: clamp(8rem, 15vw, 12rem) 0 clamp(4rem, 9vw, 7rem);
+  padding: clamp(7rem, 12vw, 10rem) 0 clamp(4rem, 8vw, 6.5rem);
   position: relative;
 }
 
@@ -628,37 +636,27 @@
 }
 
 @media (min-width: 901px) {
-  /*
-    On a phone the photograph is a band the form rises out of. With two columns
-    it has to be the whole section instead: the form plate is opaque and covers
-    the left half, so a band would leave the bottom right corner as several
-    hundred pixels of empty navy beside a plate that is taller than it.
-  */
   .applyArt {
     height: auto;
     inset: 0;
   }
 
-  /*
-    And the horizontal wash flips with the layout. It is weighted to the right
-    here, where the copy column reads over the photograph — the left is already
-    covered by the plate and needs nothing.
-  */
   .applyArtScrim {
     background:
       linear-gradient(
         266deg,
-        rgba(3, 13, 31, 0.84) 0%,
-        rgba(3, 13, 31, 0.6) 34%,
-        rgba(3, 13, 31, 0.24) 74%,
-        rgba(3, 13, 31, 0.46) 100%
+        rgba(3, 13, 31, 0.88) 0%,
+        rgba(3, 13, 31, 0.86) 36%,
+        rgba(3, 13, 31, 0.5) 58%,
+        rgba(3, 13, 31, 0.08) 76%,
+        rgba(3, 13, 31, 0) 86%
       ),
       linear-gradient(
         180deg,
         var(--ink) 0%,
-        rgba(6, 23, 53, 0.3) 20%,
-        rgba(3, 13, 31, 0.36) 58%,
-        rgba(3, 13, 31, 0.84) 90%,
+        rgba(6, 23, 53, 0.24) 18%,
+        rgba(3, 13, 31, 0.2) 56%,
+        rgba(3, 13, 31, 0.7) 88%,
         var(--ink) 100%
       );
   }

@@ -69,23 +69,42 @@ export default function AboutPage() {
   return (
     <>
       {/* ---------------------------------------------------------------- */}
-      {/* Page head — flat navy, so the header is condensed from first paint */}
+      {/* Page head — the neighbourhood the whole company is about, under the */}
+      {/* kit's authored scrim, with one left column standing on it.          */}
       {/* ---------------------------------------------------------------- */}
       <header className={kit.pageHead}>
-        <div className={kit.shell}>
-          <div className={kit.pageHeadRow}>
-            <div className={styles.pageHeadCol}>
-              <p className={kit.pageHeadEyebrow}>Our story</p>
-              <h1 className={kit.pageHeadTitle}>
-                We connect America.
-                <br />
-                <span className={styles.lime}>One door at a time.</span>
-              </h1>
-            </div>
+        <div className={kit.pageHeadArt}>
+          <Image
+            src="/redesign/v2/photos/hero-wide-1600.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={kit.pageHeadImage}
+          />
+        </div>
+        <div className={kit.pageHeadScrim} aria-hidden="true" />
+
+        <div className={kit.pageHeadInner}>
+          <div className={kit.pageHeadCol}>
+            <p className={kit.pageHeadEyebrow}>Our story</p>
+            <h1 className={kit.pageHeadTitle}>
+              We connect America.
+              <span className={kit.pageHeadLime}>One door at a time.</span>
+            </h1>
             <p className={kit.pageHeadLede}>
               3C World Group is a nationwide face-to-face sales organization specializing in
               customer acquisition for telecommunications and security providers.
             </p>
+            <div className={kit.pageHeadActions}>
+              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+                Apply now
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+              </Link>
+              <a href="#who-we-serve" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                Who we serve
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -93,7 +112,7 @@ export default function AboutPage() {
       {/* ---------------------------------------------------------------- */}
       {/* 1 — the door, and the four figures under it                      */}
       {/* ---------------------------------------------------------------- */}
-      <section id="story" className={kit.surfaceInk} aria-labelledby="story-title">
+      <section id="story" className={`${kit.surfaceInk} ${styles.story}`} aria-labelledby="story-title">
         <h2 id="story-title" className={kit.srOnly}>
           3C World Group at a glance
         </h2>

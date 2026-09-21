@@ -235,19 +235,35 @@ below), not a blanket opacity.
 Every navy/paper joint on this page is authored. A navy-to-paper gradient was
 built first and thrown out for the reason `home-page.module.css` gives for
 throwing out its own: alpha-blending navy over near-white is a hundred pixels
-of desaturated grey, and it reads as fog rather than as a decision. The rest of
-the site answers this with a diagonal cut. This page is orthogonal — the route
-walks right angles — so its joint is orthogonal too.
+of desaturated grey, and it reads as fog rather than as a decision. The answer
+is a cut.
 
-Both paper chapters (`.routeSection`, `.faq`) carry one `clip-path` that cuts
-the same offset into both of their edges: the paper starts `--step`
-(`clamp(1.75rem, 3vw, 3rem)`) lower across the left 38% of the top, and
-finishes `--step` higher across the right 38% of the bottom. Each edge is two
-offset horizontals joined by a vertical, never one line straight across, and
-the right-hand side is consistently the higher one so the four joints read as
-one gesture. `.page`'s own background is the navy that shows through the cut,
-so no negative margin or padding compensation is involved, and `--step` is far
-smaller than either section's top padding so nothing is ever clipped.
+An earlier draft cut an orthogonal step — two offset horizontals joined by a
+vertical, on the left 38% of the top and the right 38% of the bottom. It was
+thrown out at review: as a notch it read as a rendering fault rather than as a
+gesture, and it was the one joint on the site that did not match the others.
+
+There is now exactly **one** seam, `kit.seam` in
+`src/app/_cinematic/cinematic.module.css`, and every paper chapter on every page
+carries it — here, `.routeSection` and `.faq`. It is a single
+`clip-path: polygon()` cutting one straight full-width diagonal, rising to the
+right, into the section's own top and bottom edge at the same angle: the paper
+starts `--seam-rise` (`3.6vw`) lower on the left of the top edge and finishes
+`--seam-rise` higher on the right of the bottom edge. `.page`'s own background
+is the navy that shows through the cut, so no negative margin or padding
+compensation is involved, and `--seam-rise` is far smaller than any section's
+top padding so nothing is ever clipped.
+
+Below 900px `--seam-rise` drops to `0px` and the `clip-path` is removed on every
+page at once: at phone width the same angle is a wedge of dead space rather than
+a line, so the joint is a straight edge there, consistently.
+
+A note on the angle. The review brief asked for a `125deg` hard-edged gradient
+matching the Contact hero's lime line. Taken literally that edge is ~55° off
+horizontal, which across a 1740px page drops the seam more than 1200px — a
+column divider, not a section joint. The gesture was kept (one straight
+diagonal, one angle, every joint) and the angle set to the shallow `3.6vw` rise
+the approved homepage seam already used.
 
 The one navy/navy joint — two doors into the closing — is not a cut but a hue
 step, so `.closing::after` now opens on `--ink` and falls to `--ink-deep`

@@ -31,8 +31,14 @@ path with `aria-current="page"` and `kit.headerLinkCurrent`. Adding a route to
 
 ## The kit
 
-**Shell** — `kit.shell` (78rem, gutter), `kit.shellNarrow` (52rem). Every
+**Shell** — `kit.shell` (`--shell`, 90rem / 1440px, on a fluid
+`clamp(1.25rem, 4.5vw, 4.5rem)` gutter), `kit.shellNarrow` (62rem). Every
 section is `<section class={surface}><div class={kit.shell}>…`.
+
+**Vertical rhythm** — `--section-pad` (`clamp(4rem, 8vw, 7rem)`) is the one
+number every section top/bottom padding is written from. A section head and the
+content under it are never more than ~3rem apart, and no navy band exists purely
+to hold space.
 
 **Grounds** — `kit.surfaceInk` (navy), `kit.surfaceInkDeep`, `kit.surfacePaper`,
 `kit.surfacePaperRaise`. Each sets background, text colour, the paper
@@ -40,9 +46,18 @@ section is `<section class={surface}><div class={kit.shell}>…`.
 background colour on a section yourself.
 
 **Seam** — `kit.seam`. **Every paper section carries it; no navy section ever
-does.** It cuts the orthogonal step into the section's own top and bottom edges,
-so navy/paper joints are never a bare horizontal line. Compose it alongside the
-ground: `composes: surfacePaper seam from "…"`.
+does.** One straight diagonal, full width, rising to the right, cut into the
+section's own top *and* bottom edge by a single `clip-path: polygon()`, so every
+navy/paper joint on the site is the same gesture at the same angle. The rise is
+`--seam-rise` (`3.6vw`) — the same shallow angle the approved homepage seam
+used. `.page`'s own background is the navy the cut reveals, so no negative
+margin or padding compensation is involved. Below 900px `--seam-rise` goes to
+`0px` and the cut is dropped entirely: at phone width the same angle is a wedge
+of dead space, so the joint is a straight edge instead, consistently on every
+page. `kit.seamTopOnly` is the same cut on the top edge only, for a paper
+section that runs to the footer (the two legal routes). Compose either alongside
+the ground: `composes: surfacePaper seam from "…"`. There is no stepped or
+orthogonal seam anywhere in the codebase any more.
 
 **Section head** — `kit.sectionHead` on navy, `kit.sectionHeadInk` on paper:
 display heading left, lede right, on a hairline. This is the page's rhythm — use
@@ -83,15 +98,35 @@ them; do not restate a hex value.
 
 ## Opening a page
 
-Only the homepage has the photographic hero. Everything else opens on
-`kit.pageHead` — a navy band deep enough to clear the fixed header, with
-`kit.pageHeadRow` (eyebrow + title left, lede right), `kit.pageHeadEyebrow`,
-`kit.pageHeadTitle`, `kit.pageHeadLede`. It is not a reveal: it is the first
-thing read, so it is simply there.
+**Every page opens on a photograph.** `kit.pageHead` is a full-bleed
+photographic hero `clamp(560px, 76svh, 820px)` tall, built from:
+
+- `kit.pageHeadArt` + `kit.pageHeadImage` — the photograph, `fill`, `priority`,
+  `sizes="100vw"`. Crop it with `--head-focus` on a page-local class on the
+  `<header>`; the kit default is `62% 48%`.
+- `kit.pageHeadScrim` — a two-layer authored scrim, never a flat tint: a 100deg
+  wash that is dark under the copy column and lets the far side of the frame
+  stay lit, over a vertical fall that lands the bottom edge on `--ink` so the
+  hero sits down into the seam below it.
+- `kit.pageHeadInner` / `kit.pageHeadCol` — **one** left column, bottom-aligned.
+  Eyebrow, then a two-line `kit.pageHeadTitle` (white line, then a
+  `kit.pageHeadLime` line), then `kit.pageHeadLede` directly under the headline
+  on the same left edge, then `kit.pageHeadActions` with a primary and a ghost
+  CTA. The lede never moves to a second column.
+
+Below 900px the height relaxes to `clamp(30rem, 74svh, 40rem)`, the scrim drops
+to its vertical layer only and the column runs full width.
+
+`kit.pageHeadFlat` / `kit.pageHeadRow` / `kit.pageHeadLedeFlat` are the old flat
+navy band, kept for the two legal routes where a photograph would be pretence.
 
 The header reads the page: with no `[data-hero]` element it is condensed from
-the first paint, which is why the flat navy band matters — there is nothing for
-a transparent header to be transparent over.
+first paint.
+
+**One page, one frame.** Never run the same photograph twice in a page at the
+same scale. Where the v2 set leaves no alternative (Services: the head and band
+01 are the only fiber frame with a street in it), the two crops must differ
+hard — the head establishes, the band pushes in on the detail.
 
 ## Standing prohibitions (from PRODUCT.md)
 
@@ -115,17 +150,34 @@ export default function ServicesPage() {
   return (
     <>
       <header className={kit.pageHead}>
-        <div className={kit.shell}>
-          <div className={kit.pageHeadRow}>
-            <div>
-              <p className={kit.pageHeadEyebrow}>What we sell</p>
-              <h1 className={kit.pageHeadTitle}>
-                Three products,
-                <br />
-                one conversation.
-              </h1>
-            </div>
+        <div className={kit.pageHeadArt}>
+          <Image
+            src="/redesign/v2/photos/…-1600.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={kit.pageHeadImage}
+          />
+        </div>
+        <div className={kit.pageHeadScrim} aria-hidden="true" />
+
+        <div className={kit.pageHeadInner}>
+          <div className={kit.pageHeadCol}>
+            <p className={kit.pageHeadEyebrow}>What we sell</p>
+            <h1 className={kit.pageHeadTitle}>
+              Three products,
+              <span className={kit.pageHeadLime}>one conversation.</span>
+            </h1>
             <p className={kit.pageHeadLede}>One sentence that earns the page.</p>
+            <div className={kit.pageHeadActions}>
+              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+                Apply now
+              </Link>
+              <a href="#how" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                See how
+              </a>
+            </div>
           </div>
         </div>
       </header>

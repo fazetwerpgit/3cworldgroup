@@ -20,38 +20,50 @@
 
 /* --------------------------------------------------------------------------
    Page head
+   --------------------------------------------------------------------------
+   Round 5. The head is now the kit's interior opening — one left column, on
+   one left edge, at the homepage's display scale — and the only thing this
+   page keeps of its own is the photograph's replacement: the 3C street-map
+   mark, bled off the right edge and anchored to the BOTTOM of the head so the
+   lime line that leaves it has a fixed distance to travel.
+
+   That anchoring is the whole reason `--head-foot` is gone. The mark used to
+   sit in the flow above the head's bottom padding, so the line's drop was the
+   padding plus the next section's; with the mark's bottom on the head's bottom
+   the drop is exactly the next section's top padding, and the line lands on the
+   hairline of the section head below it with no second measurement.
    -------------------------------------------------------------------------- */
 
 .head {
   /*
-    The kit's own bottom padding, restated so the continuation line can be told
-    how far it is from the bottom of the mark to the bottom of the head. If
-    `kit.pageHead` ever changes this value, change it here too and the line
-    follows.
+    Both of these are set by where the line has to land, not by taste. The exit
+    point sits `0.5357 * --mark-w - --mark-bleed` in from the right edge of the
+    viewport, while the hairline it lands on ends at the right edge of the
+    shell — so too small a mark or too deep a bleed drops the node on the very
+    end of that hairline instead of onto it.
   */
-  --head-foot: clamp(3rem, 6vw, 5rem);
+  --mark-w: clamp(20rem, 44vw, 58rem);
+  --mark-bleed: clamp(1rem, 4vw, 4.5rem);
 
-  display: flex;
-  flex-direction: column;
-  padding-bottom: var(--head-foot);
+  background: var(--ink);
+  /* The mark bleeds past the right edge and the line leaves the bottom edge;
+     `.page` carries `overflow-x: clip`, so neither can scroll the document. */
+  overflow: visible;
 }
 
 .headInner {
-  position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
-.headCopy {
-  max-width: 44ch;
-}
-
-.headTitleLime {
-  color: var(--lime);
+/* Three lines, not two: the page's own copy breaks that way and is not
+   rewritten. It needs a slightly shorter cap than the kit's so the third line
+   still clears the mark at 1280. */
+.headTitle {
+  font-size: clamp(3.25rem, 6vw, 6.4rem);
 }
 
 .headLede {
-  margin-top: clamp(1.25rem, 2.2vw, 1.9rem);
-  max-width: 52ch;
+  max-width: 38ch;
 }
 
 /*
@@ -65,20 +77,22 @@
   /*
     The continuation lives inside the mark, which is what makes it survive every
     width without a second set of measurements: the exit point is a fixed
-    fraction of the *image's own* width (0.5357 of it in from its right edge),
+    fraction of the *image's own* width (0.5357 of it in from its left edge),
     so `right: 53.57%` resolves against this box and is correct whether the mark
-    is bled off the viewport at 1920 or centred in the gutter at 390. `--drop`
-    is the only thing that changes: it is the distance from the bottom of the
-    mark down to the hairline the line has to land on.
+    is bled off the viewport at 1920 or sits behind the copy at 390. `--drop` is
+    the distance from the bottom of the mark down to the hairline it lands on,
+    which — with the mark's bottom on the head's bottom — is exactly the next
+    section's top padding.
   */
-  --drop: calc(var(--head-foot) + var(--path-drop));
+  --drop: var(--path-drop);
   --line-run: calc(0.7018 * var(--drop));
 
-  margin: clamp(1.75rem, 4vw, 2.75rem) auto 0;
+  bottom: 0;
   mix-blend-mode: lighten;
-  order: 2;
-  position: relative;
-  width: min(calc(100% - 2 * var(--gutter)), clamp(20rem, 56vw, 34rem));
+  position: absolute;
+  right: calc(-1 * var(--mark-bleed));
+  width: var(--mark-w);
+  z-index: 1;
 }
 
 .headArtImage {
@@ -130,16 +144,16 @@
     hairline this section's head hangs from. The two are declared together for
     that reason — change one and the touchdown moves.
   */
-  padding: var(--path-drop) 0 clamp(4.5rem, 9vw, 8.5rem);
+  padding: var(--path-drop) 0 var(--section-pad);
 }
 
 .head,
 .path {
-  --path-drop: clamp(4rem, 8vw, 7rem);
+  --path-drop: var(--section-pad);
 }
 
 .pathList {
-  margin-top: clamp(2.25rem, 4.5vw, 3.5rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .pathRow {
@@ -201,14 +215,14 @@
    -------------------------------------------------------------------------- */
 
 .formSection {
-  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .formLayout {
   display: grid;
   gap: clamp(2.5rem, 5vw, 4.5rem);
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  margin-top: clamp(2.25rem, 4.5vw, 3.5rem);
+  margin-top: clamp(1.75rem, 3vw, 3rem);
 }
 
 .form {
@@ -439,7 +453,7 @@
    -------------------------------------------------------------------------- */
 
 .closing {
-  padding: clamp(4rem, 8vw, 7rem) 0;
+  padding: var(--section-pad) 0;
 }
 
 .closingInner {
@@ -491,59 +505,46 @@
 }
 
 /* --------------------------------------------------------------------------
-   Desktop — the mark opens the page rather than sitting under it
+   The mark's own height floor
    --------------------------------------------------------------------------
-   Below 1024 the mark is a 20rem block centred under the copy, and the line
-   leaving it has to cross this head's bottom padding as well as the next
-   section's top padding to reach the hairline. Above 1024 the mark leaves the
-   flow, is bled off the right edge of the viewport and is anchored to the
-   bottom of the head — so its bottom edge *is* the head's bottom edge, and the
-   line has only `--path-drop` left to cross. That difference is the whole of
-   what changes here: `--drop`, and where the mark sits.
-
-   Both sections either side of the crossing are navy, so the join is invisible
-   and the line simply continues.
+   The head is sized by the kit (72–80vh). The one thing the kit cannot know is
+   that this page's head has to be at least as tall as the mark standing in it,
+   which at 1024 and up is taller than 560px. `--mark-h` is the file's own
+   aspect (1520 / 1860) applied to the width above.
    -------------------------------------------------------------------------- */
 
 @media (min-width: 1024px) {
   .head {
-    /*
-      Both of these are set by where the line has to land, not by taste. The
-      exit point sits `0.5357 * --mark-w - --mark-bleed` in from the right edge
-      of the viewport, while the hairline it lands on ends at the right edge of
-      the 78rem shell — so at 1920, where the shell stops 392px short of the
-      viewport, too small a mark or too deep a bleed drops the node on the very
-      end of that hairline instead of onto it. 44vw and a 4rem bleed cap keep
-      the touchdown 75px or more inside the hairline at every width from 1024
-      up, and the mark still bleeds off the edge at all of them.
-    */
-    --mark-w: clamp(30rem, 44vw, 58rem);
-    --mark-bleed: clamp(2rem, 4vw, 4rem);
-    /* 1520 / 1860 */
     --mark-h: calc(0.8172 * var(--mark-w));
 
-    justify-content: center;
-    min-height: calc(var(--mark-h) + 9rem);
+    min-height: calc(var(--mark-h) + 8rem);
   }
+}
 
-  .headCopy {
-    max-width: min(34rem, 42vw);
-  }
-
-  /*
-    Out of the flow, bled off the right edge and anchored to the bottom of the
-    head — so the mark's own bottom edge *is* the head's bottom edge, and the
-    line has only the next section's top padding left to cross.
-  */
+/*
+  Below 1024 the mark stands behind the copy rather than beside it, so it is
+  pulled down and held quiet: the copy owns the left, the mark owns the bottom
+  right corner, and the line still leaves it for the hairline below.
+*/
+@media (max-width: 1023px) {
   .headArt {
-    --drop: var(--path-drop);
+    --mark-w: min(30rem, 86vw);
 
-    bottom: 0;
-    margin: 0;
-    position: absolute;
-    right: calc(-1 * var(--mark-bleed));
-    width: var(--mark-w);
-    z-index: 0;
+    opacity: 0.5;
+  }
+}
+
+/*
+  On a phone the copy runs the full width, so the mark is behind it rather than
+  beside it. It is pushed further off the right edge and taken down to a ghost
+  — enough that the shape and the line leaving it still read, not enough to
+  compete with a paragraph sitting on top of it.
+*/
+@media (max-width: 760px) {
+  .headArt {
+    --mark-bleed: 16vw;
+
+    opacity: 0.34;
   }
 }
 

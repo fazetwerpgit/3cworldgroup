@@ -169,24 +169,39 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       {/* 1 — how the page opens: flat navy, no reveal, simply there         */}
       {/* ------------------------------------------------------------------ */}
       <header className={kit.pageHead}>
-        <div className={kit.shell}>
-          <div className={kit.pageHeadRow}>
-            <div>
-              <p className={kit.pageHeadEyebrow}>Apply</p>
-              {/*
-                No authored line break. The head's left column is half the
-                shell, and at the title's capped size the longest line that
-                fits it is about thirteen characters — a hand-placed break
-                either overhangs the gap at 1440 or reads as a different shape
-                at 1024, where the row is already one column.
-              */}
-              <h1 className={kit.pageHeadTitle}>Your next chapter starts here.</h1>
-            </div>
+        <div className={kit.pageHeadArt}>
+          <Image
+            src="/redesign/v2/photos/hero-wide-1600.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={kit.pageHeadImage}
+          />
+        </div>
+        <div className={kit.pageHeadScrim} aria-hidden="true" />
+
+        <div className={kit.pageHeadInner}>
+          <div className={kit.pageHeadCol}>
+            <p className={kit.pageHeadEyebrow}>Apply</p>
+            <h1 className={kit.pageHeadTitle}>
+              Your next chapter
+              <span className={kit.pageHeadLime}>starts here.</span>
+            </h1>
             <p className={kit.pageHeadLede}>
               Five fields, no resume. Door-to-door sales of fiber internet, TV and home
               security — a 1099 independent contractor role, commission-only and uncapped,
               with full training and no experience needed.
             </p>
+            <div className={kit.pageHeadActions}>
+              <a href="#apply-form" className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+                Start your application
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+              </a>
+              <a href="#the-work" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                The work behind the form
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -195,12 +210,17 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       {/* 2 — the form. The page.                                            */}
       {/* ------------------------------------------------------------------ */}
       <section className={styles.applySection} aria-labelledby="apply-form-title">
+        {/*
+          The door, not the aerial. The head above already carries the aerial
+          the homepage opens on; this section needed a photograph of its own so
+          the short aside column does not leave several hundred pixels of empty
+          navy beside a plate that is twice its height.
+        */}
         <div className={styles.applyArt} aria-hidden="true">
           <Image
-            src="/redesign/v2/photos/hero-wide-1600.webp"
+            src="/redesign/v2/photos/security-dusk-1600.webp"
             alt=""
             fill
-            priority
             sizes="100vw"
             className={styles.applyArtImage}
           />
@@ -377,7 +397,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               </form>
             </div>
 
-            <div className={`${styles.applyAside} ${kit.revealRise}`} data-reveal>
+            <div id="the-work" className={`${styles.applyAside} ${kit.revealRise}`} data-reveal>
               <p className={styles.asideEyebrow}>What you are applying for</p>
               <h2 className={styles.asideTitle}>
                 The work

@@ -22,7 +22,7 @@ const LAST_UPDATED = "May 6, 2026";
 export default function TermsOfServicePage() {
   return (
     <>
-      <header className={kit.pageHead}>
+      <header className={kit.pageHeadFlat}>
         <div className={kit.shell}>
           <div className={kit.pageHeadRow}>
             <div>
@@ -30,7 +30,7 @@ export default function TermsOfServicePage() {
               <h1 className={kit.pageHeadTitle}>Terms of Service</h1>
             </div>
             <div>
-              <p className={kit.pageHeadLede}>
+              <p className={kit.pageHeadLedeFlat}>
                 Please read these Terms carefully. By using our website or contractor portal, you agree
                 to be bound by them.
               </p>
@@ -40,7 +40,7 @@ export default function TermsOfServicePage() {
         </div>
       </header>
 
-      <section className={`${kit.surfacePaper} ${kit.seam} ${styles.body}`} aria-label="Terms of Service">
+      <section className={`${kit.surfacePaper} ${kit.seamTopOnly} ${styles.body}`} aria-label="Terms of Service">
         <div className={kit.shell}>
           <div className={styles.prose}>
             <LegalSection id="terms-1" title="1. Acceptance of Terms">

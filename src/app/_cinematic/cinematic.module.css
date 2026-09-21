@@ -33,11 +33,20 @@
   --display: "Bebas Neue", var(--font-geist-sans), sans-serif;
   --body: var(--font-geist-sans), system-ui, sans-serif;
 
-  --shell: 78rem;
-  /* 5vw, not 4vw: at 4vw the tablet range sat on a 30px gutter and every
-     section ran nearly edge to edge. 390 and 1440+ are unchanged — the floor
-     and the cap already own those. */
-  --gutter: clamp(1.25rem, 5vw, 3.5rem);
+  /* Round 5 — the shell was 78rem (1248px), which on the 1740px display the
+     work is reviewed at left a quarter of the screen empty on both sides and
+     made every section read as a narrow column pinned to the middle. 90rem is
+     1440px of content; the gutter grows with it so the air outside the text
+     keeps its proportion instead of collapsing. */
+  --shell: 90rem;
+  --gutter: clamp(1.25rem, 4.5vw, 4.5rem);
+  /* Round 5 — one vertical rhythm for every section on every route. Sections
+     used to carry their own clamp, and the biggest of them ran to 8.5rem of
+     padding at both ends, so two neighbouring heads sat nearly 300px apart. */
+  --section-pad: clamp(4rem, 8vw, 7rem);
+  /* The seam angle, shared by every navy/paper joint on every page. A single
+     diagonal, always rising to the right. See `.seam`. */
+  --seam-rise: 3.6vw;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   background: var(--ink);
@@ -110,7 +119,7 @@
 
 .shellNarrow {
   composes: shell;
-  max-width: 52rem;
+  max-width: 62rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -440,17 +449,149 @@
 }
 
 /* --------------------------------------------------------------------------
-   Page header — how an interior page opens
+   Page head — how an interior page opens
    --------------------------------------------------------------------------
-   Only the homepage has the photographic hero. Every other route in the group
-   opens on this: a navy band deep enough to clear the fixed header, the page
-   name in display type on the left, one lede on the right. Because the band is
-   flat navy, the header being transparent for its first paint is invisible.
+   Round 5. Every interior route used to open on a flat navy band: the headline
+   top left, the lede floating in a second column at a different baseline, and
+   no photograph at all. Against the homepage — which opens on a full-bleed
+   dusk frame with one left column of copy standing on it — an interior page
+   read as a different site.
+
+   `.pageHead` is now that same opening. A photograph under an authored scrim,
+   sized between 72 and 80vh so it is a frame and not a banner; eyebrow, two
+   display lines and the lede stacked in ONE left column on one left edge; the
+   page's two calls to action beneath them. The photograph is the page's own —
+   the street for Services, the door for Careers, the aerial for About and
+   Apply — and it is passed in by the page, not by the kit.
+
+   The scrim is two layers, never one flat tint: a horizontal wash that is
+   heavy under the copy column and clears to almost nothing on the far side, so
+   the picture stays a picture, plus a vertical fall that lands on solid navy so
+   the head joins whatever follows it. Same construction as the homepage hero.
+
+   `.pageHeadFlat` is what is left of the old band. Only the two legal routes
+   use it: they have no photograph, and a 78vh frame over a privacy policy
+   would be a lie about the page.
    -------------------------------------------------------------------------- */
 
 .pageHead {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 820px;
+  min-height: min(560px, 100svh);
+  height: clamp(560px, 76svh, 820px);
+  overflow: hidden;
+  padding-top: 7rem;
+  position: relative;
+}
+
+.pageHeadArt {
+  inset: 0;
+  position: absolute;
+  z-index: 0;
+}
+
+.pageHeadImage {
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--head-focus, 62% 48%);
+  width: 100%;
+}
+
+/*
+  Two stacked scrims. The horizontal one owns legibility under the copy column
+  and is gone by 72% of the width; the vertical one owns the joint with the
+  section below. Neither is a blanket opacity over the whole frame — that is
+  what turned the interior photographs to mud.
+*/
+.pageHeadScrim {
+  background:
+    linear-gradient(
+      100deg,
+      rgba(3, 13, 31, 0.9) 0%,
+      rgba(3, 13, 31, 0.72) 32%,
+      rgba(3, 13, 31, 0.26) 62%,
+      rgba(3, 13, 31, 0.1) 78%,
+      rgba(3, 13, 31, 0.3) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(3, 13, 31, 0.78) 0%,
+      rgba(3, 13, 31, 0.24) 30%,
+      rgba(6, 23, 53, 0.72) 82%,
+      var(--ink) 100%
+    );
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.pageHeadInner {
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding: 0 var(--gutter) clamp(2.75rem, 5vw, 4.5rem);
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
+/*
+  The one column. Eyebrow, headline, lede and buttons all start on the same
+  left edge; the lede sits directly under the headline rather than beside it.
+*/
+.pageHeadCol {
+  display: flex;
+  flex-direction: column;
+  /* Wide enough that the longest authored display line on any of the five
+     interior routes — "WE CONNECT AMERICA." at nineteen characters — holds one
+     line at the cap, so every head is the two lines it was written as. */
+  max-width: min(58rem, 100%);
+}
+
+.pageHeadEyebrow {
+  color: var(--lime);
+  font-family: var(--display);
+  font-size: 1.05rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 1.1rem;
+  text-transform: uppercase;
+}
+
+.pageHeadTitle {
+  font-family: var(--display);
+  font-size: clamp(3.5rem, 7vw, 7.5rem);
+  font-weight: 400;
+  letter-spacing: 0.004em;
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+
+.pageHeadLime {
+  color: var(--lime);
+  display: block;
+}
+
+.pageHeadLede {
+  color: #e3eaf4;
+  font-size: clamp(1.125rem, 1.3vw, 1.25rem);
+  line-height: 1.55;
+  margin-top: 1.5rem;
+  max-width: 36ch;
+  text-shadow: 0 1px 14px rgba(3, 13, 31, 0.6);
+}
+
+.pageHeadActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 2.1rem;
+}
+
+/* The flat band the two legal routes keep. */
+.pageHeadFlat {
   background: var(--ink);
-  padding: clamp(7.25rem, 12vw, 11rem) 0 clamp(3rem, 6vw, 5rem);
+  padding: clamp(7.5rem, 12vw, 11rem) 0 clamp(3rem, 6vw, 5rem);
   position: relative;
 }
 
@@ -461,29 +602,13 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.pageHeadEyebrow {
-  color: var(--lime);
-  font-family: var(--display);
-  font-size: 1rem;
-  letter-spacing: 0.2em;
-  margin-bottom: 1rem;
-  text-transform: uppercase;
-}
-
-.pageHeadTitle {
-  font-family: var(--display);
-  font-size: clamp(2.6rem, 6vw, 5.4rem);
-  font-weight: 400;
-  letter-spacing: 0.006em;
-  line-height: 0.88;
-  text-transform: uppercase;
-}
-
-.pageHeadLede {
+/* The flat band's lede sits on navy, not on a photograph. */
+.pageHeadLedeFlat {
+  composes: pageHeadLede;
   color: var(--on-ink-dim);
-  font-size: clamp(1.05rem, 1.35vw, 1.28rem);
-  line-height: 1.55;
+  margin-top: 0;
   max-width: 54ch;
+  text-shadow: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -493,7 +618,7 @@
 .sectionTitle,
 .sectionTitleInk {
   font-family: var(--display);
-  font-size: clamp(2.2rem, 4.6vw, 4.2rem);
+  font-size: clamp(2.5rem, 4.2vw, 4.25rem);
   font-weight: 400;
   letter-spacing: 0.006em;
   line-height: 0.9;
@@ -507,9 +632,9 @@
 .sectionLede,
 .sectionLedeInk {
   color: var(--on-ink-dim);
-  font-size: clamp(1rem, 1.1vw, 1.1rem);
-  line-height: 1.66;
-  max-width: 58ch;
+  font-size: clamp(1.125rem, 1.2vw, 1.25rem);
+  line-height: 1.6;
+  max-width: 52ch;
 }
 
 .sectionLedeInk {
@@ -528,7 +653,13 @@
   border-top: 1px solid var(--rule);
   display: grid;
   gap: clamp(1.25rem, 3vw, 4rem);
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /*
+    Round 5 — the lede column used to be half the shell. At 1440 of content
+    that made a 660px measure for two lines of type and left the head looking
+    like two unrelated things; the display heading now keeps the weight and the
+    lede takes a third.
+  */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   padding-top: 1.9rem;
 }
 
@@ -546,19 +677,29 @@
 /* --------------------------------------------------------------------------
    Grounds and the seam between them
    --------------------------------------------------------------------------
-   Every navy/paper joint is authored. A navy-to-paper gradient was tried first
-   and thrown out for the same reason home-page.module.css threw out its own:
-   alpha-blending navy over near-white is 100px of desaturated grey, and it
-   reads as fog rather than as a decision. The rest of the site answers this
-   with a diagonal cut. This language is orthogonal — the route walks right
-   angles — so its joint is an orthogonal one: the paper is cut to start lower
-   on the left and finish higher on the right, so each edge is two offset
-   horizontals joined by a vertical instead of one line straight across.
-   `.page`'s own background is the navy that shows through the cut, which is why
-   no negative margin is needed, and `--step` is far smaller than any section's
-   top padding so nothing is ever clipped.
+   Round 5. The joint used to be an orthogonal notch: the paper started
+   `--step` lower across the left 38% of its top and finished `--step` higher
+   across the right 38% of its bottom, so each edge was two offset horizontals
+   joined by a vertical. On a wide screen that reads as a mistake — two
+   rectangles that failed to line up — not as a decision, and the owner called
+   it exactly that.
 
-   The rule: every paper section carries `.seam`. Navy sections never do.
+   It is now one diagonal, the same gesture the rest of the site cuts its
+   sections with: a single straight line that rises to the right, on both the
+   top and the bottom edge of every paper chapter, so navy wedges down on the
+   left of the joint and up on the right of the next one and the whole page
+   reads as one angled rhythm. `--seam-rise` is the vertical travel of that
+   line across the full width; because it is stated in `vw` the ANGLE is the
+   same at 1280, 1740 and 1920 rather than the drop being the same number of
+   pixels. Below 900px the line flattens to a straight edge: at phone widths
+   3.6vw is 13px of travel, which is not a diagonal, it is a crooked line.
+
+   `.page`'s own background is the navy the cut reveals, so no negative margin
+   or padding compensation is involved, and `--seam-rise` stays well under
+   `--section-pad` so no content is ever clipped.
+
+   The rule, unchanged: every paper section carries `.seam`. Navy sections
+   never do.
    -------------------------------------------------------------------------- */
 
 .surfaceInk {
@@ -593,19 +734,33 @@
 }
 
 .seam {
-  --step: clamp(1.75rem, 3vw, 3rem);
-
   clip-path: polygon(
-    0 var(--step),
-    38% var(--step),
-    38% 0,
+    0 var(--seam-rise),
     100% 0,
-    100% calc(100% - var(--step)),
-    62% calc(100% - var(--step)),
-    62% 100%,
+    100% calc(100% - var(--seam-rise)),
     0 100%
   );
   position: relative;
+}
+
+/*
+  A paper chapter that ends the page rather than handing back to navy keeps the
+  top cut and leaves its bottom edge square, so the footer meets it flat.
+*/
+.seamTopOnly {
+  clip-path: polygon(0 var(--seam-rise), 100% 0, 100% 100%, 0 100%);
+  position: relative;
+}
+
+@media (max-width: 900px) {
+  .page {
+    --seam-rise: 0px;
+  }
+
+  .seam,
+  .seamTopOnly {
+    clip-path: none;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -806,6 +961,38 @@
   .pageHeadRow {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.1rem;
+  }
+}
+
+@media (max-width: 900px) {
+  /*
+    The head is still a photograph on a phone, just a shorter one, and the
+    horizontal scrim is replaced by a vertical one — there is no far side of
+    the frame to protect at 390px, the copy runs the whole width.
+  */
+  .pageHead {
+    height: clamp(30rem, 74svh, 40rem);
+    max-height: none;
+    min-height: 30rem;
+    padding-top: 5.5rem;
+  }
+
+  .pageHeadScrim {
+    background: linear-gradient(
+      180deg,
+      rgba(3, 13, 31, 0.72) 0%,
+      rgba(3, 13, 31, 0.5) 26%,
+      rgba(3, 13, 31, 0.82) 66%,
+      var(--ink) 100%
+    );
+  }
+
+  .pageHeadCol {
+    max-width: 100%;
+  }
+
+  .pageHeadLede {
+    max-width: 40ch;
   }
 }
 
