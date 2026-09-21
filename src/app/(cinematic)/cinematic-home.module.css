@@ -443,7 +443,7 @@
   carries the step the whole sequence is about rather than sitting empty.
 */
 .routeEnd {
-  border-left: 2px solid var(--lime);
+  border-left: 1px solid var(--rule-ink);
   display: grid;
   gap: 0.8rem;
   justify-items: start;
@@ -938,7 +938,7 @@
 .closing::after {
   background:
     radial-gradient(
-      66% 60% at 50% 46%,
+      66% 60% at 30% 46%,
       rgba(3, 13, 31, 0.4) 0%,
       rgba(3, 13, 31, 0.32) 54%,
       rgba(3, 13, 31, 0.08) 86%,
@@ -963,7 +963,7 @@
   max-width: var(--shell);
   padding-inline: var(--gutter);
   position: relative;
-  text-align: center;
+  text-align: left;
 }
 
 /* --------------------------------------------------------------------------
@@ -978,7 +978,7 @@
 
 .closingInner::before {
   background: radial-gradient(
-    50% 50% at 50% 50%,
+    50% 50% at 28% 50%,
     rgba(3, 13, 31, 0.82) 0%,
     rgba(3, 13, 31, 0.72) 44%,
     rgba(3, 13, 31, 0.3) 76%,
@@ -1005,7 +1005,7 @@
   color: var(--on-ink-dim);
   font-size: clamp(1.02rem, 1.2vw, 1.16rem);
   line-height: 1.6;
-  margin: 1.5rem auto 2.4rem;
+  margin: 1.5rem 0 2.4rem;
   max-width: 48ch;
 }
 
@@ -1107,9 +1107,6 @@
     transform 0.55s var(--ease-out-expo);
 }
 
-[data-motion="on"] .routeStop[data-arrived] .routeDot {
-  box-shadow: 0 0 0 6px rgba(141, 198, 63, 0.18);
-}
 
 /* --------------------------------------------------------------------------
    Breakpoints
@@ -1345,8 +1342,7 @@
 
   .applyBar {
     align-items: center;
-    background: rgba(3, 13, 31, 0.93);
-    backdrop-filter: blur(14px);
+    background: var(--ink-deep);
     border-top: 1px solid var(--rule);
     bottom: 0;
     display: flex;

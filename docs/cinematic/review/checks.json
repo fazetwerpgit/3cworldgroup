@@ -72,7 +72,7 @@
       "route": "/services",
       "motion": null,
       "hidden": [],
-      "h": 4819
+      "h": 4962
     }
   ],
   "nojs": [
@@ -82,7 +82,7 @@
     },
     {
       "route": "/about",
-      "height": 5329
+      "height": 4958
     }
   ],
   "menu": {
@@ -160,9 +160,9 @@
       "route": "/about",
       "box": {
         "x": 20,
-        "y": 321,
+        "y": 410,
         "w": 350,
-        "h": 144,
+        "h": 84,
         "color": "rgb(255, 255, 255)"
       },
       "file": "heroback-about-390.png"
@@ -172,7 +172,7 @@
       "route": "/services",
       "box": {
         "x": 20,
-        "y": 358,
+        "y": 330,
         "w": 350,
         "h": 96,
         "color": "rgb(255, 255, 255)"
@@ -184,7 +184,7 @@
       "route": "/opportunities",
       "box": {
         "x": 20,
-        "y": 386,
+        "y": 330,
         "w": 350,
         "h": 96,
         "color": "rgb(255, 255, 255)"
@@ -244,7 +244,7 @@
       "route": "/services",
       "box": {
         "x": 222,
-        "y": 309,
+        "y": 278,
         "w": 928,
         "h": 206,
         "color": "rgb(255, 255, 255)"
@@ -256,7 +256,7 @@
       "route": "/opportunities",
       "box": {
         "x": 222,
-        "y": 309,
+        "y": 278,
         "w": 928,
         "h": 206,
         "color": "rgb(255, 255, 255)"

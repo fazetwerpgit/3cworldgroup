@@ -500,70 +500,42 @@
 .closing {
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(5rem, 9vw, 8rem) 0;
+  /*
+    Less above than below. With 128px here, 53 from the form section's bottom
+    pad and 51 under the closer's own hairline, the joint measured 233px at
+    1740 against a 140 ceiling — a third of a screen of nothing between the
+    last field and the last line on the page. The weight belongs under the
+    button.
+  */
+  padding: clamp(1.7rem, 3.2vw, 3rem) 0 clamp(5rem, 9vw, 8rem);
   position: relative;
-}
-
-.closingArt {
-  object-fit: cover;
-  object-position: 44% 40%;
-  z-index: -2;
-}
-
-.closing::after {
-  background:
-    radial-gradient(
-      66% 60% at 50% 46%,
-      rgba(3, 13, 31, 0.4) 0%,
-      rgba(3, 13, 31, 0.32) 54%,
-      rgba(3, 13, 31, 0.08) 86%,
-      rgba(3, 13, 31, 0) 100%
-    ),
-    linear-gradient(
-      180deg,
-      var(--ink) 0%,
-      rgba(3, 13, 31, 0.32) 10%,
-      rgba(3, 13, 31, 0.02) 52%,
-      rgba(3, 13, 31, 0.3) 91%,
-      var(--ink-deep) 100%
-    );
-  content: "";
-  inset: 0;
-  position: absolute;
-  z-index: -1;
-}
-
-.closingInner {
-  display: grid;
-  gap: 1.5rem;
-  justify-items: center;
-  margin-inline: auto;
-  max-width: var(--shell);
-  padding-inline: var(--gutter);
-  position: relative;
-  text-align: center;
 }
 
 /*
-  The plate, identical to the one the other four closers carry: the band-wide
-  ellipse above stays light enough that the photograph reads at the edges, and
-  this soft rim-transparent plate, sized to the type, is what holds contrast.
+  Flat navy, no photograph: the reader has just filled a form, and the page
+  ends on one line and one button on the same hairline the form sat on.
 */
-.closingInner::before {
-  background: radial-gradient(
-    50% 50% at 50% 50%,
-    rgba(3, 13, 31, 0.82) 0%,
-    rgba(3, 13, 31, 0.72) 44%,
-    rgba(3, 13, 31, 0.3) 76%,
-    rgba(3, 13, 31, 0) 100%
-  );
-  content: "";
-  inset: -52% clamp(0px, calc(50% - 34rem), 26rem);
-  pointer-events: none;
-  position: absolute;
-  z-index: -1;
+.closingInner {
+  align-items: end;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 1.5rem clamp(2rem, 5vw, 5rem);
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: start;
+  padding-top: clamp(1rem, 1.5vw, 1.35rem);
+  position: relative;
+  text-align: left;
 }
 
+@media (max-width: 760px) {
+  .closing {
+    padding-top: 3rem;
+  }
+
+  .closingInner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
 .closingTitle {
   font-family: var(--display);

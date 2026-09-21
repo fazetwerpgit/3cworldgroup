@@ -82,10 +82,10 @@ export default function Home() {
         <div className={styles.heroInner}>
           <h1 id="hero-title" className={styles.heroTitle}>
             <span className={styles.heroLine}>
-              <span>Your next chapter</span>
+              <span>Your next</span>
             </span>
             <span className={styles.heroLine}>
-              <span>starts at</span>
+              <span>chapter starts at</span>
             </span>
             <span className={styles.heroLine}>
               <span className={styles.heroLime}>the next door.</span>
@@ -279,6 +279,15 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       {/* 7 — closing                                                      */}
       {/* ---------------------------------------------------------------- */}
+      {/*
+        The fiber drop where it ends: the ONT on the siding, the cable curving
+        up under the eave, one sconce lit. The pedestal at the curb was already
+        carrying three slots — this closer, the About band and the Careers mid
+        — and the Services page opens on a pedestal too, so from the bottom of
+        this page the next click showed the same object twice running. The
+        last box on the wall is a quieter note to end on than the one at the
+        kerb, and it is the only frame on the site that is a finished install.
+      */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
           src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"

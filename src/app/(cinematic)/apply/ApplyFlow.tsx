@@ -217,7 +217,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
         */}
         <div className={styles.applyArt} aria-hidden="true">
           <Image
-            src="/redesign/v2/photos/security-dusk-1600.webp"
+            src="/redesign/cinematic/apply-corner-dusk-1600.webp"
             alt=""
             fill
             sizes="100vw"
@@ -254,7 +254,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
 
                 <div className={styles.fieldPair}>
                   <label className={styles.field} htmlFor="apply-name">
-                    <span className={styles.fieldLabel}>Full Name*</span>
+                    <span className={styles.fieldLabel}>Full Name <span className={styles.req}>*</span></span>
                     <input
                       className={styles.input}
                       type="text"
@@ -271,7 +271,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                   </label>
 
                   <label className={styles.field} htmlFor="apply-phone">
-                    <span className={styles.fieldLabel}>Phone*</span>
+                    <span className={styles.fieldLabel}>Phone <span className={styles.req}>*</span></span>
                     <input
                       className={styles.input}
                       type="tel"
@@ -289,7 +289,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                 </div>
 
                 <label className={styles.field} htmlFor="apply-email">
-                  <span className={styles.fieldLabel}>Email*</span>
+                  <span className={styles.fieldLabel}>Email <span className={styles.req}>*</span></span>
                   <input
                     className={styles.input}
                     type="email"
@@ -306,7 +306,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                 </label>
 
                 <label className={styles.field} htmlFor="apply-city">
-                  <span className={styles.fieldLabel}>City*</span>
+                  <span className={styles.fieldLabel}>City <span className={styles.req}>*</span></span>
                   <input
                     className={styles.input}
                     type="text"
@@ -425,22 +425,17 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       {/* Closing — the same door, one screen later                          */}
       {/* ------------------------------------------------------------------ */}
       <section className={styles.closing} aria-labelledby="apply-closing-title">
-        <Image
-          src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
-          alt=""
-          fill
-          sizes="100vw"
-          className={styles.closingArt}
-        />
-        <div className={`${kit.shell} ${styles.closingInner}`}>
-          <h2 id="apply-closing-title" className={styles.closingTitle}>
-            Take the
-            <br />
-            <span className={styles.closingLime}>first step.</span>
-          </h2>
-          <p className={styles.closingLede}>
-            It all starts with the form. Everything after it is a conversation.
-          </p>
+        <div className={styles.closingInner}>
+          <div>
+            <h2 id="apply-closing-title" className={styles.closingTitle}>
+              Take the
+              <br />
+              <span className={styles.closingLime}>first step.</span>
+            </h2>
+            <p className={styles.closingLede}>
+              The form is at the top of this page. Five fields, then a call from a real person.
+            </p>
+          </div>
           <a href="#apply-form" className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
             Start your application
             <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />

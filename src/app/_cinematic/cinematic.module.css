@@ -200,19 +200,16 @@
 
 .btnLime:hover {
   background: var(--lime-bright);
-  box-shadow: 0 10px 26px -12px rgba(141, 198, 63, 0.75);
   transform: translateY(-1px);
 }
 
 .btnLime:active {
-  box-shadow: none;
   transform: translateY(1px);
 }
 
 .btnGhost {
-  background: rgba(6, 23, 53, 0.34);
-  backdrop-filter: blur(6px);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(6, 23, 53, 0.62);
+  border-color: rgba(255, 255, 255, 0.55);
   color: var(--on-ink);
 }
 
@@ -312,8 +309,7 @@
   top: 0;
   transition:
     background-color 0.3s ease,
-    box-shadow 0.3s ease,
-    backdrop-filter 0.3s ease;
+    box-shadow 0.3s ease;
   z-index: 50;
 }
 
@@ -996,8 +992,9 @@
   gap: 0.6rem 1.5rem;
   justify-content: space-between;
   margin: 1.8rem auto 0;
-  max-width: var(--shell);
-  padding: 1.4rem var(--gutter) 0;
+  max-width: calc(var(--shell) - 2 * var(--gutter));
+  padding: 1.4rem 0 0;
+  width: calc(100% - 2 * var(--gutter));
 }
 
 /*

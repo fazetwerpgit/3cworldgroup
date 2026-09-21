@@ -47,17 +47,17 @@ const CHAPTERS = [
 */
 const STAGE = [
   {
-    src: "/redesign/cinematic/fiber-pedestal-dusk-1920.webp",
+    src: "/redesign/cinematic/fiber-eave-dusk-1920.webp",
     alt: "A suburban street at dusk with a fiber cabinet and tool bag at the curb",
     position: "56% 58%",
   },
   {
-    src: "/redesign/cinematic/tv-room-dusk-1920.webp",
+    src: "/redesign/cinematic/tv-window-dusk-1920.webp",
     alt: "A living room at dusk with a wall-mounted television and the neighborhood through the window",
     position: "58% 52%",
   },
   {
-    src: "/redesign/v2/photos/security-dusk-1600.webp",
+    src: "/redesign/cinematic/security-garage-dusk-1920.webp",
     alt: "A lit front door at dusk with a keypad and door camera beside it",
     position: "60% 50%",
   },

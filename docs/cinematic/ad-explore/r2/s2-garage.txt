@@ -1,0 +1,9 @@
+Use case: website figure photograph for a "security" stage on a door-to-door sales company site, about 600 pixels wide, 3:2.
+Asset type: photograph, 3:2.
+Primary request: a real photograph at blue hour of the side entry of a house by the garage: a small outdoor security camera under the eave, a motion light, a keypad beside a side door, a driveway and a bit of lawn. No people.
+Subject: the second layer a household asks for after the internet.
+Style/medium: photograph, 35mm, crisp.
+Lighting/mood: blue hour, warm motion light, deep navy sky, calm.
+Color palette: navy, siding, warm amber. No green or lime light, no LED glow.
+Input image: the attached photo is the site's current door photo; match its colour grade and mood, but a different house and location.
+Avoid: people, cars, text, brand names, logos, house numbers, neon, purple or blue gradients, watermark, HDR, illustration look.

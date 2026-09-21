@@ -1,0 +1,9 @@
+Use case: website figure photograph beside the application form on a door-to-door fiber/TV/security sales company site, tall crop, shown about 600 pixels wide.
+Asset type: photograph, 2:3 portrait.
+Primary request: a real photograph at blue hour of a suburban street corner: a plain green street-name sign on a post (the text unreadable, out of focus), a stop sign edge, a sidewalk curving away, lit porches and warm windows of houses down both streets, tall pines against a deep navy sky. No people, no cars.
+Subject: the corner where a route starts. The market, not the house.
+Style/medium: photograph, 50mm, crisp, shallow depth of field on the sign post.
+Lighting/mood: blue hour, sodium street lamp, warm tungsten porches, deep navy, calm.
+Color palette: navy, forest green, warm amber. No lime light.
+Input image: the attached photo is the site's current street photo; match its colour grade and mood.
+Avoid: people, cars, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look.

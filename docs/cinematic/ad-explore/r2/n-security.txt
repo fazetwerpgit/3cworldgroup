@@ -1,0 +1,9 @@
+Use case: website section photograph for a home-security row on a door-to-door sales company site, half-bleed at about 900 pixels wide, 3:2.
+Asset type: photograph, 3:2.
+Primary request: a real close photograph at blue hour of a doorbell camera and a small keypad mounted on the white trim beside a front door on a grey siding house, the door painted deep green, a lit sconce above, a welcome mat below. Nobody there.
+Subject: what the security sale actually is: a camera, a keypad, a sensor on the door frame.
+Style/medium: photograph, 50mm, shallow depth of field on the camera, crisp.
+Lighting/mood: blue hour, warm tungsten sconce, deep navy at the edges, calm.
+Color palette: navy, grey siding, warm amber. No green or lime light.
+Input image: the attached photo is the site's current door photo; match its colour grade and mood, but a different house and different fixtures.
+Avoid: people, hands, text, brand names on devices, logos, house numbers, LED glow, neon, purple or blue gradients, watermark, HDR, illustration look.

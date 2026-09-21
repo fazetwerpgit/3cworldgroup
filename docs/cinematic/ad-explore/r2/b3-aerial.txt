@@ -1,0 +1,11 @@
+Use case: website hero wall background for a door-to-door fiber/TV/security sales company; headline copy sits in the left third, and the same frame is cropped to portrait on phones with the right third kept.
+Asset type: full-bleed hero photograph, 3:2.
+Primary request: a real drone photograph of a suburban neighbourhood at blue hour from about 120 metres, roads curving through dense tree cover, warm house windows and porch lights on.
+Scene: a different neighbourhood from the attached frame: one long road curving from the bottom-left up through the middle, a pond at the lower right catching the last orange of the sky, houses spaced along the road with warm windows; the left third is dark canopy where the headline sits.
+Subject: an ordinary neighbourhood at the end of the day. Roads are plain dark asphalt, lit only by a few street lamps. Nothing on the roads is drawn, traced, coloured or glowing.
+Style/medium: photograph, aerial, crisp, slight haze in the far distance for depth. Looks like a licensed stock drone photo, not a render.
+Lighting/mood: blue hour, deep navy shadows, warm sodium and tungsten window light, calm, expansive.
+Color palette: navy, forest green shadows, warm amber. No green or lime light anywhere.
+Composition: horizon just below the top edge, no elements of interest in the top-left quadrant.
+Input image: the attached photo is the current frame; keep its mood and grade, change the composition slightly, and remove every glowing road line and every light node.
+Avoid: glowing roads, light trails, neon, lime or green lines, nodes or dots at intersections, people, cars in motion, text, logos, watermark, purple or blue gradients, glow orbs, particles, HDR, illustration look, map UI overlays.

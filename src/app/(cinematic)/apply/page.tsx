@@ -25,7 +25,7 @@ const STEPS = [
   {
     n: "01",
     title: "We review your application",
-    body: "It goes to the recruiting team with the city you named on it.",
+    body: "It goes to the recruiting team for the market you named.",
   },
   {
     n: "02",
@@ -81,7 +81,6 @@ export default function ApplyPage() {
           <ol className={styles.steps}>
             {STEPS.map((step) => (
               <li key={step.n} className={`${styles.step} ${kit.revealRise}`} data-reveal>
-                <span className={styles.stepNum}>{step.n}</span>
                 <h3 className={styles.stepTitle}>{step.title}</h3>
                 <p className={styles.stepBody}>{step.body}</p>
               </li>
@@ -103,7 +102,7 @@ export default function ApplyPage() {
             </h2>
             <p className={kit.sectionLede}>
               Four things about the role that are better read now than discovered later.
-              They are the same four the terms above the submit button state in short.
+              The same four terms sit above the submit button.
             </p>
           </header>
 

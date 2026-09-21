@@ -117,18 +117,18 @@
         "tag": "section",
         "id": "mission",
         "cls": "surfacePaper seam mission",
-        "secH": 860,
+        "secH": 753,
         "padTop": 63,
         "padBot": 31,
         "first": "We sell atthe door.",
-        "last": "Every sale starts with a conve",
+        "last": "3C World Group recruits, train",
         "deadAbove": 63
       },
       {
         "tag": "section",
         "id": "values",
         "cls": "surfaceInk values",
-        "secH": 839,
+        "secH": 694,
         "padTop": 63,
         "padBot": 10,
         "first": "The three C’sthat define us.",
@@ -139,7 +139,7 @@
         "tag": "section",
         "id": "who-we-serve",
         "cls": "surfacePaper seam serve",
-        "secH": 1257,
+        "secH": 1139,
         "padTop": 63,
         "padBot": 31,
         "first": "Who weserve.",
@@ -153,7 +153,7 @@
         "secH": 659,
         "padTop": 63,
         "padBot": 52,
-        "first": "Built on experience.Driven by ",
+        "first": "The peoplewho run it.",
         "last": "Onboarding",
         "deadAbove": 94
       },
@@ -177,8 +177,8 @@
         "id": "",
         "cls": "pageHead head",
         "secH": 760,
-        "padTop": 0,
-        "padBot": 0,
+        "padTop": -96,
+        "padBot": -132,
         "first": "IMG",
         "last": "IMG"
       },
@@ -186,18 +186,18 @@
         "tag": "section",
         "id": "what-you-sell",
         "cls": "sell surfacePaper seamTopOnly",
-        "secH": 2312,
+        "secH": 2383,
         "padTop": 63,
         "padBot": 24,
         "first": "Services that fitthe home.",
-        "last": "A considered fit for the house",
-        "deadAbove": 63
+        "last": "Runs on the same connection yo",
+        "deadAbove": -69
       },
       {
         "tag": "section",
         "id": "bundle",
         "cls": "bundle surfacePaper seamBottomOnly",
-        "secH": 889,
+        "secH": 936,
         "padTop": 63,
         "padBot": 31,
         "first": "One home.A clearer setup.",
@@ -208,7 +208,7 @@
         "tag": "section",
         "id": "closing",
         "cls": "closing surfaceInkDeep",
-        "secH": 481,
+        "secH": 466,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -233,7 +233,7 @@
         "tag": "section",
         "id": "glance",
         "cls": "glance surfaceInk",
-        "secH": 708,
+        "secH": 765,
         "padTop": 63,
         "padBot": 31,
         "first": "The opportunity,at a glance.",
@@ -243,8 +243,8 @@
       {
         "tag": "section",
         "id": "stages",
-        "cls": "earnings surfaceInk",
-        "secH": 1237,
+        "cls": "earnings surfacePaper seam",
+        "secH": 1229,
         "padTop": 63,
         "padBot": 31,
         "first": "Three stagesof the same job.",
@@ -270,7 +270,7 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 858,
+        "secH": 830,
         "padTop": 88,
         "padBot": -31,
         "first": "Get in touch",
@@ -291,7 +291,7 @@
         "tag": "section",
         "id": "message",
         "cls": "surfacePaper seam formSection",
-        "secH": 1439,
+        "secH": 1351,
         "padTop": 63,
         "padBot": 50,
         "first": "Send usa message.",
@@ -302,12 +302,12 @@
         "tag": "section",
         "id": "closing",
         "cls": "surfaceInkDeep closing",
-        "secH": 312,
-        "padTop": 0,
-        "padBot": 0,
-        "first": "IMG",
-        "last": "IMG",
-        "deadAbove": 50
+        "secH": 297,
+        "padTop": 65,
+        "padBot": 80,
+        "first": "Don’t need to wait?Apply today",
+        "last": "Start your application",
+        "deadAbove": 115
       }
     ]
   },
@@ -318,8 +318,8 @@
         "id": "",
         "cls": "pageHead head",
         "secH": 760,
-        "padTop": 0,
-        "padBot": 0,
+        "padTop": -314,
+        "padBot": -369,
         "first": "IMG",
         "last": "IMG"
       },
@@ -327,18 +327,18 @@
         "tag": "section",
         "id": "",
         "cls": "applySection surfaceInk",
-        "secH": 1411,
+        "secH": 1410,
         "padTop": 0,
         "padBot": 31,
         "first": "IMG",
         "last": "3C trains you on the products,",
-        "deadAbove": 0
+        "deadAbove": -369
       },
       {
         "tag": "section",
         "id": "next",
         "cls": "next surfacePaper seam",
-        "secH": 870,
+        "secH": 752,
         "padTop": 63,
         "padBot": 31,
         "first": "What happensnext.",
@@ -349,7 +349,7 @@
         "tag": "section",
         "id": "good-to-know",
         "cls": "know surfaceInk",
-        "secH": 935,
+        "secH": 906,
         "padTop": 63,
         "padBot": 53,
         "first": "Good to knowbefore you apply.",
@@ -359,13 +359,13 @@
       {
         "tag": "section",
         "id": "",
-        "cls": "closing surfaceInkDeep",
-        "secH": 377,
-        "padTop": 0,
-        "padBot": 0,
-        "first": "IMG",
-        "last": "IMG",
-        "deadAbove": 53
+        "cls": "closing",
+        "secH": 328,
+        "padTop": 43,
+        "padBot": 64,
+        "first": "Take thefirst step.",
+        "last": "Start your application",
+        "deadAbove": 96
       }
     ]
   },
@@ -503,7 +503,7 @@
         "tag": "section",
         "id": "values",
         "cls": "surfaceInk values",
-        "secH": 527,
+        "secH": 455,
         "padTop": 84,
         "padBot": 53,
         "first": "The three C’sthat define us.",
@@ -514,11 +514,11 @@
         "tag": "section",
         "id": "who-we-serve",
         "cls": "surfacePaper seam serve",
-        "secH": 835,
+        "secH": 815,
         "padTop": 84,
         "padBot": 53,
         "first": "Who weserve.",
-        "last": "TV",
+        "last": "Fiber internet. TV. Home secur",
         "deadAbove": 137
       },
       {
@@ -528,7 +528,7 @@
         "secH": 433,
         "padTop": 84,
         "padBot": 83,
-        "first": "Built on experience.Driven by ",
+        "first": "The peoplewho run it.",
         "last": "Onboarding",
         "deadAbove": 137
       },
@@ -572,23 +572,23 @@
         "tag": "section",
         "id": "bundle",
         "cls": "bundle surfacePaper seamBottomOnly",
-        "secH": 627,
+        "secH": 652,
         "padTop": 84,
-        "padBot": -142,
+        "padBot": 53,
         "first": "One home.A clearer setup.",
-        "last": "IMG",
+        "last": "Start selling",
         "deadAbove": 84
       },
       {
         "tag": "section",
         "id": "closing",
         "cls": "closing surfaceInkDeep",
-        "secH": 611,
+        "secH": 520,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": -142
+        "deadAbove": 53
       }
     ]
   },
@@ -618,7 +618,7 @@
       {
         "tag": "section",
         "id": "stages",
-        "cls": "earnings surfaceInk",
+        "cls": "earnings surfacePaper seam",
         "secH": 883,
         "padTop": 84,
         "padBot": 53,
@@ -677,12 +677,12 @@
         "tag": "section",
         "id": "closing",
         "cls": "surfaceInkDeep closing",
-        "secH": 517,
-        "padTop": 0,
-        "padBot": 0,
-        "first": "IMG",
-        "last": "IMG",
-        "deadAbove": 53
+        "secH": 383,
+        "padTop": 71,
+        "padBot": 128,
+        "first": "Don’t need to wait?Apply today",
+        "last": "Don’t need to wait?Apply today",
+        "deadAbove": 124
       }
     ]
   },
@@ -702,7 +702,7 @@
         "tag": "section",
         "id": "",
         "cls": "applySection surfaceInk",
-        "secH": 1006,
+        "secH": 1005,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -713,7 +713,7 @@
         "tag": "section",
         "id": "next",
         "cls": "next surfacePaper seam",
-        "secH": 508,
+        "secH": 451,
         "padTop": 84,
         "padBot": 53,
         "first": "What happensnext.",
@@ -734,13 +734,13 @@
       {
         "tag": "section",
         "id": "",
-        "cls": "closing surfaceInkDeep",
-        "secH": 567,
-        "padTop": 0,
-        "padBot": 0,
-        "first": "IMG",
-        "last": "IMG",
-        "deadAbove": 78
+        "cls": "closing",
+        "secH": 410,
+        "padTop": 61,
+        "padBot": 112,
+        "first": "Take thefirst step.",
+        "last": "The form is at the top of this",
+        "deadAbove": 139
       }
     ]
   },
@@ -776,12 +776,12 @@
       "route": "/about",
       "sel": "h1",
       "label": "about h1",
-      "fs": "56px",
+      "fs": "48.8px",
       "color": "rgb(255, 255, 255)",
       "meanBackdropL": 0.0045,
-      "maxBackdropL": 0.024,
-      "worstRatio": 14.2,
-      "meanRatio": 19.26
+      "maxBackdropL": 0.0148,
+      "worstRatio": 16.21,
+      "meanRatio": 19.28
     },
     {
       "route": "/services",
@@ -789,10 +789,10 @@
       "label": "services h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0051,
-      "maxBackdropL": 0.0136,
-      "worstRatio": 16.5,
-      "meanRatio": 19.07
+      "meanBackdropL": 0.0055,
+      "maxBackdropL": 0.0193,
+      "worstRatio": 15.15,
+      "meanRatio": 18.93
     },
     {
       "route": "/opportunities",
@@ -800,10 +800,10 @@
       "label": "careers h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0053,
+      "meanBackdropL": 0.0055,
       "maxBackdropL": 0.0197,
       "worstRatio": 15.05,
-      "meanRatio": 19
+      "meanRatio": 18.92
     },
     {
       "route": "/apply",
@@ -811,10 +811,10 @@
       "label": "apply h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0052,
-      "maxBackdropL": 0.0218,
-      "worstRatio": 14.63,
-      "meanRatio": 19.03
+      "meanBackdropL": 0.0072,
+      "maxBackdropL": 0.043,
+      "worstRatio": 11.29,
+      "meanRatio": 18.36
     }
   ]
 }

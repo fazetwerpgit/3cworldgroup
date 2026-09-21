@@ -41,9 +41,11 @@
     cabinet and the cable in shot at the right of the copy; the fall comes up
     to 29% so the scrim is already dark where the headline starts.
   */
+  /* 62%/30% keeps the rain-beaded cabinet top and the porch light in the
+     clear window above the copy; the open door falls behind the scrim. */
   .head {
     --head-fall: 29%;
-    --head-focus: 78% 50%;
+    --head-focus: 62% 30%;
   }
 }
 
@@ -221,6 +223,7 @@
   grid-template-columns: 16px minmax(0, 1fr);
   line-height: 1.4;
   padding: clamp(1.05rem, 1.7vw, 1.45rem) 0;
+  text-wrap: pretty;
 }
 
 .bundleList li:last-child {
@@ -245,18 +248,15 @@
 .bundlePlateImage {
   /*
     The plate is wider than the source is tall, so `cover` crops top and bottom
-    and shows the full width — which is the whole street, the identical
-    composition the Home hero opens on. One click apart, the same picture twice,
-    and the plate read as a reprint rather than a second look.
-
-    Scaling about the right edge throws the road away and leaves the frame this
-    plate is actually about: one porch, the lit arch, and the lime drop cable
-    running up the walk. Different subject, different scale, same night.
+    and the whole width stays in frame — which is what this picture needs: the
+    lit window with the television in it, the doorbell camera beside the door
+    and the service box on the right wall are three separate objects spread
+    across the frame, and cropping in would drop one of the three services the
+    plate exists to show. Y sits just above centre to keep the walk and the
+    step in, and the empty blue sky out.
   */
   object-fit: cover;
-  object-position: 100% 40%;
-  transform: scale(2.1);
-  transform-origin: 100% 44%;
+  object-position: 56% 46%;
 }
 
 /* --------------------------------------------------------------------------
@@ -287,7 +287,7 @@
 .closing::after {
   background:
     radial-gradient(
-      58% 54% at 50% 46%,
+      58% 54% at 30% 46%,
       rgba(3, 13, 31, 0.86) 0%,
       rgba(3, 13, 31, 0.78) 50%,
       rgba(3, 13, 31, 0.36) 82%,
@@ -307,12 +307,28 @@
   z-index: -1;
 }
 
+/*
+  A row, not a plate: the display line and its sentence at the left, the
+  button at the right on the same baseline, over the aerial. Home and Careers
+  keep the centred closer; this one does not repeat it.
+*/
 .closingInner {
+  align-items: end;
+  display: grid;
+  gap: 1.5rem clamp(2rem, 5vw, 5rem);
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: start;
   margin-inline: auto;
   max-width: var(--shell);
   padding-inline: var(--gutter);
   position: relative;
-  text-align: center;
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .closingInner {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .closingTitle {
@@ -333,7 +349,7 @@
   color: var(--on-ink-dim);
   font-size: clamp(1.02rem, 1.2vw, 1.16rem);
   line-height: 1.6;
-  margin: 1.5rem auto 2.4rem;
+  margin: 1.5rem 0 0;
   max-width: 48ch;
 }
 

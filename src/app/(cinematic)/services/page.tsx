@@ -26,53 +26,53 @@ const SERVICES = [
     id: "fiber",
     number: "01",
     title: "Fiber Internet",
-    accent: "A strong fit for connected homes.",
-    body: "When fiber is available on a route, you can help each household decide whether the connection fits.",
+    accent: "The first question at most doors.",
+    body: "Where fiber has been built on a route, you tell the household it is there, what it costs, and when it can be installed.",
     image: "/redesign/cinematic/fiber-pedestal-dusk-1920.webp",
     alt: "Fiber optic cable cabinet and spool beside a suburban street at dusk",
     position: "58% 62%",
     points: [
-      "Start with what the household needs",
-      "A clear conversation about the connection",
-      "A setup designed for the long haul",
+      "You know which streets are built and which are not",
+      "Speed tiers and the monthly price, quoted at the door",
+      "Install scheduled before you leave the porch",
     ],
   },
   {
     id: "tv",
     number: "02",
     title: "TV Services",
-    accent: "A natural next question.",
-    body: "Once internet is covered, TV may fit the household too. You can help compare the available options.",
+    accent: "The second question, if it fits.",
+    body: "Once the internet is settled, some households want TV on the same bill. You lay out the packages and let them pick.",
     image: "/redesign/cinematic/tv-room-dusk-1920.webp",
-    alt: "Wall-mounted television showing a blue abstract screen in a living room at dusk",
+    alt: "Living room at dusk with a wall-mounted television and the street outside the window",
     position: "60% 50%",
     points: [
-      "Offer it when it fits the home",
-      "Packages sized to the household",
-      "Works alongside the connection",
+      "Sold with the internet, one bill",
+      "Channel packages by what they watch",
+      "Not every door; only the ones that ask",
     ],
   },
   {
     id: "security",
     number: "03",
     title: "Security Systems",
-    accent: "Practical protection for the home.",
-    body: "Cameras, sensors, and a keypad can be part of the conversation when a household wants another layer of protection.",
-    image: "/redesign/v2/photos/security-dusk-1600.webp",
+    accent: "For the households that want it.",
+    body: "Doorbell camera, door and window sensors, a keypad. Professionally installed, monitored monthly, sold when the household brings it up.",
+    image: "/redesign/cinematic/security-keypad-dusk-1920.webp",
     alt: "Security keypad and door camera beside a front door at dusk",
     position: "62% 50%",
     points: [
-      "Professional installation options",
-      "Designed to work with the connection",
-      "A considered fit for the household",
+      "Doorbell camera, sensors, keypad",
+      "Professional install, monthly monitoring",
+      "Runs on the same connection you just sold",
     ],
   },
 ] as const;
 
 const BUNDLE_POINTS = [
-  "A simpler way to consider the full setup",
-  "One point of contact through the conversation",
-  "Options matched to the household",
+  "Internet first, TV and security only if they fit",
+  "One rep, one visit, one bill for the household",
+  "Every term quoted at the door, then confirmed by the provider",
 ];
 
 export default function ServicesPage() {
@@ -104,8 +104,8 @@ export default function ServicesPage() {
               <span className={kit.pageHeadLime}>One connection.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Fiber, TV, and security options for homes on your route. A focused
-              conversation for each household.
+              Fiber internet, TV and home security, sold at the door. Three products,
+              one conversation, and you learn all three before your first route.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -132,8 +132,8 @@ export default function ServicesPage() {
               the home.
             </h2>
             <p className={kit.sectionLedeInk}>
-              We partner with leading providers to offer fiber internet, TV, and
-              security options that can be matched to the household in front of you.
+              Fiber internet, TV and home security, each from the provider that serves
+              that market. You sell what is actually available on the street you are on.
             </p>
           </header>
         </div>
@@ -224,8 +224,8 @@ export default function ServicesPage() {
             */}
             <div className={styles.bundlePlate}>
               <Image
-                src="/redesign/cinematic/home-street-dusk-1920.webp"
-                alt="A lit front porch at dusk with a service cable running along the walk to the house"
+                src="/redesign/cinematic/bundle-porch-dusk-1920.webp"
+                alt="A front porch at dusk: doorbell camera by the door, a fiber service box on the wall, and a television glowing through the window"
                 fill
                 sizes="(max-width: 900px) 100vw, 46vw"
                 className={styles.bundlePlateImage}
@@ -240,22 +240,24 @@ export default function ServicesPage() {
       {/* ---------------------------------------------------------------- */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/cinematic/aerial-dusk-1920.webp"
+          src="/redesign/cinematic/services-aerial-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"
           className={styles.closingArt}
         />
         <div className={styles.closingInner}>
-          <h2 id="closing-title" className={styles.closingTitle}>
-            Want to sell
-            <br />
-            <span className={styles.closingLime}>these services?</span>
-          </h2>
-          <p className={styles.closingLede}>
-            Fiber, TV and home security, sold at the door on a route in one of our
-            markets. Training included. No experience needed.
-          </p>
+          <div>
+            <h2 id="closing-title" className={styles.closingTitle}>
+              Want to sell these services?
+              <br />
+              <span className={styles.closingLime}>Start here.</span>
+            </h2>
+            <p className={styles.closingLede}>
+              Fiber, TV and home security, sold at the door on a route in one of our
+              markets. Training included. No experience needed.
+            </p>
+          </div>
           <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
             Apply now
             <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />

@@ -27,7 +27,7 @@ export default function CinematicLayout({ children }: { children: React.ReactNod
           and legibility is not negotiable.
         */}
         <noscript>
-          <style>{`.${styles.header}{background:rgba(6,23,53,0.92);backdrop-filter:blur(14px) saturate(130%);box-shadow:0 1px 0 0 rgba(255,255,255,0.14)}`}</style>
+          <style>{`.${styles.header}{background:var(--ink);box-shadow:0 1px 0 0 rgba(255,255,255,0.14)}`}</style>
         </noscript>
 
         <a href="#main-content" className={styles.skipLink}>

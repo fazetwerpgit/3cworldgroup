@@ -1,0 +1,9 @@
+Use case: website figure photograph for a "TV" stage on a door-to-door sales company site, about 600 pixels wide, 3:2.
+Asset type: photograph, 3:2.
+Primary request: a real photograph at blue hour from the front lawn of a house, of a lit living-room window with sheer curtains, the soft flicker of a television visible inside as a warm glow, a porch light beside it, shrubs below the window. No people visible.
+Subject: the evening the service is sold for.
+Style/medium: photograph, 50mm, crisp, moderate depth of field.
+Lighting/mood: blue hour, warm tungsten from the window, deep navy sky, calm.
+Color palette: navy, brick, warm amber. No green or lime light; nothing on the screen is readable.
+Input image: the attached photo is the site's current TV photo; match its colour grade and mood, but seen from outside.
+Avoid: people, silhouettes, text, logos, on-screen graphics, neon, purple or blue gradients, watermark, HDR, illustration look.

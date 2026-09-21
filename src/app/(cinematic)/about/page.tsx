@@ -41,13 +41,6 @@ const VALUES = [
   ],
 ] as const;
 
-/** The three products, with the existing photography for each. */
-const PRODUCTS = [
-  ["Fiber", "/redesign/v2/photos/fiber-square-800.webp"],
-  ["TV", "/redesign/v2/photos/tv-square-800.webp"],
-  ["Security", "/redesign/v2/photos/security-square-800.webp"],
-] as const;
-
 const CONTRACTOR_SUPPORT = ["Training before the first door", "A route in a live market", "A leader who picks up the phone"] as const;
 
 /** The four people who lead the company, and what each is responsible for. */
@@ -86,8 +79,8 @@ export default function AboutPage() {
               <span className={kit.pageHeadLime}>One door at a time.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              3C World Group is a nationwide face-to-face sales organization specializing in
-              customer acquisition for telecommunications and security providers.
+              3C World Group is a face-to-face sales company. We sell fiber, TV and home
+              security at the door for the providers who serve each market.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -158,7 +151,6 @@ export default function AboutPage() {
                 gets customers who understood what they bought. The contractor gets a trade
                 they can build on.
               </p>
-              <p className={styles.missionNote}>Every sale starts with a conversation.</p>
             </div>
 
             {/*
@@ -197,9 +189,8 @@ export default function AboutPage() {
           </header>
 
           <ol className={styles.valueList}>
-            {VALUES.map(([ordinal, name, body]) => (
+            {VALUES.map(([, name, body]) => (
               <li key={name} className={`${styles.value} ${kit.revealRise}`} data-reveal>
-                <p className={styles.valueOrdinal}>{ordinal}</p>
                 <h3 className={styles.valueName}>{name}</h3>
                 <p className={styles.valueBody}>{body}</p>
               </li>
@@ -241,16 +232,7 @@ export default function AboutPage() {
                 Fiber, TV and home security from the providers in their market, with someone
                 on the porch who can say what it costs and when it gets installed.
               </p>
-              <ul className={styles.productStrip}>
-                {PRODUCTS.map(([label, src]) => (
-                  <li key={label} className={styles.product}>
-                    <span className={styles.productArt}>
-                      <Image src={src} alt="" fill sizes="(max-width: 900px) 30vw, 14vw" />
-                    </span>
-                    <span className={styles.productLabel}>{label}</span>
-                  </li>
-                ))}
-              </ul>
+              <p className={styles.productLine}>Fiber internet. TV. Home security.</p>
             </article>
 
             <article className={`${styles.serveItem} ${kit.revealRise}`} data-reveal>
@@ -289,9 +271,9 @@ export default function AboutPage() {
         <div className={kit.shell}>
           <header className={kit.sectionHead} data-reveal>
             <h2 id="leadership-title" className={kit.sectionTitle}>
-              Built on experience.
+              The people
               <br />
-              Driven by purpose.
+              who run it.
             </h2>
             <p className={kit.sectionLede}>
               The people who lead 3C World Group, and what each of them is responsible for.

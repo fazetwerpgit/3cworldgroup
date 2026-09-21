@@ -61,8 +61,8 @@ export default function ContactPage() {
               <span className={kit.pageHeadLime}>conversation.</span>
             </h1>
             <p className={`${kit.pageHeadLede} ${styles.headLede}`}>
-              Questions about joining 3C, building a contractor team, or the services we
-              represent? Choose a path and we’ll point you in the right direction.
+              Applying takes five fields. Anything else goes in the message form below, and a
+              person on the team reads it.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -211,13 +211,6 @@ export default function ContactPage() {
               </div>
 
               <div className={styles.detail}>
-                <p className={styles.detailTerm}>Phone</p>
-                <div className={styles.detailValue}>
-                  <span>Coming soon</span>
-                </div>
-              </div>
-
-              <div className={styles.detail}>
                 <p className={styles.detailTerm}>Business hours</p>
                 <div className={styles.detailValue}>
                   <span>Monday – Friday: 9am – 6pm EST</span>
@@ -233,24 +226,15 @@ export default function ContactPage() {
       {/* 4 — closing                                                      */}
       {/* ---------------------------------------------------------------- */}
       {/*
-        The same closer the other five routes use: a full-bleed photograph, the
-        band scrim, and the copy centred on its own plate. This page had been
-        ending on a flat navy panel with the type ranged left, which made the
-        one page a visitor is most likely to leave from the one page that does
-        not look like the rest of the site.
+        Contact ends on a flat navy band, not a photograph: the reader has just
+        filled a form, and the last thing on the page is one line and one
+        button, ranged left on the same hairline as the form above it.
       */}
       <section
         id="closing"
         className={`${kit.surfaceInkDeep} ${styles.closing}`}
         aria-labelledby="closing-title"
       >
-        <Image
-          src="/redesign/cinematic/tv-room-dusk-1920.webp"
-          alt=""
-          fill
-          sizes="100vw"
-          className={styles.closingArt}
-        />
         <div className={kit.shell}>
           <div className={`${styles.closingInner} ${kit.revealRise}`} data-reveal>
             <h2 id="closing-title" className={styles.closingTitle}>

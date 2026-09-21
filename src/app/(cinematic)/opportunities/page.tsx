@@ -100,7 +100,8 @@ export default function OpportunitiesPage() {
               <span className={kit.pageHeadLime}>Not just a job.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Choose your role. Build your skills. Grow with real training and support.
+              Door-to-door sales of fiber, TV and home security in a market that is hiring.
+              Training first, then a route with a leader who checks in.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -127,7 +128,8 @@ export default function OpportunitiesPage() {
               at a glance.
             </h2>
             <p className={kit.sectionLede}>
-              How the role works.
+              What the work is, how you are paid, and where it happens. The details a
+              recruiter would tell you on the phone, written down.
             </p>
           </header>
 
@@ -180,13 +182,13 @@ export default function OpportunitiesPage() {
       {/* ---------------------------------------------------------------- */}
       <section id="stages" className={styles.earnings} aria-labelledby="stages-title">
         <div className={kit.shell}>
-          <header className={kit.sectionHead} data-reveal>
-            <h2 id="stages-title" className={kit.sectionTitle}>
+          <header className={kit.sectionHeadInk} data-reveal>
+            <h2 id="stages-title" className={kit.sectionTitleInk}>
               Three stages
               <br />
               of the same job.
             </h2>
-            <p className={kit.sectionLede}>
+            <p className={kit.sectionLedeInk}>
               In the order you grow into them. What changes at each one is the
               responsibility, not the title.
             </p>
@@ -204,8 +206,7 @@ export default function OpportunitiesPage() {
             {STAGES.map((stage, index) => (
               <li key={stage.title} className={`${styles.rung} ${kit.revealRise}`} data-reveal>
                 <p className={styles.rungMark}>
-                  <span className={styles.rungOrdinal} aria-hidden="true">{`0${index + 1}`}</span>
-                  <span className={styles.rungStage}>{stage.stage}</span>
+                  <span className={styles.rungOrdinal}>{`0${index + 1}`}</span>
                 </p>
                 <div className={styles.rungMain}>
                   <h3 className={styles.rungTitle}>{stage.title}</h3>

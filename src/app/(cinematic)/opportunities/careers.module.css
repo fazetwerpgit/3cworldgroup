@@ -151,7 +151,7 @@
    -------------------------------------------------------------------------- */
 
 .earnings {
-  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
+  composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
   padding: var(--section-pad) 0 var(--section-pad);
 }
 
@@ -162,14 +162,14 @@
   three ordinals stack on one axis; the other two share the rest.
 */
 .ledger {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-ink);
   list-style: none;
   margin: clamp(1.75rem, 3.2vw, 2.6rem) 0 0;
   padding: 0;
 }
 
 .rung {
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-ink);
   column-gap: clamp(1.5rem, 3vw, 3.5rem);
   display: grid;
   grid-template-columns: clamp(7rem, 11vw, 10rem) minmax(0, 1.25fr) minmax(0, 1fr);
@@ -184,21 +184,12 @@
 }
 
 .rungOrdinal {
-  color: var(--lime);
+  color: var(--lime-ink);
   font-family: var(--display);
   font-size: clamp(3.2rem, 5vw, 5rem);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.012em;
   line-height: 0.78;
-}
-
-.rungStage {
-  color: var(--on-ink-dim);
-  font-family: var(--display);
-  font-size: 0.92rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .rungTitle {
@@ -211,7 +202,7 @@
 }
 
 .rungBody {
-  color: var(--on-ink-dim);
+  color: var(--on-paper-dim);
   font-size: 1.02rem;
   line-height: 1.62;
   margin-top: 0.7rem;
@@ -220,8 +211,8 @@
 }
 
 .rungChanges {
-  border-left: 2px solid var(--lime);
-  color: var(--on-ink);
+  border-left: 1px solid var(--rule-ink);
+  color: var(--on-paper);
   font-size: 1.02rem;
   line-height: 1.6;
   max-width: 34ch;
@@ -230,7 +221,7 @@
 }
 
 .rungChangesLabel {
-  color: var(--on-ink-dim);
+  color: var(--on-paper-dim);
   display: block;
   font-family: var(--display);
   font-size: 0.92rem;
@@ -240,8 +231,8 @@
 }
 
 .bandNote {
-  border-top: 1px solid var(--rule);
-  color: var(--on-ink-dim);
+  border-top: 1px solid var(--rule-ink);
+  color: var(--on-paper-dim);
   font-size: 0.92rem;
   letter-spacing: 0.02em;
   margin-top: 0;
@@ -434,5 +425,23 @@
 
   .rungChanges {
     grid-column: 1;
+  }
+}
+
+/*
+  On a phone the band-wide ellipse plus the vertical fall crushed the
+  cul-de-sac to flat navy; the plate behind the type carries the contrast, so
+  the band scrim only needs to hold the top and bottom joints.
+*/
+@media (max-width: 760px) {
+  .closing::after {
+    background: linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.28) 10%,
+      rgba(3, 13, 31, 0) 50%,
+      rgba(3, 13, 31, 0.28) 90%,
+      var(--ink-deep) 100%
+    );
   }
 }
