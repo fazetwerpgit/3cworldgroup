@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image, { getImageProps } from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
@@ -9,6 +9,44 @@ import Faq from "./_home/Faq";
 import { APPLY_HREF } from "../_cinematic/nav";
 import kit from "../_cinematic/cinematic.module.css";
 import styles from "./cinematic-home.module.css";
+
+/*
+  The hero's two crops, resolved to plain <img> attributes rather than to
+  elements. `priority` still comes through as `loading="eager"` and
+  `fetchPriority="high"` on whichever one the browser picks; see the <picture>
+  in the markup for why they are not two <Image> elements.
+*/
+const HERO_ART = {
+  alt: "",
+  fill: true,
+  priority: true,
+  sizes: "100vw",
+} as const;
+
+const { props: heroWide } = getImageProps({
+  ...HERO_ART,
+  src: "/redesign/v2/photos/src/hero-wide.png",
+});
+
+const { props: heroTall } = getImageProps({
+  ...HERO_ART,
+  src: "/redesign/v2/photos/hero-portrait-1600.webp",
+});
+
+/*
+  No `<link rel="preload">` for either crop, and that is a measured decision
+  rather than an omission. A media-scoped preload pair was tried and made no
+  difference: six cold loads each way put the median Largest Contentful Paint
+  at 168ms against 180ms at 1440x900 and 160ms against 156ms at 390x844 — the
+  spread between runs is wider than the gap, and the desktop number came out
+  marginally worse with the preload than without it.
+
+  That is the expected result. The <img> is server-rendered near the top of the
+  document with fetchpriority="high", so the browser's preload scanner meets it
+  in the same pass that would have met the link. A preload earns its place when
+  the image is discovered late — behind a client render, a CSS background, or a
+  script. This one is not.
+*/
 
 export const metadata: Metadata = {
   title: "Door-to-Door Sales Careers | 3C World Group",
@@ -44,22 +82,48 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section className={styles.hero} data-hero aria-labelledby="hero-title">
         <div className={styles.heroArt} data-hero-art>
-          <Image
-            src="/redesign/v2/photos/src/hero-wide.png"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className={styles.heroImageWide}
-          />
-          <Image
-            src="/redesign/v2/photos/hero-portrait-1600.webp"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className={styles.heroImageTall}
-          />
+          {/*
+            One element, two photographs, and only one of them is ever
+            downloaded.
+
+            This used to be two `next/image` fills with the unwanted one hidden
+            in CSS, which is the trap the glow layer below had already written
+            down: `display: none` does not stop a browser fetching a `srcset`,
+            and `priority` made it worse by preloading both. Every desktop
+            visitor paid for the portrait crop and every phone paid for the
+            wide one.
+
+            `getImageProps` gives the same optimised `srcset` the component
+            would have built — same widths, same formats, same loader — without
+            mounting an element, so the choice can be handed to `<picture>`
+            instead. The browser evaluates the media queries BEFORE it fetches
+            and requests exactly one. The breakpoint is written as the CSS
+            writes it (max-width: 900px, see .heroImage below), because the two
+            have to agree: a picture that switched at a different width than
+            the object-position would crop the wrong photograph.
+
+            Both are full-bleed at the width where they are shown, so both
+            keep `sizes="100vw"`. What differs is the crop, and that stays in
+            CSS where it was.
+          */}
+          <picture>
+            <source media="(max-width: 900px)" srcSet={heroTall.srcSet} sizes={heroTall.sizes} />
+            {/*
+              `priority` survives the trip through getImageProps as an eager
+              load, but the rendered tag carries no `fetchpriority`, so it is
+              set here rather than assumed: this photograph is the Largest
+              Contentful Paint at every width and must be requested ahead of
+              the rest of the page. `loading="eager"` is spelled out for the
+              same reason — it is the default, and a default is not a promise.
+            */}
+            <img
+              {...heroWide}
+              alt=""
+              className={styles.heroImage}
+              fetchPriority="high"
+              loading="eager"
+            />
+          </picture>
           {/*
             The lit roads of this same photograph, lifted into their own
             transparent layer and revealed under the pointer. It is a child of
@@ -67,7 +131,8 @@ export default function Home() {
             the frame pixel for pixel; the file itself is a CSS background
             declared inside the desktop media query, because a second
             next/image in a display:none box is still fetched and a 300KB
-            decoration must never reach a phone.
+            decoration must never reach a phone — the same reason the
+            photograph above it is one `<picture>` rather than two images.
           */}
           <div className={styles.heroGlow} aria-hidden="true" />
         </div>

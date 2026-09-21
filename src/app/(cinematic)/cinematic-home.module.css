@@ -45,14 +45,14 @@
   z-index: 0;
 }
 
-.heroImageWide,
-.heroImageTall {
+/*
+  One image element now, so the crop is the only thing that changes with the
+  window — the file itself is chosen by the <picture> in page.tsx, which
+  switches at this same 900px. Keep the two in step.
+*/
+.heroImage {
   object-fit: cover;
   object-position: 50% 42%;
-}
-
-.heroImageTall {
-  display: none;
 }
 
 /*
@@ -61,7 +61,7 @@
   It is the SAME photograph, not a drawn light: an extracted layer of
   hero-wide.png at the same 1774x887, transparent everywhere except the lit
   roads and intersections, which are brightened. It sits inside .heroArt with
-  `inset: 0` and the same cover/50% 42% placement as .heroImageWide, so it
+  `inset: 0` and the same cover/50% 42% placement as .heroImage, so it
   rides the drift transform and cannot slide out of register with the frame
   underneath it — `background-size: cover` and `object-fit: cover` are the
   same placement maths run on the same box.
@@ -1708,12 +1708,8 @@
     padding-top: 6rem;
   }
 
-  .heroImageWide {
-    display: none;
-  }
-
-  .heroImageTall {
-    display: block;
+  /* The portrait crop is centred; the wide one sits high (see .heroImage). */
+  .heroImage {
     object-position: 50% 50%;
   }
 
