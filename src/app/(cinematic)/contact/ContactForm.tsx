@@ -6,13 +6,11 @@ import kit from "../../_cinematic/cinematic.module.css";
 import styles from "./contact.module.css";
 
 /**
- * The message form, carried over from src/app/contact/page.tsx unchanged in
- * everything that is not paint: the same five fields, the same five subjects,
- * the same `required` attributes, the same state shape, the same change
- * handler, and the same submit handler — including the deliberate simulated
- * submit, which is what the page this replaces does because no backend has been
- * connected to it yet. Restyling a form is not the moment to invent an
- * endpoint, so the comment that says so travels with the code.
+ * The message form: the same five fields and five subjects as the page this
+ * replaced, posted to /api/public/contact, which stores the message and
+ * emails the owners. Until 2026-09-21 the submit was simulated (a one-second
+ * wait, then "Message sent"), which meant every message typed into the live
+ * site went nowhere. The honeypot is the same one Apply uses.
  *
  * It is a client component only so `page.tsx` can stay a server component and
  * keep its `metadata` export.
@@ -33,6 +31,7 @@ export default function ContactForm() {
     phone: "",
     subject: "",
     message: "",
+    website: "",
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -56,13 +55,32 @@ export default function ContactForm() {
     setError("");
     setInvalid({});
 
-    try {
-      // Simulated submit behavior is intentionally preserved until a backend is connected.
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Form submitted:", formData);
+    if (formData.website) {
       setSubmitted(true);
-    } catch {
-      setError("Failed to send message. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/public/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          subject: formData.subject,
+          message: formData.message,
+        }),
+      });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Failed to send message");
+      }
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Error sending contact message:", err);
+      setError(err instanceof Error && err.message ? err.message : "Failed to send message. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -92,6 +110,18 @@ export default function ContactForm() {
 
   return (
     <form onSubmit={handleSubmit} className={styles.form} noValidate={false}>
+      <div aria-hidden="true" className={styles.honeypot}>
+        <label htmlFor="contact-website">Website (leave blank)</label>
+        <input
+          type="text"
+          id="contact-website"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={formData.website}
+          onChange={handleChange}
+        />
+      </div>
       <div className={styles.formPair}>
         <label className={styles.field} htmlFor="contact-name">
           <span className={styles.fieldLabel}>

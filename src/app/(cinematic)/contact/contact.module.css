@@ -235,6 +235,16 @@
   gap: clamp(1.3rem, 2.4vw, 1.9rem);
 }
 
+/* Off-canvas, not display:none, so bots that skip hidden fields still fill it. */
+.honeypot {
+  height: 1px;
+  left: -10000px;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
+}
+
 .formPair {
   display: grid;
   gap: clamp(1.3rem, 2.4vw, 1.9rem);

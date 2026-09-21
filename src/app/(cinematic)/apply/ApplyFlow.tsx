@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -24,7 +24,6 @@ import styles from "./apply.module.css";
  * the server and only the decision to show them lives on the client.
  */
 export default function ApplyFlow({ children }: { children: React.ReactNode }) {
-  const formStartedAtRef = useRef(Date.now());
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -62,7 +61,14 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     setSubmitError(null);
     setInvalid({});
 
-    if (formData.website || Date.now() - formStartedAtRef.current < 3000) {
+    /*
+      Honeypot only. There used to be a second bot test here, "submitted
+      under three seconds", that silently swallowed the application. A real
+      person with autofill clears this form in under three seconds, and they
+      saw the success screen while nothing was sent. The server keeps the
+      honeypot check too.
+    */
+    if (formData.website) {
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
       setIsSubmitting(false);
