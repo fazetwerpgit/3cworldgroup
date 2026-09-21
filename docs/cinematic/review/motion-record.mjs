@@ -117,9 +117,16 @@ const CLIPS = {
     await land(page, "/");
     await scrollTo(page, "#start-title", { frac: 0.5, delay: 30 });
     // The four stops reveal in sequence; 2.5s ends the clip before the last one lands.
-    await wait(page, 4500);
+    await wait(page, 4000);
     await wheel(page, 240, { step: 80, delay: 70 });
-    await wait(page, 900);
+    await wait(page, 700);
+    // Back to the top, then down again, so the replay is on camera.
+    await wheel(page, -7000, { step: 220, delay: 26 });
+    await wait(page, 1000);
+    // Match pass one's depth, or the stops sit under the fold and never trigger.
+    await scrollTo(page, "#start-title", { frac: 0.5, delay: 30 });
+    await wheel(page, 240, { step: 80, delay: 70 });
+    await wait(page, 4200);
     return context;
   },
 
@@ -129,7 +136,7 @@ const CLIPS = {
     await land(page, "/");
     await scrollTo(page, "#markets-title", { frac: 0.3, delay: 25 });
     await wait(page, 700);
-    for (const city of ["Birmingham", "Atlanta", "Jacksonville", "Lansing", "Grand Rapids"]) {
+    for (const city of ["Dallas", "Houston", "Southern California", "Lansing", "Grand Rapids"]) {
       await page.getByRole("button", { name: new RegExp(`^${city}`) }).first().click();
       await wait(page, 700);
     }
@@ -229,7 +236,7 @@ const CLIPS = {
     await wait(page, 1100);
     await scrollTo(page, "#markets-title", { frac: 0.3, step: 140, delay: 26 });
     await wait(page, 500);
-    for (const city of ["Atlanta", "Grand Rapids"]) {
+    for (const city of ["Houston", "Grand Rapids"]) {
       await page.getByRole("button", { name: new RegExp(`^${city}`) }).first().tap();
       await wait(page, 700);
     }

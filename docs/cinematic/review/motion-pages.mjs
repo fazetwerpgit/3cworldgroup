@@ -234,6 +234,17 @@ async function aboutValues(browser, vp) {
     `about values ${vp.name}: background photograph moved (${JSON.stringify(artBefore)} -> ${JSON.stringify(artAfter)})`,
   );
 
+  // On a short viewport the third row sits below the fold when the section
+  // head is in view, so it has legitimately not entered yet. Bring the last
+  // row in before asserting that every row settles.
+  await page.evaluate(() => {
+    const last = document.querySelector("#values dl > div:last-child");
+    if (!last) return;
+    const top = last.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - window.innerHeight * 0.5));
+  });
+  await page.waitForTimeout(1100);
+
   const rows = await page.evaluate(() => {
     const out = [];
     document.querySelectorAll("#values dl > div").forEach((row) => {

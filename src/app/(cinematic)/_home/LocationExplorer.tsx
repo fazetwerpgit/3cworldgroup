@@ -4,29 +4,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { APPLY_HREF } from "../../_cinematic/nav";
+import { MARKETS, applyHrefForMarket } from "../../_cinematic/markets";
 import kit from "../../_cinematic/cinematic.module.css";
 import styles from "../cinematic-home.module.css";
 
 /**
- * The five markets 3C's existing homepage already names, with the skyline art
- * that already ships in /public/redesign. Selecting a city changes the picture
- * and the selected market shown in the panel — nothing more. It does not
- * reserve, route or pre-fill an application.
+ * The five markets the site names, with the market art that ships for each in
+ * /public/redesign/v2/photos. Selecting one changes the picture and the market
+ * shown in the panel, and points that panel's Apply link at /apply with the
+ * market named, so the form opens with the City field already filled in.
  *
- * Deliberately no per-city blurb: nothing in this codebase establishes anything
- * about recruiting, territory, density or build-out in any of these cities, and
- * invented geography does not help anyone decide whether to apply. The panel
- * says the one true thing — openings change with client demand — and lets the
- * reader name the market they want.
+ * The list itself lives in _cinematic/markets.ts because /apply reads the same
+ * list to resolve `?market=`. Per-market copy is geography only: nothing in
+ * this codebase establishes territory, density or build-out anywhere, so the
+ * panel pairs the place with the one sourced line — openings change with
+ * client demand — and lets the reader name the market they want.
  */
-const MARKETS = [
-  { city: "Birmingham", state: "Alabama", image: "/redesign/home-r6-market-birmingham-hd.png" },
-  { city: "Atlanta", state: "Georgia", image: "/redesign/home-r5-market-atlanta-hd.png" },
-  { city: "Jacksonville", state: "Florida", image: "/redesign/home-r5-market-jacksonville-hd.png" },
-  { city: "Lansing", state: "Michigan", image: "/redesign/home-r7-market-lansing-hd.png" },
-  { city: "Grand Rapids", state: "Michigan", image: "/redesign/home-r7-market-grand-rapids-hd.png" },
-] as const;
 
 /** Matches the bar's own height in cinematic-home.module.css (.cityIndicator). */
 const INDICATOR_HEIGHT = 2;
@@ -158,14 +151,14 @@ export default function LocationExplorer() {
       <div ref={listRef} className={styles.cityList} role="group" aria-label="Markets" onKeyDown={onKeyDown}>
         {MARKETS.map((market, i) => (
           <button
-            key={market.city}
+            key={market.slug}
             type="button"
             className={styles.cityChip}
             aria-pressed={i === index}
             onClick={() => setIndex(i)}
           >
-            <span className={styles.cityChipName}>{market.city}</span>
-            <span className={styles.cityChipState}>{market.state}</span>
+            <span className={styles.cityChipName}>{market.name}</span>
+            <span className={styles.cityChipState}>{market.region}</span>
           </button>
         ))}
         <span className={styles.cityIndicator} aria-hidden="true" />
@@ -178,16 +171,16 @@ export default function LocationExplorer() {
         the one thing that actually changes when you pick a market.
       */}
       <p className={kit.srOnly} role="status" aria-live="polite">
-        {active.city}, {active.state} selected
+        {active.label} selected
       </p>
 
       <div className={styles.cityPlate}>
         <div className={styles.cityPlateArt}>
           {MARKETS.map((market, i) => (
             <Image
-              key={market.city}
+              key={market.slug}
               src={market.image}
-              alt={`${market.city}, ${market.state}`}
+              alt=""
               fill
               sizes="(max-width: 900px) 100vw, 46vw"
               className={styles.cityPlateImage}
@@ -208,7 +201,7 @@ export default function LocationExplorer() {
         <div className={styles.cityPlateBody}>
           {MARKETS.map((market, i) => (
             <div
-              key={market.city}
+              key={market.slug}
               ref={(el) => {
                 panelRefs.current[i] = el;
               }}
@@ -216,19 +209,19 @@ export default function LocationExplorer() {
               data-active={i === index || undefined}
               aria-hidden={i !== index}
             >
-              <p className={styles.cityPlateState}>{market.state}</p>
-              <h3 className={styles.cityPlateName}>{market.city}</h3>
+              <p className={styles.cityPlateState}>{market.region}</p>
+              <h3 className={styles.cityPlateName}>{market.name}</h3>
               <p className={styles.cityPlateNote}>
-                Choose your preferred market. Openings vary with client demand.
+                {market.note} Openings vary with client demand.
               </p>
               <p className={styles.cityPlateStep}>
-                Interested in working in {market.city}? Include your preferred location when
-                you apply.
+                Interested in working in {market.name}? The form names this market for
+                you, and you can change it.
               </p>
               {/* Quiet links, not a lime button: the closer one section down carries
                   the page's last Apply, and a button here made Home ask four times. */}
               <div className={styles.cityPlateActions}>
-                <Link href={APPLY_HREF} className={kit.quietLink}>
+                <Link href={applyHrefForMarket(market.slug)} className={kit.quietLink}>
                   Apply for this market <ArrowRight aria-hidden="true" className={kit.btnArrow} size={15} strokeWidth={2.2} />
                 </Link>
                 <Link href="/opportunities" className={kit.quietLink}>

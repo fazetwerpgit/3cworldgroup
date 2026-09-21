@@ -163,11 +163,11 @@ for (const motion of ["no-preference", "reduce"]) {
       "status node follows the keyboard", (await status.textContent()).trim());
     await page.keyboard.press("Home");
     await page.waitForTimeout(300);
-    check((await status.textContent()).trim() === "Birmingham, Alabama selected",
+    check((await status.textContent()).trim() === "Dallas, Texas selected",
       "status node follows Home", (await status.textContent()).trim());
     await chips.nth(2).click();
     await page.waitForTimeout(300);
-    check((await status.textContent()).trim() === "Jacksonville, Florida selected",
+    check((await status.textContent()).trim() === "Southern California selected",
       "status node follows a click", (await status.textContent()).trim());
     check((await page.locator('[class*="cityPlateBody"][aria-live]').count()) === 0,
       "panel container no longer claims to be a live region");

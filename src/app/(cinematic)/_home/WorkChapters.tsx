@@ -47,6 +47,18 @@ const CHAPTERS = [
   photograph of somewhere, and it sat in the middle of the page's most
   cinematic moment.
 */
+/*
+  One `sizes` string, used by BOTH copies of every photograph — the sticky
+  stage's and the one each chapter carries for the narrow layout. They are two
+  elements showing the same file, and only ever one of them is displayed, but
+  `display: none` does not stop a browser fetching a srcset. If the two
+  disagreed about their width the browser would resolve them to two different
+  entries in the srcset and pull each photograph down twice: once at 44vw for
+  the stage and again at 100vw for the copy nobody can see. Agreeing on one
+  string makes the second element a cache hit instead of a download.
+*/
+const STAGE_SIZES = "(max-width: 900px) 100vw, 44vw";
+
 const STAGE = [
   {
     src: "/redesign/cinematic/home-threshold-dusk-1920.webp",
@@ -69,38 +81,75 @@ export default function WorkChapters() {
   return (
     <div className={styles.workLayout}>
       <div className={styles.stageColumn}>
-        <div className={styles.stage} data-chapter-stage data-active-chapter="0">
-          {STAGE.map((frame, i) => (
-            <figure key={frame.src} className={styles.stageLayer} data-layer={i}>
-              <Image
-                src={frame.src}
-                alt={frame.alt}
-                fill
-                sizes="(max-width: 900px) 100vw, 44vw"
-                className={styles.stageImage}
-                style={{ objectPosition: frame.position }}
-              />
-            </figure>
-          ))}
-
-          <span className={styles.stageTicks} aria-hidden="true">
-            {CHAPTERS.map((chapter) => (
-              <span key={chapter.n} className={styles.stageTick} />
+        {/*
+          The sticky thing is this wrapper, not the picture frame, so the
+          caption travels with the photograph and is part of what has to fit
+          on screen. The stage's own height is the viewport less the header
+          less this caption — see `--stage-caption` in the stylesheet.
+        */}
+        <div className={styles.stageSticky} data-chapter-stage data-active-chapter="0">
+          <div className={styles.stage}>
+            {STAGE.map((frame, i) => (
+              <figure key={frame.src} className={styles.stageLayer} data-layer={i}>
+                <Image
+                  src={frame.src}
+                  alt={frame.alt}
+                  fill
+                  sizes={STAGE_SIZES}
+                  className={styles.stageImage}
+                  style={{ objectPosition: frame.position }}
+                />
+              </figure>
             ))}
-          </span>
+          </div>
+
+          {/*
+            All three captions are rendered into one grid cell and the active
+            one is faded up, which is what keeps the line from changing height
+            as the label changes and means the caption is correct before any
+            script runs. It is aria-hidden because it says nothing the chapter
+            list beside it does not already say out loud, and it is text, not
+            a control: there is nothing here to press.
+          */}
+          <p className={styles.stageCaption} data-stage-caption aria-hidden="true">
+            {CHAPTERS.map((chapter, index) => (
+              <span key={chapter.n} className={styles.stageCaptionItem} data-caption={index}>
+                <span className={styles.stageCaptionIndex}>
+                  {chapter.n} / {String(CHAPTERS.length).padStart(2, "0")}
+                </span>
+                <span className={styles.stageCaptionLabel}>{chapter.title}</span>
+              </span>
+            ))}
+          </p>
         </div>
       </div>
 
       <ol className={styles.chapterList}>
         {CHAPTERS.map((chapter, index) => (
-          <li key={chapter.n} className={`${styles.chapter} ${kit.revealRise}`} data-chapter data-reveal>
-            {/* Mobile carries its own image inline; the sticky stage is desktop-only. */}
+          <li
+            key={chapter.n}
+            className={`${styles.chapter} ${kit.revealRise}`}
+            data-chapter
+            data-reveal
+            /*
+              These three arrive once and stay. Elsewhere a section replays its
+              entrance every time it is scrolled back into view, but a chapter
+              is already answering the scroll — the photograph beside it swaps
+              and its number lights — and re-fading the copy underneath that
+              would be two motions competing over the same movement. The narrow
+              layout has no sticky stage at all, and the owner asked for one
+              quiet fade there rather than a section that keeps re-introducing
+              itself on the way back up.
+            */
+            data-reveal-once
+          >
+            {/* The narrow layout carries its own image inline; the sticky stage is desktop-only. */}
             <div className={styles.chapterArt} aria-hidden="true">
               <Image
-                src={STAGE[index].src.replace("-1600.webp", "-800.webp")}
+                src={STAGE[index].src}
                 alt=""
                 fill
-                sizes="100vw"
+                sizes={STAGE_SIZES}
                 className={styles.stageImage}
                 style={{ objectPosition: STAGE[index].position }}
               />

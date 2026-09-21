@@ -66,12 +66,14 @@
       "route": "/",
       "motion": null,
       "hidden": [
+        "cinematic-home-module__mBhnHq__stageCaptionItem",
+        "cinematic-home-module__mBhnHq__stageCaptionItem",
         "cinematic-home-module__mBhnHq__cityPlatePanel",
         "cinematic-home-module__mBhnHq__cityPlatePanel",
         "cinematic-home-module__mBhnHq__cityPlatePanel",
         "cinematic-home-module__mBhnHq__cityPlatePanel"
       ],
-      "h": 8073
+      "h": 8124
     },
     {
       "route": "/services",
@@ -83,7 +85,7 @@
   "nojs": [
     {
       "route": "/",
-      "height": 8073
+      "height": 8124
     },
     {
       "route": "/about",

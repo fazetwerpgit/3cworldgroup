@@ -40,7 +40,7 @@ const FAQS = [
   },
   {
     q: "Where does 3C operate?",
-    a: "3C works with communities across the country; the markets named on this page are Birmingham, Atlanta, Jacksonville, Lansing and Grand Rapids. Opportunities vary by market and change with client demand, so the honest answer for any specific city is a conversation.",
+    a: "3C works with communities across the country; the markets named on this page are Dallas, Houston, Southern California, Lansing and Grand Rapids. Opportunities vary by market and change with client demand, so the honest answer for any specific city is a conversation.",
   },
 ];
 

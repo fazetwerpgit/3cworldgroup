@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 const B = "http://127.0.0.1:3120";
-const out = process.argv[2], W = Number(process.argv[3] || 1740);
+const out = process.argv[2] || ".tmpshots/motion/chapters", W = Number(process.argv[3] || 1740);
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: W, height: W > 900 ? 1000 : 844 }, deviceScaleFactor: 1 });
 const p = await ctx.newPage();

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
+import { findMarket } from "../../_cinematic/markets";
 import styles from "./apply.module.css";
 
 /**
@@ -50,6 +51,20 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
 
   const applyReferral = useCallback((ref: string) => {
     setFormData((prev) => ({ ...prev, referredBy: ref }));
+  }, []);
+
+  /*
+    `?market=` comes off Home's market explorer. It only ever prefills City,
+    and only from a slug that names one of the five markets the site lists —
+    an unknown slug fills in nothing, so a link cannot put arbitrary query
+    text into the field. City stays a free-text input either way: the reader
+    can replace the market with the town they actually live in, and what a
+    submit sends is the same string it has always sent.
+  */
+  const applyMarket = useCallback((slug: string) => {
+    const market = findMarket(slug);
+    if (!market) return;
+    setFormData((prev) => (prev.city ? prev : { ...prev, city: market.applyCity }));
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,16 +205,16 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/*
-        The `?ref=` prefill is the page's only use of the search params, and
-        `useSearchParams` opts whatever renders it out of static rendering. It
-        is isolated to this one-line component behind its own Suspense boundary
+        The `?ref=` and `?market=` prefills are the page's only use of the
+        search params, and `useSearchParams` opts whatever renders it out of
+        static rendering. They are isolated to this one component behind its own Suspense boundary
         rather than wrapped around the page, so the form and every section
         below it still render and hydrate as ordinary server output — which is
         also what keeps MotionRoot's reveals from landing on a subtree React
         has not hydrated yet.
       */}
       <Suspense>
-        <ReferralFromQuery onReferral={applyReferral} />
+        <PrefillFromQuery onReferral={applyReferral} onMarket={applyMarket} />
       </Suspense>
 
       {/* ------------------------------------------------------------------ */}
@@ -479,17 +494,25 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Reads `?ref=` and hands it to the form. Renders nothing; it exists only so
- * the dynamic-rendering bailout `useSearchParams` causes is scoped to a node
- * with no output instead of to the whole page.
+ * Reads `?ref=` and `?market=` and hands them to the form. Renders nothing; it
+ * exists only so the dynamic-rendering bailout `useSearchParams` causes is
+ * scoped to a node with no output instead of to the whole page.
  */
-function ReferralFromQuery({ onReferral }: { onReferral: (ref: string) => void }) {
+function PrefillFromQuery({
+  onReferral,
+  onMarket,
+}: {
+  onReferral: (ref: string) => void;
+  onMarket: (slug: string) => void;
+}) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const ref = searchParams.get("ref");
     if (ref) onReferral(ref);
-  }, [searchParams, onReferral]);
+    const market = searchParams.get("market");
+    if (market) onMarket(market);
+  }, [searchParams, onReferral, onMarket]);
 
   return null;
 }

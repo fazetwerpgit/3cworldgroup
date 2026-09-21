@@ -16,6 +16,8 @@
               twice or leave a second set of observers behind.
     slow      on a device too slow to hydrate inside the safety timer, the copy
               must never go visible and then hidden again.
+    replay    a section scrolled away and back must arrive again — once per
+              entry, never twice, and never at all if it opted out.
 
   Screenshots land in .tmpshots/motion/home/. Read them; the numbers below only
   say a state was reached, not that it looked right.
@@ -361,14 +363,30 @@ const chapterState = (page) =>
     const chs = [...document.querySelectorAll("[data-chapter]")];
     const clearance = Math.min(112, Math.max(76, innerHeight * 0.11));
     const targetY = clearance + (innerHeight - clearance) * 0.5;
+    /*
+      The reading line is a band, not a hairline, so at most scroll positions
+      there is one correct answer and near a boundary there are two. `first` is
+      the earliest chapter that must have taken the stage by now; `last` is the
+      latest that may still be holding it. Anything between them is right, and
+      that range is what makes this check independent of which direction the
+      reader came from. See the BAND constant in MotionRoot.
+    */
+    const BAND = 24;
     let expected = 0;
+    let first = 0;
+    let last = 0;
     chs.forEach((c, i) => {
-      if (c.getBoundingClientRect().top <= targetY) expected = i;
+      const t = c.getBoundingClientRect().top;
+      if (t <= targetY) expected = i;
+      if (t <= targetY - BAND) first = i;
+      if (t <= targetY + BAND) last = i;
     });
     const op = layers.map((l) => Number(getComputedStyle(l).opacity));
     return {
       active: Number(stage?.dataset.activeChapter ?? -1),
       expected,
+      first,
+      last,
       opacity: op.map((o) => o.toFixed(3)),
       opaque: op.filter((o) => o > 0.999).length,
       topOpaque: op.lastIndexOf(op.filter((o) => o > 0.999).pop() ?? -1),
@@ -396,16 +414,16 @@ if (run("chapters")) {
         await page.evaluate((v) => scrollTo(0, v), y);
         await page.waitForTimeout(700); // past the 0.6s settle
         const s = await chapterState(page);
-        if (s.active !== s.expected) {
+        if (s.active < s.first || s.active > s.last) {
           bad++;
-          console.log(`   ${tag} y=${y} active=${s.active} expected=${s.expected} op=${s.opacity}`);
+          console.log(`   ${tag} y=${y} active=${s.active} allowed=${s.first}..${s.last} op=${s.opacity}`);
         }
         if (s.opaque < 1) {
           blank++;
           console.log(`   ${tag} y=${y} NO OPAQUE LAYER op=${s.opacity}`);
         }
       }
-      check(bad === 0, `${w}x${h} ${tag}: active layer matches the reading line at every sample`);
+      check(bad === 0, `${w}x${h} ${tag}: the active layer is the one the reading band allows at every sample`);
       check(blank === 0, `${w}x${h} ${tag}: at least one layer fully opaque at every sample`);
     };
 
@@ -545,17 +563,23 @@ if (run("route")) {
     check(last.drawnFraction > 0.999 && last.stops.every((s) => s.card > 0.999) && last.art.every((a) => a > 0.999),
       `${w}x${h} settled complete by 1500ms`);
 
-    // Jump past in one step, wait, come back.
+    // Jump past in one step, wait, come back. The section is forgotten while
+    // it is away, so this is now a test that the pen starts over and finishes
+    // rather than one that the drawing survived — and that a reader who flew
+    // past it never finds it stranded half-drawn.
     const { ctx: c2, page: p2 } = await newPage({ viewport: { width: w, height: h } });
     await p2.goto(BASE + "/", { waitUntil: "networkidle" });
     await p2.evaluate(() => scrollTo(0, document.body.scrollHeight));
     await p2.waitForTimeout(1600);
+    const past = await routeState(p2);
+    check(!past.drawnFraction || past.drawnFraction < 0.001,
+      `${w}x${h} the route is re-armed once it is behind the reader (${past.drawnFraction})`);
     await p2.evaluate((y) => scrollTo(0, y), secTop - h * 0.4);
-    await p2.waitForTimeout(400);
+    await p2.waitForTimeout(1800);
     const jumped = await routeState(p2);
     console.log(`   jump-past: drawn=${jumped.drawnFraction?.toFixed(3)} cards=${jumped.stops.map((x) => x.card.toFixed(2)).join(" ")}`);
     check(jumped.drawnFraction > 0.999 && jumped.stops.every((s) => s.card > 0.999),
-      `${w}x${h} jump-past settles into the completed state`);
+      `${w}x${h} jump-past then return draws again and completes`);
     await p2.screenshot({ path: `${OUT}/route-${w}x${h}-jumppast.png` });
     await c2.close();
     await ctx.close();
@@ -674,6 +698,168 @@ if (run("slow")) {
   }
 }
 
+/* ---------------------------------------------------------------- replay -- */
+/*
+  Entrances replay on re-entry. Scroll to the route, back to the top and down
+  again: the line draws a second time and its stops arrive with it. That is the
+  requirement, and three things have to hold alongside it.
+
+  The reset is a snap, not a rewind. Every attribute involved is the ON half of
+  a pair whose OFF half carries no transition, so removing it returns the
+  section to its pre-draw state inside a frame. `dur` below is the line's
+  resolved transition-duration at the moment of the reset, and it has to read
+  0s — if it ever reads 1.1s the line is un-drawing itself.
+
+  Once per entry, not more. MotionRoot writes only on a real change, so a
+  mutation count IS a replay count; without that guard a section sitting still
+  on screen would log a write every frame.
+
+  And nothing thrashes at the boundary. The show line and the re-arm line are
+  22% of the viewport apart, so an element parked between them and jittered by a
+  couple of pixels must not toggle at all.
+*/
+if (run("replay")) {
+  console.log("\n== REPLAY ON RE-ENTRY ==");
+  for (const [label, viewport] of [["1440x900", { width: 1440, height: 900 }], ["390x844", { width: 390, height: 844 }]]) {
+    const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+    await ctx.addInitScript(() => {
+      const style = document.createElement("style");
+      style.textContent = "html{scroll-behavior:auto!important} nextjs-portal{display:none!important}";
+      document.addEventListener("DOMContentLoaded", () => {
+        document.head.appendChild(style);
+        window.__w = new WeakMap();
+        window.__peak = 0;
+        window.__draw = [];
+        new MutationObserver((rs) => {
+          for (const r of rs) {
+            const el = r.target;
+            if (r.attributeName === "data-shown" && el.hasAttribute("data-shown")) {
+              const n = (window.__w.get(el) || 0) + 1;
+              window.__w.set(el, n);
+              if (n > window.__peak) window.__peak = n;
+            }
+            if (r.attributeName === "data-drawn") window.__draw.push(el.hasAttribute("data-drawn") ? 1 : 0);
+          }
+        }).observe(document.body, { attributes: true, attributeFilter: ["data-shown", "data-drawn"], subtree: true });
+      });
+    });
+    const page = await ctx.newPage();
+    await page.goto(BASE + "/", { waitUntil: "networkidle" });
+    await page.waitForTimeout(900);
+
+    const routeState = () =>
+      page.evaluate(() => {
+        const sec = document.querySelector("[data-route-section]");
+        const lines = [...document.querySelectorAll('[class*="routeLine"]')];
+        // Both svgs are in the DOM; only one is laid out. Pick the painted one.
+        const line = lines.find((l) => { const r = l.getBoundingClientRect(); return r.width || r.height; }) || lines[0];
+        const cs = line ? getComputedStyle(line) : null;
+        return {
+          drawn: !!sec?.dataset.drawn,
+          arrived: [...document.querySelectorAll("[data-stop]")].filter((x) => x.dataset.arrived).length,
+          // Chrome leaves the stacked rail's value as an unresolved calc(), so
+          // fall back to the variable the calc is built from.
+          off: cs ? (parseFloat(cs.strokeDashoffset) || Number(sec?.style.getPropertyValue("--rail-progress") || 0) === 0 ? parseFloat(cs.strokeDashoffset) : null) : null,
+          raw: cs ? cs.strokeDashoffset : null,
+          dur: cs ? cs.transitionDuration : null,
+          cards: [...document.querySelectorAll('[class*="routeStopCard"]')].map((c) => Number(getComputedStyle(c).opacity)),
+        };
+      });
+    const glide = async (to) => {
+      const from = await page.evaluate(() => scrollY);
+      for (let i = 1; i <= 24; i++) {
+        await page.evaluate((y) => scrollTo(0, y), Math.round(from + ((to - from) * i) / 24));
+        await page.waitForTimeout(45);
+      }
+      await page.waitForTimeout(500);
+    };
+    const routeY = await page.evaluate(() =>
+      Math.round(document.querySelector("[data-route-draw]").getBoundingClientRect().top + scrollY));
+
+    await glide(routeY + 200);
+    const first = await routeState();
+    await glide(0);
+    const top = await routeState();
+    await glide(routeY + 200);
+    const again = await routeState();
+    console.log(`   ${label} first=${first.drawn}/${first.arrived} stops  top=${top.drawn}/${top.arrived} raw=${top.raw} dur=${top.dur}  again=${again.drawn}/${again.arrived}`);
+    check(first.drawn && first.arrived > 0, `${label} route draws on the first entry`);
+    check(!top.drawn && top.arrived === 0 && top.cards.every((c) => c < 0.01),
+      `${label} route is fully re-armed from the top (drawn=${top.drawn} arrived=${top.arrived})`);
+    check(top.dur === "0s", `${label} the reset is a snap, not a rewind (transition-duration=${top.dur})`);
+    check(again.drawn && again.arrived > 0, `${label} route draws AGAIN on the second entry`);
+    await page.screenshot({ path: `${OUT}/replay-route-${label}.png` });
+
+    // A generic reveal: bring it on screen, take it away, bring it back.
+    // Note it is NOT shown at scroll 0 — the first one sits below the show
+    // line on a 900px viewport, which is the point of having a show line.
+    const revealCycle = await page.evaluate(async () => {
+      const el = document.querySelector("[data-reveal]");
+      const wait = () => new Promise((r) => setTimeout(r, 450));
+      const into = () => scrollTo(0, Math.round(el.getBoundingClientRect().top + scrollY - innerHeight * 0.5));
+      scrollTo(0, 0); await wait();
+      const before = !!el.dataset.shown;
+      into(); await wait();
+      const onScreen = !!el.dataset.shown;
+      scrollTo(0, document.body.scrollHeight); await wait();
+      const away = !!el.dataset.shown;
+      into(); await wait();
+      return { before, onScreen, away, back: !!el.dataset.shown };
+    });
+    console.log(`   ${label} first [data-reveal]: belowLine=${!revealCycle.before} onScreen=${revealCycle.onScreen} scrolledAway=${revealCycle.away} returned=${revealCycle.back}`);
+    check(revealCycle.onScreen && !revealCycle.away && revealCycle.back,
+      `${label} a reveal is re-armed when it leaves and replays when it returns`);
+
+    // data-reveal-once: the opt-out motion-pages puts on the Services rows.
+    // Same element, same journey, and this time it keeps its entrance.
+    const once = await page.evaluate(async () => {
+      const el = document.querySelector("[data-reveal]");
+      const wait = () => new Promise((r) => setTimeout(r, 450));
+      el.setAttribute("data-reveal-once", "");
+      scrollTo(0, document.body.scrollHeight); await wait();
+      const away = !!el.dataset.shown;
+      el.removeAttribute("data-reveal-once");
+      return away;
+    });
+    check(once === true, `${label} data-reveal-once keeps an element shown after it leaves (${once})`);
+
+    // Thrash: park an element on its own show line and jitter across it. One
+    // write is the correct answer — it crosses the line once and stays put.
+    // Re-arming is 10% of the viewport away, so nothing can toggle here.
+    const thrash = await page.evaluate(async () => {
+      const el = [...document.querySelectorAll("[data-reveal]")][1] || document.querySelector("[data-reveal]");
+      delete el.dataset.shown;
+      const y = el.getBoundingClientRect().top + scrollY - innerHeight * 0.88;
+      scrollTo(0, Math.round(y));
+      await new Promise((r) => setTimeout(r, 400));
+      let writes = 0;
+      const mo = new MutationObserver((rs) => { writes += rs.length; });
+      mo.observe(el, { attributes: true, attributeFilter: ["data-shown"] });
+      for (let i = 0; i < 40; i++) {
+        scrollTo(0, Math.round(y) + (i % 2 ? 2 : -2));
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      await new Promise((r) => setTimeout(r, 300));
+      mo.disconnect();
+      return writes;
+    });
+    console.log(`   ${label} boundary jitter (40 frames across the show line): ${thrash} attribute writes`);
+    check(thrash <= 1, `${label} an element parked on the boundary does not toggle (${thrash} writes)`);
+
+    // Chapters are explicitly unchanged by this pass.
+    const chapters = await chapterState(page);
+    check(chapters.active >= chapters.first && chapters.active <= chapters.last,
+      `${label} chapter stage still tracks the reading band after the journey (${chapters.active} in ${chapters.first}..${chapters.last})`);
+
+    const peak = await page.evaluate(() => window.__peak);
+    const draw = await page.evaluate(() => window.__draw.join(""));
+    console.log(`   ${label} most data-shown writes on one element=${peak}  data-drawn toggles=${draw}`);
+    check(peak <= 12, `${label} no element is re-shown more than once per entry (peak=${peak})`);
+    check(!/11|00/.test(draw), `${label} data-drawn strictly alternates, one draw per entry (${draw})`);
+    await ctx.close();
+  }
+}
+
 /* ------------------------------------------------------------------- nav -- */
 if (run("nav")) {
   console.log("\n== ROUTE CHANGES ==");
@@ -711,16 +897,41 @@ if (run("nav")) {
   await page.goBack();
   await page.waitForURL(BASE + "/");
   await page.waitForTimeout(1200);
-  await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(900);
-  await page.evaluate(() => scrollTo(0, 0));
-  await page.waitForTimeout(900);
+
+  /*
+    Read the whole page at a reading pace and watch every reveal arrive.
+
+    This used to count what was still shown once the scroll was over, which
+    only made sense while an entrance was permanent. Now that a section is
+    re-armed behind the reader, the count at the bottom is nearly zero and
+    says nothing. The question worth asking is the one the requirement
+    actually asks: did anything get skipped on the way down — is any section
+    still hidden after the reader has passed it?
+  */
+  const swept = await page.evaluate(async () => {
+    const all = [...document.querySelectorAll("[data-reveal]")];
+    const seen = new Set();
+    const step = innerHeight * 0.5;
+    for (let y = 0; y <= document.body.scrollHeight; y += step) {
+      scrollTo(0, y);
+      for (let f = 0; f < 6; f++) await new Promise((r) => requestAnimationFrame(r));
+      all.forEach((el, i) => { if (el.dataset.shown) seen.add(i); });
+    }
+    scrollTo(0, 0);
+    await new Promise((r) => setTimeout(r, 600));
+    return { total: all.length, seen: seen.size, missed: all.map((el, i) => i).filter((i) => !seen.has(i)) };
+  });
+  await page.waitForTimeout(300);
   const back = await counts();
   console.log("   back on home:", JSON.stringify(back));
+  console.log(`   reveals arriving over one full read: ${swept.seen}/${swept.total}${swept.missed.length ? " missed " + swept.missed.join(",") : ""}`);
 
   check(back.root === 1 && back.motion === 1, "one motion root, one data-entered element after back");
   check(back.entered <= 2, `data-entered written once per page visit (writes=${back.entered})`);
-  check(back.shown === back.reveal, `every [data-reveal] shown after a full scroll (${back.shown}/${back.reveal})`);
+  check(swept.seen === swept.total,
+    `no [data-reveal] is skipped on the way down (${swept.seen}/${swept.total})`);
+  check(back.shown < back.reveal,
+    `reveals behind the reader are re-armed, not left shown (${back.shown}/${back.reveal} still shown at the top)`);
   check(errors.length === 0, `no page errors during navigation${errors.length ? " — " + errors[0] : ""}`);
   await page.screenshot({ path: `${OUT}/nav-back-home.png` });
   await ctx.close();

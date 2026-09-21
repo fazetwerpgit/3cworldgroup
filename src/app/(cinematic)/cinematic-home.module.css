@@ -308,33 +308,53 @@
   inside the fold at every desktop width, and the chapter column opposite it
   carries a matching beat (see `.chapter` under min-width: 901px).
 */
+/*
+  Round 16 — the sticky element is the wrapper, not the picture frame. The
+  caption below the photograph has to travel with it and has to count against
+  the same height budget, or the two together are taller than the space under
+  the header and the caption is the part that falls off the bottom.
+*/
+.stageSticky {
+  /*
+    The caption's own line plus the gap above it. It is a variable because two
+    rules need the same number and they are 200 lines apart: the stage
+    subtracts it from the viewport, and getting it wrong by a line is the
+    difference between a caption on screen and a caption under the fold.
+  */
+  --stage-caption: 2.1rem;
+  position: sticky;
+  /* Clears the header. Also the number the stage height subtracts from the
+     viewport, along with the caption, so the whole block fits between the
+     header and the fold with room under it. */
+  top: 6.5rem;
+}
+
 .stage {
   aspect-ratio: 1 / 1.06;
   background: var(--paper-raise);
   border: 1px solid var(--rule-ink);
-  max-height: clamp(24rem, calc(100svh - 22rem), 38rem);
+  max-height: clamp(24rem, calc(100svh - 22rem - var(--stage-caption)), 38rem);
   overflow: hidden;
-  position: sticky;
-  top: 6.5rem;
+  position: relative;
 }
 
 /*
-  0.8s on the Material curve was half a second of nothing before the new
-  photograph read at all, which on a fast scroll meant the stage was always
-  answering the chapter you had just left. The expo curve front-loads instead
-  — most of the opacity is spent in the first third — so the swap registers
-  immediately, and the settle is 0.6s so the frame stops moving when the fade
-  does rather than drifting on for another half second after it. It cannot
-  flash blank at any speed: the layer underneath is opaque (see below).
+  A dissolve and nothing else. The scale this used to carry was a zoom on
+  every chapter change, which is the one thing a photograph should not do
+  while you are reading beside it — and paired with a 0.55s fade it made the
+  swap feel like a slideshow rather than a change of subject.
+
+  Round 16: 0.55s → 0.35s, and the transform is gone. The expo curve is still
+  the right shape because it front-loads, so most of the opacity is spent
+  immediately and the swap registers the moment the chapter takes over rather
+  than a third of a second later. It cannot flash blank at any speed: the
+  layer underneath is opaque (see below).
 */
 .stageLayer {
   inset: 0;
   opacity: 0;
   position: absolute;
-  transition:
-    opacity 0.55s var(--ease-out-expo),
-    transform 0.6s var(--ease-out-expo);
-  transform: scale(1.035);
+  transition: opacity 0.35s var(--ease-out-expo);
 }
 
 /*
@@ -344,59 +364,82 @@
   a muddy double exposure mid-swap. Scrolling back fades the top layer out
   and the solid one underneath is simply there.
 */
-.stage[data-active-chapter="0"] .stageLayer[data-layer="0"],
-.stage[data-active-chapter="1"] .stageLayer[data-layer="0"],
-.stage[data-active-chapter="1"] .stageLayer[data-layer="1"],
-.stage[data-active-chapter="2"] .stageLayer[data-layer="0"],
-.stage[data-active-chapter="2"] .stageLayer[data-layer="1"],
-.stage[data-active-chapter="2"] .stageLayer[data-layer="2"] {
+.stageSticky[data-active-chapter="0"] .stageLayer[data-layer="0"],
+.stageSticky[data-active-chapter="1"] .stageLayer[data-layer="0"],
+.stageSticky[data-active-chapter="1"] .stageLayer[data-layer="1"],
+.stageSticky[data-active-chapter="2"] .stageLayer[data-layer="0"],
+.stageSticky[data-active-chapter="2"] .stageLayer[data-layer="1"],
+.stageSticky[data-active-chapter="2"] .stageLayer[data-layer="2"] {
   opacity: 1;
-  transform: scale(1);
 }
 
 .stageImage {
   object-fit: cover;
 }
 
-.stageTicks {
-  bottom: 1.1rem;
+/*
+  Round 16 — the three marks that used to sit inside the photograph are gone.
+  At the size they had to be to stay out of the picture they were a few pale
+  dashes in a corner: readable as decoration, not as "you are on the second of
+  three". This says it.
+
+  All three captions occupy the same grid cell, so the line is the height of
+  the tallest label at every state and the photograph above it never moves
+  when the label changes. Rendering all three also means the caption is right
+  before any script runs, and `visibility` keeps the two inactive ones out of
+  a text selection rather than leaving invisible words lying across the line.
+*/
+.stageCaption {
+  display: grid;
+  margin-top: 0.8rem;
+}
+
+.stageCaptionItem {
+  align-items: baseline;
   display: flex;
-  gap: 0.4rem;
-  left: 1.1rem;
-  position: absolute;
-  z-index: 3;
-}
-
-/*
-  The tick is drawn at its full 40px and scaled down to rest, so the chapter
-  change animates a transform rather than a width and never asks the row to
-  reflow three times a scroll.
-*/
-/*
-  R14 — :3122 puts these on a paper band that its stage draws across the foot
-  of the frame, so its marks are dark green. This stage has no band: the marks
-  sit directly on the photograph, where dark green at 30% is invisible. They
-  stay light, which is the same decision :3122 made for its own ground.
-*/
-.stageTick {
-  background: rgba(255, 255, 255, 0.42);
-  height: 3px;
-  transform: scaleX(0.45);
-  transform-origin: left center;
-  /* The mark is an indicator, not an entrance: it answers at interaction
-     speed so the chapter change is confirmed before the photograph has
-     finished dissolving. */
+  gap: 0.55rem;
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  /* Matched to the dissolve above, so the label and the photograph change as
+     one thing. The visibility delay holds until the fade has finished. */
   transition:
-    background-color 0.2s ease,
-    transform 0.2s var(--ease-out-expo);
-  width: 40px;
+    opacity 0.35s var(--ease-out-expo),
+    visibility 0s linear 0.35s;
 }
 
-.stage[data-active-chapter="0"] .stageTick:nth-child(1),
-.stage[data-active-chapter="1"] .stageTick:nth-child(2),
-.stage[data-active-chapter="2"] .stageTick:nth-child(3) {
-  background: var(--lime);
-  transform: scaleX(1);
+.stageSticky[data-active-chapter="0"] .stageCaptionItem[data-caption="0"],
+.stageSticky[data-active-chapter="1"] .stageCaptionItem[data-caption="1"],
+.stageSticky[data-active-chapter="2"] .stageCaptionItem[data-caption="2"] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.35s var(--ease-out-expo),
+    visibility 0s linear;
+}
+
+.stageCaptionIndex {
+  color: var(--lime-ink);
+  font-family: var(--display);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.stageCaptionLabel {
+  color: var(--on-paper-dim);
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* The separator is drawn rather than typed so it needs no element of its own
+   and cannot be selected or read out as a word. */
+.stageCaptionLabel::before {
+  color: var(--rule-ink-strong, var(--on-paper-dim));
+  content: "·";
+  margin-right: 0.55rem;
 }
 
 .chapterList {
@@ -414,13 +457,35 @@
 }
 
 .chapterNumber {
+  align-items: center;
   color: var(--lime-ink);
+  display: flex;
   font-family: var(--display);
   font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
+  gap: 0.75rem;
   /* 0.18em split "01" into "0 1" at this size (Opus r14). */
   letter-spacing: 0.06em;
   margin-bottom: 0.9rem;
+}
+
+/*
+  The rule beside the active chapter's number. It is drawn at its full length
+  and scaled to nothing at rest, so the row reserves its space at every state
+  and the number does not shift sideways when a chapter takes the stage — the
+  same trick the marks inside the photograph used to use, moved somewhere it
+  can actually be seen. Desktop only: see the media query below.
+*/
+.chapterNumber::after {
+  background: var(--lime);
+  content: "";
+  display: none;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  /* An indicator answers at interaction speed, not entrance speed. */
+  transition: transform 0.2s var(--ease-out-expo);
+  width: 2.5rem;
 }
 
 .chapterTitle {
@@ -483,8 +548,62 @@
       pinned stage, so the one-chapter-one-photo pairing holds. Third-photo
       dwell measured with docs/cinematic/review/dwell.mjs after the change.
     */
-    min-height: clamp(22rem, 50svh, 30rem);
+    /*
+      Round 16 (owner: less empty scrolling between the descriptions): 50svh
+      → 44svh, about 55px a beat at 1440. The pairing that 50svh was
+      protecting — one chapter beside one photograph — does not depend on the
+      beat matching the stage's height, only on the beats being equal and
+      taller than their copy, so the reading distance can come down without
+      the swaps bunching up. What DID depend on the tall beat was the third
+      photograph's dwell, and that is now paid for explicitly by the list's
+      own foot below rather than by making all three chapters taller.
+    */
+    min-height: clamp(20rem, 44svh, 27rem);
     padding: clamp(1.75rem, 2.6vw, 2.4rem) 0;
+  }
+
+  /*
+    The third photograph's dwell, in one place.
+
+    The stage is released when this column ends, and the third chapter takes
+    the stage when its top crosses the reading line — so the scroll between
+    those two events is the beat, plus this pad, plus the reading line, less
+    the sticky block. Round 14 bought that distance by giving the last chapter
+    a full beat it did not need, which is the "empty column under the final
+    paragraph" everyone has been looking at. This is the same distance, asked
+    for directly, and it is ~60px shorter because it no longer has to be a
+    whole beat.
+  */
+  .chapterList {
+    padding-bottom: clamp(3rem, 9svh, 6.5rem);
+  }
+
+  /*
+    Which chapter you are reading, said twice: the number warms and a short
+    rule opens beside it. Only the number changes — the heading and both
+    paragraphs stay at full strength in every state, because a chapter you
+    have already read is still there to be read, and three descriptions where
+    two are ghosted is a harder page than three that are simply there.
+
+    `data-idle` rather than `:not([data-current])` so the dimming only ever
+    applies once the script has actually taken charge. With no script nothing
+    carries either attribute and all three numbers keep their normal colour,
+    which is the state this section shipped in.
+  */
+  .chapterNumber {
+    transition: color 0.2s ease;
+  }
+
+  .chapterNumber::after {
+    display: block;
+  }
+
+  .chapter[data-idle] .chapterNumber {
+    color: var(--on-paper-dim);
+  }
+
+  .chapter[data-current] .chapterNumber::after {
+    transform: scaleX(1);
   }
 
   /*
@@ -531,7 +650,12 @@
 @media (min-width: 901px) {
   .stage {
     aspect-ratio: auto;
-    height: min(calc(100svh - 11rem), 50rem);
+    /* 11rem is the header clearance above plus the room left under the block;
+       the caption is subtracted as well so that adding it did not push the
+       photograph's foot past the fold. The two together still measure what
+       the photograph alone used to, which is what keeps the third
+       photograph's dwell where it was. */
+    height: min(calc(100svh - 11rem - var(--stage-caption)), 50rem);
     max-height: none;
   }
 }
@@ -1910,7 +2034,14 @@
   }
 
   .stageLayer,
+  .stageCaptionItem,
   .cityPlateImage {
+    transition: none;
+  }
+
+  /* The indicator still answers, it just answers instantly. */
+  .chapterNumber,
+  .chapterNumber::after {
     transition: none;
   }
 

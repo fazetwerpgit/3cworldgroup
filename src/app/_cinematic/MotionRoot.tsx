@@ -270,180 +270,192 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       });
     }
 
-    // --- Section reveals, fired once each ------------------------------------
+    /* --- Section reveals, replayed on every entry ---------------------------
+
+       These used to fire once for the life of the page visit. They now replay:
+       scroll a section off the screen and back, and its copy arrives again.
+       The exception is per-element and opt-in — `data-reveal-once` — for runs
+       of content where seeing the same entrance twice would read as noise
+       rather than as arrival.
+
+       Two lines, deliberately far apart. A section shows once its top crosses
+       88% of the viewport, and is re-armed only once it is a further 10% of
+       the viewport clear of an edge. Nothing happens in the band between them,
+       which is what stops an element parked on the boundary from toggling as
+       the page settles by a pixel — the hysteresis IS the thrash guard.
+
+       Note the sign: the re-arm margin GROWS the root rather than shrinking
+       it. A negative margin would re-arm an element that is still partly on
+       screen, and because that region overlaps the show line it would flip the
+       same element back and forth for as long as it sat there.
+
+       One function decides, and it decides from geometry rather than from a
+       history of events — the same reasoning the chapter stage uses below. The
+       observers and listeners hold no logic; they only ask for another
+       reading. So a jump scroll, a resize, an image landing and a restored
+       scroll position all converge on one answer instead of each needing its
+       own repair, and there is exactly one writer of `data-shown`.
+    */
+    const SHOW_LINE = 0.88;
+    const REARM_PAD = 0.1;
+    const REARM_MARGIN = `${REARM_PAD * 100}% 0px`;
+
     const reveals = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
     if (reveals.length) {
-      const io = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (!entry.isIntersecting) continue;
-            (entry.target as HTMLElement).dataset.shown = "true";
-            io.unobserve(entry.target);
-          }
-        },
-        { rootMargin: "0px 0px -12% 0px", threshold: 0.12 },
-      );
-      reveals.forEach((el) => io.observe(el));
-      cleanups.push(() => io.disconnect());
-      // Belt and braces, and the reason it is not a one-shot timeout: a jump
-      // scroll lands the viewport somewhere IO may not report on — the entry
-      // for a section skipped over is never delivered, and a single deadline
-      // that has already passed cannot rescue it, so the copy stays at opacity
-      // 0 for the rest of the visit. This sweep runs on the same rAF the rest
-      // of the file uses and shows anything the viewport has reached or passed.
-      // Hidden copy is a worse failure than a missed entrance.
-      let pending = reveals.slice();
-      let sweepFrame = 0;
-      const sweep = () => {
-        sweepFrame = 0;
+      let revealFrame = 0;
+      const syncReveals = () => {
+        revealFrame = 0;
         const vh = window.innerHeight;
-        pending = pending.filter((el) => {
-          if (el.dataset.shown) return false;
-          // `top < vh` is true once the element has been reached and stays true
-          // after it is scrolled past, so one test covers both the section you
-          // are arriving at and every section a jump skipped over.
-          if (el.getBoundingClientRect().top >= vh) return true;
-          el.dataset.shown = "true";
-          return false;
-        });
-        if (!pending.length) detachSweep();
+        const pad = vh * REARM_PAD;
+        for (const el of reveals) {
+          const rect = el.getBoundingClientRect();
+          // Both branches write only on a real change. This runs on every
+          // scroll frame, and re-setting an attribute to the value it already
+          // holds still invalidates style and still reports a mutation — so
+          // without the guards a section sitting quietly on screen would
+          // generate a write per frame and nothing could tell a replay from a
+          // repaint.
+          if (rect.bottom > 0 && rect.top < vh * SHOW_LINE) {
+            if (!el.dataset.shown) el.dataset.shown = "true";
+          } else if (rect.bottom < -pad || rect.top > vh + pad) {
+            // `data-reveal-once` keeps the first entrance and nothing after it.
+            // Services carries it on the three product rows, where the row is
+            // one exhibit and replaying it on the way back up is just motion.
+            if (el.dataset.shown && !el.hasAttribute("data-reveal-once")) {
+              delete el.dataset.shown;
+            }
+          }
+        }
       };
-      const scheduleSweep = () => {
-        if (!sweepFrame) sweepFrame = requestAnimationFrame(sweep);
+      const scheduleReveals = () => {
+        if (!revealFrame) revealFrame = requestAnimationFrame(syncReveals);
       };
-      const detachSweep = () => {
-        window.removeEventListener("scroll", scheduleSweep);
-        window.removeEventListener("resize", scheduleSweep);
-      };
-      window.addEventListener("scroll", scheduleSweep, { passive: true });
-      window.addEventListener("resize", scheduleSweep);
+      // The observer is here for the movements a scroll listener cannot see: an
+      // image landing, an accordion opening, a font swap reflowing the column
+      // above it. Its margin matches the re-arm distance so it still has
+      // something to report out at that edge.
+      const io = new IntersectionObserver(scheduleReveals, {
+        rootMargin: REARM_MARGIN,
+        threshold: [0, 0.12],
+      });
+      reveals.forEach((el) => io.observe(el));
+      window.addEventListener("scroll", scheduleReveals, { passive: true });
+      window.addEventListener("resize", scheduleReveals);
+      // Off the bfcache the scroll position is restored with no scroll event.
+      window.addEventListener("pageshow", scheduleReveals);
       // Two frames, for the same reason the hero entrance waits: the gated
       // style has to be painted before the shown style, or the transition is
       // collapsed by one style recalculation and the entrance never runs.
-      const firstSweep = requestAnimationFrame(() => {
-        requestAnimationFrame(sweep);
+      const firstReveal = requestAnimationFrame(() => {
+        requestAnimationFrame(syncReveals);
       });
       cleanups.push(() => {
-        detachSweep();
-        cancelAnimationFrame(firstSweep);
-        if (sweepFrame) cancelAnimationFrame(sweepFrame);
+        io.disconnect();
+        window.removeEventListener("scroll", scheduleReveals);
+        window.removeEventListener("resize", scheduleReveals);
+        window.removeEventListener("pageshow", scheduleReveals);
+        cancelAnimationFrame(firstReveal);
+        if (revealFrame) cancelAnimationFrame(revealFrame);
       });
     }
 
-    // --- The route: one triggered draw, not a scroll scrub -------------------
-    // The line used to scrub with the scroll position, which tied the pen to
-    // how fast a person happened to be moving: a flick drew all four blocks
-    // inside one frame, a slow read left the stroke stranded half-finished for
-    // a page of copy, and no stop could know when the line would reach it. It
-    // is now a fixed-length draw that starts once, so the stroke reads at the
-    // same speed every visit and each stop derives its own delay from its
-    // fraction of the path (`--route-at`, see cinematic-home.module.css).
-    //
-    // Both switches below are wired at every width and the CSS decides which
-    // one applies, because a resize across 900px can land mid-sequence: the
-    // wide route follows one pen, the stacked rail advances step by step.
-    // Attributes are layout-agnostic; only the rules reading them are not.
+    /* --- The route: one triggered draw, not a scroll scrub -------------------
+
+       The line used to scrub with the scroll position, which tied the pen to
+       how fast a person happened to be moving: a flick drew all four blocks
+       inside one frame, a slow read left the stroke stranded half-finished for
+       a page of copy, and no stop could know when the line would reach it. It
+       is a fixed-length draw that starts once per entry, so the stroke reads at
+       the same speed every time and each stop derives its own delay from its
+       fraction of the path (`--route-at`, see cinematic-home.module.css).
+
+       Once per ENTRY, not once per visit: leave the section properly behind and
+       the whole sequence is forgotten, so the pen draws again on the way back.
+       What starts it is the drawing's own box, not the section's — the section
+       opens on a pad and a two-line heading, some 240px of it, so a line
+       measured on the section top fired while the canvas was still a full
+       viewport below the fold. `[data-route-draw]` is the canvas itself.
+
+       Forgetting is a snap, not a rewind, and that is load-bearing. Every
+       attribute here is the ON half of a pair whose OFF half carries no
+       `transition` at all, so taking one away returns the section to its
+       pre-draw state within a frame instead of un-drawing it over 1.1s. It is
+       why this needs no CSS hook of its own: a visible rewind would be the one
+       thing worse than a stale drawing, and the reset only ever happens with
+       the section off screen anyway.
+
+       Both switches are wired at every width and the CSS decides which one
+       applies, because a resize across 900px can land mid-sequence: the wide
+       route follows one pen, the stacked rail advances step by step.
+    */
     const routeSection = root.querySelector<HTMLElement>("[data-route-section]");
     if (routeSection) {
       const stops = Array.from(routeSection.querySelectorAll<HTMLElement>("[data-stop]"));
-
-      // Fire-once, like every other entrance here: re-drawing the route when
-      // someone scrolls back to re-read it would erase four steps of real copy.
-      const startDraw = () => {
-        routeSection.dataset.drawn = "true";
-      };
-      // The stacked rail only ever goes forward, for the same reason.
-      let rail = 0;
-      const arrive = (stop: HTMLElement) => {
-        if (stop.dataset.arrived) return;
-        stop.dataset.arrived = "true";
-        const at = Number(stop.dataset.atSm ?? "0");
-        if (at <= rail) return;
-        rail = at;
-        routeSection.style.setProperty("--rail-progress", rail.toFixed(4));
-      };
-      const reach = (el: HTMLElement) => {
-        if (el.hasAttribute("data-stop")) arrive(el);
-        else startDraw();
-      };
-
-      // What starts the draw is the drawing's own box, not the section's. The
-      // section opens on a section pad and a two-line heading, some 240px of
-      // it, so a line measured on the section top fired while the canvas was
-      // still a full viewport below the fold and the stroke was finished
-      // before it came into frame. `[data-route-draw]` is the canvas itself.
-      //
-      // Each target carries the fraction of the viewport its top has to cross.
-      // 0.55 for the canvas puts stop 01's row on screen as the pen leaves it;
-      // 0.74 for a stacked step is the same line the rest of the page reveals
-      // on. Both are expressed twice — as an IntersectionObserver rootMargin
-      // and as a number the sweep compares against — because the sweep is the
-      // only thing that catches a section the observer never reports on.
       const canvas = routeSection.querySelector<HTMLElement>("[data-route-draw]") ?? routeSection;
-      const targets: Array<[HTMLElement, number]> = [
-        [canvas, 0.55],
-        ...stops.map((stop) => [stop, 0.74] as [HTMLElement, number]),
-      ];
-      const observers = new Map<number, IntersectionObserver>();
-      const observerFor = (line: number) => {
-        const existing = observers.get(line);
-        if (existing) return existing;
-        const io = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (!entry.isIntersecting) continue;
-              reach(entry.target as HTMLElement);
-              io.unobserve(entry.target);
-            }
-          },
-          { rootMargin: `0px 0px -${Math.round((1 - line) * 100)}% 0px`, threshold: 0 },
-        );
-        observers.set(line, io);
-        return io;
-      };
-      targets.forEach(([el, line]) => observerFor(line).observe(el));
-      const unobserve = (el: HTMLElement) => {
-        observers.forEach((io) => io.unobserve(el));
-      };
-      cleanups.push(() => observers.forEach((io) => io.disconnect()));
+      // 0.55 for the canvas puts stop 01's row on screen as the pen leaves it;
+      // 0.74 for a stacked step is the same line the rest of the page uses.
+      const DRAW_LINE = 0.55;
+      const STOP_LINE = 0.74;
 
-      // The same belt-and-braces sweep the reveals use, and for the same
-      // reason: a jump scroll past this section is never reported by IO, and
-      // a route that never draws leaves its four stops hidden for the visit.
-      // `top < line` is true both on arrival and after being scrolled past.
-      // On the wide layout the stops are zero-height anchors, which is exactly
-      // the shape an observer is least reliable about — this covers them.
-      let pending = targets.slice();
-      let sweepFrame = 0;
-      const sweep = () => {
-        sweepFrame = 0;
+      // The stacked rail only goes forward within one entry, so a reader moving
+      // back up a step does not wind the line back with them.
+      let rail = 0;
+      const setRail = (value: number) => {
+        rail = value;
+        if (value > 0) routeSection.style.setProperty("--rail-progress", value.toFixed(4));
+        else routeSection.style.removeProperty("--rail-progress");
+      };
+
+      let routeFrame = 0;
+      const syncRoute = () => {
+        routeFrame = 0;
         const vh = window.innerHeight;
-        pending = pending.filter(([el, line]) => {
-          if (el.getBoundingClientRect().top >= vh * line) return true;
-          reach(el);
-          unobserve(el);
-          return false;
-        });
-        if (!pending.length) detachSweep();
+        const pad = vh * REARM_PAD;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.bottom < -pad || rect.top > vh + pad) {
+          // Guarded like the reveals above: this runs every frame the section
+          // is off screen, which is most of them.
+          if (!routeSection.dataset.drawn && rail === 0) return;
+          delete routeSection.dataset.drawn;
+          stops.forEach((stop) => delete stop.dataset.arrived);
+          setRail(0);
+          return;
+        }
+        if (rect.top < vh * DRAW_LINE && !routeSection.dataset.drawn) {
+          routeSection.dataset.drawn = "true";
+        }
+        for (const stop of stops) {
+          if (stop.dataset.arrived) continue;
+          if (stop.getBoundingClientRect().top >= vh * STOP_LINE) continue;
+          stop.dataset.arrived = "true";
+          const at = Number(stop.dataset.atSm ?? "0");
+          if (at > rail) setRail(at);
+        }
       };
-      const scheduleSweep = () => {
-        if (!sweepFrame) sweepFrame = requestAnimationFrame(sweep);
+      const scheduleRoute = () => {
+        if (!routeFrame) routeFrame = requestAnimationFrame(syncRoute);
       };
-      const detachSweep = () => {
-        window.removeEventListener("scroll", scheduleSweep);
-        window.removeEventListener("resize", scheduleSweep);
-      };
-      window.addEventListener("scroll", scheduleSweep, { passive: true });
-      window.addEventListener("resize", scheduleSweep);
+      // On the wide layout the stops are zero-height anchors, which is the shape
+      // an observer is least reliable about — hence the geometry pass above and
+      // an observer whose only job is to wake it.
+      const io = new IntersectionObserver(scheduleRoute, { rootMargin: REARM_MARGIN, threshold: 0 });
+      io.observe(canvas);
+      stops.forEach((stop) => io.observe(stop));
+      window.addEventListener("scroll", scheduleRoute, { passive: true });
+      window.addEventListener("resize", scheduleRoute);
+      window.addEventListener("pageshow", scheduleRoute);
       // Two frames, so the pre-draw state is painted before the drawn state
       // and the transition runs rather than being collapsed into it.
-      const firstSweep = requestAnimationFrame(() => {
-        requestAnimationFrame(sweep);
+      const firstRoute = requestAnimationFrame(() => {
+        requestAnimationFrame(syncRoute);
       });
       cleanups.push(() => {
-        detachSweep();
-        cancelAnimationFrame(firstSweep);
-        if (sweepFrame) cancelAnimationFrame(sweepFrame);
+        io.disconnect();
+        window.removeEventListener("scroll", scheduleRoute);
+        window.removeEventListener("resize", scheduleRoute);
+        window.removeEventListener("pageshow", scheduleRoute);
+        cancelAnimationFrame(firstRoute);
+        if (routeFrame) cancelAnimationFrame(routeFrame);
       });
     }
 
@@ -501,10 +513,26 @@ function attachStatic(root: HTMLElement): () => void {
       // instead of once it has climbed a third of the way up (owner: the
       // photo changed too late). Pairs with equal-height beats in the CSS.
       const targetY = headerClearance + (window.innerHeight - headerClearance) * 0.5;
+      /*
+        Round 16 — the reading line is a band, not a hairline.
+
+        The rule is still "the last chapter whose top has crossed the line",
+        but a chapter has to cross 24px PAST the line to take the stage and
+        24px back before it gives it up. A single line meant a chapter top
+        resting within a pixel of it could hand the stage back and forth as
+        the page settled, a scrollbar appeared, or a trackpad idled — two
+        photographs trading places over a 1px movement. Nothing at all
+        happens inside the band, which is the whole point of having one.
+      */
+      const BAND = 24;
       const rects = chapters.map((chapter) => chapter.getBoundingClientRect());
       let bestIndex = 0;
       rects.forEach((rect, index) => {
-        if (rect.top <= targetY) bestIndex = index;
+        // Ahead of where we already are, the line is the far edge of the band;
+        // at or behind it, the near edge. So the chapter in possession keeps it
+        // until the reader has clearly moved on.
+        const line = index > lastIndex ? targetY - BAND : targetY + BAND;
+        if (rect.top <= line) bestIndex = index;
       });
       // Compare against the DOM as well as the cached index. The cache alone
       // would early-return on a re-entry where the element is freshly rendered
@@ -515,8 +543,17 @@ function attachStatic(root: HTMLElement): () => void {
       lastIndex = bestIndex;
       stage.dataset.activeChapter = String(bestIndex);
       chapters.forEach((chapter, index) => {
-        if (index === bestIndex) chapter.dataset.current = "true";
-        else delete chapter.dataset.current;
+        if (index === bestIndex) {
+          chapter.dataset.current = "true";
+          delete chapter.dataset.idle;
+        } else {
+          delete chapter.dataset.current;
+          // The stylesheet dims an idle chapter's number, and it keys on this
+          // rather than on "not current" so that a page with no script running
+          // leaves all three numbers alone instead of dimming every one of
+          // them. Nothing carries either attribute until this line runs.
+          chapter.dataset.idle = "true";
+        }
       });
     };
     const schedule = () => {
