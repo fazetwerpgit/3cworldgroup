@@ -32,7 +32,7 @@ Sourced only from copy already live in this codebase (`/apply`,
 - Training is provided: products, sales process, hands-on coaching, field support. (`src/app/opportunities/page.tsx`)
 - Products represented: fiber internet, TV service, home security systems, and bundles, from leading providers. (`src/app/services/page.tsx`, root metadata)
 - Path to start: apply online → conversation with the team → training → work in the field. (`src/app/opportunities/page.tsx`)
-- Markets referenced on this homepage: Birmingham AL, Atlanta GA, Jacksonville FL, Lansing MI, Grand Rapids MI. (existing homepage market list + existing city art)
+- Markets referenced on this homepage: Dallas TX, Houston TX, Southern California (region), Lansing MI, Grand Rapids MI. (market list set by the owner; city art in /public/redesign/v2/photos)
 - Openings change by market based on client demand. (existing homepage copy)
 - Advancement exists toward coaching and running a team. (existing homepage copy)
 
@@ -47,7 +47,7 @@ Sourced only from copy already live in this codebase (`/apply`,
   anything. It changes what you're reading; applying is the actual action.
 - **No per-city descriptive copy.** Nothing in this codebase establishes
   anything about recruiting, territory, housing density, build-out or metro
-  size in Birmingham, Atlanta, Jacksonville, Lansing or Grand Rapids. Invented
+  size in Dallas, Houston, Southern California, Lansing or Grand Rapids. Invented
   geography reads as filler and does not help anyone decide whether to apply.
   The explorer carries the five names, the five existing skyline images, and one
   shared, sourced line — openings change by market with client demand — and

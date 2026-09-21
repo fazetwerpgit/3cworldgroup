@@ -180,8 +180,8 @@ below), not a blanket opacity.
    the route sequence. At ≤900px it leaves the absolute layer and rejoins the
    flow under the last stop.
 
-4. **Where (`#markets`, navy).** Five native `<button>`s — Birmingham, Atlanta,
-   Jacksonville, Lansing, Grand Rapids — all visible at once, `aria-pressed`,
+4. **Where (`#markets`, navy).** Five native `<button>`s — Dallas, Houston,
+   Southern California, Lansing, Grand Rapids — all visible at once, `aria-pressed`,
    arrow-key and tab operable, with a lime fill on the selected one. Selecting
    swaps a large city plate (existing market art) and an honest next step: what
    to do about that city, stated as "tell us where you want to work when you
