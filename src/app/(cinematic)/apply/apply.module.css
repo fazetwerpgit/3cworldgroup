@@ -436,7 +436,9 @@
 
 .next {
   composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
-  padding: var(--section-pad) 0;
+  /* The steps close on a hairline, so a full section pad under it plus the
+     next section's pad-top read as dead paper (166px measured at 1740; the row's own bottom pad counts too). */
+  padding: var(--section-pad) 0 clamp(1.25rem, 2vw, 1.5rem);
 }
 
 /*

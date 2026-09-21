@@ -316,9 +316,9 @@
         "tag": "section",
         "id": "next",
         "cls": "next surfacePaper seam",
-        "secH": 778,
+        "secH": 766,
         "padTop": 63,
-        "padBot": 52,
+        "padBot": 41,
         "first": "What happensnext.",
         "last": "The products, the people and t",
         "deadAbove": 94
@@ -332,7 +332,7 @@
         "padBot": 31,
         "first": "Good to knowbefore you apply.",
         "last": "Back to the form",
-        "deadAbove": 115
+        "deadAbove": 104
       }
     ]
   },
@@ -658,9 +658,9 @@
         "tag": "section",
         "id": "next",
         "cls": "next surfacePaper seam",
-        "secH": 642,
+        "secH": 613,
         "padTop": 84,
-        "padBot": 82,
+        "padBot": 53,
         "first": "What happensnext.",
         "last": "The products, the people and t",
         "deadAbove": 84
@@ -674,7 +674,7 @@
         "padBot": 53,
         "first": "Good to knowbefore you apply.",
         "last": "Back to the form",
-        "deadAbove": 166
+        "deadAbove": 137
       }
     ]
   },
