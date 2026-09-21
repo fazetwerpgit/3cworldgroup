@@ -118,35 +118,6 @@
   flex-wrap: wrap;
   gap: 0.85rem;
 }
-
-.heroRail {
-  border-top: 1px solid var(--rule);
-  color: var(--on-ink-dim);
-  display: grid;
-  font-family: var(--display);
-  font-size: 0.92rem;
-  gap: 1rem;
-  grid-template-columns: repeat(3, 1fr);
-  letter-spacing: 0.2em;
-  margin-inline: auto;
-  max-width: var(--shell);
-  padding: 1.05rem var(--gutter) 1.15rem;
-  position: relative;
-  text-transform: uppercase;
-  width: 100%;
-  z-index: 2;
-}
-
-.heroRail span {
-  border-left: 1px solid var(--rule);
-  padding-left: 0.9rem;
-}
-
-.heroRail span:first-child {
-  border-left: 0;
-  padding-left: 0;
-}
-
 /* --------------------------------------------------------------------------
    2 — The work
    -------------------------------------------------------------------------- */
@@ -1110,15 +1081,6 @@
   assembling a second and a half in. It now opens with the buttons and lands
   inside a second, which is where the whole entrance ends.
 */
-[data-motion="on"] .heroRail {
-  clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.7s var(--ease-out-expo) 0.38s;
-}
-
-[data-motion="on"][data-entered] .heroRail {
-  clip-path: inset(0 0 0 0);
-}
-
 /* Section reveals — two distinct gestures, not one entrance repeated. */
 /* The route line. Default state is fully drawn, so no JS means no blank line. */
 .routeLine {
@@ -1195,10 +1157,24 @@
   }
 
   .heroImageTall {
+    /*
+      The source is a landscape frame, so in a portrait box `cover` crops
+      sideways only and the whole height is shown — and the top fifth of this
+      photograph is empty night sky. Measured in 4% bands it runs 0.02–0.06
+      relative luminance from the frame top to 20%, then jumps to 0.99 at the
+      porch. So the mobile hero opened on a black rectangle and the scrim's
+      clear window, which sits at the top, had nothing to show: the frame read
+      as a flat navy panel rather than a photograph.
+
+      Scaling about the porch throws the dead sky out of frame and lifts the
+      lit doorway into the window that is already clear. The light now lands at
+      14–26% of the frame instead of 32–40%, above the copy rather than behind
+      it, and the crop is a tighter, more deliberate picture besides.
+    */
     display: block;
-    /* Keep the lit porch and the door in the 390 slice; the copy sits over
-       the road and lawn at the left, under its own scrim. */
     object-position: 72% 42%;
+    transform: scale(1.4);
+    transform-origin: 72% 62%;
   }
 
   /*
@@ -1230,16 +1206,6 @@
   .heroTitle {
     max-width: 12ch;
   }
-
-  .heroRail {
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
-  }
-
-  .heroRail span {
-    padding-left: 0.6rem;
-  }
-
   /* Sticky apparatus dissolves: each chapter simply carries its own image. */
   .workLayout {
     grid-template-columns: minmax(0, 1fr);
@@ -1434,18 +1400,6 @@
     flex: 1 1 100%;
     justify-content: center;
   }
-
-  .heroRail {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.3rem;
-    padding-block: 0.8rem;
-  }
-
-  .heroRail span {
-    border-left: 0;
-    padding-left: 0;
-  }
-
   .cityList {
     grid-template-columns: minmax(0, 1fr);
   }

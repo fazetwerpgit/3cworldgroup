@@ -48,7 +48,7 @@ const PRODUCTS = [
   ["Security", "/redesign/v2/photos/security-square-800.webp"],
 ] as const;
 
-const CONTRACTOR_SUPPORT = ["Hands-on Training", "Protected Territories", "Ongoing Support"] as const;
+const CONTRACTOR_SUPPORT = ["Training before the first door", "A route in a live market", "A leader who picks up the phone"] as const;
 
 /** The four people who lead the company, and what each is responsible for. */
 const LEADERS = [
@@ -68,7 +68,7 @@ export default function AboutPage() {
       <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
-            src="/redesign/v2/photos/hero-portrait-1600.webp"
+            src="/redesign/cinematic/about-aerial-dusk-1920.webp"
             alt=""
             fill
             priority
@@ -117,7 +117,7 @@ export default function AboutPage() {
         */}
         <div id="story-band" className={styles.band}>
           <Image
-            src="/redesign/v2/photos/fiber-dusk-1600.webp"
+            src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
             alt=""
             fill
             priority
@@ -140,25 +140,25 @@ export default function AboutPage() {
         <div className={kit.shell}>
           <header className={kit.sectionHeadInk} data-reveal>
             <h2 id="mission-title" className={kit.sectionTitleInk}>
-              Empowering sales
+              We sell at
               <br />
-              professionals.
+              the door.
             </h2>
             <p className={kit.sectionLedeInk}>
-              We empower sales professionals through training, support, and opportunity —
-              helping them build rewarding careers while delivering exceptional service to
-              customers.
+              Fiber, TV and home security for the providers we represent, sold face to face
+              in the neighborhoods they serve.
             </p>
           </header>
 
           <div className={styles.missionBody}>
             <div className={`${styles.missionCopy} ${kit.revealRise}`} data-reveal>
               <p className={styles.missionLead}>
-                For more than 10+ years, 3C World Group has been opening doors for top-tier
-                brands and creating opportunities for motivated professionals across the
-                country.
+                3C World Group recruits, trains and supports independent contractors, and
+                puts them on routes in markets where the service is available. The provider
+                gets customers who understood what they bought. The contractor gets a trade
+                they can build on.
               </p>
-              <p className={styles.missionNote}>Building lasting connections.</p>
+              <p className={styles.missionNote}>Every sale starts with a conversation.</p>
             </div>
 
             {/*
@@ -168,7 +168,7 @@ export default function AboutPage() {
             */}
             <figure className={`${styles.missionFigure} ${kit.revealRise}`} data-reveal>
               <Image
-                src="/redesign/v2/photos/fiber-wide-1600.webp"
+                src="/redesign/cinematic/doorhanger-dusk-1920.webp"
                 alt=""
                 fill
                 sizes="(max-width: 900px) 100vw, 42vw"
@@ -233,14 +233,13 @@ export default function AboutPage() {
             <article className={`${styles.serveItem} ${kit.revealRise}`} data-reveal>
               <p className={styles.serveKind}>For our customers</p>
               <h3 className={styles.serveTitle}>
-                Better services.
+                The right service,
                 <br />
-                Built for your home.
+                explained at the door.
               </h3>
               <p className={styles.serveBody}>
-                We connect customers to the essential services they rely on — fiber, TV, and
-                security — delivered by trusted providers with the quality and reliability
-                they deserve.
+                Fiber, TV and home security from the providers in their market, with someone
+                on the porch who can say what it costs and when it gets installed.
               </p>
               <ul className={styles.productStrip}>
                 {PRODUCTS.map(([label, src]) => (
@@ -257,14 +256,13 @@ export default function AboutPage() {
             <article className={`${styles.serveItem} ${kit.revealRise}`} data-reveal>
               <p className={styles.serveKind}>For our contractors</p>
               <h3 className={styles.serveTitle}>
-                Built for your success.
+                A route, training,
                 <br />
-                Backed every step.
+                and someone to call.
               </h3>
               <p className={styles.serveBody}>
-                We invest in our contractors with hands-on training, protected territories,
-                and ongoing support so you can build a career with confidence and grow
-                without limits.
+                Training before the first door, a route in a live market, and a leader who
+                has worked one and picks up the phone.
               </p>
               <ul className={styles.supportList}>
                 {CONTRACTOR_SUPPORT.map((item) => (
@@ -316,7 +314,7 @@ export default function AboutPage() {
       {/* ---------------------------------------------------------------- */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/v2/photos/security-dusk-1600.webp"
+          src="/redesign/cinematic/about-street-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"

@@ -1,0 +1,6 @@
+Use case: website section photograph for a company that sells TV service door to door.
+Asset type: photograph, 3:2, same framing as the attached image.
+Primary request: reproduce the attached photograph exactly, with one change: the television screen no longer shows an abstract blue gradient with a green line. Instead it shows a dim, ordinary paused frame from a nature documentary, a wide shot of a river valley at dusk in muted greens and greys, low brightness so it does not glow.
+Everything else stays: the sofa and knit throw, the tripod lamp, the plants, the window with the neighbourhood at blue hour, the media console, the mugs.
+Style/medium: photograph, realistic.
+Avoid: abstract gradients, blue or purple gradients, glowing lines, neon, logos, channel graphics, text on screen, people on screen, watermark, HDR.

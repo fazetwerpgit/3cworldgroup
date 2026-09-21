@@ -132,13 +132,17 @@ const TARGETS = [
   ["/", "home closing lime", "#closing [class*=closingLime], #closing h2 span"],
   ["/", "home closing lede", "#closing p[class*=closingLede]"],
   ["/about", "about closing lime", "#closing h2 span"],
-  ["/about", "about closing eyebrow", "#closing p[class*=closingEyebrow]"],
   ["/opportunities", "careers closing lime", "#apply h2 span"],
-  ["/opportunities", "careers closing eyebrow", "#apply p[class*=closingEyebrow]"],
   ["/apply", "apply closing lime", "[class*=closing] h2 span"],
   ["/contact", "contact closing lime", "#closing h2 span"],
-  ["/contact", "contact closing eyebrow", "#closing p[class*=closingEyebrow]"],
   ["/apply", "apply closing lede", "[class*=closing] p[class*=closingLede]"],
+  /* About, Careers and Contact close on a display line and the lime button,
+     with no supporting line under the head — the earlier anti-slop pass took
+     out the unverified claims that used to sit there and nothing replaced
+     them, which is right: a poster closer does not owe the reader a sentence.
+     Home and Apply still carry a lede and are still measured. These rows were
+     deleted rather than made optional, so a selector that misses anywhere else
+     still fails loudly instead of being quietly skipped. */
 ];
 
 const browser = await chromium.launch();

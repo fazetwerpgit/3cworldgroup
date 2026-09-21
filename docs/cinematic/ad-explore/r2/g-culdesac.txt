@@ -1,0 +1,9 @@
+Use case: website closing-section background for the Careers page of a door-to-door fiber/TV/security sales company; a centred headline and one button sit over the middle of the frame.
+Asset type: full-bleed photograph, 3:2.
+Primary request: a real photograph of a suburban cul-de-sac at the very end of blue hour, taken from the mouth of the street at standing height, five or six houses arranged around the circle with porch lights and a few warm windows on, lawns, young trees, the sky almost dark with a last band of orange at the horizon.
+Subject: a neighbourhood that has just been worked, quiet, settled in for the night. The centre of the frame is calm and low-detail so a headline reads over it.
+Style/medium: photograph, wide lens, crisp, slight haze.
+Lighting/mood: late blue hour, deep navy, warm tungsten and sodium light, calm.
+Color palette: navy, forest green, warm amber. No green or lime light.
+Input image: the attached photo is the current Home hero; match its colour grade and mood exactly.
+Avoid: people, cars in motion, text, logos, house numbers, watermark, purple or blue gradients, glow orbs, particles, light trails, neon, HDR, illustration look.

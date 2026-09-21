@@ -28,7 +28,7 @@ const SERVICES = [
     title: "Fiber Internet",
     accent: "A strong fit for connected homes.",
     body: "When fiber is available on a route, you can help each household decide whether the connection fits.",
-    image: "/redesign/v2/photos/fiber-dusk-1600.webp",
+    image: "/redesign/cinematic/fiber-pedestal-dusk-1920.webp",
     alt: "Fiber optic cable cabinet and spool beside a suburban street at dusk",
     position: "58% 62%",
     points: [
@@ -43,7 +43,7 @@ const SERVICES = [
     title: "TV Services",
     accent: "A natural next question.",
     body: "Once internet is covered, TV may fit the household too. You can help compare the available options.",
-    image: "/redesign/v2/photos/tv-dusk-1600.webp",
+    image: "/redesign/cinematic/tv-room-dusk-1920.webp",
     alt: "Wall-mounted television showing a blue abstract screen in a living room at dusk",
     position: "60% 50%",
     points: [

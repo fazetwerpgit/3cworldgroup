@@ -1,0 +1,9 @@
+Use case: website hero wall background for the "Apply" page of a door-to-door fiber/TV/security sales company; headline copy sits in the left third; the same frame is cropped to portrait on phones keeping the right half.
+Asset type: full-bleed hero photograph, 3:2.
+Primary request: a real photograph, from the sidewalk at standing height, of a quiet suburban street at blue hour, the road and sidewalk leading away from the camera toward a bend, a row of houses on the right with porch lights and warm windows on, mailboxes at the curb, tall pines against the sky.
+Subject: the route itself, the walk a rep makes house to house at the end of the day. The left third is the darker side of the street (trees, lawn) so type can sit there.
+Style/medium: photograph, 35mm, deep depth of field, crisp, slight haze at the far end of the street.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch light, sodium street lamp far down the road, calm.
+Color palette: navy, forest green, warm amber. No green or lime light.
+Input image: the attached photo is the current Home hero; match its colour grade, lens and mood exactly, but this is a different street and a different composition.
+Avoid: people, pets, cars in motion, text, logos, house numbers, watermark, purple or blue gradients, glow orbs, particles, light trails, neon, HDR, illustration look.

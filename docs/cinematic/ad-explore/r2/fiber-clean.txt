@@ -1,0 +1,6 @@
+Use case: website closing-section background for a door-to-door fiber sales company.
+Asset type: photograph, 3:2, same framing as the attached image.
+Primary request: reproduce the attached photograph exactly, with one change: remove the glowing yellow-green cable that runs from the open pedestal across the lawn. Where it was, show plain lawn and, inside the pedestal, ordinary unlit fiber patch cords.
+Everything else stays: the street at dusk, the curb, the open fiber pedestal, the black tool bag, the black cable spool, the houses with warm porch and window lights, the pines against the blue-hour sky.
+Style/medium: photograph, realistic, no emissive or self-illuminated cables, no glow of any colour.
+Avoid: neon, glowing cables, light trails, lime or green light, people, text, logos, watermark, HDR.

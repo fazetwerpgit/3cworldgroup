@@ -108,7 +108,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     return (
       <section className={styles.done} aria-labelledby="done-title">
         <Image
-          src="/redesign/v2/photos/hero-wide-1600.webp"
+          src="/redesign/cinematic/apply-street-dusk-1920.webp"
           alt=""
           fill
           priority
@@ -171,7 +171,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
-            src="/redesign/v2/photos/hero-wide-1600.webp"
+            src="/redesign/cinematic/apply-street-dusk-1920.webp"
             alt=""
             fill
             priority
@@ -185,13 +185,12 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           <div className={kit.pageHeadCol}>
             <p className={kit.pageHeadEyebrow}>Apply</p>
             <h1 className={kit.pageHeadTitle}>
-              Your next chapter
-              <span className={kit.pageHeadLime}>starts here.</span>
+              Apply in
+              <span className={kit.pageHeadLime}>five fields.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Five fields, no resume. Door-to-door sales of fiber internet, TV and home
-              security — a 1099 independent contractor role, commission-only and uncapped,
-              with full training and no experience needed.
+              No resume. Door-to-door sales of fiber internet, TV and home security.
+              1099 contractor, commission only, training included.
             </p>
             <div className={kit.pageHeadActions}>
               <a href="#apply-form" className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -427,7 +426,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       {/* ------------------------------------------------------------------ */}
       <section className={styles.closing} aria-labelledby="apply-closing-title">
         <Image
-          src="/redesign/v2/photos/fiber-dusk-1600.webp"
+          src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"

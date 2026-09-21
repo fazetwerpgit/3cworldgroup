@@ -162,7 +162,7 @@ export default function OpportunitiesPage() {
             */}
             <div className={styles.glanceArt} aria-hidden="true">
               <Image
-                src="/redesign/v2/photos/fiber-dusk-1600.webp"
+                src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
                 alt=""
                 fill
                 priority
@@ -235,7 +235,7 @@ export default function OpportunitiesPage() {
       {/* ---------------------------------------------------------------- */}
       <section id="apply" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/v2/photos/hero-wide-1600.webp"
+          src="/redesign/cinematic/careers-culdesac-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"
@@ -243,9 +243,9 @@ export default function OpportunitiesPage() {
         />
         <div className={styles.closingInner}>
           <h2 id="closing-title" className={styles.closingTitle}>
-            Your next market
+            There is a route open.
             <br />
-            <span className={styles.lime}>starts here.</span>
+            <span className={styles.lime}>Come work it.</span>
           </h2>
           <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
             Start your application

@@ -69,7 +69,7 @@ export default function Home() {
             className={styles.heroImageWide}
           />
           <Image
-            src="/redesign/cinematic/home-street-dusk-960.webp"
+            src="/redesign/cinematic/home-street-dusk-1920.webp"
             alt=""
             fill
             priority
@@ -264,7 +264,7 @@ export default function Home() {
             */}
             <div className={styles.doorsArt} aria-hidden="true">
               <Image
-                src="/redesign/v2/photos/hero-portrait-1600.webp"
+                src="/redesign/cinematic/mailboxes-dusk-1920.webp"
                 alt=""
                 fill
                 sizes="(max-width: 900px) 100vw, 44vw"
@@ -281,7 +281,7 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/v2/photos/fiber-dusk-1600.webp"
+          src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"

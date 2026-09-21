@@ -245,7 +245,7 @@ export default function ContactPage() {
         aria-labelledby="closing-title"
       >
         <Image
-          src="/redesign/v2/photos/tv-dusk-1600.webp"
+          src="/redesign/cinematic/tv-room-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"
@@ -253,7 +253,6 @@ export default function ContactPage() {
         />
         <div className={kit.shell}>
           <div className={`${styles.closingInner} ${kit.revealRise}`} data-reveal>
-            <p className={styles.closingEyebrow}>Your next move</p>
             <h2 id="closing-title" className={styles.closingTitle}>
               Don’t need to wait?
               <br />

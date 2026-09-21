@@ -1135,9 +1135,9 @@
     the frame to protect at 390px, the copy runs the whole width.
   */
   .pageHead {
-    height: clamp(30rem, 74svh, 40rem);
+    height: auto;
     max-height: none;
-    min-height: 30rem;
+    min-height: min(90svh, 48rem);
     padding-top: 5.5rem;
   }
 

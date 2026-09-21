@@ -1,0 +1,9 @@
+Use case: website figure photograph in the "what we do" section of a door-to-door fiber/TV/security sales company, shown about 700 pixels wide, 4:3 crop.
+Asset type: photograph, 3:2.
+Primary request: a real photograph at blue hour of a front door on a brick house, seen from the walk at a slight angle: a dark painted door with a brass handle, a plain unprinted card-stock door hanger hooked on the knob, a doormat, a lit sconce beside the door, a small potted shrub. The door is closed. Nobody is there.
+Subject: the moment after the knock, or before it. Plain, specific, real.
+Style/medium: photograph, 50mm, moderate depth of field, crisp.
+Lighting/mood: blue hour, warm tungsten sconce light on brick, deep navy sky at the edge, calm.
+Color palette: navy, brick, warm amber. No green or lime light.
+Input image: the attached photo is the site's current door photo; match its colour grade and mood, but a different door, a different house, and no tool bag.
+Avoid: people, hands, text or printing on the hanger, house numbers, logos, watermark, purple or blue gradients, glow orbs, particles, neon, HDR, illustration look.

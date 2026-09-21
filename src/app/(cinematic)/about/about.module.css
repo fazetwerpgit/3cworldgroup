@@ -529,12 +529,6 @@
   z-index: -1;
 }
 
-.closingEyebrow {
-  color: var(--on-ink-dim);
-  font-size: clamp(1.02rem, 1.2vw, 1.16rem);
-  line-height: 1.5;
-  margin-bottom: 1.2rem;
-}
 
 .closingTitle {
   font-family: var(--display);
