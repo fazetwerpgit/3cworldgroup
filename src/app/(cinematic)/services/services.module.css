@@ -19,7 +19,7 @@
   the entry, `.bundle` takes the exit.
 */
 .sell {
-  composes: surfacePaper seamTopOnly from "../../_cinematic/cinematic.module.css";
+  composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
   color: var(--on-paper);
   padding: var(--section-pad) 0 0;
 }
@@ -179,7 +179,9 @@
    -------------------------------------------------------------------------- */
 
 .bundle {
-  composes: surfacePaper seamBottomOnly from "../../_cinematic/cinematic.module.css";
+  /* Ink, not paper: with the bundle on paper the page ran 2700px of paper
+     into one navy closer, so the alternation the seam promises never came. */
+  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
   padding: var(--section-pad) 0 var(--section-pad);
 }
 
@@ -215,8 +217,8 @@
 }
 
 .bundleList li {
-  border-top: 1px solid var(--rule-ink);
-  color: var(--on-paper);
+  border-top: 1px solid var(--rule);
+  color: var(--on-ink);
   display: grid;
   font-size: clamp(1.05rem, 1.4vw, 1.26rem);
   gap: 0.9rem;
@@ -227,11 +229,11 @@
 }
 
 .bundleList li:last-child {
-  border-bottom: 1px solid var(--rule-ink);
+  border-bottom: 1px solid var(--rule);
 }
 
 .bundleList li::before {
-  background: var(--lime-ink);
+  background: var(--lime);
   content: "";
   height: 2px;
   margin-top: 0.62em;
@@ -239,7 +241,7 @@
 }
 
 .bundlePlate {
-  border: 1px solid var(--rule-ink);
+  border: 1px solid var(--rule);
   min-height: clamp(15rem, 20vw, 20rem);
   overflow: hidden;
   position: relative;
@@ -313,10 +315,12 @@
   keep the centred closer; this one does not repeat it.
 */
 .closingInner {
-  align-items: end;
+  align-items: start;
   display: grid;
-  gap: 1.5rem clamp(2rem, 5vw, 5rem);
-  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  /* One column: the button belongs under the lede it answers, not 1100px
+     to its right in a second column. */
+  grid-template-columns: minmax(0, 1fr);
   justify-items: start;
   margin-inline: auto;
   max-width: var(--shell);

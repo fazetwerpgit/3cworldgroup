@@ -1,0 +1,28 @@
+/ @1740 total 6084px
+  ink    2272px  section+the-work  CTA: Apply to sell with 3C
+  paper   949px  start
+  ink     831px  markets
+  paper   813px  questions
+  ink    1219px  why+closing+footer  CTA: Apply to sell with 3C
+/about @1740 total 3245px
+  ink     684px  header  CTA: Apply now
+  paper   800px  mission
+  ink     741px  values
+  paper   434px  leadership
+  ink     627px  closing+footer  CTA: Apply now
+/services @1740 total 4158px
+  ink     684px  header  CTA: Start selling
+  paper  2047px  what-you-sell
+  ink    1427px  bundle+closing+footer  CTA: Apply now
+/opportunities @1740 total 3089px
+  ink    1487px  header+glance  CTA: Start your application
+  paper   883px  stages
+  ink     719px  apply+footer  CTA: Start your application
+/contact @1740 total 2796px
+  ink    1344px  header+fastest-path  CTA: Start your application
+  paper   878px  message  CTA: Send message
+  ink     574px  closing+footer  CTA: Start your application
+/apply @1740 total 3327px
+  ink    1689px  header+section  CTA: Start your application | Submit my application
+  paper   642px  next
+  ink     996px  good-to-know+footer

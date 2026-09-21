@@ -1,0 +1,9 @@
+Use case: chapter photograph on the homepage of a door-to-door sales company site, the second of three frames ("the right fit": the room where a household decides what it needs), shown about 700 pixels wide beside copy.
+Asset type: photograph, 3:2.
+Primary request: inside a family living room at blue hour, photographed from the doorway: a wall-mounted television switched off with a soft reflection, a sofa, a lamp on, and a large front window with the neighborhood outside in deep blue and a porch light across the street. The room is warm and lived-in, evening quiet. No people anywhere, no faces on the screen, no readable text.
+Subject: the room the decision gets made in, seen from where the rep would stand.
+Style/medium: real photograph, 35mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: interior tungsten lamp light against a deep navy dusk in the window, calm.
+Color palette: navy, warm amber, muted wood and fabric tones. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, pets, readable text, logos, watermark, glowing screens, purple or blue gradients, glow orbs, neon, HDR, illustration look, equipment, cabling, routers.

@@ -198,7 +198,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               No resume. Door-to-door sales of fiber internet, TV and home security.
               1099 contractor, commission only, training included.
             </p>
-            <div className={kit.pageHeadActions}>
+            <div className={`${kit.pageHeadActions} ${styles.headActions}`}>
               <a href="#apply-form" className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
                 Start your application
                 <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
@@ -425,29 +425,13 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
         </div>
       </section>
 
+      {/*
+        No closer on this page. The form IS the page and sits at the top; a
+        paper closer under "Good to know" cut the tail into 725px of navy, a
+        342px paper sliver and the navy footer. The good-to-know section ends
+        on a quiet link back up to the form instead.
+      */}
       {children}
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Closing — the same door, one screen later                          */}
-      {/* ------------------------------------------------------------------ */}
-      <section className={styles.closing} aria-labelledby="apply-closing-title">
-        <div className={styles.closingInner}>
-          <div>
-            <h2 id="apply-closing-title" className={styles.closingTitle}>
-              Take the
-              <br />
-              <span className={styles.closingLime}>first step.</span>
-            </h2>
-            <p className={styles.closingLede}>
-              The form is at the top of this page. Five fields, then a call from a real person.
-            </p>
-          </div>
-          <a href="#apply-form" className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
-            Start your application
-            <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
-          </a>
-        </div>
-      </section>
     </>
   );
 }

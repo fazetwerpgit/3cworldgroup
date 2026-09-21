@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import ApplyFlow from "./ApplyFlow";
 import styles from "./apply.module.css";
@@ -81,6 +82,9 @@ export default function ApplyPage() {
           <ol className={styles.steps}>
             {STEPS.map((step) => (
               <li key={step.n} className={`${styles.step} ${kit.revealRise}`} data-reveal>
+                <span className={styles.stepNum} aria-hidden="true">
+                  {step.n}
+                </span>
                 <h3 className={styles.stepTitle}>{step.title}</h3>
                 <p className={styles.stepBody}>{step.body}</p>
               </li>
@@ -114,6 +118,14 @@ export default function ApplyPage() {
               </div>
             ))}
           </dl>
+
+          {/* The page's last line points back up to the form; there is no closer. */}
+          <p className={styles.knowBack}>
+            <a href="#apply-form" className={kit.quietLink}>
+              Back to the form
+              <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
+            </a>
+          </p>
         </div>
       </section>
     </ApplyFlow>

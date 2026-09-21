@@ -146,7 +146,6 @@ export default function RouteSequence() {
           >
             <span className={styles.routeDot} aria-hidden="true" />
             <span className={styles.routeStopCard}>
-              <span className={styles.routeStopNumber}>{stop.n}</span>
               <span className={styles.routeStopTitle}>{stop.title}</span>
               <span className={styles.routeStopBody}>{stop.body}</span>
               <span className={styles.routeStopArtSm} aria-hidden="true">

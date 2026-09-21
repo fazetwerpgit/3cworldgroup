@@ -1,0 +1,11 @@
+390 home      white 11.28/3  lime 5.27/3  lede 10.51/4.5  | frameMaxL 0.7558 | frameH 776 copyTop 41% lime 48-54%
+390 about     white 16.21/3  lime 8.21/3  lede 14.93/4.5  | frameMaxL 0.647 | frameH 760 copyTop 54% lime 59-65%
+390 services  white 14.95/3  lime 7.26/3  lede 14.68/4.5  | frameMaxL 0.8411 | frameH 760 copyTop 43% lime 50-56%
+390 careers   white 15.79/3  lime 7.37/3  lede 14.55/4.5  | frameMaxL 0.7263 | frameH 760 copyTop 43% lime 50-56%
+390 apply     white 16.02/3  lime 8.36/3  lede 14.98/4.5  | frameMaxL 0.5196 | frameH 455 copyTop 43% lime 53-64%
+430 home      white 11.21/3  lime 6.24/3  lede 11.48/4.5  | frameMaxL 0.7245 | frameH 857 copyTop 47% lime 53-58%
+430 about     white 16.36/3  lime 8.28/3  lede 14.95/4.5  | frameMaxL 0.6643 | frameH 768 copyTop 54% lime 60-65%
+430 services  white 14.76/3  lime 7.84/3  lede 14.68/4.5  | frameMaxL 0.8423 | frameH 768 copyTop 48% lime 54-60%
+430 careers   white 16.36/3  lime 7.43/3  lede 14.54/4.5  | frameMaxL 0.7289 | frameH 768 copyTop 48% lime 54-60%
+430 apply     white 16.51/3  lime 8.36/3  lede 15/4.5  | frameMaxL 0.4565 | frameH 427 copyTop 46% lime 57-68%
+all hero bands clear their floors and every frame reads as a photo

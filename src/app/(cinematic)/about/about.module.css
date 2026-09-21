@@ -205,11 +205,18 @@
    5 — Leadership
    -------------------------------------------------------------------------- */
 
+/* Pulled up under the values band by one seam rise, so this paper section's
+   diagonal cut runs through the photograph instead of above a strip of bare
+   navy where the photo had already stopped. */
 .leadership {
+  margin-top: calc(-1 * var(--seam-rise));
   padding: var(--section-pad) 0;
 }
 
+/* Closed at the bottom as well as the top, so the four columns read as one
+   ruled block rather than dividers that run out. */
 .leaderList {
+  border-bottom: 1px solid var(--rule-ink);
   display: grid;
   gap: 1px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -217,7 +224,7 @@
 }
 
 .leader {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-ink);
   display: flex;
   flex-direction: column;
   padding: clamp(1.3rem, 2.2vw, 1.9rem) clamp(0.9rem, 1.6vw, 1.5rem)
@@ -225,12 +232,12 @@
 }
 
 .leader + .leader {
-  border-left: 1px solid var(--rule);
+  border-left: 1px solid var(--rule-ink);
   padding-left: clamp(0.9rem, 1.6vw, 1.5rem);
 }
 
 .leaderInitials {
-  color: var(--lime);
+  color: var(--ink);
   font-family: var(--display);
   font-size: clamp(2rem, 3.2vw, 2.9rem);
   letter-spacing: 0.02em;
@@ -248,7 +255,7 @@
 }
 
 .leaderRole {
-  color: var(--on-ink-dim);
+  color: var(--on-paper-dim);
   font-size: 0.86rem;
   letter-spacing: 0.2em;
   margin-top: 0.4rem;

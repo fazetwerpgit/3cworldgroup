@@ -26,22 +26,22 @@
         "tag": "section",
         "id": "start",
         "cls": "routeSection surfacePaper seam",
-        "secH": 1975,
+        "secH": 1860,
         "padTop": 63,
         "padBot": 31,
         "first": "From applicationto your first ",
-        "last": "Apply",
+        "last": "Apply to sell with 3C",
         "deadAbove": 79
       },
       {
         "tag": "section",
         "id": "markets",
         "cls": "markets surfaceInk",
-        "secH": 1115,
+        "secH": 1111,
         "padTop": 63,
         "padBot": 31,
         "first": "Find your market.",
-        "last": "Apply",
+        "last": "Apply for this market",
         "deadAbove": 94
       },
       {
@@ -57,13 +57,13 @@
       },
       {
         "tag": "section",
-        "id": "doors",
-        "cls": "doors surfaceInk",
-        "secH": 955,
+        "id": "why",
+        "cls": "why surfaceInk",
+        "secH": 756,
         "padTop": 31,
-        "padBot": 77,
-        "first": "Two waysthrough the door.",
-        "last": "Contact the team",
+        "padBot": 56,
+        "first": "Why peoplesell with 3C.",
+        "last": "Already lead a sales crew? Tha",
         "deadAbove": -100
       },
       {
@@ -75,7 +75,7 @@
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": 77
+        "deadAbove": 56
       },
       {
         "tag": "div",
@@ -127,10 +127,10 @@
       {
         "tag": "section",
         "id": "leadership",
-        "cls": "surfaceInk leadership",
-        "secH": 659,
+        "cls": "surfacePaper seam leadership",
+        "secH": 660,
         "padTop": 63,
-        "padBot": 52,
+        "padBot": 53,
         "first": "The peoplewho run it.",
         "last": "Onboarding",
         "deadAbove": 63
@@ -144,7 +144,7 @@
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": 52
+        "deadAbove": 53
       }
     ]
   },
@@ -163,7 +163,7 @@
       {
         "tag": "section",
         "id": "what-you-sell",
-        "cls": "sell surfacePaper seamTopOnly",
+        "cls": "sell surfacePaper seam",
         "secH": 2383,
         "padTop": 63,
         "padBot": 24,
@@ -174,8 +174,8 @@
       {
         "tag": "section",
         "id": "bundle",
-        "cls": "bundle surfacePaper seamBottomOnly",
-        "secH": 936,
+        "cls": "bundle surfaceInk",
+        "secH": 923,
         "padTop": 63,
         "padBot": 31,
         "first": "One home.A clearer setup.",
@@ -248,7 +248,7 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 830,
+        "secH": 903,
         "padTop": 88,
         "padBot": -31,
         "first": "Get in touch",
@@ -295,9 +295,9 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 760,
-        "padTop": -314,
-        "padBot": -369,
+        "secH": 455,
+        "padTop": -376,
+        "padBot": -33,
         "first": "IMG",
         "last": "IMG"
       },
@@ -310,15 +310,15 @@
         "padBot": 31,
         "first": "IMG",
         "last": "3C trains you on the products,",
-        "deadAbove": -369
+        "deadAbove": -33
       },
       {
         "tag": "section",
         "id": "next",
         "cls": "next surfacePaper seam",
-        "secH": 752,
+        "secH": 778,
         "padTop": 63,
-        "padBot": 31,
+        "padBot": 52,
         "first": "What happensnext.",
         "last": "The products, the people and t",
         "deadAbove": 94
@@ -327,23 +327,12 @@
         "tag": "section",
         "id": "good-to-know",
         "cls": "know surfaceInk",
-        "secH": 906,
+        "secH": 974,
         "padTop": 63,
-        "padBot": 53,
+        "padBot": 31,
         "first": "Good to knowbefore you apply.",
-        "last": "Fiber internet, TV service and",
-        "deadAbove": 94
-      },
-      {
-        "tag": "section",
-        "id": "",
-        "cls": "closing",
-        "secH": 319,
-        "padTop": 49,
-        "padBot": 48,
-        "first": "Take thefirst step.",
-        "last": "Start your application",
-        "deadAbove": 102
+        "last": "Back to the form",
+        "deadAbove": 115
       }
     ]
   },
@@ -421,13 +410,13 @@
       },
       {
         "tag": "section",
-        "id": "doors",
-        "cls": "doors surfaceInk",
-        "secH": 789,
+        "id": "why",
+        "cls": "why surfaceInk",
+        "secH": 417,
         "padTop": 53,
-        "padBot": 97,
-        "first": "Two waysthrough the door.",
-        "last": "IMG",
+        "padBot": 88,
+        "first": "Why peoplesell with 3C.",
+        "last": "Your first route is worked wit",
         "deadAbove": 25
       },
       {
@@ -439,7 +428,7 @@
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": 97
+        "deadAbove": 88
       }
     ]
   },
@@ -480,10 +469,10 @@
       {
         "tag": "section",
         "id": "leadership",
-        "cls": "surfaceInk leadership",
-        "secH": 433,
+        "cls": "surfacePaper seam leadership",
+        "secH": 434,
         "padTop": 84,
-        "padBot": 83,
+        "padBot": 84,
         "first": "The peoplewho run it.",
         "last": "Onboarding",
         "deadAbove": 84
@@ -497,7 +486,7 @@
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": 83
+        "deadAbove": 84
       }
     ]
   },
@@ -516,7 +505,7 @@
       {
         "tag": "section",
         "id": "what-you-sell",
-        "cls": "sell surfacePaper seamTopOnly",
+        "cls": "sell surfacePaper seam",
         "secH": 2047,
         "padTop": -7,
         "padBot": 0,
@@ -527,8 +516,8 @@
       {
         "tag": "section",
         "id": "bundle",
-        "cls": "bundle surfacePaper seamBottomOnly",
-        "secH": 652,
+        "cls": "bundle surfaceInk",
+        "secH": 639,
         "padTop": 84,
         "padBot": 53,
         "first": "One home.A clearer setup.",
@@ -539,7 +528,7 @@
         "tag": "section",
         "id": "closing",
         "cls": "closing surfaceInkDeep",
-        "secH": 520,
+        "secH": 597,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -669,9 +658,9 @@
         "tag": "section",
         "id": "next",
         "cls": "next surfacePaper seam",
-        "secH": 451,
+        "secH": 642,
         "padTop": 84,
-        "padBot": 53,
+        "padBot": 82,
         "first": "What happensnext.",
         "last": "The products, the people and t",
         "deadAbove": 84
@@ -680,23 +669,12 @@
         "tag": "section",
         "id": "good-to-know",
         "cls": "know surfaceInk",
-        "secH": 725,
+        "secH": 805,
         "padTop": 84,
-        "padBot": 78,
+        "padBot": 53,
         "first": "Good to knowbefore you apply.",
-        "last": "What you would represent",
-        "deadAbove": 137
-      },
-      {
-        "tag": "section",
-        "id": "",
-        "cls": "closing",
-        "secH": 342,
-        "padTop": 61,
-        "padBot": 72,
-        "first": "Take thefirst step.",
-        "last": "The form is at the top of this",
-        "deadAbove": 139
+        "last": "Back to the form",
+        "deadAbove": 166
       }
     ]
   },
@@ -723,10 +701,10 @@
       "label": "home h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0064,
-      "maxBackdropL": 0.0699,
-      "worstRatio": 8.76,
-      "meanRatio": 18.63
+      "meanBackdropL": 0.006,
+      "maxBackdropL": 0.0476,
+      "worstRatio": 10.76,
+      "meanRatio": 18.76
     },
     {
       "route": "/about",
@@ -767,10 +745,10 @@
       "label": "apply h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0072,
-      "maxBackdropL": 0.043,
-      "worstRatio": 11.29,
-      "meanRatio": 18.36
+      "meanBackdropL": 0.0047,
+      "maxBackdropL": 0.0155,
+      "worstRatio": 16.02,
+      "meanRatio": 19.19
     }
   ]
 }

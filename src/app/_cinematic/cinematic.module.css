@@ -786,8 +786,8 @@
    reads as one angled rhythm. `--seam-rise` is the vertical travel of that
    line across the full width; because it is stated in `vw` the ANGLE is the
    same at 1280, 1740 and 1920 rather than the drop being the same number of
-   pixels. Below 900px the line flattens to a straight edge: at phone widths
-   3.6vw is 13px of travel, which is not a diagonal, it is a crooked line.
+   pixels. Below 900px the travel is a fixed 14px instead (see the phone block
+   below): a vw value there would be 9px, which reads as a crooked cut.
 
    `.page`'s own background is the navy the cut reveals, so no negative margin
    or padding compensation is involved, and `--seam-rise` is held below
@@ -860,15 +860,14 @@
   position: relative;
 }
 
+/*
+  Phones keep the seam. At 2.4vw it would be a 9px rise over 390px, which
+  reads as a flat cut with a wobble; a fixed 14px (about 2 degrees) is the
+  shallowest angle that still reads as the diagonal the desktop has.
+*/
 @media (max-width: 900px) {
   .page {
-    --seam-rise: 0px;
-  }
-
-  .seam,
-  .seamTopOnly,
-  .seamBottomOnly {
-    clip-path: none;
+    --seam-rise: 14px;
   }
 }
 

@@ -51,13 +51,12 @@ export default function ContactPage() {
             <p className={kit.pageHeadEyebrow}>Get in touch</p>
             {/*
               One white line and one lime line, like every other head on the
-              site. The words are the page's own and are not rewritten — only
-              the break moved: the lime used to start a line early and run to a
-              second one, so this was the one head on the site wearing two lime
-              lines instead of one.
+              site, and the lime line no longer than the white one: at phone
+              width "Let's start the right" wrapped to two lines and left
+              "conversation." longer than the line above it.
             */}
             <h1 className={`${kit.pageHeadTitle} ${styles.headTitle}`}>
-              Let’s start the right
+              Start the right
               <span className={kit.pageHeadLime}>conversation.</span>
             </h1>
             <p className={`${kit.pageHeadLede} ${styles.headLede}`}>

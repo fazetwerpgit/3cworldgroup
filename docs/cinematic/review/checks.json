@@ -66,23 +66,23 @@
       "route": "/",
       "motion": null,
       "hidden": [],
-      "h": 8394
+      "h": 8075
     },
     {
       "route": "/services",
       "motion": null,
       "hidden": [],
-      "h": 4962
+      "h": 4949
     }
   ],
   "nojs": [
     {
       "route": "/",
-      "height": 8394
+      "height": 8075
     },
     {
       "route": "/about",
-      "height": 3885
+      "height": 3872
     }
   ],
   "menu": {
@@ -148,9 +148,9 @@
       "route": "/",
       "box": {
         "x": 20,
-        "y": 269,
+        "y": 320,
         "w": 350,
-        "h": 151,
+        "h": 101,
         "color": "rgb(255, 255, 255)"
       },
       "file": "heroback-home-390.png"
@@ -198,7 +198,7 @@
         "x": 20,
         "y": 131,
         "w": 350,
-        "h": 144,
+        "h": 96,
         "color": "rgb(255, 255, 255)"
       },
       "file": "heroback-contact-390.png"
@@ -208,7 +208,7 @@
       "route": "/apply",
       "box": {
         "x": 20,
-        "y": 330,
+        "y": 195,
         "w": 350,
         "h": 96,
         "color": "rgb(255, 255, 255)"
@@ -220,9 +220,9 @@
       "route": "/",
       "box": {
         "x": 222,
-        "y": 405,
+        "y": 513,
         "w": 768,
-        "h": 324,
+        "h": 216,
         "color": "rgb(255, 255, 255)"
       },
       "file": "heroback-home-1740.png"

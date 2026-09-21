@@ -97,9 +97,11 @@ export default function LocationExplorer() {
             Interested in working in {active.city}? Include your preferred location when
             you apply.
           </p>
+          {/* Quiet links, not a lime button: the closer one section down carries
+              the page's last Apply, and a button here made Home ask four times. */}
           <div className={styles.cityPlateActions}>
-            <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime}`}>
-              Apply <ArrowRight aria-hidden="true" className={kit.btnArrow} size={17} strokeWidth={2.2} />
+            <Link href={APPLY_HREF} className={kit.quietLink}>
+              Apply for this market <ArrowRight aria-hidden="true" className={kit.btnArrow} size={15} strokeWidth={2.2} />
             </Link>
             <Link href="/opportunities" className={kit.quietLink}>
               See the career path <ArrowRight aria-hidden="true" className={kit.btnArrow} size={15} strokeWidth={2.2} />

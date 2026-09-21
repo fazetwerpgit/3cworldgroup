@@ -498,15 +498,8 @@
   bottom: 1.85rem;
 }
 
-.routeStopNumber {
-  color: var(--on-paper-dim);
-  display: block;
-  font-family: var(--display);
-  font-size: 0.92rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.2em;
-  margin-bottom: 0.35rem;
-}
+/* No numeral on the stops: the chapters above are Home's one numbered
+   section, and the drawn line already puts these four in order. */
 
 .routeStopTitle {
   display: block;
@@ -677,7 +670,26 @@
   position: relative;
 }
 
+/*
+  The market frames are real photographs of real skylines, shot in daylight,
+  and they stay real: the owner asked for accurate market cards. What they get
+  is the page's grade — a navy multiply from the sky down and a warmer floor —
+  so they sit in the dusk key of every other frame instead of being the one
+  midday picture between two navy bands.
+*/
+.cityPlateArt::after {
+  background:
+    linear-gradient(180deg, rgba(3, 13, 31, 0.82) 0%, rgba(3, 13, 31, 0.5) 45%, rgba(3, 13, 31, 0.3) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(120, 70, 20, 0.28) 100%);
+  content: "";
+  inset: 0;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  position: absolute;
+}
+
 .cityPlateImage {
+  filter: saturate(0.72) brightness(0.92) contrast(1.06);
   object-fit: cover;
   opacity: 0;
   transform: scale(1.04);
@@ -814,124 +826,81 @@
 }
 
 /* --------------------------------------------------------------------------
-   6 — Two doors
+   6 — Why people sell with 3C
+   --------------------------------------------------------------------------
+   Four facts in hairline rows, no ordinals (the route section above owns this
+   page's numerals), copy left and the mailbox plate right. No Apply button:
+   the closer below carries the page's last one.
    -------------------------------------------------------------------------- */
 
-.doors {
+.why {
   composes: surfaceInk from "../_cinematic/cinematic.module.css";
-  padding: var(--section-pad) 0 clamp(3.5rem, 7vw, 6rem);
+  padding: var(--section-pad) 0 clamp(3.5rem, 6vw, 5.5rem);
 }
 
 /*
-  Deliberately asymmetric on both axes: copy left, photograph right, and inside
-  the copy column a filled lime-edged panel over a quieter outlined one. The
-  two paths are never two equal cards.
+  Title left, four reasons right in two columns. The reasons are set as a
+  typographic grid — lime term, plain fact — with no hairlines, so the block
+  reads differently from the FAQ's row stack that sits one seam above it.
 */
-.doorsLayout {
+.whyLayout {
+  align-items: start;
   display: grid;
-  gap: clamp(1.75rem, 3.5vw, 3.25rem);
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
 }
 
-.doorsBody {
-  display: flex;
-  flex-direction: column;
-}
-
-.doorsTitle {
+.whyTitle {
   font-family: var(--display);
-  /* The kit's section scale — see `.cityPlateName`. */
   font-size: clamp(2.5rem, 4.2vw, 4.25rem);
-  font-weight: 400;
-  letter-spacing: 0.006em;
   line-height: 0.9;
-  margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  margin: 0;
   text-transform: uppercase;
 }
 
-.doorPrimary {
-  background:
-    linear-gradient(150deg, rgba(141, 198, 63, 0.2) 0%, rgba(141, 198, 63, 0.03) 60%),
-    var(--ink-raise);
-  border: 1px solid rgba(141, 198, 63, 0.42);
-  border-left: 3px solid var(--lime);
-  display: grid;
-  gap: 1.15rem;
-  justify-items: start;
-  margin-top: auto;
-  padding: clamp(1.7rem, 3vw, 2.5rem);
+.whyBody {
+  padding-top: 0.35rem;
 }
 
-.doorKind {
+.whyList {
+  display: grid;
+  gap: clamp(1.75rem, 3vw, 2.5rem) clamp(1.5rem, 3vw, 3rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.whyItem {
+  margin: 0;
+}
+
+.whyTerm {
   color: var(--lime);
   font-family: var(--display);
-  font-size: 1rem;
-  letter-spacing: 0.2em;
+  font-size: clamp(1.6rem, 1.9vw, 2.05rem);
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  margin: 0 0 0.45rem;
   text-transform: uppercase;
 }
 
-.doorPitch {
-  font-size: clamp(1.22rem, 1.9vw, 1.62rem);
-  font-weight: 500;
-  line-height: 1.4;
+.whyFact {
+  color: var(--on-ink-dim);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
   max-width: 34ch;
 }
 
-.doorSecondary {
-  border: 1px solid var(--rule);
-  display: grid;
-  gap: 0.6rem;
-  justify-items: start;
-  margin-top: 1rem;
-  padding: clamp(1.25rem, 2.4vw, 1.8rem);
-}
-
-.doorKindQuiet {
-  color: var(--on-ink-dim);
-  font-family: var(--display);
-  font-size: 1rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-
-.doorPitchQuiet {
+/* The crew-lead note sits under the title, so the left column carries the
+   title and the aside and the right column carries only the four reasons. */
+.whyTeam {
   color: var(--on-ink-dim);
   font-size: 0.97rem;
-  line-height: 1.62;
-  max-width: 52ch;
+  line-height: 1.6;
+  margin: clamp(1.75rem, 2.6vw, 2.5rem) 0 0;
+  max-width: 34ch;
 }
 
-/*
-  The right half is a photograph under the same two-layer authored scrim the
-  hero uses: a horizontal wash so the frame dissolves into the copy column on
-  its left edge, and a vertical fall so it sits down into the navy rather than
-  ending on a cut.
-*/
-.doorsArt {
-  border: 1px solid var(--rule);
-  min-height: clamp(21rem, 33vw, 31rem);
-  overflow: hidden;
-  position: relative;
-}
-
-.doorsArtImage {
-  object-fit: cover;
-  object-position: 50% 62%;
-}
-
-.doorsArtScrim {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(6, 23, 53, 0.84) 0%,
-      rgba(6, 23, 53, 0.42) 24%,
-      rgba(6, 23, 53, 0.04) 58%,
-      rgba(6, 23, 53, 0.2) 100%
-    ),
-    linear-gradient(180deg, rgba(3, 13, 31, 0.4) 0%, rgba(3, 13, 31, 0) 34%, rgba(3, 13, 31, 0.5) 100%);
-  inset: 0;
-  position: absolute;
-}
 
 /* --------------------------------------------------------------------------
    7 — Closing
@@ -1367,27 +1336,44 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .doorsLayout {
+  .whyLayout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .doorsArt {
-    aspect-ratio: 16 / 10;
-    min-height: 0;
-    order: -1;
+  .whyList {
+    gap: 1.5rem;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .doorsTitle {
-    order: -2;
-  }
-
-  /* The title leads, the photograph sits under it, then the two paths. */
-  .doorsBody {
+  /* One column: title, the four reasons, then the crew-lead aside last. The
+     head wrapper dissolves so the aside can be ordered after the list. */
+  .whyHead {
     display: contents;
   }
 
-  .doorPrimary {
-    margin-top: 0;
+  .whyBody {
+    order: 1;
+    padding-top: 0;
+  }
+
+  .whyTeam {
+    margin-top: 0.25rem;
+    max-width: 52ch;
+    order: 2;
+  }
+
+  /* The closer's copy runs the full measure on a phone, so the scrim does
+     too: an even plate behind the whole copy block instead of the desktop
+     ellipse, whose right edge thinned under the end of the lede. The crop
+     shifts left so the door jamb in the photograph falls off the right edge
+     instead of through the headline. */
+  .closingInner::before {
+    background: linear-gradient(180deg, rgba(3, 13, 31, 0) 0%, rgba(3, 13, 31, 0.74) 18%, rgba(3, 13, 31, 0.74) 82%, rgba(3, 13, 31, 0) 100%);
+    inset: -18% 0;
+  }
+
+  .closingArt {
+    object-position: 100% 46%;
   }
 
   .applyBar {

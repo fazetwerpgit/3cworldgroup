@@ -52,6 +52,16 @@ const FAQS = [
   },
 ];
 
+/* Every line here restates something already on the site: the careers list,
+   the route steps, or the apply page. Nothing is promised here that is not
+   promised there. */
+const WHY = [
+  ["Uncapped pay", "Commission is uncapped. Your effort drives your earnings, and top performers earn more."],
+  ["Training first", "You learn the products and the sales process from people who sell them, before anyone sends you out."],
+  ["Field support", "Your first route is worked with your team and a leader who has worked one, not from a classroom."],
+  ["Your schedule", "You set your hours. It is independent contractor work, paid on commission."],
+] as const;
+
 export default function Home() {
   return (
     <>
@@ -82,13 +92,10 @@ export default function Home() {
         <div className={styles.heroInner}>
           <h1 id="hero-title" className={styles.heroTitle}>
             <span className={styles.heroLine}>
-              <span>Your next</span>
+              <span>Your next chapter</span>
             </span>
             <span className={styles.heroLine}>
-              <span>chapter starts at</span>
-            </span>
-            <span className={styles.heroLine}>
-              <span className={styles.heroLime}>the next door.</span>
+              <span className={styles.heroLime}>starts next door.</span>
             </span>
           </h1>
 
@@ -151,9 +158,10 @@ export default function Home() {
           <RouteSequence />
 
           {/*
-            The foot carries the apply call now: the bay under stop 04 holds
-            that stop's photograph, so the "start here" panel that used to sit
-            there joins the timing note on one hairline instead.
+            The foot joins the timing note and a quiet apply link on one
+            hairline. Not a lime button: the hero above and the closer below
+            carry this page's two Apply buttons, and a third one here made the
+            page ask four times.
           */}
           <div className={styles.routeFoot}>
             <p className={styles.routeFootNote}>
@@ -164,9 +172,9 @@ export default function Home() {
               goes into what comes after your first route.
             </p>
             <div className={styles.routeFootCta}>
-              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime}`}>
-                Apply
-                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={17} strokeWidth={2.2} />
+              <Link href={APPLY_HREF} className={kit.quietLinkInk}>
+                Apply to sell with 3C
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
               </Link>
             </div>
           </div>
@@ -234,56 +242,48 @@ export default function Home() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 6 — two doors: rep, or team owner                                */}
+      {/* 6 — why people sell with 3C                                      */}
       {/* ---------------------------------------------------------------- */}
-      <section id="doors" className={styles.doors} aria-labelledby="doors-title">
+      {/*
+        Four facts, each already stated elsewhere on the site (the careers
+        list, the route steps, the apply page) and confirmed by the owner on
+        2026-09-21. No Apply button here: the closer one screen down carries
+        the page's last one, so the reader is not asked twice on one navy.
+        The team line replaces the old second card.
+      */}
+      <section id="why" className={styles.why} aria-labelledby="why-title">
         <div className={kit.shell}>
-          <div className={styles.doorsLayout}>
-            <div className={styles.doorsBody}>
-              <h2 id="doors-title" className={styles.doorsTitle}>
-                Two ways
+          {/*
+            Four reasons as a typographic grid: a lime term over a one-line
+            fact, no rules, no cards, no icons. The FAQ two sections up is a
+            hairline row stack, so this block deliberately is not one.
+          */}
+          <div className={styles.whyLayout}>
+            <div className={styles.whyHead}>
+              <h2 id="why-title" className={styles.whyTitle}>
+                Why people
                 <br />
-                <span className={styles.heroLime}>through the door.</span>
+                <span className={styles.heroLime}>sell with 3C.</span>
               </h2>
 
-              <div className={`${styles.doorPrimary} ${kit.reveal}`} data-reveal>
-                <p className={styles.doorKind}>Selling for yourself</p>
-                <p className={styles.doorPitch}>
-                  Work a route, get trained on the products, and be paid on what you close.
-                </p>
-                <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
-                  Apply
-                  <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
-                </Link>
-              </div>
-
-              <div className={styles.doorSecondary}>
-                <p className={styles.doorKindQuiet}>Bring a team</p>
-                <p className={styles.doorPitchQuiet}>
-                  If you already lead a sales crew, that is a different conversation, and it
-                  starts with a message rather than an application.
-                </p>
-                <Link href="/contact" className={kit.quietLink}>
+              <p className={styles.whyTeam}>
+                Already lead a sales crew? That is a different conversation, and it starts with a
+                message rather than an application.{" "}
+                <Link href="/contact" className={kit.inlineLink}>
                   Contact the team
-                  <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
                 </Link>
-              </div>
+              </p>
             </div>
 
-            {/*
-              A dusk street from the existing v2 set, under the hero's own
-              two-layer scrim so the frame dissolves into the copy column instead
-              of sitting in the navy as a pasted rectangle.
-            */}
-            <div className={styles.doorsArt} aria-hidden="true">
-              <Image
-                src="/redesign/cinematic/mailboxes-dusk-1920.webp"
-                alt=""
-                fill
-                sizes="(max-width: 900px) 100vw, 44vw"
-                className={styles.doorsArtImage}
-              />
-              <div className={styles.doorsArtScrim} />
+            <div className={styles.whyBody}>
+              <dl className={styles.whyList}>
+                {WHY.map(([term, fact]) => (
+                  <div key={term} className={`${styles.whyItem} ${kit.revealRise}`} data-reveal>
+                    <dt className={styles.whyTerm}>{term}</dt>
+                    <dd className={styles.whyFact}>{fact}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           </div>
         </div>
@@ -295,8 +295,9 @@ export default function Home() {
       {/*
         From inside a dark hallway, looking out through the open front door at
         the lit street: the headline read as a picture, from the side of the
-        door you step out of. The one interior lens on the page, which is what
-        separates it from the street frames above it.
+        door you step out of. Chapter 02 above looks INTO a living room from
+        the open door; this one looks OUT of one, which is the other half of
+        the same threshold and the note the page ends on.
       */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image

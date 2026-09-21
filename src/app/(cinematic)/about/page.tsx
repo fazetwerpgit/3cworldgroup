@@ -202,19 +202,24 @@ export default function AboutPage() {
       {/* ---------------------------------------------------------------- */}
       {/* 5 — leadership                                                   */}
       {/* ---------------------------------------------------------------- */}
+      {/*
+        Paper, not navy: with the values band and the closer both on ink, a
+        navy leadership block made the phone's last run almost 2000px of navy.
+        The seam clips this section's own top and bottom edges.
+      */}
       <section
         id="leadership"
-        className={`${kit.surfaceInk} ${styles.leadership}`}
+        className={`${kit.surfacePaper} ${kit.seam} ${styles.leadership}`}
         aria-labelledby="leadership-title"
       >
         <div className={kit.shell}>
-          <header className={kit.sectionHead} data-reveal>
-            <h2 id="leadership-title" className={kit.sectionTitle}>
+          <header className={kit.sectionHeadInk} data-reveal>
+            <h2 id="leadership-title" className={kit.sectionTitleInk}>
               The people
               <br />
               who run it.
             </h2>
-            <p className={kit.sectionLede}>
+            <p className={kit.sectionLedeInk}>
               The people who lead 3C World Group, and what each of them is responsible for.
             </p>
           </header>

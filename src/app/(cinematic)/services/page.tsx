@@ -18,7 +18,7 @@ export const metadata: Metadata = {
  * src/app/(cinematic)/layout.tsx.
  *
  * The composition pairs a photographic hero with three light editorial rows,
- * a paper bundle chapter, and a dark map close.
+ * a navy bundle chapter, and a dark map close.
  */
 
 const SERVICES = [
@@ -186,17 +186,17 @@ export default function ServicesPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 3 — the light bundle chapter                                    */}
+      {/* 3 — the bundle chapter, on navy                                  */}
       {/* ---------------------------------------------------------------- */}
       <section id="bundle" className={styles.bundle} aria-labelledby="bundle-title">
         <div className={kit.shell}>
-          <header className={kit.sectionHeadInk} data-reveal>
-            <h2 id="bundle-title" className={kit.sectionTitleInk}>
+          <header className={kit.sectionHead} data-reveal>
+            <h2 id="bundle-title" className={kit.sectionTitle}>
               One home.
               <br />
               A clearer setup.
             </h2>
-            <p className={kit.sectionLedeInk}>
+            <p className={kit.sectionLede}>
               Fiber, TV, and security can come together when they suit the
               household. You guide the conversation from first question to next step.
             </p>
@@ -209,9 +209,12 @@ export default function ServicesPage() {
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
+              {/* A quiet link, not a lime button: the closer one section down
+                  carries this page's last Apply, and two lime buttons a screen
+                  apart read as the page asking twice. */}
+              <Link href={APPLY_HREF} className={kit.quietLink}>
                 Start selling
-                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
               </Link>
             </div>
 
@@ -219,8 +222,8 @@ export default function ServicesPage() {
               The street at dusk, cropped in on the one house with the lime
               service cable running up its walk: one home, the whole setup. A
               photograph, not a diagram — the earlier plate drew the idea in
-              light trails, which is the one thing this site never does. It is
-              a navy plate on the page's one paper chapter, framed not bled.
+              light trails, which is the one thing this site never does. A
+              framed plate on the navy bundle chapter, not bled.
             */}
             <div className={styles.bundlePlate}>
               <Image

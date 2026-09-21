@@ -165,7 +165,9 @@
 }
 
 .rungOrdinal {
-  color: var(--lime-ink);
+  /* Ink, like the numerals on Home's route and the About leader rows: on
+     paper the lime-ink token reads as a third, olive colour next to navy. */
+  color: var(--ink);
   font-family: var(--display);
   font-size: clamp(3.2rem, 5vw, 5rem);
   font-variant-numeric: tabular-nums;
@@ -293,7 +295,9 @@
   max-width: var(--shell);
   padding-inline: var(--gutter);
   position: relative;
-  text-align: center;
+  /* Ranged left on the shell like every other closer on the site; a centred
+     display line over one centred button is the template shape. */
+  text-align: left;
 }
 
 /* --------------------------------------------------------------------------
@@ -308,7 +312,7 @@
 
 .closingInner::before {
   background: radial-gradient(
-    50% 50% at 50% 50%,
+    50% 50% at 28% 50%,
     rgba(3, 13, 31, 0.82) 0%,
     rgba(3, 13, 31, 0.72) 44%,
     rgba(3, 13, 31, 0.3) 76%,

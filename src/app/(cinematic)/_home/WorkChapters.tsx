@@ -37,8 +37,10 @@ const CHAPTERS = [
 
 /*
   R8 — three photographs of one neighbourhood at one hour, in the order the
-  chapters walk: the curb where the conversation starts, the room where the
-  fit is decided, the door where the next step is confirmed. This replaces the
+  chapters walk: the threshold where the conversation starts (a door open a
+  hand-width, the owner's note: the eave frame that stood here read as a
+  roofline, not a conversation), the room where the fit is decided, the door
+  where the next step is confirmed. This replaces the
   page's own aerial (which the hero one screen above already carries) on the
   first layer and a contact sheet of three square product shots on the second.
   A stack of product squares was the only picture on the site that was not a
@@ -47,14 +49,14 @@ const CHAPTERS = [
 */
 const STAGE = [
   {
-    src: "/redesign/cinematic/fiber-eave-dusk-1920.webp",
-    alt: "A suburban street at dusk with a fiber cabinet and tool bag at the curb",
-    position: "56% 58%",
+    src: "/redesign/cinematic/home-threshold-dusk-1920.webp",
+    alt: "A front door at dusk, open a hand-width, with warm light across the doormat",
+    position: "50% 50%",
   },
   {
-    src: "/redesign/cinematic/tv-window-dusk-1920.webp",
-    alt: "A living room at dusk with a wall-mounted television and the neighborhood through the window",
-    position: "58% 52%",
+    src: "/redesign/cinematic/home-room-dusk-1920.webp",
+    alt: "A living room seen from the open front door at dusk, lamp on, the lit street through the window",
+    position: "50% 50%",
   },
   {
     src: "/redesign/cinematic/security-garage-dusk-1920.webp",

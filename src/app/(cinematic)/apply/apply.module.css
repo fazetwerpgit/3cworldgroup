@@ -25,33 +25,64 @@
 }
 
 @media (max-width: 759px) {
+  /*
+    Content-sized, not the kit's 76svh frame: on a phone the form is the next
+    thing under this head, and a fixed-height head put its first field a full
+    screen down. Doubled class to beat the kit's height rule.
+  */
+  .head.head {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    padding-bottom: 0;
+    /* Two lines more than the kit's 7rem: enough for the lit windows to read
+       as a photograph above the eyebrow rather than a strip under the header. */
+    padding-top: 9.5rem;
+  }
+
+  /* The kit's copy block (the second child; the first is the art) keeps a
+     desktop-sized foot of up to 4.5rem. Here the form is the next thing down,
+     and that foot plus the section's own top pad put the first field under
+     the fold on a 390-wide phone. */
+  .head > div + div {
+    padding-bottom: 1.75rem;
+  }
+
+  .applyLayout {
+    padding-top: 1.25rem;
+  }
+
+  /* On a phone the head has one job: get the first field on screen. Both head
+     buttons go: the lime one would sit 160px above a form heading that says
+     the same words on the page that IS the application, and the ghost link
+     points at the work section, which is the next thing under the form
+     anyway. The head copy hands straight down to the form. */
+  .headActions {
+    display: none;
+  }
+
   .head {
     /*
-      The window closes at 38%, not 34%: the copy starts at 43% and the lit
-      row of windows in this crop runs to about 35%, so a window that shut at
-      34% cut the light off one band short and the frame measured 0.36 — over
-      the floor but with nothing to spare. Four more points of frame buys the
-      whole lit row and still leaves a ramp before the first word.
+      The head is content-sized on phones now, so the copy starts near 22% of
+      the frame instead of 43%. The window has to close above that: 17%, and
+      the lit row of windows is pushed up into the clear band by scaling about
+      a lower origin (see the img rule).
     */
-    --head-fall: 38%;
+    --head-fall: 24%;
     --head-focus: 84% 40%;
   }
 
   /*
     The lit windows sit at the far right of the source; a portrait crop at 84%
     shows roofline and pines. Scale about the house so the light lands in the
-    clear window above the copy.
-
-    At 1.55 about 42% only the top edge of the windows reached the window that
-    is still clear, and the frame measured 0.32 against a 0.35 floor — dim
-    enough that the head read as navy with a suggestion of a house in it.
-    Going to 1.9 about 46% puts the whole lit row at 22–28% of the frame and
-    throws the empty sky above the rooflines out of shot; the sconces below
-    stay behind the scrim, where they belong.
+    clear window above the copy. With the head content-sized (copy from 22%,
+    scrim closing at 17%) the origin has to sit low, 92%, so the scaled row of
+    windows rises into the top sixth of the frame: 0.40 at 390 and 0.37 at 430
+    against the 0.35 floor. Origins of 46%, 62% and 80% measured 0.26 to 0.34.
   */
   .head img {
     transform: scale(1.9);
-    transform-origin: 96% 46%;
+    transform-origin: 96% 92%;
   }
 }
 
@@ -408,32 +439,36 @@
   padding: var(--section-pad) 0;
 }
 
+/*
+  Three rows on hairlines: numeral, title, body across the shell. Not a
+  three-up card row — the numeral is the typographic weight of each row, the
+  same grammar as the Careers stages, and this is the page's one numbered
+  section. Good to know below is term/definition rows without numerals.
+*/
 .steps {
-  display: grid;
-  gap: 2.2rem clamp(2rem, 4vw, 4rem);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: clamp(1.75rem, 3vw, 3rem);
-}
-
-@media (max-width: 640px) {
-  .steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  border-top: 1px solid var(--rule-ink);
+  list-style: none;
+  margin: clamp(1.75rem, 3vw, 3rem) 0 0;
+  padding: 0;
 }
 
 .step {
-  border-top: 1px solid var(--rule-ink);
-  padding-top: 1.1rem;
+  align-items: start;
+  border-bottom: 1px solid var(--rule-ink);
+  display: grid;
+  gap: 0.6rem clamp(1.5rem, 3vw, 3rem);
+  grid-template-columns: 5rem minmax(0, 22rem) minmax(0, 1fr);
+  padding: clamp(1.25rem, 2.2vw, 1.75rem) 0;
 }
 
 .stepNum {
-  color: var(--lime-ink);
+  color: var(--ink);
   display: block;
   font-family: var(--display);
   font-size: clamp(2.4rem, 4vw, 3.4rem);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
-  line-height: 1;
+  line-height: 0.9;
 }
 
 .stepTitle {
@@ -443,7 +478,7 @@
   font-weight: 400;
   letter-spacing: 0.008em;
   line-height: 1;
-  margin-top: 0.7rem;
+  margin: 0.35rem 0 0;
   text-transform: uppercase;
 }
 
@@ -451,9 +486,21 @@
   color: var(--on-paper-dim);
   font-size: 0.97rem;
   line-height: 1.6;
-  margin-top: 0.6rem;
+  margin: 0.45rem 0 0;
   max-width: 44ch;
 }
+
+@media (max-width: 900px) {
+  .step {
+    grid-template-columns: 3.25rem minmax(0, 1fr);
+  }
+
+  .stepBody {
+    grid-column: 2;
+    margin-top: 0;
+  }
+}
+
 
 /* --------------------------------------------------------------------------
    5 — Good to know (navy)
@@ -512,63 +559,8 @@
   padding held 51px of empty paper between the seam and the first word, which
   put this joint at 242 against a 140 ceiling.
 */
-.closing {
-  background: var(--paper);
-  color: var(--ink);
-  isolation: isolate;
-  overflow: hidden;
-  padding: clamp(2rem, 2.6vw, 2.4rem) 0 clamp(3rem, 5vw, 4.5rem);
-  position: relative;
-  text-align: left;
-}
-
-/*
-  The one closer on paper. It does not borrow the photographic closers' shape:
-  the display line sits ranged left on the shell hairline with the button on
-  the same baseline at the right, the way Contact ends, so the page finishes
-  on a row rather than a centred plate.
-*/
-.closingInner {
-  align-items: end;
-  border-top: 1px solid var(--rule-ink);
-  display: grid;
-  gap: 1.5rem clamp(2rem, 5vw, 5rem);
-  grid-template-columns: minmax(0, 1fr) auto;
-  justify-items: start;
-  margin-inline: auto;
-  max-width: calc(var(--shell) - 2 * var(--gutter));
-  padding-top: clamp(1rem, 1.5vw, 1.35rem);
-  position: relative;
-  text-align: left;
-  width: calc(100% - 2 * var(--gutter));
-}
-
-@media (max-width: 760px) {
-  .closingInner {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.closingTitle {
-  font-family: var(--display);
-  font-size: clamp(2.6rem, 5vw, 4.6rem);
-  font-weight: 400;
-  letter-spacing: 0.005em;
-  line-height: 0.88;
-  text-transform: uppercase;
-}
-
-.closingLime {
-  color: var(--ink);
-}
-
-.closingLede {
-  text-wrap: balance;
-  color: var(--on-paper-dim);
-  font-size: clamp(1.02rem, 1.2vw, 1.18rem);
-  line-height: 1.6;
-  margin: 1.2rem 0 0;
-  max-width: 46ch;
+.knowBack {
+  margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -713,11 +705,7 @@
 }
 
 @media (min-width: 760px) {
-  .steps {
-    gap: clamp(1.5rem, 3vw, 2.5rem);
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
+  
   .knowRow {
     gap: clamp(1.25rem, 3vw, 3rem);
     grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);

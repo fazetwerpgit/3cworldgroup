@@ -453,6 +453,11 @@
 
 .details {
   align-self: start;
+  /* The rail is shorter than the form beside it. Sticky keeps the email and
+     hours in view down the length of the textarea and submit instead of
+     leaving blank paper beside them once the rail's own height is spent. */
+  position: sticky;
+  top: 6rem;
 }
 
 .detail {
@@ -644,14 +649,25 @@
     padding-bottom: 0;
   }
 
+  /*
+    Big, and bled off the right edge like the desktop mark. The slash inside
+    the image runs to the image's top-right corner; when the whole image sat
+    inside the viewport (owner's phone, 2026-09-21) that slash ended in
+    mid-air above the C and read as a broken line. Bleeding the corner past
+    the edge makes the line leave the page the way it does at 1740, and the
+    mark stops being small.
+  */
   .headArt.headArt {
-    --mark-w: min(21rem, 72vw);
-    --mark-bleed: 0px;
+    --mark-w: min(30rem, 110vw);
+    --mark-bleed: 24vw;
 
-    margin-inline: auto var(--gutter);
+    margin-inline: auto calc(-1 * var(--mark-bleed));
     margin-top: clamp(1.25rem, 5vw, 2.25rem);
     opacity: 1;
-    position: static;
+    /* In the flow, but still the box the line and node are measured from:
+       `relative`, never `static`, or their `right: 53.57%` resolves against
+       the head and the stub lands 80px away from the slash it continues. */
+    position: relative;
     right: auto;
   }
 }
