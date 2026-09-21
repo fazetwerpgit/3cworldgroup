@@ -244,7 +244,8 @@
 
 .bundlePlateImage {
   object-fit: cover;
-  object-position: 72% 46%;
+  /* The porch light sits at 75% across; keep the house and the cable run. */
+  object-position: 80% 40%;
 }
 
 /* --------------------------------------------------------------------------

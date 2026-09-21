@@ -284,7 +284,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                       required
                       value={formData.phone}
                       onChange={handleChange}
-                      placeholder="(555) 123-4567"
+                      placeholder="Your phone number"
                     />
                   </label>
                 </div>

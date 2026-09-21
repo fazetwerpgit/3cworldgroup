@@ -1,0 +1,12 @@
+390 home      white 14.67/3  lime 8.63/3  lede 14.67/4.5  | frameMaxL 0.0428 DIM | frameH 776 copyTop 35% lime 48-54%
+390 about     white 4.87/3  lime 6.6/3  lede 13.6/4.5  | frameMaxL 0.3906 | frameH 625 copyTop 30% lime 45-53%
+390 services  white 12.11/3  lime 7.89/3  lede 14.39/4.5  | frameMaxL 0.8008 | frameH 625 copyTop 36% lime 43-51%
+390 careers   white 15.14/3  lime 7.43/3  lede 14.43/4.5  | frameMaxL 0.7513 | frameH 625 copyTop 40% lime 48-56%
+390 apply     white 5.73/3  lime 6.03/3  lede 12.06/4.5  | frameMaxL 0.7742 | frameH 625 copyTop 27% lime 35-42%
+430 home      white 16.81/3  lime 8.62/3  lede 14.81/4.5  | frameMaxL 0.0428 DIM | frameH 857 copyTop 41% lime 53-58%
+430 about     white 13.47/3  lime 7.49/3  lede 13.96/4.5  | frameMaxL 0.3839 | frameH 640 copyTop 43% lime 51-58%
+430 services  white 14.32/3  lime 7.69/3  lede 14.64/4.5  | frameMaxL 0.8128 | frameH 640 copyTop 37% lime 45-52%
+430 careers   white 15.56/3  lime 7.43/3  lede 14.28/4.5  | frameMaxL 0.7369 | frameH 640 copyTop 42% lime 49-57%
+430 apply     white 7.28/3  lime 6.29/3  lede 12.42/4.5  | frameMaxL 0.7716 | frameH 640 copyTop 29% lime 36-44%
+FAILING: 390 home frame, 430 home frame
+heroscrim exit 0

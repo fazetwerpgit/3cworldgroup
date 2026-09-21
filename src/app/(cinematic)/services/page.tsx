@@ -216,14 +216,16 @@ export default function ServicesPage() {
             </div>
 
             {/*
-              The existing services artwork for this idea: one lit street with
-              the run coming off it into a single house. It is a navy plate on
-              the page's one paper chapter, so it is framed rather than bled.
+              The street at dusk, cropped in on the one house with the lime
+              service cable running up its walk: one home, the whole setup. A
+              photograph, not a diagram — the earlier plate drew the idea in
+              light trails, which is the one thing this site never does. It is
+              a navy plate on the page's one paper chapter, framed not bled.
             */}
             <div className={styles.bundlePlate}>
               <Image
-                src="/redesign/services-r3/hero-h-1600.webp"
-                alt="A lit suburban street at dusk with service lines running into one home"
+                src="/redesign/cinematic/home-street-dusk-1920.webp"
+                alt="A lit front porch at dusk with a service cable running along the walk to the house"
                 fill
                 sizes="(max-width: 900px) 100vw, 46vw"
                 className={styles.bundlePlateImage}
