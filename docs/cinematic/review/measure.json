@@ -6,32 +6,32 @@
         "id": "",
         "cls": "hero",
         "secH": 776,
-        "padTop": -234,
-        "padBot": -155,
+        "padTop": -8,
+        "padBot": -8,
         "first": "IMG",
         "last": "IMG"
       },
       {
         "tag": "section",
         "id": "the-work",
-        "cls": "work surfaceInk",
-        "secH": 1945,
-        "padTop": 63,
-        "padBot": 32,
+        "cls": "work surfacePaper seamBottomOnly",
+        "secH": 1936,
+        "padTop": 54,
+        "padBot": 31,
         "first": "Three things happenat every do",
         "last": "Once someone is interested, yo",
-        "deadAbove": -92
+        "deadAbove": 46
       },
       {
         "tag": "section",
         "id": "why",
         "cls": "why surfaceInk",
-        "secH": 724,
+        "secH": 731,
         "padTop": 31,
-        "padBot": 24,
+        "padBot": 31,
         "first": "Why peoplesell with 3C.",
         "last": "Already lead a sales crew? Tha",
-        "deadAbove": 63
+        "deadAbove": 62
       },
       {
         "tag": "section",
@@ -42,7 +42,7 @@
         "padBot": 31,
         "first": "From applicationto your first ",
         "last": "Apply to sell with 3C",
-        "deadAbove": 87
+        "deadAbove": 94
       },
       {
         "tag": "section",
@@ -59,9 +59,9 @@
         "tag": "section",
         "id": "questions",
         "cls": "faq surfacePaperRaise seam",
-        "secH": 792,
+        "secH": 808,
         "padTop": 63,
-        "padBot": -131,
+        "padBot": -114,
         "first": "Straightanswers.",
         "last": "3C works with communities acro",
         "deadAbove": 94
@@ -75,7 +75,7 @@
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": -131
+        "deadAbove": -114
       },
       {
         "tag": "div",
@@ -359,32 +359,32 @@
         "id": "",
         "cls": "hero",
         "secH": 880,
-        "padTop": -28,
-        "padBot": -28,
+        "padTop": -8,
+        "padBot": -8,
         "first": "IMG",
         "last": "IMG"
       },
       {
         "tag": "section",
         "id": "the-work",
-        "cls": "work surfaceInk",
-        "secH": 1397,
-        "padTop": 84,
-        "padBot": 68,
+        "cls": "work surfacePaper seamBottomOnly",
+        "secH": 2031,
+        "padTop": 79,
+        "padBot": 223,
         "first": "Three things happenat every do",
         "last": "Once someone is interested, yo",
-        "deadAbove": 56
+        "deadAbove": 71
       },
       {
         "tag": "section",
         "id": "why",
         "cls": "why surfaceInk",
-        "secH": 372,
+        "secH": 381,
         "padTop": 53,
-        "padBot": 44,
+        "padBot": 53,
         "first": "Why peoplesell with 3C.",
-        "last": "Your first route is worked wit",
-        "deadAbove": 121
+        "last": "Already lead a sales crew? Tha",
+        "deadAbove": 276
       },
       {
         "tag": "section",
@@ -395,7 +395,7 @@
         "padBot": 53,
         "first": "From applicationto your first ",
         "last": "Timing depends on the market a",
-        "deadAbove": 128
+        "deadAbove": 137
       },
       {
         "tag": "section",
@@ -701,10 +701,10 @@
       "label": "home h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.006,
-      "maxBackdropL": 0.0476,
-      "worstRatio": 10.76,
-      "meanRatio": 18.76
+      "meanBackdropL": 0.0054,
+      "maxBackdropL": 0.0152,
+      "worstRatio": 16.11,
+      "meanRatio": 18.94
     },
     {
       "route": "/about",

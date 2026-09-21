@@ -12,32 +12,25 @@
    1 — Hero
    -------------------------------------------------------------------------- */
 
+/*
+  R14 — the owner-approved editorial hero. The frame is capped short of the
+  viewport at every width and the copy sits at its foot, under the lit door,
+  with the chapter rail closing the section. The round-13 desktop override
+  that centred the copy in a capped frame is gone: this composition is the
+  one that was signed off.
+*/
 .hero {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: 100svh;
+  min-height: clamp(44rem, 88svh, 58rem);
   overflow: hidden;
   padding-top: 7rem;
   position: relative;
 }
 
-/*
-  Desktop: the copy used to sit at the foot of a full-viewport frame, which
-  left ~500px of scrimmed sky above the headline at 1740x1000 (owner, round
-  13). The frame is capped short of the viewport and the copy is centred in
-  what is left, so the headline sits beside the lit door instead of under
-  it. Phones keep the full frame with the copy at the foot (heroscrim-tuned).
-*/
-@media (min-width: 64rem) {
-  .hero {
-    justify-content: center;
-    min-height: clamp(44rem, 88svh, 58rem);
-  }
-}
-
 .heroArt {
-  inset: -28px;
+  inset: -8px;
   position: absolute;
   transform: translate3d(var(--drift-x, 0px), var(--drift-y, 0px), 0) scale(var(--hero-scale, 1));
   transition:
@@ -50,9 +43,7 @@
 .heroImageWide,
 .heroImageTall {
   object-fit: cover;
-  /* The street at dusk: porch light at 75% across, 37% down; the wet road
-     fills the lower left, under the copy. Y is the whole decision at 1740. */
-  object-position: 50% 46%;
+  object-position: 50% 42%;
 }
 
 .heroImageTall {
@@ -67,11 +58,14 @@
 */
 .heroScrim {
   /*
-    The vertical fade sits on top so its last stop (opaque --ink) is the
-    exact colour of the section below: with the side wash on top, the foot
-    of the hero read a step darker than the work section and the frame
-    edge showed as a horizontal line once the hero stopped filling the
-    viewport (round 13).
+    The vertical fade is the FIRST layer, so it paints on top: its last stop is
+    opaque `--ink`, the exact colour the section below starts on, and nothing
+    can tint the foot after it. :3122 lists the side wash first, which lays
+    rgba(3,13,31,0.3) over that opaque ink across the right of the frame — the
+    hero's last row then renders a step darker than the ink the seam draws and
+    the frame edge shows as a horizontal two-tone band (owner, round 14; the
+    same defect round 13 fixed this way). Both gradients are :3122's; only the
+    order is the target's.
   */
   background:
     linear-gradient(180deg, rgba(3, 13, 31, 0.72) 0%, rgba(3, 13, 31, 0.18) 34%, rgba(6, 23, 53, 0.9) 84%, var(--ink) 100%),
@@ -90,7 +84,10 @@
 .heroInner {
   margin-inline: auto;
   max-width: var(--shell);
-  padding: 0 var(--gutter) 3.5rem;
+  /* R14 — was 3.5rem. The hero foot and the work head together put ~200px
+     between the buttons and "Three things happen"; the frame keeps its
+     composition and this padding carries the trim. */
+  padding: 0 var(--gutter) 2.25rem;
   position: relative;
   width: 100%;
   z-index: 2;
@@ -130,7 +127,6 @@
   line-height: 1.55;
   margin-bottom: 2.7rem;
   max-width: 52ch;
-  text-wrap: balance;
   text-shadow: 0 1px 14px rgba(3, 13, 31, 0.6);
 }
 
@@ -139,15 +135,66 @@
   flex-wrap: wrap;
   gap: 0.85rem;
 }
+
+.heroRail {
+    color: var(--on-ink-dim);
+  display: grid;
+  font-family: var(--display);
+  font-size: 0.92rem;
+  gap: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  letter-spacing: 0.14em;
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding: 0.85rem var(--gutter) 0.9rem;
+  position: relative;
+  text-transform: uppercase;
+  width: 100%;
+  z-index: 2;
+}
+
+/* The rule sits on the content edge (gutter to gutter) like every other
+   hairline on the page, not on the rail box's padding edge. */
+.heroRail::before {
+  border-top: 1px solid var(--rule);
+  content: "";
+  left: var(--gutter);
+  position: absolute;
+  right: var(--gutter);
+  top: 0;
+}
+
+.heroRail span {
+  border-left: 1px solid var(--rule);
+  padding-left: 0.9rem;
+}
+
+.heroRail span:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
 /* --------------------------------------------------------------------------
    2 — The work
    -------------------------------------------------------------------------- */
 
+/*
+  R14 — the chapters are the page's editorial chapter, on paper, the way the
+  owner approved them on :3122. It sits between the navy hero above and the
+  navy why block below, so it carries `.seam` like every other paper section:
+  one diagonal on each edge, cutting to `.page`'s navy. No hairline is added.
+*/
 .work {
-  composes: surfaceInk from "../_cinematic/cinematic.module.css";
-  /* Round 13: the why block follows on the same navy (it used to hand off to
-     the paper route through a seam), so the chapters need a real foot. */
-  padding: var(--section-pad) 0 clamp(2rem, 3vw, 3.5rem);
+  /* Round 14 (owner): straight edges on both sides; the seam class is flat
+     now (see the kit) and stays only so the surface pairing reads the same
+     as every other paper section. */
+  composes: surfacePaper seamBottomOnly from "../_cinematic/cinematic.module.css";
+  /* R14 — the head pad is a shade under `--section-pad` so the hero foot and
+     this joint together land inside the 120-180px the owner asked for, and it
+     is held above `--seam-rise` at every width so the head is never clipped. */
+  /* Foot is the standard pad: with straight edges a photo stopping 14px
+     short of the navy band read as a missed alignment (Opus r14). */
+  padding: clamp(1.4rem, 2.9vw, 3rem) 0 var(--section-pad);
   position: relative;
 }
 
@@ -172,8 +219,8 @@
 */
 .stage {
   aspect-ratio: 1 / 1.06;
-  background: var(--ink-raise);
-  border: 1px solid var(--rule);
+  background: var(--paper-raise);
+  border: 1px solid var(--rule-ink);
   max-height: clamp(24rem, calc(100svh - 22rem), 38rem);
   overflow: hidden;
   position: sticky;
@@ -185,13 +232,23 @@
   opacity: 0;
   position: absolute;
   transition:
-    opacity 0.65s var(--ease-out-expo),
-    transform 0.9s var(--ease-out-expo);
+    opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 1.1s var(--ease-out-expo);
   transform: scale(1.035);
 }
 
+/*
+  Round 14 (owner: "clunky"): every layer at or below the active one stays
+  opaque, so a chapter change is one photograph dissolving IN over a solid
+  one — not two half-transparent frames crossing, which dipped the stage to
+  a muddy double exposure mid-swap. Scrolling back fades the top layer out
+  and the solid one underneath is simply there.
+*/
 .stage[data-active-chapter="0"] .stageLayer[data-layer="0"],
+.stage[data-active-chapter="1"] .stageLayer[data-layer="0"],
 .stage[data-active-chapter="1"] .stageLayer[data-layer="1"],
+.stage[data-active-chapter="2"] .stageLayer[data-layer="0"],
+.stage[data-active-chapter="2"] .stageLayer[data-layer="1"],
 .stage[data-active-chapter="2"] .stageLayer[data-layer="2"] {
   opacity: 1;
   transform: scale(1);
@@ -215,8 +272,14 @@
   change animates a transform rather than a width and never asks the row to
   reflow three times a scroll.
 */
+/*
+  R14 — :3122 puts these on a paper band that its stage draws across the foot
+  of the frame, so its marks are dark green. This stage has no band: the marks
+  sit directly on the photograph, where dark green at 30% is invisible. They
+  stay light, which is the same decision :3122 made for its own ground.
+*/
 .stageTick {
-  background: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.42);
   height: 3px;
   transform: scaleX(0.45);
   transform-origin: left center;
@@ -239,7 +302,7 @@
 }
 
 .chapter {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-ink);
   padding: clamp(2rem, 4vw, 3rem) 0 clamp(3rem, 8vw, 7rem);
 }
 
@@ -248,11 +311,12 @@
 }
 
 .chapterNumber {
-  color: var(--lime);
+  color: var(--lime-ink);
   font-family: var(--display);
   font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.18em;
+  /* 0.18em split "01" into "0 1" at this size (Opus r14). */
+  letter-spacing: 0.06em;
   margin-bottom: 0.9rem;
 }
 
@@ -266,7 +330,7 @@
 }
 
 .chapterLede {
-  color: var(--on-ink);
+  color: var(--on-paper);
   font-size: clamp(1.12rem, 1.45vw, 1.4rem);
   font-weight: 500;
   line-height: 1.45;
@@ -275,7 +339,7 @@
 }
 
 .chapterBody {
-  color: var(--on-ink-dim);
+  color: var(--on-paper-dim);
   font-size: clamp(1rem, 1.06vw, 1.04rem);
   line-height: 1.72;
   margin-top: 1rem;
@@ -303,7 +367,14 @@
       hairlines have something to divide, tight enough that the copy and the
       photograph opposite it read as one block.
     */
-    min-height: clamp(19rem, 26vw, 25rem);
+    /*
+      Round 14 (owner: the third photo arrived "so far down"): 25rem beats
+      put all three chapters beside the stage at once on a tall desktop, so
+      the swaps fired in a bunch as the section left. A beat is now ~60svh,
+      about the pinned stage's own height, so one chapter pairs with the
+      photograph at a time and each change lands while its copy is beside it.
+    */
+    min-height: clamp(22rem, 60svh, 36rem);
     padding: clamp(1.75rem, 2.6vw, 2.4rem) 0;
   }
 
@@ -319,8 +390,14 @@
     MotionRoot), so the short beat and a reachable third image coexist.
   */
   .chapter:last-child {
-    min-height: 0;
-    padding-bottom: clamp(0.5rem, 1vw, 1rem);
+    /* Round 14: the last beat is a FULL beat like the other two (owner + Opus).
+       Every shorter version — zero, then ~28svh — let the section end before
+       the pinned stage could dwell on the third photograph, so it arrived as
+       the stage left. The cost is empty column under the last paragraph,
+       which measure.mjs reports as a ~250px joint into the why block; that is
+       the sticky photograph's dwell room, the photo is pinned beside it, and
+       it is the one accepted exception to the 138px joint bar. */
+    padding-bottom: clamp(1.75rem, 2.6vw, 2.4rem);
   }
 }
 
@@ -860,10 +937,7 @@
 
 .why {
   composes: surfaceInk from "../_cinematic/cinematic.module.css";
-  /* Round 13: hands into the paper route through the seam, so the foot is
-     short like the other navy-to-paper joints (it used to sit above the
-     navy closer and needed a real one). */
-  padding: var(--section-pad) 0 clamp(1.5rem, 2.5vw, 2.75rem);
+  padding: var(--section-pad) 0 var(--section-pad);
 }
 
 /*
@@ -888,6 +962,25 @@
 
 .whyBody {
   padding-top: 0.35rem;
+}
+
+/*
+  Round 14 (Opus): on desktop the crew-lead aside used to sit directly under
+  the title, so the first body text after the head was an exception aimed
+  at a different reader. The left column is a flex column the height of
+  the reasons grid, title at the top and the aside pinned to the foot, so
+  the aside follows the four reasons — the order phones already had.
+*/
+@media (min-width: 901px) {
+  .whyLayout {
+    align-items: stretch;
+  }
+
+  .whyHead {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 }
 
 .whyList {
@@ -1047,7 +1140,7 @@
    -------------------------------------------------------------------------- */
 
 [data-motion="on"] .heroArt {
-  --hero-scale: 1.055;
+  --hero-scale: 1.02;
   filter: blur(10px);
 }
 
@@ -1112,6 +1205,15 @@
   assembling a second and a half in. It now opens with the buttons and lands
   inside a second, which is where the whole entrance ends.
 */
+[data-motion="on"] .heroRail {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.62s var(--ease-out-expo) 0.38s;
+}
+
+[data-motion="on"][data-entered] .heroRail {
+  clip-path: inset(0 0 0 0);
+}
+
 /* Section reveals — two distinct gestures, not one entrance repeated. */
 /* The route line. Default state is fully drawn, so no JS means no blank line. */
 .routeLine {
@@ -1186,6 +1288,12 @@
 }
 
 @media (max-width: 900px) {
+  /* Phone FAQ foot: keep ~48px of paper before the navy closer (the phone
+     section pad alone gave 31px). */
+  .faq {
+    padding-bottom: 3rem;
+  }
+
   .hero {
     min-height: 92svh;
     padding-top: 6rem;
@@ -1196,24 +1304,8 @@
   }
 
   .heroImageTall {
-    /*
-      The source is a landscape frame, so in a portrait box `cover` crops
-      sideways only and the whole height is shown — and the top fifth of this
-      photograph is empty night sky. Measured in 4% bands it runs 0.02–0.06
-      relative luminance from the frame top to 20%, then jumps to 0.99 at the
-      porch. So the mobile hero opened on a black rectangle and the scrim's
-      clear window, which sits at the top, had nothing to show: the frame read
-      as a flat navy panel rather than a photograph.
-
-      Scaling about the porch throws the dead sky out of frame and lifts the
-      lit doorway into the window that is already clear. The light now lands at
-      14–26% of the frame instead of 32–40%, above the copy rather than behind
-      it, and the crop is a tighter, more deliberate picture besides.
-    */
     display: block;
-    object-position: 72% 42%;
-    transform: scale(1.4);
-    transform-origin: 72% 62%;
+    object-position: 50% 50%;
   }
 
   /*
@@ -1228,16 +1320,27 @@
     sunset line, which is the part of this frame worth seeing — and the scrim
     ramps to legible before the first word and stays there.
   */
+  /*
+    R14 — :3122's own curve, with one stop moved. Its clear window closed at
+    17.5% and ramped to 0.52 by 21%, but on this portrait aerial the top tenth
+    is dead sky and the lit grid only arrives at 15-25%: the brightest pixel
+    anywhere in the visible frame measured 0.339, under heroscrim's 0.35 floor,
+    so the phone hero read as a navy panel rather than a photograph. The window
+    now closes at 23.5% and reaches full strength by 34% instead of 30%. Every
+    band the copy actually sits on (39% down) is unchanged or a shade darker
+    than :3122's, so the contrast floors only improve.
+  */
   .heroScrim {
     background: linear-gradient(
       180deg,
-      rgba(3, 13, 31, 0.2) 0%,
-      rgba(3, 13, 31, 0.06) 6%,
-      rgba(3, 13, 31, 0.04) 20%,
-      rgba(3, 13, 31, 0.4) 27%,
-      rgba(3, 13, 31, 0.68) 36%,
-      rgba(3, 13, 31, 0.8) 52%,
-      rgba(3, 13, 31, 0.9) 78%,
+      rgba(3, 13, 31, 0.26) 0%,
+      rgba(3, 13, 31, 0.09) 6%,
+      rgba(3, 13, 31, 0.06) 17.5%,
+      rgba(3, 13, 31, 0.22) 23.5%,
+      rgba(3, 13, 31, 0.72) 29%,
+      rgba(3, 13, 31, 0.9) 34%,
+      rgba(3, 13, 31, 0.93) 48%,
+      rgba(3, 13, 31, 0.97) 76%,
       var(--ink) 100%
     );
   }
@@ -1245,6 +1348,16 @@
   .heroTitle {
     max-width: 12ch;
   }
+
+  .heroRail {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+  }
+
+  .heroRail span {
+    padding-left: 0.6rem;
+  }
+
   /* Sticky apparatus dissolves: each chapter simply carries its own image. */
   .workLayout {
     grid-template-columns: minmax(0, 1fr);
@@ -1256,7 +1369,7 @@
 
   .chapterArt {
     aspect-ratio: 16 / 10;
-    border: 1px solid var(--rule);
+    border: 1px solid var(--rule-ink);
     display: block;
     margin-bottom: 1.5rem;
     overflow: hidden;
@@ -1460,6 +1573,19 @@
     flex: 1 1 100%;
     justify-content: center;
   }
+
+  .heroRail {
+    /* 12px floor: 0.7rem was 11.2px, the smallest type on the site. */
+    font-size: 0.75rem;
+    gap: 0.55rem;
+    letter-spacing: 0.08em;
+    padding-block: 0.65rem 0.7rem;
+  }
+
+  .heroRail span {
+    padding-left: 0.45rem;
+  }
+
   .cityList {
     grid-template-columns: minmax(0, 1fr);
   }

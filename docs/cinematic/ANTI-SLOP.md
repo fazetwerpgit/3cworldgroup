@@ -21,7 +21,10 @@ mitigation is written next to it — direction is not up for debate, execution i
 
 ## Where our direction touches a tell — and what makes it authored instead
 - **Navy ground + Bebas uppercase.** Risk: "permanent dark mode + all-caps labels." Mitigation:
-  navy alternates with paper on every page via ONE diagonal seam; uppercase is reserved for
+  navy alternates with paper on every page on straight, full-bleed edges (owner, 2026-09-21:
+  the diagonal seam is retired — "the repeated diagonal section cuts"); the joint is carried
+  by the background change, the standard section pad on both sides, and the hairline lead-in
+  under every section head; uppercase is reserved for
   display and eyebrows, body is sentence-case Geist at ≥16px with measured contrast; lime is
   used as a single accent line, never a glow.
 - **Eyebrow over the headline.** Risk: "badge above H1." Mitigation: it is a tracked text
@@ -30,7 +33,8 @@ mitigation is written next to it — direction is not up for debate, execution i
   typographic weight of the row (large Bebas, lime-ink), used in at most one section per
   page, and never combined with icon cards.
 - **Scroll reveals.** Mitigation: two authored entrances (heads wipe, bodies rise), staggered,
-  fire once, plus one real set piece per page (the route line draw, the seam, the 3C mark).
+  fire once, plus one real set piece per page (the route line draw, the chapter stage, the
+  3C mark).
 - **Photography.** Mitigation: environments only, dusk grade, one photo per placement, local
   scrims behind copy only; every hero photo is a different picture.
 

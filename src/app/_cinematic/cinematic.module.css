@@ -64,7 +64,9 @@
      have taken the left end of the section head's hairline with it. 2.4vw
      clears the hairline at every width from 901px to 1920px with room to
      spare, and 42px of travel at 1740 still reads as one angled line. */
-  --seam-rise: 2.4vw;
+  /* Round 14 (owner): section boundaries are straight. The seam classes stay
+     in the kit (every page composes them) but they cut nothing now. */
+  --seam-rise: 0px;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --rise: 18px;
   --t-quick: 0.2s;
@@ -829,12 +831,10 @@
 }
 
 .seam {
-  clip-path: polygon(
-    0 var(--seam-rise),
-    100% 0,
-    100% calc(100% - var(--seam-rise)),
-    0 100%
-  );
+  /* Round 14: flat. Sections are separated by a background change and the
+     page's spacing, not an angled cut (owner: "the repeated diagonal section
+     cuts" were the problem). */
+  clip-path: none;
   position: relative;
 }
 
@@ -843,7 +843,7 @@
   top cut and leaves its bottom edge square, so the footer meets it flat.
 */
 .seamTopOnly {
-  clip-path: polygon(0 var(--seam-rise), 100% 0, 100% 100%, 0 100%);
+  clip-path: none;
   position: relative;
 }
 
@@ -856,7 +856,7 @@
   one alone would have cut a navy wedge between two sheets of the same paper.
 */
 .seamBottomOnly {
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--seam-rise)), 0 100%);
+  clip-path: none;
   position: relative;
 }
 
@@ -867,7 +867,7 @@
 */
 @media (max-width: 900px) {
   .page {
-    --seam-rise: 14px;
+    --seam-rise: 0px;
   }
 }
 

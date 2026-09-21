@@ -71,7 +71,7 @@ export default function Home() {
       <section className={styles.hero} data-hero aria-labelledby="hero-title">
         <div className={styles.heroArt} data-hero-art>
           <Image
-            src="/redesign/cinematic/home-street-dusk-1920.webp"
+            src="/redesign/v2/photos/src/hero-wide.png"
             alt=""
             fill
             priority
@@ -79,7 +79,7 @@ export default function Home() {
             className={styles.heroImageWide}
           />
           <Image
-            src="/redesign/cinematic/home-street-dusk-1920.webp"
+            src="/redesign/v2/photos/hero-portrait-1600.webp"
             alt=""
             fill
             priority
@@ -115,6 +115,11 @@ export default function Home() {
           </div>
         </div>
 
+        <div className={styles.heroRail} aria-hidden="true">
+          <span>The conversation</span>
+          <span>The right fit</span>
+          <span>The follow-through</span>
+        </div>
       </section>
 
       {/* ---------------------------------------------------------------- */}
@@ -122,13 +127,13 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section id="the-work" className={styles.work} aria-labelledby="work-title">
         <div className={kit.shell}>
-          <header className={kit.sectionHead} data-reveal>
-            <h2 id="work-title" className={kit.sectionTitle}>
+          <header className={kit.sectionHeadInk} data-reveal>
+            <h2 id="work-title" className={kit.sectionTitleInk}>
               Three things happen
               <br />
               at every door.
             </h2>
-            <p className={kit.sectionLede}>
+            <p className={kit.sectionLedeInk}>
               You meet people, understand what they need, and explain a useful next step.
               3C trains you through each part of that conversation.
             </p>

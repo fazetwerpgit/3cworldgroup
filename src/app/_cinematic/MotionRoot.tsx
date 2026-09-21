@@ -251,7 +251,11 @@ function attachStatic(root: HTMLElement): () => void {
         reader actually uses, and it is the same line at every scroll state.
       */
       const headerClearance = Math.min(112, Math.max(76, window.innerHeight * 0.11));
-      const targetY = headerClearance + (window.innerHeight - headerClearance) * 0.32;
+      // Round 14: 0.32 → 0.5 so a chapter takes the stage as its beat
+      // crosses the middle of the viewport — roughly the stage's own middle —
+      // instead of once it has climbed a third of the way up (owner: the
+      // photo changed too late). Pairs with equal-height beats in the CSS.
+      const targetY = headerClearance + (window.innerHeight - headerClearance) * 0.5;
       const rects = chapters.map((chapter) => chapter.getBoundingClientRect());
       let bestIndex = 0;
       rects.forEach((rect, index) => {
