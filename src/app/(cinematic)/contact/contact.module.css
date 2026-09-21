@@ -55,11 +55,10 @@
   z-index: 2;
 }
 
-/* Three lines, not two: the page's own copy breaks that way and is not
-   rewritten. It needs a slightly shorter cap than the kit's so the third line
-   still clears the mark at 1280. */
+/* A slightly shorter cap than the kit's, because this is the one head whose
+   copy column has the mark standing beside it rather than open space. */
 .headTitle {
-  font-size: clamp(3.25rem, 6vw, 6.4rem);
+  font-size: clamp(3.5rem, 5.7vw, 6.1rem);
 }
 
 .headLede {
@@ -144,7 +143,12 @@
     hairline this section's head hangs from. The two are declared together for
     that reason — change one and the touchdown moves.
   */
-  padding: var(--path-drop) 0 var(--section-pad);
+  /*
+    Round 6 — the bottom is not `--section-pad`. The last `.pathRow` already
+    pads 22-32px below its own text and closes on a hairline, so a full section
+    pad under it put 170px between that hairline and the next section's head.
+  */
+  padding: var(--path-drop) 0 clamp(0.6rem, 1.2vw, 1.1rem);
 }
 
 .head,
@@ -429,14 +433,22 @@
   color: var(--on-paper);
   display: grid;
   font-size: 1.02rem;
-  gap: 0.25rem;
+  gap: 0.15rem;
   justify-items: start;
   line-height: 1.7;
-  margin-top: 0.45rem;
+  margin-top: 0.2rem;
 }
 
+/*
+  R7 — the two mailto links were 28px boxes stacked 4px apart. They are the
+  primary action in this column, so each gets the 40px the guideline asks for
+  and the gap between them opens enough that the two targets stay distinct.
+*/
 .detailLink {
+  align-items: center;
   color: var(--on-paper);
+  display: inline-flex;
+  min-height: 40px;
   text-decoration: underline;
   text-decoration-color: var(--lime-ink);
   text-decoration-thickness: 2px;
@@ -535,16 +547,37 @@
 }
 
 /*
-  On a phone the copy runs the full width, so the mark is behind it rather than
-  beside it. It is pushed further off the right edge and taken down to a ghost
-  — enough that the shape and the line leaving it still read, not enough to
-  compete with a paragraph sitting on top of it.
-*/
-@media (max-width: 760px) {
-  .headArt {
-    --mark-bleed: 16vw;
+  On a phone the copy runs the full width, so there is no room beside it for
+  the mark and it used to be laid UNDER it at a third opacity: the lede and the
+  ghost button ran straight across the streets of the plate, which is exactly
+  the thing this page is not supposed to do.
 
-    opacity: 0.34;
+  It comes out of the stack instead and stands in the flow BELOW the copy, at
+  full strength, as the last thing in the head. The head stops being a fixed
+  frame here and grows to hold it. Everything the continuation is measured from
+  survives: the mark is still the last box in the head, so its bottom is still
+  the head's bottom, so the drop to the hairline is still exactly the next
+  section's top padding and the line still lands on it.
+
+  Doubled class: the kit sets the head's height, and these have to beat it.
+*/
+@media (max-width: 900px) {
+  .head.head {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .headArt.headArt {
+    --mark-w: min(21rem, 72vw);
+    --mark-bleed: 0px;
+
+    margin-inline: auto var(--gutter);
+    margin-top: clamp(1.25rem, 5vw, 2.25rem);
+    opacity: 1;
+    position: static;
+    right: auto;
   }
 }
 

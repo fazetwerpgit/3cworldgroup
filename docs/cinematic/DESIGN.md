@@ -78,6 +78,22 @@ below), not a blanket opacity.
   measure capped at `62ch`–`68ch`.
 - Numerals in the route stops and chapter numbers use `font-variant-numeric:
   tabular-nums`.
+- **Floors.** No rendered text goes below **11px**, and 11px is reserved for a
+  tracked uppercase label such as the header tagline. Running copy and form
+  labels stop at **14px**. Uppercase micro-labels carry `0.1em`–`0.2em` of
+  tracking; the smaller the label, the more of it, because Bebas and Geist both
+  lose their counters before they lose their width.
+- **Navigation speaks in the display face.** Header row, mobile sheet and footer
+  nav are all Bebas uppercase and tracked — the footer one step down in size
+  from the header, as the quiet restatement of it. Sentence-case Geist is for
+  reading, not for wayfinding.
+- **Pointer targets.** A named action — a button, a quiet link, an email
+  address, a social chip — is at least **40px** tall. A link inside a running
+  sentence is exempt (WCAG 2.2 SC 2.5.8 inline exception) and keeps its line
+  rhythm. Everything else that is clickable clears **24px**. Where a link had to
+  grow, it grows into space the column already had rather than pushing its
+  neighbours: `.quietLink` takes its extra height as `padding-top`, so the words
+  and the hairline under them keep their relationship.
 
 ## Composition — top to bottom
 

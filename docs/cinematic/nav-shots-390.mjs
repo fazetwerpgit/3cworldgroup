@@ -13,11 +13,14 @@ for (const [href, name] of routes) {
     await p.locator('header button[aria-expanded="false"]').first().click();
     await p.locator(`header a[href="${href}"]`).last().click();
     await p.waitForURL(`**${href}`);
-    // The sheet is a static block inside the fixed header, so if it is still
-    // open it paints over the top of whatever the new route rendered.
-    const open = p.locator('header button[aria-expanded="true"]').first();
-    if (await open.count()) await open.click();
     await p.waitForTimeout(600);
+    // Round 6 — the sheet used to stay open across a client navigation and had
+    // to be closed by hand here or it painted over the new route. SiteHeader
+    // resets it on the pathname now, so this asserts instead of repairing: if
+    // the sheet is ever open once the route has settled, the shot below would
+    // be of a menu rather than of the page.
+    const stillOpen = await p.locator('header button[aria-expanded="true"]').count();
+    if (stillOpen) throw new Error(`menu sheet still open after navigating to ${href}`);
   }
   const h = await p.evaluate(() => document.body.scrollHeight);
   for (let y = 0; y < h; y += 700) { await p.evaluate((y) => window.scrollTo(0, y), y); await p.waitForTimeout(120); }

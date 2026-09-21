@@ -70,7 +70,13 @@
   gap: 1px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: clamp(1.75rem, 3vw, 3rem);
-  padding-bottom: var(--section-pad);
+  /*
+    Round 6 — this used to be a full `--section-pad`, on top of the 22-32px each
+    `.figure` cell already pads below its label. The two stacked into 85px of
+    navy under the last figure before the next section's own padding had even
+    started. The cells close the strip; this only keeps it off the seam.
+  */
+  padding-bottom: clamp(0.4rem, 1vw, 1.2rem);
 }
 
 .figure {
@@ -173,21 +179,29 @@
 
 /*
   Three short chapters would otherwise float in the middle of a large navy
-  field. Giving each cell a floor and pushing its body to the bottom of it turns
-  them into three tall columns with the words settling at the base — the hairline
-  between them then has something to divide.
+  field, so each cell keeps a floor and the hairline between them has something
+  to divide. R7 — the floor came down from 13rem to 9rem: with the bodies no
+  longer pushed to the bottom of the cell, the old floor hung 53px of empty
+  navy under the last line and that landed on top of the section's own padding.
 */
 .value {
   border-left: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
-  min-height: clamp(10rem, 15vw, 13rem);
+  min-height: 9rem;
   padding: 0 clamp(1.1rem, 2.2vw, 2.1rem);
 }
 
+/*
+  R7 — the bodies used to be pushed to the bottom of the cell with margin-top:
+  auto so the three paragraphs bottom-aligned. On a wide screen that opened a
+  ~107px hole between each heading and its paragraph, which reads as a missing
+  icon rather than as alignment. The body now follows its heading; the cells
+  still share a height, so the rules between them still run the full row.
+*/
 .value .valueBody {
-  margin-top: auto;
-  padding-top: 1.1rem;
+  margin-top: 1rem;
+  padding-top: 0;
 }
 
 .value:first-child {
@@ -500,6 +514,14 @@
     border-top: 1px solid var(--rule);
     min-height: 0;
     padding: clamp(1.3rem, 3vw, 1.8rem) 0;
+  }
+
+  /*
+    Stacked, the last cell's bottom padding sits directly on the section's own
+    and the two read as one dead band before the next head.
+  */
+  .value:last-child {
+    padding-bottom: 0;
   }
 
   .value .valueBody {

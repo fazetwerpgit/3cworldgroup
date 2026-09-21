@@ -41,6 +41,19 @@ export default function SiteHeader() {
     return () => window.removeEventListener("scroll", sync);
   }, [pathname]);
 
+  /*
+    The sheet is rendered by the group layout, which survives every client
+    navigation inside the group — so nothing closed it when a link took the
+    reader somewhere. Tapping the always-visible lime Apply in the header row
+    landed on /apply with the sheet still covering the hero, and Back brought
+    the reader home with it still open. The route changing is the one signal
+    that is true for every way out of the sheet: a sheet link, the header row
+    Apply, the logo, Back, Forward. Reset on it.
+  */
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     if (!menuOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -50,6 +63,22 @@ export default function SiteHeader() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
+
+  /*
+    The sheet is an overlay, so the page behind it must not scroll under the
+    reader's thumb. Restores whatever `overflow` the document had, including on
+    unmount, so a navigation that tears the header down cannot leave the body
+    locked.
+  */
+  useEffect(() => {
+    if (!menuOpen) return;
+    const body = document.body;
+    const previous = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = previous;
+    };
   }, [menuOpen]);
 
   const isCurrent = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -99,10 +128,17 @@ export default function SiteHeader() {
         </nav>
 
         <div className={styles.headerActions}>
+          {/*
+            This link stays visible with the sheet open, so it needs the same
+            close handler the sheet's own links carry — the pathname reset below
+            covers a real navigation, but tapping Apply while already on /apply
+            changes no route and would otherwise leave the sheet up.
+          */}
           <Link
             href={APPLY_HREF}
             aria-current={pathname === APPLY_HREF ? "page" : undefined}
             className={`${styles.btn} ${styles.btnLime} ${styles.btnSm}`}
+            onClick={() => setMenuOpen(false)}
           >
             Apply
           </Link>

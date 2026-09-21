@@ -124,9 +124,9 @@
 .fieldLabel {
   color: var(--on-paper);
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.11em;
   margin-bottom: 0.45rem;
   text-transform: uppercase;
 }
@@ -621,6 +621,19 @@
 /* --------------------------------------------------------------------------
    Breakpoints
    -------------------------------------------------------------------------- */
+
+/*
+  R7 — on a phone the plate sat inside the shell's gutter, so a 20px strip of
+  the hero photograph ran down both sides of it and the form read as a card
+  dropped on the page rather than as the page. It goes edge to edge instead,
+  and keeps its own padding so the fields are not against the glass.
+*/
+@media (max-width: 759px) {
+  .formPanel {
+    margin-inline: calc(-1 * var(--gutter));
+    padding-inline: max(var(--gutter), 1.25rem);
+  }
+}
 
 @media (min-width: 760px) {
   .steps {

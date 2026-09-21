@@ -150,7 +150,7 @@
 
 .work {
   composes: surfaceInk from "../_cinematic/cinematic.module.css";
-  padding: var(--section-pad) 0 clamp(2rem, 3vw, 3rem);
+  padding: var(--section-pad) 0 clamp(1rem, 1.6vw, 1.75rem);
   position: relative;
 }
 
@@ -312,8 +312,40 @@
     padding: clamp(1.75rem, 2.6vw, 2.4rem) 0;
   }
 
+  /*
+    Round 6 — every chapter is a fixed-height beat so it pairs with the sticky
+    stage, and its copy is centred in that beat. On the LAST one there is no
+    next beat to pair with, so the centring left ~62px of empty column under
+    the final paragraph and the section's own padding landed on top of it:
+    232px between the last word of this chapter and the next section's head.
+    The last beat hugs its copy instead; the stage simply releases with it.
+  */
   .chapter:last-child {
-    padding-bottom: clamp(1.75rem, 2.6vw, 2.4rem);
+    min-height: 0;
+    padding-bottom: clamp(0.5rem, 1vw, 1rem);
+  }
+}
+
+/*
+  R7 — on a 1740 screen the stage was a 559x593 frame pinned to the top of a
+  column that ran ~1500px, so the left half of the section was mostly empty
+  navy: the image read as a thumbnail next to a wall of copy. Two things fix
+  it. The stage stops being a fixed 1/1.06 box that a max-height can shrink
+  below its column — it fills the column's width and takes its height from the
+  viewport, so there is never slack beside it at any window height. And the
+  columns rebalance toward the image: the copy already wrapped at its 52ch
+  measure well short of its column, so the width it gives up costs nothing.
+*/
+@media (min-width: 1600px) {
+  .workLayout {
+    gap: 3.25rem;
+    grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+  }
+
+  .stage {
+    aspect-ratio: auto;
+    height: min(calc(100svh - 11rem), 46rem);
+    max-height: none;
   }
 }
 
@@ -648,7 +680,10 @@
 
 .cityPlateName {
   font-family: var(--display);
-  font-size: clamp(2.6rem, 4.4vw, 4rem);
+  /* The kit's section scale. Round 6 — at 1740 this used to render 64px
+     against the kit's 68px, so the homepage read a size down from its own
+     interiors. */
+  font-size: clamp(2.5rem, 4.2vw, 4.25rem);
   font-weight: 400;
   letter-spacing: 0.006em;
   line-height: 0.92;
@@ -780,7 +815,8 @@
 
 .doorsTitle {
   font-family: var(--display);
-  font-size: clamp(2.2rem, 4.4vw, 4rem);
+  /* The kit's section scale — see `.cityPlateName`. */
+  font-size: clamp(2.5rem, 4.2vw, 4.25rem);
   font-weight: 400;
   letter-spacing: 0.006em;
   line-height: 0.9;
@@ -1089,7 +1125,7 @@
   }
 
   .routeStopBody {
-    font-size: 0.83rem;
+    font-size: 0.88rem;
   }
 }
 
@@ -1108,12 +1144,28 @@
     object-position: 50% 50%;
   }
 
+  /*
+    Round 6 — the portrait frame is the aerial, and its lit road grid ran
+    straight under the headline: white measured 2.33:1 and the lime line 1.32:1
+    at 390, which is not legible, it is decoration. The old curve was upside
+    down for this crop — heavy at the very top, where only sky is, and 0.3
+    through the middle, where the copy is.
+
+    The copy block starts at 20% of the frame here and runs to the chapter rail
+    at the bottom, so the clear window is the top fifth — the sky and the
+    sunset line, which is the part of this frame worth seeing — and the scrim
+    ramps to legible before the first word and stays there.
+  */
   .heroScrim {
     background: linear-gradient(
       180deg,
-      rgba(3, 13, 31, 0.78) 0%,
-      rgba(3, 13, 31, 0.3) 26%,
-      rgba(3, 13, 31, 0.78) 62%,
+      rgba(3, 13, 31, 0.26) 0%,
+      rgba(3, 13, 31, 0.09) 6%,
+      rgba(3, 13, 31, 0.06) 17.5%,
+      rgba(3, 13, 31, 0.52) 21%,
+      rgba(3, 13, 31, 0.86) 30%,
+      rgba(3, 13, 31, 0.93) 48%,
+      rgba(3, 13, 31, 0.97) 76%,
       var(--ink) 100%
     );
   }
@@ -1123,8 +1175,8 @@
   }
 
   .heroRail {
-    font-size: 0.72rem;
-    letter-spacing: 0.1em;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
   }
 
   .heroRail span {
@@ -1325,10 +1377,15 @@
 }
 
 @media (max-width: 560px) {
-  /* Each authored line has to survive as one line; a ch cap here would break
-     them mid-phrase, so the size is what fits the column instead. */
+  /*
+    Round 6 — this used to drop to clamp(2.1rem, 11.3vw, 3.4rem), which is 44px
+    at 390 while every interior head renders 56px there: the homepage, the one
+    page that is supposed to set the scale, was the smallest page on the site
+    on a phone. It now holds the kit's own floor. The authored lines are no
+    longer guaranteed to survive as single lines at 390 — `text-wrap: balance`
+    splits the longest of them evenly rather than orphaning a word.
+  */
   .heroTitle {
-    font-size: clamp(2.1rem, 11.3vw, 3.4rem);
     max-width: none;
   }
 

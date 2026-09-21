@@ -49,13 +49,16 @@ export default function ContactPage() {
         <div className={`${kit.pageHeadInner} ${styles.headInner}`}>
           <div className={kit.pageHeadCol}>
             <p className={kit.pageHeadEyebrow}>Get in touch</p>
+            {/*
+              One white line and one lime line, like every other head on the
+              site. The words are the page's own and are not rewritten — only
+              the break moved: the lime used to start a line early and run to a
+              second one, so this was the one head on the site wearing two lime
+              lines instead of one.
+            */}
             <h1 className={`${kit.pageHeadTitle} ${styles.headTitle}`}>
-              Let’s start
-              <span className={kit.pageHeadLime}>
-                the right
-                <br />
-                conversation.
-              </span>
+              Let’s start the right
+              <span className={kit.pageHeadLime}>conversation.</span>
             </h1>
             <p className={`${kit.pageHeadLede} ${styles.headLede}`}>
               Questions about joining 3C, building a contractor team, or the services we

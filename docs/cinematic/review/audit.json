@@ -1,0 +1,5150 @@
+[
+  {
+    "vp": "390",
+    "page": "home",
+    "url": "http://127.0.0.1:3120/",
+    "reachedBy": "cold-load",
+    "errors": [],
+    "shots": [
+      "home-390-y00000.png",
+      "home-390-y00809.png",
+      "home-390-y01618.png",
+      "home-390-y02428.png",
+      "home-390-y03237.png",
+      "home-390-y04046.png",
+      "home-390-y04855.png",
+      "home-390-y05665.png",
+      "home-390-y06474.png",
+      "home-390-y07283.png"
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "docHeight": 8127,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLink",
+        "text": "See the career path",
+        "w": 144,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLink",
+        "text": "Contact the team",
+        "w": 132,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 88,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 350,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 11.5,
+        "text": "The conversation"
+      },
+      {
+        "tag": "span",
+        "cls": "cinematic-home-module__mBhnHq__cityChipState",
+        "fs": 11.5,
+        "text": "Alabama"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 12.5,
+        "text": "Door-to-door sales · 1099, commission-on"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "cinematic-home-module__mBhnHq__routeStopBody",
+        "fs": 13.3,
+        "text": "A short application online. Tell us wher"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__routeEndKind",
+        "fs": 14.7,
+        "text": "Step one"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__cityPlateState",
+        "fs": 15.2,
+        "text": "Alabama"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__doorPitchQuiet",
+        "fs": 15.5,
+        "text": "If you already lead a sales crew, that i"
+      }
+    ],
+    "h1": {
+      "fs": 44,
+      "lh": "37.9002px",
+      "w": 350,
+      "h": 119,
+      "text": "Your next chapterstarts atthe next door."
+    },
+    "sections": [
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "cinematic-home-module__mBhnHq__hero",
+        "h": 776,
+        "padT": "96px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "the-work",
+        "cls": "cinematic-home-module__mBhnHq__work cinematic-",
+        "h": 2142,
+        "padT": "64px",
+        "padB": "32px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "start",
+        "cls": "cinematic-home-module__mBhnHq__routeSection ci",
+        "h": 1338,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "markets",
+        "cls": "cinematic-home-module__mBhnHq__markets cinemat",
+        "h": 1218,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "questions",
+        "cls": "cinematic-home-module__mBhnHq__faq cinematic-m",
+        "h": 857,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(247, 249, 252)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 265,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "doors",
+        "cls": "cinematic-home-module__mBhnHq__doors cinematic",
+        "h": 970,
+        "padT": "64px",
+        "padB": "56px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "cinematic-home-module__mBhnHq__closing cinemat",
+        "h": 406,
+        "padT": "80px",
+        "padB": "80px",
+        "bg": "rgb(3, 13, 31)"
+      },
+      {
+        "tag": "div",
+        "id": "",
+        "cls": "cinematic-home-module__mBhnHq__applyBar",
+        "h": 59,
+        "padT": "11.2px",
+        "padB": "11.2px",
+        "bg": "rgba(3, 13, 31, 0.93)"
+      }
+    ]
+  },
+  {
+    "vp": "390",
+    "page": "about",
+    "url": "http://127.0.0.1:3120/about",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "about-390-y00000.png",
+      "about-390-y00730.png",
+      "about-390-y01460.png",
+      "about-390-y02190.png",
+      "about-390-y02920.png",
+      "about-390-y03650.png",
+      "about-390-y04380.png",
+      "about-390-y05110.png"
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "docHeight": 5954,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLinkInk cinematic-module__CcU",
+        "text": "Apply to sell with 3C",
+        "w": 350,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 350,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "dd",
+        "cls": "",
+        "fs": 13.8,
+        "text": "States served"
+      },
+      {
+        "tag": "span",
+        "cls": "about-module__bAlq1q__leaderRole",
+        "fs": 13.8,
+        "text": "Founder & CEO"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "p",
+        "cls": "about-module__bAlq1q__serveKind",
+        "fs": 15.2,
+        "text": "For our customers"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 350,
+      "h": 144,
+      "text": "We connect America.One door at a time."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 625,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "story",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 625,
+        "padT": "64px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "mission",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 871,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 265,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "values",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 907,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "who-we-serve",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 1340,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "leadership",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 902,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "about-module__bAlq1q__closing cinematic-module",
+        "h": 333,
+        "padT": "80px",
+        "padB": "80px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "390",
+    "page": "services",
+    "url": "http://127.0.0.1:3120/services",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "services-390-y00000.png",
+      "services-390-y00786.png",
+      "services-390-y01572.png",
+      "services-390-y02357.png",
+      "services-390-y03143.png",
+      "services-390-y03929.png"
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "docHeight": 4773,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 350,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "fs": 15.8,
+        "text": "Customers already want it"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 350,
+      "h": 96,
+      "text": "Three services.One connection."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead services-mo",
+        "h": 625,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "what-you-sell",
+        "cls": "services-module__WI48oG__sell cinematic-module",
+        "h": 2414,
+        "padT": "64px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 265,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "bundle",
+        "cls": "services-module__WI48oG__bundle cinematic-modu",
+        "h": 902,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "services-module__WI48oG__closing cinematic-mod",
+        "h": 481,
+        "padT": "104px",
+        "padB": "104px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "390",
+    "page": "careers",
+    "url": "http://127.0.0.1:3120/opportunities",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "careers-390-y00000.png",
+      "careers-390-y00705.png",
+      "careers-390-y01410.png",
+      "careers-390-y02116.png",
+      "careers-390-y02821.png",
+      "careers-390-y03526.png"
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "docHeight": 4370,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 350,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 14.1,
+        "text": "per week"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__bandNote",
+        "fs": 14.7,
+        "text": "Earnings vary by performance and market."
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "span",
+        "cls": "careers-module__KsUxra__railNum",
+        "fs": 15.2,
+        "text": "Step 1"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__railBody",
+        "fs": 15.5,
+        "text": "Submit your application in minutes. We'r"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__glanceItemBody",
+        "fs": 15.7,
+        "text": "Your effort drives your earnings. Top pe"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 350,
+      "h": 96,
+      "text": "Build a career.Not just a job."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 625,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "glance",
+        "cls": "careers-module__KsUxra__glance cinematic-modul",
+        "h": 1089,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "how-it-works",
+        "cls": "careers-module__KsUxra__path cinematic-module_",
+        "h": 934,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "earnings",
+        "cls": "careers-module__KsUxra__earnings cinematic-mod",
+        "h": 999,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "apply",
+        "cls": "careers-module__KsUxra__closing cinematic-modu",
+        "h": 372,
+        "padT": "80px",
+        "padB": "80px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "390",
+    "page": "contact",
+    "url": "http://127.0.0.1:3120/contact",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "contact-390-y00000.png",
+      "contact-390-y00657.png",
+      "contact-390-y01314.png",
+      "contact-390-y01970.png",
+      "contact-390-y02627.png"
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "docHeight": 3471,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "contact-module__4OR70q__detailLink",
+        "text": "info@3cworldgroup.com",
+        "w": 181,
+        "h": 28
+      },
+      {
+        "tag": "a",
+        "cls": "contact-module__4OR70q__detailLink",
+        "text": "careers@3cworldgroup.com",
+        "w": 211,
+        "h": 28
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 350,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "contact-module__4OR70q__pathKind",
+        "fs": 13.8,
+        "text": "Joining 3C"
+      },
+      {
+        "tag": "p",
+        "cls": "contact-module__4OR70q__detailTerm",
+        "fs": 13.8,
+        "text": "Email"
+      },
+      {
+        "tag": "p",
+        "cls": "contact-module__4OR70q__formNote",
+        "fs": 14.4,
+        "text": "Fields marked  are required."
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      }
+    ],
+    "h1": {
+      "fs": 52,
+      "lh": "44.72px",
+      "w": 350,
+      "h": 134,
+      "text": "Let’s startthe rightconversation."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead contact-mod",
+        "h": 625,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "fastest-path",
+        "cls": "cinematic-module__CcUsUG__surfaceInk contact-m",
+        "h": 684,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "message",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 1495,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "cinematic-module__CcUsUG__surfaceInkDeep conta",
+        "h": 316,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "390",
+    "page": "apply",
+    "url": "http://127.0.0.1:3120/apply",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "apply-390-y00000.png",
+      "apply-390-y00788.png",
+      "apply-390-y01577.png",
+      "apply-390-y02365.png",
+      "apply-390-y03154.png",
+      "apply-390-y03942.png"
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "docHeight": 4786,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "input",
+        "cls": "",
+        "text": "",
+        "w": 218,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 350,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "span",
+        "cls": "apply-module__Cf1gyG__fieldLabel",
+        "fs": 12.5,
+        "text": "Full Name*"
+      },
+      {
+        "tag": "span",
+        "cls": "apply-module__Cf1gyG__fieldOptional",
+        "fs": 12.5,
+        "text": "(optional)"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__formFine",
+        "fs": 12.8,
+        "text": "By applying, you agree to be contacted a"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "fs": 15.2,
+        "text": "This is a  role."
+      },
+      {
+        "tag": "strong",
+        "cls": "",
+        "fs": 15.2,
+        "text": "1099 independent contractor"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__asideEyebrow",
+        "fs": 15.2,
+        "text": "What you are applying for"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__stepBody",
+        "fs": 15.5,
+        "text": "It goes to the recruiting team with the "
+      },
+      {
+        "tag": "dd",
+        "cls": "apply-module__Cf1gyG__knowDef",
+        "fs": 15.5,
+        "text": "You work as a 1099 independent contracto"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 350,
+      "h": 96,
+      "text": "Your next chapterstarts here."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 625,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "apply-module__Cf1gyG__applySection cinematic-m",
+        "h": 1496,
+        "padT": "0px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "next",
+        "cls": "apply-module__Cf1gyG__next cinematic-module__C",
+        "h": 936,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "good-to-know",
+        "cls": "apply-module__Cf1gyG__know cinematic-module__C",
+        "h": 1001,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "apply-module__Cf1gyG__closing cinematic-module",
+        "h": 377,
+        "padT": "72px",
+        "padB": "72px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "430",
+    "page": "home",
+    "url": "http://127.0.0.1:3120/",
+    "reachedBy": "cold-load",
+    "errors": [],
+    "shots": [
+      "home-430-y00000.png",
+      "home-430-y00918.png",
+      "home-430-y01837.png",
+      "home-430-y02755.png",
+      "home-430-y03674.png",
+      "home-430-y04592.png",
+      "home-430-y05510.png",
+      "home-430-y06429.png",
+      "home-430-y07347.png"
+    ],
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "innerWidth": 430,
+    "overflow": false,
+    "docHeight": 8279,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLink",
+        "text": "See the career path",
+        "w": 144,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLink",
+        "text": "Contact the team",
+        "w": 132,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 88,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 390,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 11.5,
+        "text": "The conversation"
+      },
+      {
+        "tag": "span",
+        "cls": "cinematic-home-module__mBhnHq__cityChipState",
+        "fs": 11.5,
+        "text": "Alabama"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 12.5,
+        "text": "Door-to-door sales · 1099, commission-on"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "cinematic-home-module__mBhnHq__routeStopBody",
+        "fs": 13.3,
+        "text": "A short application online. Tell us wher"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__routeEndKind",
+        "fs": 14.7,
+        "text": "Step one"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__cityPlateState",
+        "fs": 15.2,
+        "text": "Alabama"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__doorPitchQuiet",
+        "fs": 15.5,
+        "text": "If you already lead a sales crew, that i"
+      }
+    ],
+    "h1": {
+      "fs": 49,
+      "lh": "41.7874px",
+      "w": 390,
+      "h": 131,
+      "text": "Your next chapterstarts atthe next door."
+    },
+    "sections": [
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "cinematic-home-module__mBhnHq__hero",
+        "h": 857,
+        "padT": "96px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "the-work",
+        "cls": "cinematic-home-module__mBhnHq__work cinematic-",
+        "h": 2189,
+        "padT": "64px",
+        "padB": "32px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "start",
+        "cls": "cinematic-home-module__mBhnHq__routeSection ci",
+        "h": 1338,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "markets",
+        "cls": "cinematic-home-module__mBhnHq__markets cinemat",
+        "h": 1246,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "questions",
+        "cls": "cinematic-home-module__mBhnHq__faq cinematic-m",
+        "h": 828,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(247, 249, 252)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "doors",
+        "cls": "cinematic-home-module__mBhnHq__doors cinematic",
+        "h": 995,
+        "padT": "64px",
+        "padB": "56px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "cinematic-home-module__mBhnHq__closing cinemat",
+        "h": 406,
+        "padT": "80px",
+        "padB": "80px",
+        "bg": "rgb(3, 13, 31)"
+      },
+      {
+        "tag": "div",
+        "id": "",
+        "cls": "cinematic-home-module__mBhnHq__applyBar",
+        "h": 59,
+        "padT": "11.2px",
+        "padB": "11.2px",
+        "bg": "rgba(3, 13, 31, 0.93)"
+      }
+    ]
+  },
+  {
+    "vp": "430",
+    "page": "about",
+    "url": "http://127.0.0.1:3120/about",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "about-430-y00000.png",
+      "about-430-y00841.png",
+      "about-430-y01681.png",
+      "about-430-y02522.png",
+      "about-430-y03363.png",
+      "about-430-y04203.png",
+      "about-430-y05044.png"
+    ],
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "innerWidth": 430,
+    "overflow": false,
+    "docHeight": 5976,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLinkInk cinematic-module__CcU",
+        "text": "Apply to sell with 3C",
+        "w": 390,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 390,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "dd",
+        "cls": "",
+        "fs": 13.8,
+        "text": "States served"
+      },
+      {
+        "tag": "span",
+        "cls": "about-module__bAlq1q__leaderRole",
+        "fs": 13.8,
+        "text": "Founder & CEO"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "p",
+        "cls": "about-module__bAlq1q__serveKind",
+        "fs": 15.2,
+        "text": "For our customers"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 390,
+      "h": 96,
+      "text": "We connect America.One door at a time."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 640,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "story",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 625,
+        "padT": "64px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "mission",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 865,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "values",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 907,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "who-we-serve",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 1353,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "leadership",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 902,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "about-module__bAlq1q__closing cinematic-module",
+        "h": 333,
+        "padT": "80px",
+        "padB": "80px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "430",
+    "page": "services",
+    "url": "http://127.0.0.1:3120/services",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "services-430-y00000.png",
+      "services-430-y00784.png",
+      "services-430-y01568.png",
+      "services-430-y02352.png",
+      "services-430-y03136.png",
+      "services-430-y03920.png"
+    ],
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "innerWidth": 430,
+    "overflow": false,
+    "docHeight": 4852,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 390,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "fs": 15.8,
+        "text": "Customers already want it"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 390,
+      "h": 96,
+      "text": "Three services.One connection."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead services-mo",
+        "h": 640,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "what-you-sell",
+        "cls": "services-module__WI48oG__sell cinematic-module",
+        "h": 2447,
+        "padT": "64px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "bundle",
+        "cls": "services-module__WI48oG__bundle cinematic-modu",
+        "h": 932,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "services-module__WI48oG__closing cinematic-mod",
+        "h": 481,
+        "padT": "104px",
+        "padB": "104px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "430",
+    "page": "careers",
+    "url": "http://127.0.0.1:3120/opportunities",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "careers-430-y00000.png",
+      "careers-430-y00843.png",
+      "careers-430-y01687.png",
+      "careers-430-y02530.png",
+      "careers-430-y03373.png"
+    ],
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "innerWidth": 430,
+    "overflow": false,
+    "docHeight": 4305,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 390,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 14.1,
+        "text": "per week"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__bandNote",
+        "fs": 14.7,
+        "text": "Earnings vary by performance and market."
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "span",
+        "cls": "careers-module__KsUxra__railNum",
+        "fs": 15.2,
+        "text": "Step 1"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__railBody",
+        "fs": 15.5,
+        "text": "Submit your application in minutes. We'r"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__glanceItemBody",
+        "fs": 15.7,
+        "text": "Your effort drives your earnings. Top pe"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 390,
+      "h": 96,
+      "text": "Build a career.Not just a job."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 640,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "glance",
+        "cls": "careers-module__KsUxra__glance cinematic-modul",
+        "h": 1089,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "how-it-works",
+        "cls": "careers-module__KsUxra__path cinematic-module_",
+        "h": 905,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "earnings",
+        "cls": "careers-module__KsUxra__earnings cinematic-mod",
+        "h": 947,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 179,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "apply",
+        "cls": "careers-module__KsUxra__closing cinematic-modu",
+        "h": 372,
+        "padT": "80px",
+        "padB": "80px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "430",
+    "page": "contact",
+    "url": "http://127.0.0.1:3120/contact",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "contact-430-y00000.png",
+      "contact-430-y00842.png",
+      "contact-430-y01684.png",
+      "contact-430-y02526.png"
+    ],
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "innerWidth": 430,
+    "overflow": false,
+    "docHeight": 3458,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "contact-module__4OR70q__detailLink",
+        "text": "info@3cworldgroup.com",
+        "w": 181,
+        "h": 28
+      },
+      {
+        "tag": "a",
+        "cls": "contact-module__4OR70q__detailLink",
+        "text": "careers@3cworldgroup.com",
+        "w": 211,
+        "h": 28
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 390,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "contact-module__4OR70q__pathKind",
+        "fs": 13.8,
+        "text": "Joining 3C"
+      },
+      {
+        "tag": "p",
+        "cls": "contact-module__4OR70q__detailTerm",
+        "fs": 13.8,
+        "text": "Email"
+      },
+      {
+        "tag": "p",
+        "cls": "contact-module__4OR70q__formNote",
+        "fs": 14.4,
+        "text": "Fields marked  are required."
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      }
+    ],
+    "h1": {
+      "fs": 52,
+      "lh": "44.72px",
+      "w": 390,
+      "h": 134,
+      "text": "Let’s startthe rightconversation."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead contact-mod",
+        "h": 640,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "fastest-path",
+        "cls": "cinematic-module__CcUsUG__surfaceInk contact-m",
+        "h": 655,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "message",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 1495,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "cinematic-module__CcUsUG__surfaceInkDeep conta",
+        "h": 316,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "430",
+    "page": "apply",
+    "url": "http://127.0.0.1:3120/apply",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "apply-430-y00000.png",
+      "apply-430-y00759.png",
+      "apply-430-y01518.png",
+      "apply-430-y02276.png",
+      "apply-430-y03035.png",
+      "apply-430-y03794.png"
+    ],
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "innerWidth": 430,
+    "overflow": false,
+    "docHeight": 4726,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "input",
+        "cls": "",
+        "text": "",
+        "w": 218,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 390,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "span",
+        "cls": "apply-module__Cf1gyG__fieldLabel",
+        "fs": 12.5,
+        "text": "Full Name*"
+      },
+      {
+        "tag": "span",
+        "cls": "apply-module__Cf1gyG__fieldOptional",
+        "fs": 12.5,
+        "text": "(optional)"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__formFine",
+        "fs": 12.8,
+        "text": "By applying, you agree to be contacted a"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "fs": 15.2,
+        "text": "This is a  role."
+      },
+      {
+        "tag": "strong",
+        "cls": "",
+        "fs": 15.2,
+        "text": "1099 independent contractor"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__asideEyebrow",
+        "fs": 15.2,
+        "text": "What you are applying for"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__stepBody",
+        "fs": 15.5,
+        "text": "It goes to the recruiting team with the "
+      },
+      {
+        "tag": "dd",
+        "cls": "apply-module__Cf1gyG__knowDef",
+        "fs": 15.5,
+        "text": "You work as a 1099 independent contracto"
+      }
+    ],
+    "h1": {
+      "fs": 56,
+      "lh": "48.16px",
+      "w": 390,
+      "h": 96,
+      "text": "Your next chapterstarts here."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 640,
+        "padT": "88px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "apply-module__Cf1gyG__applySection cinematic-m",
+        "h": 1420,
+        "padT": "0px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "next",
+        "cls": "apply-module__Cf1gyG__next cinematic-module__C",
+        "h": 936,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 207,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "good-to-know",
+        "cls": "apply-module__Cf1gyG__know cinematic-module__C",
+        "h": 1001,
+        "padT": "64px",
+        "padB": "64px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 236,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "apply-module__Cf1gyG__closing cinematic-module",
+        "h": 377,
+        "padT": "72px",
+        "padB": "72px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "1740",
+    "page": "home",
+    "url": "http://127.0.0.1:3120/",
+    "reachedBy": "cold-load",
+    "errors": [],
+    "shots": [
+      "home-1740-y00000.png",
+      "home-1740-y00921.png",
+      "home-1740-y01841.png",
+      "home-1740-y02762.png",
+      "home-1740-y03683.png",
+      "home-1740-y04604.png",
+      "home-1740-y05524.png",
+      "home-1740-y06445.png"
+    ],
+    "scrollWidth": 1740,
+    "clientWidth": 1740,
+    "innerWidth": 1740,
+    "overflow": false,
+    "docHeight": 7445,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [
+      {
+        "tag": "figure",
+        "cls": "cinematic-home-module__mBhnHq__stageLayer",
+        "text": "Fiber optic strands, a wall-mounted television, an"
+      }
+    ],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "About",
+        "w": 35,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Services",
+        "w": 53,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Careers",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Contact",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 65,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__inlineLink",
+        "text": "The full career path",
+        "w": 147,
+        "h": 21
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLink",
+        "text": "See the career path",
+        "w": 144,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLink",
+        "text": "Contact the team",
+        "w": 132,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 145,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "span",
+        "cls": "cinematic-home-module__mBhnHq__cityChipState",
+        "fs": 11.5,
+        "text": "Alabama"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "cinematic-home-module__mBhnHq__routeStopBody",
+        "fs": 14.3,
+        "text": "A short application online. Tell us wher"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 14.7,
+        "text": "The conversation"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__routeEndKind",
+        "fs": 14.7,
+        "text": "Step one"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__cityPlateState",
+        "fs": 15.2,
+        "text": "Alabama"
+      },
+      {
+        "tag": "p",
+        "cls": "cinematic-home-module__mBhnHq__doorPitchQuiet",
+        "fs": 15.5,
+        "text": "If you already lead a sales crew, that i"
+      }
+    ],
+    "h1": {
+      "fs": 120,
+      "lh": "103.2px",
+      "w": 768,
+      "h": 324,
+      "text": "Your next chapterstarts atthe next door."
+    },
+    "sections": [
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "cinematic-home-module__mBhnHq__hero",
+        "h": 1000,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "the-work",
+        "cls": "cinematic-home-module__mBhnHq__work cinematic-",
+        "h": 1850,
+        "padT": "112px",
+        "padB": "48px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "start",
+        "cls": "cinematic-home-module__mBhnHq__routeSection ci",
+        "h": 1067,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "markets",
+        "cls": "cinematic-home-module__mBhnHq__markets cinemat",
+        "h": 976,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "questions",
+        "cls": "cinematic-home-module__mBhnHq__faq cinematic-m",
+        "h": 931,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(247, 249, 252)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "doors",
+        "cls": "cinematic-home-module__mBhnHq__doors cinematic",
+        "h": 831,
+        "padT": "112px",
+        "padB": "96px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "cinematic-home-module__mBhnHq__closing cinemat",
+        "h": 611,
+        "padT": "128px",
+        "padB": "128px",
+        "bg": "rgb(3, 13, 31)"
+      },
+      {
+        "tag": "div",
+        "id": "",
+        "cls": "cinematic-home-module__mBhnHq__applyBar",
+        "h": 0,
+        "padT": "0px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "vp": "1740",
+    "page": "about",
+    "url": "http://127.0.0.1:3120/about",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "about-1740-y00000.png",
+      "about-1740-y00872.png",
+      "about-1740-y01743.png",
+      "about-1740-y02615.png",
+      "about-1740-y03486.png",
+      "about-1740-y04358.png"
+    ],
+    "scrollWidth": 1740,
+    "clientWidth": 1740,
+    "innerWidth": 1740,
+    "overflow": false,
+    "docHeight": 5358,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink cinematic-module__CcUsU",
+        "text": "About",
+        "w": 35,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Services",
+        "w": 53,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Careers",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Contact",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 65,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__quietLinkInk cinematic-module__CcU",
+        "text": "Apply to sell with 3C",
+        "w": 616,
+        "h": 31
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 145,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "dd",
+        "cls": "",
+        "fs": 13.8,
+        "text": "States served"
+      },
+      {
+        "tag": "span",
+        "cls": "about-module__bAlq1q__leaderRole",
+        "fs": 13.8,
+        "text": "Founder & CEO"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "p",
+        "cls": "about-module__bAlq1q__serveKind",
+        "fs": 15.2,
+        "text": "For our customers"
+      }
+    ],
+    "h1": {
+      "fs": 120,
+      "lh": "103.2px",
+      "w": 928,
+      "h": 206,
+      "text": "We connect America.One door at a time."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 760,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "story",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 873,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "mission",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 876,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "values",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 634,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "who-we-serve",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 954,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "leadership",
+        "cls": "cinematic-module__CcUsUG__surfaceInk about-mod",
+        "h": 600,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "about-module__bAlq1q__closing cinematic-module",
+        "h": 483,
+        "padT": "128px",
+        "padB": "128px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "1740",
+    "page": "services",
+    "url": "http://127.0.0.1:3120/services",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "services-1740-y00000.png",
+      "services-1740-y00914.png",
+      "services-1740-y01829.png",
+      "services-1740-y02743.png",
+      "services-1740-y03657.png"
+    ],
+    "scrollWidth": 1740,
+    "clientWidth": 1740,
+    "innerWidth": 1740,
+    "overflow": false,
+    "docHeight": 4657,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "About",
+        "w": 35,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink cinematic-module__CcUsU",
+        "text": "Services",
+        "w": 53,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Careers",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Contact",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 65,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 145,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "fs": 15.8,
+        "text": "Customers already want it"
+      }
+    ],
+    "h1": {
+      "fs": 120,
+      "lh": "103.2px",
+      "w": 928,
+      "h": 206,
+      "text": "Three services.One connection."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead services-mo",
+        "h": 760,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "what-you-sell",
+        "cls": "services-module__WI48oG__sell cinematic-module",
+        "h": 2234,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "bundle",
+        "cls": "services-module__WI48oG__bundle cinematic-modu",
+        "h": 874,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "services-module__WI48oG__closing cinematic-mod",
+        "h": 611,
+        "padT": "128px",
+        "padB": "128px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "1740",
+    "page": "careers",
+    "url": "http://127.0.0.1:3120/opportunities",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "careers-1740-y00000.png",
+      "careers-1740-y00769.png",
+      "careers-1740-y01538.png",
+      "careers-1740-y02307.png",
+      "careers-1740-y03076.png"
+    ],
+    "scrollWidth": 1740,
+    "clientWidth": 1740,
+    "innerWidth": 1740,
+    "overflow": false,
+    "docHeight": 4076,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "About",
+        "w": 35,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Services",
+        "w": 53,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink cinematic-module__CcUsU",
+        "text": "Careers",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Contact",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 65,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 145,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "",
+        "fs": 14.1,
+        "text": "per week"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__bandNote",
+        "fs": 14.7,
+        "text": "Earnings vary by performance and market."
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "span",
+        "cls": "careers-module__KsUxra__railNum",
+        "fs": 15.2,
+        "text": "Step 1"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__railBody",
+        "fs": 15.5,
+        "text": "Submit your application in minutes. We'r"
+      },
+      {
+        "tag": "p",
+        "cls": "careers-module__KsUxra__glanceItemBody",
+        "fs": 15.7,
+        "text": "Your effort drives your earnings. Top pe"
+      }
+    ],
+    "h1": {
+      "fs": 120,
+      "lh": "103.2px",
+      "w": 928,
+      "h": 206,
+      "text": "Build a career.Not just a job."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 760,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "glance",
+        "cls": "careers-module__KsUxra__glance cinematic-modul",
+        "h": 922,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "how-it-works",
+        "cls": "careers-module__KsUxra__path cinematic-module_",
+        "h": 640,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "earnings",
+        "cls": "careers-module__KsUxra__earnings cinematic-mod",
+        "h": 1007,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "apply",
+        "cls": "careers-module__KsUxra__closing cinematic-modu",
+        "h": 569,
+        "padT": "128px",
+        "padB": "128px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "1740",
+    "page": "contact",
+    "url": "http://127.0.0.1:3120/contact",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "contact-1740-y00000.png",
+      "contact-1740-y00716.png",
+      "contact-1740-y01433.png",
+      "contact-1740-y02149.png"
+    ],
+    "scrollWidth": 1740,
+    "clientWidth": 1740,
+    "innerWidth": 1740,
+    "overflow": false,
+    "docHeight": 3149,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "About",
+        "w": 35,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Services",
+        "w": 53,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Careers",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink cinematic-module__CcUsU",
+        "text": "Contact",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 65,
+        "h": 36
+      },
+      {
+        "tag": "a",
+        "cls": "contact-module__4OR70q__detailLink",
+        "text": "info@3cworldgroup.com",
+        "w": 181,
+        "h": 28
+      },
+      {
+        "tag": "a",
+        "cls": "contact-module__4OR70q__detailLink",
+        "text": "careers@3cworldgroup.com",
+        "w": 211,
+        "h": 28
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 145,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "span",
+        "cls": "contact-module__4OR70q__pathKind",
+        "fs": 13.8,
+        "text": "Joining 3C"
+      },
+      {
+        "tag": "p",
+        "cls": "contact-module__4OR70q__detailTerm",
+        "fs": 13.8,
+        "text": "Email"
+      },
+      {
+        "tag": "p",
+        "cls": "contact-module__4OR70q__formNote",
+        "fs": 14.4,
+        "text": "Fields marked  are required."
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      }
+    ],
+    "h1": {
+      "fs": 102,
+      "lh": "88.064px",
+      "w": 928,
+      "h": 264,
+      "text": "Let’s startthe rightconversation."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead contact-mod",
+        "h": 760,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "fastest-path",
+        "cls": "cinematic-module__CcUsUG__surfaceInk contact-m",
+        "h": 744,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "message",
+        "cls": "cinematic-module__CcUsUG__surfacePaper cinemat",
+        "h": 997,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "closing",
+        "cls": "cinematic-module__CcUsUG__surfaceInkDeep conta",
+        "h": 470,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  },
+  {
+    "vp": "1740",
+    "page": "apply",
+    "url": "http://127.0.0.1:3120/apply",
+    "reachedBy": "nav-click",
+    "errors": [],
+    "shots": [
+      "apply-1740-y00000.png",
+      "apply-1740-y00754.png",
+      "apply-1740-y01509.png",
+      "apply-1740-y02263.png",
+      "apply-1740-y03017.png"
+    ],
+    "scrollWidth": 1740,
+    "clientWidth": 1740,
+    "innerWidth": 1740,
+    "overflow": false,
+    "docHeight": 4017,
+    "wideEls": [],
+    "unrevealed": [],
+    "invisibleText": [],
+    "smallTaps": [
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__skipLink",
+        "text": "Skip to content",
+        "w": 129,
+        "h": 42
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__brand",
+        "text": "3C World GroupConnecting America",
+        "w": 203,
+        "h": 39
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "About",
+        "w": 35,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Services",
+        "w": 53,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Careers",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__headerLink",
+        "text": "Contact",
+        "w": 49,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG__btnL",
+        "text": "Apply",
+        "w": 65,
+        "h": 36
+      },
+      {
+        "tag": "input",
+        "cls": "",
+        "text": "",
+        "w": 218,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__footerBrand",
+        "text": "3C World Group",
+        "w": 145,
+        "h": 32
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "About",
+        "w": 42,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Services",
+        "w": 57,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Careers",
+        "w": 50,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Contact",
+        "w": 54,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Apply",
+        "w": 40,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Employee login",
+        "w": 105,
+        "h": 24
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on LinkedIn",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Facebook",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "3C World Group on Instagram",
+        "w": 34,
+        "h": 34
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Privacy",
+        "w": 45,
+        "h": 17
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "Terms",
+        "w": 37,
+        "h": 17
+      }
+    ],
+    "smallText": [
+      {
+        "tag": "span",
+        "cls": "cinematic-module__CcUsUG__brandTag",
+        "fs": 9.6,
+        "text": "Connecting America"
+      },
+      {
+        "tag": "span",
+        "cls": "apply-module__Cf1gyG__fieldLabel",
+        "fs": 12.5,
+        "text": "Full Name*"
+      },
+      {
+        "tag": "span",
+        "cls": "apply-module__Cf1gyG__fieldOptional",
+        "fs": 12.5,
+        "text": "(optional)"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__formFine",
+        "fs": 12.8,
+        "text": "By applying, you agree to be contacted a"
+      },
+      {
+        "tag": "p",
+        "cls": "",
+        "fs": 12.8,
+        "text": "© 2026 3C World Group. Sales roles are 1"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 12.8,
+        "text": "Privacy"
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "fs": 14.4,
+        "text": "About"
+      },
+      {
+        "tag": "a",
+        "cls": "cinematic-module__CcUsUG__btn cinematic-module__CcUsUG_",
+        "fs": 15.2,
+        "text": "Apply"
+      },
+      {
+        "tag": "li",
+        "cls": "",
+        "fs": 15.2,
+        "text": "This is a  role."
+      },
+      {
+        "tag": "strong",
+        "cls": "",
+        "fs": 15.2,
+        "text": "1099 independent contractor"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__asideEyebrow",
+        "fs": 15.2,
+        "text": "What you are applying for"
+      },
+      {
+        "tag": "p",
+        "cls": "apply-module__Cf1gyG__stepBody",
+        "fs": 15.5,
+        "text": "It goes to the recruiting team with the "
+      },
+      {
+        "tag": "dd",
+        "cls": "apply-module__Cf1gyG__knowDef",
+        "fs": 15.5,
+        "text": "You work as a 1099 independent contracto"
+      }
+    ],
+    "h1": {
+      "fs": 120,
+      "lh": "103.2px",
+      "w": 928,
+      "h": 206,
+      "text": "Your next chapterstarts here."
+    },
+    "sections": [
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__pageHead",
+        "h": 760,
+        "padT": "112px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "apply-module__Cf1gyG__applySection cinematic-m",
+        "h": 1041,
+        "padT": "0px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "section",
+        "id": "next",
+        "cls": "apply-module__Cf1gyG__next cinematic-module__C",
+        "h": 627,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(238, 243, 248)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHeadInk cinem",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "good-to-know",
+        "cls": "apply-module__Cf1gyG__know cinematic-module__C",
+        "h": 843,
+        "padT": "112px",
+        "padB": "112px",
+        "bg": "rgb(6, 23, 53)"
+      },
+      {
+        "tag": "header",
+        "id": "",
+        "cls": "cinematic-module__CcUsUG__sectionHead cinemati",
+        "h": 154,
+        "padT": "30.4px",
+        "padB": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "id": "",
+        "cls": "apply-module__Cf1gyG__closing cinematic-module",
+        "h": 567,
+        "padT": "136px",
+        "padB": "136px",
+        "bg": "rgb(3, 13, 31)"
+      }
+    ]
+  }
+]

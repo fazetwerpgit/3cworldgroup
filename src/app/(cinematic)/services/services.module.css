@@ -30,6 +30,29 @@
   --head-focus: 48% 16%;
 }
 
+@media (max-width: 900px) {
+  /*
+    At 390 the head shows the full height of the source and crops horizontally,
+    so the top of the frame is sky and the lit windows and the garage light sit
+    a fifth of the way down. The default fall at 25% put the scrim straight
+    over them and the photograph read as a flat brown field. This page's copy
+    does not start until 40% of the frame, so the window can run to 29%, which
+    is where the light in this frame actually is.
+  */
+  .head {
+    --head-fall: 37%;
+    /*
+      And a different crop. At 390 the frame takes the full height of the
+      source and keeps a 42% slice of its width, so the desktop focus at 48%
+      cut the lit brick house and the garage light out of the picture entirely
+      and left only the dark street and the pines. 84% keeps the pedestal, the
+      house and its light in frame — which is the part of this photograph the
+      window above is there to show.
+    */
+    --head-focus: 84% 50%;
+  }
+}
+
 .filmstrip {
   margin-top: clamp(1.75rem, 3vw, 3rem);
 }
@@ -378,7 +401,12 @@
 
   .bandCopy {
     max-width: 44rem;
-    padding: clamp(1.75rem, 6vw, 2.5rem) 0 clamp(2.5rem, 8vw, 3.5rem);
+    /*
+      The bottom is smaller than the top on purpose: band 03 is the last thing
+      in this section, so whatever it pads below its list is paid again by the
+      next section's own top padding.
+    */
+    padding: clamp(1.75rem, 6vw, 2.5rem) 0 clamp(1.5rem, 5vw, 2.5rem);
   }
 
   .bundleLayout {

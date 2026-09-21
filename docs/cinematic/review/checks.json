@@ -1,0 +1,293 @@
+{
+  "axe": [
+    {
+      "vp": "390",
+      "route": "/",
+      "violations": []
+    },
+    {
+      "vp": "390",
+      "route": "/about",
+      "violations": []
+    },
+    {
+      "vp": "390",
+      "route": "/services",
+      "violations": []
+    },
+    {
+      "vp": "390",
+      "route": "/opportunities",
+      "violations": []
+    },
+    {
+      "vp": "390",
+      "route": "/contact",
+      "violations": []
+    },
+    {
+      "vp": "390",
+      "route": "/apply",
+      "violations": []
+    },
+    {
+      "vp": "1740",
+      "route": "/",
+      "violations": []
+    },
+    {
+      "vp": "1740",
+      "route": "/about",
+      "violations": []
+    },
+    {
+      "vp": "1740",
+      "route": "/services",
+      "violations": []
+    },
+    {
+      "vp": "1740",
+      "route": "/opportunities",
+      "violations": []
+    },
+    {
+      "vp": "1740",
+      "route": "/contact",
+      "violations": []
+    },
+    {
+      "vp": "1740",
+      "route": "/apply",
+      "violations": []
+    }
+  ],
+  "reduced": [
+    {
+      "route": "/",
+      "motion": null,
+      "hidden": [
+        "cinematic-home-module__mBhnHq__stageLayer"
+      ],
+      "h": 7890
+    },
+    {
+      "route": "/services",
+      "motion": null,
+      "hidden": [],
+      "h": 4652
+    }
+  ],
+  "nojs": [
+    {
+      "route": "/",
+      "height": 7890
+    },
+    {
+      "route": "/about",
+      "height": 5615
+    }
+  ],
+  "menu": {
+    "sheet": {
+      "top": 66,
+      "h": 337,
+      "w": 390
+    },
+    "links": [
+      {
+        "t": "3C World GroupConnecting Ame",
+        "h": 39,
+        "y": 13
+      },
+      {
+        "t": "Apply",
+        "h": 44,
+        "y": 11
+      },
+      {
+        "t": "About",
+        "h": 64,
+        "y": 75
+      },
+      {
+        "t": "Services",
+        "h": 64,
+        "y": 140
+      },
+      {
+        "t": "Careers",
+        "h": 64,
+        "y": 204
+      },
+      {
+        "t": "Contact",
+        "h": 64,
+        "y": 268
+      },
+      {
+        "t": "Apply to sell with 3C",
+        "h": 51,
+        "y": 332
+      },
+      {
+        "t": "Start selling",
+        "h": 53,
+        "y": 461
+      },
+      {
+        "t": "See what you'll sell",
+        "h": 53,
+        "y": 528
+      }
+    ],
+    "bodyScrollLocked": "hidden",
+    "pageScrollableBehind": true
+  },
+  "menuClosed": "false",
+  "heroLegibility": [
+    {
+      "vp": "390",
+      "route": "/",
+      "box": {
+        "x": 20,
+        "y": 149,
+        "w": 350,
+        "h": 151,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-home-390.png"
+    },
+    {
+      "vp": "390",
+      "route": "/about",
+      "box": {
+        "x": 20,
+        "y": 186,
+        "w": 350,
+        "h": 144,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-about-390.png"
+    },
+    {
+      "vp": "390",
+      "route": "/services",
+      "box": {
+        "x": 20,
+        "y": 251,
+        "w": 350,
+        "h": 96,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-services-390.png"
+    },
+    {
+      "vp": "390",
+      "route": "/opportunities",
+      "box": {
+        "x": 20,
+        "y": 251,
+        "w": 350,
+        "h": 96,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-opportunities-390.png"
+    },
+    {
+      "vp": "390",
+      "route": "/contact",
+      "box": {
+        "x": 20,
+        "y": 131,
+        "w": 350,
+        "h": 144,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-contact-390.png"
+    },
+    {
+      "vp": "390",
+      "route": "/apply",
+      "box": {
+        "x": 20,
+        "y": 168,
+        "w": 350,
+        "h": 96,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-apply-390.png"
+    },
+    {
+      "vp": "1740",
+      "route": "/",
+      "box": {
+        "x": 222,
+        "y": 347,
+        "w": 768,
+        "h": 324,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-home-1740.png"
+    },
+    {
+      "vp": "1740",
+      "route": "/about",
+      "box": {
+        "x": 222,
+        "y": 278,
+        "w": 928,
+        "h": 206,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-about-1740.png"
+    },
+    {
+      "vp": "1740",
+      "route": "/services",
+      "box": {
+        "x": 222,
+        "y": 309,
+        "w": 928,
+        "h": 206,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-services-1740.png"
+    },
+    {
+      "vp": "1740",
+      "route": "/opportunities",
+      "box": {
+        "x": 222,
+        "y": 309,
+        "w": 928,
+        "h": 206,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-opportunities-1740.png"
+    },
+    {
+      "vp": "1740",
+      "route": "/contact",
+      "box": {
+        "x": 222,
+        "y": 317,
+        "w": 928,
+        "h": 168,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-contact-1740.png"
+    },
+    {
+      "vp": "1740",
+      "route": "/apply",
+      "box": {
+        "x": 222,
+        "y": 216,
+        "w": 928,
+        "h": 206,
+        "color": "rgb(255, 255, 255)"
+      },
+      "file": "heroback-apply-1740.png"
+    }
+  ]
+}

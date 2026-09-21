@@ -42,11 +42,28 @@
   --gutter: clamp(1.25rem, 4.5vw, 4.5rem);
   /* Round 5 — one vertical rhythm for every section on every route. Sections
      used to carry their own clamp, and the biggest of them ran to 8.5rem of
-     padding at both ends, so two neighbouring heads sat nearly 300px apart. */
-  --section-pad: clamp(4rem, 8vw, 7rem);
+     padding at both ends, so two neighbouring heads sat nearly 300px apart.
+
+     Round 6 — halved. This is the padding ONE section puts at ONE of its ends,
+     and every joint on the site has two of them: a section's bottom padding
+     and the next section's top padding both fire, then `.sectionHead` adds its
+     own 1.9rem above the hairline. At 7rem that came to 255-291px of nothing
+     between the last painted pixel of one chapter and the first of the next at
+     1740, and 159-182px at 390 — a screenful of navy on a phone. At 3.3rem the
+     joint measures ~136px at 1740 and ~93px at 390, and the seam's 3.6vw rise
+     eats into that again at every navy/paper change. The air inside a section
+     is set by its own content, not by this. */
+  --section-pad: clamp(1.95rem, 3.9vw, 3.3rem);
   /* The seam angle, shared by every navy/paper joint on every page. A single
-     diagonal, always rising to the right. See `.seam`. */
-  --seam-rise: 3.6vw;
+     diagonal, always rising to the right. See `.seam`.
+
+     Round 6 — 3.6vw became 2.4vw when `--section-pad` halved. The cut eats the
+     top-left corner of the section it is on, and at 1740 a 3.6vw rise removes
+     57px at the shell's left edge against 53px of section padding: it would
+     have taken the left end of the section head's hairline with it. 2.4vw
+     clears the hairline at every width from 901px to 1920px with room to
+     spare, and 42px of travel at 1740 still reads as one angled line. */
+  --seam-rise: 2.4vw;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   background: var(--ink);
@@ -206,7 +223,15 @@
   font-size: 1.04rem;
   gap: 0.45rem;
   letter-spacing: 0.035em;
+  /*
+    R7 — the link was a 31px box. The pointer target floor is 40px, and the
+    cheapest way there that moves nothing is to grow the box upward: the text
+    and its hairline keep their place relative to each other, the element
+    simply starts higher in a column that already had the room.
+  */
+  min-height: 40px;
   padding-bottom: 0.3rem;
+  padding-top: 0.55rem;
   text-decoration: none;
   transition:
     border-color 0.22s ease,
@@ -326,9 +351,9 @@
 
 .brandTag {
   color: var(--on-ink-dim);
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -408,11 +433,36 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+/*
+  An opaque surface of its own, not the header's 86% tint. The sheet sits over
+  a photographic hero on most routes; at 86% the hero's lit windows read
+  straight through the links, and the computed background of the sheet element
+  itself was rgba(0,0,0,0) — it was borrowing the header's, which is a
+  translucency meant for a 60px bar, not for a 340px panel of navigation.
+*/
 .menuSheet {
+  background: var(--ink);
   border-top: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
-  padding: 0.5rem var(--gutter) 1.25rem;
+  padding: 0.5rem var(--gutter) calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  position: relative;
+  z-index: 1;
+}
+
+/*
+  And a backdrop under it, so the page below the panel dims rather than
+  competing with it. `z-index: -1` inside the header's own stacking context
+  puts it behind the header's background and the sheet, and the header's
+  background only covers the bar and the panel — everything below them is what
+  the reader sees dimmed.
+*/
+.header[data-open]::after {
+  background: rgba(3, 13, 31, 0.66);
+  content: "";
+  inset: 0;
+  position: fixed;
+  z-index: -1;
 }
 
 .menuSheet[hidden] {
@@ -474,7 +524,15 @@
    would be a lie about the page.
    -------------------------------------------------------------------------- */
 
+/*
+  `--head-fall` is where the mobile scrim stops being a window on the
+  photograph and starts being a surface to read on: the ramp begins here and is
+  fully heavy 11% further down. It must land ABOVE the first line of the
+  headline, and a page whose copy sits low can therefore leave more of its
+  frame lit. Only used below 900px; see the breakpoint block.
+*/
 .pageHead {
+  --head-fall: 25%;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -695,8 +753,8 @@
    3.6vw is 13px of travel, which is not a diagonal, it is a crooked line.
 
    `.page`'s own background is the navy the cut reveals, so no negative margin
-   or padding compensation is involved, and `--seam-rise` stays well under
-   `--section-pad` so no content is ever clipped.
+   or padding compensation is involved, and `--seam-rise` is held below
+   `--section-pad` at every width so no content is ever clipped.
 
    The rule, unchanged: every paper section carries `.seam`. Navy sections
    never do.
@@ -803,22 +861,27 @@
 .footerNav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 1.4rem;
+  gap: 0.15rem 1.5rem;
 }
 
 /*
-  A6 — the row is a set of 0.9rem links, which is a 22px box on a phone. The
-  minimum box a pointer target is allowed is 24px (WCAG 2.2 SC 2.5.8), so the
-  link is given one rather than left to its line box. Nothing moves: the row
-  gap already exceeds the 2px the extra height adds either side.
+  R7 — the row used to be sentence-case 14.4px Geist, the only place on the
+  site where a navigation link was not set in the display face. It now speaks
+  the header's language: Bebas, uppercase, tracked, one step down in size from
+  the header row so it reads as the quiet restatement it is. The box is 32px
+  rather than the 24px floor because a footer link is the last thing a thumb
+  reaches for on a phone.
 */
 .footerNav a {
   align-items: center;
   color: var(--on-ink-dim);
   display: inline-flex;
-  font-size: 0.9rem;
-  min-height: 24px;
+  font-family: var(--display);
+  font-size: 0.98rem;
+  letter-spacing: 0.06em;
+  min-height: 32px;
   text-decoration: none;
+  text-transform: uppercase;
   transition: color 0.2s ease;
 }
 
@@ -836,13 +899,13 @@
   border: 1px solid var(--rule);
   color: var(--on-ink-dim);
   display: flex;
-  height: 34px;
+  height: 40px;
   justify-content: center;
   transition:
     border-color 0.22s ease,
     color 0.22s ease,
     transform 0.22s var(--ease-out-expo);
-  width: 34px;
+  width: 40px;
 }
 
 .footerSocial a:hover {
@@ -864,9 +927,17 @@
   padding: 1.4rem var(--gutter) 0;
 }
 
+/*
+  R7 — Privacy and Terms were bare inline text: a 17px pointer target, the
+  smallest on the site. They keep their size and their place; only the box
+  they answer to grows.
+*/
 .footerLegal a {
+  align-items: center;
   color: inherit;
+  display: inline-flex;
   margin-right: 1.1rem;
+  min-height: 26px;
   text-decoration: none;
 }
 
@@ -977,12 +1048,29 @@
     padding-top: 5.5rem;
   }
 
+  /*
+    Round 6 — this was a blanket tint: 0.72 over the top of the frame, never
+    below 0.5 anywhere. The top of every interior photograph is its lit part —
+    the sunset over the aerial, the windows behind the pedestal, the glow at
+    the door — and a 72% veil over it turned all four heads into brown mud with
+    a headline on it. You could not tell there was a photograph there.
+
+    Authored like the desktop scrim instead, just rotated: a clear window over
+    the top fifth of the frame where nothing is written, then a fast ramp that
+    arrives before the first line of the headline (which starts at 27-43% of
+    the frame depending on the route) and holds heavy under the lime line and
+    the lede, landing on solid ink so the head joins the section below it.
+  */
   .pageHeadScrim {
     background: linear-gradient(
       180deg,
-      rgba(3, 13, 31, 0.72) 0%,
-      rgba(3, 13, 31, 0.5) 26%,
-      rgba(3, 13, 31, 0.82) 66%,
+      rgba(3, 13, 31, 0.28) 0%,
+      rgba(3, 13, 31, 0.1) calc(var(--head-fall) - 17%),
+      rgba(3, 13, 31, 0.07) calc(var(--head-fall) - 8%),
+      rgba(3, 13, 31, 0.52) var(--head-fall),
+      rgba(3, 13, 31, 0.84) calc(var(--head-fall) + 11%),
+      rgba(3, 13, 31, 0.93) calc(var(--head-fall) + 31%),
+      rgba(3, 13, 31, 0.97) 82%,
       var(--ink) 100%
     );
   }
@@ -997,6 +1085,16 @@
 }
 
 @media (max-width: 900px) {
+  /*
+    R7 — the tagline went from 9.6px to 11.2px to clear the small-text floor,
+    and at that size the default tracking wrapped it onto two lines inside a
+    390px header row. It keeps the larger size and loses the extra tracking.
+  */
+  .brandTag {
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
   .headerNav {
     display: none;
   }
