@@ -17,12 +17,8 @@ export const metadata: Metadata = {
  * the chrome, the `.page` element and the motion root are all in
  * src/app/(cinematic)/layout.tsx.
  *
- * The composition is one camera move: a flat navy head, then a filmstrip of
- * three full-bleed dusk photographs that walk from the curb to the living room
- * to the front door, then the one light chapter where all three land on a
- * single account, then the map at the end. Every claim on the page is carried
- * over from the services page it replaces; nothing about speed, price, provider
- * or coverage has been added.
+ * The composition pairs a photographic hero with three light editorial rows,
+ * a paper bundle chapter, and a dark map close.
  */
 
 const SERVICES = [
@@ -30,67 +26,67 @@ const SERVICES = [
     id: "fiber",
     number: "01",
     title: "Fiber Internet",
-    accent: "The one everyone's waiting for.",
-    body: "When fiber reaches a street, the whole block wants in. You're the person at the door with the answer.",
+    accent: "A strong fit for connected homes.",
+    body: "When fiber is available on a route, you can help each household decide whether the connection fits.",
     image: "/redesign/v2/photos/fiber-dusk-1600.webp",
     alt: "Fiber optic cable cabinet and spool beside a suburban street at dusk",
     position: "58% 62%",
     points: [
-      "Customers already want it",
-      "One conversation, one install date",
-      "A connection they'll keep for years",
+      "Start with what the household needs",
+      "A clear conversation about the connection",
+      "A setup designed for the long haul",
     ],
   },
   {
     id: "tv",
     number: "02",
     title: "TV Services",
-    accent: "The natural next question.",
-    body: "Once the internet is handled, TV comes up on its own. You answer it with a package that fits the household.",
+    accent: "A natural next question.",
+    body: "Once internet is covered, TV may fit the household too. You can help compare the available options.",
     image: "/redesign/v2/photos/tv-dusk-1600.webp",
     alt: "Wall-mounted television showing a blue abstract screen in a living room at dusk",
-    position: "68% 50%",
+    position: "60% 50%",
     points: [
-      "Sold in the same visit",
-      "Packages sized to the home",
-      "Runs on the connection you just sold",
+      "Offer it when it fits the home",
+      "Packages sized to the household",
+      "Works alongside the connection",
     ],
   },
   {
     id: "security",
     number: "03",
     title: "Security Systems",
-    accent: "Peace of mind, installed.",
-    body: "Cameras, sensors, and a keypad, set up by a pro. You bring it up; most homeowners were already thinking about it.",
+    accent: "Practical protection for the home.",
+    body: "Cameras, sensors, and a keypad can be part of the conversation when a household wants another layer of protection.",
     image: "/redesign/v2/photos/security-dusk-1600.webp",
     alt: "Security keypad and door camera beside a front door at dusk",
     position: "62% 50%",
     points: [
-      "Professional installation",
-      "Works on the same connection",
-      "Protects the customer you just signed",
+      "Professional installation options",
+      "Designed to work with the connection",
+      "A considered fit for the household",
     ],
   },
 ] as const;
 
 const BUNDLE_POINTS = [
-  "One monthly bill",
-  "One point of contact: you",
-  "Priority support for bundled homes",
+  "A simpler way to consider the full setup",
+  "One point of contact through the conversation",
+  "Options matched to the household",
 ];
 
 export default function ServicesPage() {
   return (
     <>
       {/* ---------------------------------------------------------------- */}
-      {/* 1 — the head: the curb at dusk, cropped high so it establishes   */}
-      {/*     the street; band 01 below crops the same frame tight on the  */}
-      {/*     pedestal, so the two read as two beats of one walk           */}
+      {/* 1 — the head: the pedestal at dusk, close, with the street soft   */}
+      {/*     behind it; band 01 below is the same object at working       */}
+      {/*     distance, so the two read as two beats of one walk           */}
       {/* ---------------------------------------------------------------- */}
       <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
-            src="/redesign/v2/photos/fiber-dusk-1600.webp"
+            src="/redesign/cinematic/services-pedestal-dusk-1920.webp"
             alt=""
             fill
             priority
@@ -108,8 +104,8 @@ export default function ServicesPage() {
               <span className={kit.pageHeadLime}>One connection.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Fiber, TV, and security for every home on your route. One account,
-              one rep.
+              Fiber, TV, and security options for homes on your route. A focused
+              conversation for each household.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -125,34 +121,23 @@ export default function ServicesPage() {
       </header>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 2 — the filmstrip: curb, living room, front door                  */}
+      {/* 2 — editorial service rows                                       */}
       {/* ---------------------------------------------------------------- */}
       <section id="what-you-sell" className={styles.sell} aria-labelledby="sell-title">
         <div className={kit.shell}>
-          <header className={kit.sectionHead} data-reveal>
-            <h2 id="sell-title" className={kit.sectionTitle}>
-              Sold in
+          <header className={kit.sectionHeadInk} data-reveal>
+            <h2 id="sell-title" className={kit.sectionTitleInk}>
+              Services that fit
               <br />
-              one visit.
+              the home.
             </h2>
-            <p className={kit.sectionLede}>
-              We partner with industry-leading providers to deliver fiber
-              internet, TV, and security solutions that customers actually want —
-              and that you can sell with confidence.
+            <p className={kit.sectionLedeInk}>
+              We partner with leading providers to offer fiber internet, TV, and
+              security options that can be matched to the household in front of you.
             </p>
           </header>
         </div>
 
-        {/*
-          Three full-bleed photographs of the same neighborhood at the same
-          hour, butted together with a hairline between them so they read as one
-          walk rather than three cards. The copy sits on the photograph on
-          desktop under a scrim weighted to the copy's own side; below 900px the
-          photograph becomes a band and the copy drops beneath it. The copy is on
-          the left in all three because all three photographs put their subject
-          on the right — alternating the side would have buried the fiber
-          cabinet, the television and the keypad under their own scrim.
-        */}
         <div className={styles.filmstrip}>
           {SERVICES.map((service, i) => (
             <article
@@ -161,27 +146,19 @@ export default function ServicesPage() {
               className={styles.band}
               aria-labelledby={`${service.id}-title`}
             >
-              <div
-                className={
-                  i === 0 ? `${styles.bandArt} ${styles.bandArtTight}` : styles.bandArt
-                }
-              >
-                {/*
-                  P4 — the LCP candidate is the page head's photograph now, not
-                  this one, so every band stays lazy and there is one preload on
-                  the route rather than two competing for it.
-
-                  Band 01 shares the head's photograph: the v2 set has exactly
-                  one fiber frame with a street in it. bandArtTight pushes this
-                  copy in to a detail crop of the pedestal, the bag and the
-                  spool, so it reads as the next beat of the same walk rather
-                  than the same picture twice.
-                */}
+              {/*
+                Band 01 carries the page head's photograph: the v2 set has one
+                fiber frame with a street in it and the head is pinned to it.
+                `bandArtTight` pushes this one in on the pedestal, the tool bag
+                and the spool, so the row is a detail of the walk the head
+                establishes rather than the same picture printed twice.
+              */}
+              <div className={i === 0 ? `${styles.bandArt} ${styles.bandArtTight}` : styles.bandArt}>
                 <Image
                   src={service.image}
                   alt={service.alt}
                   fill
-                  sizes="100vw"
+                  sizes="(max-width: 900px) 100vw, 46vw"
                   className={styles.bandImage}
                   style={{ objectPosition: service.position }}
                 />
@@ -209,19 +186,19 @@ export default function ServicesPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 3 — the light chapter: all three on one account                   */}
+      {/* 3 — the light bundle chapter                                    */}
       {/* ---------------------------------------------------------------- */}
       <section id="bundle" className={styles.bundle} aria-labelledby="bundle-title">
         <div className={kit.shell}>
           <header className={kit.sectionHeadInk} data-reveal>
             <h2 id="bundle-title" className={kit.sectionTitleInk}>
-              One home. One bill.
+              One home.
               <br />
-              One rep.
+              A clearer setup.
             </h2>
             <p className={kit.sectionLedeInk}>
-              Fiber, TV, and security on a single account. Fewer bills for the
-              customer. One relationship for you.
+              Fiber, TV, and security can come together when they suit the
+              household. You guide the conversation from first question to next step.
             </p>
           </header>
 
@@ -257,11 +234,11 @@ export default function ServicesPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 4 — closing, over the territory map the old page carried          */}
+      {/* 4 — closing, over a second aerial: a different neighbourhood      */}
       {/* ---------------------------------------------------------------- */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/services-r3/bundle-map-q3-1536.webp"
+          src="/redesign/cinematic/aerial-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"
@@ -274,8 +251,8 @@ export default function ServicesPage() {
             <span className={styles.closingLime}>these services?</span>
           </h2>
           <p className={styles.closingLede}>
-            Join 3C World Group and represent the solutions that power American
-            homes — one connection at a time.
+            Fiber, TV and home security, sold at the door on a route in one of our
+            markets. Training included. No experience needed.
           </p>
           <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
             Apply now

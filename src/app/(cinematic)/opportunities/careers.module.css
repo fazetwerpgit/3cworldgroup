@@ -202,7 +202,7 @@
   font-family: var(--display);
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
@@ -237,67 +237,97 @@
   padding: var(--section-pad) 0 var(--section-pad);
 }
 
-.bands {
+/*
+  R9 — a ledger. Three full-width rungs under one rule: ordinal and stage at
+  the left margin, the stage itself in the middle, what changes at the right.
+  Reads down, the way the progression happens. Column one is fixed so the
+  three ordinals stack on one axis; the other two share the rest.
+*/
+.ledger {
+  border-top: 1px solid var(--rule);
   list-style: none;
-  margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  margin: clamp(1.75rem, 3.2vw, 2.6rem) 0 0;
   padding: 0;
 }
 
-.band {
-  align-items: baseline;
-  border-top: 1px solid var(--rule);
-  display: grid;
-  gap: clamp(0.9rem, 3vw, 3rem);
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding: clamp(1.5rem, 3vw, 2.4rem) 0;
-}
-
-.band:last-child {
+.rung {
   border-bottom: 1px solid var(--rule);
+  column-gap: clamp(1.5rem, 3vw, 3.5rem);
+  display: grid;
+  grid-template-columns: clamp(7rem, 11vw, 10rem) minmax(0, 1.25fr) minmax(0, 1fr);
+  padding: clamp(1.6rem, 2.6vw, 2.4rem) 0;
 }
 
-.bandTitle {
+.rungMark {
+  align-items: baseline;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.rungOrdinal {
+  color: var(--lime);
   font-family: var(--display);
-  font-size: clamp(1.7rem, 2.8vw, 2.5rem);
+  font-size: clamp(3.2rem, 5vw, 5rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.012em;
+  line-height: 0.78;
+}
+
+.rungStage {
+  color: var(--on-ink-dim);
+  font-family: var(--display);
+  font-size: 0.92rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rungTitle {
+  font-family: var(--display);
+  font-size: clamp(1.8rem, 2.4vw, 2.4rem);
   font-weight: 400;
   letter-spacing: 0.008em;
   line-height: 1;
   text-transform: uppercase;
 }
 
-.bandBody {
+.rungBody {
   color: var(--on-ink-dim);
-  font-size: 1rem;
+  font-size: 1.02rem;
   line-height: 1.62;
-  margin-top: 0.6rem;
-  max-width: 48ch;
+  margin-top: 0.7rem;
+  max-width: 40ch;
+  text-wrap: pretty;
 }
 
-.bandRange {
-  color: var(--lime);
-  font-family: var(--display);
-  font-size: clamp(2.5rem, 5.2vw, 4.4rem);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.006em;
-  line-height: 0.9;
-  text-align: right;
-  white-space: nowrap;
+.rungChanges {
+  border-left: 2px solid var(--lime);
+  color: var(--on-ink);
+  font-size: 1.02rem;
+  line-height: 1.6;
+  max-width: 34ch;
+  padding-left: 1.1rem;
+  text-wrap: pretty;
 }
 
-.bandRange span {
+.rungChangesLabel {
   color: var(--on-ink-dim);
   display: block;
-  font-size: 0.88rem;
+  font-family: var(--display);
+  font-size: 0.92rem;
   letter-spacing: 0.2em;
-  margin-top: 0.6rem;
+  margin-bottom: 0.45rem;
   text-transform: uppercase;
 }
 
 .bandNote {
+  border-top: 1px solid var(--rule);
   color: var(--on-ink-dim);
   font-size: 0.92rem;
   letter-spacing: 0.02em;
-  margin-top: 1.4rem;
+  margin-top: 0;
+  padding-top: 1.1rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -318,27 +348,48 @@
   position: relative;
 }
 
+/*
+  security-dusk under the centred closer: the lantern and the lit doorway are
+  right of centre at 66% across, 44% down. 74%/30% was cropped for the aerial
+  that used to sit here and put the frame's only light off the top edge.
+*/
+/*
+  hero-wide also opens Home, so this head takes a different read of it: down
+  and left, past the horizon and the pond, on the run of lit roads only. The
+  kit default (62% 48%) framed the same intersection Home's hero does.
+*/
+.head {
+  --head-focus: 34% 72%;
+}
+
+@media (max-width: 900px) {
+  .head {
+    --head-fall: 31%;
+    --head-focus: 44% 62%;
+  }
+}
+
 .closingArt {
   object-fit: cover;
-  object-position: 50% 58%;
+  object-position: 62% 44%;
   z-index: -2;
 }
 
 .closing::after {
   background:
     radial-gradient(
-      58% 54% at 50% 45%,
-      rgba(3, 13, 31, 0.88) 0%,
-      rgba(3, 13, 31, 0.8) 54%,
-      rgba(3, 13, 31, 0.24) 86%,
+      66% 60% at 50% 46%,
+      rgba(3, 13, 31, 0.4) 0%,
+      rgba(3, 13, 31, 0.32) 54%,
+      rgba(3, 13, 31, 0.08) 86%,
       rgba(3, 13, 31, 0) 100%
     ),
     linear-gradient(
       180deg,
       var(--ink) 0%,
-      rgba(3, 13, 31, 0.22) 20%,
-      rgba(3, 13, 31, 0.08) 54%,
-      rgba(3, 13, 31, 0.36) 88%,
+      rgba(3, 13, 31, 0.32) 10%,
+      rgba(3, 13, 31, 0.02) 52%,
+      rgba(3, 13, 31, 0.3) 91%,
       var(--ink-deep) 100%
     );
   content: "";
@@ -353,6 +404,31 @@
   padding-inline: var(--gutter);
   position: relative;
   text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   The plate. Round 7 moved the darkening off the whole band and onto the copy
+   block: the band-wide ellipse above is now light enough that the photograph
+   actually reads as a photograph at the edges, and this soft plate — sized to
+   the type, transparent at its own rim — is what carries the contrast. Both
+   are measured by docs/cinematic/contrast.mjs, which gained rows for every
+   closing line in this round because a blanket pseudo reset had been deleting
+   these scrims before measuring them.
+   -------------------------------------------------------------------------- */
+
+.closingInner::before {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(3, 13, 31, 0.82) 0%,
+    rgba(3, 13, 31, 0.72) 44%,
+    rgba(3, 13, 31, 0.3) 76%,
+    rgba(3, 13, 31, 0) 100%
+  );
+  content: "";
+  inset: -52% clamp(0px, calc(50% - 34rem), 26rem);
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
 }
 
 .closingEyebrow {
@@ -377,28 +453,11 @@
 /* --------------------------------------------------------------------------
    Reveal stagger
    --------------------------------------------------------------------------
-   Each list item carries its own `data-reveal`, so the delay is what turns
-   four independent entrances into one cascade. Behind [data-motion="on"] like
-   every other pre-reveal style, and the last item's delay is small enough that
-   nothing is still arriving after a quarter of a second.
+   Each list item carries its own `data-reveal`, and the cascade that turns
+   those independent entrances into one gesture now lives in the kit, keyed on
+   .revealRise and its own siblings, so every group on every route reads the
+   same way. Nothing page-local is needed here any more.
    -------------------------------------------------------------------------- */
-
-[data-motion="on"] .glanceItem:nth-child(2),
-[data-motion="on"] .railStep:nth-child(2),
-[data-motion="on"] .band:nth-child(2) {
-  transition-delay: 60ms;
-}
-
-[data-motion="on"] .glanceItem:nth-child(3),
-[data-motion="on"] .railStep:nth-child(3),
-[data-motion="on"] .band:nth-child(3) {
-  transition-delay: 120ms;
-}
-
-[data-motion="on"] .glanceItem:nth-child(4),
-[data-motion="on"] .railStep:nth-child(4) {
-  transition-delay: 180ms;
-}
 
 /* --------------------------------------------------------------------------
    Breakpoints
@@ -456,49 +515,60 @@
 }
 
 @media (max-width: 900px) {
+
+  /*
+    R7 — the glance list closes on its own rule, and that rule needs its
+    18px of air, but the air was landing on top of the section's own bottom
+    padding and the joint into the paper chapter measured 114px against a
+    96px ceiling at 390. The section gives the padding back; the list keeps it.
+  */
+  .glance {
+    padding-bottom: calc(var(--section-pad) - 1.2rem);
+  }
   .glanceLayout {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The route photograph is useful beside the list on desktop, but reads as
+     an unrelated insert after the terms when the chapter stacks on phones. */
   .glanceArt {
-    min-height: clamp(15rem, 52vw, 22rem);
-  }
-
-  /*
-    Stacked, the photograph is above the list rather than beside it, so the
-    horizontal wash has nothing to dissolve into. Drop it and keep the vertical
-    fall, which is the layer that does the joining in this direction.
-  */
-  .glanceArtScrim {
-    background: linear-gradient(
-      180deg,
-      rgba(3, 13, 31, 0.5) 0%,
-      rgba(3, 13, 31, 0.05) 42%,
-      rgba(3, 13, 31, 0.55) 100%
-    );
-  }
-
-  .glanceArtImage {
-    object-position: 72% 58%;
+    display: none;
   }
 }
 
 /*
-  The range cannot share a row with the title much below this: at 640 the
-  display range and a 48ch body are fighting over the same 380px. It moves
-  under the copy and stops being right-aligned.
+  The three columns cannot hold below about 1000px: the ledger becomes two
+  columns (ordinal, then stage + what changes stacked), and one column under
+  640, where the ordinal leads the rung and everything else follows it.
 */
+@media (max-width: 1000px) {
+  .rung {
+    grid-template-columns: clamp(5.5rem, 12vw, 7rem) minmax(0, 1fr);
+    row-gap: 1.1rem;
+  }
+
+  .rungChanges {
+    grid-column: 2;
+  }
+}
+
 @media (max-width: 640px) {
-  .band {
-    gap: 1.15rem;
+  .rung {
     grid-template-columns: minmax(0, 1fr);
+    padding: clamp(1.25rem, 4vw, 1.75rem) 0;
+    row-gap: 0.9rem;
   }
 
-  .bandRange {
-    text-align: left;
+  .rungMark {
+    flex-direction: row;
+    gap: 0.8rem;
   }
 
-  .bandRange span {
-    margin-top: 0.4rem;
+  .rungOrdinal {
+    font-size: 2.9rem;
+  }
+
+  .rungChanges {
+    grid-column: 1;
   }
 }

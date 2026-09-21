@@ -23,29 +23,21 @@ export const metadata: Metadata = {
  * only from the existing v2 set.
  */
 
-/** Carried verbatim from the page this replaces. See the report: unverified. */
-const FIGURES = [
-  ["50+", "States served"],
-  ["1,000+", "Contractors"],
-  ["$5K+", "Weekly potential"],
-  ["98%", "Satisfaction"],
-] as const;
-
 const VALUES = [
   [
     "01",
     "Connection",
-    "We connect customers with the services they need and build relationships that last.",
+    "The service that fits the household, explained at the door by someone who knows it.",
   ],
   [
     "02",
     "Community",
-    "We foster a culture of respect, growth, and opportunity for our contractors and partners.",
+    "Contractors trained by people who have worked the route, and supported in the field.",
   ],
   [
     "03",
     "Commitment",
-    "We are committed to integrity, excellence, and delivering outstanding results every day.",
+    "A real conversation at every door, and follow-through on what was promised there.",
   ],
 ] as const;
 
@@ -58,11 +50,12 @@ const PRODUCTS = [
 
 const CONTRACTOR_SUPPORT = ["Hands-on Training", "Protected Territories", "Ongoing Support"] as const;
 
+/** The four people who lead the company, and what each is responsible for. */
 const LEADERS = [
-  ["JM", "Jeremy McFarland", "Founder & CEO"],
-  ["WT", "William Teasdale", "Director of Sales"],
-  ["JM", "Jacob Myers", "Operations"],
-  ["BC", "Braeden Crouse", "Onboarding"],
+  ["Jeremy McFarland", "Founder & CEO"],
+  ["William Teasdale", "Director of Sales"],
+  ["Jacob Myers", "Operations"],
+  ["Braeden Crouse", "Onboarding"],
 ] as const;
 
 export default function AboutPage() {
@@ -72,10 +65,10 @@ export default function AboutPage() {
       {/* Page head — the neighbourhood the whole company is about, under the */}
       {/* kit's authored scrim, with one left column standing on it.          */}
       {/* ---------------------------------------------------------------- */}
-      <header className={kit.pageHead}>
+      <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
-            src="/redesign/v2/photos/hero-wide-1600.webp"
+            src="/redesign/v2/photos/hero-portrait-1600.webp"
             alt=""
             fill
             priority
@@ -110,7 +103,7 @@ export default function AboutPage() {
       </header>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 1 — the door, and the four figures under it                      */}
+      {/* 1 — the opening frame                                            */}
       {/* ---------------------------------------------------------------- */}
       <section id="story" className={`${kit.surfaceInk} ${styles.story}`} aria-labelledby="story-title">
         <h2 id="story-title" className={kit.srOnly}>
@@ -124,7 +117,7 @@ export default function AboutPage() {
         */}
         <div id="story-band" className={styles.band}>
           <Image
-            src="/redesign/v2/photos/security-dusk-1600.webp"
+            src="/redesign/v2/photos/fiber-dusk-1600.webp"
             alt=""
             fill
             priority
@@ -134,16 +127,6 @@ export default function AboutPage() {
           <div className={styles.bandScrim} aria-hidden="true" />
         </div>
 
-        <div className={kit.shell}>
-          <dl className={`${styles.figures} ${kit.revealRise}`} data-reveal>
-            {FIGURES.map(([value, label]) => (
-              <div key={label} className={styles.figure}>
-                <dt>{value}</dt>
-                <dd>{label}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
       </section>
 
       {/* ---------------------------------------------------------------- */}
@@ -318,11 +301,8 @@ export default function AboutPage() {
           </header>
 
           <ul className={styles.leaderList}>
-            {LEADERS.map(([initials, name, role]) => (
+            {LEADERS.map(([name, role]) => (
               <li key={name} className={`${styles.leader} ${kit.revealRise}`} data-reveal>
-                <span className={styles.leaderInitials} aria-hidden="true">
-                  {initials}
-                </span>
                 <span className={styles.leaderName}>{name}</span>
                 <span className={styles.leaderRole}>{role}</span>
               </li>
@@ -336,16 +316,13 @@ export default function AboutPage() {
       {/* ---------------------------------------------------------------- */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/v2/photos/fiber-dusk-1600.webp"
+          src="/redesign/v2/photos/security-dusk-1600.webp"
           alt=""
           fill
           sizes="100vw"
           className={styles.closingArt}
         />
         <div id="closing-inner" className={styles.closingInner}>
-          <p id="closing-eyebrow" className={styles.closingEyebrow}>
-            Ready to build your future?
-          </p>
           <h2 id="closing-title" className={styles.closingTitle}>
             Join the <span className={styles.lime}>3C team.</span>
           </h2>

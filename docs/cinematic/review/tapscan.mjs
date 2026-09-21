@@ -16,9 +16,17 @@ for (const [w, h] of [[390, 844], [430, 932], [1740, 1000]]) {
       for (const el of document.querySelectorAll("a[href], button")) {
         const r = el.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) continue;
-        const inFooter = !!el.closest("footer");
-        const floor = inFooter ? 24 : 24;
-        if (r.height < floor) small.push(`${el.tagName}:${(el.textContent || "").trim().slice(0, 22)}=${r.height.toFixed(0)}`);
+        /* WCAG 2.2 SC 2.5.8 exempts a link set in a sentence: its size is
+           determined by the line it sits in, and padding it out would break
+           the paragraph. Skip inline anchors whose parent carries other text;
+           everything that is its own control still has to clear 24px. */
+        const display = getComputedStyle(el).display;
+        if (display === "inline" && el.parentElement) {
+          const own = (el.textContent || "").trim();
+          const around = (el.parentElement.textContent || "").trim();
+          if (around.length > own.length + 2) continue;
+        }
+        if (r.height < 24) small.push(`${el.tagName}:${(el.textContent || "").trim().slice(0, 22)}=${r.height.toFixed(0)}`);
       }
       for (const el of document.querySelectorAll("p,span,a,li,label,div,small,em,strong")) {
         if (!el.firstChild || el.firstChild.nodeType !== 3 || !el.textContent.trim()) continue;

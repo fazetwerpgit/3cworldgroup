@@ -18,12 +18,11 @@ export const metadata: Metadata = {
  * first paint. The chrome, the motion root and `.page` all live in
  * src/app/(cinematic)/layout.tsx — this file is sections.
  *
- * Every claim here was already published on the page this replaces
- * (src/app/opportunities/page.tsx): the nationwide framing, the four
- * at-a-glance benefits, the four-step path, the three weekly earning bands and
- * their caveat. Nothing was added. What changed is the composition: the old
- * page was four icon-card grids stacked, and this is five chapters that
+ * Every claim here is grounded in the opportunity page and current training
+ * language. What changed is the composition: the old
+ * page was four icon-card grids stacked, and this is four chapters that
  * alternate navy and paper across an authored seam, each carrying one idea.
+ * The four-step path is not repeated here: the homepage owns the route.
  */
 
 /** The opportunity at a glance — verbatim from the page this replaces. */
@@ -41,47 +40,36 @@ const GLANCE = [
     body: "Set your own hours and build a schedule that works for you.",
   },
   {
-    title: "Protected territory",
-    body: "Exclusive markets so you can build long-term success.",
+    title: "Field support",
+    body: "Work with experienced leaders as you learn the role.",
   },
 ];
 
-/** The four steps, in order, unchanged. */
-const PATH = [
+/*
+  The three stages that replaced the weekly dollar bands. The ranges are gone
+  because nothing published supports them; what is left is the shape of the
+  progression, which the training does support. Each rung carries what the
+  stage is and what changes when you reach it — both grounded in the
+  training and support language the site already makes.
+*/
+const STAGES = [
   {
-    title: "Apply online",
-    body: "Submit your application in minutes. We're always looking for driven individuals.",
+    title: "Learn the role",
+    stage: "Stage one",
+    body: "Train on the products, the process, and the conversation at the door.",
+    changes: "Hands-on coaching and roleplay with experienced leaders, in the field.",
   },
   {
-    title: "Interview",
-    body: "Let's get to know you and explore how your goals align with our opportunity.",
+    title: "Build consistency",
+    stage: "Stage two",
+    body: "Work the process on a route, with field support to review how it went.",
+    changes: "Your own route in an available market, with a leader checking in.",
   },
   {
-    title: "Training",
-    body: "Learn our proven sales process, products, and tools with hands-on coaching and support.",
-  },
-  {
-    title: "Start earning",
-    body: "Launch in your protected territory and start building your income from day one.",
-  },
-];
-
-/** The three weekly bands, ranges and bodies unchanged. */
-const BANDS = [
-  {
-    title: "Getting started",
-    range: "$1K–$2K",
-    body: "Build your pipeline and close your first deals.",
-  },
-  {
-    title: "Building momentum",
-    range: "$2K–$4K",
-    body: "Refine your process, increase consistency, and grow.",
-  },
-  {
-    title: "Top performers",
-    range: "$5K+",
-    body: "Advanced skills. Bigger results. Unlimited potential.",
+    title: "Take on more",
+    stage: "Stage three",
+    body: "Take on more responsibility as your experience and your results develop.",
+    changes: "A bigger part in the team, and in how the route is worked.",
   },
 ];
 
@@ -91,7 +79,7 @@ export default function OpportunitiesPage() {
       {/* ---------------------------------------------------------------- */}
       {/* Page head — navy, deep enough to clear the fixed header          */}
       {/* ---------------------------------------------------------------- */}
-      <header className={kit.pageHead}>
+      <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
             src="/redesign/v2/photos/security-dusk-1600.webp"
@@ -106,21 +94,21 @@ export default function OpportunitiesPage() {
 
         <div className={kit.pageHeadInner}>
           <div className={kit.pageHeadCol}>
-            <p className={kit.pageHeadEyebrow}>Now hiring nationwide</p>
+            <p className={kit.pageHeadEyebrow}>Hiring in selected markets</p>
             <h1 className={kit.pageHeadTitle}>
               Build a career.
               <span className={kit.pageHeadLime}>Not just a job.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Choose your path. Build your market. Grow with real training and support.
+              Choose your role. Build your skills. Grow with real training and support.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
                 Start your application
                 <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
               </Link>
-              <a href="#earnings" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
-                Earning potential
+              <a href="#stages" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                How the role grows
               </a>
             </div>
           </div>
@@ -139,7 +127,7 @@ export default function OpportunitiesPage() {
               at a glance.
             </h2>
             <p className={kit.sectionLede}>
-              What you get from day one. No fine print and no waiting period.
+              How the role works.
             </p>
           </header>
 
@@ -188,84 +176,62 @@ export default function OpportunitiesPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 2 — the path, on paper, across the seam                          */}
+      {/* 2 — the three stages                                             */}
       {/* ---------------------------------------------------------------- */}
-      <section id="how-it-works" className={styles.path} aria-labelledby="path-title">
+      <section id="stages" className={styles.earnings} aria-labelledby="stages-title">
         <div className={kit.shell}>
-          <header className={kit.sectionHeadInk} data-reveal>
-            <h2 id="path-title" className={kit.sectionTitleInk}>
-              Your path
+          <header className={kit.sectionHead} data-reveal>
+            <h2 id="stages-title" className={kit.sectionTitle}>
+              Three stages
               <br />
-              to success.
+              of the same job.
             </h2>
-            <p className={kit.sectionLedeInk}>
-              Four steps, in order — from the application you send tonight to the day you
-              start earning.
+            <p className={kit.sectionLede}>
+              In the order you grow into them. What changes at each one is the
+              responsibility, not the title.
             </p>
           </header>
 
           {/*
-            A rail, not four cards: one hairline carries all four stations, with
-            a lime node where each one sits and the last node ringed so the
-            sequence arrives rather than stopping. Below 1080px the rail turns
-            and runs down the left instead, because four columns of body copy do
-            not survive a tablet.
+            A ledger, not three columns: each stage is a full-width rung under
+            one rule, the ordinal at the left margin, the stage in the middle
+            and what changes at the right. The eye reads down, the way the
+            progression happens, and the three rungs are visibly different
+            lengths because the copy is, which is what keeps it from reading as
+            a template row.
           */}
-          <ol className={styles.rail}>
-            {PATH.map((step, index) => (
-              <li
-                key={step.title}
-                className={`${styles.railStep} ${kit.revealRise}`}
-                data-reveal
-                data-last={index === PATH.length - 1 ? "true" : undefined}
-              >
-                <span className={styles.railNode} aria-hidden="true" />
-                <span className={styles.railNum}>Step {index + 1}</span>
-                <h3 className={styles.railTitle}>{step.title}</h3>
-                <p className={styles.railBody}>{step.body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* 3 — earning potential                                            */}
-      {/* ---------------------------------------------------------------- */}
-      <section id="earnings" className={styles.earnings} aria-labelledby="earnings-title">
-        <div className={kit.shell}>
-          <header className={kit.sectionHead} data-reveal>
-            <h2 id="earnings-title" className={kit.sectionTitle}>
-              Earning
-              <br />
-              potential.
-            </h2>
-            <p className={kit.sectionLede}>
-              Three stages of the same job, stated by the week.
-            </p>
-          </header>
-
-          <ol className={styles.bands}>
-            {BANDS.map((band) => (
-              <li key={band.title} className={`${styles.band} ${kit.revealRise}`} data-reveal>
-                <div className={styles.bandCopy}>
-                  <h3 className={styles.bandTitle}>{band.title}</h3>
-                  <p className={styles.bandBody}>{band.body}</p>
+          <ol className={styles.ledger}>
+            {STAGES.map((stage, index) => (
+              <li key={stage.title} className={`${styles.rung} ${kit.revealRise}`} data-reveal>
+                <p className={styles.rungMark}>
+                  <span className={styles.rungOrdinal} aria-hidden="true">{`0${index + 1}`}</span>
+                  <span className={styles.rungStage}>{stage.stage}</span>
+                </p>
+                <div className={styles.rungMain}>
+                  <h3 className={styles.rungTitle}>{stage.title}</h3>
+                  <p className={styles.rungBody}>{stage.body}</p>
                 </div>
-                <p className={styles.bandRange}>
-                  {band.range}
-                  <span>per week</span>
+                <p className={styles.rungChanges}>
+                  <span className={styles.rungChangesLabel}>What changes</span>
+                  {stage.changes}
                 </p>
               </li>
             ))}
           </ol>
 
-          <p className={styles.bandNote}>Earnings vary by performance and market.</p>
+          {/*
+            The pay disclosure, stated once and next to the progression it
+            qualifies, so nothing above it can be read as an earnings claim.
+          */}
+          <p className={styles.bandNote}>
+            This is 1099 independent contractor work, paid by commission only. Earnings
+            vary by performance and market.
+          </p>
         </div>
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 4 — closing                                                      */}
+      {/* 3 — closing                                                      */}
       {/* ---------------------------------------------------------------- */}
       <section id="apply" className={styles.closing} aria-labelledby="closing-title">
         <Image
@@ -276,7 +242,6 @@ export default function OpportunitiesPage() {
           className={styles.closingArt}
         />
         <div className={styles.closingInner}>
-          <p className={styles.closingEyebrow}>Ready when you are</p>
           <h2 id="closing-title" className={styles.closingTitle}>
             Your next market
             <br />

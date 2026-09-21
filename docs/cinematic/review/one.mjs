@@ -1,0 +1,16 @@
+import { chromium } from "playwright";
+const [route, sel, out, w] = process.argv.slice(2);
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: +(w||1740), height: 1000 }, deviceScaleFactor: 1 });
+const p = await ctx.newPage();
+await p.goto("http://127.0.0.1:3120" + route, { waitUntil: "networkidle" });
+await p.addStyleTag({ content: "html{scroll-behavior:auto !important} nextjs-portal{display:none!important}" });
+await p.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 450) { window.scrollTo(0, y); await new Promise(r => requestAnimationFrame(r)); } window.scrollTo(0,0); });
+await p.waitForTimeout(900);
+const el = await p.$(sel);
+const y = await p.evaluate((s)=>{const e=document.querySelector(s);const h=document.querySelector("header");return e.getBoundingClientRect().top+scrollY-(h?h.getBoundingClientRect().height:0)-8;}, sel);
+await p.evaluate((y)=>window.scrollTo(0,Math.max(0,y)), y);
+await p.waitForTimeout(700);
+await p.screenshot({ path: out });
+await b.close();
+console.log("wrote", out);

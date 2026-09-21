@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 /**
@@ -20,6 +20,18 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
   // the pathname tears the old observers down and wires the new page up;
   // without it, every page reached from the nav stays hidden behind the gate.
   const pathname = usePathname();
+
+  // The OS setting can change mid-visit. Reading the query once per navigation
+  // meant a person who turned reduced motion on while reading kept every
+  // entrance until they clicked something; this bumps a counter on the media
+  // query's own change event so the effect below re-runs and re-decides.
+  const [motionEpoch, setMotionEpoch] = useState(0);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setMotionEpoch((n) => n + 1);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -100,18 +112,49 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       );
       reveals.forEach((el) => io.observe(el));
       cleanups.push(() => io.disconnect());
-      // Belt and braces: if the observer has not reported on something that is
-      // already inside the viewport, show it anyway. Hidden copy is a worse
-      // failure than a missed entrance.
-      const fallback = window.setTimeout(() => {
+      // Belt and braces, and the reason it is not a one-shot timeout: a jump
+      // scroll lands the viewport somewhere IO may not report on — the entry
+      // for a section skipped over is never delivered, and a single deadline
+      // that has already passed cannot rescue it, so the copy stays at opacity
+      // 0 for the rest of the visit. This sweep runs on the same rAF the rest
+      // of the file uses and shows anything the viewport has reached or passed.
+      // Hidden copy is a worse failure than a missed entrance.
+      let pending = reveals.slice();
+      let sweepFrame = 0;
+      const sweep = () => {
+        sweepFrame = 0;
         const vh = window.innerHeight;
-        for (const el of reveals) {
-          if (el.dataset.shown) continue;
-          const r = el.getBoundingClientRect();
-          if (r.top < vh && r.bottom > 0) el.dataset.shown = "true";
-        }
-      }, 1200);
-      cleanups.push(() => window.clearTimeout(fallback));
+        pending = pending.filter((el) => {
+          if (el.dataset.shown) return false;
+          // `top < vh` is true once the element has been reached and stays true
+          // after it is scrolled past, so one test covers both the section you
+          // are arriving at and every section a jump skipped over.
+          if (el.getBoundingClientRect().top >= vh) return true;
+          el.dataset.shown = "true";
+          return false;
+        });
+        if (!pending.length) detachSweep();
+      };
+      const scheduleSweep = () => {
+        if (!sweepFrame) sweepFrame = requestAnimationFrame(sweep);
+      };
+      const detachSweep = () => {
+        window.removeEventListener("scroll", scheduleSweep);
+        window.removeEventListener("resize", scheduleSweep);
+      };
+      window.addEventListener("scroll", scheduleSweep, { passive: true });
+      window.addEventListener("resize", scheduleSweep);
+      // Two frames, for the same reason the hero entrance waits: the gated
+      // style has to be painted before the shown style, or the transition is
+      // collapsed by one style recalculation and the entrance never runs.
+      const firstSweep = requestAnimationFrame(() => {
+        requestAnimationFrame(sweep);
+      });
+      cleanups.push(() => {
+        detachSweep();
+        cancelAnimationFrame(firstSweep);
+        if (sweepFrame) cancelAnimationFrame(sweepFrame);
+      });
     }
 
     // --- The route line: the page's second authored moment -------------------
@@ -166,7 +209,7 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       delete root.dataset.motion;
       delete root.dataset.entered;
     };
-  }, [pathname]);
+  }, [pathname, motionEpoch]);
 
   return <div ref={rootRef}>{children}</div>;
 }
@@ -178,28 +221,67 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
  */
 function attachStatic(root: HTMLElement): () => void {
   const cleanups: Array<() => void> = [];
-  if (typeof IntersectionObserver === "undefined") return () => {};
-
   const stage = root.querySelector<HTMLElement>("[data-chapter-stage]");
   const chapters = Array.from(root.querySelectorAll<HTMLElement>("[data-chapter]"));
   if (stage && chapters.length) {
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          const index = chapters.indexOf(entry.target as HTMLElement);
-          if (index < 0) continue;
-          stage.dataset.activeChapter = String(index);
-          chapters.forEach((chapter, i) => {
-            if (i === index) chapter.dataset.current = "true";
-            else delete chapter.dataset.current;
-          });
-        }
-      },
-      { rootMargin: "-46% 0px -46% 0px", threshold: 0 },
-    );
-    chapters.forEach((chapter) => io.observe(chapter));
-    cleanups.push(() => io.disconnect());
+    // The original IntersectionObserver watched a narrow centre band. A fast
+    // jump — a hash link, a restored scroll position, Careers and back — can
+    // cross every chapter without any of them being sampled inside that band,
+    // and the stage then keeps whichever image it was last told about. So the
+    // active chapter is derived, not accumulated: one function reads geometry
+    // and is the only writer of `data-active-chapter`, which makes every entry
+    // path (load, scroll, resize, restore) converge on the same answer.
+    let frame = 0;
+    let lastIndex = -1;
+    const reconcile = () => {
+      frame = 0;
+      /*
+        R8 — the active chapter is the LAST one whose top has crossed a reading
+        line a third of the way down the viewport, and the line no longer moves
+        with the sticky stage.
+
+        Two bugs came out of the old model. Nearest-centre could never reach
+        the third chapter: while the stage is pinned the list's bottom cannot
+        rise above the stage's own bottom, so the final chapter's centre stops
+        short of the centre line and the second chapter wins forever — the
+        stage's third photograph was unreachable at every desktop width. And a
+        line measured inside the stage answers differently depending on whether
+        the stage is pinned, so no single fraction of it was right both as the
+        section enters and as it releases. A fixed viewport line is the thing a
+        reader actually uses, and it is the same line at every scroll state.
+      */
+      const headerClearance = Math.min(112, Math.max(76, window.innerHeight * 0.11));
+      const targetY = headerClearance + (window.innerHeight - headerClearance) * 0.32;
+      const rects = chapters.map((chapter) => chapter.getBoundingClientRect());
+      let bestIndex = 0;
+      rects.forEach((rect, index) => {
+        if (rect.top <= targetY) bestIndex = index;
+      });
+      if (bestIndex === lastIndex) return;
+      lastIndex = bestIndex;
+      stage.dataset.activeChapter = String(bestIndex);
+      chapters.forEach((chapter, index) => {
+        if (index === bestIndex) chapter.dataset.current = "true";
+        else delete chapter.dataset.current;
+      });
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(reconcile);
+    };
+    reconcile();
+    // A restored scroll position and the sticky stage's own images both land
+    // after hydration, so read the geometry once more when it has settled.
+    const settle = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(reconcile);
+    });
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    cleanups.push(() => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(settle);
+      if (frame) cancelAnimationFrame(frame);
+    });
   }
 
   // The compact apply bar is homepage-only by design, and this pairing is the
@@ -209,7 +291,7 @@ function attachStatic(root: HTMLElement): () => void {
   // no bar; the rule is written down in docs/cinematic/PAGE-KIT.md.
   const hero = root.querySelector<HTMLElement>("[data-hero]");
   const applyBar = root.querySelector<HTMLElement>("[data-apply-bar]");
-  if (hero && applyBar) {
+  if (hero && applyBar && typeof IntersectionObserver !== "undefined") {
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) delete applyBar.dataset.visible;

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, ArrowUpRight, Plus } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import WorkChapters from "./_home/WorkChapters";
 import RouteSequence from "./_home/RouteSequence";
 import LocationExplorer from "./_home/LocationExplorer";
@@ -12,7 +12,7 @@ import styles from "./cinematic-home.module.css";
 export const metadata: Metadata = {
   title: "Door-to-Door Sales Careers | 3C World Group",
   description:
-    "Sell fiber internet, TV, and home security face to face in your own market. A 1099, commission-only role with real training and support. Apply to 3C World Group.",
+    "Sell fiber internet, TV, and home security face to face. A 1099, commission-only role with real training and support. Apply to 3C World Group.",
 };
 
 /**
@@ -61,7 +61,7 @@ export default function Home() {
       <section className={styles.hero} data-hero aria-labelledby="hero-title">
         <div className={styles.heroArt} data-hero-art>
           <Image
-            src="/redesign/v2/photos/hero-wide-1600.webp"
+            src="/redesign/cinematic/home-street-dusk-1920.webp"
             alt=""
             fill
             priority
@@ -69,7 +69,7 @@ export default function Home() {
             className={styles.heroImageWide}
           />
           <Image
-            src="/redesign/v2/photos/hero-portrait-1600.webp"
+            src="/redesign/cinematic/home-street-dusk-960.webp"
             alt=""
             fill
             priority
@@ -93,9 +93,8 @@ export default function Home() {
           </h1>
 
           <p className={styles.heroLede}>
-            Door-to-door sales in your own neighborhood — fiber internet, TV and home
-            security, with the training to sell all three. 1099 independent contractor,
-            commission-only, uncapped.
+            Door-to-door sales for fiber internet, TV and home security, with training to sell
+            all three. 1099 independent contractor, commission-only, uncapped.
           </p>
 
           <div className={styles.heroActions}>
@@ -109,11 +108,6 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={styles.heroRail} aria-hidden="true">
-          <span>The conversation</span>
-          <span>The right fit</span>
-          <span>The follow-through</span>
-        </div>
       </section>
 
       {/* ---------------------------------------------------------------- */}
@@ -128,9 +122,8 @@ export default function Home() {
               at every door.
             </h2>
             <p className={kit.sectionLede}>
-              Nobody hands you a script and a territory map and calls it a career. This is
-              what the role is when you break it down — and what 3C trains you to do in
-              each part of it.
+              You meet people, understand what they need, and explain a useful next step.
+              3C trains you through each part of that conversation.
             </p>
           </header>
 
@@ -174,9 +167,7 @@ export default function Home() {
         <div className={kit.shell}>
           <header className={kit.sectionHead} data-reveal>
             <h2 id="markets-title" className={kit.sectionTitle}>
-              Pick the ground
-              <br />
-              you want to walk.
+              Find your market.
             </h2>
             <p className={kit.sectionLede}>
               These are markets where 3C teams work. Pick the one you would want to walk,
@@ -261,7 +252,7 @@ export default function Home() {
                 </p>
                 <Link href="/contact" className={kit.quietLink}>
                   Contact the team
-                  <ArrowUpRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
+                  <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
                 </Link>
               </div>
             </div>
@@ -273,7 +264,7 @@ export default function Home() {
             */}
             <div className={styles.doorsArt} aria-hidden="true">
               <Image
-                src="/redesign/v2/photos/fiber-dusk-1600.webp"
+                src="/redesign/v2/photos/hero-portrait-1600.webp"
                 alt=""
                 fill
                 sizes="(max-width: 900px) 100vw, 44vw"
@@ -290,7 +281,7 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/v2/photos/hero-wide-1600.webp"
+          src="/redesign/v2/photos/fiber-dusk-1600.webp"
           alt=""
           fill
           sizes="100vw"

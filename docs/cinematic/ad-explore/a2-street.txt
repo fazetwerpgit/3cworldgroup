@@ -1,0 +1,11 @@
+Use case: website hero wall background for a door-to-door fiber/TV/security sales company (3C World Group); copy sits in the left third.
+Asset type: full-bleed hero photograph, 3:2, later cropped to 16:9 and to portrait on phones.
+Primary request: a real, material, blue-hour suburban street seen at standing height from the sidewalk, looking down the block toward one brick house whose porch lantern is lit.
+Scene: wet asphalt after rain reflecting the porch light, a concrete curb, mailbox, low hedges, mature pines; the left third is open dark street and sky with no detail so headline copy can sit there.
+Subject: the lit front door and brick porch at the right third; a single slim fibre cable running along the curb toward the house, matte, unlit, a yellow-green (#8dc63f) jacket that simply catches the porch light, the only saturated colour in the frame; it must look like a real cable, not an LED strip.
+Style/medium: photograph, 35mm, shallow depth of field on the near curb, sharp on the house.
+Lighting/mood: last light of dusk, deep navy sky (#061735 family), warm tungsten porch glow, quiet, cinematic, confident.
+Color palette: deep navy, near-black asphalt, warm amber, one lime accent.
+Composition: horizon at lower third, negative space on the left, no elements in the top-left quadrant.
+Input image: the attached screenshot shows the current site palette and type; match its colour grade and mood, do not copy its layout.
+Avoid: wreaths or decorations on the door, glowing or neon cable, people, faces, silhouettes, text, logos, watermark, purple or blue gradients, aurora, glow orbs, particles, lens flare streaks, HDR look, illustration look.

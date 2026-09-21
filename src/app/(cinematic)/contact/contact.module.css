@@ -230,6 +230,7 @@
 }
 
 .form {
+  --focus-ring: var(--lime-ink);
   display: grid;
   gap: clamp(1.3rem, 2.4vw, 1.9rem);
 }
@@ -250,7 +251,7 @@
   display: block;
   font-family: var(--display);
   font-size: 1rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.2em;
   margin-bottom: 0.5rem;
   text-transform: uppercase;
 }
@@ -280,7 +281,7 @@
 }
 
 .input:hover {
-  border-color: rgba(16, 31, 56, 0.34);
+  border-color: var(--rule-ink-strong);
 }
 
 .input:focus {
@@ -295,18 +296,50 @@
   indicator (2.82:1 against its own unfocused state — under the 3:1 a focus
   indicator needs).
 
-  The ring is the kit's, unchanged: 2px lime at a 3px offset. The box-shadow is
-  a 1px ink hairline on the field's own edge — lime alone is 1.8:1 against this
-  near-white plate, under the 3:1 a focus indicator needs, and the hairline is
-  what carries it (ink/paper 16:1, lime/ink 8.7:1). It sits inside the ring
-  rather than filling the offset so the lime still reads as the ring; on a navy
-  surface it disappears and what is left is exactly the documented ring.
+  The ring is the kit's. R7 gave it a --focus-ring token so a paper ground can
+  hand it a colour that reads there, and .form above sets that token; this rule
+  no longer restates the outline. What stays is the 2px ink hairline on the
+  field's own edge, inside the ring, which carries the indicator across the
+  near-white plate (ink/paper 16:1).
 */
 .input:focus-visible {
   border-color: var(--lime-ink);
-  box-shadow: 0 0 0 1px var(--ink);
-  outline: 2px solid var(--lime);
-  outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/*
+  The same three states the Apply form uses, so the two forms on the site speak
+  one validation language: typed lifts the plate, :user-invalid (never :invalid,
+  which would redden five empty boxes on first paint) thickens the edge to red
+  rather than tinting it, and disabled drops out of the tab order visibly.
+*/
+/*
+  background-color, not the background shorthand: :placeholder-shown does not
+  apply to a <select>, so every select matches :not(:placeholder-shown) from
+  first paint, and the shorthand was resetting background-image — which is
+  where the chevron lives. The caret was missing on every select on the site.
+*/
+.input:not(:placeholder-shown) {
+  background-color: #ffffff;
+  border-color: var(--rule-ink-strong);
+}
+
+.input:user-invalid {
+  background-color: rgba(180, 35, 24, 0.05);
+  border-color: #b42318;
+  border-width: 2px;
+  padding: calc(0.8rem - 1px) calc(1rem - 1px);
+}
+
+.input:user-invalid:focus {
+  border-color: #b42318;
+}
+
+.input:disabled {
+  background-color: var(--paper);
+  border-color: var(--rule-ink);
+  color: var(--on-paper-dim);
+  cursor: not-allowed;
 }
 
 /* The native caret is replaced so the control reads as the rest of the set;
@@ -465,14 +498,70 @@
    -------------------------------------------------------------------------- */
 
 .closing {
-  padding: var(--section-pad) 0;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(5rem, 9vw, 8rem) 0;
+  position: relative;
+}
+
+.closingArt {
+  object-fit: cover;
+  object-position: 44% 40%;
+  z-index: -2;
+}
+
+.closing::after {
+  background:
+    radial-gradient(
+      66% 60% at 50% 46%,
+      rgba(3, 13, 31, 0.4) 0%,
+      rgba(3, 13, 31, 0.32) 54%,
+      rgba(3, 13, 31, 0.08) 86%,
+      rgba(3, 13, 31, 0) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0.32) 10%,
+      rgba(3, 13, 31, 0.02) 52%,
+      rgba(3, 13, 31, 0.3) 91%,
+      var(--ink-deep) 100%
+    );
+  content: "";
+  inset: 0;
+  position: absolute;
+  z-index: -1;
 }
 
 .closingInner {
   display: grid;
   gap: 1.5rem;
-  justify-items: start;
-  max-width: 44rem;
+  justify-items: center;
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding-inline: var(--gutter);
+  position: relative;
+  text-align: center;
+}
+
+/*
+  The plate, identical to the one the other four closers carry: the band-wide
+  ellipse above stays light enough that the photograph reads at the edges, and
+  this soft rim-transparent plate, sized to the type, is what holds contrast.
+*/
+.closingInner::before {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(3, 13, 31, 0.82) 0%,
+    rgba(3, 13, 31, 0.72) 44%,
+    rgba(3, 13, 31, 0.3) 76%,
+    rgba(3, 13, 31, 0) 100%
+  );
+  content: "";
+  inset: -52% clamp(0px, calc(50% - 34rem), 26rem);
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
 }
 
 .closingEyebrow {
@@ -485,11 +574,22 @@
 
 .closingTitle {
   font-family: var(--display);
-  font-size: clamp(2.2rem, 4.6vw, 4.2rem);
+  font-size: clamp(2.6rem, 5.9vw, 6.4rem);
   font-weight: 400;
   letter-spacing: 0.006em;
   line-height: 0.9;
   text-transform: uppercase;
+}
+
+/*
+  The second line is lime on every closer on the site. Here the span had been
+  pointing at a class name that does not exist in this file, so the one page
+  whose closer is the last thing a visitor reads was setting both of its lines
+  in white.
+*/
+.closingLime {
+  color: var(--lime);
+  display: block;
 }
 
 /* --------------------------------------------------------------------------
@@ -613,10 +713,3 @@
   transform: translate(50%, -50%) scale(1);
 }
 
-[data-motion="on"] .pathRow:nth-child(2) {
-  transition-delay: 0.06s;
-}
-
-[data-motion="on"] .pathRow:nth-child(3) {
-  transition-delay: 0.12s;
-}

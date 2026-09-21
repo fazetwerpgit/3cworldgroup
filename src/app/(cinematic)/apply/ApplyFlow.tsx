@@ -168,7 +168,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       {/* ------------------------------------------------------------------ */}
       {/* 1 — how the page opens: flat navy, no reveal, simply there         */}
       {/* ------------------------------------------------------------------ */}
-      <header className={kit.pageHead}>
+      <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
             src="/redesign/v2/photos/hero-wide-1600.webp"
@@ -433,7 +433,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           sizes="100vw"
           className={styles.closingArt}
         />
-        <div className={kit.shell}>
+        <div className={`${kit.shell} ${styles.closingInner}`}>
           <h2 id="apply-closing-title" className={styles.closingTitle}>
             Take the
             <br />

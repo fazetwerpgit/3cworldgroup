@@ -1,0 +1,11 @@
+Use case: website hero wall background for a door-to-door fiber/TV/security sales company (3C World Group); copy sits in the left third.
+Asset type: full-bleed hero photograph, 3:2, later cropped to 16:9 and to portrait on phones.
+Primary request: a macro, material-led photograph of the open steel door of a curbside fibre pedestal at dusk, brushed galvanised metal beaded with dew, one slim yellow-green (#8dc63f) fibre cable emerging from a bundle of grey cables and curving out of frame.
+Scene: the pedestal fills the right two thirds; behind it, out of focus, a suburban street at blue hour with one warm porch light as a soft bokeh disc; the left third is the dark, smooth painted metal of the door interior, almost featureless, so headline copy can sit there.
+Subject: metal texture, dew, cable ties, the lime cable as the single accent; on second look, the street and porch light are reflected faintly in the wet metal.
+Style/medium: photograph, 90mm macro, very shallow depth of field, tactile.
+Lighting/mood: cool navy ambient (#061735 family) with a warm rim from the porch light, industrial but quiet, premium.
+Color palette: navy, gunmetal, warm amber, one lime accent.
+Composition: no elements of interest in the top-left quadrant.
+Input image: the attached screenshot shows the current site palette and type; match its colour grade and mood, do not copy its layout.
+Avoid: people, hands, text, logos, watermark, purple or blue gradients, glow orbs, particles, neon, sci-fi, HUD graphics, illustration look.

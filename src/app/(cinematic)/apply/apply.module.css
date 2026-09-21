@@ -11,6 +11,26 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
+   Head crop. This page opens on the aerial, like About and Services, but on
+   its own slice of it — About reads the middle at 62/48 and Services the lit
+   crossing at 34/58, so Apply takes the far side where the routes run out
+   toward the horizon. It was briefly the lit living room instead; tv-dusk has
+   no specular highlight anywhere in it and the mobile frame measured 0.27
+   against the 0.35 the hero-light gate wants, at every crop, so the picture
+   went back to the one that carries light.
+   -------------------------------------------------------------------------- */
+
+.head {
+  --head-focus: 88% 62%;
+}
+
+@media (max-width: 759px) {
+  .head {
+    --head-focus: 66% 46%;
+  }
+}
+
+/* --------------------------------------------------------------------------
    1 — The form section
    --------------------------------------------------------------------------
    Round 5 — the page now opens on the kit's photographic head, and that head
@@ -74,6 +94,7 @@
    -------------------------------------------------------------------------- */
 
 .formPanel {
+  --focus-ring: var(--lime-ink);
   background: var(--paper-raise);
   border-top: 3px solid var(--lime-ink);
   box-shadow: 0 26px 64px rgba(3, 13, 31, 0.45);
@@ -121,13 +142,19 @@
   min-width: 0;
 }
 
+/*
+  The same label the Contact form uses, to the character. Two forms on one site
+  had been running two faces, two sizes and two tracking values for the same
+  component; navigation and labels speak in the display face here, so this is
+  the one that stays.
+*/
 .fieldLabel {
   color: var(--on-paper);
   display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  margin-bottom: 0.45rem;
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
   text-transform: uppercase;
 }
 
@@ -156,8 +183,8 @@
   padding: 0.85rem 1rem;
   scroll-margin: 6.25rem 0 9rem;
   transition:
-    border-color 0.18s ease,
-    background-color 0.18s ease;
+    border-color var(--t-quick) ease,
+    background-color var(--t-quick) ease;
   width: 100%;
 }
 
@@ -166,7 +193,7 @@
 }
 
 .input:hover {
-  border-color: rgba(16, 31, 56, 0.34);
+  border-color: var(--rule-ink-strong);
 }
 
 .input:focus {
@@ -181,18 +208,15 @@
   indicator (2.82:1 against its own unfocused state — under the 3:1 a focus
   indicator needs).
 
-  The ring is the kit's, unchanged: 2px lime at a 3px offset. The box-shadow is
-  a 1px ink hairline on the field's own edge — lime alone is 1.8:1 against this
-  near-white plate, under the 3:1 a focus indicator needs, and the hairline is
-  what carries it (ink/paper 16:1, lime/ink 8.7:1). It sits inside the ring
-  rather than filling the offset so the lime still reads as the ring; on a navy
-  surface it disappears and what is left is exactly the documented ring.
+  The ring is the kit's. R7 gave it a --focus-ring token so a paper ground can
+  hand it a colour that reads there, and .formPanel below sets that token; this
+  rule no longer restates the outline at all. What stays is the 2px ink
+  hairline on the field's own edge, inside the ring, which is what carries the
+  indicator across the near-white plate (ink/paper 16:1).
 */
 .input:focus-visible {
   border-color: var(--lime-ink);
-  box-shadow: 0 0 0 1px var(--ink);
-  outline: 2px solid var(--lime);
-  outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 /*
@@ -200,9 +224,27 @@
   paint, and colouring five empty boxes red before anyone has typed is not a
   validation state, it is an accusation.
 */
+/*
+  4 — a filled field reads as filled. Rest is the page's paper; anything typed
+  lifts the plate to white and firms the edge, so a part-finished form shows
+  its own progress without a single extra element.
+*/
+/*
+  background-color, not the background shorthand: :placeholder-shown does not
+  apply to a <select>, so every select matches :not(:placeholder-shown) from
+  first paint, and the shorthand was resetting background-image — which is
+  where the chevron lives. The caret was missing on every select on the site.
+*/
+.input:not(:placeholder-shown) {
+  background-color: #ffffff;
+  border-color: var(--rule-ink-strong);
+}
+
 .input:user-invalid {
-  background: rgba(180, 35, 24, 0.05);
+  background-color: rgba(180, 35, 24, 0.05);
   border-color: #b42318;
+  border-width: 2px;
+  padding: calc(0.85rem - 1px) calc(1rem - 1px);
 }
 
 .input:user-invalid:focus {
@@ -449,21 +491,54 @@
   occupies, falling away at the left and right edges so the lit street still
   reads as a photograph rather than as navy.
 */
+.closingInner {
+  margin-inline: auto;
+  max-width: var(--shell);
+  padding-inline: var(--gutter);
+  position: relative;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   The plate. Round 7 moved the darkening off the whole band and onto the copy
+   block: the band-wide ellipse above is now light enough that the photograph
+   actually reads as a photograph at the edges, and this soft plate — sized to
+   the type, transparent at its own rim — is what carries the contrast. Both
+   are measured by docs/cinematic/contrast.mjs, which gained rows for every
+   closing line in this round because a blanket pseudo reset had been deleting
+   these scrims before measuring them.
+   -------------------------------------------------------------------------- */
+
+.closingInner::before {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(3, 13, 31, 0.82) 0%,
+    rgba(3, 13, 31, 0.72) 44%,
+    rgba(3, 13, 31, 0.3) 76%,
+    rgba(3, 13, 31, 0) 100%
+  );
+  content: "";
+  inset: -52% clamp(0px, calc(50% - 34rem), 26rem);
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
 .closing::after {
   background:
     radial-gradient(
-      56% 58% at 50% 46%,
-      rgba(3, 13, 31, 0.9) 0%,
-      rgba(3, 13, 31, 0.82) 52%,
-      rgba(3, 13, 31, 0.28) 86%,
+      66% 64% at 50% 46%,
+      rgba(3, 13, 31, 0.4) 0%,
+      rgba(3, 13, 31, 0.32) 52%,
+      rgba(3, 13, 31, 0.09) 86%,
       rgba(3, 13, 31, 0) 100%
     ),
     linear-gradient(
       180deg,
       var(--ink) 0%,
-      rgba(3, 13, 31, 0.26) 22%,
-      rgba(3, 13, 31, 0.12) 56%,
-      rgba(3, 13, 31, 0.4) 88%,
+      rgba(3, 13, 31, 0.32) 10%,
+      rgba(3, 13, 31, 0.02) 52%,
+      rgba(3, 13, 31, 0.3) 91%,
       var(--ink-deep) 100%
     );
   content: "";
@@ -486,6 +561,7 @@
 }
 
 .closingLede {
+  text-wrap: balance;
   color: #dbe4f0;
   font-size: clamp(1.02rem, 1.2vw, 1.18rem);
   line-height: 1.6;

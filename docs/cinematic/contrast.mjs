@@ -125,6 +125,20 @@ const TARGETS = [
   ["/contact", "Contact head lede", "header p[class*=pageHeadLede]"],
   ["/apply", "Apply head lede", "header p[class*=pageHeadLede]"],
   ["/apply", "apply aside body", "p[class*=asideBody]"],
+
+  /* The four full-bleed closing bands. Their scrims were opened up in round 7
+     so the photograph reads as a photograph; these rows are what stops that
+     from being done by eye. Lime is the tightest of the three every time. */
+  ["/", "home closing lime", "#closing [class*=closingLime], #closing h2 span"],
+  ["/", "home closing lede", "#closing p[class*=closingLede]"],
+  ["/about", "about closing lime", "#closing h2 span"],
+  ["/about", "about closing eyebrow", "#closing p[class*=closingEyebrow]"],
+  ["/opportunities", "careers closing lime", "#apply h2 span"],
+  ["/opportunities", "careers closing eyebrow", "#apply p[class*=closingEyebrow]"],
+  ["/apply", "apply closing lime", "[class*=closing] h2 span"],
+  ["/contact", "contact closing lime", "#closing h2 span"],
+  ["/contact", "contact closing eyebrow", "#closing p[class*=closingEyebrow]"],
+  ["/apply", "apply closing lede", "[class*=closing] p[class*=closingLede]"],
 ];
 
 const browser = await chromium.launch();
@@ -159,29 +173,59 @@ for (const [route, label, selector] of TARGETS) {
   await page.evaluate((y) => window.scrollTo(0, Math.max(0, y - 400)), probe.top);
   await page.waitForTimeout(800);
 
-  /* Hide the type and the drawn markers, keep every real background: the
-     scrims are elements, the list ticks are pseudo-elements. */
+  /* Hide the type and the drawn markers, keep every real background.
+     The pseudo reset is scoped to text-bearing elements on purpose: the list
+     ticks it is there to remove are li::before, but the full-bleed section
+     scrims are section::after, and a blanket *::after reset deleted them and
+     measured the closing bands against the raw unscrimmed photograph. */
   await page.addStyleTag({
     content:
       "*{color:transparent!important;text-shadow:none!important;text-decoration-color:transparent!important}" +
-      "*::before,*::after{background:transparent!important;border-color:transparent!important}",
+      ":is(p,li,span,h1,h2,h3,h4,a,button,em,strong,dt,dd)::before," +
+      ":is(p,li,span,h1,h2,h3,h4,a,button,em,strong,dt,dd)::after" +
+      "{background:transparent!important;border-color:transparent!important}",
   });
   await page.waitForTimeout(250);
 
-  const rect = await page.evaluate((selector) => {
-    const r = document.querySelector(selector).getBoundingClientRect();
-    const x = Math.max(0, Math.round(r.x));
-    const y = Math.max(0, Math.round(r.y));
-    return {
-      x,
-      y,
-      width: Math.max(1, Math.min(Math.round(r.right), window.innerWidth) - x),
-      height: Math.max(1, Math.min(Math.round(r.bottom), window.innerHeight) - y),
+  /* Measure the LINE BOXES, not the element box. A centred <p> is as wide as
+     its column even when the sentence in it is half that, and sampling the
+     empty half was reporting the brightest pixel of a photograph no glyph ever
+     sits on — which is how the closing eyebrows read as 2:1 failures while
+     their text was over a scrim the whole time. Range rects are the glyphs. */
+  const rects = await page.evaluate((selector) => {
+    const el = document.querySelector(selector);
+    const range = document.createRange();
+    const out = [];
+    const walk = (n) => {
+      if (n.nodeType === 3 && n.textContent.trim()) {
+        range.selectNodeContents(n);
+        for (const r of range.getClientRects()) if (r.width >= 2 && r.height >= 2) out.push(r);
+      } else if (n.nodeType === 1 && getComputedStyle(n).display !== "none") {
+        for (const c of n.childNodes) walk(c);
+      }
     };
+    walk(el);
+    const src = out.length ? out : [el.getBoundingClientRect()];
+    return src
+      .map((r) => {
+        const x = Math.max(0, Math.round(r.x));
+        const y = Math.max(0, Math.round(r.y));
+        return {
+          x,
+          y,
+          width: Math.min(Math.round(r.right), window.innerWidth) - x,
+          height: Math.min(Math.round(r.bottom), window.innerHeight) - y,
+        };
+      })
+      .filter((r) => r.width > 1 && r.height > 1);
   }, selector);
-  const shot = await page.screenshot({ clip: rect });
-  const image = decodePng(shot);
-  const peak = peakLuminance(image, { x: 0, y: 0, width: image.width, height: image.height });
+  if (!rects.length) { console.log("MISSING  " + route + "  " + selector); fails.push(route + " " + label + ": no line boxes"); continue; }
+  let peak = 0;
+  for (const rect of rects) {
+    const shot = await page.screenshot({ clip: rect });
+    const image = decodePng(shot);
+    peak = Math.max(peak, peakLuminance(image, { x: 0, y: 0, width: image.width, height: image.height }));
+  }
   const ratio = contrast(luminance(...probe.color), peak);
   const large = probe.size >= 24 || (probe.size >= 18.66 && probe.weight >= 700);
   const floor = large ? 3 : 4.5;

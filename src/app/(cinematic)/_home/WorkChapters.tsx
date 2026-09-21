@@ -15,30 +15,52 @@ const CHAPTERS = [
   {
     n: "01",
     title: "The conversation",
-    lede: "You work a neighborhood on foot.",
+    lede: "You start with a conversation.",
     body:
-      "Knock, introduce yourself, and find out what a household is actually paying for internet and TV — and what it is actually getting. Most of the job is the part where you listen. The pitch is short; the questions are not.",
+      "Knock, introduce yourself, and learn what a household needs from internet, TV, or security. The pitch is short; the questions come first.",
   },
   {
     n: "02",
     title: "The right fit",
-    lede: "Then you match them to something real.",
+    lede: "Then you match the need to a product.",
     body:
-      "3C represents established providers, so what you are offering is fiber internet, TV service, and home security people already recognize — on its own or bundled. Knowing which of the three a household needs, and saying so honestly when the answer is none of them, is the skill the job pays for.",
+      "You offer fiber internet, TV service, or home security from the providers 3C represents — on its own or bundled. Good selling means explaining the fit clearly and saying when it is not a fit.",
   },
   {
     n: "03",
     title: "The follow-through",
-    lede: "And you stay with it until it’s installed and working.",
+    lede: "Finally, you confirm the next step.",
     body:
-      "The sale is not the end of your involvement. You set expectations you can keep, you answer the call when something is unclear, and you leave a street where the next rep is welcome. That is what builds a route worth coming back to.",
+      "Once someone is interested, you explain what happens next and make sure the handoff is clear. The job is to leave the customer with an honest offer and a confirmed next step.",
   },
 ];
 
-const STAGE_ALT = [
-  "A residential street grid at dusk seen from above, house lights on",
-  "Fiber optic strands, a wall-mounted television, and a set of home security devices",
-  "A living room with a wall-mounted television, streaming box and remote on a credenza",
+/*
+  R8 — three photographs of one neighbourhood at one hour, in the order the
+  chapters walk: the curb where the conversation starts, the room where the
+  fit is decided, the door where the next step is confirmed. This replaces the
+  page's own aerial (which the hero one screen above already carries) on the
+  first layer and a contact sheet of three square product shots on the second.
+  A stack of product squares was the only picture on the site that was not a
+  photograph of somewhere, and it sat in the middle of the page's most
+  cinematic moment.
+*/
+const STAGE = [
+  {
+    src: "/redesign/v2/photos/fiber-dusk-1600.webp",
+    alt: "A suburban street at dusk with a fiber cabinet and tool bag at the curb",
+    position: "56% 58%",
+  },
+  {
+    src: "/redesign/v2/photos/tv-dusk-1600.webp",
+    alt: "A living room at dusk with a wall-mounted television and the neighborhood through the window",
+    position: "58% 52%",
+  },
+  {
+    src: "/redesign/v2/photos/security-dusk-1600.webp",
+    alt: "A lit front door at dusk with a keypad and door camera beside it",
+    position: "60% 50%",
+  },
 ];
 
 export default function WorkChapters() {
@@ -46,34 +68,18 @@ export default function WorkChapters() {
     <div className={styles.workLayout}>
       <div className={styles.stageColumn}>
         <div className={styles.stage} data-chapter-stage data-active-chapter="0">
-          <figure className={styles.stageLayer} data-layer="0">
-            <Image
-              src="/redesign/v2/photos/hero-wide-1600.webp"
-              alt={STAGE_ALT[0]}
-              fill
-              sizes="(max-width: 900px) 100vw, 44vw"
-              className={styles.stageImage}
-            />
-          </figure>
-
-          <figure className={styles.stageLayer} data-layer="1">
-            <span className={styles.stageTriptych}>
-              <Image src="/redesign/v2/photos/fiber-square-800.webp" alt="" width={800} height={800} sizes="15vw" />
-              <Image src="/redesign/v2/photos/tv-square-800.webp" alt="" width={800} height={800} sizes="15vw" />
-              <Image src="/redesign/v2/photos/security-square-800.webp" alt="" width={800} height={800} sizes="15vw" />
-            </span>
-            <figcaption className={kit.srOnly}>{STAGE_ALT[1]}</figcaption>
-          </figure>
-
-          <figure className={styles.stageLayer} data-layer="2">
-            <Image
-              src="/redesign/v2/photos/tv-wide-1600.webp"
-              alt={STAGE_ALT[2]}
-              fill
-              sizes="(max-width: 900px) 100vw, 44vw"
-              className={styles.stageImage}
-            />
-          </figure>
+          {STAGE.map((frame, i) => (
+            <figure key={frame.src} className={styles.stageLayer} data-layer={i}>
+              <Image
+                src={frame.src}
+                alt={frame.alt}
+                fill
+                sizes="(max-width: 900px) 100vw, 44vw"
+                className={styles.stageImage}
+                style={{ objectPosition: frame.position }}
+              />
+            </figure>
+          ))}
 
           <span className={styles.stageTicks} aria-hidden="true">
             {CHAPTERS.map((chapter) => (
@@ -88,21 +94,14 @@ export default function WorkChapters() {
           <li key={chapter.n} className={`${styles.chapter} ${kit.revealRise}`} data-chapter data-reveal>
             {/* Mobile carries its own image inline; the sticky stage is desktop-only. */}
             <div className={styles.chapterArt} aria-hidden="true">
-              {index === 1 ? (
-                <span className={styles.chapterArtTriptych}>
-                  <Image src="/redesign/v2/photos/fiber-square-800.webp" alt="" width={800} height={800} sizes="30vw" />
-                  <Image src="/redesign/v2/photos/tv-square-800.webp" alt="" width={800} height={800} sizes="30vw" />
-                  <Image src="/redesign/v2/photos/security-square-800.webp" alt="" width={800} height={800} sizes="30vw" />
-                </span>
-              ) : (
-                <Image
-                  src={index === 0 ? "/redesign/v2/photos/hero-wide-800.webp" : "/redesign/v2/photos/tv-wide-800.webp"}
-                  alt=""
-                  fill
-                  sizes="100vw"
-                  className={styles.stageImage}
-                />
-              )}
+              <Image
+                src={STAGE[index].src.replace("-1600.webp", "-800.webp")}
+                alt=""
+                fill
+                sizes="100vw"
+                className={styles.stageImage}
+                style={{ objectPosition: STAGE[index].position }}
+              />
             </div>
 
             <p className={styles.chapterNumber}>{chapter.n}</p>

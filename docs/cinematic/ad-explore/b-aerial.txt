@@ -1,0 +1,11 @@
+Use case: website hero wall background for a door-to-door fiber/TV/security sales company (3C World Group); copy sits in the left third.
+Asset type: full-bleed hero photograph, 3:2, later cropped to 16:9 and to portrait on phones.
+Primary request: a real aerial photograph of a suburban neighbourhood at dusk from a drone at about 120 metres, roads curving through tree cover, warm house windows lit.
+Scene: cul-de-sacs, driveways, a small lake catching the last orange of the sky at the top edge; the left third is dark tree canopy and shadow so headline copy can sit there.
+Subject: the street grid as a quiet network; one single house near the right third with its porch lit; a faint continuous yellow-green (#8dc63f) line tracing the main road from the bottom edge to that house, thin, drawn on the road surface like a route, the only saturated colour.
+Style/medium: photograph, aerial, crisp, slight haze in the far distance for depth.
+Lighting/mood: blue hour, deep navy shadows (#061735 family), warm sodium and tungsten window light, calm, expansive.
+Color palette: navy, forest green shadows, warm amber, one lime accent.
+Composition: horizon just below the top edge, no elements of interest in the top-left quadrant.
+Input image: the attached screenshot shows the current site palette and type; match its colour grade and mood, do not copy its layout.
+Avoid: people, cars in motion, text, logos, watermark, purple or blue gradients, glow orbs, particles, light trails from traffic, HDR, illustration look, map UI overlays.

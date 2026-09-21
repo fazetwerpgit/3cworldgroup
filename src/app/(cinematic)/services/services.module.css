@@ -4,153 +4,115 @@
    Tokens, shell, grounds, the seam, section heads, buttons and the reveal
    classes all come from src/app/_cinematic/cinematic.module.css and are
    composed in from there. What is here is the one thing this page does that no
-   other route does: a filmstrip of three full-bleed dusk photographs that walk
-   from the curb to the living room to the front door, and the light chapter
-   where all three land on a single account.
+   other route does: restrained service rows on paper, followed by a light
+   bundle chapter and a dark map close.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   2 — The filmstrip
+   2 — Service rows
    -------------------------------------------------------------------------- */
 
+/*
+  R8 — Services had no seam at all while every other route cuts its paper
+  chapter in and out on the same diagonal. The paper run here is two sections
+  long (rows, then bundle), so the cut is split across the pair: this one takes
+  the entry, `.bundle` takes the exit.
+*/
 .sell {
-  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
+  composes: surfacePaper seamTopOnly from "../../_cinematic/cinematic.module.css";
+  color: var(--on-paper);
   padding: var(--section-pad) 0 0;
 }
 
-/*
-  The page head and band 01 are the same photograph on purpose: the v2 set has
-  exactly one fiber frame with a street in it, and the brief pins the head to
-  it. They are never the same crop. The head sits high (16%) so it holds the
-  sunset, the tree line and the lit houses and cuts the grass entirely; band 01
-  runs the default centre crop, which is the pedestal, the bag and the spool
-  with no sky at all. Two beats of one walk, not a repeat.
-*/
 .head {
-  --head-focus: 48% 16%;
+  /*
+    The pedestal at dusk: the cabinet door fills the left 45% of the frame in
+    near-black steel, which is where the headline lands, so the frame carries
+    its own scrim. The open cabinet and the lime patch cable sit at the right;
+    the porch light is at 53% across, 15% down. At 1740 the source crops top
+    and bottom only, so Y is the whole decision.
+  */
+  --head-focus: 50% 46%;
 }
 
 @media (max-width: 900px) {
   /*
-    At 390 the head shows the full height of the source and crops horizontally,
-    so the top of the frame is sky and the lit windows and the garage light sit
-    a fifth of the way down. The default fall at 25% put the scrim straight
-    over them and the photograph read as a flat brown field. This page's copy
-    does not start until 40% of the frame, so the window can run to 29%, which
-    is where the light in this frame actually is.
+    At 390 the frame keeps a 42% slice of the width. 78% keeps the open
+    cabinet and the cable in shot at the right of the copy; the fall comes up
+    to 29% so the scrim is already dark where the headline starts.
   */
   .head {
-    --head-fall: 37%;
-    /*
-      And a different crop. At 390 the frame takes the full height of the
-      source and keeps a 42% slice of its width, so the desktop focus at 48%
-      cut the lit brick house and the garage light out of the picture entirely
-      and left only the dark street and the pines. 84% keeps the pedestal, the
-      house and its light in frame — which is the part of this photograph the
-      window above is there to show.
-    */
-    --head-focus: 84% 50%;
+    --head-fall: 29%;
+    --head-focus: 78% 50%;
   }
 }
 
 .filmstrip {
-  margin-top: clamp(1.75rem, 3vw, 3rem);
+  margin-top: clamp(2.25rem, 4vw, 4rem);
 }
 
-/*
-  Three photographs of the same neighborhood at the same hour, butted together
-  with one hairline between them. Full bleed and edge to edge on purpose: a
-  bordered rectangle per product is the card stack this language threw out, and
-  these three frames are meant to read as one continuous walk.
-*/
 .band {
-  align-items: center;
-  display: flex;
-  min-height: clamp(30rem, 44vw, 40rem);
+  align-items: stretch;
+  background: var(--paper);
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  min-height: clamp(28rem, 38vw, 37rem);
   overflow: hidden;
-  position: relative;
   scroll-margin-top: 5.5rem;
 }
 
 .band + .band {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-ink);
+  background: var(--paper-raise);
 }
 
 .bandArt {
-  inset: 0;
-  position: absolute;
-  z-index: 0;
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 100%;
+  /* The tight crop below scales its image; without this the scaled frame
+     spills out of the column and runs under the copy. */
+  overflow: hidden;
+  position: relative;
 }
 
 .bandImage {
   object-fit: cover;
 }
 
-/*
-  Band 01 runs the same photograph as the page head. The head is the wide
-  establishing view — sunset, tree line, lit houses, pedestal small at the
-  right. This pushes in on the pedestal, the tool bag and the cable spool so
-  the band is a detail, not a reprint. Origin sits on the pedestal so the
-  subject stays put as the frame grows.
-*/
 .bandArtTight .bandImage {
-  transform: scale(1.4);
-  transform-origin: 66% 64%;
+  transform: scale(1.7);
+  transform-origin: 63% 67%;
 }
 
-/*
-  Two layers, not a blanket tint: a horizontal wash that puts the copy on its
-  own darkness and lets the right of the photograph stay lit, over a vertical
-  fall so each frame lands on navy at top and bottom and the three stack as a
-  strip rather than as three pasted rectangles.
-
-  The wash is weighted left on all three bands, not alternated, because all
-  three photographs put their subject on the right: the fiber cabinet, the
-  television and the keypad. Alternating the side buried each of them under the
-  heavy end of its own scrim.
-
-  Round 5 — the wash is now LOCAL. It used to carry 0.44 ink at 57% and 0.24 at
-  the far edge, with a vertical fall of 0.55/0.62 on top of it, which meant the
-  subject of every photograph sat under roughly half an inch of navy and all
-  three frames read as mud. The horizontal wash now clears completely by 78% and
-  the vertical fall is down to 0.30/0.38, which is what the joints need and
-  nothing more; legibility is carried entirely by the left end of the wash,
-  under the copy column, where it is heavier than it was.
-*/
+/* A restrained wash preserves subject detail while keeping the image legible. */
 .bandScrim {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(6, 23, 53, 0.93) 0%,
-      rgba(6, 23, 53, 0.85) 34%,
-      rgba(6, 23, 53, 0.5) 52%,
-      rgba(6, 23, 53, 0.1) 68%,
-      rgba(6, 23, 53, 0) 78%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(3, 13, 31, 0.3) 0%,
-      rgba(3, 13, 31, 0) 20%,
-      rgba(3, 13, 31, 0) 76%,
-      rgba(3, 13, 31, 0.38) 100%
-    );
+  background: linear-gradient(180deg, rgba(3, 13, 31, 0.04), rgba(3, 13, 31, 0.22));
   inset: 0;
   position: absolute;
-  z-index: 1;
 }
 
 .bandShell {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  max-width: none;
+  padding-left: max(var(--gutter), calc((100vw - var(--shell)) / 2 + var(--gutter)));
+  padding-right: var(--gutter);
+  width: 100%;
   position: relative;
-  z-index: 2;
+  z-index: 1;
 }
 
 .bandCopy {
-  max-width: 36rem;
-  padding: clamp(2.5rem, 5vw, 4rem) 0;
+  max-width: 38rem;
+  padding: clamp(3rem, 6vw, 5.5rem) 0;
 }
 
 .bandNumber {
-  color: var(--lime);
+  color: var(--lime-ink);
   font-family: var(--display);
   font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
@@ -159,6 +121,7 @@
 }
 
 .bandTitle {
+  color: var(--on-paper);
   font-family: var(--display);
   font-size: clamp(2rem, 3.4vw, 3.2rem);
   font-weight: 400;
@@ -168,7 +131,7 @@
 }
 
 .bandAccent {
-  color: var(--on-ink);
+  color: var(--on-paper);
   font-size: clamp(1.12rem, 1.45vw, 1.4rem);
   font-weight: 500;
   line-height: 1.45;
@@ -177,7 +140,7 @@
 }
 
 .bandBody {
-  color: var(--on-ink-dim);
+  color: var(--on-paper-dim);
   font-size: clamp(1rem, 1.06vw, 1.04rem);
   line-height: 1.72;
   margin-top: 0.95rem;
@@ -193,7 +156,7 @@
 }
 
 .bandList li {
-  color: var(--on-ink);
+  color: var(--on-paper);
   display: grid;
   font-size: 0.99rem;
   gap: 0.8rem;
@@ -202,7 +165,7 @@
 }
 
 .bandList li::before {
-  background: var(--lime);
+  background: var(--lime-ink);
   content: "";
   height: 2px;
   margin-top: 0.72em;
@@ -214,14 +177,18 @@
    -------------------------------------------------------------------------- */
 
 .bundle {
-  composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
+  composes: surfacePaper seamBottomOnly from "../../_cinematic/cinematic.module.css";
   padding: var(--section-pad) 0 var(--section-pad);
 }
 
 .bundleLayout {
-  /* Start, not centre: the copy column is shorter than the plate, and centring
-     it left a band of empty paper above the first hairline. */
-  align-items: start;
+  /*
+    R8 — stretch, not start. The plate used to be a fixed 3/2 box and the copy
+    column ran ~170px shorter than it, so the chapter ended on a band of empty
+    paper beside the image. The plate now takes the row's height, which the
+    copy sets, and the aerial crops to a letterbox that suits it.
+  */
+  align-items: stretch;
   display: grid;
   gap: clamp(1.75rem, 3.5vw, 3.25rem);
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
@@ -253,7 +220,7 @@
   gap: 0.9rem;
   grid-template-columns: 16px minmax(0, 1fr);
   line-height: 1.4;
-  padding: 1.05rem 0;
+  padding: clamp(1.05rem, 1.7vw, 1.45rem) 0;
 }
 
 .bundleList li:last-child {
@@ -269,8 +236,8 @@
 }
 
 .bundlePlate {
-  aspect-ratio: 3 / 2;
   border: 1px solid var(--rule-ink);
+  min-height: clamp(15rem, 20vw, 20rem);
   overflow: hidden;
   position: relative;
 }
@@ -308,18 +275,18 @@
 .closing::after {
   background:
     radial-gradient(
-      62% 56% at 50% 46%,
-      rgba(3, 13, 31, 0.94) 0%,
-      rgba(3, 13, 31, 0.92) 52%,
-      rgba(3, 13, 31, 0.5) 82%,
-      rgba(3, 13, 31, 0.12) 100%
+      58% 54% at 50% 46%,
+      rgba(3, 13, 31, 0.86) 0%,
+      rgba(3, 13, 31, 0.78) 50%,
+      rgba(3, 13, 31, 0.36) 82%,
+      rgba(3, 13, 31, 0.06) 100%
     ),
     linear-gradient(
       180deg,
       var(--ink) 0%,
-      rgba(3, 13, 31, 0.32) 18%,
-      rgba(3, 13, 31, 0.14) 52%,
-      rgba(3, 13, 31, 0.42) 86%,
+      rgba(3, 13, 31, 0.22) 18%,
+      rgba(3, 13, 31, 0.06) 52%,
+      rgba(3, 13, 31, 0.3) 86%,
       var(--ink-deep) 100%
     );
   content: "";
@@ -350,6 +317,7 @@
 }
 
 .closingLede {
+  text-wrap: balance;
   color: var(--on-ink-dim);
   font-size: clamp(1.02rem, 1.2vw, 1.16rem);
   line-height: 1.6;
@@ -389,13 +357,17 @@
     position: relative;
   }
 
+  .bandShell {
+    max-width: var(--shell);
+    padding-inline: var(--gutter);
+  }
+
   .bandScrim {
     background: linear-gradient(
       180deg,
       rgba(3, 13, 31, 0.34) 0%,
       rgba(3, 13, 31, 0) 38%,
-      rgba(3, 13, 31, 0.55) 82%,
-      var(--ink) 100%
+      rgba(3, 13, 31, 0.24) 100%
     );
   }
 

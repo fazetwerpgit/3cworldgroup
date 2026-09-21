@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import ContactForm from "./ContactForm";
 import { APPLY_HREF } from "../../_cinematic/nav";
 import kit from "../../_cinematic/cinematic.module.css";
@@ -149,22 +149,25 @@ export default function ContactPage() {
           </header>
 
           <div className={styles.pathList}>
+            {/*
+              The reveal rides a wrapper rather than the row itself. The row
+              owns a hover that eases its rule and a press that drops it a
+              pixel, and the reveal's `transition` shorthand was overwriting
+              both, so neither had ever run.
+            */}
             {PATHS.map((path) => (
-              <Link
-                key={path.href}
-                href={path.href}
-                className={`${styles.pathRow} ${kit.revealRise}`}
-                data-reveal
-              >
-                <span className={styles.pathKind}>{path.kind}</span>
-                <span className={styles.pathTitle}>{path.title}</span>
-                <ArrowRight
-                  aria-hidden="true"
-                  className={styles.pathArrow}
-                  size={26}
-                  strokeWidth={2}
-                />
-              </Link>
+              <div key={path.href} className={kit.revealRise} data-reveal>
+                <Link href={path.href} className={styles.pathRow}>
+                  <span className={styles.pathKind}>{path.kind}</span>
+                  <span className={styles.pathTitle}>{path.title}</span>
+                  <ArrowRight
+                    aria-hidden="true"
+                    className={styles.pathArrow}
+                    size={26}
+                    strokeWidth={2}
+                  />
+                </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -229,27 +232,36 @@ export default function ContactPage() {
       {/* ---------------------------------------------------------------- */}
       {/* 4 — closing                                                      */}
       {/* ---------------------------------------------------------------- */}
+      {/*
+        The same closer the other five routes use: a full-bleed photograph, the
+        band scrim, and the copy centred on its own plate. This page had been
+        ending on a flat navy panel with the type ranged left, which made the
+        one page a visitor is most likely to leave from the one page that does
+        not look like the rest of the site.
+      */}
       <section
         id="closing"
         className={`${kit.surfaceInkDeep} ${styles.closing}`}
         aria-labelledby="closing-title"
       >
+        <Image
+          src="/redesign/v2/photos/tv-dusk-1600.webp"
+          alt=""
+          fill
+          sizes="100vw"
+          className={styles.closingArt}
+        />
         <div className={kit.shell}>
           <div className={`${styles.closingInner} ${kit.revealRise}`} data-reveal>
             <p className={styles.closingEyebrow}>Your next move</p>
             <h2 id="closing-title" className={styles.closingTitle}>
               Don’t need to wait?
               <br />
-              <span className={styles.headTitleLime}>Apply today.</span>
+              <span className={styles.closingLime}>Apply today.</span>
             </h2>
             <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
               Start your application
-              <ArrowUpRight
-                aria-hidden="true"
-                className={kit.btnArrow}
-                size={19}
-                strokeWidth={2.2}
-              />
+              <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
             </Link>
           </div>
         </div>

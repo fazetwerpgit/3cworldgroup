@@ -129,7 +129,7 @@ export default function RouteSequence() {
         layout it rejoins the flow underneath the last stop.
       */}
       <div className={styles.routeEnd}>
-        <p className={styles.routeEndKind}>Step one</p>
+        <p className={styles.routeEndKind}>Ready to get started?</p>
         <p className={styles.routeEndBody}>Everything above starts with one application.</p>
         <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime}`}>
           Apply

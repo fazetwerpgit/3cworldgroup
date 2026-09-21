@@ -36,7 +36,9 @@
 .heroImageWide,
 .heroImageTall {
   object-fit: cover;
-  object-position: 50% 42%;
+  /* The street at dusk: porch light at 75% across, 37% down; the wet road
+     fills the lower left, under the copy. Y is the whole decision at 1740. */
+  object-position: 50% 46%;
 }
 
 .heroImageTall {
@@ -107,6 +109,7 @@
   line-height: 1.55;
   margin-bottom: 2.7rem;
   max-width: 52ch;
+  text-wrap: balance;
   text-shadow: 0 1px 14px rgba(3, 13, 31, 0.6);
 }
 
@@ -124,7 +127,7 @@
   font-size: 0.92rem;
   gap: 1rem;
   grid-template-columns: repeat(3, 1fr);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.2em;
   margin-inline: auto;
   max-width: var(--shell);
   padding: 1.05rem var(--gutter) 1.15rem;
@@ -204,22 +207,6 @@
   object-fit: cover;
 }
 
-.stageTriptych {
-  display: grid;
-  gap: 1px;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  height: 100%;
-  width: 100%;
-}
-
-.stageTriptych img {
-  display: block;
-  height: 100%;
-  min-height: 0;
-  object-fit: cover;
-  width: 100%;
-}
-
 .stageTicks {
   bottom: 1.1rem;
   display: flex;
@@ -229,20 +216,27 @@
   z-index: 3;
 }
 
+/*
+  The tick is drawn at its full 40px and scaled down to rest, so the chapter
+  change animates a transform rather than a width and never asks the row to
+  reflow three times a scroll.
+*/
 .stageTick {
   background: rgba(255, 255, 255, 0.34);
   height: 3px;
+  transform: scaleX(0.45);
+  transform-origin: left center;
   transition:
     background-color 0.4s ease,
-    width 0.5s var(--ease-out-expo);
-  width: 18px;
+    transform 0.5s var(--ease-out-expo);
+  width: 40px;
 }
 
 .stage[data-active-chapter="0"] .stageTick:nth-child(1),
 .stage[data-active-chapter="1"] .stageTick:nth-child(2),
 .stage[data-active-chapter="2"] .stageTick:nth-child(3) {
   background: var(--lime);
-  width: 40px;
+  transform: scaleX(1);
 }
 
 .chapterList {
@@ -308,17 +302,27 @@
   .chapter {
     align-content: center;
     display: grid;
-    min-height: clamp(21rem, 33vw, 31rem);
+    /*
+      R8 — the beat was 31rem against 206px of copy, so ~145px of navy sat
+      above and below every chapter and the column read as three paragraphs
+      adrift in a field. 25rem keeps roughly 70px each side — enough that the
+      hairlines have something to divide, tight enough that the copy and the
+      photograph opposite it read as one block.
+    */
+    min-height: clamp(19rem, 26vw, 25rem);
     padding: clamp(1.75rem, 2.6vw, 2.4rem) 0;
   }
 
   /*
-    Round 6 — every chapter is a fixed-height beat so it pairs with the sticky
-    stage, and its copy is centred in that beat. On the LAST one there is no
-    next beat to pair with, so the centring left ~62px of empty column under
-    the final paragraph and the section's own padding landed on top of it:
-    232px between the last word of this chapter and the next section's head.
-    The last beat hugs its copy instead; the stage simply releases with it.
+    The last beat hugs its copy: there is no next beat to pair it with, and a
+    full beat hangs ~83px of empty column under the final paragraph, which
+    lands on the section's own padding and opens the joint into the route to
+    195 against a 140 ceiling.
+
+    R8 — this used to also cost the third chapter its activation, because the
+    old reading line was measured inside the sticky stage and a short last beat
+    could never cross it. The line is a fixed one in the viewport now (see
+    MotionRoot), so the short beat and a reachable third image coexist.
   */
   .chapter:last-child {
     min-height: 0;
@@ -336,16 +340,26 @@
   columns rebalance toward the image: the copy already wrapped at its 52ch
   measure well short of its column, so the width it gives up costs nothing.
 */
+/*
+  R8 — this was a >=1600 rule and the defect it fixes is not a >=1600 defect.
+  A fixed 1/1.06 box that a max-height can shrink leaves slack beside itself at
+  every desktop width: 53px at 1440, 83px at 1280. Above 900 the stage now
+  fills its column's width and takes its height from the viewport, so there is
+  never empty navy beside it. The column rebalance stays at >=1600, where there
+  is width to move.
+*/
+@media (min-width: 901px) {
+  .stage {
+    aspect-ratio: auto;
+    height: min(calc(100svh - 11rem), 50rem);
+    max-height: none;
+  }
+}
+
 @media (min-width: 1600px) {
   .workLayout {
     gap: 3.25rem;
     grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
-  }
-
-  .stage {
-    aspect-ratio: auto;
-    height: min(calc(100svh - 11rem), 46rem);
-    max-height: none;
   }
 }
 
@@ -374,9 +388,15 @@
   display: none;
 }
 
+/*
+  The path carries pathLength={1}, so dash lengths are fractions of the whole
+  route, not pixels: at `3 7` the first dash covered the entire line and the
+  preview drew solid. These are the same 3/7 rhythm expressed against a length
+  of 1, and the stroke is lifted to where a hairline on paper actually reads.
+*/
 .routeGhost {
-  stroke: rgba(16, 31, 56, 0.13);
-  stroke-dasharray: 3 7;
+  stroke: rgba(16, 31, 56, 0.22);
+  stroke-dasharray: 0.0024 0.0057;
   stroke-linecap: round;
   stroke-width: 2;
 }
@@ -633,7 +653,7 @@
 .cityChipState {
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
@@ -764,7 +784,7 @@
 }
 
 .faqSummary:hover {
-  color: #2c4a1f;
+  color: var(--lime-ink);
 }
 
 .faqMark {
@@ -865,7 +885,7 @@
   color: var(--on-ink-dim);
   font-family: var(--display);
   font-size: 1rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
@@ -891,7 +911,7 @@
 
 .doorsArtImage {
   object-fit: cover;
-  object-position: 60% 52%;
+  object-position: 50% 62%;
 }
 
 .doorsArtScrim {
@@ -934,27 +954,31 @@
   round 2 left them at 0.016. docs/cinematic/r3-shots.mjs re-measures all of it
   on every run and fails the run if any of it slips.
 */
+/*
+  fiber-dusk: porch lights and the horizon glow sit in the upper half; 58% was
+  cropped for the aerial that used to be here and fell to road and grass.
+*/
 .closingArt {
   object-fit: cover;
-  object-position: 50% 58%;
+  object-position: 50% 46%;
   z-index: -2;
 }
 
 .closing::after {
   background:
     radial-gradient(
-      58% 54% at 50% 45%,
-      rgba(3, 13, 31, 0.88) 0%,
-      rgba(3, 13, 31, 0.8) 54%,
-      rgba(3, 13, 31, 0.24) 86%,
+      66% 60% at 50% 46%,
+      rgba(3, 13, 31, 0.4) 0%,
+      rgba(3, 13, 31, 0.32) 54%,
+      rgba(3, 13, 31, 0.08) 86%,
       rgba(3, 13, 31, 0) 100%
     ),
     linear-gradient(
       180deg,
       var(--ink) 0%,
-      rgba(3, 13, 31, 0.22) 20%,
-      rgba(3, 13, 31, 0.08) 54%,
-      rgba(3, 13, 31, 0.36) 88%,
+      rgba(3, 13, 31, 0.32) 10%,
+      rgba(3, 13, 31, 0.02) 52%,
+      rgba(3, 13, 31, 0.3) 91%,
       var(--ink-deep) 100%
     );
   content: "";
@@ -971,6 +995,31 @@
   text-align: center;
 }
 
+/* --------------------------------------------------------------------------
+   The plate. Round 7 moved the darkening off the whole band and onto the copy
+   block: the band-wide ellipse above is now light enough that the photograph
+   actually reads as a photograph at the edges, and this soft plate — sized to
+   the type, transparent at its own rim — is what carries the contrast. Both
+   are measured by docs/cinematic/contrast.mjs, which gained rows for every
+   closing line in this round because a blanket pseudo reset had been deleting
+   these scrims before measuring them.
+   -------------------------------------------------------------------------- */
+
+.closingInner::before {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(3, 13, 31, 0.82) 0%,
+    rgba(3, 13, 31, 0.72) 44%,
+    rgba(3, 13, 31, 0.3) 76%,
+    rgba(3, 13, 31, 0) 100%
+  );
+  content: "";
+  inset: -52% clamp(0px, calc(50% - 34rem), 26rem);
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
 .closingTitle {
   font-family: var(--display);
   font-size: clamp(2.8rem, 7vw, 6.4rem);
@@ -981,6 +1030,7 @@
 }
 
 .closingLede {
+  text-wrap: balance;
   color: var(--on-ink-dim);
   font-size: clamp(1.02rem, 1.2vw, 1.16rem);
   line-height: 1.6;
@@ -1036,7 +1086,7 @@
 
 [data-motion="on"] :is(.heroLede, .heroActions) {
   opacity: 0;
-  transform: translateY(14px);
+  transform: translateY(var(--rise));
   transition:
     opacity 0.6s var(--ease-out-expo),
     transform 0.6s var(--ease-out-expo);
@@ -1048,16 +1098,21 @@
 }
 
 [data-motion="on"][data-entered] .heroLede {
-  transition-delay: 0.42s;
+  transition-delay: 0.3s;
 }
 
 [data-motion="on"][data-entered] .heroActions {
-  transition-delay: 0.52s;
+  transition-delay: 0.38s;
 }
 
+/*
+  The rail used to start at 600ms and run for 900, so the hero was still
+  assembling a second and a half in. It now opens with the buttons and lands
+  inside a second, which is where the whole entrance ends.
+*/
 [data-motion="on"] .heroRail {
   clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.9s var(--ease-out-expo) 0.6s;
+  transition: clip-path 0.7s var(--ease-out-expo) 0.38s;
 }
 
 [data-motion="on"][data-entered] .heroRail {
@@ -1081,7 +1136,7 @@
 
 [data-motion="on"] .routeStop:not([data-arrived]) .routeStopCard {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(var(--rise));
 }
 
 [data-motion="on"] .routeStopCard {
@@ -1141,7 +1196,9 @@
 
   .heroImageTall {
     display: block;
-    object-position: 50% 50%;
+    /* Keep the lit porch and the door in the 390 slice; the copy sits over
+       the road and lawn at the left, under its own scrim. */
+    object-position: 72% 42%;
   }
 
   /*
@@ -1199,22 +1256,6 @@
     margin-bottom: 1.5rem;
     overflow: hidden;
     position: relative;
-  }
-
-  .chapterArtTriptych {
-    display: grid;
-    gap: 1px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    height: 100%;
-    width: 100%;
-  }
-
-  .chapterArtTriptych img {
-    display: block;
-    height: 100%;
-    min-width: 0;
-    object-fit: cover;
-    width: 100%;
   }
 
   .chapter {

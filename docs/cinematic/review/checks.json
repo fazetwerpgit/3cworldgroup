@@ -65,26 +65,24 @@
     {
       "route": "/",
       "motion": null,
-      "hidden": [
-        "cinematic-home-module__mBhnHq__stageLayer"
-      ],
-      "h": 7890
+      "hidden": [],
+      "h": 7691
     },
     {
       "route": "/services",
       "motion": null,
       "hidden": [],
-      "h": 4652
+      "h": 4683
     }
   ],
   "nojs": [
     {
       "route": "/",
-      "height": 7890
+      "height": 7691
     },
     {
       "route": "/about",
-      "height": 5615
+      "height": 5655
     }
   ],
   "menu": {
@@ -150,7 +148,7 @@
       "route": "/",
       "box": {
         "x": 20,
-        "y": 149,
+        "y": 177,
         "w": 350,
         "h": 151,
         "color": "rgb(255, 255, 255)"
@@ -174,7 +172,7 @@
       "route": "/services",
       "box": {
         "x": 20,
-        "y": 251,
+        "y": 223,
         "w": 350,
         "h": 96,
         "color": "rgb(255, 255, 255)"

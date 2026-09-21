@@ -1,12 +1,20 @@
 import { chromium } from "playwright";
 const out = process.argv[2];
 const b = await chromium.launch();
-const p = await b.newPage({ viewport: { width: 1740, height: 1000 } });
+const W = Number(process.argv[3] || 1740);
+const p = await b.newPage({ viewport: { width: W, height: W > 900 ? 1000 : 844 } });
 await p.goto("http://127.0.0.1:3120/", { waitUntil: "networkidle" });
 const routes = [["/", "home"], ["/about", "about"], ["/services", "services"], ["/opportunities", "careers"], ["/contact", "contact"], ["/apply", "apply"]];
 for (const [href, name] of routes) {
   if (href !== "/") {
-    await p.click(`header a[href="${href}"]`);
+    // Below 900 the nav lives behind the menu toggle, so the click that proves
+    // a client navigation re-runs the reveals has to open the menu first.
+    const toggle = await p.$("header button[aria-expanded]");
+    if (toggle && (await toggle.isVisible())) {
+      await toggle.click();
+      await p.waitForTimeout(400);
+    }
+    await p.click(`a[href="${href}"]:visible`);
     await p.waitForURL(`**${href}`);
     await p.waitForTimeout(600);
   }

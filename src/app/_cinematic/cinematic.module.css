@@ -28,7 +28,8 @@
   --on-paper: #101f38;
   --on-paper-dim: #4a5a71;
   --rule: rgba(255, 255, 255, 0.14);
-  --rule-ink: rgba(16, 31, 56, 0.16);
+  --rule-ink: rgba(16, 31, 56, 0.2);
+  --rule-ink-strong: rgba(16, 31, 56, 0.34);
 
   --display: "Bebas Neue", var(--font-geist-sans), sans-serif;
   --body: var(--font-geist-sans), system-ui, sans-serif;
@@ -65,6 +66,9 @@
      spare, and 42px of travel at 1740 still reads as one angled line. */
   --seam-rise: 2.4vw;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --rise: 18px;
+  --t-quick: 0.2s;
+  --t-move: 0.3s;
 
   background: var(--ink);
   color: var(--on-ink);
@@ -81,10 +85,27 @@
   color: var(--ink);
 }
 
+/*
+  The focus ring is ground-aware, and it carries the ground in an inherited
+  custom property rather than in a pile of override selectors: lime reads 7:1
+  on navy, 1.8:1 on paper, and 1:1 on a lime button, so paper surfaces and lime
+  plates each hand the ring their own colour and every descendant picks it up.
+  Measured: --lime-ink on --paper 5.2:1, --ink on --lime 8.7:1.
+*/
 .page :focus-visible {
   border-radius: 2px;
-  outline: 2px solid var(--lime);
+  outline: 2px solid var(--focus-ring, var(--lime));
   outline-offset: 3px;
+}
+
+.surfacePaper,
+.surfacePaperRaise {
+  --focus-ring: var(--lime-ink);
+}
+
+.btnLime,
+.skipLink {
+  --focus-ring: var(--ink);
 }
 
 .page input,
@@ -155,16 +176,16 @@
   padding: 0.85rem 1.4rem 0.75rem;
   text-decoration: none;
   transition:
-    transform 0.22s var(--ease-out-expo),
-    background-color 0.22s ease,
-    border-color 0.22s ease,
-    box-shadow 0.22s var(--ease-out-expo),
+    transform var(--t-move) var(--ease-out-expo),
+    background-color var(--t-quick) ease,
+    border-color var(--t-quick) ease,
+    box-shadow var(--t-move) var(--ease-out-expo),
     color 0.22s ease;
   white-space: nowrap;
 }
 
 .btnArrow {
-  transition: transform 0.28s var(--ease-out-expo);
+  transition: transform var(--t-move) var(--ease-out-expo);
 }
 
 .btn:hover .btnArrow,
@@ -198,6 +219,7 @@
 .btnGhost:hover {
   background: rgba(6, 23, 53, 0.6);
   border-color: var(--on-ink);
+  transform: translateY(-1px);
 }
 
 .btnGhost:active {
@@ -234,8 +256,8 @@
   padding-top: 0.55rem;
   text-decoration: none;
   transition:
-    border-color 0.22s ease,
-    color 0.22s ease;
+    border-color var(--t-quick) ease,
+    color var(--t-quick) ease;
 }
 
 .quietLink:hover {
@@ -267,7 +289,7 @@
   text-decoration-color: var(--lime-ink);
   text-decoration-thickness: 2px;
   text-underline-offset: 0.22em;
-  transition: color 0.2s ease;
+  transition: color var(--t-quick) ease;
 }
 
 .inlineLink:hover {
@@ -295,10 +317,17 @@
   z-index: 50;
 }
 
+/*
+  Solid, not translucent. At 0.86 the bar kept 14% of whatever sat under it,
+  and a 14px blur cannot smear a hard vertical edge across 1740px: scrolled
+  over a section where a photo starts mid-row, the header showed that edge
+  straight through itself and read as a rendering fault. Opaque with the same
+  hairline under it is also what the footer does, so the two ends of every
+  page now share one ground.
+*/
 .header[data-condensed],
 .header[data-open] {
-  background: rgba(6, 23, 53, 0.86);
-  backdrop-filter: blur(14px) saturate(130%);
+  background: var(--ink);
   box-shadow: 0 1px 0 0 var(--rule);
 }
 
@@ -328,7 +357,7 @@
 
 .brandMark {
   height: auto;
-  transition: transform 0.3s var(--ease-out-expo);
+  transition: transform var(--t-move) var(--ease-out-expo);
   width: 42px;
 }
 
@@ -383,7 +412,7 @@
   right: 0;
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 0.28s var(--ease-out-expo);
+  transition: transform var(--t-move) var(--ease-out-expo);
 }
 
 .headerLink:hover::after,
@@ -420,8 +449,8 @@
   height: 40px;
   justify-content: center;
   transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease;
+    background-color var(--t-quick) ease,
+    border-color var(--t-quick) ease;
   width: 40px;
 }
 
@@ -616,7 +645,16 @@
   text-transform: uppercase;
 }
 
+/*
+  R8 — `balance` on the display lines and `pretty` on the reading lines. Every
+  headline on the site sets its own breaks with <br>, which balance does not
+  override; where a line does wrap on its own (a long market name, a narrow
+  phone) it now splits evenly instead of dropping one word. `pretty` is for the
+  ledes, which wrap freely and were ending on a single word — "uncapped.",
+  "them.", "you." — at one width or another on five of the six routes.
+*/
 .pageHeadTitle {
+  text-wrap: balance;
   font-family: var(--display);
   font-size: clamp(3.5rem, 7vw, 7.5rem);
   font-weight: 400;
@@ -632,6 +670,7 @@
 
 .pageHeadLede {
   color: #e3eaf4;
+  text-wrap: balance;
   font-size: clamp(1.125rem, 1.3vw, 1.25rem);
   line-height: 1.55;
   margin-top: 1.5rem;
@@ -676,6 +715,7 @@
 .sectionTitle,
 .sectionTitleInk {
   font-family: var(--display);
+  text-wrap: balance;
   font-size: clamp(2.5rem, 4.2vw, 4.25rem);
   font-weight: 400;
   letter-spacing: 0.006em;
@@ -690,6 +730,7 @@
 .sectionLede,
 .sectionLedeInk {
   color: var(--on-ink-dim);
+  text-wrap: balance;
   font-size: clamp(1.125rem, 1.2vw, 1.25rem);
   line-height: 1.6;
   max-width: 52ch;
@@ -810,15 +851,47 @@
   position: relative;
 }
 
+/*
+  R8 — the other half of the same pair. A paper RUN made of more than one
+  section takes the top cut on its first section and the bottom cut on its
+  last, so the run reads as one chapter with the same two angled edges a
+  single `.seam` section gets. Used on Services, where the service rows and
+  the bundle chapter are both paper and adjacent; putting `.seam` on either
+  one alone would have cut a navy wedge between two sheets of the same paper.
+*/
+.seamBottomOnly {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--seam-rise)), 0 100%);
+  position: relative;
+}
+
 @media (max-width: 900px) {
   .page {
     --seam-rise: 0px;
   }
 
   .seam,
-  .seamTopOnly {
+  .seamTopOnly,
+  .seamBottomOnly {
     clip-path: none;
   }
+}
+
+/* --------------------------------------------------------------------------
+   Press states
+   --------------------------------------------------------------------------
+   The buttons, the menu toggle and the city chips all drop a pixel when they
+   are held. The text links did not, so half the interactive set answered a
+   press and half went straight from hover to navigation. One rule, the same
+   gesture, everything that is not a filled button.
+   -------------------------------------------------------------------------- */
+
+.quietLink:active,
+.inlineLink:active,
+.headerLink:active,
+.footerNav a:active,
+.footerSocial a:active,
+.footerLegal a:active {
+  transform: translateY(1px);
 }
 
 /* --------------------------------------------------------------------------
@@ -882,7 +955,7 @@
   min-height: 32px;
   text-decoration: none;
   text-transform: uppercase;
-  transition: color 0.2s ease;
+  transition: color var(--t-quick) ease;
 }
 
 .footerNav a:hover {
@@ -902,9 +975,9 @@
   height: 40px;
   justify-content: center;
   transition:
-    border-color 0.22s ease,
-    color 0.22s ease,
-    transform 0.22s var(--ease-out-expo);
+    border-color var(--t-quick) ease,
+    color var(--t-quick) ease,
+    transform var(--t-move) var(--ease-out-expo);
   width: 40px;
 }
 
@@ -934,6 +1007,7 @@
 */
 .footerLegal a {
   align-items: center;
+  transition: color var(--t-quick) ease;
   color: inherit;
   display: inline-flex;
   margin-right: 1.1rem;
@@ -978,7 +1052,7 @@
   opacity: 0;
   transition:
     mask-size 0.85s var(--ease-out-expo),
-    opacity 0.45s ease;
+    opacity 0.85s var(--ease-out-expo);
 }
 
 [data-motion="on"] .reveal[data-shown] {
@@ -992,10 +1066,29 @@
 
 [data-motion="on"] .revealRise {
   opacity: 0;
-  transform: translateY(18px);
+  transform: translateY(var(--rise));
   transition:
     opacity 0.55s var(--ease-out-expo),
     transform 0.62s var(--ease-out-expo);
+}
+
+/*
+  The stagger. Two routes had a hand-written nth-child cascade and the other
+  four fired their groups as one block, so the same gesture read as authored on
+  Careers and as a pop everywhere else. It lives here now, keyed on the reveal
+  class itself, and it is capped: four steps of 70ms is 210ms of lead, inside
+  the 400ms a group is allowed to take before the last card feels late.
+*/
+[data-motion="on"] .revealRise ~ .revealRise {
+  transition-delay: 70ms;
+}
+
+[data-motion="on"] .revealRise ~ .revealRise ~ .revealRise {
+  transition-delay: 140ms;
+}
+
+[data-motion="on"] .revealRise ~ .revealRise ~ .revealRise ~ .revealRise {
+  transition-delay: 210ms;
 }
 
 [data-motion="on"] .revealRise[data-shown] {
