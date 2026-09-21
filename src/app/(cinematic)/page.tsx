@@ -139,7 +139,57 @@ export default function Home() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 3 — the route: how you start                                     */}
+      {/* 3 — why people sell with 3C                                      */}
+      {/* ---------------------------------------------------------------- */}
+      {/*
+        Four facts, each already stated elsewhere on the site (the careers
+        list, the route steps, the apply page) and confirmed by the owner on
+        2026-09-21. Sits right after the work chapters and before the route,
+        so the reason to apply comes before the steps to do it (moved up from
+        below the FAQ, 2026-09-21 evening). No Apply button here: the route
+        foot below carries a quiet link and the closer carries the button.
+        The team line replaces the old second card.
+      */}
+      <section id="why" className={styles.why} aria-labelledby="why-title">
+        <div className={kit.shell}>
+          {/*
+            Four reasons as a typographic grid: a lime term over a one-line
+            fact, no rules, no cards, no icons. The FAQ further down is a
+            hairline row stack, so this block deliberately is not one.
+          */}
+          <div className={styles.whyLayout}>
+            <div className={styles.whyHead}>
+              <h2 id="why-title" className={styles.whyTitle}>
+                Why people
+                <br />
+                <span className={styles.heroLime}>sell with 3C.</span>
+              </h2>
+
+              <p className={styles.whyTeam}>
+                Already lead a sales crew? That is a different conversation, and it starts with a
+                message rather than an application.{" "}
+                <Link href="/contact" className={kit.inlineLink}>
+                  Contact the team
+                </Link>
+              </p>
+            </div>
+
+            <div className={styles.whyBody}>
+              <dl className={styles.whyList}>
+                {WHY.map(([term, fact]) => (
+                  <div key={term} className={`${styles.whyItem} ${kit.revealRise}`} data-reveal>
+                    <dt className={styles.whyTerm}>{term}</dt>
+                    <dd className={styles.whyFact}>{fact}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* 4 — the route: how you start                                     */}
       {/* ---------------------------------------------------------------- */}
       <section id="start" className={styles.routeSection} data-route-section aria-labelledby="start-title">
         <div className={kit.shell}>
@@ -182,7 +232,7 @@ export default function Home() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 4 — where                                                        */}
+      {/* 5 — where                                                        */}
       {/* ---------------------------------------------------------------- */}
       <section id="markets" className={styles.markets} aria-labelledby="markets-title">
         <div className={kit.shell}>
@@ -201,7 +251,7 @@ export default function Home() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 5 — questions                                                    */}
+      {/* 6 — questions                                                    */}
       {/* ---------------------------------------------------------------- */}
       <section id="questions" className={styles.faq} aria-labelledby="faq-title">
         <div className={kit.shell}>
@@ -237,54 +287,6 @@ export default function Home() {
                 </div>
               </details>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* 6 — why people sell with 3C                                      */}
-      {/* ---------------------------------------------------------------- */}
-      {/*
-        Four facts, each already stated elsewhere on the site (the careers
-        list, the route steps, the apply page) and confirmed by the owner on
-        2026-09-21. No Apply button here: the closer one screen down carries
-        the page's last one, so the reader is not asked twice on one navy.
-        The team line replaces the old second card.
-      */}
-      <section id="why" className={styles.why} aria-labelledby="why-title">
-        <div className={kit.shell}>
-          {/*
-            Four reasons as a typographic grid: a lime term over a one-line
-            fact, no rules, no cards, no icons. The FAQ two sections up is a
-            hairline row stack, so this block deliberately is not one.
-          */}
-          <div className={styles.whyLayout}>
-            <div className={styles.whyHead}>
-              <h2 id="why-title" className={styles.whyTitle}>
-                Why people
-                <br />
-                <span className={styles.heroLime}>sell with 3C.</span>
-              </h2>
-
-              <p className={styles.whyTeam}>
-                Already lead a sales crew? That is a different conversation, and it starts with a
-                message rather than an application.{" "}
-                <Link href="/contact" className={kit.inlineLink}>
-                  Contact the team
-                </Link>
-              </p>
-            </div>
-
-            <div className={styles.whyBody}>
-              <dl className={styles.whyList}>
-                {WHY.map(([term, fact]) => (
-                  <div key={term} className={`${styles.whyItem} ${kit.revealRise}`} data-reveal>
-                    <dt className={styles.whyTerm}>{term}</dt>
-                    <dd className={styles.whyFact}>{fact}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
           </div>
         </div>
       </section>

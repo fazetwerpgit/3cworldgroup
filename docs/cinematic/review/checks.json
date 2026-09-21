@@ -66,7 +66,7 @@
       "route": "/",
       "motion": null,
       "hidden": [],
-      "h": 8075
+      "h": 8099
     },
     {
       "route": "/services",
@@ -78,7 +78,7 @@
   "nojs": [
     {
       "route": "/",
-      "height": 8075
+      "height": 8099
     },
     {
       "route": "/about",
@@ -220,7 +220,7 @@
       "route": "/",
       "box": {
         "x": 222,
-        "y": 513,
+        "y": 253,
         "w": 768,
         "h": 216,
         "color": "rgb(255, 255, 255)"
