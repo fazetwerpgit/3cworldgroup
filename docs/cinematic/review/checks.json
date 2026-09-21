@@ -65,7 +65,12 @@
     {
       "route": "/",
       "motion": null,
-      "hidden": [],
+      "hidden": [
+        "cinematic-home-module__mBhnHq__cityPlatePanel",
+        "cinematic-home-module__mBhnHq__cityPlatePanel",
+        "cinematic-home-module__mBhnHq__cityPlatePanel",
+        "cinematic-home-module__mBhnHq__cityPlatePanel"
+      ],
       "h": 8073
     },
     {

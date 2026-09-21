@@ -44,7 +44,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    /*
+      suppressHydrationWarning is here for one attribute: the (cinematic) group's
+      layout opens its motion gate with a blocking inline script that sets
+      `data-motion` on this element before React hydrates, so the server HTML and
+      the client tree legitimately differ by that attribute and React would
+      otherwise log a mismatch on every cinematic page load. It suppresses
+      warnings for this element's own attributes only, not for its subtree.
+    */
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

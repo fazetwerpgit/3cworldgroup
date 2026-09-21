@@ -30,6 +30,14 @@
   --rule: rgba(255, 255, 255, 0.14);
   --rule-ink: rgba(16, 31, 56, 0.2);
   --rule-ink-strong: rgba(16, 31, 56, 0.34);
+  /*
+    Lime, resolved against whatever ground the element is standing on. Lime
+    reads 7:1 on navy and 1.8:1 on paper; --lime-ink reads 5.2:1 on paper and
+    is nearly invisible on navy. Anything that wants "the accent colour, but
+    legible here" takes this rather than picking one of the two by hand, which
+    is how an underline ended up drawn in dark green on a navy paragraph.
+  */
+  --accent: var(--lime);
 
   --display: "Bebas Neue", var(--font-geist-sans), sans-serif;
   --body: var(--font-geist-sans), system-ui, sans-serif;
@@ -69,8 +77,17 @@
   --seam-rise: 0px;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --rise: 18px;
-  --t-quick: 0.2s;
-  --t-move: 0.3s;
+  /*
+    The two interaction-feedback durations. Everything a pointer or a key can
+    provoke — a colour change, a nudge, a press — answers inside 150-220ms,
+    which is the band where the response reads as the element's own rather
+    than as an animation played at you. `--t-quick` is colour and `--t-move`
+    is travel; the movement is given the longer of the two because it has a
+    distance to cover and the colour does not. Entrances are slower and are
+    written out in full at the reveal classes, not taken from these.
+  */
+  --t-quick: 0.18s;
+  --t-move: 0.2s;
 
   background: var(--ink);
   color: var(--on-ink);
@@ -88,26 +105,38 @@
 }
 
 /*
-  The focus ring is ground-aware, and it carries the ground in an inherited
-  custom property rather than in a pile of override selectors: lime reads 7:1
-  on navy, 1.8:1 on paper, and 1:1 on a lime button, so paper surfaces and lime
-  plates each hand the ring their own colour and every descendant picks it up.
-  Measured: --lime-ink on --paper 5.2:1, --ink on --lime 8.7:1.
+  The focus ring rides `--accent` by default, so it is ground-aware for free,
+  and `--focus-ring` exists for the one case the ground cannot answer: an
+  element whose own fill is the accent. Measured: --ink on --lime 8.7:1.
 */
 .page :focus-visible {
   border-radius: 2px;
-  outline: 2px solid var(--focus-ring, var(--lime));
+  outline: 2px solid var(--focus-ring, var(--accent));
   outline-offset: 3px;
 }
 
 .surfacePaper,
 .surfacePaperRaise {
-  --focus-ring: var(--lime-ink);
+  --accent: var(--lime-ink);
 }
 
+/*
+  A filled lime element wears its ring INSIDE its own fill. The navy is the
+  colour with the measured contrast against lime, and at a positive offset a
+  navy ring is drawn in the gap outside the element — on the navy ground,
+  where it disappears entirely. Pulling the offset inward puts those 8.7:1 on
+  the only surface that is guaranteed to be there whatever the element is
+  standing on. Every button carries at least 10px of padding, so the ring sits
+  in the fill and never on the label.
+*/
 .btnLime,
 .skipLink {
   --focus-ring: var(--ink);
+}
+
+.btnLime:focus-visible,
+.skipLink:focus-visible {
+  outline-offset: -3px;
 }
 
 .page input,
@@ -166,9 +195,23 @@
    Buttons and links
    -------------------------------------------------------------------------- */
 
+/*
+  A button answers three ways and only three ways: the ground under the label
+  changes on hover, the arrow leans in the direction the button is about to
+  take you, and a press compresses the whole thing. The lift a button used to
+  take on hover is gone — every filled element on every template floats a pixel
+  when you point at it, and with the arrow already moving there was nothing
+  left for the lift to say.
+
+  `scale()` is the press rather than a downward pixel because scale cannot move
+  a neighbour: the button occupies the same box at 0.98 as it does at 1, so a
+  row of buttons and the copy beside them stay exactly where they are while one
+  of them is held.
+*/
 .btn {
   align-items: center;
   border: 1px solid transparent;
+  cursor: pointer;
   display: inline-flex;
   font-family: var(--display);
   font-size: 1.06rem;
@@ -181,18 +224,33 @@
     transform var(--t-move) var(--ease-out-expo),
     background-color var(--t-quick) ease,
     border-color var(--t-quick) ease,
-    box-shadow var(--t-move) var(--ease-out-expo),
-    color 0.22s ease;
+    color var(--t-quick) ease;
   white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btnArrow {
   transition: transform var(--t-move) var(--ease-out-expo);
 }
 
-.btn:hover .btnArrow,
-.quietLink:hover .btnArrow {
-  transform: translateX(4px);
+/*
+  Keyboard gets the same lean as the pointer. The ring says which element is
+  selected; the arrow is the part that says what the element does, and a reader
+  tabbing through the page was the one person not being told.
+*/
+.btn:focus-visible .btnArrow,
+.quietLink:focus-visible .btnArrow {
+  transform: translateX(3px);
+}
+
+@media (hover: hover) {
+  .btn:hover .btnArrow,
+  .quietLink:hover .btnArrow {
+    transform: translateX(3px);
+  }
 }
 
 .btnLime {
@@ -200,13 +258,17 @@
   color: var(--ink);
 }
 
-.btnLime:hover {
-  background: var(--lime-bright);
-  transform: translateY(-1px);
-}
-
-.btnLime:active {
-  transform: translateY(1px);
+/*
+  Every hover in this file is behind `(hover: hover)`. A phone resolves `:hover`
+  on tap and then holds it until something else is tapped, so without the query
+  the last button a thumb touched stays lit for the rest of the visit. `:active`
+  is deliberately outside the query — that one is the press, and a press is
+  exactly what a thumb does.
+*/
+@media (hover: hover) {
+  .btnLime:hover {
+    background: var(--lime-bright);
+  }
 }
 
 .btnGhost {
@@ -215,14 +277,11 @@
   color: var(--on-ink);
 }
 
-.btnGhost:hover {
-  background: rgba(6, 23, 53, 0.6);
-  border-color: var(--on-ink);
-  transform: translateY(-1px);
-}
-
-.btnGhost:active {
-  transform: translateY(1px);
+@media (hover: hover) {
+  .btnGhost:hover {
+    background: rgba(6, 23, 53, 0.82);
+    border-color: var(--on-ink);
+  }
 }
 
 .btnLg {
@@ -259,9 +318,23 @@
     color var(--t-quick) ease;
 }
 
-.quietLink:hover {
+/*
+  Two link grammars on this site, and only two. A link that already carries a
+  rule under it — this one, and the underlined links inside prose — turns that
+  rule lime; a link with nothing under it grows a lime one from the left. Which
+  of the two an element gets is decided by whether the underline is part of how
+  it is drawn at rest, never by which page it is on.
+*/
+.quietLink:focus-visible {
   border-color: var(--lime);
   color: var(--lime);
+}
+
+@media (hover: hover) {
+  .quietLink:hover {
+    border-color: var(--lime);
+    color: var(--lime);
+  }
 }
 
 /*
@@ -277,22 +350,45 @@
   color: var(--on-paper);
 }
 
-.quietLinkInk:hover {
+.quietLinkInk:focus-visible {
   border-bottom-color: var(--lime-ink);
   color: var(--lime-ink);
+}
+
+@media (hover: hover) {
+  .quietLinkInk:hover {
+    border-bottom-color: var(--lime-ink);
+    color: var(--lime-ink);
+  }
 }
 
 .inlineLink {
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: var(--lime-ink);
+  text-decoration-color: var(--accent);
   text-decoration-thickness: 2px;
   text-underline-offset: 0.22em;
-  transition: color var(--t-quick) ease;
+  transition:
+    color var(--t-quick) ease,
+    text-decoration-color var(--t-quick) ease;
 }
 
-.inlineLink:hover {
-  color: var(--lime-ink);
+/*
+  An inline link wraps with the sentence it sits in, so its underline has to be
+  `text-decoration` — a drawn bar would only ever underline one of the two lines
+  a wrapped link occupies. It answers by colouring the rule it already has,
+  which is the same move `.quietLink` makes.
+*/
+.inlineLink:focus-visible {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+@media (hover: hover) {
+  .inlineLink:hover {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -359,8 +455,15 @@
   width: 42px;
 }
 
-.brand:hover .brandMark {
-  transform: scale(1.06) rotate(-2deg);
+/*
+  Scale only. The mark used to tilt two degrees as well, which is the one
+  gesture on the site that existed purely to be noticed — a logo that spins
+  when you point at it is decoration, and this pass has none.
+*/
+@media (hover: hover) {
+  .brand:hover .brandMark {
+    transform: scale(1.04);
+  }
 }
 
 .brandCopy {
@@ -413,9 +516,14 @@
   transition: transform var(--t-move) var(--ease-out-expo);
 }
 
-.headerLink:hover::after,
 .headerLink:focus-visible::after {
   transform: scaleX(1);
+}
+
+@media (hover: hover) {
+  .headerLink:hover::after {
+    transform: scaleX(1);
+  }
 }
 
 /*
@@ -448,16 +556,20 @@
   justify-content: center;
   transition:
     background-color var(--t-quick) ease,
-    border-color var(--t-quick) ease;
+    border-color var(--t-quick) ease,
+    transform var(--t-move) var(--ease-out-expo);
   width: 40px;
 }
 
-.menuToggle:hover {
-  border-color: var(--on-ink);
+@media (hover: hover) {
+  .menuToggle:hover {
+    border-color: var(--on-ink);
+  }
 }
 
 .menuToggle:active {
   background: rgba(255, 255, 255, 0.1);
+  transform: scale(0.96);
 }
 
 /*
@@ -505,10 +617,14 @@
   padding: 0.85rem 0;
   text-decoration: none;
   text-transform: uppercase;
+  transition:
+    color var(--t-quick) ease,
+    transform var(--t-move) var(--ease-out-expo);
 }
 
 .menuLink:active {
   color: var(--lime);
+  transform: translateY(1px);
 }
 
 .menuLinkCurrent {
@@ -874,17 +990,17 @@
 /* --------------------------------------------------------------------------
    Press states
    --------------------------------------------------------------------------
-   The buttons, the menu toggle and the city chips all drop a pixel when they
-   are held. The text links did not, so half the interactive set answered a
-   press and half went straight from hover to navigation. One rule, the same
-   gesture, everything that is not a filled button.
+   Every interactive element on the site answers a press, and there are two
+   answers depending on what is being pressed. A filled or bordered control —
+   a button, the menu toggle, an icon box — compresses to 0.98; a line of text
+   drops a pixel, because there is no box there to squeeze. Both are transform
+   only, so nothing next to the pressed element moves while it is held.
    -------------------------------------------------------------------------- */
 
 .quietLink:active,
 .inlineLink:active,
 .headerLink:active,
 .footerNav a:active,
-.footerSocial a:active,
 .footerLegal a:active {
   transform: translateY(1px);
 }
@@ -939,6 +1055,13 @@
   the header row so it reads as the quiet restatement it is. The box is 32px
   rather than the 24px floor because a footer link is the last thing a thumb
   reaches for on a phone.
+
+  And the second link grammar, which the footer was missing: these rows used to
+  go lime on hover and nothing else, so the site had a link that answered with
+  colour alone while the identical row in the header drew a line. They now draw
+  the same line — lime, two pixels, opening from the left edge — and the dim
+  grey lifts to full white underneath it rather than turning lime itself,
+  because lime is the accent and it is already being spent on the rule.
 */
 .footerNav a {
   align-items: center;
@@ -948,13 +1071,41 @@
   font-size: 0.98rem;
   letter-spacing: 0.06em;
   min-height: 32px;
+  position: relative;
   text-decoration: none;
   text-transform: uppercase;
   transition: color var(--t-quick) ease;
 }
 
-.footerNav a:hover {
-  color: var(--lime);
+.footerNav a::after {
+  background: var(--lime);
+  bottom: 0.15rem;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t-move) var(--ease-out-expo);
+}
+
+.footerNav a:focus-visible {
+  color: var(--on-ink);
+}
+
+.footerNav a:focus-visible::after {
+  transform: scaleX(1);
+}
+
+@media (hover: hover) {
+  .footerNav a:hover {
+    color: var(--on-ink);
+  }
+
+  .footerNav a:hover::after {
+    transform: scaleX(1);
+  }
 }
 
 .footerSocial {
@@ -976,10 +1127,25 @@
   width: 40px;
 }
 
-.footerSocial a:hover {
+/*
+  The icon boxes lost their two-pixel lift with the buttons, for the same
+  reason: the border and the glyph going lime is already the whole answer, and
+  the lift was the part that made a row of them read as a widget.
+*/
+.footerSocial a:focus-visible {
   border-color: var(--lime);
   color: var(--lime);
-  transform: translateY(-2px);
+}
+
+.footerSocial a:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) {
+  .footerSocial a:hover {
+    border-color: var(--lime);
+    color: var(--lime);
+  }
 }
 
 .footerLegal {
@@ -1008,11 +1174,39 @@
   display: inline-flex;
   margin-right: 1.1rem;
   min-height: 26px;
+  position: relative;
   text-decoration: none;
 }
 
-.footerLegal a:hover {
-  color: var(--lime);
+.footerLegal a::after {
+  background: var(--lime);
+  bottom: 0;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t-move) var(--ease-out-expo);
+}
+
+.footerLegal a:focus-visible {
+  color: var(--on-ink);
+}
+
+.footerLegal a:focus-visible::after {
+  transform: scaleX(1);
+}
+
+@media (hover: hover) {
+  .footerLegal a:hover {
+    color: var(--on-ink);
+  }
+
+  .footerLegal a:hover::after {
+    transform: scaleX(1);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1041,61 +1235,111 @@
   /* Marker class. Everything it does is under [data-motion="on"] below. */
 }
 
+/*
+  The durations live on the `[data-shown]` rules, never on the pre-state.
+  `data-motion` lands on an element the server already painted finished, so a
+  transition declared on the pre-state has something to animate FROM: the head
+  eases out to nothing over its own duration and then eases back in, and any
+  element shown inside those first frames starts its entrance from wherever
+  the exit had got to. With the timing on the arrival rule, the pre-state is a
+  snap — the state the element would have had if the server had drawn it that
+  way — and the reveal is the only thing that ever plays.
+*/
 [data-motion="on"] .reveal {
   mask-image: linear-gradient(to bottom, #000 0, #000 100%);
   mask-repeat: no-repeat;
   mask-size: 100% 0%;
   opacity: 0;
-  transition:
-    mask-size 0.85s var(--ease-out-expo),
-    opacity 0.85s var(--ease-out-expo);
 }
 
 [data-motion="on"] .reveal[data-shown] {
   mask-size: 100% 100%;
   opacity: 1;
+  transition:
+    mask-size 0.62s var(--ease-out-expo),
+    opacity 0.62s var(--ease-out-expo);
 }
 
+/*
+  Twelve pixels of travel, not the eighteen the page token carries, and it is
+  set here rather than on `.page` because the homepage's two set pieces — the
+  hero lede and the route stop cards — are written against the larger distance
+  and are each one element arriving alone, where it reads. Eight cards all
+  crossing eighteen pixels reads as the page settling rather than as an
+  entrance. Everything else this class does is under [data-motion="on"] below.
+*/
 .revealRise {
-  /* Marker class. Everything it does is under [data-motion="on"] below. */
+  --rise: 12px;
 }
 
 [data-motion="on"] .revealRise {
   opacity: 0;
   transform: translateY(var(--rise));
+}
+
+[data-motion="on"] .revealRise[data-shown] {
+  opacity: 1;
+  transform: none;
   transition:
-    opacity 0.55s var(--ease-out-expo),
-    transform 0.62s var(--ease-out-expo);
+    opacity 0.4s var(--ease-out-expo),
+    transform 0.45s var(--ease-out-expo);
 }
 
 /*
   The stagger. Two routes had a hand-written nth-child cascade and the other
   four fired their groups as one block, so the same gesture read as authored on
   Careers and as a pop everywhere else. It lives here now, keyed on the reveal
-  class itself, and it is capped: four steps of 70ms is 210ms of lead, inside
-  the 400ms a group is allowed to take before the last card feels late.
+  class itself, and it is capped: four steps of 80ms is 240ms of lead, and the
+  fourth card finishes 690ms after the first one started — inside the second
+  that a group has before the last of it feels like an afterthought. The step
+  went up with the entrance getting shorter: at 70ms against a 450ms rise the
+  cards overlapped so heavily the cascade was hard to see at all.
+
+  Keyed on `[data-shown]` for the same reason the durations are: a delay on the
+  pre-state would only ever postpone the disappearance.
 */
-[data-motion="on"] .revealRise ~ .revealRise {
-  transition-delay: 70ms;
+[data-motion="on"] .revealRise ~ .revealRise[data-shown] {
+  transition-delay: 80ms;
 }
 
-[data-motion="on"] .revealRise ~ .revealRise ~ .revealRise {
-  transition-delay: 140ms;
+[data-motion="on"] .revealRise ~ .revealRise ~ .revealRise[data-shown] {
+  transition-delay: 160ms;
 }
 
-[data-motion="on"] .revealRise ~ .revealRise ~ .revealRise ~ .revealRise {
-  transition-delay: 210ms;
+[data-motion="on"] .revealRise ~ .revealRise ~ .revealRise ~ .revealRise[data-shown] {
+  transition-delay: 240ms;
 }
 
-[data-motion="on"] .revealRise[data-shown] {
-  opacity: 1;
-  transform: none;
-}
+/*
+  The header's share of the page entrance, timed on the arrival rule for the
+  same reason the reveals are — and here the delay made it worse than a stutter.
+  `data-entered` is set two frames after `data-motion`, so a 120ms delay
+  declared on the pre-state had not started counting when the target flipped
+  back: the header never left opacity 1 or y 0, and the entrance simply did not
+  play. The pre-state is a snap; the 12px and the 0.55s belong to the arrival.
 
-/* The header's share of the page entrance. */
+  The condense transitions ride along on the arrival rule because the shorthand
+  there replaces the one on `.header` wholesale. The pre-state declares no
+  transition at all, so before the header enters it still uses `.header`'s own,
+  and a page that opens condensed animates its backdrop as it always did.
+*/
 [data-motion="on"] .header {
   opacity: 0;
   transform: translateY(-12px);
+}
+
+/*
+  Keyed on `data-booted`, not `data-entered`. The header lives in the layout and
+  never unmounts, while `data-entered` is cleared and re-set on every
+  client-side navigation — so the one element that stays put was the one
+  replaying its arrival each time a link was followed, which read as a flicker
+  in the chrome. `data-booted` is set with the first entrance and never removed,
+  so this plays once for the life of the document. Page-level entrances stay on
+  `data-entered` and do replay, which is the point of them.
+*/
+[data-motion="on"][data-booted] .header {
+  opacity: 1;
+  transform: none;
   transition:
     opacity 0.55s var(--ease-out-expo) 0.12s,
     transform 0.55s var(--ease-out-expo) 0.12s,
@@ -1103,9 +1347,56 @@
     box-shadow 0.3s ease;
 }
 
-[data-motion="on"][data-entered] .header {
+/*
+  How an interior page opens. Home and the interior routes were arriving
+  differently: the homepage hero has an entrance written against
+  `[data-entered]`, and `.pageHead` — which About, Careers, Contact and
+  Services all open on — had none, so navigating from Home to About went from
+  a page that assembled itself to a page that was simply already there. The
+  owner read that as the entrances stopping.
+
+  The copy column is the unit, and its direct children are the beats, which is
+  why this is keyed on `.pageHeadCol > *` rather than on the four kit classes.
+  Careers wraps its eyebrow in a row with a link beside it; targeting the
+  children means that row rises as the one thing it looks like, instead of the
+  eyebrow lifting out from under a link that was already in place.
+
+  Only the copy moves. The photograph, the scrim and the ground are untouched,
+  so the frame is sharp and still from the first paint and the composition
+  never shifts. Contact's 3C mark sits outside this column and keeps the single
+  `data-reveal` entrance it already had; it is not doubled here.
+
+  Four beats at 80ms is 240ms of lead and the last of them lands inside 700ms.
+  The cap is four because every head on the site is written as four.
+
+  Timing on the arrival rule, pre-state a bare snap — same contract as the
+  reveals above, and here it is load-bearing: `data-entered` follows
+  `data-motion` by two frames, so a duration on the pre-state would have its
+  target flipped back before the copy had travelled anything.
+*/
+[data-motion="on"] .pageHead .pageHeadCol > * {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+[data-motion="on"][data-entered] .pageHead .pageHeadCol > * {
   opacity: 1;
   transform: none;
+  transition:
+    opacity 0.45s var(--ease-out-expo),
+    transform 0.45s var(--ease-out-expo);
+}
+
+[data-motion="on"][data-entered] .pageHead .pageHeadCol > :nth-child(2) {
+  transition-delay: 80ms;
+}
+
+[data-motion="on"][data-entered] .pageHead .pageHeadCol > :nth-child(3) {
+  transition-delay: 160ms;
+}
+
+[data-motion="on"][data-entered] .pageHead .pageHeadCol > :nth-child(4) {
+  transition-delay: 240ms;
 }
 
 /* --------------------------------------------------------------------------

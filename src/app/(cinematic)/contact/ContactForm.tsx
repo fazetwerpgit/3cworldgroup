@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import styles from "./contact.module.css";
@@ -41,6 +41,14 @@ export default function ContactForm() {
   // form's own `invalid` event (which fires on submit, capture-phase only,
   // because `invalid` does not bubble) and cleared per field as it is edited.
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  /*
+    The duplicate-submit guard. `submitting` disables the button, but state is
+    not readable until React has re-rendered — a double click inside one frame,
+    or Enter held down in a field, runs `handleSubmit` twice against the old
+    `false` and sends the message twice. The ref flips synchronously on the
+    first call, so the second returns before it reaches fetch.
+  */
+  const pendingRef = useRef(false);
 
   const handleInvalid = (
     e: React.FormEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -51,6 +59,8 @@ export default function ContactForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setSubmitting(true);
     setError("");
     setInvalid({});
@@ -58,6 +68,7 @@ export default function ContactForm() {
     if (formData.website) {
       setSubmitted(true);
       setSubmitting(false);
+      pendingRef.current = false;
       return;
     }
 
@@ -74,15 +85,25 @@ export default function ContactForm() {
         }),
       });
       if (!response.ok) {
+        /*
+          The server's own sentence when it wrote one — it knows which field it
+          rejected and this one does not. The catch below is for the case where
+          there is no response to read a sentence out of, which is why it does
+          not repeat `err.message`: "Failed to fetch" is not a sentence anyone
+          should be shown. Nothing is cleared either way, so every value typed
+          is still in the form to send again.
+        */
         const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || "Failed to send message");
+        setError(data.error || "Failed to send message. Please try again.");
+        return;
       }
       setSubmitted(true);
     } catch (err) {
       console.error("Error sending contact message:", err);
-      setError(err instanceof Error && err.message ? err.message : "Failed to send message. Please try again.");
+      setError("Failed to send message. Please try again.");
     } finally {
       setSubmitting(false);
+      pendingRef.current = false;
     }
   };
 
@@ -109,7 +130,12 @@ export default function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={styles.form} noValidate={false}>
+    <form
+      onSubmit={handleSubmit}
+      className={styles.form}
+      noValidate={false}
+      aria-busy={submitting || undefined}
+    >
       <div aria-hidden="true" className={styles.honeypot}>
         <label htmlFor="contact-website">Website (leave blank)</label>
         <input
@@ -241,15 +267,24 @@ export default function ContactForm() {
       </div>
 
       <div className={styles.formActions}>
+        {/*
+          Both labels are in the DOM, stacked in one grid cell, and the inactive
+          one is `visibility: hidden` — so this button keeps the width of the
+          longer string and the height of the line box whichever state it is in.
+          The arrow stays for the same reason: dropping it mid-submit took 25px
+          off the button and the note under it jumped. Hidden to assistive tech
+          as well as to the eye, so only one label is ever announced.
+        */}
         <button
           type="submit"
           disabled={submitting}
           className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}
         >
-          {submitting ? "Sending…" : "Send message"}
-          {submitting ? null : (
-            <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
-          )}
+          <span className={styles.submitLabel}>
+            <span data-hidden={submitting || undefined}>Send message</span>
+            <span data-hidden={!submitting || undefined}>Sending…</span>
+          </span>
+          <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
         </button>
         <p className={styles.formNote}>
           Fields marked <span className={styles.req}>*</span> are required.

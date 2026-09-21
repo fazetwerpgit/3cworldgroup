@@ -20,16 +20,25 @@ export const metadata: Metadata = {
  *
  * Every claim here is grounded in the opportunity page and current training
  * language. What changed is the composition: the old
- * page was four icon-card grids stacked, and this is four chapters that
- * alternate navy and paper across an authored seam, each carrying one idea.
+ * page was four icon-card grids stacked, and this is three chapters that each
+ * carry one idea. Round 15 (owner) moved the glance onto paper, so the page
+ * now runs photographic hero, one paper chapter of two sections, then the navy
+ * closer — the same ink/paper/ink read Home has, on straight edges.
  * The four-step path is not repeated here: the homepage owns the route.
  */
 
-/** The opportunity at a glance — verbatim from the page this replaces. */
-const GLANCE = [
+/**
+ * The opportunity at a glance — verbatim from the page this replaces, with one
+ * addition: the pay term now states the engagement on the term itself. The
+ * disclosure under the stages still states it for the page as a whole, but a
+ * reader who only scans this grid was previously told the ceiling was uncapped
+ * without being told there is no floor.
+ */
+const GLANCE: { title: string; body: string; note?: string }[] = [
   {
     title: "Uncapped commission",
     body: "Your effort drives your earnings. Top performers earn more.",
+    note: "1099 independent contractor, commission only.",
   },
   {
     title: "Full training",
@@ -65,11 +74,21 @@ const STAGES = [
     body: "Work the process on a route, with field support to review how it went.",
     changes: "Your own route in an available market, with a leader checking in.",
   },
+  /*
+    Stage three is the only rung whose content is not drawn from the site's own
+    training language: both facts come from the compensation schedule, which
+    ties a higher per-account rate to a week's install count and ties travel to
+    the highest weekly producers. No title, no promotion and no threshold
+    number is stated here — the titles above account executive on that schedule
+    sit on the ladder the site deliberately does not publish, and the numbers
+    are the owner's to release.
+  */
   {
     title: "Take on more",
     stage: "Stage three",
-    body: "Take on more responsibility as your experience and your results develop.",
-    changes: "A bigger part in the team, and in how the route is worked.",
+    body: "Raise your weekly install count on the route you already work, week after week.",
+    changes:
+      "Qualify for a higher commission tier when you meet the weekly installation threshold. Road trips and company events go to the highest weekly producers.",
   },
 ];
 
@@ -94,7 +113,20 @@ export default function OpportunitiesPage() {
 
         <div className={kit.pageHeadInner}>
           <div className={kit.pageHeadCol}>
-            <p className={kit.pageHeadEyebrow}>Hiring in selected markets</p>
+            {/*
+              The eyebrow names the constraint, so the link that answers it sits
+              on the same line. The market list itself is the homepage's
+              explorer — this page never had a markets section — so the link
+              crosses to it rather than pointing at an anchor that does not
+              exist here.
+            */}
+            <div className={styles.headEyebrow}>
+              <p className={kit.pageHeadEyebrow}>Hiring in selected markets</p>
+              <Link href="/#markets" className={`${kit.quietLink} ${styles.headMarketsLink}`}>
+                See available markets
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
+              </Link>
+            </div>
             <h1 className={kit.pageHeadTitle}>
               Build a career.
               <span className={kit.pageHeadLime}>Not just a job.</span>
@@ -117,59 +149,46 @@ export default function OpportunitiesPage() {
       </header>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 1 — what the role gives you                                      */}
+      {/* 1 — what the role gives you. Paper, and the first section of the  */}
+      {/*     page's one paper run: the stages below share the ground, so   */}
+      {/*     the two are separated by the rhythm and the stages head's own */}
+      {/*     hairline, not by a second colour band.                        */}
       {/* ---------------------------------------------------------------- */}
       <section id="glance" className={styles.glance} aria-labelledby="glance-title">
         <div className={kit.shell}>
-          <header className={kit.sectionHead} data-reveal>
-            <h2 id="glance-title" className={kit.sectionTitle}>
+          <header className={kit.sectionHeadInk} data-reveal>
+            <h2 id="glance-title" className={kit.sectionTitleInk}>
               The opportunity,
               <br />
               at a glance.
             </h2>
-            <p className={kit.sectionLede}>
+            <p className={kit.sectionLedeInk}>
               What the work is, how you are paid, and where it happens. The details a
               recruiter would tell you on the phone, written down.
             </p>
           </header>
 
-          <div className={styles.glanceLayout}>
-            <ol className={styles.glanceList}>
-              {GLANCE.map((item) => (
-                <li
-                  key={item.title}
-                  className={`${styles.glanceItem} ${kit.revealRise}`}
-                  data-reveal
-                >
-                  <div>
-                    <h3 className={styles.glanceItemTitle}>{item.title}</h3>
-                    <p className={styles.glanceItemBody}>{item.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-
-            {/*
-              The neighborhood as a whole from a low rise: rooftops, tree line,
-              lit windows out to an orange horizon. The page head is one front
-              door up close and the closer is one cul-de-sac, so this is the
-              third distance, the whole territory in one look, and the only
-              frame on the site with a horizon. A light vertical fall only: the
-              plate has a hairline, so a left wash read as the picture starting
-              a third of the way in.
-            */}
-            <div className={styles.glanceArt} aria-hidden="true">
-              <Image
-                src="/redesign/cinematic/careers-rooftops-dusk-1920.webp"
-                alt=""
-                fill
-                priority
-                sizes="(max-width: 900px) 100vw, 44vw"
-                className={styles.glanceArtImage}
-              />
-              <div className={styles.glanceArtScrim} />
-            </div>
-          </div>
+          {/*
+            Round 16 (owner) removed the neighbourhood plate that stood beside
+            these terms and set the four on one crossed hairline instead: two
+            columns by two rows on desktop, a rule over each row and a single
+            rule between the columns. No box and no icon — the grid is drawn by
+            the hairlines the rest of the paper uses, and the set closes on the
+            stages head's own rule rather than spending a third full-width one.
+          */}
+          <ol className={styles.glanceGrid}>
+            {GLANCE.map((item) => (
+              <li
+                key={item.title}
+                className={`${styles.glanceItem} ${kit.revealRise}`}
+                data-reveal
+              >
+                <h3 className={styles.glanceItemTitle}>{item.title}</h3>
+                <p className={styles.glanceItemBody}>{item.body}</p>
+                {item.note ? <p className={styles.glanceItemNote}>{item.note}</p> : null}
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
@@ -180,9 +199,9 @@ export default function OpportunitiesPage() {
         <div className={kit.shell}>
           <header className={kit.sectionHeadInk} data-reveal>
             <h2 id="stages-title" className={kit.sectionTitleInk}>
-              Three stages
+              How you grow
               <br />
-              of the same job.
+              with 3C.
             </h2>
             <p className={kit.sectionLedeInk}>
               In the order you grow into them. What changes at each one is the

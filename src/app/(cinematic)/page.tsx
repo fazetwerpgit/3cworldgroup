@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import WorkChapters from "./_home/WorkChapters";
 import RouteSequence from "./_home/RouteSequence";
 import LocationExplorer from "./_home/LocationExplorer";
+import Faq from "./_home/Faq";
 import { APPLY_HREF } from "../_cinematic/nav";
 import kit from "../_cinematic/cinematic.module.css";
 import styles from "./cinematic-home.module.css";
@@ -24,33 +25,6 @@ export const metadata: Metadata = {
  * The chrome, the motion root and the `.page` element are all in
  * src/app/(cinematic)/layout.tsx. This file is sections.
  */
-
-const FAQS = [
-  {
-    q: "What is the job, day to day?",
-    a: "Face-to-face sales in residential neighborhoods. You work an area on foot, knock, introduce yourself, find out what a household is paying for internet, TV or security, and offer something that fits. It is outdoor, conversational work, and the number of conversations you have is the part of it you control.",
-  },
-  {
-    q: "What would I be selling?",
-    a: "Fiber internet, TV service, and home security systems from the providers 3C represents — individually or bundled. These are established products people already recognize, not something you have to explain from scratch.",
-  },
-  {
-    q: "How does the pay work?",
-    a: "This is a commission-only role with uncapped earnings. Your effort drives what you make, and top performers earn more. There is no salary component, so it suits people who want their income tied to their own activity.",
-  },
-  {
-    q: "Am I an employee or a contractor?",
-    a: "A 1099 independent contractor. You sign an independent contractor agreement that sets out compensation and scope, and you are responsible for your own taxes as a contractor.",
-  },
-  {
-    q: "Do I need sales experience?",
-    a: "No. 3C trains you on the products, the people, and the sales process, with hands-on coaching, roleplay, and support from experienced leaders — in the field, not only in a classroom or on a call.",
-  },
-  {
-    q: "Where does 3C operate?",
-    a: "3C works with communities across the country; the markets named on this page are Birmingham, Atlanta, Jacksonville, Lansing and Grand Rapids. Opportunities vary by market and change with client demand, so the honest answer for any specific city is a conversation.",
-  },
-];
 
 /* Every line here restates something already on the site: the careers list,
    the route steps, or the apply page. Nothing is promised here that is not
@@ -86,6 +60,16 @@ export default function Home() {
             sizes="100vw"
             className={styles.heroImageTall}
           />
+          {/*
+            The lit roads of this same photograph, lifted into their own
+            transparent layer and revealed under the pointer. It is a child of
+            .heroArt so it rides the drift transform and stays registered to
+            the frame pixel for pixel; the file itself is a CSS background
+            declared inside the desktop media query, because a second
+            next/image in a display:none box is still fetched and a 300KB
+            decoration must never reach a phone.
+          */}
+          <div className={styles.heroGlow} aria-hidden="true" />
         </div>
         <div className={styles.heroScrim} aria-hidden="true" />
 
@@ -205,7 +189,7 @@ export default function Home() {
               to your first route.
             </h2>
             <p className={kit.sectionLedeInk}>
-              Four steps, in order. No part of this is a formality — the conversation is a
+              Four steps, in order. No part of this is a formality. The conversation is a
               real one, and the training happens before anyone sends you out.
             </p>
           </header>
@@ -274,25 +258,13 @@ export default function Home() {
               answers.
             </h2>
             <p className={kit.sectionLedeInk}>
-              Six questions this role raises before anyone applies — the work itself, the
+              Six questions this role raises before anyone applies: the work itself, the
               products, how the pay works, contractor status, the training, and where 3C
               operates.
             </p>
           </header>
 
-          <div className={styles.faqList}>
-            {FAQS.map((item) => (
-              <details key={item.q} className={styles.faqItem} name="home-faq">
-                <summary className={styles.faqSummary}>
-                  <span>{item.q}</span>
-                  <Plus aria-hidden="true" className={styles.faqMark} size={20} strokeWidth={2} />
-                </summary>
-                <div className={styles.faqBody}>
-                  <p>{item.a}</p>
-                </div>
-              </details>
-            ))}
-          </div>
+          <Faq />
         </div>
       </section>
 

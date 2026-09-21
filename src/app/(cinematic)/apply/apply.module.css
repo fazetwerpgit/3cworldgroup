@@ -237,9 +237,17 @@
   min-height: 3.25rem;
   padding: 0.85rem 1rem;
   scroll-margin: 6.25rem 0 9rem;
+  /*
+    Interaction feedback, not an entrance: 180ms is long enough that the edge
+    and the ring arrive rather than snap, and short enough that the field is
+    already focused by the time a typist's first character lands. box-shadow is
+    in the list so the 2px ink hairline under the focus ring fades in with the
+    border instead of appearing a frame ahead of it.
+  */
   transition:
-    border-color var(--t-quick) ease,
-    background-color var(--t-quick) ease;
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
   width: 100%;
 }
 
@@ -333,9 +341,27 @@
   width: 100%;
 }
 
+/*
+  The pending button must not resize. `.submit` is already full width, so the
+  label swap cannot move the edges; the label itself is stacked so the taller
+  of the two strings owns the line box and the row height is constant too.
+*/
 .submit:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.submitLabel {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.submitLabel > span {
+  grid-area: 1 / 1;
+}
+
+.submitLabel > span[data-hidden] {
+  visibility: hidden;
 }
 
 .formError {

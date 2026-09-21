@@ -8,14 +8,25 @@
    the form.
 
    The mark and its line are the one element the owner named on the page this
-   replaces, so the geometry is exact rather than eyeballed. Measured off
-   public/redesign/contact-three-c-hd-x4f.webp — measured on the 1860x1520
-   master it was encoded from and re-encoded at 1395x1140, exactly 3/4 of it,
-   so every fraction below still holds: the lime diagonal
-   passes through (1860, 100) and (864, 1520), i.e. it runs down-left at
-   dx/dy = 0.7018 (35.07 deg off vertical) and leaves the bottom edge at
-   x = 863.6, which is 0.4643 of the image width from its left edge and so
-   0.5357 of it from its right.
+   replaces, so the geometry is exact rather than eyeballed — and re-measured
+   from the pixels rather than from the master's construction, because the
+   two disagreed.
+
+   Round 15. Every number below comes from a least-squares fit to the lime
+   centreline of public/redesign/contact-three-c-hd-x4f.webp (1395x1140, the
+   file next/image actually serves at every width on this page — the source is
+   narrower than the smallest device candidate, so it is never resampled).
+   Fitted over the diagonal's bottom 840 rows, rms 0.51px:
+
+     slope       dx/dy = 0.7035  (35.12 deg off vertical), not 0.7018
+     exit        x = 645.8 at the bottom edge, which is 0.5370 of the image
+                 width in from its RIGHT edge, not 0.5357
+     stroke      7.85px at 1395 wide, i.e. 0.00562 of the mark's width —
+                 so it is 3.1px at 1280 and 4.8px at 1920, never a fixed 3
+
+   The old figures came from the 1860x1520 master's two construction points
+   ((1860, 100) and (864, 1520)); the encoded file's actual centreline sits
+   0.0013 of its width to the left of that and runs 0.07 deg steeper.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -37,7 +48,7 @@
 .head {
   /*
     Both of these are set by where the line has to land, not by taste. The exit
-    point sits `0.5357 * --mark-w - --mark-bleed` in from the right edge of the
+    point sits `0.537 * --mark-w - --mark-bleed` in from the right edge of the
     viewport, while the hairline it lands on ends at the right edge of the
     shell — so too small a mark or too deep a bleed drops the node on the very
     end of that hairline instead of onto it.
@@ -76,15 +87,22 @@
   /*
     The continuation lives inside the mark, which is what makes it survive every
     width without a second set of measurements: the exit point is a fixed
-    fraction of the *image's own* width (0.5357 of it in from its left edge),
-    so `right: 53.57%` resolves against this box and is correct whether the mark
+    fraction of the *image's own* width (0.537 of it in from its RIGHT edge),
+    so `right: 53.7%` resolves against this box and is correct whether the mark
     is bled off the viewport at 1920 or sits behind the copy at 390. `--drop` is
     the distance from the bottom of the mark down to the hairline it lands on,
     which — with the mark's bottom on the head's bottom — is exactly the next
     section's top padding.
   */
   --drop: var(--path-drop);
-  --line-run: calc(0.7018 * var(--drop));
+  --line-run: calc(0.7035 * var(--drop));
+  /*
+    The raster's stroke scales with the mark, so the vector's has to as well —
+    a fixed 3px was thinner than the plate's line at every width above 1150
+    and the handoff read as a step down. One coefficient off the file (see the
+    head of this file), one source of truth: `--mark-w`.
+  */
+  --mark-stroke: calc(0.00562 * var(--mark-w));
 
   bottom: 0;
   mix-blend-mode: lighten;
@@ -100,19 +118,56 @@
   width: 100%;
 }
 
-/* A plain wrapper: it exists to carry `data-reveal` for the two things below
-   it, both of which are out of flow, so it adds no box of its own. */
+/* A plain wrapper for the two out-of-flow things below it, so it adds no box
+   of its own. It used to carry the `data-reveal` too; that moved up to
+   `.headArt` so the mark and the line it hands off to run on one timeline —
+   see the Motion section at the foot of this file. */
 .headTrail {
   display: block;
 }
 
 .headLine {
   height: var(--drop);
+  /*
+    The line runs corner to corner of this box, so half of its stroke falls
+    outside the box at each end — and an outermost `svg` clips to its own
+    viewport by default. That clip was the visible step: for the first ~2.5px
+    below the mark the stroke was cut into a tapering wedge that sat entirely
+    left of the point it was continuing (measured 2026-09-21: 5.8 device px
+    wide at the joint against 11 once clear of it). The stroke is the drawing
+    here, not the box, so the box does not get to crop it.
+
+    What the box DOES get to do is cut the top, and only the top. The line is
+    drawn from 8% above this box (see page.tsx) so its cap is never the thing
+    at the seam, and this polygon then trims it back to the mark's bottom edge
+    — the same horizontal the raster's own stroke is cut on. Butt to butt on
+    one horizontal, at one centre, at one width. The three other sides are
+    pushed far outside so the stroke keeps its full width all the way down.
+
+    The cut is 1.5px ABOVE that edge rather than on it. Scaling a raster down
+    costs its last row or two of coverage, so the plate's stroke pinches by
+    about 0.4px over the 1.3px before it ends and the seam read as a faint
+    hairline. 1.5px of overlap covers exactly that pinch and nothing above it:
+    short enough that no crisp edge appears inside the mark's own stroke, long
+    enough that the line is full width on both sides of the join.
+  */
+  clip-path: polygon(-400% -1.5px, 500% -1.5px, 500% 400%, -400% 400%);
+  overflow: visible;
   pointer-events: none;
   position: absolute;
-  right: 53.57%;
+  right: 53.7%;
   top: 100%;
   width: var(--line-run);
+}
+
+/*
+  The stroke lives here rather than on the element so it can be a calc on the
+  mark's own width. `non-scaling-stroke` means this length is read in CSS px
+  despite the uneven scale the viewBox applies.
+*/
+.headLinePath {
+  stroke: var(--lime);
+  stroke-width: var(--mark-stroke);
 }
 
 .headNode {
@@ -121,7 +176,7 @@
   height: 9px;
   pointer-events: none;
   position: absolute;
-  right: calc(53.57% + var(--line-run));
+  right: calc(53.7% + var(--line-run));
   top: calc(100% + var(--drop));
   transform: translate(50%, -50%);
   width: 9px;
@@ -279,9 +334,17 @@
   line-height: 1.5;
   min-height: 3.25rem;
   padding: 0.8rem 1rem;
+  /*
+    Interaction feedback, not an entrance: 180ms is long enough that the edge
+    and the ring arrive rather than snap, and short enough that the field is
+    already focused by the time a typist's first character lands. box-shadow is
+    in the list so the 2px ink hairline under the focus ring fades in with the
+    border instead of appearing a frame ahead of it.
+  */
   transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease;
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
   width: 100%;
 }
 
@@ -398,6 +461,32 @@
 
 .formActions {
   margin-top: 0.4rem;
+}
+
+/*
+  The pending button must not resize, or the note under it moves while the
+  reader is waiting to find out whether their message went. Both labels sit in
+  one grid cell, so the button is always as wide as the longer of the two and
+  as tall as the line box, and the swap is a visibility change inside a box
+  that never measures differently.
+*/
+.submitLabel {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.submitLabel > span {
+  grid-area: 1 / 1;
+}
+
+.submitLabel > span[data-hidden] {
+  visibility: hidden;
+}
+
+.formActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
 }
 
 .formNote {
@@ -665,7 +754,7 @@
     margin-top: clamp(1.25rem, 5vw, 2.25rem);
     opacity: 1;
     /* In the flow, but still the box the line and node are measured from:
-       `relative`, never `static`, or their `right: 53.57%` resolves against
+       `relative`, never `static`, or their `right: 53.7%` resolves against
        the head and the stub lands 80px away from the slash it continues. */
     position: relative;
     right: auto;
@@ -681,26 +770,88 @@
    exists. With JS off the line is simply drawn and the node is simply there.
    -------------------------------------------------------------------------- */
 
+/*
+  The mark arrives, then the line leaves it. One reveal drives all three: the
+  `data-reveal` is on `.headArt`, and the trail's rules below hang off that same
+  `[data-shown]`, so the three delays are one timeline rather than two observers
+  on two boxes — one of which has no box at all — that could fire a frame apart.
+  The mark itself never moves after it lands and never loops: it is the page's
+  set piece, not an animation.
+
+  It has to land clean, because the handoff at the bottom of the mark is
+  measured geometry (see the head of this file) and a residual transform on
+  either element would move one line and not the other. It does land clean —
+  the settled state is `transform: none` on the image, nothing on `.headArt`,
+  and the joint measures identically with reduced motion on and off.
+
+  Opacity goes on the IMAGE, not on `.headArt`: the wrapper's own opacity is
+  design (0.5 between 901 and 1023, 1 elsewhere) and a reveal that ended in
+  `opacity: 1` would quietly repaint that band at full strength. Nested inside,
+  the entrance multiplies with whatever the breakpoint asked for.
+
+  Every `transition` below is on the `[data-shown]` rule, never on the
+  pre-reveal rule, and that is the whole reason this set piece plays at all. It
+  did not before. MotionRoot sets `data-motion` after hydration, on a head the
+  server already painted finished, and the IntersectionObserver hands back
+  `data-shown` a few frames later — the mark is above the fold, so it is already
+  intersecting. With the transition declared on the pre-reveal rule,
+  `data-motion` did not hide the trail: it started a 1.1s animation *towards*
+  hidden whose 0.42s delay had not even elapsed when `data-shown` arrived and
+  reversed it. Measured 2026-09-21 — stroke-dashoffset never left 0 and the node
+  never left opacity 1 at 1440, 1920 or 390. The line was simply there. Declared
+  this way the pre-reveal state is a plain style: `data-motion` snaps the trail
+  out in one frame, and `data-shown` is the only thing that animates.
+*/
+[data-motion="on"] .headArtImage {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+[data-motion="on"] .headArt[data-shown] .headArtImage {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.45s var(--ease-out-expo),
+    transform 0.45s var(--ease-out-expo);
+}
+
+/*
+  0.45s of delay, not 0.25s: the line starts at the mark and runs away from it,
+  so it cannot begin before the mark it continues is solid. 450ms is the mark's
+  entrance; the draw picks up exactly as it finishes.
+*/
 [data-motion="on"] .headLinePath {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  transition: stroke-dashoffset 1.1s var(--ease-out-expo) 0.25s;
 }
 
-[data-motion="on"] .headTrail[data-shown] .headLinePath {
+[data-motion="on"] .headArt[data-shown] .headLinePath {
   stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1.1s var(--ease-out-expo) 0.45s;
 }
 
+/* 0.45s + 1.1s — the node lands as the line reaches it. */
 [data-motion="on"] .headNode {
   opacity: 0;
   transform: translate(50%, -50%) scale(0.2);
-  transition:
-    opacity 0.3s ease 1.1s,
-    transform 0.45s var(--ease-out-expo) 1.1s;
 }
 
-[data-motion="on"] .headTrail[data-shown] .headNode {
+[data-motion="on"] .headArt[data-shown] .headNode {
   opacity: 1;
   transform: translate(50%, -50%) scale(1);
+  transition:
+    opacity 0.3s ease 1.55s,
+    transform 0.45s var(--ease-out-expo) 1.55s;
+}
+
+/*
+  The field transitions are feedback on a control rather than an entrance, so
+  they are not behind `[data-motion="on"]` — which also means nothing else
+  switches them off when the reader has asked for less motion.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
 }
 

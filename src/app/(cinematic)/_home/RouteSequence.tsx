@@ -1,12 +1,16 @@
 import Image from "next/image";
-import kit from "../../_cinematic/cinematic.module.css";
 import styles from "../cinematic-home.module.css";
 
 /**
  * The signature moment: a route drawn the way a rep actually walks one — down a
- * street, turn, down the next. Both paths carry `pathLength="1"`, so the draw
- * is a single `stroke-dashoffset: calc(1 - var(--route-progress))` with no
- * measurement in JavaScript; MotionRoot only supplies the number.
+ * street, turn, down the next. Both paths carry `pathLength="1"`, so dash
+ * lengths are fractions of the whole route and nothing is measured in
+ * JavaScript; MotionRoot only says when to start.
+ *
+ * The wide route is one continuous pen stroke of a fixed length. Every stop
+ * publishes its own fraction of the path as `--route-at`, and the CSS turns
+ * that into a transition-delay against the shared `--route-draw`, so a stop
+ * arrives as the line reaches it without a single timer in the component.
  *
  * Two paths exist because a horizontal route and a vertical route are different
  * drawings, not one drawing stretched. The labels are a single ordered list,
@@ -99,8 +103,12 @@ const WIDE_PATH =
 const STACKED_PATH = "M 18 20 V 500";
 
 export default function RouteSequence() {
+  // `data-route-draw` marks the canvas rather than the section: the section's
+  // own top sits a section pad and a two-line heading — about 240px — above
+  // the drawing, so a trigger measured there started the stroke while the line
+  // was still under the fold and it was over before it came into frame.
   return (
-    <div className={styles.route}>
+    <div className={styles.route} data-route-draw>
       <svg
         className={styles.routeSvgWide}
         viewBox="0 0 1200 470"
@@ -142,7 +150,13 @@ export default function RouteSequence() {
             data-at-sm={stop.atSm}
             data-side={stop.side}
             data-cap={stop.cap}
-            style={{ "--stop-x": stop.x, "--stop-y": stop.y } as React.CSSProperties}
+            style={
+              {
+                "--stop-x": stop.x,
+                "--stop-y": stop.y,
+                "--route-at": stop.at,
+              } as React.CSSProperties
+            }
           >
             <span className={styles.routeDot} aria-hidden="true" />
             <span className={styles.routeStopCard}>
@@ -160,15 +174,26 @@ export default function RouteSequence() {
         The wide layout's photographs, one per bay. They are outside the list
         so the sequence is still read once; the photos say nothing the copy
         does not.
+
+        They used to ride the generic reveal kit, which meant all four appeared
+        together the moment the section scrolled in, ahead of the line that is
+        supposed to be introducing them. They now carry the same `--route-at`
+        as their stop and arrive on the same delay, so each photograph belongs
+        to a step rather than to the section.
       */}
       <div className={styles.routeArt} aria-hidden="true">
         {STOPS.map((stop) => (
           <span
             key={stop.n}
-            className={`${styles.routeArtItem} ${kit.revealRise}`}
-            data-reveal
+            className={styles.routeArtItem}
             data-side={stop.side}
-            style={{ "--stop-x": stop.x, "--stop-y": stop.y } as React.CSSProperties}
+            style={
+              {
+                "--stop-x": stop.x,
+                "--stop-y": stop.y,
+                "--route-at": stop.at,
+              } as React.CSSProperties
+            }
           >
             <Image src={stop.art} alt="" fill sizes="(max-width: 900px) 1px, 16vw" />
           </span>

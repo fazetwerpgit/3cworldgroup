@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -39,6 +39,14 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   // bubble shows is also on the element for assistive tech. Driven by the
   // controls' own `invalid` event, cleared per field as it is edited.
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  /*
+    The duplicate-submit guard. `isSubmitting` disables the button, but state
+    is not readable until React has re-rendered — a double click inside one
+    frame, or Enter held down in a field, runs `handleSubmit` twice against the
+    old `false` and posts the application twice. The ref flips synchronously on
+    the first call, so the second one returns before it reaches fetch.
+  */
+  const pendingRef = useRef(false);
 
   const applyReferral = useCallback((ref: string) => {
     setFormData((prev) => ({ ...prev, referredBy: ref }));
@@ -57,6 +65,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
     setInvalid({});
@@ -72,6 +82,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
       setIsSubmitting(false);
+      pendingRef.current = false;
       return;
     }
 
@@ -89,7 +100,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string; code?: string };
+        const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
         if (response.status === 409 && data.code === "account_exists") {
           setSubmitError({
             message: data.error || "You already have a 3C portal account. Sign in instead of re-applying.",
@@ -97,16 +108,36 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           });
           return;
         }
-        throw new Error(data.error || "Failed to submit application");
+        /*
+          The server's own sentence when it wrote one — it knows which field it
+          rejected and this one does not. The catch below is for the case where
+          there is no response to read a sentence out of.
+        */
+        setSubmitError({
+          message: data.error || "There was an error submitting your application. Please try again.",
+          code: "submit_failed",
+        });
+        return;
       }
 
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
+      /*
+        This used to be a `window.alert()`: a modal the reader had to dismiss
+        before they could see the form again, with nothing left on the page
+        afterwards to say the submit had failed. It goes to the same live
+        region every other rejection uses. Nothing is cleared, so every field
+        the applicant typed is still there to send again.
+      */
       console.error("Error submitting application:", error);
-      alert("There was an error submitting your application. Please try again.");
+      setSubmitError({
+        message: "There was an error submitting your application. Please try again.",
+        code: "submit_failed",
+      });
     } finally {
       setIsSubmitting(false);
+      pendingRef.current = false;
     }
   };
 
@@ -244,7 +275,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               </h2>
               <p className={styles.formLede}>No resume needed. Just tell us about yourself.</p>
 
-              <form onSubmit={handleSubmit} className={styles.form}>
+              <form onSubmit={handleSubmit} className={styles.form} aria-busy={isSubmitting || undefined}>
                 <div aria-hidden="true" className={styles.honeypot}>
                   <label htmlFor="website">Website (leave blank)</label>
                   <input
@@ -351,15 +382,26 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                   <li>
                     <strong>Commission-only</strong> with uncapped earnings.
                   </li>
-                  <li>No sales experience required &mdash; full training provided.</li>
+                  <li>No sales experience required. Full training provided.</li>
                 </ul>
 
+                {/*
+                  Both labels are in the DOM, stacked in one grid cell, and the
+                  inactive one is `visibility: hidden` — so the button keeps the
+                  width of the longer string and the height of the line box
+                  whichever state it is in, and nothing under it moves when the
+                  submit starts or fails. Hidden to assistive tech as well as to
+                  the eye, so only one label is ever announced.
+                */}
                 <button
                   type="submit"
                   disabled={isSubmitting}
                   className={`${kit.btn} ${kit.btnLime} ${kit.btnLg} ${styles.submit}`}
                 >
-                  {isSubmitting ? "Submitting..." : "Submit my application"}
+                  <span className={styles.submitLabel}>
+                    <span data-hidden={isSubmitting || undefined}>Submit my application</span>
+                    <span data-hidden={!isSubmitting || undefined}>Submitting...</span>
+                  </span>
                   <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
                 </button>
 
@@ -417,7 +459,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               <hr className={styles.asideRule} />
               <p className={styles.asideBody}>
                 3C trains you on the products, the people and the sales process, with
-                hands-on coaching and support from experienced leaders in the field — before
+                hands-on coaching and support from experienced leaders in the field, before
                 you work a route of your own.
               </p>
             </div>

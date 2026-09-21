@@ -29,13 +29,18 @@
   position: relative;
 }
 
+/*
+  The only thing that moves this frame is the pointer drift, which is
+  interaction rather than entrance: the photograph is already composed and
+  already sharp when the page paints, and it stays that way. The 0.6s on the
+  transform is the drift's own smoothing, not an arrival. `inset: -8px` is the
+  bleed the drift travels into (max 7px on either axis, see MotionRoot).
+*/
 .heroArt {
   inset: -8px;
   position: absolute;
-  transform: translate3d(var(--drift-x, 0px), var(--drift-y, 0px), 0) scale(var(--hero-scale, 1));
-  transition:
-    transform 0.6s var(--ease-out-expo),
-    filter 0.95s var(--ease-out-expo);
+  transform: translate3d(var(--drift-x, 0px), var(--drift-y, 0px), 0);
+  transition: transform 0.6s var(--ease-out-expo);
   will-change: transform;
   z-index: 0;
 }
@@ -48,6 +53,92 @@
 
 .heroImageTall {
   display: none;
+}
+
+/*
+  The roads lighting up under the pointer.
+
+  It is the SAME photograph, not a drawn light: an extracted layer of
+  hero-wide.png at the same 1774x887, transparent everywhere except the lit
+  roads and intersections, which are brightened. It sits inside .heroArt with
+  `inset: 0` and the same cover/50% 42% placement as .heroImageWide, so it
+  rides the drift transform and cannot slide out of register with the frame
+  underneath it — `background-size: cover` and `object-fit: cover` are the
+  same placement maths run on the same box.
+
+  Off by default and off everywhere but a desktop with a real pointer, and
+  the file is named in one rule only — the `[data-glow-armed]` one, which
+  MotionRoot switches on from the first pointerenter over the hero. Nothing
+  else can pull it: not a phone, not reduced motion, not scripting off, and
+  not a desktop load where no mouse ever reaches the frame. It used to sit on
+  the base rule and every desktop visit paid 300KB against the hero
+  photograph's own LCP before the effect could possibly be wanted.
+*/
+.heroGlow {
+  display: none;
+}
+
+@media (pointer: fine) and (min-width: 901px) {
+  [data-motion="on"] .heroGlow {
+    /*
+      440px and 0.95, arrived at by measuring rather than taste. 0.58 over a
+      360px circle — the first setting tried — lifted the brightest road
+      pixel by 7.8 out of 100, which no one sees; the layer's own alpha caps
+      the lift near 13, so the peak has to sit near the top of its range to
+      register at all. What keeps it off the spotlight side is the FALLOFF,
+      not the peak: four stops over 440px, still nearly two-thirds lit at the
+      third of the radius and a quarter lit past two-thirds, so a road running
+      out of the circle dims over 140px and never shows an end. Measured with
+      the pointer parked on open water, the median lift across a 200px box is
+      0 — the light has no floor, because the layer it reveals is empty
+      everywhere but the roads.
+    */
+    --glow-r: 440px;
+    --glow-peak: 0.95;
+
+    background-position: 50% 42%;
+    background-repeat: no-repeat;
+    background-size: cover;
+    display: block;
+    inset: 0;
+    /*
+      The fallbacks are the rest state: until MotionRoot has seen a pointer
+      inside the hero there is no centre on the canvas, so the mask is empty
+      and the layer is the photograph alone. Position is written straight onto
+      the custom properties with no transition — the rAF throttle is the only
+      smoothing it needs, and easing the centre would make the light trail the
+      cursor like an object.
+    */
+    -webkit-mask-image: radial-gradient(
+      circle var(--glow-r) at var(--glow-x, -9999px) var(--glow-y, -9999px),
+      rgba(0, 0, 0, var(--glow-peak)) 0%,
+      rgba(0, 0, 0, calc(var(--glow-peak) * 0.62)) 35%,
+      rgba(0, 0, 0, calc(var(--glow-peak) * 0.26)) 68%,
+      transparent 100%
+    );
+    mask-image: radial-gradient(
+      circle var(--glow-r) at var(--glow-x, -9999px) var(--glow-y, -9999px),
+      rgba(0, 0, 0, var(--glow-peak)) 0%,
+      rgba(0, 0, 0, calc(var(--glow-peak) * 0.62)) 35%,
+      rgba(0, 0, 0, calc(var(--glow-peak) * 0.26)) 68%,
+      transparent 100%
+    );
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    transition: opacity 0.2s ease;
+    z-index: 0;
+  }
+
+  /* The request, made by the first pointer to enter the hero and by nothing
+     else. The 200ms opacity fade below is what the decode hides behind. */
+  [data-motion="on"] [data-hero-art][data-glow-armed] .heroGlow {
+    background-image: url("/redesign/v2/photos/hero-wide-glow-bloom.webp");
+  }
+
+  [data-motion="on"] [data-hero-art][data-glow] .heroGlow {
+    opacity: 1;
+  }
 }
 
 /*
@@ -227,13 +318,22 @@
   top: 6.5rem;
 }
 
+/*
+  0.8s on the Material curve was half a second of nothing before the new
+  photograph read at all, which on a fast scroll meant the stage was always
+  answering the chapter you had just left. The expo curve front-loads instead
+  — most of the opacity is spent in the first third — so the swap registers
+  immediately, and the settle is 0.6s so the frame stops moving when the fade
+  does rather than drifting on for another half second after it. It cannot
+  flash blank at any speed: the layer underneath is opaque (see below).
+*/
 .stageLayer {
   inset: 0;
   opacity: 0;
   position: absolute;
   transition:
-    opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 1.1s var(--ease-out-expo);
+    opacity 0.55s var(--ease-out-expo),
+    transform 0.6s var(--ease-out-expo);
   transform: scale(1.035);
 }
 
@@ -283,9 +383,12 @@
   height: 3px;
   transform: scaleX(0.45);
   transform-origin: left center;
+  /* The mark is an indicator, not an entrance: it answers at interaction
+     speed so the chapter change is confirmed before the photograph has
+     finished dissolving. */
   transition:
-    background-color 0.4s ease,
-    transform 0.5s var(--ease-out-expo);
+    background-color 0.2s ease,
+    transform 0.2s var(--ease-out-expo);
   width: 40px;
 }
 
@@ -450,6 +553,12 @@
 }
 
 .route {
+  /*
+    The length of the wide route's single pen stroke. Every stop's delay is a
+    fraction of this number, so the whole sequence is retimed by editing one
+    value and nothing drifts out of step with the line.
+  */
+  --route-draw: 1.1s;
   margin-top: clamp(1.75rem, 3vw, 3rem);
   position: relative;
 }
@@ -515,9 +624,6 @@
   position: absolute;
   top: 0;
   transform: translate(-50%, -50%);
-  transition:
-    transform 0.4s var(--ease-out-expo),
-    box-shadow 0.4s var(--ease-out-expo);
   width: 15px;
 }
 
@@ -549,8 +655,9 @@
   centred on the same dot with the same edge clamp, on the other side of the
   line (2rem off it, where the copy sits 1.85rem off it). `--art-h` is the
   3:2 height of that column, so the box is stated in the same units as the
-  card and the two never drift apart. Reveal is the kit's rise, not the stop
-  arrival: the photo is scenery, the copy is the stop.
+  card and the two never drift apart. Each photo carries its stop's
+  `--route-at` and arrives on the same delay as that stop's copy, so the pair
+  reads as one step rather than as scenery revealed all at once.
 */
 .routeArt {
   --art-w: 14rem;
@@ -687,6 +794,40 @@
   display: grid;
   gap: 1px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Containing block for the sliding indicator below. */
+  position: relative;
+}
+
+/*
+  One lime bar that measures the selected chip and slides to it, instead of
+  five borders blinking on and off. LocationExplorer writes the three custom
+  properties; the bar is display:none until it has, so a server render or a
+  reader with JavaScript off keeps the chip's own lime edge and never sees a
+  bar parked at the origin. Coming out of display:none also means the first
+  placement cannot transition in from nowhere.
+*/
+.cityIndicator {
+  background: var(--lime);
+  display: none;
+  height: 2px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: translate3d(var(--market-indicator-x, 0px), var(--market-indicator-y, 0px), 0);
+  width: var(--market-indicator-w, 0px);
+}
+
+.cityList[data-indicator="ready"] .cityIndicator {
+  display: block;
+}
+
+/* Only the motion branch slides it. Reduced motion leaves data-motion unset,
+   and the bar is simply in the right place the frame you select. */
+[data-motion="on"] .cityList[data-indicator="ready"] .cityIndicator {
+  transition:
+    transform 0.22s var(--ease-out-expo),
+    width 0.22s var(--ease-out-expo);
 }
 
 .cityChip {
@@ -703,8 +844,8 @@
   position: relative;
   text-align: left;
   transition:
-    color 0.24s ease,
-    border-color 0.24s ease;
+    color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 /* Fills from the bottom on hover, snaps to a solid lime edge when selected. */
@@ -715,12 +856,16 @@
   position: absolute;
   transform: scaleY(0);
   transform-origin: bottom;
-  transition: transform 0.32s var(--ease-out-expo);
+  transition: transform 0.22s var(--ease-out-expo);
   z-index: 0;
 }
 
-.cityChip:hover::before {
-  transform: scaleY(1);
+/* Touch reports a sticky hover after a tap, which left the last chip you
+   pressed washed in lime. */
+@media (hover: hover) {
+  .cityChip:hover::before {
+    transform: scaleY(1);
+  }
 }
 
 .cityChip:active {
@@ -740,6 +885,11 @@
 .cityChip[aria-pressed="true"]::before {
   background: rgba(141, 198, 63, 0.1);
   transform: scaleY(1);
+}
+
+/* The bar is drawing this edge now; two of them would read as a thick one. */
+.cityList[data-indicator="ready"] .cityChip[aria-pressed="true"] {
+  border-bottom-color: transparent;
 }
 
 .cityChipName {
@@ -802,7 +952,7 @@
   opacity: 0;
   transform: scale(1.04);
   transition:
-    opacity 0.55s var(--ease-out-expo),
+    opacity 0.42s var(--ease-out-expo),
     transform 0.8s var(--ease-out-expo);
 }
 
@@ -811,8 +961,27 @@
   transform: scale(1);
 }
 
+/*
+  All five panels sit in one grid cell, so the plate is always as tall as the
+  tallest market and the page cannot jump between a one-word city and a
+  two-word one. The four that are not selected stay visibility:hidden, which
+  holds the height open while keeping their links out of the tab order and
+  their headings out of the accessibility tree.
+*/
 .cityPlateBody {
   align-self: center;
+  display: grid;
+}
+
+.cityPlatePanel {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.cityPlatePanel[data-active] {
+  opacity: 1;
+  visibility: visible;
 }
 
 .cityPlateState {
@@ -908,17 +1077,30 @@
   display: none;
 }
 
-.faqSummary:hover {
-  color: var(--lime-ink);
+@media (hover: hover) {
+  .faqSummary:hover {
+    color: var(--lime-ink);
+  }
 }
 
 .faqMark {
   color: var(--lime-ink);
   flex: none;
-  transition: transform 0.32s var(--ease-out-expo);
+  /* Same 220ms as the row's height run in Faq.tsx. */
+  transition: transform 0.22s var(--ease-out-expo);
 }
 
+/* [open] is the no-JS answer. Faq.tsx writes data-open the moment you click,
+   which is what makes the mark turn with the height rather than after it. */
 .faqItem[open] .faqMark {
+  transform: rotate(135deg);
+}
+
+.faqItem[data-open="false"] .faqMark {
+  transform: none;
+}
+
+.faqItem[data-open="true"] .faqMark {
   transform: rotate(135deg);
 }
 
@@ -1145,105 +1327,202 @@
    MotionRoot sets only when reduced motion is off.
    -------------------------------------------------------------------------- */
 
-[data-motion="on"] .heroArt {
-  --hero-scale: 1.02;
-  filter: blur(10px);
-}
+/*
+  The hero entrance, and the whole of it. One budget, written here so it can be
+  read as a timeline rather than reassembled from five rules:
 
-[data-motion="on"][data-entered] .heroArt {
-  --hero-scale: 1;
-  filter: blur(0);
-}
+      0.00 → 0.50s   headline line 1 rises out of its mask
+      0.09 → 0.59s   headline line 2
+      0.17 → 0.59s   the lede
+      0.25 → 0.67s   the buttons, and the rail opening with them
 
-[data-motion="on"] .heroScrim {
-  opacity: 0;
-  transition: opacity 0.9s var(--ease-out-expo);
-}
+  Everything is finished inside 0.7s. What used to be here also blurred the
+  photograph in from 10px and pushed it from 1.02 scale while the scrim faded
+  up over 0.9s, so the background was still resolving after the copy had
+  landed. The brief is the opposite: the picture is still and sharp from the
+  first paint and only the words arrive. Two lines are two readable units, not
+  four staggered words, so they carry 90ms between them and nothing else.
 
-[data-motion="on"][data-entered] .heroScrim {
-  opacity: 1;
-}
-
+  Every duration sits on the ENTERED rule, never on the pre-state, and that is
+  load-bearing rather than a formatting choice. MotionRoot sets
+  data-motion="on" two frames before data-entered, and a transition declared on
+  the pre-state starts the moment that attribute lands — so the finished page
+  spent those two frames easing towards its own hidden state and was then
+  flipped back. Measured, the lede only ever dipped to 0.84 and the headline
+  travelled about 12px of its 91px mask rise: the authored entrance barely
+  played. With the pre-state as a plain snap, data-entered is the only thing
+  that animates and it runs from the true start.
+*/
 [data-motion="on"] .heroLine > span {
   transform: translateY(105%);
-  transition: transform 0.78s var(--ease-out-expo);
 }
 
 [data-motion="on"][data-entered] .heroLine > span {
   transform: none;
-}
-
-[data-motion="on"][data-entered] .heroLine:nth-child(1) > span {
-  transition-delay: 0.1s;
+  transition: transform 0.5s var(--ease-out-expo);
 }
 
 [data-motion="on"][data-entered] .heroLine:nth-child(2) > span {
-  transition-delay: 0.185s;
+  transition-delay: 0.09s;
 }
 
-[data-motion="on"][data-entered] .heroLine:nth-child(3) > span {
-  transition-delay: 0.27s;
-}
-
+/*
+  Opacity and transform only, and never visibility or pointer-events: the
+  Apply button is the point of this page and it has to be pressable from the
+  first frame, whether or not its entrance has run.
+*/
 [data-motion="on"] :is(.heroLede, .heroActions) {
   opacity: 0;
-  transform: translateY(var(--rise));
-  transition:
-    opacity 0.6s var(--ease-out-expo),
-    transform 0.6s var(--ease-out-expo);
+  /* 14px, not the page's 18px `--rise`: entrance travel is capped at 8-16px,
+     and the kit token is shared with elements this file does not own. */
+  transform: translateY(14px);
 }
 
 [data-motion="on"][data-entered] :is(.heroLede, .heroActions) {
   opacity: 1;
   transform: none;
+  transition:
+    opacity 0.42s var(--ease-out-expo),
+    transform 0.42s var(--ease-out-expo);
 }
 
 [data-motion="on"][data-entered] .heroLede {
-  transition-delay: 0.3s;
+  transition-delay: 0.17s;
 }
 
 [data-motion="on"][data-entered] .heroActions {
-  transition-delay: 0.38s;
+  transition-delay: 0.25s;
 }
 
-/*
-  The rail used to start at 600ms and run for 900, so the hero was still
-  assembling a second and a half in. It now opens with the buttons and lands
-  inside a second, which is where the whole entrance ends.
-*/
+/* The rail opens with the buttons and lands with them. */
 [data-motion="on"] .heroRail {
   clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.62s var(--ease-out-expo) 0.38s;
 }
 
 [data-motion="on"][data-entered] .heroRail {
   clip-path: inset(0 0 0 0);
+  transition: clip-path 0.42s var(--ease-out-expo) 0.25s;
 }
 
-/* Section reveals — two distinct gestures, not one entrance repeated. */
-/* The route line. Default state is fully drawn, so no JS means no blank line. */
+/* --------------------------------------------------------------------------
+   The route draw — this page's second set piece
+   --------------------------------------------------------------------------
+   It used to scrub: `--route-progress` came straight off the scroll position,
+   so the pen moved at whatever speed the reader happened to be scrolling and
+   the stroke could be finished, or stranded half-drawn, or redrawn on the way
+   back. It is now one fixed-length draw, started once by MotionRoot when the
+   section reaches 72% of the viewport (`[data-drawn]`).
+
+   The line is LINEAR on purpose. A pen does not ease, and, more usefully, a
+   constant speed makes a stop's arrival exactly `--route-at × --route-draw`
+   with no compensation table between the two: move a corner, recompute the
+   fractions in RouteSequence.tsx, and the copy still lands with the line. The
+   softness in this section comes from the stops' own expo reveals riding on
+   top of the stroke, not from the stroke.
+
+   Timeline at the wide layout, with --route-draw at 1.1s:
+
+       0.00s   the pen leaves stop 01 (at 0.01)
+       0.37s   it reaches 02 (0.333), whose dot, copy and photo start
+       0.73s   03 (0.667)
+       1.08s   04 (0.98) — the line is complete at 1.10s
+       ~1.50s  04's copy and photo have finished fading up
+
+   Default state, with no JS and under reduced motion: drawn, every stop
+   present. Only the rules behind [data-motion="on"] take that away.
+   -------------------------------------------------------------------------- */
+
 .routeLine {
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
 }
 
-[data-motion="on"] .routeLine {
-  stroke-dashoffset: calc(1 - var(--route-progress, 0));
-}
-
-[data-motion="on"] .routeStop:not([data-arrived]) .routeDot {
+/*
+  Pre-draw, shared by both layouts; which switch turns it back on is not. No
+  `transition` on any of these rules, for the same reason the hero entrance
+  keeps its durations on the entered rule: data-motion="on" lands before
+  data-drawn, and a transition declared here would spend that gap easing the
+  finished section out — four stops of real copy visibly fading away on
+  hydration, and the draw then starting from wherever the fade-out reached.
+  The pre-state snaps; only the rules below animate.
+*/
+[data-motion="on"] .routeStop .routeDot {
   transform: translate(-50%, -50%) scale(0.35);
 }
 
-[data-motion="on"] .routeStop:not([data-arrived]) .routeStopCard {
+[data-motion="on"] :is(.routeStopCard, .routeArtItem) {
   opacity: 0;
-  transform: translateY(var(--rise));
+  /* Same 14px as the hero, and for the same reason: inside the 8-16px cap. */
+  transform: translateY(14px);
 }
 
-[data-motion="on"] .routeStopCard {
-  transition:
-    opacity 0.5s var(--ease-out-expo),
-    transform 0.55s var(--ease-out-expo);
+/*
+  Wide: one stroke, and each stop delayed by its own fraction of it. The two
+  svgs are scoped separately rather than by media query because only one of
+  them is ever displayed, and the stacked rail is a different mechanism.
+*/
+[data-motion="on"] .routeSvgWide .routeLine {
+  stroke-dashoffset: 1;
+}
+
+[data-motion="on"] .routeSection[data-drawn] .routeSvgWide .routeLine {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset var(--route-draw) linear;
+}
+
+@media (min-width: 901px) {
+  /* transition-delay follows the shorthand inside each block, or the shorthand
+     would reset it to zero and every stop would arrive with the pen at 01. */
+  [data-motion="on"] .routeSection[data-drawn] .routeDot {
+    transform: translate(-50%, -50%) scale(1);
+    transition: transform 0.34s var(--ease-out-expo);
+    transition-delay: calc(var(--route-at, 0) * var(--route-draw));
+  }
+
+  [data-motion="on"] .routeSection[data-drawn] :is(.routeStopCard, .routeArtItem) {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.38s var(--ease-out-expo),
+      transform 0.42s var(--ease-out-expo);
+    transition-delay: calc(var(--route-at, 0) * var(--route-draw));
+  }
+}
+
+/*
+  Stacked: there is no single pen to follow down a column four screens tall,
+  so each step arrives on its own as it enters view and the rail advances to
+  that step's fraction behind it. Same drawing, read at reading speed.
+*/
+@media (max-width: 900px) {
+  [data-motion="on"] .routeSvgStacked .routeLine {
+    stroke-dashoffset: calc(1 - var(--rail-progress, 0));
+  }
+
+  /*
+    The rail's own value moves every time a step arrives, so unlike everything
+    else here it has no separate "shown" rule to hang a duration on. Gating the
+    duration on the section having started keeps the same guarantee: at
+    hydration the offset snaps to 1 instead of erasing a drawn rail over half a
+    second. Stop 01 can land a frame before the gate opens, and its advance —
+    all of 0.01 of the rail — snaps with it.
+  */
+  [data-motion="on"] .routeSection[data-drawn] .routeSvgStacked .routeLine {
+    transition: stroke-dashoffset 0.5s var(--ease-out-expo);
+  }
+
+  [data-motion="on"] .routeStop[data-arrived] .routeDot {
+    transform: translate(-50%, -50%) scale(1);
+    transition: transform 0.34s var(--ease-out-expo);
+  }
+
+  [data-motion="on"] .routeStop[data-arrived] .routeStopCard {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.38s var(--ease-out-expo),
+      transform 0.42s var(--ease-out-expo);
+  }
 }
 
 
@@ -1609,6 +1888,12 @@
     border-bottom-color: var(--lime);
   }
 
+  /* Stacked, the bar travels vertically and rides over the row rule, so the
+     rule has to stay unbroken rather than turning lime underneath it. */
+  .cityList[data-indicator="ready"] .cityChip[aria-pressed="true"] {
+    border-bottom-color: var(--rule);
+  }
+
 }
 
 /*
@@ -1621,7 +1906,6 @@
   .heroArt {
     --drift-x: 0px;
     --drift-y: 0px;
-    filter: none;
     transform: none;
   }
 

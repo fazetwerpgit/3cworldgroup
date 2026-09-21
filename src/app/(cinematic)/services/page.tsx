@@ -140,11 +140,15 @@ export default function ServicesPage() {
 
         <div className={styles.filmstrip}>
           {SERVICES.map((service, i) => (
+            /* One entrance per row, fired once when the row itself enters view.
+               The photograph leads and the whole text column follows 80ms later;
+               services.module.css owns the two steps. */
             <article
               key={service.id}
               id={service.id}
               className={styles.band}
               aria-labelledby={`${service.id}-title`}
+              data-reveal
             >
               {/*
                 Band 01 carries the page head's photograph: the v2 set has one
@@ -153,6 +157,8 @@ export default function ServicesPage() {
                 and the spool, so the row is a detail of the walk the head
                 establishes rather than the same picture printed twice.
               */}
+              {/* The photograph fades up inside a frame that never moves, so the
+                  band keeps its height and its crop. */}
               <div className={i === 0 ? `${styles.bandArt} ${styles.bandArtTight}` : styles.bandArt}>
                 <Image
                   src={service.image}
@@ -166,7 +172,10 @@ export default function ServicesPage() {
               </div>
 
               <div className={`${kit.shell} ${styles.bandShell}`}>
-                <div className={`${styles.bandCopy} ${kit.revealRise}`} data-reveal>
+                {/* The column moves as ONE unit — number, title, sentence and the
+                    three points together. No internal stagger: the row is one
+                    exhibit, not five paragraphs each starting their own animation. */}
+                <div className={styles.bandCopy}>
                   <p className={styles.bandNumber}>{service.number}</p>
                   <h3 id={`${service.id}-title`} className={styles.bandTitle}>
                     {service.title}

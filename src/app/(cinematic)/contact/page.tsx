@@ -10,7 +10,7 @@ import styles from "./contact.module.css";
 export const metadata: Metadata = {
   title: "Contact | 3C World Group",
   description:
-    "Get in touch with 3C World Group — join as a sales rep, bring or build a team, or ask about the services we represent.",
+    "Get in touch with 3C World Group. Join as a sales rep, bring or build a team, or ask about the services we represent.",
 };
 
 /**
@@ -82,8 +82,13 @@ export default function ContactPage() {
           child of the mark either way, so the point it starts from is a
           fraction of the mark's own width rather than a second measurement —
           see the note in contact.module.css.
+
+          The `data-reveal` moved from the trail up to the mark: the mark's
+          entrance and the line that leaves it are one gesture, and two
+          observers on two boxes — one of which has no box at all — could fire
+          a frame apart and start the line before the mark was solid.
         */}
-        <div className={styles.headArt} aria-hidden="true">
+        <div className={styles.headArt} aria-hidden="true" data-reveal>
           <Image
             src="/redesign/contact-three-c-hd-x4f.webp"
             alt=""
@@ -94,7 +99,7 @@ export default function ContactPage() {
             className={styles.headArtImage}
           />
 
-          <span className={styles.headTrail} data-reveal>
+          <span className={styles.headTrail}>
             <svg
               className={styles.headLine}
               viewBox="0 0 100 100"
@@ -105,19 +110,25 @@ export default function ContactPage() {
                 `preserveAspectRatio="none"` over a box whose aspect ratio is
                 the line's own dx/dy keeps the angle exact without a degree
                 value written down twice, and `non-scaling-stroke` keeps the
-                stroke even under that uneven scale. 3px is the width the mark's
-                own line renders at once the file is scaled down, which is what
-                makes the handoff invisible.
+                stroke even under that uneven scale. The colour and the width
+                are in contact.module.css, because the width is a calc on the
+                mark's rendered size rather than a constant.
+
+                The start is (108, -8), not (100, 0): 8% of the run back up the
+                same vector, so the stroke crosses the bottom edge of the mark
+                instead of ending on it. A butt cap at (100, 0) is cut square to
+                the LINE, so half of it fell below the mark's own horizontal cut
+                and left a hairline nick at the handoff. Overlapping is free —
+                both lines are the same lime at full strength — and
+                `pathLength` still normalises the draw to 1 whatever the length.
               */}
               <line
                 className={styles.headLinePath}
-                x1="100"
-                y1="0"
+                x1="108"
+                y1="-8"
                 x2="0"
                 y2="100"
                 pathLength={1}
-                stroke="var(--lime)"
-                strokeWidth={3}
                 vectorEffect="non-scaling-stroke"
               />
             </svg>
@@ -142,7 +153,7 @@ export default function ContactPage() {
               path.
             </h2>
             <p className={kit.sectionLede}>
-              Three routes off this page. If one of them is why you came, take it — it goes
+              Three routes off this page. If one of them is why you came, take it. It goes
               straight to the page that answers you, without the form.
             </p>
           </header>

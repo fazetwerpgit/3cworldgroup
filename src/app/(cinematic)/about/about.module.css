@@ -473,3 +473,42 @@
     font-size: 3.05rem;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Motion — the three C's
+   --------------------------------------------------------------------------
+   Everything here is behind `[data-motion="on"]`, which MotionRoot only sets
+   when JavaScript runs and reduced motion is off; without it the section is
+   already finished and none of this applies.
+
+   The photograph behind this section is never touched. It is the subject, not
+   a backdrop to drift: no scale, no parallax, no wash that lifts. The scrim
+   that makes the copy legible is painted once and stays painted.
+
+   What moves is the reading order. The heading keeps the kit's head wipe, the
+   same grammar every section head on the site uses, and the three rows follow
+   it instead of starting with it — 140ms of lead, then 100ms between rows. The
+   kit's own sibling cascade runs 80/160/240 from zero, which would open the
+   first row while the heading is still wiping in and put the whole group on
+   the page as one block. Each row keeps its single `[data-reveal]`, so the
+   lime term and the line of fact beside it always arrive together.
+
+   `.values .valueList` in the selector is there to out-specify the kit's
+   `.revealRise ~ .revealRise` chain, which matches these same elements; only
+   the delay is overridden, the rise itself still comes from the kit. The
+   override sits on `[data-shown]` because that is where the kit declares the
+   transition these delays belong to — on the pre-state there is nothing to
+   delay, and the rule would quietly do nothing.
+   -------------------------------------------------------------------------- */
+
+[data-motion="on"] .values .valueList .value[data-shown] {
+  transition-delay: 140ms;
+}
+
+[data-motion="on"] .values .valueList .value:nth-child(2)[data-shown] {
+  transition-delay: 240ms;
+}
+
+[data-motion="on"] .values .valueList .value:nth-child(3)[data-shown] {
+  transition-delay: 340ms;
+}

@@ -31,7 +31,7 @@ const STEPS = [
   {
     n: "02",
     title: "A 15-minute phone call",
-    body: "A real conversation about the role and about you — what you are looking for, and what the work actually asks.",
+    body: "A real conversation about the role and about you: what you are looking for, and what the work actually asks.",
   },
   {
     n: "03",
@@ -51,7 +51,7 @@ const GOOD_TO_KNOW = [
   },
   {
     term: "No sales experience required",
-    def: "3C provides full training and ongoing support — the products, the sales process, roleplay and coaching in the field, not only in a classroom.",
+    def: "3C provides full training and ongoing support: the products, the sales process, roleplay and coaching in the field, not only in a classroom.",
   },
   {
     term: "What you would represent",

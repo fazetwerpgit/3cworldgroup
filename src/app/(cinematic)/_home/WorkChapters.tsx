@@ -24,7 +24,7 @@ const CHAPTERS = [
     title: "The right fit",
     lede: "Then you match the need to a product.",
     body:
-      "You offer fiber internet, TV service, or home security from the providers 3C represents — on its own or bundled. Good selling means explaining the fit clearly and saying when it is not a fit.",
+      "You offer fiber internet, TV service, or home security from the providers 3C represents, on its own or bundled. Good selling means explaining the fit clearly and saying when it is not a fit.",
   },
   {
     n: "03",

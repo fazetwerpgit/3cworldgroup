@@ -78,12 +78,22 @@
   position: relative;
 }
 
+/*
+  The crop and the reveal travel share one `transform`, so they are composed
+  from two custom properties rather than fighting over the declaration. Both
+  default to their resting value: with no motion attribute set, this computes
+  to exactly what it did before — `scale(1.7)` on band 01, nothing on the rest.
+*/
 .bandImage {
   object-fit: cover;
+  transform: translateY(var(--band-shift, 0px)) scale(var(--band-zoom, 1));
+}
+
+.bandArtTight {
+  --band-zoom: 1.7;
 }
 
 .bandArtTight .bandImage {
-  transform: scale(1.7);
   transform-origin: 63% 67%;
 }
 
@@ -470,4 +480,80 @@
   .bundlePlate {
     aspect-ratio: 4 / 3;
   }
+}
+
+/* --------------------------------------------------------------------------
+   Motion
+   --------------------------------------------------------------------------
+   Every rule below sits behind `[data-motion="on"]`, which MotionRoot only
+   sets when JavaScript runs and reduced motion is off. Without it none of this
+   applies: the server already rendered the finished page, and it stays
+   finished. Nothing here touches `pointer-events`, so every link on the page
+   is clickable from the first frame whatever state it is painted in.
+   -------------------------------------------------------------------------- */
+
+/*
+  The head's entrance is no longer written here. `.pageHead` in the kit now
+  carries it for every interior route — the copy column's children rise 14px
+  over 0.45s on `[data-entered]`, 80ms apart — so a local copy of the same
+  gesture would only be a second, lower-specificity answer to a settled
+  question. What stays local is the row entrance below.
+*/
+
+/*
+  A service row arrives as one thought, and the row is the unit. One
+  `[data-reveal]` sits on the `<article>`, so the kit's observer fires each row
+  independently and exactly once — 12% of the article visible against a
+  viewport whose bottom edge is pulled up 12%, which is the "about 15%" this
+  section was specified at. Scrolling back up never replays it; the kit
+  unobserves on the first hit.
+
+  Two steps, not five. The photograph goes first at 0ms and the entire text
+  column — number, title, sentence and the three points — follows as ONE unit
+  80ms later. Nothing inside the column staggers: a row is one exhibit, and
+  three benefit points arriving one after another is the tell this page is
+  trying not to be.
+
+  8px of travel over 450ms on `--ease-out-expo`, opacity and transform only.
+  The transitions are declared on the `[data-shown]` rules and the pre-state is
+  a bare snap: a row already on screen when the page hydrates would otherwise
+  spend the gap between `data-motion` and `data-shown` easing backwards out of
+  view before easing in again.
+
+  The photograph travels INSIDE its frame, never with it: the transform is on
+  the image, so `.bandArt` keeps its box, the band keeps its height, and
+  nothing below the row shifts while it plays. `.bandArt` already clips (the
+  tight crop needs it), so the travel cannot spill past the frame edge.
+  `--band-shift` carries it because band 01 composes its crop scale into the
+  same `transform`; both fall back to their resting values, so with motion off
+  the crop is byte-identical to what it always was.
+*/
+[data-motion="on"] .band:not([data-shown]) {
+  --band-shift: 8px;
+}
+
+[data-motion="on"] .band:not([data-shown]) .bandImage,
+[data-motion="on"] .band:not([data-shown]) .bandScrim {
+  opacity: 0;
+}
+
+[data-motion="on"] .band:not([data-shown]) .bandCopy {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+[data-motion="on"] .band[data-shown] .bandImage {
+  transition:
+    opacity 0.45s var(--ease-out-expo),
+    transform 0.45s var(--ease-out-expo);
+}
+
+[data-motion="on"] .band[data-shown] .bandScrim {
+  transition: opacity 0.45s var(--ease-out-expo);
+}
+
+[data-motion="on"] .band[data-shown] .bandCopy {
+  transition:
+    opacity 0.45s var(--ease-out-expo) 80ms,
+    transform 0.45s var(--ease-out-expo) 80ms;
 }

@@ -15,11 +15,46 @@
 }
 
 /* --------------------------------------------------------------------------
+   0 — Page head
+   --------------------------------------------------------------------------
+   The eyebrow states the constraint ("hiring in selected markets"), so the
+   quiet link that answers it shares the eyebrow's line rather than opening a
+   fourth block under the two buttons. The kit's `pageHeadEyebrow` carries the
+   space under the line, so the row takes that margin over and the paragraph
+   inside it gives its own up.
+   -------------------------------------------------------------------------- */
+
+.headEyebrow {
+  align-items: baseline;
+  column-gap: clamp(1rem, 2.4vw, 1.75rem);
+  display: flex;
+  flex-wrap: wrap;
+  /* The kit's eyebrow spends 1.1rem under itself. The row spends a little more
+     because the link brings a drawn underline with it: at 1.1rem that rule sat
+     close enough to the display line below to read as the headline's own. */
+  margin-bottom: 1.35rem;
+  row-gap: 0.15rem;
+}
+
+.headEyebrow p {
+  margin-bottom: 0;
+}
+
+/* One step under the eyebrow's own scale: the link is the quieter half of the
+   line, and at the kit's 1.04rem it competed with the lime it sits beside. */
+.headMarketsLink {
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+
+/* --------------------------------------------------------------------------
    1 — The opportunity at a glance
    --------------------------------------------------------------------------
-   Photograph left, four numbered rows right. Deliberately not four equal
-   cards: the rows share one hairline stack, so the four read as one list of
-   terms rather than as four competing tiles.
+   Round 16 (owner): the neighbourhood plate that stood beside these terms is
+   gone, and the four terms are a 2x2 on one crossed hairline — a rule over
+   each row, one rule down between the columns. Deliberately still not four
+   cards: the rules are the same hairlines the rest of the paper draws with, so
+   the four read as one table of terms rather than as four competing tiles.
    -------------------------------------------------------------------------- */
 
 /*
@@ -28,57 +63,43 @@
   `var(--section-pad)` on top of it stacked into ~210px of empty navy
   at 1440. This is the lighter opening; every chapter after it keeps the full
   one, because each of those has a real edge above it.
+
+  Round 15 (owner): paper, the same sheet Home's work chapter stands on. It was
+  navy, which put the photographic hero and this chapter on one unbroken run of
+  ink and left the page's only light band down at the stages. On paper it takes
+  the ink-on-paper tokens throughout — `--on-paper` for the terms, the kit's
+  `sectionHeadInk` for the head, `--rule-ink` for every hairline — and it is now
+  the FIRST section of the page's one paper run, so it takes the top edge and
+  the stages take the bottom (see `.earnings`). Both edges are straight; the
+  seam classes cut nothing since round 14.
+*/
+/*
+  R16, second pass. The foot is zero, and the seam into the stages is the
+  stages' own top pad alone. Two sections on one sheet of paper spending a full
+  pad each measured 106px of empty paper between the grid's closing rule and
+  the stages head's — against 53px from the page head into this section's first
+  rule, and 37px from this head into the grid. One space, one divider: the
+  grid's closing rule is gone (see `.glanceItem`), the stages head's hairline is
+  the divider, and the space is the one pad the stages already spend.
 */
 .glance {
-  composes: surfaceInk from "../../_cinematic/cinematic.module.css";
-  padding: var(--section-pad) 0;
+  composes: surfacePaper seamTopOnly from "../../_cinematic/cinematic.module.css";
+  padding: var(--section-pad) 0 0;
 }
 
 /*
-  Copy left, photograph right — the same asymmetry the homepage's two-doors
-  block uses, and for the same reason: the numbered terms read directly under
-  the display heading that introduces them, and the photograph's own scrim can
-  dissolve toward the copy instead of away from it.
+  Two columns by two rows, and no gap on either axis: the row gap is what used
+  to break each row's rule into two segments with a hole in the middle, and the
+  column gap is replaced by padding inside the terms so the horizontal rules
+  run unbroken across the shell and meet the one vertical rule at a corner.
+  The outer edges of the grid take no padding, so the first word of each term
+  stands on the same axis as the display heading above it.
 */
-.glanceLayout {
-  align-items: stretch;
+.glanceGrid {
   display: grid;
-  gap: clamp(1.75rem, 3.5vw, 3.25rem);
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  margin-top: clamp(1.75rem, 3vw, 3rem);
-}
-
-.glanceArt {
-  border: 1px solid var(--rule);
-  min-height: clamp(21rem, 33vw, 31rem);
-  overflow: hidden;
-  position: relative;
-}
-
-/*
-  The box is near square against a 3:2 source, so the crop trims the sides.
-  22% keeps the lit house at the source's left edge in frame: it is what gives
-  the plate a visible left edge against the navy.
-*/
-.glanceArtImage {
-  object-fit: cover;
-  object-position: 22% 50%;
-}
-
-/* A vertical fall only, so the frame sits down into the navy at top and
-   bottom without losing its left edge. */
-.glanceArtScrim {
-  background: linear-gradient(180deg, rgba(3, 13, 31, 0.32) 0%, rgba(3, 13, 31, 0) 30%, rgba(3, 13, 31, 0.4) 100%);
-  inset: 0;
-  position: absolute;
-}
-
-.glanceList {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   list-style: none;
-  margin: 0;
+  margin: clamp(1.5rem, 2.6vw, 2.4rem) 0 0;
   padding: 0;
 }
 
@@ -87,17 +108,40 @@
   numerals, and the glance is a list of facts, not a sequence.
 */
 .glanceItem {
-  border-top: 1px solid var(--rule);
-  padding: clamp(1.15rem, 2.2vw, 1.7rem) 0;
+  border-top: 1px solid var(--rule-ink);
+  padding: clamp(1.15rem, 2vw, 1.65rem) clamp(1.25rem, 2.6vw, 2.5rem);
 }
 
-.glanceItem:last-child {
-  border-bottom: 1px solid var(--rule);
+.glanceItem:nth-child(odd) {
+  padding-left: 0;
 }
+
+/*
+  The right-hand column carries the one vertical hairline. Because the rows sit
+  flush the two segments are contiguous, so it reads as a single rule through
+  both rows — the same move `.rungChanges` makes in the ledger below.
+*/
+.glanceItem:nth-child(even) {
+  border-left: 1px solid var(--rule-ink);
+  padding-right: 0;
+}
+
+/*
+  The bottom row carries no closing rule. It had one for a pass, to give the
+  vertical hairline something to end on, but with the section's foot zeroed that
+  rule and the stages head's stood a pad apart with nothing between them, which
+  is a stacked pair, not a seam. The rule goes and the row keeps a short foot
+  instead, so the vertical hairline ends just under the last line rather than
+  running on into the joint.
+*/
+.glanceItem:nth-child(n + 3) {
+  padding-bottom: clamp(0.65rem, 1vw, 0.95rem);
+}
+
 
 .glanceItemTitle {
   font-family: var(--display);
-  font-size: clamp(1.5rem, 2.4vw, 2.05rem);
+  font-size: clamp(1.45rem, 1.95vw, 1.85rem);
   font-weight: 400;
   letter-spacing: 0.008em;
   line-height: 1;
@@ -105,11 +149,24 @@
 }
 
 .glanceItemBody {
-  color: var(--on-ink-dim);
+  color: var(--on-paper-dim);
   font-size: 0.98rem;
   line-height: 1.62;
   margin-top: 0.55rem;
-  max-width: 46ch;
+  max-width: 38ch;
+}
+
+/*
+  The engagement, on the term that needs it. Round 16 (owner) set it as plain
+  body copy rather than a condensed uppercase sub-line: it is a second sentence
+  of the same fact, so it is read, not labelled.
+*/
+.glanceItemNote {
+  color: var(--on-paper-dim);
+  font-size: 0.98rem;
+  line-height: 1.62;
+  margin-top: 0.4rem;
+  max-width: 38ch;
 }
 
 /* --------------------------------------------------------------------------
@@ -131,8 +188,16 @@
    the three ranges stack into a column you can read down in one pass.
    -------------------------------------------------------------------------- */
 
+/*
+  Round 15 — `.glance` above is paper too, so this is the second half of one
+  paper run rather than a lone sheet between two navy bands: it keeps the bottom
+  edge into the closer and `.glance` takes the top. Nothing is added at the
+  joint — the standard pad at both ends, the same as every other joint on the
+  page, and this section's own `sectionHeadInk` hairline as the one rule that
+  spans the shell there.
+*/
 .earnings {
-  composes: surfacePaper seam from "../../_cinematic/cinematic.module.css";
+  composes: surfacePaper seamBottomOnly from "../../_cinematic/cinematic.module.css";
   padding: var(--section-pad) 0 var(--section-pad);
 }
 
@@ -357,22 +422,26 @@
 @media (max-width: 900px) {
 
   /*
-    R7 — the glance list closes on its own rule, and that rule needs its
-    18px of air, but the air was landing on top of the section's own bottom
-    padding and the joint into the paper chapter measured 114px against a
-    96px ceiling at 390. The section gives the padding back; the list keeps it.
+    One column, and the crossed hairline collapses to the stack it was before
+    R16: every term keeps its rule above and the vertical rule goes, because
+    there is no longer a second column for it to divide. The terms take the
+    shell's own edges again.
   */
-  .glance {
-    padding-bottom: calc(var(--section-pad) - 1.2rem);
-  }
-  .glanceLayout {
+  .glanceGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* The route photograph is useful beside the list on desktop, but reads as
-     an unrelated insert after the terms when the chapter stacks on phones. */
-  .glanceArt {
-    display: none;
+  .glanceItem,
+  .glanceItem:nth-child(odd),
+  .glanceItem:nth-child(even) {
+    border-left: 0;
+    padding-inline: 0;
+  }
+
+  /* Stacked, the last two terms are ordinary rows again; only the last one
+     keeps the short foot that holds the seam into the stages. */
+  .glanceItem:nth-child(3) {
+    padding-bottom: clamp(1.15rem, 2vw, 1.65rem);
   }
 }
 

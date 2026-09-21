@@ -210,10 +210,10 @@
       {
         "tag": "section",
         "id": "glance",
-        "cls": "glance surfaceInk",
-        "secH": 765,
+        "cls": "glance surfacePaper seamTopOnly",
+        "secH": 783,
         "padTop": 63,
-        "padBot": 31,
+        "padBot": 50,
         "first": "The opportunity,at a glance.",
         "last": "Work with experienced leaders ",
         "deadAbove": 63
@@ -221,13 +221,13 @@
       {
         "tag": "section",
         "id": "stages",
-        "cls": "earnings surfacePaper seam",
+        "cls": "earnings surfacePaper seamBottomOnly",
         "secH": 1229,
         "padTop": 63,
         "padBot": 31,
         "first": "Three stagesof the same job.",
         "last": "This is 1099 independent contr",
-        "deadAbove": 94
+        "deadAbove": 113
       },
       {
         "tag": "section",
@@ -368,9 +368,9 @@
         "tag": "section",
         "id": "the-work",
         "cls": "work surfacePaper seamBottomOnly",
-        "secH": 2031,
+        "secH": 1743,
         "padTop": 79,
-        "padBot": 223,
+        "padBot": 175,
         "first": "Three things happenat every do",
         "last": "Once someone is interested, yo",
         "deadAbove": 71
@@ -384,7 +384,7 @@
         "padBot": 53,
         "first": "Why peoplesell with 3C.",
         "last": "Already lead a sales crew? Tha",
-        "deadAbove": 276
+        "deadAbove": 228
       },
       {
         "tag": "section",
@@ -552,7 +552,7 @@
       {
         "tag": "section",
         "id": "glance",
-        "cls": "glance surfaceInk",
+        "cls": "glance surfacePaper seamTopOnly",
         "secH": 803,
         "padTop": 84,
         "padBot": 54,
@@ -563,7 +563,7 @@
       {
         "tag": "section",
         "id": "stages",
-        "cls": "earnings surfacePaper seam",
+        "cls": "earnings surfacePaper seamBottomOnly",
         "secH": 883,
         "padTop": 84,
         "padBot": 53,
