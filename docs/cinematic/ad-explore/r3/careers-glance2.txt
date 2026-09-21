@@ -1,0 +1,9 @@
+Use case: figure photograph beside a four-line "at a glance" list on the careers page of a door-to-door sales company site, shown about 560 pixels wide.
+Asset type: photograph, 3:2, tight.
+Primary request: a close, low photograph of a front-door threshold at blue hour: a coir doormat, the bottom of a dark front door open a hand-width, warm interior light spilling across the mat and the porch boards, a boot scraper or planter at the edge. Tight framing, no street, no sky. No people.
+Subject: the door, up close, about to open.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.

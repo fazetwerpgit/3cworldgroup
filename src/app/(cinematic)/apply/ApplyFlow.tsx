@@ -108,7 +108,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     return (
       <section className={styles.done} aria-labelledby="done-title">
         <Image
-          src="/redesign/cinematic/apply-street-dusk-1920.webp"
+          src="/redesign/cinematic/apply-doors-dusk-1920.webp"
           alt=""
           fill
           priority

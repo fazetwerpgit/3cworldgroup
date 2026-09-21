@@ -32,7 +32,7 @@
     the porch light is at 53% across, 15% down. At 1740 the source crops top
     and bottom only, so Y is the whole decision.
   */
-  --head-focus: 50% 46%;
+  --head-focus: 56% 50%;
 }
 
 @media (max-width: 900px) {
@@ -41,11 +41,11 @@
     cabinet and the cable in shot at the right of the copy; the fall comes up
     to 29% so the scrim is already dark where the headline starts.
   */
-  /* 62%/30% keeps the rain-beaded cabinet top and the porch light in the
-     clear window above the copy; the open door falls behind the scrim. */
+  /* The door frame is lit right of centre — the sconce and the doorbell —
+     so the phone crop keeps that side and no lift is needed. */
   .head {
     --head-fall: 29%;
-    --head-focus: 62% 30%;
+    --head-focus: 78% 50%;
   }
 }
 

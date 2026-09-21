@@ -23,7 +23,20 @@ import styles from "./cinematic.module.css";
 export default function SiteHeader() {
   const pathname = usePathname();
   const [condensed, setCondensed] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  /*
+    The sheet remembers which route it was opened on and is open only while the
+    reader is still there, so a route change closes it with no effect and no
+    reset. Without that, a tap on a sheet link landed on /apply with the sheet
+    still covering the hero, and Back brought the reader home with it still
+    open. The route changing is the one signal that is true for every way out
+    of the sheet: a sheet link, the header row Apply, the logo, Back, Forward.
+  */
+  const [openedOn, setOpenedOn] = useState<string | null>(null);
+  const menuOpen = openedOn === pathname;
+  const setMenuOpen = (next: boolean | ((open: boolean) => boolean)) => {
+    const resolved = typeof next === "function" ? next(menuOpen) : next;
+    setOpenedOn(resolved ? pathname : null);
+  };
   const toggleRef = useRef<HTMLButtonElement>(null);
   const sheetId = useId();
 
@@ -41,24 +54,11 @@ export default function SiteHeader() {
     return () => window.removeEventListener("scroll", sync);
   }, [pathname]);
 
-  /*
-    The sheet is rendered by the group layout, which survives every client
-    navigation inside the group — so nothing closed it when a link took the
-    reader somewhere. Tapping the always-visible lime Apply in the header row
-    landed on /apply with the sheet still covering the hero, and Back brought
-    the reader home with it still open. The route changing is the one signal
-    that is true for every way out of the sheet: a sheet link, the header row
-    Apply, the logo, Back, Forward. Reset on it.
-  */
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [pathname]);
-
   useEffect(() => {
     if (!menuOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setMenuOpen(false);
+      setOpenedOn(null);
       toggleRef.current?.focus();
     };
     document.addEventListener("keydown", onKeyDown);

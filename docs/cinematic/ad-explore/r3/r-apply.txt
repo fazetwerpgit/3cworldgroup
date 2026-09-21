@@ -1,0 +1,9 @@
+Use case: small figure photo under step 01 "Apply" of a four-step recruiting timeline on a door-to-door sales company site, shown about 400 pixels wide.
+Asset type: photograph, 3:2.
+Primary request: a kitchen table by a window at blue hour, a phone lying face up showing only a blank bright screen, a mug and a notepad beside it, the window showing a dark blue evening and one neighbour porch light. No people.
+Subject: the moment someone fills in a short application at home.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.

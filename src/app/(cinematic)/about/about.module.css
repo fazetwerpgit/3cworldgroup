@@ -14,100 +14,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   1 — The opening band and the four figures
-   --------------------------------------------------------------------------
-   Full bleed: the band is the page's photographic opening and it sits inside a
-   navy section, so instead of a border it gets a scrim that dissolves its top
-   edge into the page head above and its bottom edge into the figures below.
-   Nothing is framed; the photograph simply surfaces out of the navy.
-   -------------------------------------------------------------------------- */
-
-/*
-  Round 5 — the head is a photograph now, and this band is a second one. They
-  need a full chapter of navy between them or they read as one image split by a
-  hairline rather than as the opening and the first beat after it.
-*/
-.story {
-  padding-top: var(--section-pad);
-}
-
-.band {
-  height: clamp(16rem, 34vw, 28rem);
-  position: relative;
-  width: 100%;
-}
-
-.bandImage {
-  object-fit: cover;
-  /* The lit door and the keypad sit right of centre in the source, so the crop
-     is weighted that way and survives the narrow viewports. */
-  object-position: 44% 46%;
-}
-
-/*
-  Round 5 — the band carries no copy, so nothing on it needs a scrim for
-  legibility; all it has to do is dissolve its own two edges into the navy above
-  and below. The middle is now clear, and the left-hand wash that used to run
-  half the frame at 0.5 ink is gone with it.
-*/
-.bandScrim {
-  background: linear-gradient(
-    180deg,
-    var(--ink) 0%,
-    rgba(6, 23, 53, 0.34) 11%,
-    rgba(6, 23, 53, 0) 30%,
-    rgba(6, 23, 53, 0) 62%,
-    rgba(6, 23, 53, 0.22) 78%,
-    rgba(6, 23, 53, 0.72) 93%,
-    var(--ink) 100%
-  );
-  inset: 0;
-  position: absolute;
-}
-
-.figures {
-  border-top: 1px solid var(--rule);
-  display: grid;
-  gap: 1px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: clamp(1.75rem, 3vw, 3rem);
-  /*
-    Round 6 — this used to be a full `--section-pad`, on top of the 22-32px each
-    `.figure` cell already pads below its label. The two stacked into 85px of
-    navy under the last figure before the next section's own padding had even
-    started. The cells close the strip; this only keeps it off the seam.
-  */
-  padding-bottom: clamp(0.4rem, 1vw, 1.2rem);
-}
-
-.figure {
-  border-left: 1px solid var(--rule);
-  padding: clamp(1.4rem, 2.4vw, 2rem) clamp(0.9rem, 1.6vw, 1.6rem);
-}
-
-.figure:first-child {
-  border-left: 0;
-  padding-left: 0;
-}
-
-.figure dt {
-  color: var(--lime);
-  font-family: var(--display);
-  font-size: clamp(2.4rem, 4.4vw, 3.9rem);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.008em;
-  line-height: 0.9;
-}
-
-.figure dd {
-  color: var(--on-ink-dim);
-  font-size: 0.86rem;
-  letter-spacing: 0.06em;
-  margin-top: 0.7rem;
-  text-transform: uppercase;
-}
-
-/* --------------------------------------------------------------------------
    2 — The mission
    -------------------------------------------------------------------------- */
 
@@ -133,6 +39,7 @@
   font-size: clamp(1.18rem, 1.7vw, 1.5rem);
   line-height: 1.5;
   max-width: 34ch;
+  text-wrap: pretty;
 }
 
 /*
@@ -151,8 +58,11 @@
   text-transform: uppercase;
 }
 
+/* Its top edge sits on the cap height of the lead's first line, not on the
+   line box, so the two columns read as one top rule. */
 .missionFigure {
   aspect-ratio: 4 / 3;
+  margin-top: 0.6rem;
   background: var(--ink-deep);
   overflow: hidden;
   position: relative;
@@ -164,219 +74,130 @@
 }
 
 /* --------------------------------------------------------------------------
-   3 — The three C's
+   3 — The three C's, over the neighbourhood
+   --------------------------------------------------------------------------
+   A full-bleed frame with the copy standing in its dark left third. The
+   scrim is authored in two directions: a horizontal wash that holds the copy
+   column, and a vertical fall that seats the frame into the navy above and
+   below so the joints are hue steps, not cuts. Three names on hairlines, one
+   line each — the section that used to be three text columns is now the
+   page's second photograph.
    -------------------------------------------------------------------------- */
 
-/*
-  The band's own bottom padding comes off by the height of the cells' new
-  bottom padding, or the joint into "Who we serve" opens to 175px against a
-  140 ceiling. The cells keep the padding — it is what hangs them off the rule.
-*/
 .values {
-  padding: var(--section-pad) 0 max(0.6rem, calc(var(--section-pad) - 2.4rem));
+  align-items: end;
+  background: var(--ink);
+  color: var(--on-ink);
+  display: grid;
+  isolation: isolate;
+  min-height: clamp(30rem, 64vh, 44rem);
+  overflow: hidden;
+  position: relative;
 }
 
-/*
-  Same grammar as the Careers stage band: one rule across the top, the three
-  columns hanging from it, each opening on a large lime ordinal. Before R7 the
-  ordinal was a 1.05rem eyebrow and the row read as three plain text columns
-  divided by hairlines — a template, not a composition.
-*/
+.valuesArt {
+  object-fit: cover;
+  object-position: 62% 50%;
+  z-index: -2;
+}
+
+.valuesScrim {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(3, 13, 31, 0.86) 0%,
+      rgba(3, 13, 31, 0.72) 24%,
+      rgba(3, 13, 31, 0.22) 44%,
+      rgba(3, 13, 31, 0) 60%
+    ),
+    linear-gradient(
+      180deg,
+      var(--ink) 0%,
+      rgba(3, 13, 31, 0) 16%,
+      rgba(3, 13, 31, 0) 78%,
+      var(--ink) 100%
+    );
+  inset: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.valuesInner {
+  padding-bottom: clamp(3.5rem, 6vw, 5.5rem);
+  padding-top: clamp(4rem, 7vw, 6.5rem);
+  position: relative;
+}
+
 .valueList {
   border-top: 1px solid var(--rule);
-  display: grid;
-  gap: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  list-style: none;
-  margin-top: clamp(1.75rem, 3vw, 3rem);
-  padding: 0;
+  margin: clamp(1.75rem, 3vw, 3rem) 0 0;
+  max-width: 38rem;
 }
 
-/*
-  Three short chapters would otherwise float in the middle of a large navy
-  field, so each cell keeps a floor and the hairline between them has something
-  to divide. R7 — the floor came down from 13rem to 9rem: with the bodies no
-  longer pushed to the bottom of the cell, the old floor hung 53px of empty
-  navy under the last line and that landed on top of the section's own padding.
-*/
 .value {
-  border-left: 1px solid var(--rule);
-  display: flex;
-  flex-direction: column;
-  min-height: 9rem;
-  padding: clamp(1.5rem, 2.4vw, 2.1rem) clamp(1.25rem, 2.4vw, 2.2rem)
-    clamp(1.6rem, 2.6vw, 2.4rem);
-}
-
-/*
-  R7 — the bodies used to be pushed to the bottom of the cell with margin-top:
-  auto so the three paragraphs bottom-aligned. On a wide screen that opened a
-  ~107px hole between each heading and its paragraph, which reads as a missing
-  icon rather than as alignment. The body now follows its heading; the cells
-  still share a height, so the rules between them still run the full row.
-*/
-.value:first-child {
-  border-left: 0;
-  padding-left: 0;
-}
-
-.value:last-child {
-  padding-right: 0;
-}
-
-.valueOrdinal {
-  color: var(--lime);
-  font-family: var(--display);
-  font-size: clamp(3.2rem, 5vw, 5rem);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.012em;
-  line-height: 0.78;
+  align-items: baseline;
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 0.4rem 2rem;
+  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
+  padding: clamp(1.1rem, 1.8vw, 1.5rem) 0;
 }
 
 .valueName {
   color: var(--lime);
   font-family: var(--display);
-  font-size: clamp(2.4rem, 3.4vw, 3.4rem);
+  font-size: clamp(2rem, 2.8vw, 2.8rem);
   font-weight: 400;
   letter-spacing: 0.008em;
   line-height: 0.92;
-  margin-top: 0;
-  text-transform: uppercase;
-}
-
-.productLine {
-  color: var(--lime-ink);
-  font-family: var(--display);
-  font-size: clamp(1.15rem, 1.5vw, 1.4rem);
-  letter-spacing: 0.06em;
-  margin-top: auto;
-  padding-top: clamp(1.6rem, 3vw, 2.4rem);
+  margin: 0;
   text-transform: uppercase;
 }
 
 .valueBody {
-  color: var(--on-ink-dim);
-  font-size: 1rem;
-  line-height: 1.62;
-  margin-top: 0.7rem;
+  color: var(--on-ink);
+  font-size: 1.02rem;
+  line-height: 1.55;
+  margin: 0;
   max-width: 34ch;
   text-wrap: pretty;
 }
 
 /* --------------------------------------------------------------------------
-   4 — Who we serve
+   2b — The two audiences, folded under the mission
    -------------------------------------------------------------------------- */
 
-.serve {
-  padding: var(--section-pad) 0;
-}
-
-.serveGrid {
-  display: grid;
-  gap: clamp(2.2rem, 4vw, 4rem);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: clamp(1.75rem, 3vw, 3rem);
-}
-
-.serveItem {
+.audiences {
   border-top: 1px solid var(--rule-ink);
-  display: flex;
-  flex-direction: column;
-  padding-top: clamp(1.4rem, 2.4vw, 2rem);
+  margin: clamp(1.8rem, 3vw, 2.6rem) 0 0;
 }
 
-.serveKind {
-  color: var(--lime-ink);
-  font-family: var(--display);
-  font-size: 0.95rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+.audience {
+  border-bottom: 1px solid var(--rule-ink);
+  display: grid;
+  gap: 0.35rem 1.5rem;
+  grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr);
+  padding: 1.05rem 0;
 }
 
-.serveTitle {
-  font-family: var(--display);
-  font-size: clamp(1.9rem, 3vw, 2.9rem);
-  font-weight: 400;
-  letter-spacing: 0.008em;
-  line-height: 1;
-  margin-top: 0.85rem;
-  text-transform: uppercase;
-}
-
-.serveBody {
+.audienceKind {
   color: var(--on-paper-dim);
-  font-size: 1rem;
-  line-height: 1.65;
-  margin-top: 1.1rem;
-  max-width: 46ch;
-}
-
-/* The three products, as the photographs that already exist for them. */
-.productStrip {
-  display: grid;
-  gap: clamp(0.7rem, 1.4vw, 1.1rem);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: auto;
-  padding-top: clamp(1.6rem, 3vw, 2.4rem);
-}
-
-.product {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.productArt {
-  aspect-ratio: 1 / 1;
-  background: var(--ink-deep);
-  display: block;
-  overflow: hidden;
-  position: relative;
-}
-
-.productArt img {
-  object-fit: cover;
-}
-
-.productLabel {
-  color: var(--on-paper);
   font-family: var(--display);
-  font-size: 1.1rem;
+  font-size: 0.92rem;
   letter-spacing: 0.2em;
+  padding-top: 0.25rem;
   text-transform: uppercase;
 }
 
-.supportList {
-  margin-top: auto;
-  padding-top: clamp(1.6rem, 3vw, 2.4rem);
+.audienceBody {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 42ch;
 }
 
-.supportList li {
-  align-items: center;
-  border-top: 1px solid var(--rule-ink);
-  color: var(--on-paper);
-  display: flex;
-  font-family: var(--display);
-  font-size: 1.25rem;
-  letter-spacing: 0.05em;
-  padding: 0.85rem 0;
-  text-transform: uppercase;
-}
-
-.supportList li::before {
-  background: var(--lime-ink);
-  content: "";
-  display: block;
-  height: 7px;
-  margin-right: 0.85rem;
-  width: 7px;
-}
-
-/*
-  Colour is the kit's now — `kit.quietLinkInk` is the paper variant of the quiet
-  link, so all this page still owns is where the link sits.
-*/
 .applyLink {
+  display: inline-flex;
   margin-top: 1.4rem;
 }
 
@@ -586,28 +407,22 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* On a phone the frame is behind the copy, so the wash goes uniform. */
+  .valuesScrim {
+    background:
+      linear-gradient(180deg, var(--ink) 0%, rgba(3, 13, 31, 0.5) 18%, rgba(3, 13, 31, 0.6) 100%);
+  }
+
+  .valuesArt {
+    object-position: 68% 50%;
+  }
+
   .value {
-    border-left: 0;
-    border-top: 1px solid var(--rule);
-    min-height: 0;
-    padding: clamp(1.3rem, 3vw, 1.8rem) 0;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  /*
-    Stacked, the last cell's bottom padding sits directly on the section's own
-    and the two read as one dead band before the next head.
-  */
-  .value:last-child {
-    padding-bottom: 0;
-  }
-
-  .value .valueBody {
-    margin-top: 1rem;
-    padding-top: 0;
-  }
-
-  .value:first-child {
-    padding-left: 0;
+  .audience {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .leader:nth-child(odd) {
@@ -620,33 +435,12 @@
     padding-left: 0;
   }
 
-  .serveGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .productStrip,
-  .supportList {
-    margin-top: 0;
-  }
 }
 
 @media (max-width: 620px) {
-  .figures {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 
-  .figure {
-    padding: clamp(1.2rem, 4vw, 1.6rem) 0.9rem;
-  }
 
-  .figure:nth-child(odd) {
-    border-left: 0;
-    padding-left: 0;
-  }
 
-  .figure:nth-child(n + 3) {
-    border-top: 1px solid var(--rule);
-  }
 
   .valueList,
   .leaderList {
@@ -664,9 +458,6 @@
     padding-top: clamp(1.3rem, 4vw, 1.7rem);
   }
 
-  .bandImage {
-    object-position: 70% 52%;
-  }
 }
 
 /* The lime line "One door at a time." ran to the gutter at 390; one step down. */

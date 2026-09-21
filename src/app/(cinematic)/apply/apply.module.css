@@ -517,7 +517,7 @@
   color: var(--ink);
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(3rem, 5vw, 4.5rem) 0;
+  padding: clamp(2rem, 2.6vw, 2.4rem) 0 clamp(3rem, 5vw, 4.5rem);
   position: relative;
   text-align: left;
 }

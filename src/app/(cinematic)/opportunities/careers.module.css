@@ -56,30 +56,19 @@
 }
 
 /*
-  The pedestal, the tool bag and the cable spool occupy the right half of the
-  source (x 0.50-0.95, y 0.37-0.85). The box is close to the source aspect, so
-  the crop is shallow; 62% 58% keeps all three clear of the left wash.
+  The box is near square against a 3:2 source, so the crop trims the sides.
+  22% keeps the lit house at the source's left edge in frame: it is what gives
+  the plate a visible left edge against the navy.
 */
 .glanceArtImage {
   object-fit: cover;
-  object-position: 62% 58%;
+  object-position: 22% 50%;
 }
 
-/*
-  The homepage's two-layer scrim: the horizontal wash dissolves the frame's
-  left edge toward the copy column beside it, and the vertical fall sets it
-  down into the navy at top and bottom.
-*/
+/* A vertical fall only, so the frame sits down into the navy at top and
+   bottom without losing its left edge. */
 .glanceArtScrim {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(6, 23, 53, 0.84) 0%,
-      rgba(6, 23, 53, 0.42) 24%,
-      rgba(6, 23, 53, 0.04) 58%,
-      rgba(6, 23, 53, 0.2) 100%
-    ),
-    linear-gradient(180deg, rgba(3, 13, 31, 0.4) 0%, rgba(3, 13, 31, 0) 34%, rgba(3, 13, 31, 0.5) 100%);
+  background: linear-gradient(180deg, rgba(3, 13, 31, 0.32) 0%, rgba(3, 13, 31, 0) 30%, rgba(3, 13, 31, 0.4) 100%);
   inset: 0;
   position: absolute;
 }
@@ -93,25 +82,17 @@
   padding: 0;
 }
 
+/*
+  No ordinal: the stage ledger below already spends the page's one set of
+  numerals, and the glance is a list of facts, not a sequence.
+*/
 .glanceItem {
   border-top: 1px solid var(--rule);
-  display: grid;
-  gap: 0 clamp(0.9rem, 2vw, 1.6rem);
-  grid-template-columns: auto minmax(0, 1fr);
   padding: clamp(1.15rem, 2.2vw, 1.7rem) 0;
 }
 
 .glanceItem:last-child {
   border-bottom: 1px solid var(--rule);
-}
-
-.glanceNum {
-  color: var(--lime);
-  font-family: var(--display);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.16em;
-  padding-top: 0.42rem;
 }
 
 .glanceItemTitle {

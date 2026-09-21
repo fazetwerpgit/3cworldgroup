@@ -1,0 +1,9 @@
+Use case: full-bleed closing band photograph on the home page of a door-to-door sales company site; the headline "The route starts when you do" and a button sit on the left third over a dark scrim.
+Asset type: full-bleed photograph, 3:2.
+Primary request: from inside a dark front hallway looking out through a wide-open front door at blue hour: the door frame and the open door soft and dark at the left and top edges, the threshold and a doormat in the foreground, and beyond it a lit porch, a front walk, and a quiet street with warm windows opposite. Interior lens, not a street lens. No people.
+Subject: the next door, seen from the inside about to step out.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.

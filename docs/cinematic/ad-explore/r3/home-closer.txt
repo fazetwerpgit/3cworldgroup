@@ -1,0 +1,9 @@
+Use case: full-bleed closing band photograph on the home page of a door-to-door sales company site; the headline and a button sit on the left over a dark scrim.
+Asset type: full-bleed photograph, 3:2.
+Primary request: the brick entrance monument of a suburban neighbourhood at blue hour, the sign face blank and unlit, low landscape lighting on the shrubs, the entrance road curving away between lit houses and tall pines, the left third mostly dark trees where the headline sits. No people, no cars.
+Subject: the next neighbourhood, the next door.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.

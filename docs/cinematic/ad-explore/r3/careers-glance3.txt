@@ -1,0 +1,9 @@
+Use case: figure photograph beside a four-line "at a glance" list on the careers page of a door-to-door sales company site, shown about 560 pixels wide.
+Asset type: photograph, 3:2.
+Primary request: a view across a suburban neighborhood from a low grassy rise at blue hour: rooftops, chimneys and a tree line stepping away toward the horizon, porch lights and warm windows lit across the whole neighborhood, a last band of orange at the horizon under a deep navy sky. Wide, still, the whole territory in one look. No street or door in the foreground. No people.
+Subject: the neighborhood as a whole, seen at the end of a working day.
+Style/medium: real photograph, 35mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten window and porch light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, drone top-down angle, fiber equipment, cabling, pedestals.

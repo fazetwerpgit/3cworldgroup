@@ -135,15 +135,12 @@ export default function OpportunitiesPage() {
 
           <div className={styles.glanceLayout}>
             <ol className={styles.glanceList}>
-              {GLANCE.map((item, index) => (
+              {GLANCE.map((item) => (
                 <li
                   key={item.title}
                   className={`${styles.glanceItem} ${kit.revealRise}`}
                   data-reveal
                 >
-                  <span className={styles.glanceNum}>
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
                   <div>
                     <h3 className={styles.glanceItemTitle}>{item.title}</h3>
                     <p className={styles.glanceItemBody}>{item.body}</p>
@@ -153,18 +150,17 @@ export default function OpportunitiesPage() {
             </ol>
 
             {/*
-              The curb at dusk: an open pedestal, a tool bag in the grass and a
-              lit street behind it — the route this job actually is, with no one
-              in the frame. The lit front door is the page head, so the mid-page
-              frame is a different moment on the same walk.
-              The scrim is the homepage's two-layer authored one: a horizontal
-              wash that dissolves the frame's left edge into the copy column
-              beside it, and a vertical fall so it sits down into the navy
-              rather than ending on a cut.
+              The neighborhood as a whole from a low rise: rooftops, tree line,
+              lit windows out to an orange horizon. The page head is one front
+              door up close and the closer is one cul-de-sac, so this is the
+              third distance, the whole territory in one look, and the only
+              frame on the site with a horizon. A light vertical fall only: the
+              plate has a hairline, so a left wash read as the picture starting
+              a third of the way in.
             */}
             <div className={styles.glanceArt} aria-hidden="true">
               <Image
-                src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
+                src="/redesign/cinematic/careers-rooftops-dusk-1920.webp"
                 alt=""
                 fill
                 priority

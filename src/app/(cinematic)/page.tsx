@@ -150,13 +150,26 @@ export default function Home() {
 
           <RouteSequence />
 
-          <p className={styles.routeFoot}>
-            Timing depends on the market and on you.{" "}
-            <Link href="/opportunities" className={kit.inlineLink}>
-              The full career path
-            </Link>{" "}
-            goes into what comes after your first route.
-          </p>
+          {/*
+            The foot carries the apply call now: the bay under stop 04 holds
+            that stop's photograph, so the "start here" panel that used to sit
+            there joins the timing note on one hairline instead.
+          */}
+          <div className={styles.routeFoot}>
+            <p className={styles.routeFootNote}>
+              Timing depends on the market and on you.{" "}
+              <Link href="/opportunities" className={kit.inlineLink}>
+                The full career path
+              </Link>{" "}
+              goes into what comes after your first route.
+            </p>
+            <div className={styles.routeFootCta}>
+              <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime}`}>
+                Apply
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={17} strokeWidth={2.2} />
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -280,17 +293,14 @@ export default function Home() {
       {/* 7 — closing                                                      */}
       {/* ---------------------------------------------------------------- */}
       {/*
-        The fiber drop where it ends: the ONT on the siding, the cable curving
-        up under the eave, one sconce lit. The pedestal at the curb was already
-        carrying three slots — this closer, the About band and the Careers mid
-        — and the Services page opens on a pedestal too, so from the bottom of
-        this page the next click showed the same object twice running. The
-        last box on the wall is a quieter note to end on than the one at the
-        kerb, and it is the only frame on the site that is a finished install.
+        From inside a dark hallway, looking out through the open front door at
+        the lit street: the headline read as a picture, from the side of the
+        door you step out of. The one interior lens on the page, which is what
+        separates it from the street frames above it.
       */}
       <section id="closing" className={styles.closing} aria-labelledby="closing-title">
         <Image
-          src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
+          src="/redesign/cinematic/home-doorway-dusk-1920.webp"
           alt=""
           fill
           sizes="100vw"

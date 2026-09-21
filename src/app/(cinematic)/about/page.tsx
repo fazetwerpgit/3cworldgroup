@@ -24,24 +24,22 @@ export const metadata: Metadata = {
  */
 
 const VALUES = [
-  [
-    "01",
-    "Connection",
-    "The service that fits the household, explained at the door by someone who knows it.",
-  ],
-  [
-    "02",
-    "Community",
-    "Contractors trained by people who have worked the route, and supported in the field.",
-  ],
-  [
-    "03",
-    "Commitment",
-    "A real conversation at every door, and follow-through on what was promised there.",
-  ],
+  ["Connection", "The right service, explained at the door by someone who knows it."],
+  ["Community", "Contractors trained and backed by people who have worked the route."],
+  ["Commitment", "Follow-through on what was promised on the porch."],
 ] as const;
 
-const CONTRACTOR_SUPPORT = ["Training before the first door", "A route in a live market", "A leader who picks up the phone"] as const;
+/** The two people in every conversation, one line each. */
+const AUDIENCES = [
+  [
+    "For customers",
+    "Someone on the porch who can say what the provider in their market offers, what it costs and when it gets installed.",
+  ],
+  [
+    "For contractors",
+    "Training before the first door, a route in a live market, and a leader who has worked one and picks up the phone.",
+  ],
+] as const;
 
 /** The four people who lead the company, and what each is responsible for. */
 const LEADERS = [
@@ -87,40 +85,13 @@ export default function AboutPage() {
                 Apply now
                 <ArrowRight aria-hidden="true" className={kit.btnArrow} size={19} strokeWidth={2.2} />
               </Link>
-              <a href="#who-we-serve" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
-                Who we serve
+              <a href="#mission" className={`${kit.btn} ${kit.btnGhost} ${kit.btnLg}`}>
+                What we do
               </a>
             </div>
           </div>
         </div>
       </header>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* 1 — the opening frame                                            */}
-      {/* ---------------------------------------------------------------- */}
-      <section id="story" className={`${kit.surfaceInk} ${styles.story}`} aria-labelledby="story-title">
-        <h2 id="story-title" className={kit.srOnly}>
-          3C World Group at a glance
-        </h2>
-
-        {/*
-          Full bleed on purpose: the band is the page's photographic opening, and
-          the scrim dissolves both of its edges into the navy above and below so
-          it reads as a frame in the film rather than a pasted rectangle.
-        */}
-        <div id="story-band" className={styles.band}>
-          <Image
-            src="/redesign/cinematic/fiber-pedestal-dusk-1920.webp"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className={styles.bandImage}
-          />
-          <div className={styles.bandScrim} aria-hidden="true" />
-        </div>
-
-      </section>
 
       {/* ---------------------------------------------------------------- */}
       {/* 2 — the mission                                                  */}
@@ -138,8 +109,8 @@ export default function AboutPage() {
               the door.
             </h2>
             <p className={kit.sectionLedeInk}>
-              Fiber, TV and home security for the providers we represent, sold face to face
-              in the neighborhoods they serve.
+              Face to face, for the providers we represent, in the neighborhoods they
+              serve. Two people in every conversation, and we work for both.
             </p>
           </header>
 
@@ -151,6 +122,24 @@ export default function AboutPage() {
                 gets customers who understood what they bought. The contractor gets a trade
                 they can build on.
               </p>
+
+              {/*
+                The old "Who we serve" section, reduced to the two lines it
+                was actually saying. They belong under the mission, not in a
+                section of their own with two headings and a bullet list.
+              */}
+              <dl className={styles.audiences}>
+                {AUDIENCES.map(([kind, body]) => (
+                  <div key={kind} className={styles.audience}>
+                    <dt className={styles.audienceKind}>{kind}</dt>
+                    <dd className={styles.audienceBody}>{body}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Link href={APPLY_HREF} className={`${kit.quietLinkInk} ${styles.applyLink}`}>
+                Apply to sell with 3C
+                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
+              </Link>
             </div>
 
             {/*
@@ -172,91 +161,41 @@ export default function AboutPage() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* 3 — the three C's                                                */}
+      {/* 3 — the three C's, over the neighbourhood                        */}
       {/* ---------------------------------------------------------------- */}
-      <section id="values" className={`${kit.surfaceInk} ${styles.values}`} aria-labelledby="values-title">
-        <div className={kit.shell}>
+      {/*
+        The values used to be three text columns on navy — the one section on
+        the page with no picture, past the point where the owner stopped
+        reading. Now they sit on the neighbourhood itself: a street corner at
+        dusk with a bench, a lamp and the mailboxes, the left third dark where
+        the copy stands. Three names, one line each.
+      */}
+      <section id="values" className={styles.values} aria-labelledby="values-title">
+        <Image
+          src="/redesign/cinematic/about-corner-dusk-1920.webp"
+          alt=""
+          fill
+          sizes="100vw"
+          className={styles.valuesArt}
+        />
+        <div className={styles.valuesScrim} aria-hidden="true" />
+        <div className={`${kit.shell} ${styles.valuesInner}`}>
           <header className={kit.sectionHead} data-reveal>
             <h2 id="values-title" className={kit.sectionTitle}>
               The three C&rsquo;s
               <br />
               that define us.
             </h2>
-            <p className={kit.sectionLede}>
-              Connection, community and commitment — the three the company is named for, and
-              the three it is run on.
-            </p>
           </header>
 
-          <ol className={styles.valueList}>
-            {VALUES.map(([, name, body]) => (
-              <li key={name} className={`${styles.value} ${kit.revealRise}`} data-reveal>
-                <h3 className={styles.valueName}>{name}</h3>
-                <p className={styles.valueBody}>{body}</p>
-              </li>
+          <dl className={styles.valueList}>
+            {VALUES.map(([name, body]) => (
+              <div key={name} className={`${styles.value} ${kit.revealRise}`} data-reveal>
+                <dt className={styles.valueName}>{name}</dt>
+                <dd className={styles.valueBody}>{body}</dd>
+              </div>
             ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* 4 — the two people on either side of the door                    */}
-      {/* ---------------------------------------------------------------- */}
-      <section
-        id="who-we-serve"
-        className={`${kit.surfacePaper} ${kit.seam} ${styles.serve}`}
-        aria-labelledby="serve-title"
-      >
-        <div className={kit.shell}>
-          <header className={kit.sectionHeadInk} data-reveal>
-            <h2 id="serve-title" className={kit.sectionTitleInk}>
-              Who we
-              <br />
-              serve.
-            </h2>
-            <p className={kit.sectionLedeInk}>
-              There are two people in every one of these conversations: the household that
-              needs the service, and the contractor who brings it to the door.
-            </p>
-          </header>
-
-          <div className={styles.serveGrid}>
-            <article className={`${styles.serveItem} ${kit.revealRise}`} data-reveal>
-              <p className={styles.serveKind}>For our customers</p>
-              <h3 className={styles.serveTitle}>
-                The right service,
-                <br />
-                explained at the door.
-              </h3>
-              <p className={styles.serveBody}>
-                Fiber, TV and home security from the providers in their market, with someone
-                on the porch who can say what it costs and when it gets installed.
-              </p>
-              <p className={styles.productLine}>Fiber internet. TV. Home security.</p>
-            </article>
-
-            <article className={`${styles.serveItem} ${kit.revealRise}`} data-reveal>
-              <p className={styles.serveKind}>For our contractors</p>
-              <h3 className={styles.serveTitle}>
-                A route, training,
-                <br />
-                and someone to call.
-              </h3>
-              <p className={styles.serveBody}>
-                Training before the first door, a route in a live market, and a leader who
-                has worked one and picks up the phone.
-              </p>
-              <ul className={styles.supportList}>
-                {CONTRACTOR_SUPPORT.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              <Link href={APPLY_HREF} className={`${kit.quietLinkInk} ${styles.applyLink}`}>
-                Apply to sell with 3C
-                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
-              </Link>
-            </article>
-          </div>
+          </dl>
         </div>
       </section>
 

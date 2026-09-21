@@ -1,0 +1,9 @@
+Use case: full-bleed hero photograph on the services page of a door-to-door sales company site; headline copy sits in the left third; on phones the frame is cropped to portrait keeping the right two thirds.
+Asset type: full-bleed hero photograph, 3:2, close.
+Primary request: a close photograph beside a front door at blue hour: a lit brass porch sconce and a small video doorbell on the door frame at the right, the dark painted door filling the middle, the left third the shadowed clapboard wall where the headline sits. Shallow depth of field, the porch rail and one warm window across the street soft in the far right. No house numbers, no readable text. No people.
+Subject: the door where the services are sold, at arm's length.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.

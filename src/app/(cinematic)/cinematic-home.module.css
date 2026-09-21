@@ -439,36 +439,48 @@
 }
 
 /*
-  The bottom-right of the route canvas is where the drawn line finishes, so it
-  carries the step the whole sequence is about rather than sitting empty.
+  The photographs, one per stop: the same 14rem column as the stop's copy,
+  centred on the same dot with the same edge clamp, on the other side of the
+  line (2rem off it, where the copy sits 1.85rem off it). `--art-h` is the
+  3:2 height of that column, so the box is stated in the same units as the
+  card and the two never drift apart. Reveal is the kit's rise, not the stop
+  arrival: the photo is scenery, the copy is the stop.
 */
-.routeEnd {
-  border-left: 1px solid var(--rule-ink);
-  display: grid;
-  gap: 0.8rem;
-  justify-items: start;
-  padding-left: 1.3rem;
+.routeArt {
+  --art-w: 14rem;
+  --art-h: 9.333rem;
+  inset: 0;
+  pointer-events: none;
   position: absolute;
-  right: 0;
-  /* Anchored under the line's own y, not to the bottom of the box: the box
-     shrinks faster than this panel does, and at 1024 a bottom-anchored panel
-     rose far enough to have the route drawn straight through it. */
-  top: calc(63.83% + 1.6rem);
-  width: clamp(15rem, 27%, 20rem);
 }
 
-.routeEndKind {
-  color: var(--on-paper-dim);
-  font-family: var(--display);
-  font-size: 0.92rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+.routeArtItem {
+  background: var(--ink-deep);
+  display: block;
+  height: var(--art-h);
+  left: var(--stop-x);
+  margin-left: max(calc(-0.5 * var(--art-w)), calc(-1 * var(--stop-x)));
+  overflow: hidden;
+  position: absolute;
+  width: var(--art-w);
 }
 
-.routeEndBody {
-  font-size: 1.02rem;
-  line-height: 1.5;
-  max-width: 26ch;
+/* Copy below the line → photo above it, and the reverse. */
+.routeArtItem[data-side="below"] {
+  top: calc(var(--stop-y) - 2rem - var(--art-h));
+}
+
+.routeArtItem[data-side="above"] {
+  top: calc(var(--stop-y) + 2rem);
+}
+
+.routeArtItem img {
+  object-fit: cover;
+}
+
+/* Stacked layout only: the same photo sits above its copy, in flow. */
+.routeStopArtSm {
+  display: none;
 }
 
 .routeStopCard {
@@ -526,14 +538,36 @@
   that escapes the box is `10.5rem - 14.2% of the canvas width`, and nothing at
   all once the canvas is wide enough to contain it.
 */
+/* The Apply button sits one gap after the note, not at the far edge of the
+   shell: with the note at its 58ch measure, a right-aligned button left up to
+   ~580px of nothing between them on wide screens. */
 .routeFoot {
+  align-items: center;
   border-top: 1px solid var(--rule-ink);
+  display: grid;
+  gap: 1.5rem clamp(2rem, 5vw, 5rem);
+  grid-template-columns: auto auto;
+  justify-content: start;
+  margin-top: calc(clamp(2rem, 4vw, 3.5rem) + max(0px, 10.5rem - 14.2%));
+  padding-top: 1.5rem;
+}
+
+.routeFootNote {
   color: var(--on-paper-dim);
   font-size: 1rem;
   line-height: 1.66;
-  margin-top: calc(clamp(2rem, 4vw, 3.5rem) + max(0px, 10.5rem - 14.2%));
   max-width: 58ch;
-  padding-top: 1.5rem;
+}
+
+.routeFootNote a {
+  white-space: nowrap;
+}
+
+.routeFootCta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem 1.5rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -1134,6 +1168,17 @@
     width: 12.5rem;
   }
 
+  .routeArt {
+    --art-w: 12.5rem;
+    --art-h: 8.333rem;
+  }
+
+  /* The "above" cards hang higher than a canvas this short, so the canvas
+     itself moves down to keep 04 off the section lede. */
+  .route {
+    margin-top: 4.5rem;
+  }
+
   .routeStopTitle {
     font-size: 1.4rem;
   }
@@ -1235,9 +1280,10 @@
   }
 
   .routeSvgStacked {
+    align-self: stretch;
     display: block;
     flex: none;
-    height: 640px;
+    height: 100%;
     width: 56px;
   }
 
@@ -1246,37 +1292,52 @@
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
+  /* Four equal rows; the stretched line puts its stops on their centres. */
   .routeStops {
     display: grid;
-    grid-template-rows: repeat(4, 160px);
+    grid-template-rows: repeat(4, minmax(0, 1fr));
     inset: auto;
     position: relative;
   }
 
+  .routeArt {
+    display: none;
+  }
+
+  .routeStopArtSm {
+    aspect-ratio: 3 / 2;
+    background: var(--ink-deep);
+    display: block;
+    margin-top: 1rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .routeStopArtSm img {
+    object-fit: cover;
+  }
+
   .routeStop {
-    align-content: center;
+    align-content: start;
     display: grid;
     height: auto;
     left: auto;
     margin-left: 0;
-    padding-left: 0.75rem;
+    padding: 0 0 1.4rem 0.75rem;
     position: relative;
     top: auto;
     width: auto;
   }
 
-  /* The dot re-registers against the stacked line, which jogs between
-     x=18 and x=38 inside its own 56px column. */
+  /* The dot re-registers against the stacked rail at x=18 inside its own
+     56px column; the rail's stops sit 12.5% into each row, level with the
+     title. */
   .routeDot {
-    top: 50%;
+    top: 12.5%;
   }
 
-  .routeStop[data-side="below"] .routeDot {
+  .routeStop .routeDot {
     left: -38px;
-  }
-
-  .routeStop[data-side="above"] .routeDot {
-    left: -18px;
   }
 
   .routeStopCard {
@@ -1287,19 +1348,8 @@
 
   /* Stacked, everything is in flow and nothing overhangs the canvas. */
   .routeFoot {
+    grid-template-columns: minmax(0, 1fr);
     margin-top: clamp(2rem, 4vw, 3.5rem);
-  }
-
-  .routeEnd {
-    bottom: auto;
-    grid-column: 1 / -1;
-    margin-top: 1.75rem;
-    position: relative;
-    right: auto;
-    /* It is in normal flow here, so the wide layout's line anchor has to go or
-       it would offset the panel down by 63.83% of its own height. */
-    top: auto;
-    width: auto;
   }
 
   .routeStop[data-side="below"] .routeStopCard,

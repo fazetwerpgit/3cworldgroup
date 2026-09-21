@@ -79,14 +79,14 @@ export default function ServicesPage() {
   return (
     <>
       {/* ---------------------------------------------------------------- */}
-      {/* 1 — the head: the pedestal at dusk, close, with the street soft   */}
-      {/*     behind it; band 01 below is the same object at working       */}
-      {/*     distance, so the two read as two beats of one walk           */}
+      {/* 1 — the head: beside a front door at arm's length, a lit sconce  */}
+      {/*     and a video doorbell at the frame; the wall the headline sits */}
+      {/*     on is the dark clapboard at the left                          */}
       {/* ---------------------------------------------------------------- */}
       <header className={`${kit.pageHead} ${styles.head}`}>
         <div className={kit.pageHeadArt}>
           <Image
-            src="/redesign/cinematic/services-pedestal-dusk-1920.webp"
+            src="/redesign/cinematic/services-door-dusk-1920.webp"
             alt=""
             fill
             priority

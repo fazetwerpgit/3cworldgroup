@@ -1,0 +1,9 @@
+Use case: small figure photo under step 02 "Talk it through" of a four-step recruiting timeline on a door-to-door sales company site, shown about 400 pixels wide.
+Asset type: photograph, 3:2.
+Primary request: a covered front porch at blue hour with two chairs angled toward each other, the front door half open with warm light spilling out, a porch lamp lit, the street soft behind. No people.
+Subject: a real conversation about the job, implied by the two chairs.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.

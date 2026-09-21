@@ -1,0 +1,9 @@
+Use case: full-bleed band photograph on the about page of a door-to-door sales company site; three short value names sit on the left third over a dark scrim.
+Asset type: full-bleed photograph, 3:2.
+Primary request: a suburban street corner at blue hour with a small pocket park, a wooden bench and one lit lamp post, a cluster of mailboxes, houses with warm windows along the curve behind, tall pines; the left third is dark tree shadow where the copy sits. No people, no cars.
+Subject: the neighbourhood as a community, the place the company works in.
+Style/medium: real photograph, 50mm, crisp, natural depth of field. Looks like licensed editorial stock, not a render.
+Lighting/mood: blue hour, deep navy sky, warm tungsten porch and window light, calm.
+Color palette: navy, forest green, warm amber. No lime or green light anywhere.
+Input image: the attached photo is a frame from the same site; match its colour grade, mood and film look exactly.
+Avoid: people, faces, hands, cars in motion, readable text, logos, watermark, purple or blue gradients, glow orbs, light trails, neon, HDR, illustration look, fiber equipment, cabling, pedestals.
