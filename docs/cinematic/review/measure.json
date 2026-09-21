@@ -785,9 +785,9 @@
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
       "meanBackdropL": 0.0079,
-      "maxBackdropL": 0.1149,
-      "worstRatio": 6.37,
-      "meanRatio": 18.14
+      "maxBackdropL": 0.1655,
+      "worstRatio": 4.87,
+      "meanRatio": 18.13
     },
     {
       "route": "/services",
@@ -806,10 +806,10 @@
       "label": "careers h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0084,
-      "maxBackdropL": 0.0375,
-      "worstRatio": 11.99,
-      "meanRatio": 17.97
+      "meanBackdropL": 0.0056,
+      "maxBackdropL": 0.0194,
+      "worstRatio": 15.14,
+      "meanRatio": 18.88
     },
     {
       "route": "/apply",
