@@ -104,7 +104,6 @@ const ratio = (l1, l2) => (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   const p2 = await ctx2.newPage();
   out.contrast = [];
   const TARGETS = [
-    { route: "/", sel: "[class*=heroRail] [class*=railLabel], [class*=heroRail] a, [class*=heroRail] span", label: "hero chapter rail" },
     { route: "/", sel: "h1", label: "home h1" },
     { route: "/about", sel: "h1", label: "about h1" },
     { route: "/services", sel: "h1", label: "services h1" },

@@ -6,8 +6,8 @@
         "id": "",
         "cls": "hero",
         "secH": 776,
-        "padTop": -28,
-        "padBot": -28,
+        "padTop": -234,
+        "padBot": -155,
         "first": "IMG",
         "last": "IMG"
       },
@@ -20,7 +20,7 @@
         "padBot": 16,
         "first": "Three things happenat every do",
         "last": "Once someone is interested, yo",
-        "deadAbove": 35
+        "deadAbove": -92
       },
       {
         "tag": "section",
@@ -96,7 +96,7 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 625,
+        "secH": 760,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -117,11 +117,11 @@
         "tag": "section",
         "id": "mission",
         "cls": "surfacePaper seam mission",
-        "secH": 805,
+        "secH": 860,
         "padTop": 63,
         "padBot": 31,
-        "first": "Empowering salesprofessionals.",
-        "last": "Building lasting connections.",
+        "first": "We sell atthe door.",
+        "last": "Every sale starts with a conve",
         "deadAbove": 63
       },
       {
@@ -139,7 +139,7 @@
         "tag": "section",
         "id": "who-we-serve",
         "cls": "surfacePaper seam serve",
-        "secH": 1283,
+        "secH": 1257,
         "padTop": 63,
         "padBot": 31,
         "first": "Who weserve.",
@@ -176,7 +176,7 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 625,
+        "secH": 760,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -223,7 +223,7 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 625,
+        "secH": 760,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -302,7 +302,7 @@
         "tag": "section",
         "id": "closing",
         "cls": "surfaceInkDeep closing",
-        "secH": 360,
+        "secH": 312,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -317,7 +317,7 @@
         "tag": "header",
         "id": "",
         "cls": "pageHead head",
-        "secH": 625,
+        "secH": 760,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -495,7 +495,7 @@
         "secH": 757,
         "padTop": 84,
         "padBot": 53,
-        "first": "Empowering salesprofessionals.",
+        "first": "We sell atthe door.",
         "last": "IMG",
         "deadAbove": 84
       },
@@ -514,7 +514,7 @@
         "tag": "section",
         "id": "who-we-serve",
         "cls": "surfacePaper seam serve",
-        "secH": 842,
+        "secH": 835,
         "padTop": 84,
         "padBot": 53,
         "first": "Who weserve.",
@@ -574,9 +574,9 @@
         "cls": "bundle surfacePaper seamBottomOnly",
         "secH": 627,
         "padTop": 84,
-        "padBot": 53,
+        "padBot": -142,
         "first": "One home.A clearer setup.",
-        "last": "Start selling",
+        "last": "IMG",
         "deadAbove": 84
       },
       {
@@ -588,7 +588,7 @@
         "padBot": 0,
         "first": "IMG",
         "last": "IMG",
-        "deadAbove": 53
+        "deadAbove": -142
       }
     ]
   },
@@ -677,7 +677,7 @@
         "tag": "section",
         "id": "closing",
         "cls": "surfaceInkDeep closing",
-        "secH": 565,
+        "secH": 517,
         "padTop": 0,
         "padBot": 0,
         "first": "IMG",
@@ -763,20 +763,14 @@
   "contrast": [
     {
       "route": "/",
-      "sel": "[class*=heroRail] [class*=railLabel], [class*=heroRail] a, [class*=heroRail] span",
-      "label": "hero chapter rail",
-      "note": "not found / offscreen"
-    },
-    {
-      "route": "/",
       "sel": "h1",
       "label": "home h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0046,
-      "maxBackdropL": 0.0216,
-      "worstRatio": 14.67,
-      "meanRatio": 19.22
+      "meanBackdropL": 0.0064,
+      "maxBackdropL": 0.0699,
+      "worstRatio": 8.76,
+      "meanRatio": 18.63
     },
     {
       "route": "/about",
@@ -784,10 +778,10 @@
       "label": "about h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0079,
-      "maxBackdropL": 0.1655,
-      "worstRatio": 4.87,
-      "meanRatio": 18.13
+      "meanBackdropL": 0.0045,
+      "maxBackdropL": 0.024,
+      "worstRatio": 14.2,
+      "meanRatio": 19.26
     },
     {
       "route": "/services",
@@ -795,10 +789,10 @@
       "label": "services h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0059,
-      "maxBackdropL": 0.0367,
-      "worstRatio": 12.11,
-      "meanRatio": 18.78
+      "meanBackdropL": 0.0051,
+      "maxBackdropL": 0.0136,
+      "worstRatio": 16.5,
+      "meanRatio": 19.07
     },
     {
       "route": "/opportunities",
@@ -806,10 +800,10 @@
       "label": "careers h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0056,
-      "maxBackdropL": 0.0194,
-      "worstRatio": 15.14,
-      "meanRatio": 18.88
+      "meanBackdropL": 0.0053,
+      "maxBackdropL": 0.0197,
+      "worstRatio": 15.05,
+      "meanRatio": 19
     },
     {
       "route": "/apply",
@@ -817,10 +811,10 @@
       "label": "apply h1",
       "fs": "56px",
       "color": "rgb(255, 255, 255)",
-      "meanBackdropL": 0.0083,
-      "maxBackdropL": 0.1333,
-      "worstRatio": 5.73,
-      "meanRatio": 18.02
+      "meanBackdropL": 0.0052,
+      "maxBackdropL": 0.0218,
+      "worstRatio": 14.63,
+      "meanRatio": 19.03
     }
   ]
 }

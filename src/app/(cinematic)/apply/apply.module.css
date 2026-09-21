@@ -26,7 +26,16 @@
 
 @media (max-width: 759px) {
   .head {
+    --head-fall: 34%;
     --head-focus: 84% 40%;
+  }
+
+  /* The lit windows sit at the far right of the source; a portrait crop at
+     84% shows roofline and pines. Scale about the house so the light lands in
+     the clear window above the copy. */
+  .head img {
+    transform: scale(1.55);
+    transform-origin: 96% 42%;
   }
 }
 
