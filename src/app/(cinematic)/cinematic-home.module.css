@@ -373,8 +373,14 @@
       the swaps fired in a bunch as the section left. A beat is now ~60svh,
       about the pinned stage's own height, so one chapter pairs with the
       photograph at a time and each change lands while its copy is beside it.
+
+      Round 15 (reviewer: three chapters spend a lot of column on ~200px of
+      copy): 60svh/36rem → 50svh/30rem. Trims the reading distance between
+      descriptions by ~70–100px a beat while a beat still roughly matches the
+      pinned stage, so the one-chapter-one-photo pairing holds. Third-photo
+      dwell measured with docs/cinematic/review/dwell.mjs after the change.
     */
-    min-height: clamp(22rem, 60svh, 36rem);
+    min-height: clamp(22rem, 50svh, 30rem);
     padding: clamp(1.75rem, 2.6vw, 2.4rem) 0;
   }
 
