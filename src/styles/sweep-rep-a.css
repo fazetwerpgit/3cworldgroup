@@ -1263,3 +1263,18 @@
   line-height: 1.45;
   color: var(--muted);
 }
+
+/* iOS Safari zooms on focus below 16px; phones/tablets get 16px fields,
+   desktop keeps the compact sizes. */
+@media (max-width: 1023px) {
+  .portal-scope .sales-board-search input,
+  .sales-board-reason input {
+    font-size: 16px;
+  }
+
+  .portal-scope .sales-board-assign-row select {
+    padding-top: 3px;
+    padding-bottom: 3px;
+    font-size: 16px;
+  }
+}

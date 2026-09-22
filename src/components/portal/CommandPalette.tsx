@@ -359,7 +359,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
               setActiveIndex(0);
             }}
             placeholder="Search pages, actions, customers…"
-            className="h-12 flex-1 bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none"
+            className="h-12 flex-1 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none lg:text-sm"
             // Inline style: the portal-scope "inputs follow the theme" CSS rule
             // would otherwise paint this near-black on the navy glass in light
             // mode. The palette is always navy, so its text is always white.
