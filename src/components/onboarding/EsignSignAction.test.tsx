@@ -3,9 +3,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loadSignWellEmbedMock, getIdTokenMock } = vi.hoisted(() => ({
+const { loadSignWellEmbedMock, getIdTokenMock, routerPushMock } = vi.hoisted(() => ({
   loadSignWellEmbedMock: vi.fn(),
   getIdTokenMock: vi.fn(),
+  routerPushMock: vi.fn(),
 }));
 
 vi.mock('@/lib/esign/embedClient', () => ({
@@ -13,6 +14,9 @@ vi.mock('@/lib/esign/embedClient', () => ({
 }));
 vi.mock('@/lib/firebase/getIdToken', () => ({
   getIdToken: getIdTokenMock,
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPushMock }),
 }));
 
 import { EsignSignAction } from './EsignSignAction';
@@ -45,9 +49,9 @@ function makeFakeConstructor() {
   });
 }
 
-async function renderAction(onRefresh = vi.fn()) {
+async function renderAction(onRefresh = vi.fn(), signingUrl = 'https://sign.example/x') {
   await act(async () => {
-    root.render(<EsignSignAction itemId="contract" signingUrl="https://sign.example/x" onRefresh={onRefresh} />);
+    root.render(<EsignSignAction itemId="contract" signingUrl={signingUrl} onRefresh={onRefresh} />);
   });
   return { onRefresh };
 }
@@ -71,6 +75,7 @@ beforeEach(() => {
   fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
   vi.stubGlobal('fetch', fetchMock);
   getIdTokenMock.mockReset().mockResolvedValue('id-token-123');
+  routerPushMock.mockReset();
   loadSignWellEmbedMock.mockReset().mockImplementation(async () => makeFakeConstructor());
   vi.useFakeTimers();
 });
@@ -129,6 +134,18 @@ describe('EsignSignAction', () => {
     // of hanging, and must never claim approval it hasn't received.
     expect(container.textContent).toContain('taking longer than usual');
     expect(container.textContent).not.toMatch(/approved/i);
+  });
+
+  it('navigates in-app when the signing URL is an in-house path', async () => {
+    // The in-house provider hands back '/portal/onboarding/sign/{id}'. That is
+    // a page in this app, so it must be routed to - not fetched, not embedded.
+    await renderAction(vi.fn(), '/portal/onboarding/sign/abc');
+
+    await clickSignNow();
+
+    expect(routerPushMock).toHaveBeenCalledWith('/portal/onboarding/sign/abc');
+    expect(loadSignWellEmbedMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('refreshes the signing URL at click time before opening the embed', async () => {

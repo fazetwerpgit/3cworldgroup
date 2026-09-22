@@ -32,6 +32,7 @@ export const ONBOARDING_ALLOWED_APIS = [
   '/api/portal/profile',
   '/api/portal/presence',
   '/api/portal/push/register',
+  '/api/portal/push/health',
   '/api/portal/chat/channels',
   '/api/portal/chat/gifs',
   '/api/portal/chat/media',
@@ -44,6 +45,7 @@ export const ONBOARDING_ALLOWED_APIS = [
 // `/api/portal/chat/channels` legitimately covers `/…/channels/{id}/members`,
 // so the administrative sub-routes are subtracted explicitly.
 export const DENIED_API_PATHS: readonly string[] = [
+  '/api/portal/onboarding/esign-send',
   '/api/portal/chat/channels/manage',
   '/api/portal/chat/channels/sync',
 ];

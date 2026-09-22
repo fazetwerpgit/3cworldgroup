@@ -1,20 +1,8 @@
-import { NextResponse } from 'next/server';
-
-// POST /api/portal/auth/signup - DISABLED for security
-// Employee accounts must be created by admins through User Management
-export async function POST() {
-  return NextResponse.json(
-    { error: 'Public signup is disabled. Please contact your manager to create an account.' },
-    { status: 403 }
-  );
-}
-
-/* ORIGINAL CODE - DISABLED FOR SECURITY
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 // POST /api/portal/auth/signup - Register new employee as entry_level_rep
-export async function POST_DISABLED(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     if (!adminDb || !adminAuth) {
       return NextResponse.json(
@@ -26,7 +14,6 @@ export async function POST_DISABLED(request: NextRequest) {
     const body = await request.json();
     const { email, password, displayName } = body;
 
-    // Validate required fields
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -41,18 +28,16 @@ export async function POST_DISABLED(request: NextRequest) {
       );
     }
 
-    // Create Firebase Auth user
     const userRecord = await adminAuth.createUser({
       email,
       password,
       displayName: displayName || email.split('@')[0],
     });
 
-    // Create Firestore user profile with entry_level_rep field role
     const userProfile = {
       email,
       displayName: displayName || email.split('@')[0],
-      fieldRole: 'entry_level_rep', // Default field role - admin can change later
+      fieldRole: 'entry_level_rep',
       status: 'active',
       hireDate: new Date(),
       createdAt: new Date(),
@@ -61,7 +46,6 @@ export async function POST_DISABLED(request: NextRequest) {
 
     await adminDb.collection('users').doc(userRecord.uid).set(userProfile);
 
-    // Send welcome notification
     await adminDb.collection('notifications').add({
       userId: userRecord.uid,
       type: 'announcement',
@@ -84,13 +68,15 @@ export async function POST_DISABLED(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Error creating user:', error);
 
-    // Handle specific Firebase errors
     if (error && typeof error === 'object' && 'code' in error) {
       const firebaseError = error as { code: string };
       if (firebaseError.code === 'auth/email-already-exists') {
         return NextResponse.json(
-          { error: 'An account with this email already exists' },
-          { status: 400 }
+          {
+            error: 'You already have a portal account. Sign in instead, or reset your password from the login page.',
+            code: 'account_exists',
+          },
+          { status: 409 }
         );
       }
       if (firebaseError.code === 'auth/invalid-email') {
@@ -113,4 +99,3 @@ export async function POST_DISABLED(request: NextRequest) {
     );
   }
 }
-*/

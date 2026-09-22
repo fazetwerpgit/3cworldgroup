@@ -40,6 +40,8 @@ interface SalesTableProps {
   payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
   /** Provider install status, fetched once by the page. */
   fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
+  /** Refetches the book after the detail sheet edits a sale's install date. */
+  onSaleUpdated?: () => void;
 }
 
 function formatMoney(value: number) {
@@ -84,6 +86,7 @@ export function SalesTable({
   month,
   payPlan,
   fiber,
+  onSaleUpdated,
 }: SalesTableProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
@@ -382,6 +385,7 @@ export function SalesTable({
         isAdmin={isAdmin}
         loading={loading}
         onRequestDelete={(id) => setDeletingId(id)}
+        onSaleUpdated={onSaleUpdated}
       />
 
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>

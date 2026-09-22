@@ -231,7 +231,15 @@ describe('page and api allowlists agree', () => {
   it('allows no api whose only consumer would be a blocked page', () => {
     // Shell-wide APIs are reachable from every page and so have no single
     // consumer; everything else must be justified by the map above.
-    const SHELL_WIDE = ['/api/portal/notifications', '/api/portal/presence', '/api/portal/push/register'];
+    const SHELL_WIDE = [
+      '/api/portal/notifications',
+      '/api/portal/presence',
+      '/api/portal/push/register',
+      // push/health has requireVerifiedUser and writes pushHealth only onto the
+      // verified caller's own users/{uid} document. The shell posts it on every
+      // load, so a hire without it takes a 403 on every page.
+      '/api/portal/push/health',
+    ];
     const depended = new Set(Object.values(PAGE_API_DEPENDENCIES).flat());
     for (const api of ONBOARDING_ALLOWED_APIS) {
       if (SHELL_WIDE.includes(api)) continue;
@@ -265,6 +273,15 @@ const ALLOWED_SUBPATHS = [
   // onboarding/esign-signing-url has requireVerifiedUser and scopes both the
   // envelope lookup and refreshed bearer URL to the verified caller.
   '/api/portal/onboarding/esign-signing-url',
+  // onboarding/esign/sign has requireVerifiedUser and refuses any envelope
+  // whose userId is not the verified caller before it stamps or completes.
+  '/api/portal/onboarding/esign/sign',
+  // onboarding/esign/envelope/{id} has requireVerifiedUser and the same
+  // envelope-ownership check before returning the field list.
+  '/api/portal/onboarding/esign/envelope/x',
+  // onboarding/esign/envelope/{id}/pdf has requireVerifiedUser and the same
+  // envelope-ownership check before streaming the blank source document.
+  '/api/portal/onboarding/esign/envelope/x/pdf',
   // chat channel media has getVerifiedChatUser plus userCanAccessChannelDoc.
   '/api/portal/chat/channels/x/media',
   // chat channel members has getVerifiedChatUser plus userCanAccessChannelDoc.

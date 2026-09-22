@@ -8,6 +8,7 @@ import { PageTitle } from '@/components/portal/PageTitle';
 import '@/styles/sweep-admin-a.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { isEsignItem } from '@/lib/onboarding/esign';
 import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
 
 // The review route verifies the reviewer from the ID token and stamps their uid
@@ -40,6 +41,7 @@ interface Submission {
   reviewedAt: string | null;
   reviewerName: string | null;
   hasSignedPdf: boolean;
+  esignEnvelopeId?: string | null;
 }
 
 interface SubmissionGroup {
@@ -106,6 +108,7 @@ export default function OnboardingReviewPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState('all');
   const [atRiskOnly, setAtRiskOnly] = useState(false);
+  const [sendState, setSendState] = useState<Record<string, { message: string; error?: boolean }>>({});
 
   const fetchQueue = useCallback(async () => {
     if (!user) return;
@@ -150,6 +153,33 @@ export default function OnboardingReviewPage() {
       setRejectionReason('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to review submission');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const sendForSignature = async (submission: Submission) => {
+    if (!user) return;
+    setProcessingId(submission.id);
+    setSendState((prev) => ({ ...prev, [submission.id]: { message: '' } }));
+    try {
+      const response = await fetch('/api/portal/onboarding/esign-send', {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ userId: submission.userId, itemId: submission.itemId }),
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Failed to send for signature');
+      setSendState((prev) => ({
+        ...prev,
+        [submission.id]: { message: json.reason === 'envelope_exists' ? 'Already sent.' : 'Sent. The rep can sign it in their portal.' },
+      }));
+      await fetchQueue();
+    } catch (err) {
+      setSendState((prev) => ({
+        ...prev,
+        [submission.id]: { message: err instanceof Error ? err.message : 'Failed to send for signature', error: true },
+      }));
     } finally {
       setProcessingId(null);
     }
@@ -354,7 +384,22 @@ export default function OnboardingReviewPage() {
                             >
                               Reject
                             </button>
+                            {isEsignItem(submission.itemId) && !submission.esignEnvelopeId && (
+                              <button
+                                type="button"
+                                className="ops-line-action"
+                                disabled={processingId === submission.id}
+                                onClick={() => void sendForSignature(submission)}
+                              >
+                                {processingId === submission.id ? 'Sending…' : 'Send for signature'}
+                              </button>
+                            )}
                           </div>
+                          {sendState[submission.id]?.message && (
+                            <p className="ops-line-intro" style={{ marginTop: 8 }} role="status">
+                              {sendState[submission.id].message}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -449,6 +494,9 @@ export default function OnboardingReviewPage() {
                             <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>
                               Dispatched {formatDate(submission.submittedAt)} · {submission.userEmail}
                             </p>
+                            {submission.status === 'submitted' && submission.esignEnvelopeId && (
+                              <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>Awaiting rep signature</p>
+                            )}
                             <div className="ops-line-detail-actions">
                               <button
                                 type="button"

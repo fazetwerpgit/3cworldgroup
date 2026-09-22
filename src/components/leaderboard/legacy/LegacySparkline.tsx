@@ -2,7 +2,7 @@ import { sparklineGeometry } from '@/lib/leaderboard/sparkline';
 
 // 7-day rank trend. Line going up = climbing (rank axis is inverted in the
 // geometry helper). Nulls (unranked days) break the line into segments.
-export function Sparkline({ spark, mine }: { spark: (number | null)[]; mine?: boolean }) {
+export function LegacySparkline({ spark, mine }: { spark: (number | null)[]; mine?: boolean }) {
   const { polylines, dots } = sparklineGeometry(spark, 96, 27, 3);
   const values = spark.filter((value): value is number => value !== null);
   const mutedLine = !mine && (polylines.length > 1 || (values.length > 1 && new Set(values).size === 1));

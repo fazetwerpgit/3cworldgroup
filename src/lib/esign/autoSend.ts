@@ -11,6 +11,8 @@ import { getEsignProvider } from './provider';
 import type { EsignDocKey, EsignProvider } from './provider';
 
 const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+const CLAIM_STALE_MS = 2 * 60 * 1000;
+const READY_EMAIL_INTERVAL_MS = 10 * 60 * 1000;
 const MAX_ERROR_LENGTH = 500;
 const ALERT_KIND = 'review_needed' as const;
 
@@ -75,6 +77,79 @@ async function recordFailure(
   } catch (recordError) {
     console.error(`[esign] failed to record dispatch failure for ${userId}/${pending.item.id}`, recordError);
     return null;
+  }
+}
+
+/**
+ * Two checklist reads for the same rep can arrive at once — the portal issues
+ * them together on login — and each used to create its own envelope for every
+ * item: ten envelopes instead of five, and the "ready to sign" email twice.
+ *
+ * Each item is now claimed in a transaction before its envelope is created.
+ * The transaction re-reads the document, so the loser of the race sees either
+ * the winner's envelope id or its 'sending' marker and skips the item.
+ *
+ * A 'sending' marker older than two minutes counts as free: a dispatch that
+ * crashed mid-flight must not brick the item forever.
+ */
+async function claimForDispatch(pending: PendingItem, userId: string): Promise<boolean> {
+  try {
+    return await adminDb!.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(pending.ref);
+      if (fresh.get('esignEnvelopeId')) return false;
+
+      const state = dispatchState(fresh);
+      if (state.state === 'sending') {
+        const lastAttemptAt = asDate(state.lastAttemptAt);
+        if (lastAttemptAt && Date.now() - lastAttemptAt.getTime() < CLAIM_STALE_MS) return false;
+      }
+
+      transaction.set(
+        pending.ref,
+        {
+          userId,
+          itemId: pending.item.id,
+          esignDispatch: { state: 'sending', lastAttemptAt: new Date() },
+        },
+        { merge: true }
+      );
+      return true;
+    });
+  } catch (error) {
+    console.error(`[esign] failed to claim ${userId}/${pending.item.id} for dispatch`, error);
+    return false;
+  }
+}
+
+/**
+ * The per-item claim stops duplicate envelopes, but not duplicate email: two
+ * concurrent callers each claim a subset of the items and each would then tell
+ * the rep their documents are ready. One notice per rep per ten minutes is
+ * enough, because the message points at the checklist rather than listing the
+ * whole set — the winner names only the documents it sent, and the checklist is
+ * the source of truth for the rest.
+ *
+ * Ten minutes rather than forever: a rejected document is re-sent later, and
+ * that resend has to be able to reach the rep.
+ */
+async function claimReadyEmail(userId: string, now: Date): Promise<boolean> {
+  try {
+    const ref = adminDb!.doc(`users/${userId}`);
+    return await adminDb!.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(ref);
+      const lastSentAt = asDate(fresh.get('esignReadyEmailAt'));
+      if (lastSentAt && now.getTime() - lastSentAt.getTime() < READY_EMAIL_INTERVAL_MS) {
+        return false;
+      }
+      transaction.set(ref, { esignReadyEmailAt: now }, { merge: true });
+      return true;
+    });
+  } catch (error) {
+    // The envelopes are already created and the checklist already shows them.
+    // A failed claim costs the rep a notification, never a document, so it is
+    // logged and swallowed rather than risking a second email.
+    console.error(`[esign] failed to claim the ready-to-sign notice for ${userId}`, error);
+    return false;
   }
 }
 
@@ -289,9 +364,10 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
     const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
     if (!fieldRole) return sent;
 
-    // Last line of defence for every call site, including the public token
-    // route: only a hire still in the pending stage may have documents sent.
-    if (userSnap.get('status') !== 'pending') return sent;
+    // Last line of defence for every call site: only a pending or active hire
+    // may have documents sent. Decommissioned, suspended, and other statuses
+    // must never trigger provider dispatch.
+    if (!['pending', 'active'].includes(userSnap.get('status') as string)) return sent;
     if (!roleRequiresOnboarding(fieldRole)) return sent;
 
     const signerName = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
@@ -341,6 +417,9 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
     let recovered = false;
     const sentLabels: string[] = [];
     for (const item of pending) {
+      // Another caller is already dispatching this item; it sends the email.
+      if (!(await claimForDispatch(item, userId))) continue;
+
       const result = await sendOne(provider, item, userId, signerName, signerEmail);
       if (result.sent) {
         sent.push(item.item.id);
@@ -360,7 +439,7 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
       await resolveDispatchAlert(userId);
     }
 
-    if (sentLabels.length > 0) {
+    if (sentLabels.length > 0 && (await claimReadyEmail(userId, new Date()))) {
       try {
         await dispatchToUser({
           userId,

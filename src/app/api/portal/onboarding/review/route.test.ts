@@ -6,7 +6,7 @@ vi.mock('next/server', async () => {
   return { ...actual, after: vi.fn((callback: () => unknown) => void callback()) };
 });
 
-const { docGetMock, docUpdateMock, docDeleteMock, docIdMock, gateMock, queryGetMock, getAllMock } = vi.hoisted(() => ({
+const { docGetMock, docUpdateMock, docDeleteMock, docIdMock, gateMock, queryGetMock, getAllMock, sendPendingEsignDocsMock } = vi.hoisted(() => ({
   docGetMock: vi.fn(),
   docUpdateMock: vi.fn(),
   docDeleteMock: vi.fn(async () => undefined),
@@ -19,6 +19,7 @@ const { docGetMock, docUpdateMock, docDeleteMock, docIdMock, gateMock, queryGetM
   gateMock: vi.fn(),
   queryGetMock: vi.fn(),
   getAllMock: vi.fn(),
+  sendPendingEsignDocsMock: vi.fn(async () => []),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -53,6 +54,7 @@ vi.mock('@/lib/email/templates', () => ({
   itemRejectedEmail: vi.fn(() => undefined),
 }));
 vi.mock('@/lib/onboarding/activation', () => ({ maybeFlagActivationReady: vi.fn(async () => undefined) }));
+vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignDocsMock }));
 
 import { GET, POST } from './route';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
@@ -83,6 +85,7 @@ beforeEach(() => {
   getAllMock.mockResolvedValue([]);
   docGetMock.mockResolvedValue(onboardingDoc('env_current'));
   docUpdateMock.mockResolvedValue(undefined);
+  sendPendingEsignDocsMock.mockResolvedValue([]);
 });
 
 describe('POST /api/portal/onboarding/review', () => {
@@ -103,6 +106,7 @@ describe('POST /api/portal/onboarding/review', () => {
     expect(docUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
       status: 'rejected',
       supersededEnvelopeIds: '__FIELD_VALUE_ARRAY_UNION__:env_current',
+      reference: '__FIELD_VALUE_DELETE__',
       esignEnvelopeId: '__FIELD_VALUE_DELETE__',
       esignDispatch: '__FIELD_VALUE_DELETE__',
     }));
@@ -110,6 +114,7 @@ describe('POST /api/portal/onboarding/review', () => {
     // served to the candidate after the item is rejected.
     expect(docIdMock).toHaveBeenCalledWith('esignSigningUrls', 'user-1_contract');
     expect(docDeleteMock).toHaveBeenCalledOnce();
+    expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('user-1');
   });
 
   it('rejects an e-sign item without an envelope without adding a superseded id', async () => {
@@ -121,6 +126,7 @@ describe('POST /api/portal/onboarding/review', () => {
     const update = docUpdateMock.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(update).not.toHaveProperty('supersededEnvelopeIds');
     expect(update).toMatchObject({
+      reference: '__FIELD_VALUE_DELETE__',
       esignEnvelopeId: '__FIELD_VALUE_DELETE__',
       esignDispatch: '__FIELD_VALUE_DELETE__',
     });

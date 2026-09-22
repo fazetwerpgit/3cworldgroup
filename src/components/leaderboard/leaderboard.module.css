@@ -1,0 +1,759 @@
+/* Leaderboard, phone only.
+   The route renders this page below 1024px and the legacy desktop board above
+   it (src/components/leaderboard/legacy), so nothing here has a desktop layout:
+   the column simply stops growing at 640px for a tablet.
+   Built to measurements taken off the reference: a compact podium (330px wide,
+   100px tall at most) carrying the page, a centred header stack, and a lit
+   ground that fades from the accent down to the page colour by the podium.
+   Shape rule: cards and rows are 14px, the filter rail and countdown are pills,
+   and the podium blocks are the one square-footed object. */
+
+.shell {
+  --leaderboard-surface-2: var(--secondary);
+  --leaderboard-ink: var(--foreground);
+  --leaderboard-muted: var(--muted-foreground);
+  --leaderboard-line: var(--border);
+  --leaderboard-accent: var(--primary);
+  --gold: #d6a94c;
+  --gold-deep: #a8802f;
+  --silver: #9ba4af;
+  --bronze: #b1723e;
+  /* The brand lime is only 1.85:1 on a white row, so small accent marks take a
+     deeper green in light theme (5.1:1) and the bright rail lime in dark. */
+  --accent-ink: #4a7a18;
+  --glow: rgba(141, 198, 63, 0.03);
+  --glow-hot: rgba(141, 198, 63, 0.05);
+  --row-surface: var(--card);
+  --row-line: var(--border);
+  --standing-surface: var(--card);
+  --avatar-ring: rgba(10, 31, 68, 0.14);
+  --rail-fill: rgba(10, 31, 68, 0.05);
+  --rail-line: rgba(10, 31, 68, 0.11);
+  --rail-ink: var(--leaderboard-muted);
+  --pill-fill: color-mix(in srgb, var(--primary) 12%, transparent);
+  --pill-line: color-mix(in srgb, var(--primary) 42%, transparent);
+  position: relative;
+  isolation: isolate;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+}
+
+/* A faint accent glow behind the header that has faded back to the page colour
+   well before the podium. The page ground stays the portal navy. */
+.shell::before {
+  content: '';
+  position: absolute;
+  /* Behind the shell's own content. `isolation` on .shell keeps this negative
+     index from escaping into the page, which is what lets every child stack
+     naturally without carrying a z-index of its own. */
+  z-index: -1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 320px;
+  background:
+    radial-gradient(ellipse 98% 86% at 50% -20%, var(--glow-hot), transparent 72%),
+    linear-gradient(180deg, var(--glow) 0%, transparent 84%);
+  pointer-events: none;
+}
+
+/* On a phone the shell is the whole width, so the glow runs edge to edge. Once
+   the column stops growing it is narrower than the page and the glow's two
+   vertical edges read as seams, so fade it out sideways as well. */
+@media (min-width: 641px) {
+  .shell::before {
+    mask-image: linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
+  }
+}
+
+
+
+:global(.dark) .shell {
+  --glow: rgba(163, 230, 53, 0.12);
+  --glow-hot: rgba(110, 231, 170, 0.28);
+  --accent-ink: var(--rail-lime);
+  --row-surface: rgba(255, 255, 255, 0.06);
+  --row-line: rgba(255, 255, 255, 0.1);
+  --standing-surface: #161b28;
+  --avatar-ring: rgba(255, 255, 255, 0.5);
+  /* A dark translucent rail, a step under the navy ground, found by its
+     hairline rather than by a fill lighter than the page. */
+  --rail-fill: rgba(2, 16, 8, 0.38);
+  --rail-line: rgba(255, 255, 255, 0.18);
+  --rail-ink: rgba(255, 255, 255, 0.85);
+  --pill-fill: color-mix(in srgb, var(--rail-lime) 15%, transparent);
+  --pill-line: color-mix(in srgb, var(--rail-lime) 38%, transparent);
+}
+
+/* ---------- header ---------- */
+
+.header {
+  text-align: center;
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--leaderboard-ink);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: var(--leaderboard-muted);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-top: 12px;
+  padding: 0 13px;
+  border: 1px solid var(--pill-line);
+  border-radius: 999px;
+  background: var(--pill-fill);
+  color: var(--accent-ink);
+  font: 600 14px var(--font-archivo, sans-serif);
+  white-space: nowrap;
+}
+
+.countdownValue,
+.countdownText {
+  white-space: nowrap;
+}
+
+/* ---------- filters ---------- */
+
+.filters {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin: 12px auto 0;
+  padding: 3px;
+  border: 1px solid var(--rail-line);
+  border-radius: 999px;
+  background: var(--rail-fill);
+}
+
+.filters div {
+  display: flex;
+  min-width: 0;
+  gap: 2px;
+}
+
+.filters div + div {
+  margin-left: 4px;
+  padding-left: 5px;
+  border-left: 1px solid var(--rail-line);
+}
+
+.filters button {
+  position: relative;
+  min-height: 30px;
+  padding: 0 8px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rail-ink);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+/* The rail reads at 38px but still takes a 44px press. */
+.filters button::after {
+  content: '';
+  position: absolute;
+  inset: -7px 0;
+}
+
+.filters button[aria-pressed='true'] {
+  background: var(--secondary-foreground);
+  color: var(--card);
+  font-weight: 700;
+}
+
+:global(.dark) .filters button[aria-pressed='true'] {
+  background: var(--rail-lime);
+  color: var(--primary-foreground);
+}
+
+/* The stack under the header: podium, rows, standing bar. */
+.board {
+  min-width: 0;
+}
+
+/* ---------- podium ----------
+   Three charcoal boxes that touch on one baseline. Each is drawn as a lit lid
+   seen slightly from above (a trapezoid, back edge inset) over a darker front
+   face, with a highlight along the seam between them. The centre box is nearest
+   the eye, so its lid is the deepest. Dark in both themes: it is the one solid
+   object here. */
+
+.podium {
+  display: grid;
+  grid-template-columns: 97fr 135fr 97fr;
+  align-items: end;
+  gap: 0;
+  position: relative;
+  width: 100%;
+  max-width: 330px;
+  margin: 22px auto 0;
+}
+
+/* The shadow the whole podium casts on the ground, behind the blocks (which
+   carry z-index 1 and 2) so it never darkens a neighbour's face. */
+.podium::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  right: 4%;
+  bottom: -7px;
+  left: 4%;
+  height: 26px;
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(0, 0, 0, 0.6), transparent 72%);
+  pointer-events: none;
+}
+
+.podiumSlot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  color: var(--leaderboard-ink);
+  text-align: center;
+  --pod-base: #16181c;
+  --pod-top: #24272c;
+  --pod-lid: 8px;
+  --pod-inset: 7%;
+  --pod-h: 72px;
+  --pod-radius: 6px 0 0 0;
+}
+
+.podiumSlot[data-rank='1'] {
+  z-index: 2;
+  --pod-base: #1b1e22;
+  --pod-top: #2a2e33;
+  --pod-lid: 14px;
+  --pod-inset: 6%;
+  --pod-h: 100px;
+  --pod-radius: 6px 6px 0 0;
+}
+
+.podiumSlot[data-rank='3'] {
+  --pod-h: 60px;
+  --pod-radius: 0 6px 0 0;
+}
+
+/* The stack stands on its own block: the score line lands 6px above the top
+   band, so name and points fill the 48px under the avatar. */
+.podiumIdentity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  /* The stack may overhang its block so an ordinary surname fits, but only by
+     a fixed amount: 12px on the side slots, 24px on the centre. Past that the
+     name ellipsises instead of running into the next slot or the screen edge. */
+  margin: 0 -6px;
+  padding: 0 2px 6px;
+}
+
+.podiumSlot[data-rank='1'] .podiumIdentity {
+  margin: 0 -12px;
+}
+
+.crown {
+  /* The margins do two jobs. -9px at the bottom cancels the stack's 4px gap and
+     pulls the crown 5px down onto the avatar ring, so it reads as worn rather
+     than hovering. -4px at the top gives back the height this grew by, letting
+     the crown rise into the gap under the filters instead of pushing the whole
+     podium — and the rows under it — further down the screen. */
+  width: 34px;
+  height: 22px;
+  margin: -4px 0 -9px;
+}
+
+.podiumName {
+  width: 100%;
+  overflow: hidden;
+  color: var(--leaderboard-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.podiumSlot[data-rank='1'] .podiumName {
+  font-size: 14px;
+}
+
+/* ---------- the blocks ---------- */
+
+.block {
+  position: relative;
+  width: 100%;
+  height: var(--pod-h);
+  overflow: hidden;
+  border-radius: var(--pod-radius);
+  background: var(--pod-base);
+  animation: podiumRise 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The lid. Its back edge is inset on both sides, which is what makes the box
+   read as a box rather than a card with a stripe. */
+.blockTop {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--pod-lid);
+  background: var(--pod-top);
+  clip-path: polygon(
+    var(--pod-inset) 0,
+    calc(100% - var(--pod-inset)) 0,
+    100% 100%,
+    0 100%
+  );
+}
+
+.blockFace {
+  position: absolute;
+  top: var(--pod-lid);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  /* The front face is lit from above, so it lifts faintly toward the lid. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 62%),
+    var(--pod-base);
+  box-shadow: inset 0 1px 0 rgba(233, 240, 250, 0.15);
+}
+
+/* The winner catches the light: a sheen across the lid and a brighter seam
+   under it. */
+.podiumSlot[data-rank='1'] .blockTop {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0) 78%),
+    var(--pod-top);
+}
+
+.podiumSlot[data-rank='1'] .blockFace {
+  box-shadow: inset 0 1px 0 rgba(240, 248, 255, 0.22);
+}
+
+.podiumSlot[data-rank='3'] .block { animation-delay: 0ms; }
+.podiumSlot[data-rank='2'] .block { animation-delay: 70ms; }
+.podiumSlot[data-rank='1'] .block { animation-delay: 150ms; }
+
+@keyframes podiumRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.crest {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* A tenth smaller than drawn, and held back to 85%, so the wreath sits behind
+   the numeral in the mix instead of competing with it. */
+.laurel {
+  position: absolute;
+  width: 70.67px;
+  height: 32.09px;
+  opacity: 0.85;
+}
+
+/* Struck metal, not flat colour: the fill is a vertical gradient clipped to the
+   glyph, over a 1px dark edge below it so the numeral reads as embossed into
+   the block face. */
+.blockNumeral {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    var(--metal-top) 0%,
+    var(--metal-mid) 70%,
+    var(--metal-bottom) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  font:
+    700 34px/1 var(--font-archivo, 'Archivo'),
+    var(--font-sans, system-ui),
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.podiumSlot[data-rank='1'] .blockNumeral {
+  --metal-top: #ffe38f;
+  --metal-mid: #d4a13a;
+  --metal-bottom: #a8741f;
+  font-size: 38px;
+}
+
+.podiumSlot[data-rank='2'] .blockNumeral {
+  --metal-top: #f4f6f9;
+  --metal-mid: #c3c9d2;
+  --metal-bottom: #8a929d;
+}
+
+.podiumSlot[data-rank='3'] .blockNumeral {
+  --metal-top: #f2b98a;
+  --metal-mid: #c9803f;
+  --metal-bottom: #8f5222;
+}
+
+/* ---------- avatars ---------- */
+
+.avatarCenter,
+.avatarSide,
+.avatarRow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border: 0 solid transparent;
+  border-radius: 50%;
+  background: var(--leaderboard-surface-2);
+  color: var(--secondary-foreground);
+  font-family: var(--font-archivo, sans-serif);
+  font-weight: 700;
+}
+
+.avatarPhoto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarCenter {
+  width: 64px;
+  height: 64px;
+  border-width: 2px;
+  font-size: 19px;
+}
+
+.avatarSide {
+  width: 52px;
+  height: 52px;
+  border-width: 2px;
+  font-size: 16px;
+}
+
+.avatarRow {
+  width: 32px;
+  height: 32px;
+  box-shadow: 0 0 0 1.5px var(--avatar-ring);
+  font-size: 11px;
+}
+
+.avatarGold { border-color: var(--gold); }
+.avatarSilver { border-color: var(--silver); }
+.avatarBronze { border-color: var(--bronze); }
+
+/* On the podium the medal ring carries the rank, so the disc stays out of its
+   way: a light neutral face with navy initials and a white inner edge, so it
+   lifts off the dark block the way a photo does. Per-person colour still
+   identifies people in the rows, one step down in chroma. */
+.avatarCenter.avatarFallback,
+.avatarSide.avatarFallback {
+  background: #e6eaf0;
+  box-shadow: inset 0 0 0 2px #ffffff;
+  color: #0a1f44;
+}
+
+/* Rows take the same light disc as the podium. A per-person colour here turned
+   a quiet list into a row of loud dots, and nothing reads rank off it. */
+.avatarRow.avatarFallback {
+  background: #e6eaf0;
+  color: #0a1f44;
+}
+
+.openAvatar {
+  border: 1px dashed var(--leaderboard-muted);
+  background: transparent;
+  opacity: 0.5;
+}
+
+.mine .avatarCenter,
+.mine .avatarSide {
+  box-shadow: 0 0 0 2px var(--leaderboard-accent);
+}
+
+.mine .avatarCenter.avatarFallback,
+.mine .avatarSide.avatarFallback {
+  box-shadow:
+    inset 0 0 0 2px #ffffff,
+    0 0 0 2px var(--leaderboard-accent);
+}
+
+/* ---------- score ---------- */
+
+.podiumPoints,
+.rowPoints {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--leaderboard-ink);
+  font-family: var(--font-archivo, sans-serif);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.podiumPoints {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rowPoints {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.metricGlyph {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--accent-ink);
+}
+
+/* The bolt is a closed outline, so filling it gives a solid mark. The
+   handshake is not, so only the bolt takes this. */
+.metricGlyphFilled {
+  fill: currentColor;
+}
+
+.rowPoints .metricGlyph {
+  width: 14px;
+  height: 14px;
+}
+
+.srOnly {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- rows ---------- */
+
+.rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 24px 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--row-line);
+  border-radius: 16px;
+  background: var(--row-surface);
+}
+
+.rowMine {
+  border-color: var(--leaderboard-accent);
+  background: color-mix(in srgb, var(--row-surface) 88%, var(--leaderboard-accent));
+}
+
+.rank {
+  color: var(--leaderboard-muted);
+  font: 500 14px var(--font-archivo, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.rowName em {
+  margin-left: 7px;
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- your standing ---------- */
+
+.standing {
+  position: sticky;
+  z-index: 30;
+  /* 12px, not 12px + nav height: <main> is the scrollport and already carries
+     4.5rem + safe-area of bottom padding for the tab bar, and a sticky offset
+     resolves inside that padding. */
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--leaderboard-accent);
+  border-radius: 16px;
+  /* The lime hairline is enough to find it; a filled bar shouted over the
+     rows it floats above. Opaque, because it sits over scrolling content. */
+  background: var(--standing-surface);
+  color: var(--leaderboard-ink);
+  box-shadow: 0 10px 30px rgba(3, 9, 22, 0.35);
+  font-size: 14px;
+}
+
+.standingCopy {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- empty and error ---------- */
+
+.empty {
+  max-height: 40vh;
+  overflow: auto;
+  margin-top: 20px;
+  padding: 28px 20px;
+  border: 1px dashed var(--leaderboard-line);
+  border-radius: 14px;
+  color: var(--leaderboard-muted);
+  text-align: center;
+}
+
+.empty p {
+  margin: 0 0 6px;
+  color: var(--leaderboard-ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid var(--destructive);
+  border-radius: 14px;
+  color: color-mix(in srgb, var(--destructive) 45%, var(--foreground));
+  font-size: 13px;
+}
+
+/* ---------- loading ---------- */
+
+.skeleton {
+  min-width: 0;
+}
+
+.skeletonPodium {
+  display: grid;
+  grid-template-columns: 97fr 135fr 97fr;
+  align-items: end;
+  gap: 0;
+  width: 100%;
+  max-width: 330px;
+  margin: 22px auto 0;
+}
+
+.skeletonPodium span,
+.skeletonRows span {
+  display: block;
+  background: var(--leaderboard-line);
+}
+
+.skeletonPodium span {
+  height: 72px;
+  border-radius: 10px 0 0 0;
+}
+
+.skeletonPodium span:nth-child(2) {
+  height: 100px;
+  border-radius: 10px 10px 0 0;
+}
+
+.skeletonPodium span:nth-child(3) {
+  height: 60px;
+  border-radius: 0 10px 0 0;
+}
+
+.skeletonRows {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.skeletonRows span {
+  height: 52px;
+  border-radius: 14px;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 359px) {
+  .shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .filters button {
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .row {
+    gap: 10px;
+    padding: 0 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block {
+    animation: none;
+  }
+
+  .filters button {
+    transition: none;
+  }
+}

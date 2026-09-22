@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { appendApplicationRow } from '@/lib/sheets/applicationsSheet';
+import { findActivePortalAccount } from '@/lib/auth/existingAccount';
 
 /*
   Trim, cap, and drop control characters.
@@ -49,6 +50,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Name, phone, email, and city are required' },
         { status: 400 }
+      );
+    }
+
+    if (await findActivePortalAccount(email)) {
+      return NextResponse.json(
+        { error: 'You already have a 3C portal account. Sign in instead of re-applying.', code: 'account_exists' },
+        { status: 409 }
       );
     }
 

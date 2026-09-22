@@ -1,4 +1,5 @@
 import { signwellProvider } from './signwell';
+import { inhouseProvider } from './inhouse';
 
 export type EsignDocKey = 'contract' | 'direct_deposit' | 'pay_structure' | 'fcra_auth' | 'w9';
 
@@ -24,7 +25,7 @@ export interface EsignWebhookEvent {
 }
 
 export interface EsignProvider {
-  id: 'signwell' | 'adobe_sign';
+  id: 'signwell' | 'inhouse' | 'adobe_sign';
   createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult>;
   /** Downloads the provider's completed, signed PDF. */
   getCompletedPdf(envelopeId: string): Promise<Buffer>;
@@ -37,6 +38,7 @@ export interface EsignProvider {
 export function getEsignProvider(): EsignProvider {
   const id = process.env.ESIGN_PROVIDER ?? 'signwell';
   if (id === 'signwell') return signwellProvider;
+  if (id === 'inhouse') return inhouseProvider;
   if (id === 'adobe_sign') {
     // Adobe Sign pending API-tier confirmation (design open item, 2026-07-08).
     throw new Error('adobe_sign provider not implemented yet; set ESIGN_PROVIDER=signwell');

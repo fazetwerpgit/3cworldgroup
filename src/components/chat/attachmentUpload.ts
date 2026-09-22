@@ -44,6 +44,21 @@ function fileWithMime(file: File, mime: string): File {
   return new File([file], file.name, { type: mime, lastModified: file.lastModified });
 }
 
+// Copy the picked file's bytes into memory. Browsers (Android Chrome above all)
+// otherwise read a picker File lazily when the multipart body is sent, and a
+// content-URI photo whose backing file has since moved or changed aborts the
+// request as a bare "Failed to fetch". An in-memory File cannot go stale, and a
+// file that is already unreadable fails here with a message the user can act on.
+async function snapshotFile(file: File): Promise<File> {
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    throw new Error('That photo could not be read from your phone. Pick it again and resend.');
+  }
+  return new File([bytes], file.name, { type: file.type, lastModified: file.lastModified });
+}
+
 function jpegName(name: string): string {
   return /\.[^.]+$/.test(name) ? name.replace(/\.[^.]+$/, '.jpg') : `${name || 'photo'}.jpg`;
 }
@@ -125,7 +140,7 @@ export async function prepareImageForUpload(
   file: File
 ): Promise<{ file: File; width?: number; height?: number }> {
   const mime = selectedImageMime(file);
-  const normalizedFile = fileWithMime(file, mime);
+  const normalizedFile = await snapshotFile(fileWithMime(file, mime));
   if (mime === 'image/gif') return { file: normalizedFile };
 
   const needsUniversalJpeg = mime === 'image/heic' || mime === 'image/heif';

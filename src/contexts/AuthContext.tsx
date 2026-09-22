@@ -18,6 +18,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
+import { clearSignature } from '@/components/esign/signatureStore';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
@@ -274,6 +275,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Firebase Auth is not configured');
     }
     try {
+      // The e-sign signature lives in sessionStorage for reuse across the five
+      // onboarding documents. Drop it here so a shared phone never hands one
+      // rep's signature to whoever signs in next.
+      clearSignature();
       await firebaseSignOut(auth);
       setState({ user: null, loading: false, error: null, pendingApproval: false });
     } catch (error: unknown) {

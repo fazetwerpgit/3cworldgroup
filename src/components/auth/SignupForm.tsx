@@ -69,6 +69,7 @@ const SIGNUP_STEPS = [
 ];
 
 const TEAM_CODE_ERROR = "That team code isn't right. Ask your manager for the current one.";
+const ACCOUNT_EXISTS_ERROR = 'You already have a portal account. Sign in instead, or reset your password from the login page.';
 
 // Scoped restyle: this component no longer renders the shared AuthShell (that
 // component stays untouched — still used by LoginForm/PendingApproval, out
@@ -85,11 +86,13 @@ export function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [accountExists, setAccountExists] = useState(false);
 
   const strength = useMemo(() => passwordStrength(password), [password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAccountExists(false);
     const check = validateSignup(email, password, displayName, confirmPassword);
     if (!check.ok) {
       setError(check.error);
@@ -163,7 +166,14 @@ export function SignupForm() {
       // real PendingApproval component (this page only knows how to show the form).
       router.push('/portal');
     } catch (err) {
-      setError(friendlyAuthError(err));
+      const code = err && typeof err === 'object' && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : '';
+      const isExistingAccount = code === 'account_exists'
+        || code === 'auth/email-already-in-use'
+        || code === 'auth/email-already-exists';
+      setAccountExists(isExistingAccount);
+      setError(isExistingAccount ? ACCOUNT_EXISTS_ERROR : friendlyAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -200,7 +210,16 @@ export function SignupForm() {
             <p>Your manager gave you a team code. Use an email you check regularly.</p>
 
             <form onSubmit={handleSubmit} className="member-line-form-stack">
-              {error && <div className="member-line-note warn" role="alert">{error}</div>}
+              {error && (
+                <div className="member-line-note warn" role="alert">
+                  {error}
+                  {accountExists && (
+                    <Link className="member-line-form-links" href="/portal">
+                      Go to sign in
+                    </Link>
+                  )}
+                </div>
+              )}
 
               <div className="member-line-field">
                 <label htmlFor="signup-name">Full name / required</label>

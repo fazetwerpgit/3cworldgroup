@@ -81,6 +81,16 @@ export interface Sale {
   // Timestamps
   saleDate: Date;
   installDate?: Date; // older sales predate this field
+  // Where the install date on this row came from. Absent on every sale written
+  // before the carrier report was allowed to move a date: unknown, not 'rep'.
+  //   'rep'    — the owning rep typed it (the sale form, or their own edit)
+  //   'admin'  — management corrected it on someone else's sale
+  //   'report' — the carrier's fiber report moved it (see lib/sales/installDateSync)
+  installDateSource?: 'rep' | 'admin' | 'report';
+  // What the date was before the most recent change, so a rep can see what
+  // moved rather than just the new day. null when there was no date before.
+  installDatePreviousDate?: Date | null;
+  installDateChangedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 

@@ -4,7 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 import { Sale, SaleProduct } from '@/types';
 import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
-import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
+import { parseSaleDateInput, parseInstallDateInput, installDayKey } from '@/lib/sales/saleDate';
 import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
@@ -52,6 +52,8 @@ export async function GET(
       ...data,
       saleDate: data?.saleDate?.toDate(),
       installDate: data?.installDate?.toDate(),
+      installDatePreviousDate: data?.installDatePreviousDate?.toDate() ?? null,
+      installDateChangedAt: data?.installDateChangedAt?.toDate(),
       createdAt: data?.createdAt?.toDate(),
       updatedAt: data?.updatedAt?.toDate(),
       approvedAt: data?.approvedAt?.toDate(),
@@ -157,6 +159,19 @@ export async function PUT(
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
       updateData.installDate = parsed.date;
+
+      // Who moved the date, stamped only when the day actually changed — a rep
+      // re-saving the form untouched has not changed anything and must not look
+      // like they did. 'rep' is the sale's own rep correcting their own row;
+      // anyone else reaching this point is management, so 'admin'. The carrier
+      // report writes 'report' from lib/sales/installDateSync, never here.
+      const previousDay = installDayKey(existing?.installDate);
+      if (previousDay !== installDayKey(parsed.date)) {
+        updateData.installDateSource =
+          existing?.salesRepId === requester.uid ? 'rep' : 'admin';
+        updateData.installDatePreviousDate = existing?.installDate ?? null;
+        updateData.installDateChangedAt = new Date();
+      }
     }
 
     // One internet plan per address. Only checked when the edit actually sends

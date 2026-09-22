@@ -3704,6 +3704,88 @@ body.portal-scope {
   font-weight: 800;
 }
 
+/* Install-date edit, rep-facing. The sheet is portaled to <body> — outside
+   .portal-scope — so the input would inherit the light body foreground and
+   vanish against the sheet. Every colour here is set explicitly for that
+   reason. 44px tall and 16px type: the touch target reps actually hit, and the
+   size below which iOS zooms the page on focus. */
+.sales-line-date-change {
+  margin-left: 8px;
+  border: 1px solid rgba(141, 198, 63, 0.55);
+  border-radius: 99px;
+  padding: 4px 9px;
+  background: transparent;
+  color: #8dc63f;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sales-line-date-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sales-line-date-editor-label {
+  color: #9caabd;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sales-line-date-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(231, 237, 244, 0.22);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: rgba(231, 237, 244, 0.06);
+  color: #f4f7fa;
+  font-size: 16px;
+  caret-color: #8dc63f;
+}
+
+.sales-line-date-input:disabled {
+  opacity: 0.6;
+}
+
+.sales-line-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.7;
+}
+
+.sales-line-date-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sales-line-date-editor-actions button {
+  min-height: 44px;
+  flex: 1;
+  border: 1px solid rgba(141, 198, 63, 0.55);
+  border-radius: 10px;
+  padding: 0 14px;
+  background: rgba(141, 198, 63, 0.14);
+  color: #8dc63f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sales-line-date-editor-actions button.quiet {
+  border-color: rgba(231, 237, 244, 0.22);
+  background: transparent;
+  color: #9caabd;
+}
+
+.sales-line-date-editor-actions button:disabled {
+  opacity: 0.6;
+}
+
 .sales-line-customer-detail {
   display: grid;
   gap: 5px;

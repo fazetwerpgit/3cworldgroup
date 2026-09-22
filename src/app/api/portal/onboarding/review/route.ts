@@ -9,6 +9,7 @@ import { appBaseUrl, itemRejectedEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
+import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -117,6 +118,7 @@ export async function GET(request: NextRequest) {
         submittedAt: data.submittedAt?.toDate() ?? null,
         reviewedAt: data.reviewedAt?.toDate() ?? null,
         reviewerName: data.reviewerName ?? null,
+        esignEnvelopeId: typeof data.esignEnvelopeId === 'string' ? data.esignEnvelopeId : null,
         hasSignedPdf:
           item?.referenceKind === 'esign' && Boolean(data.completedPdfPath || data.esignEnvelopeId),
       };
@@ -238,6 +240,7 @@ export async function POST(request: NextRequest) {
             ...(currentEnvelopeId
               ? { supersededEnvelopeIds: FieldValue.arrayUnion(currentEnvelopeId) }
               : {}),
+            reference: FieldValue.delete(),
             esignEnvelopeId: FieldValue.delete(),
             esignDispatch: FieldValue.delete(),
           }
@@ -254,6 +257,11 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('Failed to delete stale esign signing url:', error);
       }
+      after(() =>
+        sendPendingEsignDocs(userId).catch((error) => {
+          console.error('Failed to resend e-sign documents after rejection:', error);
+        })
+      );
     }
 
     try {

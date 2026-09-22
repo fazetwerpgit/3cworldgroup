@@ -79,6 +79,38 @@ describe('prepareImageForUpload', () => {
     expect(prepared.height).toBe(800);
     expect(close).toHaveBeenCalledOnce();
   });
+
+  // Android Chrome reads a picker File lazily when the request body is sent; a
+  // content-URI photo whose backing file has moved/changed by then aborts the
+  // upload as a bare "Failed to fetch". The prepared file must be an in-memory
+  // copy so the multipart body never touches the picker's file again.
+  it('uploads an in-memory copy of a small picker file, never the lazy original', async () => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width: 1200, height: 800, close: vi.fn() }))
+    );
+    const original = new File([new Uint8Array([1, 2, 3, 4])], '1000006569.jpg', {
+      type: 'image/jpeg',
+      lastModified: 1700000000000,
+    });
+
+    const prepared = await prepareImageForUpload(original);
+
+    expect(prepared.file).not.toBe(original);
+    expect(prepared.file.name).toBe('1000006569.jpg');
+    expect(prepared.file.type).toBe('image/jpeg');
+    expect(prepared.file.lastModified).toBe(1700000000000);
+    expect(new Uint8Array(await prepared.file.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+
+  it('asks for a re-pick when the picker file can no longer be read', async () => {
+    const stale = new File([new Uint8Array([1, 2, 3])], 'gone.jpg', { type: 'image/jpeg' });
+    stale.arrayBuffer = async () => {
+      throw new DOMException('The requested file could not be read', 'NotReadableError');
+    };
+
+    await expect(prepareImageForUpload(stale)).rejects.toThrow(/pick it again/i);
+  });
 });
 
 describe('uploadChatImage', () => {

@@ -1,5 +1,299 @@
 # RESUME — read this and continue without being asked
 
+## SIDE TASK (2026-09-21, outside the redesign) — chat photo upload fix
+Jeremy (owner, Android PWA) got "Failed to fetch" posting a photo in All Company. Root cause:
+Android Chrome reads the picker File lazily at request time; a stale content-URI file aborts the
+fetch. Fix committed as bfcb85d4 on branch fix/chat-android-picker-upload in worktree
+~/dev/3cwg-fix-chat-upload, pushed to master by Jacob, Vercel production Ready 2026-09-21. DONE.
+Also answered: Braeden Crouse's 9/18 sale is approved; leaderboard defaults to Week, he shows under
+Month. Jacob: leave the default as is. No open items outside the redesign.
+
+## NEXT ACTION (2026-09-22 ~04:00) — ALL COMMITTED (61ed8412). Waiting on Jacob's release call
+cinematic-home HEAD = 61ed8412 "QA fix batch (18) + iPhone fixes (2)" on top of 2fd3abad. Tree clean.
+Jacob confirmed on his iPhone: "Phone is good" (Contact header pinned, Apply hero full height).
+Gates passed before commit: tsc, eslint, vitest (incl. new applicationsSheet tests), next build,
+audit-motion, docs/cinematic/review/checks.mjs (only known pre-existing portal failures), axe clean.
+Accepted noise: contact trail 0.03-0.06px over 0.5px tolerance at 1280/1800/960; careers/apply head
+art 1.25x stretch at 1920 (no larger masters); dev-only CSS preload advisory.
+Standing rules still in force: NO push, NO deploy until Jacob says so. :3122 stays as backup.
+When Jacob says go: `cd ~/dev/3cwg-cinematic && git push origin cinematic-home`, then Vercel deploy
+(his call: merge to master or deploy the branch). Then restore the portal dev server:
+`pkill socat; cd ~/dev/3cworldgroup && npx next dev -p 3000` (classifier may block the kill; Jacob
+can run it with `!`). next.config.ts allowedDevOrigins (192.168.4.88, 127.0.0.1) is committed,
+dev-only, harmless; drop it later if wanted. Tell Jacob: good point to /clear now.
+ENV NOTE: ufw allows LAN->3000; socat forwards 0.0.0.0:3000 -> 127.0.0.1:3120 so Jacob's phone
+reaches :3120 at http://192.168.4.88:3000. Playwright WebKit cannot launch on this host.
+
+## PREVIOUS (2026-09-22 ~03:00) — ALL COMMITTED. Yours: iPhone test, then release decision
+Commits on cinematic-home in ~/dev/3cwg-cinematic (:3120): 381f51a3 (motion pass + Careers R16
++ dash sweep) and 87d1995b (replay on re-entry, five markets, chapters refine).
+Gates clean, three adversarial Opus reviews passed with fixes applied. NOT pushed, NOT deployed.
+Jacob ACCEPTED: Careers R16, markets (incl. regenerated Lansing/Grand Rapids). OPEN: his verdict
+on the chapters refine (board .tmpshots/motion/chapters/board-1440-before-after.png + webm sent)
+and on the motion pass as a whole (clips in .tmpshots/motion/clips/).
+DONE + committed 835b8359: hero fetches one image per breakpoint (Jacob-approved); zero pixel diff.
+DONE + committed 2fd3abad (option 2): route replays on re-entry, other entrances once per visit. Codex overall verdict on motion direction: yes.
+Still his: real iPhone test; release (keep :3122 as backup, no merge, no push/deploy yet).
+Decisions: route replays, other entrances once per visit; header once
+per document; comp thresholds/titles off site; /#markets link from Careers; Southern California
+labelled Region; apply City stays free text (no stored-data renames).
+ENV NOTE (2026-09-22): for Jacob's iPhone test the main-repo dev server on :3000 was stopped and
+socat forwards 0.0.0.0:3000 -> 127.0.0.1:3120 (ufw only allows LAN -> 3000). Phone URL
+http://192.168.4.88:3000. Undo: pkill socat; cd ~/dev/3cworldgroup && npx next dev -p 3000.
+3cwg-cinematic next.config.ts gained allowedDevOrigins ['192.168.4.88'] (dev-only, uncommitted).
+Rollback tags: r15-backup, motion-wip-checkpoint, markets-checkpoint, chapters-checkpoint.
+Idle workers own their files (motion-home, motion-kit, motion-pages, motion-explorer,
+motion-forms, careers-refine, markets-update, contact-trail-fix, hero-glow-wire, motion-record,
+motion-review, dash-sweep). ADHD output mode in force (/i-have-adhd).
+
+## PREVIOUS (2026-09-22 ~00:30) — MOTION PASS COMMITTED, WAITING ON JACOB
+Commit 381f51a3 on cinematic-home in ~/dev/3cwg-cinematic (:3120): full motion pass + Careers
+R16 (ACCEPTED by Jacob) + dash sweep. Gates all clean (tsc/eslint/vitest/build/audit-motion/
+checks; only known pre-existing portal failures). Two adversarial Opus reviews: PASS WITH FIXES,
+all fixes applied and re-verified. NOT pushed, NOT deployed, :3122 untouched.
+Backups: tag r15-backup (6ed2a0df, pre-motion), tag motion-wip-checkpoint (mid-pass).
+Clips sent to Jacob (hero, route, nav-heads, market-faq, mobile + contact sheet); all 12 at
+~/dev/3cwg-cinematic/.tmpshots/motion/clips/. Jacob's verdict on the MOTION PASS is still open
+(he only accepted Careers so far). If he asks for changes: same worker names are idle and own
+their files (motion-home MotionRoot/home css, motion-kit kit css, motion-pages services/about,
+motion-explorer LocationExplorer/Faq, motion-forms apply/contact forms, careers-refine careers,
+contact-trail-fix contact hero, hero-glow-wire glow, motion-record clips, motion-review review).
+Decisions: entrances replay per page visit; header enters once per document (data-booted);
+comp thresholds + manager titles stay off the site; /#markets link from Careers stays.
+Known limitations: Chromium only, no real iOS Safari, mobile menu not reviewed.
+ADHD output mode in force for the session (/i-have-adhd).
+
+## PREVIOUS NEXT ACTION (2026-09-21 ~23:30, superseded)
+Round 15 (50svh beats) ACCEPTED by Jacob, committed 6ed2a0df, tag r15-backup (= recoverable
+checkpoint before the motion pass). Jacob's brief: cohesive animation/microinteraction pass,
+NOT a redesign; preserve hero/headline/light work section/straight edges/Contact 3C; no deps;
+no push/deploy. Full brief is in the session; key numbers: feedback 150–220ms, entrances
+350–500ms, stagger 70–100ms, travel 8–16px, no bounce/blur/zoom/spin. Code map (7k words):
+/tmp/claude-1000/-home-fazetwerpnerd69-dev-3cworldgroup/a1360a2f-1e42-41eb-b8f9-11f3322ff49d/scratchpad/motion-map.md
+Wave 1 Opus workers (disjoint files, uncommitted): motion-kit (cinematic.module.css buttons/
+links/focus/reveal retune), motion-forms (Apply/Contact forms states + Contact 3C restrained
+entrance; 3C is raster so no line trace), motion-pages (Services hero + grouped reveals, About
+three C's rows), motion-explorer (market indicator/crossfade + FAQ height animation, extracts
+_home/Faq.tsx), hero-glow-asset (public/redesign/v2/photos/hero-wide-glow.webp for the
+optional cursor-brightens-roads hero idea Jacob asked about; judge sheet in .tmpshots/glow/).
+Wave 2 after motion-explorer finishes: motion-home (MotionRoot + cinematic-home.module.css +
+page.tsx + WorkChapters + RouteSequence): hero sequence ≤700ms and REMOVE the current
+blur(10px)/scale entrance on .heroArt (brief: background still and sharp), chapter crossfade
++ ticks refinement, route line = time-based draw 1–1.3s triggered on entry with stops revealing
+as the line reaches them (replace scroll-scrub), then optional hero glow wiring.
+Then: Fable reviews every diff vs spec, gates (tsc/eslint/vitest/build), audit-motion.mjs +
+checks.mjs + capture.mjs, adversarial Opus anti-slop review, recordings for Jacob, board,
+commit on cinematic-home with trailers. Jacob is the acceptance gate.
+
+## PREVIOUS NEXT ACTION (2026-09-21 ~20:30, superseded by round 14)
+Cinematic (:3120, ~/dev/3cwg-cinematic, branch cinematic-home). ROUND 13 committed fa08e3fe
+(tag r13-backup): why-join moved above the route, desktop hero capped+centred, hero-foot seam
+fixed, market dusk grade lifted a step, Home joints <=138, axe 0, heroscrim pass. Opus review of
+r13 was dispatched (verdict may still be pending — if it flagged anything on why-join/markets/
+seam, act on it; its hero notes are moot). IN FLIGHT: Opus agent "port-3122-hero" is porting
+the OWNER-APPROVED :3122 Home hero (image hero-wide.png aerial + portrait, layout, spacing,
+mobile treatment; KEEP :3120's two-line headline) and :3122's LIGHT treatment for "Three things
+happen at every door" (paper bg, navy headings, gray body, dark-green numerals; keep chapter
+imagery), and tightening the hero-buttons → work-title gap (120–180px at 1740, 80–140 at 390).
+When it reports: read back page.tsx, cinematic-home.module.css, WorkChapters.tsx diff; view
+docs/cinematic/shots-r14/*; get an adversarial Opus review; commit with trailers; show Jacob
+on :3120 desktop + phone. :3122 (~/dev/3cworldgroup-editorial-20260920) must stay untouched.
+Jacob's decisions tonight: Contact phone 3C mark STAYS big ("i like the 3c"); market grade
+lifted not darkened; hero = :3122's per the owner.
+NOT done on purpose: no real Contact/Apply submission was sent (Jacob's rule).
+
+## PREVIOUS NEXT ACTION (2026-09-21 ~19:00, superseded by round 13)
+Cinematic (:3120, ~/dev/3cwg-cinematic, branch cinematic-home): round 12 committed (6a8f5247 +
+01490ef6), Opus PASS. Jacob checked it on his PHONE 2026-09-21 evening: "from what i can tell on
+the phone looks good" — phone ACCEPTED for round 12. Desktop (1740) not yet checked by him.
+Nothing is queued. Candidates for the next round, only if Jacob asks: Opus's non-blocking
+leftovers (market skyline foliage reads sunlit under the dusk grade; Apply "What happens next"
+rows leave ~330px of paper right of the body at 1740; Home route vs Apply steps use two list
+grammars), or a desktop pass on :3120. Any fix goes on :3120 only, then rerun the harness
+(docs/cinematic/review/*.mjs), get an Opus review, commit with the trailers.
+NOT done on purpose: no real Contact/Apply submission was sent (Jacob's rule). The "all dusk
+photos look alike" review note stays DECLINED (approved direction, no file used twice).
+
+## PREVIOUS NEXT ACTION (2026-09-21 ~18:30, superseded — phone verdict landed)
+Cinematic (:3120, ~/dev/3cwg-cinematic, branch cinematic-home): round 12 is built, harness-clean
+(tsc 0, eslint clean, axe 0, joints ≤138, heroscrim all pass), Opus final verdict PASS, committed
+on cinematic-home as 6a8f5247 + 01490ef6 (joint fix). Show Jacob the round-12 checklist (below) on :3120, phone
+first. WAITING on his verdict; nothing else queued. If he flags something, fix it on :3120 only,
+rerun the harness (docs/cinematic/review/*.mjs), get an Opus review, commit with the trailers.
+NOT done on purpose: no real Contact/Apply submission was sent (Jacob's rule); the Contact
+desktop rail is sticky, so in a full-page screenshot it still shows blank paper beside the
+textarea — in a real viewport it rides alongside the form. The "all dusk photos look alike"
+review note was DECLINED: dusk suburban is the approved direction, no file is used twice, and
+every hero is a different picture (see the photo map).
+
+## ROUND 12 (2026-09-21 afternoon → evening) — Jacob's answers landed + two Opus reviews
+Jacob's answers (2026-09-21): Contact → portal pipeline YES (done, b1254c6c); "why join" facts:
+everything on the site is true; Q3 "ok do those. yes." = drop the Apply from the lime card so the
+closer carries the one Apply; PLUS "The roof/eaves image beside 'The conversation' still feels
+mismatched" and "The repeated closing invitations and long navy stretches still need tightening";
+from his phone: Contact "line is fucked up & 3c is pretty small".
+What changed on :3120 (shots in ~/dev/3cwg-cinematic/docs/cinematic/shots-r12/):
+- HOME. Chapter 01 = front door open a hand-width, lit doormat (home-threshold-dusk); chapter 02 =
+  living room seen from the open door, lamp + lit street through the window (home-room-dusk, new
+  render); chapter 03 unchanged (lit door + keypad). "Two ways through the door" is gone; in its
+  place "Why people sell with 3C": title left, four lime-term/plain-fact pairs in two columns, no
+  hairlines, no icons, one Contact link; the crew-lead aside sits under the title (last on
+  phones). Hero headline re-broken: "Your next chapter / starts next door." Route steps lost their
+  01–04 numerals (chapters keep the page's one numbered set); route foot and markets Apply are
+  quiet links now, so Home's body has two lime buttons (hero, closer) like every other page.
+  Closer on phones: even scrim across the copy, crop shifted so the door jamb sits off the edge.
+  Market skylines keep their real daylight photos but wear a CSS dusk grade (navy multiply,
+  warm floor, desaturated) so they sit in the page's key.
+- ABOUT. Leadership moved to paper with the seam; ink text tokens; closing rule under the row.
+- SERVICES. Bundle chapter is navy now (the page ran 2700px of paper into one navy closer); its
+  CTA is a quiet link; closer button sits under the lede in one column, not 1100px right of it.
+- CAREERS. Closer ranged left like the other four; 01/02/03 numerals are ink (lime-ink read as
+  olive on paper); glance frame = rooftops render.
+- APPLY. "What happens next" is three numeral | title | body rows on hairlines (was a three-up
+  column row, the last one on the site). Phone head is content-sized with NO buttons (the form is the next thing; the head's
+  lime button duplicated the form heading 160px below). First field at 632px on a 390 phone.
+  Closer section deleted (it cut the tail into 725 navy / 342 paper / 191 navy slivers);
+  "Good to know" ends on a quiet "Back to the form" link.
+- CONTACT. Phone mark at 110vw bled 24vw off the right edge, full strength, in flow below the
+  copy; `.headArt` is position:relative (static broke the line-to-slash join — Opus caught it);
+  headline "Start the right / conversation." so the lime line is no longer than the white one;
+  desktop rail (email, hours) is sticky beside the form.
+- KIT. Phones keep the diagonal seam at a fixed 14px rise (was flattened to 0). Review tools:
+  ground.mjs counts page heads as ink runs; stage.mjs = viewport capture with a selector centred
+  (for sticky stages). Gotcha saved to memory: Next dev caches optimized images in
+  .next/dev/cache/images — rm it after swapping a photo under the same name, or captures lie.
+Opus reviews: r12 full review (16 findings, all acted on or superseded) then a fresh re-check on
+final shots (10 findings: 1,2,4–9 fixed; 3 "same dusk look" declined; 10 About phone hero "mud"
+declined — heroscrim frameMaxL 0.647 passes and the treeline reads), then a last pass (6 items:
+market grade + Apply rows fixed; "About phone seam flat" declined with a 3x crop showing the
+diagonal; chapter-03 empty column and why-order were stale captures; "two list grammars on two
+pages" declined). FINAL VERDICT: PASS (commit 6a8f5247; joint fix 01490ef6).
+Opus's non-blocking leftovers, for a later round if Jacob agrees: market skyline foliage still
+reads sunlit green under the dusk grade; Apply "What happens next" rows leave ~330px of paper
+right of the body at 1740; Home route (unnumbered, drawn line) and Apply steps (numbered rows)
+tell the same journey in two grammars.
+Photo map (one file per placement, none repeated): Home hero street → chapters threshold /
+room / keypad door → route apply-talk-train-walk → closer doorway-from-inside; About hero aerial
+→ values street → closer; Services hero keypad door → three product plates → bundle porch →
+closer aerial-2; Careers hero front door → glance rooftops → closer cul-de-sac; Apply hero
+canopy (apply-doors) ; Contact 3C mark.
+
+## PREVIOUS NEXT ACTION (2026-09-21 ~17:10, superseded by round 12)
+Cinematic (:3120, ~/dev/3cwg-cinematic, branch cinematic-home): round 11 committed b1fe3408 (Opus
+PASS), forms committed b1254c6c (Contact delivers for real via POST /api/public/contact →
+`contactMessages` + owner email; Apply's <3s fast-path removed, honeypot kept). Jacob answered
+2026-09-21: Contact → portal pipeline YES; Home "why join" facts: everything currently on the site
+is true; Q3 (Home "Two ways through the door" navy stretch) he asked what it meant — a phone
+screenshot was sent, recommendation = keep the section, drop the Apply button from the "Selling
+for yourself" card so the closer carries the one Apply, tighten the gap. WAITING on his word for
+Q3. Remaining agent-list items, in order: Apply form higher on mobile; Contact 3C mark on phones;
+Home "why join" section built from facts already on the site; Q3 if approved. Every visual item
+still gets rshots/checks/heroscrim/measure + an Opus review before commit.
+NOT done on purpose: no real Contact submission was sent (Jacob's rule: no outgoing messages
+without authorization); verified with the API mocked (docs/cinematic/review/forms.mjs). There is
+no admin inbox for contactMessages yet, so no portal push alert was wired.
+
+## ROUND 11 (2026-09-21 morning → afternoon) — Jacob's three findings, all landed
+What he asked: (1) a picture for every step of Home's "From application to your first route";
+(2) About "too much text not enough design past we sell at the door"; (3) the fiber pedestal
+photo used too often ("where it makes sense is ok, the fact we used it so much is a problem").
+What changed (all on :3120, shots in ~/dev/3cwg-cinematic/docs/cinematic/shots-r11/):
+- Home route: four new frames (route-apply/talk/train/walk-dusk). Desktop: even stops, line
+  corners at the quarter points, each photo in its own stop column on the far side of the line.
+  Phone: straight rail, copy first, photo under each stop. Foot = timing note + one Apply.
+- About: story band and "Who we serve" gone; hero → mission (door-hanger figure + For customers /
+  For contractors rows + Apply link) → values photo band (about-corner-dusk) → leadership → closer.
+- Pedestal appears once (Services fiber row). New frames elsewhere: home-doorway (Home closer,
+  looking out through an open door), careers-rooftops (Careers glance, horizon from a rise),
+  services-door (Services hero), apply-doors (Apply done state). careers-threshold, home-entrance,
+  careers-townhomes, services-porch, about-truck deleted.
+- Fixes from the Opus rounds: stacked route rail lost vector-effect (the draw never completed on
+  phones before this — pre-existing); route foot button beside the note; Careers glance plate
+  keeps a left edge (horizontal wash removed); About repeats "fiber, TV and home security" once;
+  header menu open state keyed to the route (SiteHeader.tsx) instead of reset in an effect.
+- Harness at commit: axe 0, joints ≤140, heroscrim no DIM, tsc/eslint clean, menu.mjs sequence ok.
+- New review tools: docs/cinematic/review/bbox.mjs (element top/height), menu.mjs (phone sheet).
+
+## OPEN QUESTIONS FOR JACOB (agent-list items, asked 2026-09-21, unanswered)
+1. Contact form: route real submissions to the portal (same pipeline as Apply) or email only?
+2. Home "why join": what training and first-week facts are true today (length, who runs it,
+   pay timing) — nothing goes on the page that he has not confirmed.
+3. Home closer: fold "Two ways through the door" into the closer to cut a navy stretch, or keep it?
+
+## PREVIOUS NEXT ACTION (2026-09-21 ~04:50, superseded by round 11)
+Cinematic (:3120, ~/dev/3cwg-cinematic, branch cinematic-home) overnight anti-slop work is DONE
+through round 10, committed as 9423bb32 (on top of a41a7b41). Jacob is the acceptance gate:
+WAIT FOR HIS MORNING VERDICT on :3120. If he calls anything slop, fix it in the worktree only
+(never :3000/:3118/:3122 trees). cine-design teammate was hard-stopped; do not let it resume editing.
+Standing rules for this branch: docs/cinematic/ANTI-SLOP.md is the bar; verify at 1740 + 390 with
+`node docs/cinematic/review/rshots.mjs <outdir> route1,route2` (routes COMMA-separated), then
+`checks.mjs` (axe/no-js/reduced), `heroscrim.mjs` (text-on-photo contrast), `measure.mjs` (joint
+gaps); every visual round gets an adversarial Opus review before commit. tsc: the one error is a
+pre-existing portal test file.
+
+## JACOB'S MORNING CHECKLIST (2026-09-21 ~04:50)
+Open :3120 (new) next to :3000 (current) and :3122 (Codex). Restart any with `npm run dev -- -p <port>`
+from its directory (:3120 = ~/dev/3cwg-cinematic). Look at 1740 wide and on your phone.
+Screens of every route at both widths: ~/dev/3cwg-cinematic/docs/cinematic/shots-r10/.
+WHAT CHANGED OVERNIGHT (commits 953ab681, def12e66, 6978fa20, 2ad9883f, a41a7b41, 9423bb32):
+- NO NEON ANYWHERE. Opus review caught that the old aerial had glowing green light-trail roads
+  with node dots, the fiber pedestal had a glowing strand, the TV showed a blue gradient. All
+  regenerated (docs/cinematic/ad-explore/r2/*.txt are the prompts; gpt-5.6-sol image gen).
+- Every hero is one photo used once: Home = lit street, Services = pedestal, About = aerial with
+  plain roads, Careers = front door, Apply = wet street after rain. Closers are each their own
+  frame (Home pedestal, Services aerial, About street, Careers cul-de-sac). Figures: Home doors =
+  mailboxes, Home stages = eave/window/garage, About mission = door hanger, Services plate =
+  porch, Services rows = keypad/pedestal/TV room, Apply = street corner.
+- Closers no longer all the same block: Apply ends on paper, ranged left, no photo; Contact ends
+  on a flat navy band with the line and the button on one hairline; About is ranged left over
+  its photo; Home/Services/Careers stay centred over a photo.
+- Button kit: lime hover glow removed; ghost button is a plain navy fill, no frosted glass.
+- Careers: duplicate 4-step "Your path" row deleted; weekly $ bands deleted (PRODUCT.md forbids
+  unverified pay claims). Replaced with a three-row ledger "Three stages of the same job".
+  Hero lede is now plain ("Door-to-door sales of fiber, TV and home security in a market that
+  is hiring. Training first, then a route with a leader who checks in.").
+- About: unverified stat banner deleted; monogram cards replaced with Bebas names + roles;
+  values are three lime names on one hairline, no 01/02/03; product strip cut to one line;
+  "10+ years" and "protected territories" claims removed; leadership zigzag fixed on phone.
+- Services: bundle plate is a real porch photo; every row has its own lit photo; hero lede and
+  bullets rewritten concretely; closer copy is plain.
+- Apply: "Apply in five fields."; steps are a two-column ruled list (no numerals); asterisks
+  consistent; closer is a paper band that points back to the form at the top.
+- Contact: closer eyebrow gone; the "Phone: coming soon" block REMOVED (a placeholder that
+  says nothing is a slop tell); hero lede now says what the form does.
+- Home: hero rail microtype removed; mobile scrim lightened so the street photo reads on a phone.
+- Forms: "John Doe"-style placeholders replaced. Footer hairline aligned to the shell.
+- Headlines no longer mad-lib "Your next ___ starts ___" (Home H1 kept as you wrote it).
+- Phone heroes run to 90svh so the photo shows above the copy on every interior page.
+- Round-10 re-check fixes: Careers earnings ledger now sits on a paper band with the seam, rung
+  ordinals only (no "Stage" label), copy in full-contrast ink; Apply form panel flattened to one
+  hairline (lime top edge + shadow gone); every lime left-border rule replaced with a hairline;
+  backdrop blur removed from the header and the mobile apply bar; route-dot halo deleted; Services
+  closer aerial regenerated (plain roads, no light trails) with a split "Want to sell these
+  services? / Start here." layout; Services phone hero no longer scaled (was blurring); Apply
+  closer tightened; About H1 no longer breaks mid-word at 430.
+- cine-design (Sonnet teammate) was sent shutdown_request; its last edits were reviewed and kept
+  (Apply phone hero framing). All src writes in the final commit are Claude Fable's.
+DECISIONS TAKEN FOR YOU (say the word to reverse any): Careers $ bands pulled; About stats pulled;
+About product strip pulled; Contact phone placeholder pulled; leadership names KEPT.
+VERIFIED (round 10): axe 0 violations x12 route/viewport pairs; every hero white/lime/lede above
+contrast floors at 390 and 430; no-JS + reduced-motion clean; tsc clean (one pre-existing portal
+test error). Safari/iOS still unverified from this machine. Opus adversarial review r10: two Opus passes; 12 findings fixed; kept the thin 04 route ring, Home/About
+closer shapes, and your H1 breaks by decision.
+
+## OLD CHECKLIST (2026-09-18 ~21:30)
+Servers (restart if down after reboot):
+- :3000 main tree  -> cd ~/dev/3cworldgroup && npm run dev -- -p 3000
+- :3120 cinematic  -> cd ~/dev/3cwg-cinematic && npm run dev -- -p 3120
+- :3118 Codex's frozen polish preview (optional, ~/dev/3cworldgroup-polish-20260918, `npx next start -p 3118`)
+1. :3120 cinematic Home round 2 -> hits per section (hero, work, route, markets, questions, doors, closing).
+2. :3000/contact -> hero line connects to the split diagonal? accept or hits.
+3. :3000/opportunities bottom (white closer, continuous navy) and :3000 Home (white closer, moved seam,
+   brief band) -> accept or hits. These are Codex polish + mine, COMMITTED d77c2f4a.
+4. Decide: does cinematic Home replace the current Home? If yes -> merge plan (own header/footer fork).
+Later backlog: dead .public-contact rules in public.css; products trio repeated About+Services;
+196 untracked src/public files in the main tree (public.css, fonts, art) should be committed.
+
 ## CURRENT (2026-09-18 ~20:00) — Codex snapshots reviewed; partial merge on :3000
 Jacob ran Codex ("Astra") in two isolated copies (no .git, never touched this tree):
 - ~/dev/3cworldgroup-polish-20260918 (preview :3118, .codex/RESUME.md, final.patch = 7 files):
@@ -12,9 +306,42 @@ Jacob 9/18 ~20:10: "build off what codex did, keep what you have going" -> Codex
 work. :3000 now = Codex polish + my Contact rebuild + connected hero line. (Home has Codex's white closer
 and the seam moved to markets->path; Careers eyebrow now "Ready when you are".) Partial hunk-picking
 was tried first and broke Apply; don't repeat, take whole files.
-Cinematic Home (:3120) NOT taken; Jacob hasn't said.
-NEXT ACTION: Jacob checks :3000 (/, /opportunities, /apply, /contact) and says commit or what to change;
-ask him about the cinematic Home separately.
+COMMITTED as d77c2f4a (Jacob: "we'd have your previous work still saved").
+Jacob 9/18 ~20:30: LOVES the cinematic Home direction ("started off with a bang", "blow someone's head
+off"); wants to keep building it SEPARATELY from this tree. Setup: branch `cinematic-home`, worktree
+~/dev/3cwg-cinematic (Codex's 3 owned paths + its PRODUCT/DESIGN/FINAL-REVIEW in docs/cinematic/, plus
+the 196 untracked src/public assets committed there because public.css etc. are untracked here).
+Dev server :3120 now serves the WORKTREE (Codex's prod server was killed). Round 2 (Opus agent cine-r2):
+finish two-doors, terminate route line, markets lede, seams, cool paper tokens, closing promise line.
+2026-09-20: Jacob back, wants cinematic finished before comparing the two homepages. Note the
+worktree branches off d77c2f4a, so EVERY non-home route on :3120 is identical to :3000 --
+the comparison is homepage vs homepage, apples to apples. Round 3 (Opus agent cine-r3) in flight:
+questions section on the page grid, closing photo lifted so it reads, work section vertical balance,
+hero lede tightened, responsive sweep at 768/1024/1280/1920 (never checked before).
+Planned round 4: axe accessibility audit + perf (LCP/image bytes) + reduced-motion/no-JS re-verify,
+all of which Codex listed as never run.
+CINEMATIC IS NOW A WHOLE SITE. Commits on branch cinematic-home (worktree ~/dev/3cwg-cinematic, :3120):
+10863627 shared shell (src/app/(cinematic)/layout.tsx + _cinematic/{SiteHeader,SiteFooter,MotionRoot,
+cinematic.module.css,nav.ts} + docs/cinematic/PAGE-KIT.md; home pixel-identical, 22/22 shots byte-equal),
+e9ea9db8 Careers+Apply+Services+About+Contact rebuilt in the language (old route dirs deleted, forms
+preserved + proven by intercepted POST, nothing invented, imagery only from public/). Crawl: all 9 routes
+200, 0 console errors, no overflow; npm run build passes.
+IN FLIGHT: cine-legal (privacy/terms into the group + kit gaps: quietLink paper variant, applyBar on
+interior pages, dead code incl. src/components/public/services, ThreeCGlyph, USMap, #apply-route-root
+rules in public.css) and cine-audit (axe + contrast re-measure + perf + Firefox/WebKit -> docs/cinematic/AUDIT.md).
+UNVERIFIED CLAIMS to put to Jacob: Careers weekly $ bands; About's 50+ states, 1,000+ contractors,
+$5K+ weekly, 98% satisfaction, 10+ years, "Protected Territories", and the four leadership names.
+Round 3 COMMITTED (7c49d5a4): FAQ on the section grid, closing photo lifted (measured contrast,
+lime 6.5:1), work section rebalanced, hero lede 3 lines, sweep 768/1024/1280/1920 fixed.
+Jacob 9/20: clicking nav on :3120 kicks back to the old site -> BUILD THE WHOLE CINEMATIC SITE.
+Order: (1) cine-shell agent extracts SiteHeader/SiteFooter + shared kit into a (cinematic) route group
++ docs/cinematic/PAGE-KIT.md, homepage must stay pixel-identical; (2) then 5 parallel Opus agents build
+/opportunities, /apply, /services, /about, /contact in the language, content SOURCED from the existing
+page on this branch (no invented facts), Apply/Contact keep working forms + API wiring.
+Privacy/Terms stay plain; /culture excluded (not real).
+Round 2 COMMITTED on cinematic-home (53cbc403): two-doors finished w/ photo, route line terminates at stops, cool paper, offset seams, lede/closing copy fixed. Shots: ~/dev/3cwg-cinematic/docs/cinematic/r2-shots/.
+NEXT ACTION: Jacob judges :3120 (cinematic Home r2); iterate on branch cinematic-home in ~/dev/3cwg-cinematic.
+Rule: take Codex output as whole files, never partial hunks.
 Gates after merge: tsc 0, eslint 0 errors, 0 console errors, no overflow 390/1440.
 
 ## Previous (2026-09-18) — Contact round 1 in progress; Careers closer + Home A UNCOMMITTED

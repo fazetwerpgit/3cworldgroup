@@ -1,0 +1,50 @@
+/* The leaderboard route carries two pages: the phone redesign below 1024px and
+   the desktop board as it shipped on master above it. Which one shows is a
+   media query, so it is right in the first painted frame; the components also
+   skip building the hidden side (see useWideViewport).
+   The two pages sit on different grounds, so the page background and the main
+   scroller switch here too, rather than in either page. */
+
+.phoneOnly {
+  display: contents;
+}
+
+.desktopOnly {
+  display: none;
+}
+
+.ground {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@media (min-width: 1024px) {
+  .phoneOnly {
+    display: none;
+  }
+
+  .desktopOnly {
+    display: contents;
+  }
+
+  /* Master's leaderboard ground, kept literal rather than tokenised: this half
+     of the route is meant to render exactly as it does on master. */
+  .ground {
+    background: #f7f8f5;
+    color: #0a1f44;
+  }
+
+  :global(.dark) .ground {
+    background: #030916;
+    color: #f6f7f8;
+  }
+
+  .main {
+    overflow: auto;
+    background: #f7f8f5;
+  }
+
+  :global(.dark) .main {
+    background: #030916;
+  }
+}

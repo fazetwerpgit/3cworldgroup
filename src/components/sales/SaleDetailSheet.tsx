@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { Sale, FIBER_COMPANIES } from '@/types';
 import { auth } from '@/lib/firebase/config';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSales } from '@/hooks/useSales';
+import { dateToSaleDateInput, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 
@@ -35,18 +38,40 @@ interface SaleDetailSheetProps {
   /** Admin-only. Omitted on the rep view, where the buttons never render. */
   onRequestCancel?: (saleId: string) => void;
   onRestore?: (saleId: string) => void;
+  /**
+   * Called after the install date is saved, so the list behind the sheet
+   * refetches. Optional: the sheet already shows the new date on its own.
+   */
+  onSaleUpdated?: () => void;
 }
+
+const INSTALL_DATE_ERROR = 'Could not save the install date. Try again.';
 
 function formatMoney(value: number) {
   return `$${Math.round(value).toLocaleString('en-US')}`;
 }
 
-function formatDate(value: Date | string | undefined) {
+function formatDate(value: Date | string | null | undefined) {
   if (!value) return 'Not provided';
   return new Date(value).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/**
+ * A stored install date as a Date. Firestore hands back either a Date or a
+ * string; a plain YYYY-MM-DD goes through parseInstallDateInput so it lands on
+ * local noon like every other sale date, instead of UTC midnight — which reads
+ * as the previous day west of Greenwich.
+ */
+function installDateAsDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const parsed = parseInstallDateInput(value);
+  if (parsed.ok) return parsed.date;
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
 function commissionLabel(value: number | undefined) {
@@ -84,10 +109,31 @@ export function SaleDetailSheet({
   onRequestDelete,
   onRequestCancel,
   onRestore,
+  onSaleUpdated,
 }: SaleDetailSheetProps) {
   const [proofLoading, setProofLoading] = useState(false);
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
+
+  // A customer reschedules and the rep needs the install date moved from their
+  // phone, on the row they are already looking at. The API has always allowed
+  // it (a rep may edit their own sale); only the UI held it back, and the full
+  // edit page stays admin-only — this is the one field a rep can correct here.
+  const { user } = useAuth();
+  const { updateSale } = useSales();
+  /** The value in the date input, or null when the row is not being edited. */
+  const [installDraft, setInstallDraft] = useState<string | null>(null);
+  const [savingInstall, setSavingInstall] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
+  // Shows the saved date immediately, before the parent's refetch lands.
+  const [installSaved, setInstallSaved] = useState<{ saleId: string; date: Date } | null>(null);
+
+  const currentSaleId = sale?.id || '';
+  useEffect(() => {
+    setInstallDraft(null);
+    setInstallError(null);
+    setSavingInstall(false);
+  }, [currentSaleId]);
 
   // Ref keeps the effects below on [open] only: callers pass an inline
   // onOpenChange, and re-running the history effect per render would push a
@@ -141,6 +187,44 @@ export function SaleDetailSheet({
 
   const saleId = sale.id || '';
   const tone = ageTone(sale);
+  const storedInstallDate = installDateAsDate(sale.installDate);
+  const shownInstallDate = installSaved && installSaved.saleId === saleId
+    ? installSaved.date
+    : storedInstallDate;
+  // The owning rep, or an admin. A cancelled sale has no install to move.
+  const canEditInstallDate =
+    sale.status !== 'cancelled' && (isAdmin || (!!user?.uid && sale.salesRepId === user.uid));
+
+  const startEditingInstall = () => {
+    setInstallError(null);
+    setInstallDraft(shownInstallDate ? dateToSaleDateInput(shownInstallDate) : todaySaleDateInput());
+  };
+
+  const cancelEditingInstall = () => {
+    setInstallDraft(null);
+    setInstallError(null);
+  };
+
+  const saveInstallDate = async () => {
+    if (installDraft === null || savingInstall) return;
+    const parsed = parseInstallDateInput(installDraft);
+    if (!parsed.ok) {
+      setInstallError(INSTALL_DATE_ERROR);
+      return;
+    }
+    setSavingInstall(true);
+    setInstallError(null);
+    const ok = await updateSale(saleId, { installDate: installDraft });
+    setSavingInstall(false);
+    if (!ok) {
+      setInstallError(INSTALL_DATE_ERROR);
+      return;
+    }
+    setInstallSaved({ saleId, date: parsed.date });
+    setInstallDraft(null);
+    onSaleUpdated?.();
+  };
+
   const openScreenshot = async () => {
     if (!sale.proofScreenshotPath) return;
     setProofLoading(true);
@@ -218,8 +302,43 @@ export function SaleDetailSheet({
             <span className="sales-line-sheet-label">Dates</span>
             <div className="sales-line-sheet-dates">
               <span>Sold <b>{formatDate(sale.saleDate)}</b></span>
-              <span>Install <b>{formatDate(sale.installDate)}</b></span>
+              <span>
+                Install <b>{formatDate(shownInstallDate)}</b>
+                {canEditInstallDate && installDraft === null && (
+                  <button
+                    className="sales-line-date-change"
+                    type="button"
+                    onClick={startEditingInstall}
+                  >
+                    Change
+                  </button>
+                )}
+              </span>
             </div>
+            {installDraft !== null && (
+              <div className="sales-line-date-editor">
+                <label className="sales-line-date-editor-label" htmlFor="sale-install-date">
+                  Install date
+                </label>
+                <input
+                  id="sale-install-date"
+                  className="sales-line-date-input"
+                  type="date"
+                  value={installDraft}
+                  disabled={savingInstall}
+                  onChange={(event) => setInstallDraft(event.target.value)}
+                />
+                <div className="sales-line-date-editor-actions">
+                  <button type="button" disabled={savingInstall} onClick={() => void saveInstallDate()}>
+                    {savingInstall ? 'Saving...' : 'Save'}
+                  </button>
+                  <button type="button" className="quiet" disabled={savingInstall} onClick={cancelEditingInstall}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {installError && <p className="sales-line-proof-error" role="alert">{installError}</p>}
           </section>
 
           <section className="sales-line-sheet-block">

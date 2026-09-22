@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getEsignProvider } from '@/lib/esign/provider';
-import { createNotification } from '@/lib/notifications/createNotification';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
-import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
-import { adminStorage } from '@/lib/firebase/admin';
-import { notifyDocSigned } from '@/lib/onboarding/ownerNotify';
+import { completeEsignItem } from '@/lib/esign/complete';
 
 const ALERT_KIND = 'esign_mismatch' as const;
 
@@ -127,61 +124,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const now = new Date();
-  await onboardingRef.set(
-    {
+  // The download stays here rather than inside completeEsignItem: only this
+  // route has a provider to download from (the in-house sign route hands over
+  // bytes it just stamped), and a failed download is a provider problem worth
+  // its own webhook-scoped log line. It is never fatal — the rep signed, so the
+  // approval is recorded either way and the provider still holds the PDF.
+  let completedPdf: Buffer | null = null;
+  try {
+    completedPdf = await getEsignProvider().getCompletedPdf(event.envelopeId);
+  } catch (error) {
+    console.error('[esign webhook] completed pdf failed', {
       userId,
       itemId,
-      status: 'approved',
-      rejectionReason: null,
-      reviewedBy: 'system',
-      reviewerName: 'E-sign (auto)',
-      reviewedAt: now,
-      updatedAt: now,
-    },
-    { merge: true }
-  );
-
-  try {
-    if (!adminStorage || !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
-      throw new Error('Storage bucket is not configured');
-    }
-    const completedPdf = await getEsignProvider().getCompletedPdf(event.envelopeId);
-    const completedPdfPath = `esign-completed/${userId}/${itemId}.pdf`;
-    await adminStorage
-      .bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
-      .file(completedPdfPath)
-      .save(completedPdf, { contentType: 'application/pdf', resumable: false });
-    await onboardingRef.set({ completedPdfPath }, { merge: true });
-  } catch (error) {
-    console.error('[esign webhook] completed pdf failed', { userId, itemId, envelopeId: event.envelopeId, error });
+      envelopeId: event.envelopeId,
+      error,
+    });
   }
 
-  await createNotification({
+  await completeEsignItem({
     userId,
-    type: 'esign_completed',
-    title: 'Document signed',
-    message: `${item.label} is complete.`,
-    link: '/portal/onboarding',
+    itemId,
+    envelopeId: event.envelopeId,
+    pdf: completedPdf,
   });
-  let repName = userId;
-  try {
-    const userSnap = await adminDb.doc(`users/${userId}`).get();
-    repName = (userSnap.get('displayName') as string | undefined) ||
-      (userSnap.get('email') as string | undefined) || userId;
-  } catch (error) {
-    console.error('[esign webhook] failed to resolve rep name for owner notification', { userId, error });
-  }
-  try {
-    await notifyDocSigned({ userId, repName, itemLabel: item.label });
-  } catch (error) {
-    console.error('[esign webhook] owner signed notification failed', { userId, itemId, error });
-  }
-  try {
-    await maybeFlagActivationReady(userId);
-  } catch (error) {
-    console.error('[esign webhook] failed to flag activation readiness', error);
-  }
 
   return NextResponse.json({ ok: true });
 }

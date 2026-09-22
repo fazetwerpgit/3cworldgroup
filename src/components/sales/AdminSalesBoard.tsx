@@ -64,6 +64,8 @@ interface AdminSalesBoardProps {
     hasPlan: boolean;
     compRole: CompPlanRole | null;
   };
+  /** Refetches the book after the detail sheet edits a sale's install date. */
+  onSaleUpdated?: () => void;
 }
 
 function formatMoney(value: number) {
@@ -249,7 +251,7 @@ function carrierTime(value: string | null | undefined): number | null {
   return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
-export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, onSetCancelled, fiber, payPlan }: AdminSalesBoardProps) {
+export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, onSetCancelled, fiber, payPlan, onSaleUpdated }: AdminSalesBoardProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
   // Owner is a tier ABOVE admin, so this cannot be a permission check — every
@@ -870,6 +872,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onRequestDelete={(id) => setDeletingId(id)}
         onRequestCancel={onSetCancelled ? (id) => { setCancelReason(''); setCancellingId(id); } : undefined}
         onRestore={onSetCancelled ? (id) => { void onSetCancelled(id, false); } : undefined}
+        onSaleUpdated={onSaleUpdated}
       />
 
       <LinkOrderDialog

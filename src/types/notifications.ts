@@ -2,6 +2,7 @@ export type NotificationType =
   | 'sale_approved'
   | 'sale_rejected'
   | 'sale_pending'
+  | 'install_date_changed'
   | 'points_earned'
   | 'leaderboard_rank'
   | 'onboarding_submitted'
@@ -39,6 +40,7 @@ export const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   sale_approved: 'bg-green-50 text-green-700',
   sale_rejected: 'bg-red-50 text-red-700',
   sale_pending: 'bg-yellow-50 text-yellow-700',
+  install_date_changed: 'bg-blue-50 text-blue-700',
   points_earned: 'bg-purple-50 text-purple-700',
   leaderboard_rank: 'bg-blue-50 text-blue-700',
   onboarding_submitted: 'bg-blue-50 text-blue-700',
