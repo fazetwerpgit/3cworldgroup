@@ -3,6 +3,7 @@ import { adminDb, adminStorage } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { getEsignProvider } from '@/lib/esign/provider';
 import { isEsignItem } from '@/lib/onboarding/esign';
+import { isSensitiveOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
 
 function pdfResponse(pdf: Buffer, itemId: string): NextResponse {
   return new NextResponse(pdf as unknown as BodyInit, {
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
     }
 
     // The signed PDF exposes another user's completed document; management only.
+    // Sensitive items (W-9 = full SSN, direct deposit = bank account) are
+    // narrowed further to admin/owner below, once the item id is known.
     const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
@@ -41,6 +44,13 @@ export async function GET(request: NextRequest) {
     if (!isEsignItem(itemId)) {
       return NextResponse.json({ error: 'Signed PDF is only available for e-sign items' }, { status: 404 });
     }
+    const sensitive = isSensitiveOnboardingItem(itemId);
+    if (sensitive && !gate.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: admin access required for sensitive documents' },
+        { status: 403 }
+      );
+    }
 
     const onboardingRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);
     const onboardingDoc = await onboardingRef.get();
@@ -51,6 +61,21 @@ export async function GET(request: NextRequest) {
     const data = onboardingDoc.data() ?? {};
     const storedPdfPath = typeof data.completedPdfPath === 'string' ? data.completedPdfPath : '';
     const envelopeId = typeof data.esignEnvelopeId === 'string' ? data.esignEnvelopeId : '';
+    if (!storedPdfPath && !envelopeId) {
+      return NextResponse.json({ error: 'Signed PDF not available' }, { status: 404 });
+    }
+
+    // Audit before any sensitive bytes leave the server, in the same shape the
+    // SSN/DL# reveal route writes. A failed write fails the request (500).
+    if (sensitive) {
+      await logSensitiveFileAccess({
+        targetUid: userId,
+        itemId,
+        revealedBy: gate.uid,
+        revealedByName: gate.name,
+        source: 'onboarding-signed-pdf',
+      });
+    }
 
     if (storedPdfPath) {
       if (!adminStorage || !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
@@ -61,10 +86,6 @@ export async function GET(request: NextRequest) {
         .file(storedPdfPath)
         .download();
       return pdfResponse(pdf, itemId);
-    }
-
-    if (!envelopeId) {
-      return NextResponse.json({ error: 'Signed PDF not available' }, { status: 404 });
     }
 
     let pdf: Buffer;

@@ -6,7 +6,8 @@ vi.mock('next/server', async () => {
   return { ...actual, after: vi.fn((callback: () => unknown) => void callback()) };
 });
 
-const { docGetMock, docUpdateMock, docDeleteMock, docIdMock, gateMock, queryGetMock, getAllMock, sendPendingEsignDocsMock } = vi.hoisted(() => ({
+const { docGetMock, docUpdateMock, docDeleteMock, docIdMock, gateMock, queryGetMock, getAllMock, sendPendingEsignDocsMock, logAddMock } = vi.hoisted(() => ({
+  logAddMock: vi.fn(async () => undefined),
   docGetMock: vi.fn(),
   docUpdateMock: vi.fn(),
   docDeleteMock: vi.fn(async () => undefined),
@@ -27,6 +28,7 @@ vi.mock('@/lib/firebase/admin', () => ({
     collection: vi.fn((name: string) => ({
       doc: (id: string) => docIdMock(name, id),
       where: vi.fn(() => ({ get: queryGetMock })),
+      add: logAddMock,
       ...(name === 'users' ? {} : {}),
     })),
     getAll: getAllMock,
@@ -44,6 +46,7 @@ vi.mock('@/types', () => ({
     { id: 'w9', label: 'W-9', category: 'paperwork', sensitive: true, referenceKind: 'esign' },
     { id: 'contract', label: 'Contract', category: 'paperwork', sensitive: false, referenceKind: 'esign' },
     { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', sensitive: false, referenceKind: 'manual' },
+    { id: 'dl_photos', label: "Driver's License Photos", category: 'paperwork', sensitive: true, referenceKind: 'storage' },
   ],
 }));
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: vi.fn(() => false) }));
@@ -58,6 +61,8 @@ vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignD
 
 import { GET, POST } from './route';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
+import { isStorageItem } from '@/lib/onboarding/uploads';
+import { getOnboardingBucket } from '@/lib/firebase/admin';
 
 const onboardingDoc = (esignEnvelopeId?: string) => ({
   exists: true,
@@ -249,5 +254,70 @@ describe('GET /api/portal/onboarding/review', () => {
         hasSignedPdf: false,
       }),
     ]);
+  });
+
+  describe('sensitive storage files', () => {
+    const getSignedUrlMock = vi.fn(async () => ['https://signed.example/front.jpg']);
+
+    beforeEach(() => {
+      vi.mocked(isStorageItem).mockImplementation((itemId: string) => itemId === 'dl_photos');
+      vi.mocked(getOnboardingBucket).mockReturnValue({
+        getFiles: vi.fn(async () => [[
+          { name: 'onboarding/user-1/dl_photos/front.jpg', metadata: { contentType: 'image/jpeg' }, getSignedUrl: getSignedUrlMock },
+        ]]),
+      } as never);
+      queryGetMock.mockResolvedValueOnce({
+        docs: [{
+          id: 'user-1_dl_photos',
+          data: () => ({
+            userId: 'user-1',
+            itemId: 'dl_photos',
+            reference: 'onboarding/user-1/dl_photos',
+            submittedAt: { toDate: () => new Date('2026-07-26') },
+          }),
+        }],
+      });
+      queryGetMock.mockResolvedValueOnce({ docs: [] });
+    });
+
+    it('gives operations the item but no signed URLs, and writes no audit row', async () => {
+      gateMock.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+      const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+
+      expect(json.submissions).toEqual([
+        expect.objectContaining({ itemId: 'dl_photos', sensitive: true, adminOnly: true, files: [] }),
+      ]);
+      expect(getSignedUrlMock).not.toHaveBeenCalled();
+      expect(logAddMock).not.toHaveBeenCalled();
+    });
+
+    it('signs the files for an admin and writes a sensitiveAccessLog row', async () => {
+      const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+
+      expect(json.submissions).toEqual([
+        expect.objectContaining({
+          itemId: 'dl_photos',
+          adminOnly: false,
+          files: [{ name: 'front.jpg', url: 'https://signed.example/front.jpg', contentType: 'image/jpeg' }],
+        }),
+      ]);
+      expect(logAddMock).toHaveBeenCalledWith({
+        targetUid: 'user-1',
+        revealedBy: 'manager-1',
+        revealedByName: 'Manager',
+        itemId: 'dl_photos',
+        source: 'onboarding-review',
+        at: expect.any(Date),
+      });
+    });
+
+    it('withholds the files when the audit row cannot be written', async () => {
+      logAddMock.mockRejectedValueOnce(new Error('write failed'));
+
+      const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+
+      expect(json.submissions).toEqual([expect.objectContaining({ itemId: 'dl_photos', files: [] })]);
+    });
   });
 });

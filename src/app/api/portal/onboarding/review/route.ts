@@ -10,6 +10,7 @@ import { onboardingFrom } from '@/lib/email/sendEmail';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -55,6 +56,8 @@ export async function GET(request: NextRequest) {
     }
 
     // The review queue exposes other users' submissions; management only.
+    // Files on sensitive items (driver's-license photos, ...) are signed only
+    // for admin/owner callers; operations sees the item with no file URLs.
     const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
@@ -95,11 +98,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Signs a storage item's files. For a sensitive item the caller must be
+    // admin/owner, and every minted URL set is audited in sensitiveAccessLog;
+    // if the audit write fails the files are withheld (fail closed).
+    const filesFor = async (
+      userId: string,
+      itemId: string,
+      reference: string | null,
+      sensitive: boolean
+    ) => {
+      if (!isStorageItem(itemId)) return [];
+      if (sensitive && !gate.isAdmin) return [];
+      const files = await signFolderFiles(reference);
+      if (!sensitive || files.length === 0) return files;
+      try {
+        await logSensitiveFileAccess({
+          targetUid: userId,
+          itemId,
+          revealedBy: gate.uid,
+          revealedByName: gate.name,
+          source: 'onboarding-review',
+        });
+        return files;
+      } catch (error) {
+        console.error('Failed to audit sensitive onboarding file access:', error);
+        return [];
+      }
+    };
+
     const toSubmission = async (doc: (typeof snapshot.docs)[number]) => {
       const data = doc.data();
       const item = ONBOARDING_ITEMS.find((i) => i.id === data.itemId);
       const user = userMap.get(data.userId);
-      const storage = isStorageItem(data.itemId);
+      const sensitive = item?.sensitive ?? false;
       return {
         id: doc.id,
         userId: data.userId,
@@ -107,10 +138,13 @@ export async function GET(request: NextRequest) {
         label: item?.label ?? data.itemId,
         itemLabel: item?.label ?? data.itemId,
         category: item?.category ?? 'paperwork',
-        sensitive: item?.sensitive ?? false,
+        sensitive,
+        // True when the item holds sensitive files this caller may not open
+        // (operations). The UI shows an "Admin only" note instead of links.
+        adminOnly: sensitive && !gate.isAdmin,
         referenceKind: item?.referenceKind ?? 'manual',
         reference: data.reference ?? null,
-        files: storage ? await signFolderFiles(data.reference ?? null) : [],
+        files: await filesFor(data.userId, data.itemId, data.reference ?? null, sensitive),
         userName: user?.displayName ?? user?.email ?? data.userId,
         userEmail: user?.email ?? '',
         atRisk: !!user?.atRisk,

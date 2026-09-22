@@ -29,6 +29,8 @@ interface Submission {
   itemLabel: string;
   category: OnboardingCategory;
   sensitive: boolean;
+  /** Sensitive item whose files this caller (operations) may not open. */
+  adminOnly?: boolean;
   referenceKind: 'vendor' | 'storage' | 'esign' | 'manual';
   reference: string | null;
   files: { name: string; url: string; contentType: string }[];
@@ -129,6 +131,30 @@ export default function OnboardingReviewPage() {
   }, [user]);
 
   useEffect(() => { fetchQueue(); }, [fetchQueue]);
+
+  // The signed-pdf route verifies a Bearer token, which a plain link cannot
+  // send, so fetch the PDF with the token and open it as a blob URL. The tab is
+  // opened synchronously in the click so popup blockers allow it.
+  const openSignedPdf = async (submission: Submission) => {
+    const tab = window.open('', '_blank');
+    try {
+      const response = await fetch(
+        `/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(submission.userId)}&itemId=${encodeURIComponent(submission.itemId)}`,
+        { headers: await authHeaders() }
+      );
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to open signed PDF');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      if (tab) tab.location.href = url;
+      else window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      tab?.close();
+      setError(err instanceof Error ? err.message : 'Failed to open signed PDF');
+    }
+  };
 
   const review = async (submission: Submission, status: 'approved' | 'rejected', reason?: string) => {
     if (!user) return;
@@ -316,9 +342,11 @@ export default function OnboardingReviewPage() {
                       </span>
                       <span className="ops-line-evidence-group">
                         <span className="ops-line-file-chip">
-                          {submission.referenceKind === 'storage'
-                            ? `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`
-                            : 'reference'}
+                          {submission.adminOnly
+                            ? 'Admin only'
+                            : submission.referenceKind === 'storage'
+                              ? `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`
+                              : 'reference'}
                         </span>
                       </span>
                       <span className="ops-line-status-chip">waiting</span>
@@ -329,7 +357,11 @@ export default function OnboardingReviewPage() {
                       <div className="ops-line-detail-panel onboard">
                         <div className="ops-line-reference-card">
                           <p className="ops-line-kicker">Reference / preview</p>
-                          {submission.referenceKind === 'storage' ? (
+                          {submission.referenceKind === 'storage' && submission.adminOnly ? (
+                            <p className="quote">
+                              <Lock className="h-3 w-3" aria-hidden="true" /> Admin only. Sensitive files are visible to admins.
+                            </p>
+                          ) : submission.referenceKind === 'storage' ? (
                             submission.files.length > 0 ? (
                               <>
                                 <div className="ops-line-evidence-group" style={{ marginTop: 12 }}>
@@ -568,15 +600,19 @@ export default function OnboardingReviewPage() {
                               <small>reviewer</small>
                             </span>
                             <span className="ops-line-evidence-group">
-                              {submission.hasSignedPdf ? (
-                                <a
+                              {submission.hasSignedPdf && submission.adminOnly ? (
+                                <span className="ops-line-file-chip">
+                                  <Lock className="h-3 w-3" aria-hidden="true" /> Admin only
+                                </span>
+                              ) : submission.hasSignedPdf ? (
+                                <button
+                                  type="button"
                                   className="ops-line-file-chip"
-                                  href={`/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(submission.userId)}&itemId=${encodeURIComponent(submission.itemId)}`}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  style={{ background: 'transparent', cursor: 'pointer' }}
+                                  onClick={() => openSignedPdf(submission)}
                                 >
                                   Signed PDF
-                                </a>
+                                </button>
                               ) : (
                                 <span className="ops-line-file-chip">no PDF</span>
                               )}

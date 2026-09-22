@@ -12,6 +12,7 @@ const {
   bucketMock,
   getCompletedPdfMock,
   getEsignProviderMock,
+  logAddMock,
 } = vi.hoisted(() => {
   const docGetMock = vi.fn();
   const docSetMock = vi.fn();
@@ -33,12 +34,13 @@ const {
     bucketMock,
     getCompletedPdfMock,
     getEsignProviderMock,
+    logAddMock: vi.fn(),
   };
 });
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { collection: vi.fn(() => ({ doc: docMock })) },
+  adminDb: { collection: vi.fn(() => ({ doc: docMock, add: logAddMock })) },
   adminStorage: { bucket: vi.fn(() => bucketMock) },
 }));
 vi.mock('@/lib/esign/provider', () => ({ getEsignProvider: getEsignProviderMock }));
@@ -62,6 +64,7 @@ beforeEach(() => {
   storageDownloadMock.mockResolvedValue([Buffer.from('%PDF-stored')]);
   storageSaveMock.mockResolvedValue(undefined);
   getCompletedPdfMock.mockResolvedValue(Buffer.from('%PDF-live'));
+  logAddMock.mockResolvedValue(undefined);
 });
 
 describe('GET /api/portal/onboarding/signed-pdf', () => {
@@ -127,5 +130,61 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
       { completedPdfPath: 'esign-completed/user-1/contract.pdf' },
       { merge: true }
     );
+  });
+
+  it.each(['w9', 'direct_deposit'])('refuses the sensitive %s PDF to non-admin management', async (itemId) => {
+    gateMock.mockResolvedValue({ ...MANAGEMENT, name: 'Ops', isAdmin: false });
+
+    const response = await GET(request('user-1', itemId));
+
+    expect(response.status).toBe(403);
+    expect(docMock).not.toHaveBeenCalled();
+    expect(storageDownloadMock).not.toHaveBeenCalled();
+    expect(logAddMock).not.toHaveBeenCalled();
+  });
+
+  it('streams a sensitive PDF to an admin and writes a sensitiveAccessLog row', async () => {
+    docGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ itemId: 'w9', completedPdfPath: 'esign-completed/user-1/w9.pdf' }),
+    });
+
+    const response = await GET(request('user-1', 'w9'));
+
+    expect(response.status).toBe(200);
+    expect(logAddMock).toHaveBeenCalledWith({
+      targetUid: 'user-1',
+      revealedBy: 'manager-1',
+      revealedByName: 'Manager',
+      itemId: 'w9',
+      source: 'onboarding-signed-pdf',
+      at: expect.any(Date),
+    });
+  });
+
+  it('withholds a sensitive PDF when the audit row cannot be written', async () => {
+    docGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ itemId: 'w9', completedPdfPath: 'esign-completed/user-1/w9.pdf' }),
+    });
+    logAddMock.mockRejectedValue(new Error('write failed'));
+
+    const response = await GET(request('user-1', 'w9'));
+
+    expect(response.status).toBe(500);
+    expect(storageDownloadMock).not.toHaveBeenCalled();
+  });
+
+  it('does not audit a non-sensitive PDF', async () => {
+    docGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ itemId: 'contract', completedPdfPath: 'esign-completed/user-1/contract.pdf' }),
+    });
+    gateMock.mockResolvedValue({ ...MANAGEMENT, isAdmin: false });
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(logAddMock).not.toHaveBeenCalled();
   });
 });
