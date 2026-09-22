@@ -48,5 +48,10 @@ export function expectedPayForSale(
 // Jacob, 2026-09-03: the portal used to print "pays on the 25th". The carrier's
 // owner reads a printed pay date as a statement of pay, and a statement of pay
 // that the final claims/chargeback report later contradicts is a liability. The
-// portal shows the ESTIMATED AMOUNT off installs and nothing about when it
-// lands; the rep ticks the sale off themselves once the money actually arrives.
+// portal shows the ESTIMATED AMOUNT off installs; the rep ticks the sale off
+// themselves once the money actually arrives.
+//
+// Jacob, 2026-09-22: T-Fiber installs may also show an ESTIMATED payout WINDOW
+// taken from the carrier's published install-week schedule (payoutWindow.ts):
+// always a range such as "Oct 7–11", always labelled an estimate, and never for
+// any other carrier. A single pay date is still never printed anywhere.
