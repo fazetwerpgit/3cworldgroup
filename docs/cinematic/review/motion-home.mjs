@@ -16,8 +16,8 @@
               twice or leave a second set of observers behind.
     slow      on a device too slow to hydrate inside the safety timer, the copy
               must never go visible and then hidden again.
-    replay    a section scrolled away and back must arrive again — once per
-              entry, never twice, and never at all if it opted out.
+    replay    the route redraws every time it is scrolled back to; ordinary
+              section entrances fire once a visit and never again.
 
   Screenshots land in .tmpshots/motion/home/. Read them; the numbers below only
   say a state was reached, not that it looked right.
@@ -700,9 +700,18 @@ if (run("slow")) {
 
 /* ---------------------------------------------------------------- replay -- */
 /*
-  Entrances replay on re-entry. Scroll to the route, back to the top and down
-  again: the line draws a second time and its stops arrive with it. That is the
-  requirement, and three things have to hold alongside it.
+  Two different rules, and the point of this section is that they stay
+  different.
+
+  The ROUTE replays. Scroll to it, back to the top and down again and the line
+  draws a second time with its stops arriving alongside it, because the drawing
+  is the content there rather than an entrance onto it.
+
+  Everything else arrives ONCE a visit. A section you have already read does
+  not re-introduce itself when you scroll back past it. Replaying them was
+  tried and read worse — a page being scanned up and down would not hold still.
+
+  Three things have to hold alongside the route's replay.
 
   The reset is a snap, not a rewind. Every attribute involved is the ON half of
   a pair whose OFF half carries no transition, so removing it returns the
@@ -790,9 +799,10 @@ if (run("replay")) {
     check(again.drawn && again.arrived > 0, `${label} route draws AGAIN on the second entry`);
     await page.screenshot({ path: `${OUT}/replay-route-${label}.png` });
 
-    // A generic reveal: bring it on screen, take it away, bring it back.
-    // Note it is NOT shown at scroll 0 — the first one sits below the show
-    // line on a 900px viewport, which is the point of having a show line.
+    // A generic reveal: bring it on screen, take it away, bring it back. It
+    // must arrive exactly once and then stay arrived. Note it is NOT shown at
+    // scroll 0 — the first one sits below the show line on a 900px viewport,
+    // which is the point of having a show line.
     const revealCycle = await page.evaluate(async () => {
       const el = document.querySelector("[data-reveal]");
       const wait = () => new Promise((r) => setTimeout(r, 450));
@@ -806,26 +816,23 @@ if (run("replay")) {
       into(); await wait();
       return { before, onScreen, away, back: !!el.dataset.shown };
     });
-    console.log(`   ${label} first [data-reveal]: belowLine=${!revealCycle.before} onScreen=${revealCycle.onScreen} scrolledAway=${revealCycle.away} returned=${revealCycle.back}`);
-    check(revealCycle.onScreen && !revealCycle.away && revealCycle.back,
-      `${label} a reveal is re-armed when it leaves and replays when it returns`);
+    console.log(`   ${label} first [data-reveal]: onScreen=${revealCycle.onScreen} stillShownFarAway=${revealCycle.away} stillShownOnReturn=${revealCycle.back}`);
+    check(revealCycle.onScreen, `${label} a reveal arrives when it is first reached`);
+    check(revealCycle.away && revealCycle.back,
+      `${label} a reveal that has arrived stays arrived — no reset, no replay`);
 
-    // data-reveal-once: the opt-out motion-pages puts on the Services rows.
-    // Same element, same journey, and this time it keeps its entrance.
-    const once = await page.evaluate(async () => {
-      const el = document.querySelector("[data-reveal]");
-      const wait = () => new Promise((r) => setTimeout(r, 450));
-      el.setAttribute("data-reveal-once", "");
-      scrollTo(0, document.body.scrollHeight); await wait();
-      const away = !!el.dataset.shown;
-      el.removeAttribute("data-reveal-once");
-      return away;
-    });
-    check(once === true, `${label} data-reveal-once keeps an element shown after it leaves (${once})`);
+    /*
+      Read the tally now, before the probe below deliberately takes
+      `data-shown` off an element to make it cross the line again. That is a
+      synthetic second arrival and counting it would make this number say the
+      opposite of what it means.
+    */
+    const peak = await page.evaluate(() => window.__peak);
+    check(peak === 1, `${label} no element is ever shown twice in one visit (peak=${peak})`);
 
     // Thrash: park an element on its own show line and jitter across it. One
     // write is the correct answer — it crosses the line once and stays put.
-    // Re-arming is 10% of the viewport away, so nothing can toggle here.
+    // Nothing ever removes `data-shown`, so a second write is impossible.
     const thrash = await page.evaluate(async () => {
       const el = [...document.querySelectorAll("[data-reveal]")][1] || document.querySelector("[data-reveal]");
       delete el.dataset.shown;
@@ -851,10 +858,8 @@ if (run("replay")) {
     check(chapters.active >= chapters.first && chapters.active <= chapters.last,
       `${label} chapter stage still tracks the reading band after the journey (${chapters.active} in ${chapters.first}..${chapters.last})`);
 
-    const peak = await page.evaluate(() => window.__peak);
     const draw = await page.evaluate(() => window.__draw.join(""));
-    console.log(`   ${label} most data-shown writes on one element=${peak}  data-drawn toggles=${draw}`);
-    check(peak <= 12, `${label} no element is re-shown more than once per entry (peak=${peak})`);
+    console.log(`   ${label} most data-shown writes on one element=${peak} (must be 1)  data-drawn toggles=${draw}`);
     check(!/11|00/.test(draw), `${label} data-drawn strictly alternates, one draw per entry (${draw})`);
     await ctx.close();
   }
@@ -901,12 +906,12 @@ if (run("nav")) {
   /*
     Read the whole page at a reading pace and watch every reveal arrive.
 
-    This used to count what was still shown once the scroll was over, which
-    only made sense while an entrance was permanent. Now that a section is
-    re-armed behind the reader, the count at the bottom is nearly zero and
-    says nothing. The question worth asking is the one the requirement
-    actually asks: did anything get skipped on the way down — is any section
-    still hidden after the reader has passed it?
+    Two questions, and the count alone answers only the weaker one. The
+    stronger question is whether anything got SKIPPED on the way down — a
+    section the reader has passed that never arrived — which a tally taken at
+    the end cannot distinguish from a section that arrived and was reset. So
+    the sweep records each element the moment it first shows, and the count at
+    the end confirms that none of them were given back.
   */
   const swept = await page.evaluate(async () => {
     const all = [...document.querySelectorAll("[data-reveal]")];
@@ -930,8 +935,8 @@ if (run("nav")) {
   check(back.entered <= 2, `data-entered written once per page visit (writes=${back.entered})`);
   check(swept.seen === swept.total,
     `no [data-reveal] is skipped on the way down (${swept.seen}/${swept.total})`);
-  check(back.shown < back.reveal,
-    `reveals behind the reader are re-armed, not left shown (${back.shown}/${back.reveal} still shown at the top)`);
+  check(back.shown === back.reveal,
+    `every reveal stays shown after a full read (${back.shown}/${back.reveal})`);
   check(errors.length === 0, `no page errors during navigation${errors.length ? " — " + errors[0] : ""}`);
   await page.screenshot({ path: `${OUT}/nav-back-home.png` });
   await ctx.close();

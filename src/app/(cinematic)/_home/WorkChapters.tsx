@@ -131,17 +131,6 @@ export default function WorkChapters() {
             className={`${styles.chapter} ${kit.revealRise}`}
             data-chapter
             data-reveal
-            /*
-              These three arrive once and stay. Elsewhere a section replays its
-              entrance every time it is scrolled back into view, but a chapter
-              is already answering the scroll — the photograph beside it swaps
-              and its number lights — and re-fading the copy underneath that
-              would be two motions competing over the same movement. The narrow
-              layout has no sticky stage at all, and the owner asked for one
-              quiet fade there rather than a section that keeps re-introducing
-              itself on the way back up.
-            */
-            data-reveal-once
           >
             {/* The narrow layout carries its own image inline; the sticky stage is desktop-only. */}
             <div className={styles.chapterArt} aria-hidden="true">

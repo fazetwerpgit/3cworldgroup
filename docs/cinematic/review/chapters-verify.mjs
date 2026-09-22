@@ -225,7 +225,7 @@ for (const [label, width, height] of [["390x844", 390, 844], ["360x780", 360, 78
     scrollTo(0, 0); await wait(600);
     return {
       order,
-      once: chs.every((c) => c.hasAttribute("data-reveal-once")),
+
       shownAfterRead,
       stillShown: chs.filter((c) => c.dataset.shown).length,
       sticky: chs.map((c) => getComputedStyle(c).position).every((p) => p === "static"),
@@ -235,7 +235,8 @@ for (const [label, width, height] of [["390x844", 390, 844], ["360x780", 360, 78
   console.log(`   image heights ${m.order.map((o) => o.artH).join("/")} of ${m.vh}vh; shown after a read ${m.shownAfterRead}/3, still shown back at the top ${m.stillShown}/3`);
   check(m.order.every((o) => o.artTop < o.textTop), `${label} every chapter is image then text, in reading order`);
   check(m.order.every((o) => o.artH < m.vh * 0.5), `${label} the images are modest, not a screen each (max ${Math.max(...m.order.map((o) => o.artH))}px)`);
-  check(m.once, `${label} the three chapters are marked one-time`);
+  // Once per visit is the site-wide rule now, so there is no attribute to
+  // check for — only the behaviour, which is what mattered anyway.
   check(m.shownAfterRead === 3 && m.stillShown === 3, `${label} each chapter fades in once and stays in (${m.stillShown}/3)`);
   check(m.sticky, `${label} nothing is sticky in the narrow layout`);
   await ctx.close();

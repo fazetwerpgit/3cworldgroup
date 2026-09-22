@@ -144,18 +144,17 @@ export default function ServicesPage() {
                The photograph leads and the whole text column follows 80ms later;
                services.module.css owns the two steps.
 
-               `data-reveal-once` opts these three rows out of the replay the
-               rest of the site now does. A reader scrolls this section to
-               compare the services against each other, up and down the list,
-               and a row that re-enacts its entrance every time it is looked at
-               again reads as a glitch rather than as a welcome. */
+               Once is the whole site's rule now, so there is nothing to opt out
+               of: a reader scrolls this section to compare the services against
+               each other, up and down the list, and a row that re-enacted its
+               entrance every time it was looked at again would read as a glitch
+               rather than as a welcome. */
             <article
               key={service.id}
               id={service.id}
               className={styles.band}
               aria-labelledby={`${service.id}-title`}
               data-reveal
-              data-reveal-once
             >
               {/*
                 Band 01 carries the page head's photograph: the v2 set has one

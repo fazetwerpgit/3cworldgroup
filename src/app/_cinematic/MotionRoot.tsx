@@ -270,72 +270,63 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       });
     }
 
-    /* --- Section reveals, replayed on every entry ---------------------------
+    /* --- Section reveals, once per page visit -------------------------------
 
-       These used to fire once for the life of the page visit. They now replay:
-       scroll a section off the screen and back, and its copy arrives again.
-       The exception is per-element and opt-in — `data-reveal-once` — for runs
-       of content where seeing the same entrance twice would read as noise
-       rather than as arrival.
+       A section arrives when you first reach it, and then it has arrived.
+       Scroll back up and down and nothing re-enacts itself.
 
-       Two lines, deliberately far apart. A section shows once its top crosses
-       88% of the viewport, and is re-armed only once it is a further 10% of
-       the viewport clear of an edge. Nothing happens in the band between them,
-       which is what stops an element parked on the boundary from toggling as
-       the page settles by a pixel — the hysteresis IS the thrash guard.
+       This is the owner's call and it is worth writing down, because the
+       opposite was tried. Replaying every entrance on re-entry sounds livelier
+       and reads worse: the copy you already know keeps re-introducing itself,
+       and a page you are scanning up and down turns into a page that will not
+       hold still. The route below is the one exception, and it earns it — the
+       line drawing itself IS the content there, not an entrance onto it.
 
-       Note the sign: the re-arm margin GROWS the root rather than shrinking
-       it. A negative margin would re-arm an element that is still partly on
-       screen, and because that region overlaps the show line it would flip the
-       same element back and forth for as long as it sat there.
+       An element shows once its top crosses 88% of the viewport, which is far
+       enough up that the movement is over before it is properly in front of
+       you. Nothing ever takes `data-shown` away.
 
-       One function decides, and it decides from geometry rather than from a
-       history of events — the same reasoning the chapter stage uses below. The
-       observers and listeners hold no logic; they only ask for another
-       reading. So a jump scroll, a resize, an image landing and a restored
-       scroll position all converge on one answer instead of each needing its
-       own repair, and there is exactly one writer of `data-shown`.
+       The decision comes from geometry rather than from a history of events —
+       the same reasoning the chapter stage uses below. The observer and the
+       listeners hold no logic; they only ask for another reading. So a jump
+       scroll, a resize, an image landing and a restored scroll position all
+       converge on one answer instead of each needing its own repair, and there
+       is exactly one writer of `data-shown`.
+
+       Because it is once, this work finishes: when the last section has
+       arrived there is nothing left to decide, so the observer and the
+       listeners are dropped rather than left running behind every scroll frame
+       for the rest of the visit.
     */
     const SHOW_LINE = 0.88;
-    const REARM_PAD = 0.1;
-    const REARM_MARGIN = `${REARM_PAD * 100}% 0px`;
 
     const reveals = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
     if (reveals.length) {
       let revealFrame = 0;
+      let pending = reveals.length;
+      let stopReveals = () => {};
+
       const syncReveals = () => {
         revealFrame = 0;
         const vh = window.innerHeight;
-        const pad = vh * REARM_PAD;
         for (const el of reveals) {
+          if (el.dataset.shown) continue;
           const rect = el.getBoundingClientRect();
-          // Both branches write only on a real change. This runs on every
-          // scroll frame, and re-setting an attribute to the value it already
-          // holds still invalidates style and still reports a mutation — so
-          // without the guards a section sitting quietly on screen would
-          // generate a write per frame and nothing could tell a replay from a
-          // repaint.
           if (rect.bottom > 0 && rect.top < vh * SHOW_LINE) {
-            if (!el.dataset.shown) el.dataset.shown = "true";
-          } else if (rect.bottom < -pad || rect.top > vh + pad) {
-            // `data-reveal-once` keeps the first entrance and nothing after it.
-            // Services carries it on the three product rows, where the row is
-            // one exhibit and replaying it on the way back up is just motion.
-            if (el.dataset.shown && !el.hasAttribute("data-reveal-once")) {
-              delete el.dataset.shown;
-            }
+            el.dataset.shown = "true";
+            pending -= 1;
           }
         }
+        if (pending <= 0) stopReveals();
       };
       const scheduleReveals = () => {
         if (!revealFrame) revealFrame = requestAnimationFrame(syncReveals);
       };
       // The observer is here for the movements a scroll listener cannot see: an
       // image landing, an accordion opening, a font swap reflowing the column
-      // above it. Its margin matches the re-arm distance so it still has
-      // something to report out at that edge.
+      // above it.
       const io = new IntersectionObserver(scheduleReveals, {
-        rootMargin: REARM_MARGIN,
+        rootMargin: "0px",
         threshold: [0, 0.12],
       });
       reveals.forEach((el) => io.observe(el));
@@ -349,11 +340,16 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       const firstReveal = requestAnimationFrame(() => {
         requestAnimationFrame(syncReveals);
       });
-      cleanups.push(() => {
+      // Idempotent: it is called both when the last section arrives and again
+      // on unmount, and `cancelAnimationFrame` on a spent handle is harmless.
+      stopReveals = () => {
         io.disconnect();
         window.removeEventListener("scroll", scheduleReveals);
         window.removeEventListener("resize", scheduleReveals);
         window.removeEventListener("pageshow", scheduleReveals);
+      };
+      cleanups.push(() => {
+        stopReveals();
         cancelAnimationFrame(firstReveal);
         if (revealFrame) cancelAnimationFrame(revealFrame);
       });
@@ -396,6 +392,22 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
       // 0.74 for a stacked step is the same line the rest of the page uses.
       const DRAW_LINE = 0.55;
       const STOP_LINE = 0.74;
+      /*
+        How far past an edge the drawing has to be before it is forgotten, as a
+        fraction of the viewport. It is a distance rather than a hairline so
+        that a section resting at the edge cannot be reset and redrawn over and
+        over as the page settles by a pixel — the hysteresis IS the thrash
+        guard, and 10% of the viewport is well clear of the 0.55 that starts
+        the draw, so the two can never chase each other.
+
+        Note the sign on the margin: it GROWS the observer's root rather than
+        shrinking it. A negative margin would report the canvas as gone while
+        it was still partly on screen, and that region overlaps the draw line,
+        so the line would start and be forgotten alternately for as long as the
+        reader sat there.
+      */
+      const REARM_PAD = 0.1;
+      const REARM_MARGIN = `${REARM_PAD * 100}% 0px`;
 
       // The stacked rail only goes forward within one entry, so a reader moving
       // back up a step does not wind the line back with them.
