@@ -26,63 +26,66 @@
 
 @media (max-width: 759px) {
   /*
-    Content-sized, not the kit's 76svh frame: on a phone the form is the next
-    thing under this head, and a fixed-height head put its first field a full
-    screen down. Doubled class to beat the kit's height rule.
-  */
-  .head.head {
-    height: auto;
-    max-height: none;
-    min-height: 0;
-    padding-bottom: 0;
-    /* Two lines more than the kit's 7rem: enough for the lit windows to read
-       as a photograph above the eyebrow rather than a strip under the header. */
-    padding-top: 9.5rem;
-  }
+    Round 16 (owner, on an iPhone): the head was content-sized here — `height:
+    auto; min-height: 0` against the kit's frame — so the photograph measured
+    455px at 390 and 427px at 430 while every other interior head on the site
+    measured 760 and 768. The picture read as a cropped strip with the copy
+    jammed against the form under it, and Apply was the one page whose opening
+    did not look like the rest of the site.
 
-  /* The kit's copy block (the second child; the first is the art) keeps a
-     desktop-sized foot of up to 4.5rem. Here the form is the next thing down,
-     and that foot plus the section's own top pad put the first field under
-     the fold on a 390-wide phone. */
-  .head > div + div {
-    padding-bottom: 1.75rem;
+    It takes the kit's phone frame now, like About, Services and Careers: the
+    kit's own `min-height: min(90svh, 48rem)` with the copy bottom-aligned in
+    it. Nothing here restates that rule — the override is simply gone, which is
+    what keeps the five heads on one measurement rather than on two that have
+    to be kept in step by hand. The form moving a screen down is the trade the
+    owner asked for; the head's job is to be the opening.
+  */
+
+  /* On a phone the head has one job: hand straight down to the form. Both head
+     buttons go: the lime one would sit above a form heading that says the same
+     words on the page that IS the application, and the ghost link points at
+     the work section, which is the next thing under the form anyway. */
+  .headActions {
+    display: none;
   }
 
   .applyLayout {
     padding-top: 1.25rem;
   }
 
-  /* On a phone the head has one job: get the first field on screen. Both head
-     buttons go: the lime one would sit 160px above a form heading that says
-     the same words on the page that IS the application, and the ghost link
-     points at the work section, which is the next thing under the form
-     anyway. The head copy hands straight down to the form. */
-  .headActions {
-    display: none;
-  }
-
   .head {
     /*
-      The head is content-sized on phones now, so the copy starts near 22% of
-      the frame instead of 43%. The window has to close above that: 17%, and
-      the lit row of windows is pushed up into the clear band by scaling about
-      a lower origin (see the img rule).
+      The head is the kit's frame again, so the crop is authored the way the
+      other three interior heads are: a phone focus point and a scrim that
+      closes above the first line, and no transform on the image. The scale
+      that used to live here (1.9 about a 96%/92% origin) was compensating for
+      a 455px head — at full height it would have been a four-times blow-up of
+      a 2000px source.
+
+      `--head-fall` sits with the others at 29%; the copy starts at 43% of the
+      frame, which is where Services and Careers start theirs.
     */
-    --head-fall: 24%;
-    --head-focus: 84% 40%;
+    --head-fall: 36%;
+    --head-focus: 84% 50%;
   }
 
   /*
-    The lit windows sit at the far right of the source; a portrait crop at 84%
-    shows roofline and pines. Scale about the house so the light lands in the
-    clear window above the copy. With the head content-sized (copy from 22%,
-    scrim closing at 17%) the origin has to sit low, 92%, so the scaled row of
-    windows rises into the top sixth of the frame: 0.40 at 390 and 0.37 at 430
-    against the 0.35 floor. Origins of 46%, 62% and 80% measured 0.26 to 0.34.
+    The one thing the taller frame does not fix by itself. The lit windows and
+    the porch lamp are a small, bright patch at the far right of a 1920-wide
+    source, and a portrait crop resamples them down until the frame measures
+    0.20 on the hero-light gate's 0.35 floor — a picture of a dark lawn. A
+    modest push about the house brings the lit facade back into the clear
+    window above the copy: 0.43 at 390 and 0.43 at 430, measured 2026-09-21.
+
+    1.35, not the 1.9 that used to stand here. That figure was compensating for
+    a 455px head; against the kit's 760px frame 1.25 already clears the floor
+    and 1.35 clears it with room, so this is the smallest push that holds at
+    both phone widths — the source is only 1920 across and every tenth above
+    this is resolution spent.
   */
   .head img {
-    transform: scale(1.9);
-    transform-origin: 96% 92%;
+    transform: scale(1.35);
+    transform-origin: 92% 80%;
   }
 }
 
@@ -177,10 +180,28 @@
   max-width: 44ch;
 }
 
+/*
+  The row gap is what the inline error line stands in. It was 1.05rem (16.8px)
+  and the line is 17.4px tall, so a rejected field's message ran into the label
+  of the field below it at 390. 1.4rem is the smallest gap that clears the line
+  with air left over, and it is now the same at every width — the 1.15rem the
+  wide layout used to set was tighter than the base, which is the wrong way
+  round for the layout that has the most room.
+*/
 .form {
   display: grid;
-  gap: 1.05rem;
+  gap: 1.4rem;
   margin-top: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+/*
+  Below the two-column breakpoint the pair is a plain block and its two fields
+  had no gap at all — name sat directly on phone while every other row had
+  1.05rem. It takes the form's own spacing here and becomes a grid at 760.
+*/
+.fieldPair {
+  display: grid;
+  gap: 1.4rem;
 }
 
 .honeypot {
@@ -195,6 +216,36 @@
 .field {
   display: block;
   min-width: 0;
+  position: relative;
+}
+
+/* The label is now inside `.field` rather than being it, so that the error
+   line can be a sibling of the label instead of a child — see the note in
+   ApplyFlow.tsx. It keeps the block box the label always had. */
+.fieldControl {
+  display: block;
+}
+
+/*
+  The error line is absolutely positioned into the gap that already sits under
+  every field, so a rejected field does not move the one below it. The form's
+  row gap is 1.05rem and this line is a little over 1rem tall, so it lands in
+  space the layout already reserved — nothing shifts, and no blank row has to
+  be held open under four valid fields to keep it that way.
+
+  Short sentences on purpose: this box cannot grow without reaching the next
+  field, so every message in ApplyFlow.tsx is written to fit one line at 390px.
+*/
+.fieldError {
+  color: #8a1c14;
+  display: block;
+  font-size: 0.78rem;
+  left: 0;
+  line-height: 1.2;
+  padding-top: 0.15rem;
+  position: absolute;
+  right: 0;
+  top: 100%;
 }
 
 /*
@@ -255,8 +306,16 @@
   color: #7b899d;
 }
 
-.input:hover {
-  border-color: var(--rule-ink-strong);
+/*
+  Behind `(hover: hover)` for the reason the kit states next to `.btnLime`: a
+  phone resolves `:hover` on tap and holds it until something else is tapped,
+  so without the query the last row a thumb touched stays lit for the rest of
+  the visit. `:active` stays outside the query — that one is the press.
+*/
+@media (hover: hover) {
+  .input:hover {
+    border-color: var(--rule-ink-strong);
+  }
 }
 
 .input:focus {
@@ -783,14 +842,10 @@
     padding: clamp(2rem, 2.6vw, 2.9rem);
   }
 
-  .form {
-    gap: 1.15rem;
-  }
-
-  /* Name and phone pair up once there is room for two comfortable columns. */
+  /* Name and phone pair up once there is room for two comfortable columns.
+     The 1.15rem here is the column gutter; the rows keep the form's 1.4rem. */
   .fieldPair {
-    display: grid;
-    gap: 1.15rem;
+    gap: 1.4rem 1.15rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

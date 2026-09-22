@@ -46,8 +46,19 @@ for (const motion of ["no-preference", "reduce"]) {
     });
     const page = await ctx.newPage();
     const errors = [];
-    page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-    page.on("pageerror", (e) => errors.push(String(e)));
+    // The dev server's HMR socket drops whenever another file is saved while
+    // this runs; that is the harness, not the page.
+    const noise = (t) => /webpack-hmr|_next\/static\/chunks\/.*hot-update|Fast Refresh/i.test(t);
+    page.on("console", (m) => m.type() === "error" && !noise(m.text()) && errors.push(m.text()));
+    page.on("pageerror", (e) => !noise(String(e)) && errors.push(String(e)));
+
+    // next/image proxies the photo, so the market file name rides in the query.
+    const photoRequests = [];
+    page.on("request", (r) => {
+      const u = decodeURIComponent(r.url());
+      if (u.includes("/redesign/v2/photos/city-")) photoRequests.push(u.split("/").pop());
+    });
+    const mountedImages = () => page.locator('[class*="cityPlateImage"]').count();
 
     await page.goto(`${BASE}/#markets`, { waitUntil: "networkidle" });
     await page.addStyleTag({ content: CSS });
@@ -60,15 +71,27 @@ for (const motion of ["no-preference", "reduce"]) {
 
     const plateBody = page.locator('[class*="cityPlateBody"]').first();
     await plateBody.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(900);
+
+    // Only the market on screen is in the DOM, so only its photo is fetched.
+    check(photoRequests.length === 1, "one market photo downloaded on load",
+      `${photoRequests.length}: ${photoRequests.join(", ")}`);
+    check((await mountedImages()) === 1, "one market image mounted on load", String(await mountedImages()));
 
     const heights = [];
     for (let i = 0; i < chipCount; i += 1) {
+      const requestsBefore = photoRequests.length;
       await chips.nth(i).click();
       await page.waitForTimeout(100);
       await page.screenshot({ path: `${OUT}/${label}-market${i}-mid.png` });
-      await page.waitForTimeout(700);
+      const midMounted = await mountedImages();
+      await page.waitForTimeout(1500);
       await page.screenshot({ path: `${OUT}/${label}-market${i}-settled.png` });
+
+      check(midMounted <= 2, `chip ${i} mounts at most two images`, String(midMounted));
+      check(photoRequests.length - requestsBefore <= 1, `chip ${i} fetches at most one new photo`,
+        String(photoRequests.length - requestsBefore));
+      check((await mountedImages()) === 1, `chip ${i} settles back to one image`, String(await mountedImages()));
 
       const box = await plateBody.boundingBox();
       heights.push(Math.round(box.height));
@@ -114,8 +137,11 @@ for (const motion of ["no-preference", "reduce"]) {
         await new Promise((r) => setTimeout(r, 50));
       }
     });
-    await page.waitForTimeout(700);
+    const rapidPeak = await mountedImages();
+    await page.waitForTimeout(1800);
     await page.screenshot({ path: `${OUT}/${label}-market-rapid.png` });
+    check(rapidPeak <= 2, "rapid clicking never mounts more than two images", String(rapidPeak));
+    check((await mountedImages()) === 1, "rapid clicking settles back to one image", String(await mountedImages()));
     const rapid = await page.evaluate(() => {
       const buttons = [...document.querySelectorAll('[aria-label="Markets"] button')];
       const panels = [...document.querySelectorAll('[class*="cityPlatePanel"]')];
@@ -155,6 +181,28 @@ for (const motion of ["no-preference", "reduce"]) {
       return { focused: buttons.indexOf(document.activeElement), pressed: buttons.findIndex((b) => b.getAttribute("aria-pressed") === "true") };
     });
     check(kbEnd.focused === 4 && kbEnd.pressed === 4, "End jumps to the last market", JSON.stringify(kbEnd));
+
+    // The chips are a plain group, so the vertical arrows belong to the page.
+    await chips.nth(0).focus();
+    await page.waitForTimeout(300);
+    const beforeDown = await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('[aria-label="Markets"] button')];
+      return { y: window.scrollY, pressed: buttons.findIndex((b) => b.getAttribute("aria-pressed") === "true") };
+    });
+    await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(400);
+    const vertical = await page.evaluate((prev) => {
+      const buttons = [...document.querySelectorAll('[aria-label="Markets"] button')];
+      return {
+        scrolled: window.scrollY - prev.y,
+        was: prev.pressed,
+        pressed: buttons.findIndex((b) => b.getAttribute("aria-pressed") === "true"),
+      };
+    }, beforeDown);
+    check(vertical.scrolled > 0 && vertical.pressed === vertical.was,
+      "ArrowDown scrolls the page and leaves the selection alone", JSON.stringify(vertical));
+    await chips.nth(0).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(250);
 
     // The live region is a status node of its own now: the panels are
     // permanent, so only this text actually changes on selection.

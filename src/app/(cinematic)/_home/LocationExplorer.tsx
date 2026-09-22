@@ -24,6 +24,10 @@ import styles from "../cinematic-home.module.css";
 /** Matches the bar's own height in cinematic-home.module.css (.cityIndicator). */
 const INDICATOR_HEIGHT = 2;
 const BODY_ENTRANCE_MS = 200;
+/** Matches the image's opacity transition in cinematic-home.module.css. */
+const CROSSFADE_MS = 460;
+/** Longest the crossfade waits for a market's bytes before starting anyway. */
+const LOAD_WAIT_MS = 500;
 
 /** The kit's easing token, read off the element so there is one source for it. */
 function easeOutExpo(el: Element) {
@@ -50,15 +54,43 @@ export default function LocationExplorer() {
   const animatedFor = useRef(index);
   const active = MARKETS[index];
 
-  // Left/right (and up/down) walk the list, selection following focus. The step
-  // is taken from the button the user is actually focused on, not from the
-  // current selection: every chip is its own tab stop, so a reader can tab onto
-  // a chip they have not selected, and stepping from the selection would jump
+  /*
+    Only the market you are looking at is in the DOM, plus the one it is fading
+    away from. Rendering all five downloaded five skyline photographs on every
+    visit to show one. `mounted` is kept in recency order, so the incoming frame
+    is appended last and therefore paints over the outgoing one, and React never
+    has to reorder a node that is mid-transition. `shown` lags it by two frames:
+    the newcomer has to be painted transparent before it is told to be opaque,
+    or there is nothing for the crossfade to start from.
+  */
+  const [mounted, setMounted] = useState<readonly number[]>([0]);
+  const [shown, setShown] = useState(0);
+  const shownRef = useRef(0);
+  const loadedRef = useRef(new Set<number>());
+  const waitingRef = useRef<{ index: number; reveal: () => void } | null>(null);
+
+  const noteLoaded = (i: number) => {
+    loadedRef.current.add(i);
+    const waiting = waitingRef.current;
+    if (waiting?.index === i) {
+      waitingRef.current = null;
+      waiting.reveal();
+    }
+  };
+
+  // Left and right walk the list, selection following focus. The step is taken
+  // from the button the user is actually focused on, not from the current
+  // selection: every chip is its own tab stop, so a reader can tab onto a chip
+  // they have not selected, and stepping from the selection would jump
   // somewhere they are not looking.
   // A5 — Home and End jump to the ends of the list, which is what a reader who
   // has learned the arrow keys here will try next.
+  // Up and down are deliberately left alone. This is a plain group, not a
+  // listbox, so nothing tells the reader the vertical arrows belong to it, and
+  // swallowing them would stop the page scrolling the moment focus reached a
+  // chip.
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
     const jump = event.key === "Home" ? 0 : event.key === "End" ? MARKETS.length - 1 : -1;
     if (!step && jump < 0) return;
     const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []);
@@ -125,6 +157,57 @@ export default function LocationExplorer() {
     measureRef.current();
   }, [index]);
 
+  // Mount the incoming frame beside the one on screen, then reveal it once its
+  // bytes are in: fading up over a picture that has not arrived would show the
+  // empty frame, which is worse than the extra beat.
+  useEffect(() => {
+    setMounted((prev) => {
+      const outgoing = shownRef.current;
+      if (outgoing === index) {
+        return prev.length === 1 && prev[0] === index ? prev : [index];
+      }
+      return prev.length === 2 && prev[0] === outgoing && prev[1] === index ? prev : [outgoing, index];
+    });
+
+    let cancelled = false;
+    let first = 0;
+    let second = 0;
+    const reveal = () => {
+      if (cancelled) return;
+      first = requestAnimationFrame(() => {
+        second = requestAnimationFrame(() => {
+          if (cancelled) return;
+          shownRef.current = index;
+          setShown(index);
+        });
+      });
+    };
+
+    let cap = 0;
+    if (loadedRef.current.has(index)) {
+      reveal();
+    } else {
+      waitingRef.current = { index, reveal };
+      cap = window.setTimeout(reveal, LOAD_WAIT_MS);
+    }
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+      if (cap) window.clearTimeout(cap);
+      if (waitingRef.current?.index === index) waitingRef.current = null;
+    };
+  }, [index]);
+
+  // The outgoing frame leaves only once the crossfade that needed it is over.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setMounted((prev) => (prev.length === 1 && prev[0] === shown ? prev : [shown]));
+    }, CROSSFADE_MS);
+    return () => window.clearTimeout(timer);
+  }, [shown]);
+
   /*
     The panel swaps instantly — the copy is already correct the frame you click
     — and then rises the last few pixels into place. Any entrance still running
@@ -175,17 +258,25 @@ export default function LocationExplorer() {
       </p>
 
       <div className={styles.cityPlate}>
+        {/*
+          alt="" is the whole accessibility story here: the photograph repeats
+          the market name the panel beside it already carries. That implicit
+          presentation role is also why the image takes no aria-* of its own —
+          a decorative element that then declares aria-hidden is a conflict axe
+          fails on, and there is nothing to hide that alt="" has not hidden.
+        */}
         <div className={styles.cityPlateArt}>
-          {MARKETS.map((market, i) => (
+          {mounted.map((i) => (
             <Image
-              key={market.slug}
-              src={market.image}
+              key={MARKETS[i].slug}
+              src={MARKETS[i].image}
               alt=""
               fill
               sizes="(max-width: 900px) 100vw, 46vw"
               className={styles.cityPlateImage}
-              data-active={i === index || undefined}
-              aria-hidden={i !== index}
+              data-active={i === shown || undefined}
+              onLoad={() => noteLoaded(i)}
+              onError={() => noteLoaded(i)}
             />
           ))}
         </div>

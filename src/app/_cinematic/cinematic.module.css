@@ -14,6 +14,41 @@
    notes are in docs/cinematic/PAGE-KIT.md.
    ========================================================================== */
 
+/*
+  The display face has no lowercase. Bebas Neue maps every lowercase codepoint
+  to its capital, so "Start your application" and "START YOUR APPLICATION"
+  measure identically in it. The fallback does not, which is why a handful of
+  kit classes below say `text-transform: uppercase` for text that already
+  looks uppercase: it is the fallback that needs telling.
+
+  And this face is roughly 57% the width of a normal sans at the same size, so
+  while it is in flight every display line is drawn nearly twice as wide as it
+  will end up. On a phone that turned a two-line page headline into four lines,
+  grew the head by about 120px, and dropped the whole page when the font landed
+  — measured 0.108 CLS on /services at 360. `size-adjust` scales the stand-in to
+  the real face's advance widths, so the fallback wraps where Bebas wraps and
+  the box is final on the first paint. Measured across four routes at 360, 390,
+  1440 and 1920: identical head, title and column heights with the font blocked
+  and with it loaded.
+
+  The ascent and descent are Bebas's own (0.9 / 0.3 of the em). Every display
+  element here sets its own line-height, so these change little; they are
+  stated so the baseline does not move either.
+*/
+@font-face {
+  font-family: "Display Fallback";
+  src:
+    local("Arial"),
+    local("Helvetica"),
+    local("Liberation Sans"),
+    local("DejaVu Sans"),
+    local("Roboto");
+  size-adjust: 57%;
+  ascent-override: 90%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
 .page {
   --ink: #061735;
   --ink-deep: #030d1f;
@@ -39,7 +74,7 @@
   */
   --accent: var(--lime);
 
-  --display: "Bebas Neue", var(--font-geist-sans), sans-serif;
+  --display: "Bebas Neue", "Display Fallback", var(--font-geist-sans), sans-serif;
   --body: var(--font-geist-sans), system-ui, sans-serif;
 
   /* Round 5 — the shell was 78rem (1248px), which on the 1740px display the
@@ -165,6 +200,7 @@
   color: var(--ink);
   font-family: var(--display);
   font-size: 1rem;
+  text-transform: uppercase;
   left: 1rem;
   letter-spacing: 0.04em;
   padding: 0.55rem 1.1rem;
@@ -215,6 +251,9 @@
   display: inline-flex;
   font-family: var(--display);
   font-size: 1.06rem;
+  /* See the note at `@font-face` above: the fallback has a lowercase and the
+     real face does not, so the case is stated rather than left to the glyphs. */
+  text-transform: uppercase;
   gap: 0.55rem;
   letter-spacing: 0.035em;
   line-height: 1;
@@ -303,6 +342,7 @@
   font-size: 1.04rem;
   gap: 0.45rem;
   letter-spacing: 0.035em;
+  text-transform: uppercase;
   /*
     R7 — the link was a 31px box. The pointer target floor is 40px, and the
     cheapest way there that moves nothing is to grow the box upward: the text
@@ -425,6 +465,30 @@
   box-shadow: 0 1px 0 0 var(--rule);
 }
 
+/*
+  The same backdrop, for the case where nothing is ever going to ask for it.
+
+  `data-condensed` is SiteHeader's to set, and SiteHeader only exists once React
+  has mounted it. With scripting off that is covered in the layout by a
+  <noscript> stylesheet — but scripting off is not the only way this fails. With
+  JS enabled and a chunk that 404s or throws, the parser sees a scripting
+  document, the <noscript> does not apply, and the header stays transparent for
+  the whole visit: white nav text scrolled onto the homepage's two paper
+  sections, unreadable.
+
+  The layout's boot script already runs a clock for exactly this — it gives
+  hydration 1.5s to prove itself and leaves `data-motion-bailed` behind when it
+  does not — so the answer is simply to read that flag here. Keying on the
+  failure rather than on the absence of hydration is what keeps the normal path
+  untouched: a document that hydrates never gets the flag, so its header opens
+  transparent over the hero and condenses on scroll exactly as before, with no
+  navy first frame to undo.
+*/
+[data-motion-bailed] .header {
+  background: var(--ink);
+  box-shadow: 0 1px 0 0 var(--rule);
+}
+
 .headerRow {
   align-items: center;
   display: flex;
@@ -476,7 +540,7 @@
   font-family: var(--display);
   font-size: 1.16rem;
   letter-spacing: 0.035em;
-  line-height: 1;
+  line-height: 1;  text-transform: uppercase;
 }
 
 .brandTag {
@@ -1031,6 +1095,7 @@
   display: flex;
   font-family: var(--display);
   font-size: 1.1rem;
+  text-transform: uppercase;
   gap: 0.6rem;
   letter-spacing: 0.04em;
   margin-right: auto;
@@ -1515,6 +1580,50 @@
   */
   .page:has([data-apply-bar]) .footer {
     padding-bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/*
+  Below the iPhone's 390. The header row is the brand on the left and the Apply
+  button plus the menu toggle on the right, and at 320 those three want 347px
+  of a 280px column: `.brand` was shrunk to fit and its two lines, which cannot
+  wrap, simply ran on underneath the button — "CONNECTING AMERICA" cut mid-word
+  by a lime rectangle. The Apply button and the toggle were pushed 25px past
+  the right edge of the screen with it.
+
+  The tagline is the line that goes. It is a restatement, the smallest type in
+  the row and the first thing a 320px screen cannot afford; it keeps its place
+  in the accessibility tree by the same geometry `.srOnly` uses, so a screen
+  reader still reads "3C World Group, Connecting America". The mark and the
+  gaps come down a step with it, and the wordmark — which is the brand at this
+  width — is untouched.
+
+  389, not 390: an iPhone is 390 or wider and nothing above this line changes.
+*/
+@media (max-width: 389px) {
+  .headerRow {
+    gap: 0.75rem;
+  }
+
+  .brand {
+    gap: 0.5rem;
+  }
+
+  .brandMark {
+    width: 34px;
+  }
+
+  .brandTag {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .headerActions {
+    gap: 0.4rem;
   }
 }
 

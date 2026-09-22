@@ -5,6 +5,9 @@ import type { NextConfig } from "next";
 const LOGIN_ALIASES = ['/login', '/signin', '/employee'];
 
 const nextConfig: NextConfig = {
+  // Dev only: lets a phone on the LAN load the dev server through the
+  // firewall-forwarded port without Next blocking /_next/* as cross-origin.
+  allowedDevOrigins: ['192.168.4.88', '127.0.0.1'],
   outputFileTracingIncludes: {
     '/**': ['assets/esign/**'],
   },

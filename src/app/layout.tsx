@@ -52,7 +52,20 @@ export default function RootLayout({
       otherwise log a mismatch on every cinematic page load. It suppresses
       warnings for this element's own attributes only, not for its subtree.
     */
-    <html lang="en" suppressHydrationWarning>
+    /*
+      `data-scroll-behavior="smooth"` is how Next 16 is told that the smooth
+      scrolling declared in globals.css is deliberate. The router turns it off
+      for the one moment it restores a scroll position on a route change — a
+      navigation that smooth-scrolls there instead of arriving there reads as
+      the page sliding out from under you — and without the attribute it cannot
+      tell whether the rule is authored or inherited, so it warns on every
+      transition instead. The attribute only marks the declaration; it does not
+      create it, and the reduced-motion override in globals.css still wins.
+
+      It is inert outside the cinematic group: the portal declares no smooth
+      scrolling, so there is nothing here for the router to suspend.
+    */
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

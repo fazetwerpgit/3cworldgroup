@@ -103,8 +103,16 @@ export default function SiteHeader() {
             width={550}
             height={516}
             className={styles.brandMark}
+            /*
+              No `priority` and no `loading="eager"`. Either one makes
+              `next/image` emit a preload link — the component gates the
+              preload on "not lazy", not on `priority` alone — and a 44px logo
+              being fetched ahead of the full-bleed photograph that is the
+              page's LCP is the wrong order. It is in the viewport at the top
+              of every route, so the lazy loader requests it on the first pass
+              anyway; measured, it decodes well before the hero does.
+            */
             sizes="44px"
-            priority
           />
           <span className={styles.brandCopy}>
             <span className={styles.brandName}>3C World Group</span>

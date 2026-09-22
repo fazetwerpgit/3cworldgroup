@@ -452,8 +452,22 @@
   padding: clamp(2rem, 4vw, 3rem) 0 clamp(3rem, 8vw, 7rem);
 }
 
+/*
+  Desktop takes its photographs from the sticky stage, so the per-chapter art is
+  the narrow layout's alone and is off here.
+
+  `position` is declared even though nothing is painted. The <Image> inside is a
+  `fill`, which next/image will only place correctly inside a positioned
+  ancestor, and it checks that ancestor's computed position after mount —
+  `display: none` hides the box but does not stop the check, so a static parent
+  warned three times on every desktop load. Computed position is reported from
+  the declaration whatever the display, so saying it here answers the check
+  without laying anything out. The narrow query below repeats it beside the rest
+  of the frame, where it is doing real work.
+*/
 .chapterArt {
   display: none;
+  position: relative;
 }
 
 .chapterNumber {

@@ -1,0 +1,58 @@
+/* ==========================================================================
+   404 — the one thing this route does that the kit does not already own
+   --------------------------------------------------------------------------
+   The head, its type, the ground and the links all come from
+   src/app/_cinematic/cinematic.module.css. Only the row the three links sit in
+   is written here: `pageHeadActions` is spaced for two buttons at 0.85rem, and
+   three hairline-underlined text links at that gap read as one broken sentence
+   rather than as three choices. Wrapping is kept so the row becomes a column
+   on a narrow phone instead of crushing the third link.
+   ========================================================================== */
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 2.25rem;
+  margin-top: 2.1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Filling the window.
+
+   Every other route in the group is taller than the viewport, so the shell's
+   navy runs off the bottom of the screen and the question never comes up. This
+   one is short: at 1440x900 the footer landed at 730px and the 170px below it
+   was the browser's own white body ground, which read as the site ending
+   halfway down the window.
+
+   The fix is the shell laid out as a column at least one viewport tall with the
+   main landmark taking the slack, so the footer is pushed to the bottom edge on
+   a short page and stays exactly where it is on a long one. The shell belongs
+   to the group layout, which this route shares with every other page, so the
+   rules are keyed on `:has()` against the marker below: they match only while
+   this page is the one mounted, and no other route is touched.
+
+   `100svh` rather than `100vh` or `100dvh`: on a phone the small viewport is
+   the one that is always visible, so the footer cannot be left hiding behind a
+   browser chrome bar that has not retracted yet, and unlike the dynamic unit it
+   does not resize the page as that bar comes and goes.
+
+   The body ground is repainted too. The shell's min-height means nothing should
+   show through any more, but overscroll still rubber-bands past it, and white
+   is the wrong colour to find behind a navy site. The literal is `--ink`, which
+   is declared on the shell element and so cannot be read from `body`.
+   -------------------------------------------------------------------------- */
+
+body:has(.fill) {
+  background: #061735;
+}
+
+div:has(> main > .fill) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+div:has(> main > .fill) > main {
+  flex: 1 0 auto;
+}

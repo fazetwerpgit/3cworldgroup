@@ -41,8 +41,20 @@ import styles from "../_cinematic/cinematic.module.css";
   behind, MotionRoot reads it and takes its static path for the life of the
   document, and the page never gates twice. What is lost is the entrance, on a
   load already too slow to have one.
+
+  The timer is deliberately outside the motion test, while the attribute it can
+  remove is inside it. Nothing here is hidden when motion is unwanted, so there
+  would be nothing to rescue — but the flag also carries the fact that hydration
+  never landed, and the header below needs that fact whatever the reader's
+  motion preference is. It is a timer that usually clears with nothing to do.
+
+  What it waits on is `data-hydrated`, which MotionRoot sets on every path
+  through its effect. `data-entered` was the wrong proof: it is set two frames
+  later and only when motion is on, so it could never appear for a reader with
+  reduced motion, and a busy main thread could drop the frame after React had
+  already arrived.
 */
-const MOTION_BOOT = `try{if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&"IntersectionObserver" in window){var d=document.documentElement;d.dataset.motion="on";setTimeout(function(){if(!d.dataset.entered){delete d.dataset.motion;d.dataset.motionBailed="true"}},1500)}}catch(e){}`;
+const MOTION_BOOT = `try{var d=document.documentElement;if(!matchMedia("(prefers-reduced-motion: reduce)").matches&&"IntersectionObserver" in window){d.dataset.motion="on"}setTimeout(function(){if(!d.dataset.hydrated){delete d.dataset.motion;d.dataset.motionBailed="true"}},1500)}catch(e){}`;
 
 /**
  * The cinematic shell. Every route in this group renders its own header and
@@ -69,6 +81,14 @@ export default function CinematicLayout({ children }: { children: React.ReactNod
           unreadable over the homepage's two paper sections. Give it the backdrop
           up front in that case — the only thing lost is the transparent opening,
           and legibility is not negotiable.
+
+          Scripting off is not the only way that handler fails to run: with JS
+          enabled and a chunk that never loads, SiteHeader never mounts either,
+          and this <noscript> does not apply. That case is covered in the
+          stylesheet by `[data-motion-bailed] .header`, which the boot script's
+          timer above turns on once hydration has missed its deadline. Two
+          separate rules because the two failures are detected differently — one
+          by the parser, one by a clock — but they resolve to the same header.
         */}
         <noscript>
           <style>{`.${styles.header}{background:var(--ink);box-shadow:0 1px 0 0 rgba(255,255,255,0.14)}`}</style>

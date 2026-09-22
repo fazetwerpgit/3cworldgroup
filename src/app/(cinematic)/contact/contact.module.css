@@ -57,9 +57,34 @@
   --mark-bleed: clamp(1rem, 4vw, 4.5rem);
 
   background: var(--ink);
-  /* The mark bleeds past the right edge and the line leaves the bottom edge;
-     `.page` carries `overflow-x: clip`, so neither can scroll the document. */
-  overflow: visible;
+  /*
+    The mark bleeds past the right edge and the line leaves the bottom edge, so
+    the two axes are clipped differently and neither can use the `overflow`
+    shorthand the kit sets.
+
+    The inline axis is clipped HERE rather than by `.page`. This is the only
+    route on the site whose art overflows the document horizontally — at 390 the
+    phone mark runs from x 55 to x 484 in a 390px viewport — and `.page` is the
+    fixed header's own parent. An ancestor clip that actually has something to
+    clip is what detaches `position: fixed` from the viewport in iOS Safari: on
+    the owner's phone (2026-09-21) the header parked part-way down the screen
+    with the mark painting above and below it, on this route only. Clipping the
+    bleed inside the head cuts it on exactly the same edge — the head is
+    viewport-wide — and leaves `.page` with no overflow to build a clip layer
+    for.
+
+    The block axis stays `visible`, because the lime line leaves the BOTTOM of
+    this box and has to reach the hairline in the section below it.
+
+    `isolation` is the same fix one layer up. `.headArt` blends (`lighten`), and
+    with no isolation between it and `.page` the blend group is the whole page —
+    the fixed header included. Isolating on the head makes the group the head,
+    and the pixels do not move: the mark's backdrop inside the head is this
+    element's own navy either way.
+  */
+  isolation: isolate;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 .headInner {
@@ -229,9 +254,17 @@
     padding-left 0.3s var(--ease-out-expo);
 }
 
-.pathRow:hover {
-  border-bottom-color: var(--lime);
-  padding-left: 0.6rem;
+/*
+  Behind `(hover: hover)` for the reason the kit states next to `.btnLime`: a
+  phone resolves `:hover` on tap and holds it until something else is tapped,
+  so without the query the last row a thumb touched stays lit for the rest of
+  the visit. `:active` stays outside the query — that one is the press.
+*/
+@media (hover: hover) {
+  .pathRow:hover {
+    border-bottom-color: var(--lime);
+    padding-left: 0.6rem;
+  }
 }
 
 .pathKind {
@@ -243,8 +276,10 @@
   transition: color 0.24s ease;
 }
 
-.pathRow:hover .pathKind {
-  color: var(--lime);
+@media (hover: hover) {
+  .pathRow:hover .pathKind {
+    color: var(--lime);
+  }
 }
 
 .pathTitle {
@@ -261,8 +296,10 @@
   transition: transform 0.3s var(--ease-out-expo);
 }
 
-.pathRow:hover .pathArrow {
-  transform: translateX(6px);
+@media (hover: hover) {
+  .pathRow:hover .pathArrow {
+    transform: translateX(6px);
+  }
 }
 
 .pathRow:active {
@@ -309,6 +346,37 @@
 .field {
   display: block;
   min-width: 0;
+  position: relative;
+}
+
+/* The label is now inside `.field` rather than being it, so that the error
+   line can be a sibling of the label instead of a child — see the note in
+   ContactForm.tsx. It keeps the block box the label always had. */
+.fieldControl {
+  display: block;
+}
+
+/*
+  The error line is absolutely positioned into the gap that already sits under
+  every field, so a rejected field does not move the one below it. The form's
+  row gap is 1.3rem at its tightest and this line is a little over 1rem tall,
+  so it lands in space the layout already reserved — nothing shifts, and no
+  blank row has to be held open under four valid fields to keep it that way.
+
+  Short sentences on purpose: this box cannot grow without reaching the next
+  field, so every message in ContactForm.tsx is written to fit one line at
+  390px.
+*/
+.fieldError {
+  color: #7f1917;
+  display: block;
+  font-size: 0.78rem;
+  left: 0;
+  line-height: 1.2;
+  padding-top: 0.15rem;
+  position: absolute;
+  right: 0;
+  top: 100%;
 }
 
 .fieldLabel {
@@ -353,8 +421,10 @@
   opacity: 0.75;
 }
 
-.input:hover {
-  border-color: var(--rule-ink-strong);
+@media (hover: hover) {
+  .input:hover {
+    border-color: var(--rule-ink-strong);
+  }
 }
 
 .input:focus {
@@ -593,8 +663,10 @@
   transition: color 0.2s ease;
 }
 
-.detailLink:hover {
-  color: var(--lime-ink);
+@media (hover: hover) {
+  .detailLink:hover {
+    color: var(--lime-ink);
+  }
 }
 
 /* --------------------------------------------------------------------------

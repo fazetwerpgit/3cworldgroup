@@ -3,7 +3,20 @@
     {
       "vp": "390",
       "route": "/",
-      "violations": []
+      "violations": [
+        {
+          "id": "presentation-role-conflict",
+          "impact": "minor",
+          "help": "Elements marked as presentational should be consistently ignored",
+          "nodes": [
+            {
+              "target": ".cinematic-home-module__mBhnHq__cityPlateImage",
+              "summary": "Fix all of the following: Element does not have global ARIA attribute"
+            }
+          ],
+          "count": 1
+        }
+      ]
     },
     {
       "vp": "390",
@@ -33,7 +46,20 @@
     {
       "vp": "1740",
       "route": "/",
-      "violations": []
+      "violations": [
+        {
+          "id": "presentation-role-conflict",
+          "impact": "minor",
+          "help": "Elements marked as presentational should be consistently ignored",
+          "nodes": [
+            {
+              "target": ".cinematic-home-module__mBhnHq__cityPlateImage",
+              "summary": "Fix all of the following: Element does not have global ARIA attribute"
+            }
+          ],
+          "count": 1
+        }
+      ]
     },
     {
       "vp": "1740",
@@ -215,7 +241,7 @@
       "route": "/apply",
       "box": {
         "x": 20,
-        "y": 195,
+        "y": 484,
         "w": 350,
         "h": 96,
         "color": "rgb(255, 255, 255)"

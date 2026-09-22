@@ -59,6 +59,21 @@ function formatSubmitted(createdAt) {
   }).format(createdAt);
 }
 
+/*
+  The same formula-injection guard `src/lib/sheets/applicationsSheet.ts`
+  applies to a live submit. This script replays rows that were stored BEFORE
+  that guard existed, so the untrusted `referredBy` (and every other typed
+  cell) has to be disarmed here too, or the backfill is the way an old payload
+  finally reaches the sheet. Kept as a copy rather than an import: this is a
+  plain .mjs script run by node with no TypeScript build step.
+*/
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+function sanitizeSheetCell(value) {
+  const text = typeof value === 'string' ? value : String(value ?? '');
+  return FORMULA_LEAD.test(text) ? `'${text}` : text;
+}
+
 function appendUrl(spreadsheetId) {
   return `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
     spreadsheetId
@@ -114,7 +129,7 @@ try {
       data.city ?? '',
       data.referredBy ?? '',
       data.status ?? '',
-    ]);
+    ].map(sanitizeSheetCell));
   }
 
   const response = await fetch(appendUrl(spreadsheetId), {

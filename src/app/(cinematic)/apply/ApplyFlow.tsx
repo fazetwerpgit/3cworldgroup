@@ -24,6 +24,63 @@ import styles from "./apply.module.css";
  * addressed to the reader. Keeping them as children means they still render on
  * the server and only the decision to show them lives on the client.
  */
+/*
+  What each field says when the browser rejects it. Short, and about what to do
+  rather than about the rule that was broken — `validationMessage` is the
+  backstop for anything not listed, so a browser that invents a new failure
+  still says something true.
+*/
+const MISSING: Record<string, string> = {
+  name: "Enter your full name.",
+  phone: "Enter your phone number.",
+  email: "Enter your email address.",
+  city: "Enter the city you live in.",
+};
+
+const MISMATCH: Record<string, string> = {
+  email: "Enter a valid email address.",
+  phone: "Enter a valid phone number.",
+};
+
+function messageFor(field: HTMLInputElement): string {
+  const { validity, name, validationMessage } = field;
+  if (validity.valueMissing) return MISSING[name] ?? "This field is required.";
+  if (validity.typeMismatch) return MISMATCH[name] ?? "Check this value.";
+  return validationMessage || "Check this value.";
+}
+
+/*
+  The one line the alert region carries when a submit is blocked. Derived from
+  `invalid` rather than stored, so it appears with the first rejected field and
+  goes as the last one is fixed, with nothing to keep in step.
+*/
+const INVALID_SUMMARY = "Fill in the highlighted fields.";
+
+/*
+  The draft.
+
+  Someone who opens /opportunities to read what the role actually is and comes
+  back used to find an empty form: a client-side navigation unmounts this
+  component, and the back navigation mounts a new one with empty state. The
+  browser's own form restore does not apply — these are controlled inputs, and
+  React writes the empty state over whatever the browser put back.
+
+  sessionStorage, not localStorage: the draft belongs to this tab and this
+  visit, and it is removed the moment the application is actually in.
+
+  The honeypot is never stored. It is only ever filled by something automated,
+  and a stored value would arm it against the person who comes back.
+*/
+const DRAFT_KEY = "3c:apply-draft";
+
+type Draft = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  referredBy?: string;
+};
+
 export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -36,10 +93,19 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<{ message: string; code: string } | null>(null);
-  // A4 — which fields the browser has rejected, so the same failure the native
-  // bubble shows is also on the element for assistive tech. Driven by the
-  // controls' own `invalid` event, cleared per field as it is edited.
-  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  /*
+    A4 — which fields the browser has rejected, and WHY, in this page's own
+    words. It holds a sentence per field rather than a flag: `aria-invalid`
+    alone told a screen reader that something was wrong and nothing about what,
+    and the native bubble it used to leave that to is invisible to anyone not
+    looking at the field it points at. Each sentence is rendered under its
+    field, given an id, and named by that field's `aria-describedby`.
+
+    Driven by the controls' own `invalid` event, cleared per field as it is
+    edited. Native validation is still what blocks the submit; this only
+    explains it.
+  */
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
   /*
     The duplicate-submit guard. `isSubmitting` disables the button, but state
     is not readable until React has re-rendered — a double click inside one
@@ -48,6 +114,91 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     the first call, so the second one returns before it reaches fetch.
   */
   const pendingRef = useRef(false);
+  /*
+    A11y — the success screen REPLACES the whole page, so the element the
+    reader was on is gone and focus falls to <body>: a screen reader is left at
+    the top of the document with no idea the application went in. Focus moves
+    to the heading instead, which is both the announcement and the place to
+    read on from. `preventScroll` so it does not fight the smooth scroll to top
+    the submit already started.
+
+    The live region below is in the DOM empty for a paint and filled after,
+    because a live region is only announced when its contents CHANGE — one that
+    mounts with its text already in it announces nothing.
+  */
+  const doneTitleRef = useRef<HTMLHeadingElement>(null);
+  const [announced, setAnnounced] = useState(false);
+
+  useEffect(() => {
+    if (!submitted) return;
+    doneTitleRef.current?.focus({ preventScroll: true });
+    const timer = window.setTimeout(() => setAnnounced(true), 120);
+    return () => window.clearTimeout(timer);
+  }, [submitted]);
+
+  /*
+    Restore once, on mount. `restored` also gates the writer below, so the
+    empty state of the first render is never written over a real draft.
+
+    `referredBy` is the one field the draft does not get to win. It is prefilled
+    from `?ref=` in the URL of THIS visit by `ReferralFromQuery`, whose effect
+    runs before this one because it is a child — so a stored value is only used
+    where the link did not carry one.
+  */
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as Draft;
+        setFormData((current) => ({
+          ...current,
+          name: draft.name ?? current.name,
+          phone: draft.phone ?? current.phone,
+          email: draft.email ?? current.email,
+          city: draft.city ?? current.city,
+          referredBy: current.referredBy || draft.referredBy || "",
+        }));
+      }
+    } catch {
+      // A draft that will not parse, or storage that is blocked outright in a
+      // private window, is not worth failing the form over. The applicant
+      // simply starts with the empty form they would have had anyway.
+    }
+    setRestored(true);
+  }, []);
+
+  useEffect(() => {
+    // Never after a submit: the application is in, and the next visitor to this
+    // tab should not find someone else's name and phone number waiting.
+    if (!restored || submitted) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const draft: Draft = {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          city: formData.city,
+          referredBy: formData.referredBy,
+        };
+        window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        // Storage full or blocked; the form still works.
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [formData, restored, submitted]);
+
+  useEffect(() => {
+    if (!submitted) return;
+    try {
+      window.sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // Nothing to do: the draft outliving a sent application is a nuisance,
+      // not a failure, and there is no second way to remove it.
+    }
+  }, [submitted]);
 
   const applyReferral = useCallback((ref: string) => {
     setFormData((prev) => ({ ...prev, referredBy: ref }));
@@ -70,12 +221,17 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((current) => ({ ...current, [name]: value }));
-    setInvalid((current) => (current[name] ? { ...current, [name]: false } : current));
+    setInvalid((current) => {
+      if (!current[name]) return current;
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
   };
 
   const handleInvalid = (e: React.FormEvent<HTMLInputElement>) => {
-    const { name } = e.currentTarget;
-    setInvalid((current) => ({ ...current, [name]: true }));
+    const field = e.currentTarget;
+    setInvalid((current) => ({ ...current, [field.name]: messageFor(field) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,13 +329,16 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               <Check size={30} strokeWidth={3} />
             </span>
             <p className={styles.doneEyebrow}>Application received</p>
-            <h1 id="done-title" className={styles.doneTitle}>
+            <h1 id="done-title" className={styles.doneTitle} ref={doneTitleRef} tabIndex={-1}>
               That is step
               <br />
               one, done.
             </h1>
             <p className={styles.doneLede}>
               Your application is with the 3C recruiting team.
+            </p>
+            <p className={kit.srOnly} role="status" aria-live="polite">
+              {announced ? "Application received. Your application is with the 3C recruiting team." : ""}
             </p>
 
             <div className={styles.doneNote}>
@@ -304,77 +463,118 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                   />
                 </div>
 
+                {/*
+                  The error text is a sibling of the <label>, never a child of
+                  it. The control is wrapped by its label, so everything inside
+                  that label is the control's accessible NAME — an error
+                  rendered in there would be read as part of the field's name
+                  for the rest of the session rather than as its error. Outside
+                  it, `aria-describedby` names it as the description it is.
+                */}
                 <div className={styles.fieldPair}>
-                  <label className={styles.field} htmlFor="apply-name">
-                    <span className={styles.fieldLabel}>Full Name <span className={styles.req}>*</span></span>
+                  <div className={styles.field}>
+                    <label className={styles.fieldControl} htmlFor="apply-name">
+                      <span className={styles.fieldLabel}>Full Name <span className={styles.req}>*</span></span>
+                      <input
+                        className={styles.input}
+                        type="text"
+                        id="apply-name"
+                        name="name"
+                        aria-invalid={invalid.name ? true : undefined}
+                        aria-describedby={invalid.name ? "apply-name-error" : undefined}
+                        onInvalid={handleInvalid}
+                        autoComplete="name"
+                        required
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="Enter your full name"
+                      />
+                    </label>
+                    {invalid.name ? (
+                      <span className={styles.fieldError} id="apply-name-error">
+                        {invalid.name}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.fieldControl} htmlFor="apply-phone">
+                      <span className={styles.fieldLabel}>Phone <span className={styles.req}>*</span></span>
+                      <input
+                        className={styles.input}
+                        type="tel"
+                        id="apply-phone"
+                        name="phone"
+                        aria-invalid={invalid.phone ? true : undefined}
+                        aria-describedby={invalid.phone ? "apply-phone-error" : undefined}
+                        onInvalid={handleInvalid}
+                        autoComplete="tel"
+                        required
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="Your phone number"
+                      />
+                    </label>
+                    {invalid.phone ? (
+                      <span className={styles.fieldError} id="apply-phone-error">
+                        {invalid.phone}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.fieldControl} htmlFor="apply-email">
+                    <span className={styles.fieldLabel}>Email <span className={styles.req}>*</span></span>
+                    <input
+                      className={styles.input}
+                      type="email"
+                      id="apply-email"
+                      name="email"
+                      aria-invalid={invalid.email ? true : undefined}
+                      aria-describedby={invalid.email ? "apply-email-error" : undefined}
+                      onInvalid={handleInvalid}
+                      autoComplete="email"
+                      required
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="you@example.com"
+                    />
+                  </label>
+                  {invalid.email ? (
+                    <span className={styles.fieldError} id="apply-email-error">
+                      {invalid.email}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.fieldControl} htmlFor="apply-city">
+                    <span className={styles.fieldLabel}>City <span className={styles.req}>*</span></span>
                     <input
                       className={styles.input}
                       type="text"
-                      id="apply-name"
-                      name="name"
-                      aria-invalid={invalid.name || undefined}
+                      id="apply-city"
+                      name="city"
+                      aria-invalid={invalid.city ? true : undefined}
+                      aria-describedby={invalid.city ? "apply-city-error" : undefined}
                       onInvalid={handleInvalid}
-                      autoComplete="name"
+                      autoComplete="address-level2"
                       required
-                      value={formData.name}
+                      value={formData.city}
                       onChange={handleChange}
-                      placeholder="Enter your full name"
+                      placeholder="Enter your city"
                     />
                   </label>
-
-                  <label className={styles.field} htmlFor="apply-phone">
-                    <span className={styles.fieldLabel}>Phone <span className={styles.req}>*</span></span>
-                    <input
-                      className={styles.input}
-                      type="tel"
-                      id="apply-phone"
-                      name="phone"
-                      aria-invalid={invalid.phone || undefined}
-                      onInvalid={handleInvalid}
-                      autoComplete="tel"
-                      required
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="Your phone number"
-                    />
-                  </label>
+                  {invalid.city ? (
+                    <span className={styles.fieldError} id="apply-city-error">
+                      {invalid.city}
+                    </span>
+                  ) : null}
                 </div>
 
-                <label className={styles.field} htmlFor="apply-email">
-                  <span className={styles.fieldLabel}>Email <span className={styles.req}>*</span></span>
-                  <input
-                    className={styles.input}
-                    type="email"
-                    id="apply-email"
-                    name="email"
-                    aria-invalid={invalid.email || undefined}
-                    onInvalid={handleInvalid}
-                    autoComplete="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="you@example.com"
-                  />
-                </label>
-
-                <label className={styles.field} htmlFor="apply-city">
-                  <span className={styles.fieldLabel}>City <span className={styles.req}>*</span></span>
-                  <input
-                    className={styles.input}
-                    type="text"
-                    id="apply-city"
-                    name="city"
-                    aria-invalid={invalid.city || undefined}
-                    onInvalid={handleInvalid}
-                    autoComplete="address-level2"
-                    required
-                    value={formData.city}
-                    onChange={handleChange}
-                    placeholder="Enter your city"
-                  />
-                </label>
-
-                <label className={styles.field} htmlFor="apply-referred-by">
+                <div className={styles.field}>
+                  <label className={styles.fieldControl} htmlFor="apply-referred-by">
                   <span className={styles.fieldLabel}>
                     Referred By <span className={styles.fieldOptional}>(optional)</span>
                   </span>
@@ -386,8 +586,9 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                     value={formData.referredBy}
                     onChange={handleChange}
                     placeholder="How did you hear about us?"
-                  />
-                </label>
+                    />
+                  </label>
+                </div>
 
                 {/* The terms that have always sat directly above the submit. */}
                 <ul className={styles.terms}>
@@ -429,7 +630,11 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                   had simply stopped doing anything.
                 */}
                 <div className={styles.formError} role="alert" aria-live="assertive">
-                  {submitError ? submitError.message : ""}
+                  {submitError
+                    ? submitError.message
+                    : Object.keys(invalid).length > 0
+                      ? INVALID_SUMMARY
+                      : ""}
                   {submitError?.code === "account_exists" ? (
                     <>
                       {" "}

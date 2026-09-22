@@ -24,9 +24,12 @@ const useBeforePaint = typeof window === "undefined" ? useEffect : useLayoutEffe
  *                     the persistent chrome keys on, so the header does not
  *                     replay its entrance on every navigation
  *
- * A fourth, `data-motion-bailed`, is written by the boot script rather than
- * here: it says hydration was too slow to be worth waiting for, and this
- * component then stays on its static path for good.
+ * Two more are about hydration rather than about motion, and so are set
+ * whatever the reader's motion preference is. `data-hydrated` is written here
+ * the moment this effect runs and says React arrived. `data-motion-bailed` is
+ * written by the boot script when it did not arrive in time: motion is given
+ * up on for good, and the header takes its legible backdrop rather than
+ * waiting for a scroll handler that is never going to run.
  *
  * With JavaScript off, or with `prefers-reduced-motion: reduce`, none of them
  * is set: nothing is hidden, nothing waits, and the route line is simply drawn.
@@ -86,6 +89,23 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
     const root = rootRef.current;
     if (!root) return;
     const doc = document.documentElement;
+
+    /*
+      Proof that React got here, written on every path through this effect —
+      motion, reduced motion, no IntersectionObserver, already bailed — because
+      it answers a question none of those change: did hydration happen at all?
+
+      The boot script's 1.5s timer reads it, and the site header's backdrop is
+      keyed on the flag that timer leaves behind. It used to read `data-entered`
+      instead, which is two animation frames later and is only ever set on the
+      motion path, so a reader with reduced motion on could never have proved
+      anything and a busy main thread could lose the race after React had
+      already arrived. Set synchronously here, it says exactly what it means.
+
+      Never removed: like `data-booted`, it is a fact about the document, not a
+      state, and the cleanup below leaves it alone.
+    */
+    doc.dataset.hydrated = "true";
 
     // Every pre-reveal style is gated on data-motion="on", and the thing that
     // takes it back off again is an IntersectionObserver. If IO is missing we
@@ -300,7 +320,21 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
     */
     const SHOW_LINE = 0.88;
 
-    const reveals = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
+    /*
+      Only what is still hidden. This effect re-runs — on every client-side
+      navigation inside the group, and again whenever the reduced-motion switch
+      is flipped — and each re-run walks a DOM where the sections that have
+      already arrived still carry `data-shown`. Seeding the work from the full
+      `[data-reveal]` list meant those were counted as pending and then skipped
+      by the loop, so the counter could never reach zero and `stopReveals` below
+      was unreachable: the observer and the scroll listener stayed live for the
+      rest of the visit with nothing left to decide. Starting from the hidden set
+      makes the count and the work the same list, and when that list is empty the
+      guard below attaches nothing at all.
+    */
+    const reveals = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]")).filter(
+      (el) => !el.dataset.shown,
+    );
     if (reveals.length) {
       let revealFrame = 0;
       let pending = reveals.length;
@@ -310,6 +344,8 @@ export default function MotionRoot({ children }: { children: React.ReactNode }) 
         revealFrame = 0;
         const vh = window.innerHeight;
         for (const el of reveals) {
+          // Still needed: the list is fixed at attach time, so an element shown
+          // in an earlier frame is walked again in this one.
           if (el.dataset.shown) continue;
           const rect = el.getBoundingClientRect();
           if (rect.bottom > 0 && rect.top < vh * SHOW_LINE) {
