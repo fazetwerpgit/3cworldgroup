@@ -811,25 +811,14 @@
   }
 
   /*
-    Big, and bled off the right edge like the desktop mark. The slash inside
-    the image runs to the image's top-right corner; when the whole image sat
-    inside the viewport (owner's phone, 2026-09-21) that slash ended in
-    mid-air above the C and read as a broken line. Bleeding the corner past
-    the edge makes the line leave the page the way it does at 1740, and the
-    mark stops being small.
+    No mark on phones (owner, 2026-09-22): laid under the copy it ran the
+    streets across the lede; bled off the right edge at 110vw it read as a
+    broken, cut-off glyph. The head ends on the buttons and the next section's
+    hairline follows, which is the phone layout that was approved in round 12.
+    The continuation line and node live inside this box, so they go with it.
   */
   .headArt.headArt {
-    --mark-w: min(30rem, 110vw);
-    --mark-bleed: 24vw;
-
-    margin-inline: auto calc(-1 * var(--mark-bleed));
-    margin-top: clamp(1.25rem, 5vw, 2.25rem);
-    opacity: 1;
-    /* In the flow, but still the box the line and node are measured from:
-       `relative`, never `static`, or their `right: 53.7%` resolves against
-       the head and the stub lands 80px away from the slash it continues. */
-    position: relative;
-    right: auto;
+    display: none;
   }
 }
 
