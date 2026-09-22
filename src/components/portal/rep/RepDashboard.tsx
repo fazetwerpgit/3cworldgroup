@@ -84,10 +84,15 @@ function statusLine(row: RecentSaleRow) {
   }
 }
 
-function payCell(row: RecentSaleRow) {
+function payCell(row: RecentSaleRow): ReactNode {
   if (row.status === 'cancelled' || row.estPay === null) return '—';
   if (row.estPay === 0) return 'Rate pending';
-  return money(row.estPay);
+  return (
+    <>
+      <small className={d.est}>est.</small>
+      {money(row.estPay)}
+    </>
+  );
 }
 
 function payoutLine(row: RecentSaleRow) {
