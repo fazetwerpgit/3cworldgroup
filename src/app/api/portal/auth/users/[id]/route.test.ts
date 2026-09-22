@@ -115,6 +115,19 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(after).toHaveBeenCalledOnce();
   });
 
+  it('does not assign a role or kick off onboarding on a name-only save of a pending user', async () => {
+    firestore.users.set('pending-user', { status: 'pending', displayName: 'Pending Signup' });
+
+    const response = await PUT(request({ displayName: 'Pending Signup Fixed', phone: '' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).not.toHaveProperty('fieldRole');
+    expect(firestore.updates[0]?.data).not.toHaveProperty('status');
+    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+    expect(sendPendingEsignDocs).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
+
   it('still activates a pending general manager immediately', async () => {
     firestore.users.set('pending-user', {
       status: 'pending',

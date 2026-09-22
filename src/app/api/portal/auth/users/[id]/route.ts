@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
@@ -15,9 +15,7 @@ import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
-import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
-import { appBaseUrl, checklistReadyEmail } from '@/lib/email/templates';
-import { onboardingFrom } from '@/lib/email/sendEmail';
+import { kickoffOnboardingChecklist } from '@/lib/onboarding/kickoff';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 
@@ -212,6 +210,8 @@ export async function PUT(
     if (zip !== undefined)
       updateData.zip = addressCheck.clean.zip ?? FieldValue.delete();
     if (status !== undefined) updateData.status = status;
+    // A body without fieldRole (e.g. a name-only save) never kicks off
+    // onboarding: roleRequiresOnboarding(undefined) is false.
     const shouldKickoffChecklist =
       roleRequiresOnboarding(fieldRole) &&
       existingFieldRole !== fieldRole &&
@@ -301,31 +301,7 @@ export async function PUT(
         (doc.get('displayName') as string | undefined) ??
         (doc.get('email') as string | undefined) ??
         'Rep';
-      try {
-        await Promise.all([
-          resolveAlertTasks(id, ['pending_assignment']),
-          dispatchToUser({
-            userId: id,
-            type: 'system',
-            title: 'Your onboarding checklist is ready',
-            message: 'Your position was assigned. Complete your checklist to go active.',
-            link: '/portal/onboarding',
-            email: checklistReadyEmail({
-              name: updatedDisplayName,
-              portalUrl: `${appBaseUrl()}/portal/onboarding`,
-            }),
-            emailFrom: onboardingFrom(),
-          }),
-        ]);
-      } catch (error) {
-        console.error('[users] checklist kickoff notification failed:', error);
-      }
-
-      after(() =>
-        sendPendingEsignDocs(id).catch((err) =>
-          console.error('[users] esign kickoff failed', err)
-        )
-      );
+      await kickoffOnboardingChecklist(id, updatedDisplayName, '[users]');
     }
 
     if (shouldActivateImmediately) {

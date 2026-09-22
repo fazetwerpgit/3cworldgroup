@@ -102,6 +102,11 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  // The role the record was loaded with. On edit, a role is only sent when the
+  // admin changes it: assigning a field role to a pending user starts their
+  // onboarding (checklist email + e-sign envelopes), so a name-only save must
+  // never re-send or default one.
+  const [loadedRole, setLoadedRole] = useState<UserRole | ''>(getEffectiveRole(user) ?? '');
 
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -109,7 +114,9 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     displayName: user?.displayName || '',
     // Default for admin-created users stays entry_rep (Account Executive), as
     // before the redesign — entry_level_rep is the onboarding-gated signup role.
-    role: getEffectiveRole(user) || ('entry_rep' as UserRole),
+    // An existing user with no role (a pending signup) gets NO default: the
+    // admin must pick one from the empty "Select a role" option.
+    role: (getEffectiveRole(user) ?? (user ? '' : 'entry_rep')) as UserRole | '',
     phone: user?.phone || '',
     address: user?.address || '',
     city: user?.city || '',
@@ -172,12 +179,15 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     setLoading(true);
 
     try {
-      const assignedFieldRole = isPlatformRole(formData.role)
+      const assignedFieldRole = !formData.role || isPlatformRole(formData.role)
         ? undefined
         : (formData.role as FieldRole);
-      const rolePayload = assignedFieldRole
-        ? { fieldRole: assignedFieldRole }
-        : { role: formData.role };
+      const rolePayload = !formData.role
+        ? {}
+        : assignedFieldRole
+          ? { fieldRole: assignedFieldRole }
+          : { role: formData.role };
+      const roleChanged = !!formData.role && formData.role !== loadedRole;
 
       if (isEdit && user) {
         const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
@@ -185,7 +195,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           headers: await authHeaders(true),
           body: JSON.stringify({
             displayName: formData.displayName,
-            ...rolePayload,
+            ...(roleChanged ? rolePayload : {}),
             phone: formData.phone,
             address: formData.address,
             city: formData.city,
@@ -203,6 +213,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         setTimeout(() => setSaved(false), 1800);
       } else {
         if (!formData.password) throw new Error('Password is required for new users');
+        if (!formData.role) throw new Error('Select a role for the new user');
 
         const response = await fetch('/api/portal/auth/create-user', {
           method: 'POST',
@@ -287,6 +298,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
       const data = await readJsonIfPresent(response);
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to accept user');
       setFormData((prev) => ({ ...prev, status: 'active', role: graduatedFieldRole(user.fieldRole!) }));
+      setLoadedRole(graduatedFieldRole(user.fieldRole));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to accept user');
     } finally {
@@ -413,7 +425,12 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
             value={formData.role}
             onChange={(e) => handleChange('role', e.target.value)}
           >
-            {!ALL_ROLE_VALUES.includes(formData.role) && (
+            {!formData.role && (
+              <option value="" disabled>
+                Select a role
+              </option>
+            )}
+            {formData.role && !ALL_ROLE_VALUES.includes(formData.role) && (
               <option value={formData.role} disabled>
                 {roleLabel(formData.role)} (retired)
               </option>

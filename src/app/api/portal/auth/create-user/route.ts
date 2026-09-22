@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { MANAGEMENT_PLATFORM_ROLES, PlatformRole, FieldRole, FieldRoles } from '@/types';
+import {
+  MANAGEMENT_PLATFORM_ROLES,
+  PlatformRole,
+  FieldRole,
+  FieldRoles,
+  roleRequiresOnboarding,
+} from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
+import { kickoffOnboardingChecklist } from '@/lib/onboarding/kickoff';
 
 // POST /api/portal/auth/create-user - Create a new user (management only)
 export async function POST(request: NextRequest) {
@@ -96,6 +103,13 @@ export async function POST(request: NextRequest) {
       displayName,
     });
 
+    // A field role that requires onboarding (W-9, background check, DL, ...)
+    // starts 'pending' with its checklist kicked off, exactly like a pending
+    // signup that is assigned the role; activation then happens only when the
+    // checklist is approved. Platform roles and non-onboarding field roles
+    // stay active on creation.
+    const requiresOnboarding = !role && roleRequiresOnboarding(fieldRole);
+
     // Create user profile in Firestore - role kind determines which field is set
     const userProfile = {
       email,
@@ -105,7 +119,7 @@ export async function POST(request: NextRequest) {
       territoryId: territoryId || null,
       phone: phone || '',
       ...addressCheck.clean,
-      status: 'active',
+      status: requiresOnboarding ? 'pending' : 'active',
       hireDate: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -120,6 +134,10 @@ export async function POST(request: NextRequest) {
         console.error('Failed to roll back orphaned Auth user:', rollbackError);
       });
       throw profileError;
+    }
+
+    if (requiresOnboarding) {
+      await kickoffOnboardingChecklist(userRecord.uid, displayName, '[create-user]');
     }
 
     return NextResponse.json({
