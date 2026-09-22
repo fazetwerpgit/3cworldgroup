@@ -19,6 +19,7 @@ import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
 import { clearSignature } from '@/components/esign/signatureStore';
+import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
@@ -31,6 +32,11 @@ interface AuthContextType extends AuthState {
   isRole: (...roles: UserRole[]) => boolean;
   refreshUser: () => Promise<void>;
   clearPendingApproval: () => void;
+  // True when the Firebase session is valid but the profile read kept failing
+  // (weak signal / Firestore offline). The session is kept; the provider shows
+  // a retry screen instead of signing the rep out.
+  profileLoadFailed: boolean;
+  retryProfileLoad: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +47,14 @@ type FetchUserDataResult =
   | { status: 'error'; error: unknown };
 
 const missingProfileMessage = 'User profile not found. Please contact an administrator.';
-const profileLoadErrorMessage = 'We could not load your profile. Please try signing in again.';
+const profileLoadErrorMessage =
+  'We could not load your profile. This is usually weak signal — you are still signed in, so just try again.';
+
+// Waits between automatic profile-read attempts (3 attempts total). A transient
+// read failure must never sign the rep out: on a weak cell signal Firestore
+// reports "client is offline"/unavailable, which says nothing about the account.
+const PROFILE_RETRY_DELAYS_MS = [1000, 3000];
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // Best-effort, fire-and-forget: copies a Google SSO photoURL onto the caller's
 // own users doc via a server route that verifies the ID token and derives both
@@ -73,6 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // signUp() deterministically owns the final state (avoids a create→setDoc race).
   const signingUp = useRef(false);
   const bootstrappingPendingProfile = useRef(false);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
+  // Bumped on every auth-state resolution so a slow, retried profile read never
+  // overwrites the state of a newer sign-in/sign-out.
+  const resolveGeneration = useRef(0);
+  const resolveProfileRef = useRef<((firebaseUser: FirebaseUser) => Promise<void>) | null>(null);
+  const profileLoadFailedRef = useRef(false);
+  useEffect(() => {
+    profileLoadFailedRef.current = profileLoadFailed;
+  }, [profileLoadFailed]);
 
   const fetchUserData = async (firebaseUser: FirebaseUser): Promise<FetchUserDataResult> => {
     if (!db) return { status: 'error', error: new Error('Firestore is not configured') };
@@ -125,57 +147,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const firestore = db;
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (signingUp.current || bootstrappingPendingProfile.current) return; // explicit auth flows own state
-      if (firebaseUser) {
-        const userDataResult = await fetchUserData(firebaseUser);
-        if (userDataResult.status === 'found') {
-          const userData = userDataResult.user;
-          if (userData.status === 'active') {
-            setState({ user: userData, loading: false, error: null, pendingApproval: false });
-            // Only fires when the client already sees the Auth photo differs from
-            // the stored one, so a normal login makes zero extra calls once synced.
-            if (firebaseUser.photoURL && firebaseUser.photoURL !== userData.avatarUrl) {
-              syncAvatarFromAuth(firebaseUser);
-            }
-          } else if (isAwaitingRoleAssignment(userData)) {
+    const fetchUserDataWithRetry = async (
+      firebaseUser: FirebaseUser,
+      generation: number
+    ): Promise<FetchUserDataResult | null> => {
+      let result = await fetchUserData(firebaseUser);
+      for (const delay of PROFILE_RETRY_DELAYS_MS) {
+        if (result.status !== 'error') break;
+        await wait(delay);
+        if (generation !== resolveGeneration.current) return null;
+        result = await fetchUserData(firebaseUser);
+      }
+      return generation === resolveGeneration.current ? result : null;
+    };
+
+    const resolveProfile = async (firebaseUser: FirebaseUser) => {
+      const generation = ++resolveGeneration.current;
+      const userDataResult = await fetchUserDataWithRetry(firebaseUser, generation);
+      if (!userDataResult) return; // superseded by a newer auth event
+      if (userDataResult.status !== 'error') setProfileLoadFailed(false);
+      if (userDataResult.status === 'found') {
+        const userData = userDataResult.user;
+        if (userData.status === 'active') {
+          setState({ user: userData, loading: false, error: null, pendingApproval: false });
+          // Only fires when the client already sees the Auth photo differs from
+          // the stored one, so a normal login makes zero extra calls once synced.
+          if (firebaseUser.photoURL && firebaseUser.photoURL !== userData.avatarUrl) {
+            syncAvatarFromAuth(firebaseUser);
+          }
+        } else if (isAwaitingRoleAssignment(userData)) {
+          if (auth) await firebaseSignOut(auth);
+          setState({ user: null, loading: false, error: null, pendingApproval: true });
+        } else if (userData.status === 'pending') {
+          setState({ user: userData, loading: false, error: null, pendingApproval: false });
+        } else {
+          if (auth) await firebaseSignOut(auth);
+          setState({
+            user: null,
+            loading: false,
+            error: 'Your account has been deactivated. Please contact an administrator.',
+            pendingApproval: false,
+          });
+        }
+      } else if (userDataResult.status === 'missing') {
+        if (firebaseUser.email) {
+          bootstrappingPendingProfile.current = true;
+          try {
+            await setDoc(doc(firestore, 'users', firebaseUser.uid), {
+              email: firebaseUser.email,
+              status: 'pending',
+              createdAt: serverTimestamp(),
+            });
             if (auth) await firebaseSignOut(auth);
             setState({ user: null, loading: false, error: null, pendingApproval: true });
-          } else if (userData.status === 'pending') {
-            setState({ user: userData, loading: false, error: null, pendingApproval: false });
-          } else {
-            if (auth) await firebaseSignOut(auth);
-            setState({
-              user: null,
-              loading: false,
-              error: 'Your account has been deactivated. Please contact an administrator.',
-              pendingApproval: false,
-            });
-          }
-        } else if (userDataResult.status === 'missing') {
-          if (firebaseUser.email) {
-            bootstrappingPendingProfile.current = true;
-            try {
-              await setDoc(doc(firestore, 'users', firebaseUser.uid), {
-                email: firebaseUser.email,
-                status: 'pending',
-                createdAt: serverTimestamp(),
-              });
-              if (auth) await firebaseSignOut(auth);
-              setState({ user: null, loading: false, error: null, pendingApproval: true });
-            } catch (profileError) {
-              console.error('Error creating pending user profile:', profileError);
-              if (auth) await firebaseSignOut(auth);
-              setState({
-                user: null,
-                loading: false,
-                error: missingProfileMessage,
-                pendingApproval: false,
-              });
-            } finally {
-              bootstrappingPendingProfile.current = false;
-            }
-          } else {
+          } catch (profileError) {
+            console.error('Error creating pending user profile:', profileError);
             if (auth) await firebaseSignOut(auth);
             setState({
               user: null,
@@ -183,25 +209,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               error: missingProfileMessage,
               pendingApproval: false,
             });
+          } finally {
+            bootstrappingPendingProfile.current = false;
           }
         } else {
-          console.error('User profile read failed:', userDataResult.error);
           if (auth) await firebaseSignOut(auth);
           setState({
             user: null,
             loading: false,
-            error: profileLoadErrorMessage,
+            error: missingProfileMessage,
             pendingApproval: false,
           });
         }
       } else {
+        // Transient failure (offline, unavailable, network): keep the Firebase
+        // session and let the rep retry instead of signing them out.
+        console.error('User profile read failed after retries:', userDataResult.error);
+        setProfileLoadFailed(true);
+        setState({
+          user: null,
+          loading: false,
+          error: profileLoadErrorMessage,
+          pendingApproval: false,
+        });
+      }
+    };
+    resolveProfileRef.current = resolveProfile;
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (signingUp.current || bootstrappingPendingProfile.current) return; // explicit auth flows own state
+      if (firebaseUser) {
+        await resolveProfile(firebaseUser);
+      } else {
+        resolveGeneration.current += 1;
+        setProfileLoadFailed(false);
         // Preserve pendingApproval so the pending screen survives the sign-out.
         setState((prev) => ({ ...prev, user: null, loading: false, error: null }));
       }
     });
 
-    return () => unsubscribe();
+    // Coming back into signal is the most likely moment a retry succeeds.
+    const handleOnline = () => {
+      const currentUser = auth?.currentUser;
+      if (currentUser && resolveProfileRef.current && profileLoadFailedRef.current) {
+        void resolveProfileRef.current(currentUser);
+      }
+    };
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
+
+  const retryProfileLoad = async () => {
+    const currentUser = auth?.currentUser;
+    if (!currentUser || !resolveProfileRef.current) {
+      setProfileLoadFailed(false);
+      setState((prev) => ({ ...prev, user: null, loading: false, error: null }));
+      return;
+    }
+    await resolveProfileRef.current(currentUser);
+  };
 
   const signIn = async (email: string, password: string) => {
     if (!auth) {
@@ -280,6 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // rep's signature to whoever signs in next.
       clearSignature();
       await firebaseSignOut(auth);
+      setProfileLoadFailed(false);
       setState({ user: null, loading: false, error: null, pendingApproval: false });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
@@ -354,9 +425,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isRole,
         refreshUser,
         clearPendingApproval,
+        profileLoadFailed,
+        retryProfileLoad,
       }}
     >
-      {children}
+      {profileLoadFailed ? (
+        <ProfileLoadRetry
+          message={state.error ?? profileLoadErrorMessage}
+          onRetry={retryProfileLoad}
+          onSignOut={signOut}
+        />
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 }
