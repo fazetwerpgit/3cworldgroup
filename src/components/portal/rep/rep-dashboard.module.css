@@ -1,0 +1,1335 @@
+/* ==========================================================================
+   Rep dashboard (direction D, aura 1). Ported from design-lab/d dashboard CSS;
+   tokens come from .root / .layer in rep.module.css. Changes from the mock:
+   aura knobs baked in at 1, score-panel kickers one tone up (the blooms sit
+   behind them; --c-text-3 measured ~4.05:1 there), the payday row became the
+   estimated T-Fiber payout window, plus loading / error / empty states.
+   ========================================================================== */
+
+.grid {
+  display: grid;
+  gap: var(--s3);
+}
+
+/* Phone: one column in answer order (pay, standing, today, sales). Desktop:
+   pay + sales on the left, the race on the right. */
+.colMain,
+.colSide {
+  display: contents;
+}
+
+@media (max-width: 1023px) {
+  .banners {
+    order: 0;
+  }
+  .board,
+  .welcome {
+    order: 1;
+  }
+  .standB {
+    order: 2;
+  }
+  .ringCard {
+    order: 3;
+  }
+  .todayB {
+    order: 4;
+  }
+  .salesB {
+    order: 5;
+  }
+}
+
+/* ---------- scoreboard (pay | rank) ---------- */
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-areas:
+    "pay rank"
+    "period period"
+    "payday payday";
+  overflow: hidden;
+}
+
+/* The hero panel: a thin lime edge light over the rank, a lime bloom behind
+   the rank numeral and a cool blue bloom behind the pay figure. */
+.board {
+  background:
+    linear-gradient(
+        90deg,
+        rgba(141, 198, 63, 0) 18%,
+        rgba(141, 198, 63, calc(0.55 * 1)) 74%,
+        rgba(141, 198, 63, 0) 100%
+      )
+      top / 100% 1px no-repeat,
+    var(--c-panel-fill);
+}
+
+.board::before,
+.board::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.board::before {
+  top: -30%;
+  right: -12%;
+  width: 72%;
+  height: 110%;
+  background: radial-gradient(
+    closest-side,
+    rgba(141, 198, 63, calc(0.2 * 1)) 0%,
+    rgba(141, 198, 63, calc(0.124 * 1)) 35%,
+    rgba(141, 198, 63, calc(0.052 * 1)) 68%,
+    transparent 100%
+  );
+}
+
+.board::after {
+  top: -34%;
+  left: -18%;
+  width: 90%;
+  height: 110%;
+  background: radial-gradient(
+    closest-side,
+    rgba(80, 140, 240, calc(0.17 * 1)) 0%,
+    rgba(80, 140, 240, calc(0.105 * 1)) 35%,
+    rgba(80, 140, 240, calc(0.044 * 1)) 68%,
+    transparent 100%
+  );
+}
+
+.cellPay,
+.cellRank {
+  position: relative;
+  padding: var(--s4) var(--s4) var(--s4);
+}
+
+.cellPay {
+  grid-area: pay;
+  border-right: 1px solid var(--c-line);
+}
+
+.cellRank {
+  grid-area: rank;
+}
+
+.score {
+  margin: var(--s3) 0 var(--s2);
+  font-family: var(--f-display);
+  font-size: var(--t-score);
+  font-weight: 400;
+  line-height: 0.82;
+  letter-spacing: 0.005em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank {
+  display: flex;
+  align-items: flex-start;
+  color: var(--c-lime);
+  text-shadow:
+    0 0 var(--rank-r1, 22px) rgba(141, 198, 63, calc(0.45 * 1)),
+    0 0 var(--rank-r2, 64px) rgba(141, 198, 63, calc(0.22 * 1));
+}
+
+.ord {
+  margin: 0.06em 0 0 0.04em;
+  font-size: 0.36em;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.delta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.sub {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.sub strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.cellPeriod {
+  grid-area: period;
+  padding: var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.periodHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+
+.periodCount {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.stack {
+  display: flex;
+  gap: 3px;
+  height: 12px;
+}
+
+.stack > span {
+  flex: 1;
+  border-radius: 2px;
+}
+
+.seg_installed {
+  background: var(--c-lime);
+  box-shadow: 0 0 10px rgba(141, 198, 63, calc(0.38 * 1));
+}
+
+.seg_scheduled {
+  background: var(--c-blue);
+  box-shadow: 0 0 10px rgba(124, 184, 255, calc(0.24 * 1));
+}
+
+.seg_needs {
+  background: var(--c-amber);
+  box-shadow: 0 0 10px rgba(245, 185, 69, calc(0.26 * 1));
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+  margin: var(--s3) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.payday {
+  grid-area: payday;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 72px;
+  padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  background: rgba(163, 184, 214, 0.04);
+  color: var(--c-text);
+  text-decoration: none;
+  transition: background-color 160ms ease;
+}
+
+@media (hover: hover) {
+  .payday:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+.payday:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.paydayIcon {
+  color: var(--c-text-2);
+}
+
+.paydayText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.paydayDate {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.paydayAmt {
+  font-family: var(--f-display);
+  font-size: 40px;
+  line-height: 1;
+  padding-top: 4px;
+}
+
+.chev {
+  color: var(--c-text-3);
+}
+
+/* ---------- panel heads ---------- */
+.headLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--tap);
+  margin-right: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.headLink:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .headLink:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- where you stand: phone (B's tiles, C's surface) ----------
+   The score panel above already carries the hero rank (76px lime, glowing).
+   These tiles restate it as plain facts: white 48px numerals, no glow, "#4 of 18". */
+.statTiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.statTile {
+  padding: var(--s4);
+}
+
+.statTile + .statTile {
+  border-left: 1px solid var(--c-line);
+}
+
+.statLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.statValue {
+  margin: var(--s3) 0 0;
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.statOf {
+  margin-left: 2px;
+  color: var(--c-text-3);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.standGap {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.standGap strong {
+  color: var(--c-lime);
+  font-weight: 650;
+}
+
+/* ---------- where you stand: desktop ladder (C) ---------- */
+.ladder {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rung {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 var(--s4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.rungPos {
+  color: var(--c-text-3);
+  font-family: var(--f-display);
+  font-size: 28px;
+  line-height: 1;
+  padding-top: 3px;
+}
+
+.rungName {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.rungPts {
+  font-family: var(--f-display);
+  font-size: 28px;
+  line-height: 1;
+  padding-top: 3px;
+}
+
+.rungPts small {
+  color: var(--c-text-3);
+  font-family: var(--f-ui);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.rungYou {
+  background: var(--c-lime-wash);
+  box-shadow: inset 3px 0 0 var(--c-lime);
+}
+
+.rungYou .rungPos,
+.rungYou .rungPts {
+  color: var(--c-lime);
+}
+
+.gap {
+  padding: var(--s4);
+}
+
+.gapText {
+  margin: var(--s3) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.gapText strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* ---------- weekly challenge ---------- */
+.clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.challengeBody {
+  padding: var(--s4);
+}
+
+.challengeTop {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s4);
+}
+
+.challengeTitle {
+  margin: 0;
+  max-width: 14em;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.challengeScore {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  line-height: 0.82;
+  white-space: nowrap;
+}
+
+.challengeScore span {
+  color: var(--c-text-3);
+  font-size: 0.6em;
+}
+
+.ticks {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  height: 12px;
+  margin-top: var(--s4);
+}
+
+.ticks > span {
+  border-radius: 2px;
+  background: var(--c-track);
+}
+
+.ticks > .tickOn {
+  background: var(--c-lime);
+  box-shadow: 0 0 8px rgba(141, 198, 63, calc(0.3 * 1));
+}
+
+.ticks > .tickLead {
+  background: var(--c-lime);
+  box-shadow: 0 0 12px var(--c-lime-glow);
+}
+
+/* ---------- today ---------- */
+.todayList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todayRow {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 68px;
+  padding: var(--s2) var(--s4);
+}
+
+.todayRow + .todayRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.todayTime {
+  color: var(--c-text-2);
+  font-family: var(--f-display);
+  font-size: var(--t-d3);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding-top: 3px;
+}
+
+.todayAction .todayTime {
+  color: var(--c-amber);
+}
+
+.todayTitle {
+  font-size: var(--t-ui);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.todayBtn {
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  font-size: 14px;
+}
+
+/* ---------- recent sales ---------- */
+.tableHead {
+  display: none;
+}
+
+.saleList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sale {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "who amt"
+    "status when";
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) var(--s4) 14px;
+  scroll-margin-top: 90px;
+}
+
+.sale + .sale {
+  border-top: 1px solid var(--c-line);
+}
+
+.sale:target {
+  background: var(--c-amber-wash);
+}
+
+.saleWho {
+  grid-area: who;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.saleName {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.saleAddr {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salePlan {
+  display: none;
+}
+
+.saleAmt {
+  grid-area: amt;
+  font-family: var(--f-display);
+  font-size: var(--t-d2);
+  line-height: 1;
+  padding-top: 3px;
+}
+
+.saleWhen {
+  grid-area: when;
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 500;
+}
+
+.num {
+  text-align: right;
+}
+
+.status {
+  grid-area: status;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* One status language on every surface: lime installed, blue scheduled,
+   amber needs a date, grey cancelled. */
+.st_installed {
+  color: var(--c-lime);
+}
+
+.st_scheduled {
+  color: var(--c-blue);
+}
+
+.st_needsdate {
+  color: var(--c-amber);
+}
+
+.st_cancelled {
+  color: var(--c-text-3);
+}
+
+.saleOff .saleName,
+.saleOff .saleAmt {
+  color: var(--c-text-3);
+}
+
+/* ---------- footnote ---------- */
+.foot {
+  margin: 0;
+  padding: var(--s3) var(--s5);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.footB {
+  margin: var(--s3) var(--s1) 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+/* ---------- phone lower half (from B, in D tokens) ---------- */
+.ringCard {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.ringWrap {
+  position: relative;
+  flex: none;
+  width: 72px;
+  height: 72px;
+}
+
+.ring {
+  display: block;
+  width: 72px;
+  height: 72px;
+}
+
+.ringTrack {
+  fill: none;
+  stroke: var(--c-track);
+  stroke-width: 7;
+}
+
+.ringFill {
+  fill: none;
+  stroke: var(--c-lime);
+  stroke-linecap: round;
+  stroke-width: 7;
+  filter: drop-shadow(0 0 5px var(--c-lime-glow));
+}
+
+.ringText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding-top: 24px;
+  font-family: var(--f-display);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.ringText span {
+  color: var(--c-text-3);
+  font-size: 0.6em;
+}
+
+.ringBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ringTitle {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.ringMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--s3);
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.ringMeta strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.ringTime {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 64px;
+  padding: 10px var(--s3) 10px var(--s4);
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.tRow + .tRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-panel);
+}
+
+.tileBlue {
+  background: rgba(124, 184, 255, 0.14);
+  color: var(--c-blue);
+}
+
+.tileAmber {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+}
+
+.tText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tTitle {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tSub {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.tNow {
+  color: var(--c-amber);
+  font-weight: 600;
+}
+
+.group {
+  overflow: hidden;
+}
+
+.saleB {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name pay'
+    'status when'
+    'meta meta';
+  align-items: center;
+  gap: 3px var(--s3);
+  padding: var(--s3) var(--s4) 14px;
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.saleB + .saleB {
+  border-top: 1px solid var(--c-line);
+}
+
+.tRow:focus-visible,
+.saleB:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.saleBName {
+  grid-area: name;
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.saleBPay {
+  grid-area: pay;
+  font-family: var(--f-display);
+  font-size: 28px;
+  line-height: 1;
+  padding-top: 3px;
+  text-align: right;
+}
+
+.saleBStatus {
+  grid-area: status;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.saleBWhen {
+  grid-area: when;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: right;
+}
+
+.saleBMeta {
+  grid-area: meta;
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saleOff .saleBName,
+.saleOff .saleBPay {
+  color: var(--c-text-3);
+}
+
+/* ---------- desktop ---------- */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--s4);
+  }
+
+  .colMain,
+  .colSide {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s4);
+    min-width: 0;
+  }
+
+  .colMain {
+    grid-column: 1 / span 8;
+  }
+
+  .colSide {
+    grid-column: 9 / span 4;
+  }
+
+  /* Next payday leaves the score panel on desktop and heads the right column,
+     so the top row reads pay | rank | payday and the two columns end together. */
+  .paydayCard {
+    min-height: 0;
+    padding: var(--s4) var(--s4) var(--s4) var(--s5);
+    border-top: 1px solid var(--c-line);
+    background:
+      radial-gradient(
+        80% 120% at 100% 0%,
+        rgba(80, 140, 240, calc(0.12 * 1)) 0%,
+        rgba(80, 140, 240, calc(0.074 * 1)) 35%,
+        rgba(80, 140, 240, calc(0.031 * 1)) 68%,
+        transparent 100%
+      ),
+      var(--c-panel-fill);
+  }
+
+  .paydayCard .paydayAmt {
+    font-size: var(--t-d1);
+  }
+
+  /* Today takes up the rest of the column; its rows share the height so the
+     column ends level with the sales table instead of leaving an empty tail. */
+  .today {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .today .todayList {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .today .todayRow {
+    flex: 1;
+  }
+
+  .cellPay,
+  .cellRank {
+    padding: var(--s5) var(--s6) var(--s6);
+  }
+
+  .score {
+    margin: var(--s5) 0 var(--s3);
+  }
+
+  .delta,
+  .sub {
+    font-size: var(--t-ui);
+  }
+
+  .cellPeriod {
+    padding: var(--s5) var(--s6);
+  }
+
+  .stack {
+    height: 14px;
+  }
+
+
+  .paydayDate {
+    font-size: 20px;
+  }
+
+  .paydayAmt {
+    font-size: var(--t-d1);
+  }
+
+  .tableHead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(
+        0,
+        1.2fr
+      ) 88px 128px;
+    gap: var(--s4);
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--s5);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-3);
+    font-size: var(--t-min);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .sale {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(
+        0,
+        1.2fr
+      ) 88px 128px;
+    grid-template-areas: "who plan status amt when";
+    gap: var(--s4);
+    min-height: 68px;
+    padding: var(--s2) var(--s5);
+  }
+
+  .salePlan {
+    grid-area: plan;
+    display: block;
+    color: var(--c-text-2);
+    font-size: var(--t-ui);
+  }
+
+  .saleWhen {
+    font-size: var(--t-sm);
+  }
+}
+
+/* ==========================================================================
+   Port additions
+   ========================================================================== */
+
+/* Labels over the blooms step up one tone so they hold 4.5:1 (the mock's
+   --c-text-3 kicker measured ~4.05:1 over the lime bloom). */
+.board .boardLabel {
+  color: var(--c-text-2);
+}
+
+/* No weekly standing yet: the pay cell takes the whole row. */
+.boardSolo {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "pay"
+    "period"
+    "payday"
+    "links";
+}
+
+.boardSolo .cellPay {
+  border-right: 0;
+}
+
+.board:not(.boardSolo) {
+  grid-template-areas:
+    "pay rank"
+    "period period"
+    "payday payday"
+    "links links";
+}
+
+.noPlan {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.deltaDown {
+  color: var(--c-text-2);
+}
+
+.periodEmpty {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* Estimated payout window: the mock's payday row, minus the chevron. */
+.payday {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.paydayAmt small {
+  margin-right: 4px;
+  color: var(--c-text-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.paydayMeta {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.payLinks {
+  grid-area: links;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--c-line);
+}
+
+.payLinks > * + * {
+  border-left: 1px solid var(--c-line);
+}
+
+.payLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 var(--s2);
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  white-space: nowrap;
+  font: 600 var(--t-sm) / 1.2 var(--f-ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.payLink:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .payLink:hover {
+    color: var(--c-text);
+  }
+}
+
+.cellFailed {
+  padding: 0;
+  margin-top: var(--s3);
+}
+
+/* ---------- zero sales: one clear action ---------- */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4);
+}
+
+.welcomeTitle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+
+.welcomeText {
+  margin: 0 0 var(--s2);
+  max-width: 34em;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+/* ---------- today: extra rows ---------- */
+.tileLime {
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.todayQueue .todayTime {
+  color: var(--c-lime);
+}
+
+.todayMore {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.st_missed {
+  color: var(--c-red);
+}
+
+.saleRow {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  a.saleRow:hover,
+  .saleB:hover,
+  .tRow:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+a.saleRow:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+/* ---------- skeletons ---------- */
+.skelScore {
+  width: 62%;
+  height: 58px;
+  margin: var(--s3) 0 var(--s2);
+}
+
+.skelLine {
+  width: 48%;
+  height: 12px;
+}
+
+.skelBar {
+  width: 100%;
+  height: 12px;
+}
+
+.skelBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelRow {
+  height: 40px;
+}
+
+.banners:empty {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .skelScore {
+    height: 88px;
+    margin: var(--s5) 0 var(--s3);
+  }
+
+  .welcome {
+    padding: var(--s6);
+  }
+
+  .banners {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- How T-Fiber pay works (sheet body) ---------- */
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4) var(--s4) var(--s5);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.help p {
+  margin: 0;
+}
+
+.help strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.help h3 {
+  margin: 0 0 var(--s2);
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.schedule {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule th,
+.schedule td {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-line);
+  text-align: left;
+  font-size: var(--t-ui);
+}
+
+.schedule th {
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.schedule td:last-child,
+.schedule th:last-child {
+  text-align: right;
+}
+
+.schedule td:last-child {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.helpCta {
+  align-self: flex-start;
+}
+
+/* Desktop rows are links inside list items. */
+.saleList > li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.payLink svg {
+  flex: none;
+}
