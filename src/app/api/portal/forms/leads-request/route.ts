@@ -3,7 +3,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
-import { buildFormAttachmentFolder } from '@/lib/forms/formUploads';
+import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
 import { leadsConditions } from '@/lib/forms/leadsPredicates';
 import {
   LEADS_CATEGORIES,
@@ -16,10 +16,13 @@ function s(v: unknown, max = 200) {
 }
 
 // Accept an uploaded path only if it exactly matches THIS caller's own folder for
-// the given slot; otherwise store empty (prevents cross-user/path injection).
-function scopedPath(raw: unknown, uid: string, slot: string): string {
+// THIS submission's upload id + the given slot
+// (form-attachments/{uid}/leads-request/{uploadId}/{slot}/); otherwise store empty
+// (prevents cross-user/path injection and reuse of another request's file).
+function scopedPath(raw: unknown, uid: string, uploadId: string, slot: string): string {
+  if (!uploadId) return '';
   const path = s(raw, 300);
-  return path === buildFormAttachmentFolder(uid, 'leads-request', slot) ? path : '';
+  return path === buildSubmissionAttachmentFolder(uid, 'leads-request', uploadId, slot) ? path : '';
 }
 
 // POST /api/portal/forms/leads-request - a verified rep/manager requests leads.
@@ -68,9 +71,10 @@ export async function POST(request: NextRequest) {
       cond.needsHostile || cond.needsBlindKnock ? s(body.situationDescription, 2000) : '';
     const newRepPhone = cond.needsNewRep ? s(body.newRepPhone, 40) : '';
     const newRepEmail = cond.needsNewRep ? s(body.newRepEmail, 180) : '';
-    const hostileUploadPath = cond.needsHostile ? scopedPath(body.hostileUploadPath, gate.uid, 'hostile') : '';
-    const blindKnockUploadPath = cond.needsBlindKnock ? scopedPath(body.blindKnockUploadPath, gate.uid, 'blind-knock') : '';
-    const lassoUploadPath = cond.needsLasso ? scopedPath(body.lassoUploadPath, gate.uid, 'lasso') : '';
+    const uploadId = isValidFormUploadId(body.uploadId) ? body.uploadId : '';
+    const hostileUploadPath = cond.needsHostile ? scopedPath(body.hostileUploadPath, gate.uid, uploadId, 'hostile') : '';
+    const blindKnockUploadPath = cond.needsBlindKnock ? scopedPath(body.blindKnockUploadPath, gate.uid, uploadId, 'blind-knock') : '';
+    const lassoUploadPath = cond.needsLasso ? scopedPath(body.lassoUploadPath, gate.uid, uploadId, 'lasso') : '';
 
     const { id } = await submitFormRecord(
       'leadsRequests',
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
       {
         campaign, managerName, managerEmail, repFirstName, repLastName, location,
         category, reason, specialRequest, leadPackCode, situationDescription,
-        hostileUploadPath, blindKnockUploadPath, lassoUploadPath, newRepPhone, newRepEmail,
+        hostileUploadPath, blindKnockUploadPath, lassoUploadPath, newRepPhone, newRepEmail, uploadId,
       }
     );
     await notifySubmission('leads-request', gate.name);

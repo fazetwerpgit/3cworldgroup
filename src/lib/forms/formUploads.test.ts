@@ -4,6 +4,10 @@ import {
   buildFormAttachmentFolder,
   MAX_FORM_FILE_BYTES,
   isAllowedFormUpload,
+  isValidFormUploadId,
+  newFormUploadId,
+  buildSubmissionAttachmentFolder,
+  resolveFormUploadFolder,
 } from './formUploads';
 
 describe('validateFormUpload', () => {
@@ -71,5 +75,48 @@ describe('sale-proof uploads', () => {
   });
   it('rejects a too-short slot', () => {
     expect(isAllowedFormUpload('sale-proof', 'abc')).toBe(false);
+  });
+});
+
+describe('per-submission upload ids (payroll-dispute, leads-request)', () => {
+  const id = 'a'.repeat(32);
+
+  it('generates ids that pass validation', () => {
+    const generated = newFormUploadId();
+    expect(isValidFormUploadId(generated)).toBe(true);
+    expect(newFormUploadId()).not.toBe(generated);
+  });
+  it('rejects malformed ids', () => {
+    expect(isValidFormUploadId('')).toBe(false);
+    expect(isValidFormUploadId('hostile')).toBe(false);
+    expect(isValidFormUploadId('../../etc')).toBe(false);
+    expect(isValidFormUploadId('A'.repeat(32))).toBe(false);
+    expect(isValidFormUploadId('a'.repeat(33))).toBe(false);
+    expect(isValidFormUploadId(123)).toBe(false);
+  });
+  it('builds a per-submission folder, keeping named slots under the id', () => {
+    expect(buildSubmissionAttachmentFolder('u1', 'payroll-dispute', id)).toBe(
+      `form-attachments/u1/payroll-dispute/${id}/`
+    );
+    expect(buildSubmissionAttachmentFolder('u1', 'leads-request', id, 'lasso')).toBe(
+      `form-attachments/u1/leads-request/${id}/lasso/`
+    );
+  });
+  it('requires a valid upload id for per-submission forms', () => {
+    expect(resolveFormUploadFolder('u1', 'payroll-dispute', '', id)).toBe(
+      `form-attachments/u1/payroll-dispute/${id}/`
+    );
+    expect(resolveFormUploadFolder('u1', 'leads-request', 'hostile', id)).toBe(
+      `form-attachments/u1/leads-request/${id}/hostile/`
+    );
+    expect(resolveFormUploadFolder('u1', 'payroll-dispute', '', '')).toBeNull();
+    expect(resolveFormUploadFolder('u1', 'leads-request', 'hostile', 'bad')).toBeNull();
+    expect(resolveFormUploadFolder('u1', 'leads-request', 'bogus', id)).toBeNull();
+  });
+  it('leaves sale-proof on its per-sale slot folder', () => {
+    expect(resolveFormUploadFolder('u1', 'sale-proof', 'a1b2c3d4e5', '')).toBe(
+      'form-attachments/u1/sale-proof/a1b2c3d4e5/'
+    );
+    expect(resolveFormUploadFolder('u1', 'sale-proof', '', '')).toBeNull();
   });
 });

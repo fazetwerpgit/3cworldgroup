@@ -4,7 +4,7 @@ import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
-import { buildFormAttachmentFolder } from '@/lib/forms/formUploads';
+import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -31,15 +31,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Select a valid campaign' }, { status: 400 });
     }
 
-    // The screenshot path, if present, must be THIS caller's own folder.
+    // The screenshot path, if present, must be THIS caller's own folder for THIS
+    // submission's upload id (form-attachments/{uid}/payroll-dispute/{uploadId}/),
+    // so each dispute keeps its own proof. Anything else is dropped.
+    const uploadId = isValidFormUploadId(body.uploadId) ? body.uploadId : '';
     const screenshot = s(body.orderScreenshotPath, 300);
-    const expected = buildFormAttachmentFolder(gate.uid, 'payroll-dispute');
-    const orderScreenshotPath = screenshot === expected ? screenshot : '';
+    const orderScreenshotPath =
+      uploadId && screenshot === buildSubmissionAttachmentFolder(gate.uid, 'payroll-dispute', uploadId)
+        ? screenshot
+        : '';
 
     const { id } = await submitFormRecord(
       'payrollDisputes',
       { uid: gate.uid, name: gate.name, email: gate.email },
-      { contractorName, contractorEmail, campaign, typeOfOrder, dateOfInstall, orderScreenshotPath }
+      { contractorName, contractorEmail, campaign, typeOfOrder, dateOfInstall, orderScreenshotPath, uploadId }
     );
     await notifySubmission('payroll-dispute', gate.name);
     return NextResponse.json({ success: true, id });

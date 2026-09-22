@@ -20,7 +20,7 @@ import FileUpload from '@/components/onboarding/FileUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
-import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
+import { FORM_ATTACHMENT_TYPES, newFormUploadId } from '@/lib/forms/formUploads';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 const EMPTY = {
@@ -32,6 +32,9 @@ export default function PayrollDisputePage() {
   const { user } = useAuth();
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
+  // One upload folder per dispute (form-attachments/{uid}/payroll-dispute/{uploadId}/),
+  // so a second dispute can never overwrite the proof on an earlier open one.
+  const [uploadId, setUploadId] = useState(newFormUploadId);
   const [saving, setSaving] = useState(false);
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
@@ -47,12 +50,13 @@ export default function PayrollDisputePage() {
       const res = await fetch('/api/portal/forms/payroll-dispute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, uploadId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
       setReferenceId(json.id);
       setForm(EMPTY);
+      setUploadId(newFormUploadId()); // next dispute gets a fresh folder (and a fresh upload widget)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
     } finally {
@@ -108,11 +112,12 @@ export default function PayrollDisputePage() {
                   <FormsLineControl id="payroll-proof" label="Screenshot or proof" className="forms-line-field-full">
                     <div className="forms-line-upload">
                       <FileUpload
+                        key={uploadId}
                         itemId="payroll-dispute"
                         accept="image/*,application/pdf"
                         allowedTypes={FORM_ATTACHMENT_TYPES}
                         uploadUrl="/api/portal/forms/upload"
-                        extraFields={{ formType: 'payroll-dispute' }}
+                        extraFields={{ formType: 'payroll-dispute', uploadId }}
                         getHeaders={async (): Promise<HeadersInit> => {
                           const token = await auth?.currentUser?.getIdToken();
                           return token ? { Authorization: `Bearer ${token}` } : {};

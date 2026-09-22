@@ -6,6 +6,7 @@ import OpsQueueList, { OpsQueueEvidenceItem, OpsQueueRowVM, opsFormatValue } fro
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { PageTitle } from '@/components/portal/PageTitle';
+import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
 import '@/styles/sweep-admin-b.css';
 
 interface Row {
@@ -64,12 +65,16 @@ export default function LeadsRequestsReviewPage() {
     if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
+  // Not async: openAttachmentInNewTab must open its tab synchronously inside the
+  // click (iOS Safari drops window.open after an await).
   const viewAttachment = useCallback(
-    async (path: string) => {
-      const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
-      const json = await res.json();
-      if (json.url) window.open(json.url, '_blank', 'noopener,noreferrer');
-    },
+    (path: string) =>
+      openAttachmentInNewTab(async () => {
+        const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
+        if (!res.ok) throw new Error(`Attachment request failed (${res.status})`);
+        const json = await res.json();
+        return typeof json.url === 'string' ? json.url : null;
+      }),
     [authedFetch]
   );
 

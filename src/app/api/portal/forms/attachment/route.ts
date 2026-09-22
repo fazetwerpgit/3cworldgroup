@@ -5,8 +5,11 @@ import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
 // GET /api/portal/forms/attachment?path=form-attachments/... - management only.
-// Mints a 15-min signed URL for the first file under the folder. Never exposes
-// the raw path back as a usable storage URL.
+// Mints a 15-min signed URL for the file in the folder. Never exposes the raw
+// path back as a usable storage URL. `path` is the folder stored on the record:
+// new submissions store their own per-submission folder
+// (form-attachments/{uid}/{formType}/{uploadId}/...), older ones the legacy
+// shared folder (form-attachments/{uid}/{formType}/[{slot}/]).
 export async function GET(request: NextRequest) {
   try {
     const gate = await requireVerifiedManagement(request);
@@ -19,7 +22,11 @@ export async function GET(request: NextRequest) {
 
     const bucket = getOnboardingBucket();
     const prefix = path.endsWith('/') ? path : `${path}/`;
-    const [files] = await bucket.getFiles({ prefix });
+    // Direct children only (delimiter '/'): uploads always write {folder}file.{ext},
+    // and a legacy folder like form-attachments/{uid}/payroll-dispute/ is now the
+    // PARENT of every per-submission folder, so a recursive listing could sign a
+    // newer submission's file for an old record.
+    const [files] = await bucket.getFiles({ prefix, delimiter: '/' });
     if (files.length === 0) return NextResponse.json({ url: null });
 
     const [url] = await files[0].getSignedUrl({

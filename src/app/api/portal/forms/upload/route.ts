@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import {
-  validateFormUpload,
-  buildFormAttachmentFolder,
-  isAllowedFormUpload,
-} from '@/lib/forms/formUploads';
+import { validateFormUpload, resolveFormUploadFolder } from '@/lib/forms/formUploads';
 
 // POST /api/portal/forms/upload - verified user uploads a form attachment.
-// Writes ONLY under the verified caller's own folder. Returns the folder path.
+// Writes ONLY under the verified caller's own folder. Payroll Dispute / Leads
+// Request uploads must carry a per-submission uploadId and land in
+// form-attachments/{uid}/{formType}/{uploadId}/[{slot}/]. Returns the folder path.
 export async function POST(request: NextRequest) {
   try {
     const gate = await requireVerifiedUser(request);
@@ -17,21 +15,27 @@ export async function POST(request: NextRequest) {
     const form = await request.formData();
     const formType = String(form.get('formType') ?? '');
     const slot = String(form.get('slot') ?? '');
+    const uploadId = String(form.get('uploadId') ?? '');
     const file = form.get('file');
 
-    if (!isAllowedFormUpload(formType, slot) || !(file instanceof File)) {
-      return NextResponse.json({ error: 'Missing or invalid formType/slot/file' }, { status: 400 });
+    const folder = resolveFormUploadFolder(gate.uid, formType, slot, uploadId);
+    if (!folder || !(file instanceof File)) {
+      return NextResponse.json(
+        { error: 'Missing or invalid formType/slot/uploadId/file' },
+        { status: 400 }
+      );
     }
 
     const check = validateFormUpload({ mime: file.type, size: file.size });
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
-    const folder = buildFormAttachmentFolder(gate.uid, formType, slot || undefined);
     const objectPath = `${folder}file.${check.ext}`;
 
     const bucket = getOnboardingBucket();
     // Clear any prior attachment in this slot folder first, so a replacement with a
     // different extension can't leave a stale object the viewer might sign instead.
+    // The folder is scoped to this one submission (or sale), so this only ever
+    // replaces the caller's own not-yet-submitted file, never another record's.
     await bucket.deleteFiles({ prefix: folder, force: true });
 
     const buffer = Buffer.from(await file.arrayBuffer());

@@ -22,7 +22,7 @@ import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
 import { LEADS_CATEGORIES, LEADS_REASONS } from '@/lib/forms/formOptions';
 import { leadsConditions } from '@/lib/forms/leadsPredicates';
-import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
+import { FORM_ATTACHMENT_TYPES, newFormUploadId } from '@/lib/forms/formUploads';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
 
 const EMPTY = {
@@ -36,6 +36,9 @@ export default function LeadsRequestPage() {
   const { user } = useAuth();
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
+  // One upload folder per submission (form-attachments/{uid}/leads-request/{uploadId}/{slot}/),
+  // so a later request can never overwrite an earlier request's attachments.
+  const [uploadId, setUploadId] = useState(newFormUploadId);
   const [saving, setSaving] = useState(false);
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
@@ -55,12 +58,13 @@ export default function LeadsRequestPage() {
       const res = await fetch('/api/portal/forms/leads-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, uploadId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
       setReferenceId(json.id);
       setForm(EMPTY);
+      setUploadId(newFormUploadId()); // next request gets a fresh folder (and fresh upload widgets)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
     } finally {
@@ -179,7 +183,7 @@ export default function LeadsRequestPage() {
                     {cond.needsHostile && (
                       <FormsLineControl id="hostile-attachment" label="Hostile attachment" className="forms-line-field-full">
                         <div className="forms-line-upload">
-                          <FileUpload itemId="leads-request-hostile" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'hostile' }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, hostileUploadPath: path }))} />
+                          <FileUpload key={`hostile-${uploadId}`} itemId="leads-request-hostile" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'hostile', uploadId }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, hostileUploadPath: path }))} />
                           <p className="forms-line-proof-hint">PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
                         </div>
                       </FormsLineControl>
@@ -187,7 +191,7 @@ export default function LeadsRequestPage() {
                     {cond.needsBlindKnock && (
                       <FormsLineControl id="blind-knock-attachment" label="Blind-knock attachment" className="forms-line-field-full">
                         <div className="forms-line-upload">
-                          <FileUpload itemId="leads-request-blind-knock" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'blind-knock' }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, blindKnockUploadPath: path }))} />
+                          <FileUpload key={`blind-knock-${uploadId}`} itemId="leads-request-blind-knock" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'blind-knock', uploadId }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, blindKnockUploadPath: path }))} />
                           <p className="forms-line-proof-hint">PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
                         </div>
                       </FormsLineControl>
@@ -195,7 +199,7 @@ export default function LeadsRequestPage() {
                     {cond.needsLasso && (
                       <FormsLineControl id="lasso-attachment" label="Lasso attachment" className="forms-line-field-full">
                         <div className="forms-line-upload">
-                          <FileUpload itemId="leads-request-lasso" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'lasso' }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, lassoUploadPath: path }))} />
+                          <FileUpload key={`lasso-${uploadId}`} itemId="leads-request-lasso" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'lasso', uploadId }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, lassoUploadPath: path }))} />
                           <p className="forms-line-proof-hint">PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
                         </div>
                       </FormsLineControl>

@@ -1,5 +1,6 @@
 // Generic form-attachment upload validation (NOT onboarding-coupled). Files for
-// rep forms (e.g. Payroll Dispute screenshot) go to form-attachments/{uid}/{formType}/.
+// rep forms (e.g. Payroll Dispute screenshot) go to
+// form-attachments/{uid}/{formType}/{uploadId}/ (see resolveFormUploadFolder).
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -24,13 +25,15 @@ export function validateFormUpload(input: {
   return { ok: true, ext };
 }
 
+// Legacy layout (no per-submission id): form-attachments/{uid}/{formType}/[{slot}/].
+// Still used by sale-proof (whose slot IS a per-sale id) and to read old records.
 export function buildFormAttachmentFolder(uid: string, formType: string, slot?: string): string {
   const base = `form-attachments/${uid}/${formType}/`;
   return slot ? `${base}${slot}/` : base;
 }
 
 // Which slots each form's uploads may use. Empty string = the single-file forms
-// (Payroll Dispute) that write straight into the formType folder. Leads Request
+// (Payroll Dispute) that write straight into the submission folder. Leads Request
 // uses three named slots so its attachments never collide.
 export const FORM_UPLOAD_SLOTS: Record<string, string[]> = {
   'payroll-dispute': [''],
@@ -45,4 +48,46 @@ export function isAllowedFormUpload(formType: string, slot: string): boolean {
   if (formType === 'sale-proof') return SALE_PROOF_SLOT.test(slot);
   const slots = FORM_UPLOAD_SLOTS[formType];
   return Array.isArray(slots) && slots.includes(slot);
+}
+
+// Payroll Dispute + Leads Request: every submission gets its own upload id
+// (generated client-side when the form opens), so a rep's second dispute or an
+// abandoned upload can never replace/delete the proof on an earlier submission.
+// Format: crypto.randomUUID() with the dashes stripped (32 lowercase hex).
+const FORM_UPLOAD_ID = /^[0-9a-f]{32}$/;
+const PER_SUBMISSION_FORMS = new Set(['payroll-dispute', 'leads-request']);
+
+export function newFormUploadId(): string {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+export function isValidFormUploadId(id: unknown): id is string {
+  return typeof id === 'string' && FORM_UPLOAD_ID.test(id);
+}
+
+// form-attachments/{uid}/{formType}/{uploadId}/[{slot}/]
+export function buildSubmissionAttachmentFolder(
+  uid: string,
+  formType: string,
+  uploadId: string,
+  slot?: string
+): string {
+  const base = `form-attachments/${uid}/${formType}/${uploadId}/`;
+  return slot ? `${base}${slot}/` : base;
+}
+
+// The folder an upload may write to, or null if formType/slot/uploadId is invalid.
+// Per-submission forms REQUIRE a valid upload id (no more shared legacy folders).
+export function resolveFormUploadFolder(
+  uid: string,
+  formType: string,
+  slot: string,
+  uploadId: string
+): string | null {
+  if (!isAllowedFormUpload(formType, slot)) return null;
+  if (PER_SUBMISSION_FORMS.has(formType)) {
+    if (!isValidFormUploadId(uploadId)) return null;
+    return buildSubmissionAttachmentFolder(uid, formType, uploadId, slot || undefined);
+  }
+  return buildFormAttachmentFolder(uid, formType, slot || undefined);
 }
