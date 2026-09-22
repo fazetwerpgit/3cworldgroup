@@ -4,6 +4,7 @@ import { sendPushToUser } from '@/lib/push/sendPush';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
@@ -243,7 +244,6 @@ export async function POST(request: NextRequest) {
       products: clientProducts,
       notes,
       orderNumberOrBtn,
-      proofScreenshotPath,
       productSold,
       saleDate,
       installDate,
@@ -292,7 +292,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Product sold is required' }, { status: 400 });
     }
 
-    if (!hasSaleProof({ orderNumberOrBtn, proofScreenshotPath })) {
+    // Up to MAX_PROOF_SCREENSHOTS proof folders (array), plus the legacy single
+    // field older clients still send. Every path must be the rep's own
+    // sale-proof upload; one bad path rejects the whole sale.
+    const proof = validateProofPaths(
+      { proofScreenshotPaths: body.proofScreenshotPaths, proofScreenshotPath: body.proofScreenshotPath },
+      salesRepId
+    );
+    if (!proof.ok) {
+      return NextResponse.json({ error: proof.error }, { status: 400 });
+    }
+    const proofPaths = proof.paths;
+
+    if (!hasSaleProof({ orderNumberOrBtn, proofScreenshotPaths: proofPaths })) {
       return NextResponse.json(
         { error: 'Provide an order number / BTN or upload a screenshot' },
         { status: 400 }
@@ -343,16 +355,6 @@ export async function POST(request: NextRequest) {
       resolvedSaleDate = resolvedInstallDate;
     }
 
-    if (proofScreenshotPath) {
-      const expectedPrefix = `form-attachments/${salesRepId}/sale-proof/`;
-      if (!String(proofScreenshotPath).startsWith(expectedPrefix)) {
-        return NextResponse.json(
-          { error: 'Invalid screenshot reference' },
-          { status: 400 }
-        );
-      }
-    }
-
     const newSale = {
       salesRepId,
       salesRepName: salesRepName || '',
@@ -374,7 +376,7 @@ export async function POST(request: NextRequest) {
       installDate: resolvedInstallDate,
       notes: notes || '',
       orderNumberOrBtn: orderNumberOrBtn || '',
-      proofScreenshotPath: proofScreenshotPath || '',
+      ...proofPathFields(proofPaths),
       productSold: productSold || '',
       createdAt: new Date(),
       updatedAt: new Date(),

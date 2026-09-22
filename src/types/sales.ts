@@ -37,7 +37,10 @@ export interface CreateSaleData {
   totalPoints: number;
   notes?: string;
   orderNumberOrBtn?: string;
+  /** Legacy single proof folder; new clients also send it as the first of proofScreenshotPaths. */
   proofScreenshotPath?: string;
+  /** Up to MAX_PROOF_SCREENSHOTS proof folders (lib/sales/proofPaths.ts). */
+  proofScreenshotPaths?: string[];
   productSold?: string;
   // Idempotency key (32 lowercase hex): the server uses it as the sale doc id so
   // a retried submit returns the existing sale instead of logging a duplicate.
@@ -64,7 +67,9 @@ export interface Sale {
   totalPoints: number;
   commission?: number;
   orderNumberOrBtn?: string;
+  /** Legacy single proof folder, kept = proofScreenshotPaths[0]. Read both via saleProofPaths(). */
   proofScreenshotPath?: string;
+  proofScreenshotPaths?: string[];
   productSold?: string;
 
   // Status & workflow

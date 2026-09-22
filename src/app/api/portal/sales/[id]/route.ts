@@ -7,6 +7,8 @@ import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requi
 import { parseSaleDateInput, parseInstallDateInput, installDayKey } from '@/lib/sales/saleDate';
 import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { priceSaleProducts } from '@/lib/sales/pricing';
+import { hasSaleProof } from '@/lib/sales/proof';
+import { proofPathFields, saleProofPaths, validateProofPaths } from '@/lib/sales/proofPaths';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -111,11 +113,52 @@ export async function PUT(
       );
     }
 
-    if (body.proofScreenshotPath) {
-      const expectedPrefix = `form-attachments/${existing?.salesRepId}/sale-proof/`;
-      if (!String(body.proofScreenshotPath).startsWith(expectedPrefix)) {
+    // Proof screenshots: when the edit sends either field, it sends the sale's
+    // complete list (up to MAX_PROOF_SCREENSHOTS, each the rep's own sale-proof
+    // upload) and both stored fields are rewritten from it. An edit that sends
+    // neither leaves the stored screenshots alone.
+    //
+    // An older client knows only the single field and re-sends the stored first
+    // path on every save; that must not collapse a multi-screenshot sale to one,
+    // so an unchanged legacy-only value counts as not touching the proof.
+    const legacyOnlyUnchanged =
+      body.proofScreenshotPaths === undefined &&
+      typeof body.proofScreenshotPath === 'string' &&
+      body.proofScreenshotPath.trim() !== '' &&
+      body.proofScreenshotPath.trim() === String(existing?.proofScreenshotPath ?? '').trim();
+    const proofTouched =
+      !legacyOnlyUnchanged &&
+      (body.proofScreenshotPaths !== undefined || body.proofScreenshotPath !== undefined);
+    let proofFields: ReturnType<typeof proofPathFields> | null = null;
+    if (proofTouched) {
+      const proof = validateProofPaths(
+        { proofScreenshotPaths: body.proofScreenshotPaths, proofScreenshotPath: body.proofScreenshotPath },
+        String(existing?.salesRepId ?? '')
+      );
+      if (!proof.ok) {
+        return NextResponse.json({ error: proof.error }, { status: 400 });
+      }
+      proofFields = proofPathFields(proof.paths);
+    }
+
+    // An edit may swap one proof for the other (drop the screenshots once an
+    // order number is in, or the reverse) but may not strip a sale of its last
+    // proof. A sale logged before the proof rule, with neither, can still be
+    // corrected field by field.
+    if (proofTouched || body.orderNumberOrBtn !== undefined) {
+      const merged = {
+        orderNumberOrBtn: String(
+          body.orderNumberOrBtn !== undefined ? body.orderNumberOrBtn ?? '' : existing?.orderNumberOrBtn ?? ''
+        ),
+        proofScreenshotPaths: proofFields ? proofFields.proofScreenshotPaths : saleProofPaths(existing ?? {}),
+      };
+      const hadProof = hasSaleProof({
+        orderNumberOrBtn: String(existing?.orderNumberOrBtn ?? ''),
+        proofScreenshotPaths: saleProofPaths(existing ?? {}),
+      });
+      if (hadProof && !hasSaleProof(merged)) {
         return NextResponse.json(
-          { error: 'Invalid screenshot reference' },
+          { error: 'Provide an order number / BTN or upload a screenshot' },
           { status: 400 }
         );
       }
@@ -138,6 +181,7 @@ export async function PUT(
       'notes',
       'orderNumberOrBtn',
       'proofScreenshotPath',
+      'proofScreenshotPaths',
       'productSold',
     ] as const;
 
@@ -145,6 +189,10 @@ export async function PUT(
     for (const field of EDITABLE_FIELDS) {
       if (body[field] !== undefined) updateData[field] = body[field];
     }
+    // Never the raw client values: both proof fields come from the validated list.
+    delete updateData.proofScreenshotPath;
+    delete updateData.proofScreenshotPaths;
+    if (proofFields) Object.assign(updateData, proofFields);
 
     if (body.saleDate !== undefined && body.saleDate !== null && body.saleDate !== '') {
       const parsed = parseSaleDateInput(body.saleDate);

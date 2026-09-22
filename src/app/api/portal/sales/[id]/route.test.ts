@@ -201,3 +201,155 @@ describe('PUT /api/portal/sales/[id] install date provenance', () => {
     expect(saleUpdateMock).not.toHaveBeenCalled();
   });
 });
+
+describe('PUT /api/portal/sales/[id] proof screenshots', () => {
+  const PREFIX = 'form-attachments/rep-1/sale-proof/';
+  const SHOT_A = `${PREFIX}slotaaaa_a1b2c3/`;
+  const SHOT_B = `${PREFIX}slotaaaa_d4e5f6/`;
+  const SHOT_C = `${PREFIX}slotaaaa_0a0b0c/`;
+
+  function existingSale(fields: Record<string, unknown>) {
+    saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-1', ...fields }) });
+  }
+
+  it('adds a screenshot within the cap and writes both fields', async () => {
+    existingSale({ proofScreenshotPaths: [SHOT_A], proofScreenshotPath: SHOT_A });
+
+    const response = await put({ proofScreenshotPaths: [SHOT_A, SHOT_B], proofScreenshotPath: SHOT_A });
+
+    expect(response.status).toBe(200);
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toEqual([SHOT_A, SHOT_B]);
+    expect(written.proofScreenshotPath).toBe(SHOT_A);
+  });
+
+  it('removes a screenshot and re-mirrors the first', async () => {
+    existingSale({ proofScreenshotPaths: [SHOT_A, SHOT_B], proofScreenshotPath: SHOT_A });
+
+    await put({ proofScreenshotPaths: [SHOT_B] });
+
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toEqual([SHOT_B]);
+    expect(written.proofScreenshotPath).toBe(SHOT_B);
+  });
+
+  it('rejects more than four screenshots', async () => {
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+
+    const response = await put({
+      proofScreenshotPaths: [SHOT_A, SHOT_B, SHOT_C, `${PREFIX}s4_111111/`, `${PREFIX}s5_222222/`],
+    });
+
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects the edit when any one path is not the sale rep's own", async () => {
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+
+    const response = await put({ proofScreenshotPaths: [SHOT_A, 'form-attachments/rep-2/sale-proof/x/'] });
+
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a path with ..', async () => {
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+
+    const response = await put({ proofScreenshotPaths: [`${PREFIX}../../rep-2/sale-proof/x/`] });
+
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('validates against the sale rep, not the admin making the edit', async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+
+    const own = await put({ proofScreenshotPaths: [SHOT_A] });
+    expect(own.status).toBe(200);
+
+    const adminPath = await put({ proofScreenshotPaths: ['form-attachments/admin-1/sale-proof/x_123456/'] });
+    expect(adminPath.status).toBe(400);
+  });
+
+  it('turns a legacy single-path sale into a list when a screenshot is added', async () => {
+    existingSale({ proofScreenshotPath: SHOT_A });
+
+    await put({ proofScreenshotPaths: [SHOT_A, SHOT_B] });
+
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toEqual([SHOT_A, SHOT_B]);
+    expect(written.proofScreenshotPath).toBe(SHOT_A);
+  });
+
+  it('accepts a legacy single-field edit from an older client', async () => {
+    existingSale({ proofScreenshotPath: SHOT_A });
+
+    const response = await put({ proofScreenshotPath: SHOT_B });
+
+    expect(response.status).toBe(200);
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toEqual([SHOT_B]);
+    expect(written.proofScreenshotPath).toBe(SHOT_B);
+  });
+
+  it('does not collapse a multi-screenshot sale when an older client re-sends the first path', async () => {
+    existingSale({ proofScreenshotPaths: [SHOT_A, SHOT_B], proofScreenshotPath: SHOT_A });
+
+    const response = await put({ proofScreenshotPath: SHOT_A, notes: 'typo' });
+
+    expect(response.status).toBe(200);
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toBeUndefined();
+    expect(written.proofScreenshotPath).toBeUndefined();
+    expect(written.notes).toBe('typo');
+  });
+
+  it('leaves the stored screenshots alone when the edit sends neither field', async () => {
+    existingSale({ proofScreenshotPaths: [SHOT_A, SHOT_B], proofScreenshotPath: SHOT_A });
+
+    await put({ notes: 'typo' });
+
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toBeUndefined();
+    expect(written.proofScreenshotPath).toBeUndefined();
+  });
+
+  it('allows removing every screenshot when the sale keeps an order number', async () => {
+    existingSale({ orderNumberOrBtn: 'ORD-1', proofScreenshotPaths: [SHOT_A], proofScreenshotPath: SHOT_A });
+
+    const response = await put({ proofScreenshotPaths: [], proofScreenshotPath: '' });
+
+    expect(response.status).toBe(200);
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.proofScreenshotPaths).toEqual([]);
+    expect(written.proofScreenshotPath).toBe('');
+  });
+
+  it('rejects removing the last screenshot from a sale with no order number', async () => {
+    existingSale({ orderNumberOrBtn: '', proofScreenshotPaths: [SHOT_A], proofScreenshotPath: SHOT_A });
+
+    const response = await put({ proofScreenshotPaths: [], orderNumberOrBtn: '' });
+
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects clearing the order number from a sale with no screenshot', async () => {
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+
+    const response = await put({ orderNumberOrBtn: '   ' });
+
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('still lets a pre-rule sale with no proof be corrected', async () => {
+    existingSale({});
+
+    const response = await put({ orderNumberOrBtn: '', proofScreenshotPaths: [], notes: 'fixed' });
+
+    expect(response.status).toBe(200);
+  });
+});
