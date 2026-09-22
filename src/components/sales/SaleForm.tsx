@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,12 +18,80 @@ interface SaleFormProps {
   onSuccess?: () => void;
 }
 
+// In-progress sale kept in sessionStorage so a reload, a crash or a lost
+// connection mid-submit never costs the rep the entry. Keyed per user so a
+// shared phone never shows one rep's customer to the next. File objects are
+// never stored — an uploaded screenshot survives as its storage path.
+const DRAFT_KEY_PREFIX = 'sale-draft:v1:';
+const DRAFT_SAVE_DELAY_MS = 400;
+const CLIENT_SALE_ID_RE = /^[a-f0-9]{32}$/;
+
+type SaleFormData = {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerAddress: string;
+  saleType: SaleType;
+  saleDate: string;
+  installDate: string;
+  notes: string;
+  orderNumberOrBtn: string;
+  proofScreenshotPath: string;
+};
+
+interface SaleDraft {
+  formData: SaleFormData;
+  products: SaleProduct[];
+  saleDateTouched: boolean;
+  proofUploadId: string;
+}
+
+function readDraft(key: string): SaleDraft | null {
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as Partial<SaleDraft>;
+    if (!draft || typeof draft !== 'object' || !draft.formData || !Array.isArray(draft.products)) {
+      return null;
+    }
+    return draft as SaleDraft;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(key: string, draft: SaleDraft | null) {
+  try {
+    if (draft) window.sessionStorage.setItem(key, JSON.stringify(draft));
+    else window.sessionStorage.removeItem(key);
+  } catch {
+    // Storage full or blocked (private mode) — the draft is a convenience only.
+  }
+}
+
+/** Anything the rep actually entered; a pristine form is not worth restoring. */
+function hasDraftContent(formData: SaleFormData, products: SaleProduct[]): boolean {
+  return (
+    products.length > 0 ||
+    [
+      formData.customerName,
+      formData.customerPhone,
+      formData.customerEmail,
+      formData.customerAddress,
+      formData.installDate,
+      formData.notes,
+      formData.orderNumberOrBtn,
+      formData.proofScreenshotPath,
+    ].some((value) => value.trim() !== '')
+  );
+}
+
 export function SaleForm({ onSuccess }: SaleFormProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { createSale, loading, error } = useSales();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SaleFormData>({
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -41,11 +109,61 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   const [saleDateTouched, setSaleDateTouched] = useState(false);
   const [saleDateFromInstall, setSaleDateFromInstall] = useState(false);
   const [formError, setFormError] = useState('');
-  const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
+  // Doubles as the sale's idempotency key (sent as clientSaleId): a resubmit
+  // after a lost response lands on the same sale instead of a duplicate.
+  const [proofUploadId, setProofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
+  const errorRef = useRef<HTMLDivElement>(null);
+  const draftKey = user ? `${DRAFT_KEY_PREFIX}${user.uid}` : null;
+  const [draftRestored, setDraftRestored] = useState(false);
+  const submittedRef = useRef(false);
 
   /** True for a YYYY-MM-DD value on a day earlier than today. */
   const isBeforeToday = (value: string) =>
     /^\d{4}-\d{2}-\d{2}$/.test(value) && value < todaySaleDateInput();
+
+  // Restore once the user is known. An untouched sale date is re-derived
+  // rather than restored, so a draft from yesterday is not dated yesterday.
+  useEffect(() => {
+    if (!draftKey || draftRestored) return;
+    const draft = readDraft(draftKey);
+    if (draft) {
+      const restored = { ...formData, ...draft.formData };
+      if (!draft.saleDateTouched) {
+        const backdated = isBeforeToday(restored.installDate);
+        restored.saleDate = backdated ? restored.installDate : todaySaleDateInput();
+        setSaleDateFromInstall(backdated);
+      }
+      setFormData(restored);
+      setProducts(draft.products);
+      setSaleDateTouched(Boolean(draft.saleDateTouched));
+      if (CLIENT_SALE_ID_RE.test(draft.proofUploadId)) setProofUploadId(draft.proofUploadId);
+    }
+    setDraftRestored(true);
+    // Runs once per user; formData is only the fallback for missing fields.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, draftRestored]);
+
+  // Debounced save of the in-progress entry.
+  useEffect(() => {
+    if (!draftKey || !draftRestored || submittedRef.current) return;
+    const timer = window.setTimeout(() => {
+      if (submittedRef.current) return;
+      writeDraft(
+        draftKey,
+        hasDraftContent(formData, products)
+          ? { formData, products, saleDateTouched, proofUploadId }
+          : null
+      );
+    }, DRAFT_SAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [draftKey, draftRestored, formData, products, saleDateTouched, proofUploadId]);
+
+  // Bring a submit error into view — on a phone the rep is at the bottom of a
+  // long form and would otherwise never see why nothing happened.
+  const shownError = formError || error;
+  useEffect(() => {
+    if (shownError) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [shownError]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -153,10 +271,13 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       products,
       totalValue: calculateTotalValue(),
       totalPoints: calculateTotalPoints(),
+      clientSaleId: proofUploadId,
     };
 
     const result = await createSale(saleData);
     if (result) {
+      submittedRef.current = true;
+      if (draftKey) writeDraft(draftKey, null);
       if (onSuccess) {
         onSuccess();
       } else {
@@ -167,11 +288,19 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
 
   const productSoldPreview = products.map((p) => p.productName).join(', ');
 
+  const missingAddress = !formData.customerAddress.trim();
+  const missingPlan = products.length === 0;
+  const submitHint =
+    missingAddress && missingPlan
+      ? 'Add the installation address and pick a plan to submit.'
+      : missingAddress
+        ? 'Add the installation address to submit.'
+        : missingPlan
+          ? 'Pick a plan to submit.'
+          : '';
+
   return (
     <form onSubmit={handleSubmit} className="sales-line-form">
-      {(formError || error) && (
-        <div className="sales-line-error" role="alert">{formError || error}</div>
-      )}
 
       <section className="sales-line-panel">
         <div className="sales-line-panel-head">
@@ -322,6 +451,16 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
         </div>
       )}
 
+      {shownError && (
+        <div ref={errorRef} className="sales-line-error sales-line-submit-error" role="alert">
+          {shownError}
+        </div>
+      )}
+
+      {!loading && submitHint && (
+        <p className="sales-line-submit-hint">{submitHint}</p>
+      )}
+
       <div className="sales-line-form-actions">
         <button type="button" className="sales-line-btn" onClick={() => router.back()}>
           Cancel
@@ -329,7 +468,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
         <button
           type="submit"
           className="sales-line-btn primary"
-          disabled={loading || products.length === 0 || !formData.customerAddress.trim()}
+          disabled={loading || missingPlan || missingAddress}
         >
           {loading ? 'Submitting...' : <><Check className="sales-line-icon" aria-hidden="true" />Submit sale</>}
         </button>

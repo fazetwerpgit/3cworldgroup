@@ -39,6 +39,9 @@ export interface CreateSaleData {
   orderNumberOrBtn?: string;
   proofScreenshotPath?: string;
   productSold?: string;
+  // Idempotency key (32 lowercase hex): the server uses it as the sale doc id so
+  // a retried submit returns the existing sale instead of logging a duplicate.
+  clientSaleId?: string;
 }
 
 export interface Sale {

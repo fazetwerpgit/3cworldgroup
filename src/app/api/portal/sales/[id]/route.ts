@@ -6,6 +6,7 @@ import { Sale, SaleProduct } from '@/types';
 import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { parseSaleDateInput, parseInstallDateInput, installDayKey } from '@/lib/sales/saleDate';
 import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
+import { priceSaleProducts } from '@/lib/sales/pricing';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -174,14 +175,26 @@ export async function PUT(
       }
     }
 
-    // One internet plan per address. Only checked when the edit actually sends
-    // products: a sale logged before this rule existed can still be corrected
-    // field by field without the route rejecting an edit that never touched it.
-    if (Array.isArray(body.products)) {
-      const planError = validateOnePlanPerSale(body.products as SaleProduct[]);
+    // Products and value are priced server-side, never taken from the client.
+    // Lines already on the sale keep their stored snapshot (see pricing.ts); new
+    // ones come from the plan catalog, and an unknown productId is rejected. A
+    // client totalValue is ignored — it is derived from the lines. totalPoints
+    // stays immutable on edit, as before.
+    delete updateData.totalValue;
+    if (body.products !== undefined) {
+      const priced = priceSaleProducts(body.products, (existing?.products ?? []) as SaleProduct[]);
+      if (!priced.ok) {
+        return NextResponse.json({ error: priced.error }, { status: 400 });
+      }
+      // One internet plan per address. Only checked when the edit actually sends
+      // products: a sale logged before this rule existed can still be corrected
+      // field by field without the route rejecting an edit that never touched it.
+      const planError = validateOnePlanPerSale(priced.products);
       if (planError) {
         return NextResponse.json({ error: planError }, { status: 400 });
       }
+      updateData.products = priced.products;
+      updateData.totalValue = priced.totalValue;
     }
 
     await docRef.update(updateData);

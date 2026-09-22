@@ -24,6 +24,22 @@ interface SalesStats {
   valueChange: number;
 }
 
+export const NO_SIGNAL_SALE_MESSAGE = 'No signal — your entry is saved. Tap Submit to retry.';
+
+/**
+ * True for a failure that never got a usable answer from the server: fetch
+ * rejecting (Safari "Load failed", Chrome "Failed to fetch", Firefox
+ * "NetworkError…") or a truncated/non-JSON body, which Safari reports from
+ * response.json() as "The string did not match the expected pattern".
+ */
+export function isNetworkFailure(err: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return /load failed|failed to fetch|networkerror|network connection was lost|did not match the expected pattern|internet connection appears to be offline|unexpected end of json/i.test(
+    message
+  );
+}
+
 export function useSales() {
   const [sales, setSales] = useState<Sale[]>([]);
   // The list query hit its cap and this book is short. Rows cut this way are
@@ -117,7 +133,11 @@ export function useSales() {
 
       return data.sale;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create sale';
+      const message = isNetworkFailure(err)
+        ? NO_SIGNAL_SALE_MESSAGE
+        : err instanceof Error
+          ? err.message
+          : 'Failed to create sale';
       setError(message);
       return null;
     } finally {

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
-import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleProduct, SaleStatus } from '@/types';
+import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
+import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
 
 // Helper function to create a notification
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -175,6 +176,39 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** Firestore ALREADY_EXISTS (gRPC code 6), thrown by DocumentReference.create(). */
+function isAlreadyExistsError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 6 || code === 'already-exists' || code === 'ALREADY_EXISTS';
+}
+
+/**
+ * The response for a sale id that already exists: the stored sale (200) when it
+ * belongs to this rep — a retried submit, nothing is re-written or re-notified —
+ * or 409 when the id is someone else's. Null when there is no such sale.
+ */
+async function existingSaleForReplay(saleId: string, salesRepId: string) {
+  if (!adminDb) return null;
+  const snap = await adminDb.collection('sales').doc(saleId).get();
+  if (!snap.exists) return null;
+  const data = snap.data() ?? {};
+  if (data.salesRepId !== salesRepId) {
+    return NextResponse.json({ error: 'Sale id already in use' }, { status: 409 });
+  }
+  return NextResponse.json({
+    success: true,
+    duplicate: true,
+    sale: {
+      id: snap.id,
+      ...data,
+      saleDate: data.saleDate?.toDate?.() ?? data.saleDate ?? null,
+      installDate: data.installDate?.toDate?.() ?? data.installDate ?? null,
+      createdAt: data.createdAt?.toDate?.() ?? data.createdAt ?? null,
+      updatedAt: data.updatedAt?.toDate?.() ?? data.updatedAt ?? null,
+    },
+  });
+}
+
 // POST /api/portal/sales - Create a new sale
 export async function POST(request: NextRequest) {
   try {
@@ -206,28 +240,50 @@ export async function POST(request: NextRequest) {
       customerEmail,
       customerAddress,
       saleType,
-      products,
-      totalValue,
+      products: clientProducts,
       notes,
       orderNumberOrBtn,
       proofScreenshotPath,
       productSold,
       saleDate,
       installDate,
+      clientSaleId: rawClientSaleId,
     } = body;
 
+    // Idempotency key: the form's per-sale proofUploadId. A retried submit (weak
+    // signal, a lost response, a double tap) lands on the same document id, so it
+    // returns the sale already written instead of logging it twice. Optional for
+    // older clients, which fall back to an auto id.
+    let clientSaleId: string | null = null;
+    if (rawClientSaleId !== undefined && rawClientSaleId !== null && rawClientSaleId !== '') {
+      if (typeof rawClientSaleId !== 'string' || !CLIENT_SALE_ID_RE.test(rawClientSaleId)) {
+        return NextResponse.json({ error: 'Invalid clientSaleId' }, { status: 400 });
+      }
+      clientSaleId = rawClientSaleId;
+      const replay = await existingSaleForReplay(clientSaleId, salesRepId);
+      if (replay) return replay;
+    }
+
     // Validate required fields - only address and products are required
-    if (!customerAddress || !products || products.length === 0) {
+    if (!customerAddress || !Array.isArray(clientProducts) || clientProducts.length === 0) {
       return NextResponse.json(
         { error: 'Missing required fields: customerAddress, products' },
         { status: 400 }
       );
     }
 
+    // Price every line from the server-side plan catalog: the client's
+    // price/points/totalValue are never trusted.
+    const priced = priceSaleProducts(clientProducts);
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: 400 });
+    }
+    const products = priced.products;
+
     // One internet plan per address (Jacob, 2026-09-03). The form makes a
     // second one unreachable; this makes it unwritable, including from a rep's
     // phone still running the old client.
-    const planError = validateOnePlanPerSale(products as SaleProduct[]);
+    const planError = validateOnePlanPerSale(products);
     if (planError) {
       return NextResponse.json({ error: planError }, { status: 400 });
     }
@@ -297,14 +353,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calculate points server-side based on products to prevent cheating
-    let calculatedPoints = 0;
-    if (Array.isArray(products)) {
-      for (const product of products) {
-        calculatedPoints += product.points || 0;
-      }
-    }
-
     const newSale = {
       salesRepId,
       salesRepName: salesRepName || '',
@@ -315,8 +363,8 @@ export async function POST(request: NextRequest) {
       customerAddress,
       saleType: saleType || 'new_service',
       products,
-      totalValue: totalValue || 0,
-      totalPoints: calculatedPoints, // Server-calculated, not from client
+      totalValue: priced.totalValue, // Catalog-priced, not from client
+      totalPoints: priced.totalPoints, // Catalog-priced, not from client
       // Sale approval was removed in Sep 2026 — a logged sale is a sale, and the
       // install pipeline is the only lifecycle the portal tracks now. The field
       // survives because isPayableSale still reads it (a sale can be cancelled)
@@ -332,7 +380,23 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const docRef = await adminDb.collection('sales').add(newSale);
+    let docRef: FirebaseFirestore.DocumentReference;
+    if (clientSaleId) {
+      docRef = adminDb.collection('sales').doc(clientSaleId);
+      try {
+        // create() fails if the id exists, so two racing submits of the same
+        // sale can never both write — the loser returns the winner's row.
+        await docRef.create(newSale);
+      } catch (createError) {
+        if (isAlreadyExistsError(createError)) {
+          const replay = await existingSaleForReplay(clientSaleId, salesRepId);
+          if (replay) return replay;
+        }
+        throw createError;
+      }
+    } else {
+      docRef = await adminDb.collection('sales').add(newSale);
+    }
 
     await createNotification(
       salesRepId,

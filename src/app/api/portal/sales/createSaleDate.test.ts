@@ -59,7 +59,7 @@ const baseBody = {
   customerAddress: '1 Main St, Springfield, MO 65801',
   productSold: 'Fiber 1 Gig',
   orderNumberOrBtn: 'ORD-1001',
-  products: [{ productId: 'p1', productName: 'Fiber 1 Gig', quantity: 1, unitPrice: 70, totalPrice: 70, points: 3 }],
+  products: [{ productId: 'tfiber-300', productName: 'TFiber 300 (300 Mbps)', quantity: 1, unitPrice: 45, totalPrice: 45, points: 3 }],
   totalValue: 70,
 };
 
