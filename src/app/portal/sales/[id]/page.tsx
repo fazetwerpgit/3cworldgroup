@@ -30,6 +30,7 @@ import {
 import { useSales } from '@/hooks/useSales';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { FIBER_COMPANIES, Sale } from '@/types';
@@ -78,7 +79,8 @@ export default function SaleDetailPage() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [proofLoading, setProofLoading] = useState(false);
+  /** Index of the screenshot being fetched, or null when none is. */
+  const [proofLoading, setProofLoading] = useState<number | null>(null);
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
 
@@ -105,23 +107,29 @@ export default function SaleDetailPage() {
     setShowDeleteModal(false);
   };
 
-  const openScreenshot = async () => {
-    if (!sale?.proofScreenshotPath) return;
-    setProofLoading(true);
+  const proofPaths = sale ? saleProofPaths(sale) : [];
+
+  const openScreenshot = async (index: number) => {
+    const path = proofPaths[index];
+    if (!path) return;
+    setProofLoading(index);
     setProofError(null);
     try {
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(
-        `/api/portal/forms/attachment?path=${encodeURIComponent(sale.proofScreenshotPath)}`,
+        `/api/portal/forms/attachment?path=${encodeURIComponent(path)}`,
         { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
       );
       const data = await response.json();
       if (!response.ok || !data.url) throw new Error('Could not load the screenshot. Try again.');
-      setProofImage({ url: data.url, alt: 'Sale proof screenshot' });
+      setProofImage({
+        url: data.url,
+        alt: proofPaths.length > 1 ? `Sale proof screenshot ${index + 1}` : 'Sale proof screenshot',
+      });
     } catch {
       setProofError('Could not load the screenshot. Try again.');
     } finally {
-      setProofLoading(false);
+      setProofLoading(null);
     }
   };
 
@@ -293,10 +301,21 @@ export default function SaleDetailPage() {
             <div className="sales-line-panel-body">
               <div className="sales-line-proof">
                 {sale.orderNumberOrBtn && <span><FileText className="sales-line-proof-icon" aria-hidden="true" />{sale.orderNumberOrBtn}</span>}
-                {sale.proofScreenshotPath ? (
-                  <button type="button" onClick={() => void openScreenshot()} disabled={proofLoading}>
-                    {proofLoading ? 'Opening proof...' : 'View proof screenshot'}
-                  </button>
+                {proofPaths.length > 0 ? (
+                  proofPaths.map((path, proofIndex) => (
+                    <button
+                      key={path}
+                      type="button"
+                      onClick={() => void openScreenshot(proofIndex)}
+                      disabled={proofLoading !== null}
+                    >
+                      {proofLoading === proofIndex
+                        ? 'Opening proof...'
+                        : proofPaths.length > 1
+                          ? `Screenshot ${proofIndex + 1}`
+                          : 'View proof screenshot'}
+                    </button>
+                  ))
                 ) : !sale.orderNumberOrBtn ? (
                   <span>No order number or proof attached</span>
                 ) : null}

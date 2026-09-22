@@ -20,6 +20,8 @@ import { PlanPicker } from '@/components/sales/PlanPicker';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
+import { MAX_PROOF_SCREENSHOTS, newProofSlot, saleProofPaths } from '@/lib/sales/proofPaths';
+import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
 import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
@@ -73,12 +75,16 @@ export default function EditSalePage() {
     installDate: '',
     notes: '',
     orderNumberOrBtn: '',
-    proofScreenshotPath: '',
+    proofScreenshotPaths: [] as string[],
   });
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
+  // The upload route clears a slot's folder before writing, so every screenshot
+  // gets its own slot: a fresh one is drawn after each upload, and the next
+  // "Add another" can never overwrite a screenshot already on the list.
+  const [nextProofSlot, setNextProofSlot] = useState(() => newProofSlot(proofUploadId));
 
   const isAdmin = isRole('admin');
   const saleId = params.id as string;
@@ -102,7 +108,7 @@ export default function EditSalePage() {
             : '',
           notes: saleData.notes || '',
           orderNumberOrBtn: saleData.orderNumberOrBtn || '',
-          proofScreenshotPath: saleData.proofScreenshotPath || '',
+          proofScreenshotPaths: saleProofPaths(saleData),
         });
         setProducts(saleData.products || []);
       }
@@ -129,6 +135,36 @@ export default function EditSalePage() {
   const removeProduct = (index: number) => {
     setProducts((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const addProofScreenshot = (path: string) => {
+    setFormData((prev) =>
+      prev.proofScreenshotPaths.includes(path) || prev.proofScreenshotPaths.length >= MAX_PROOF_SCREENSHOTS
+        ? prev
+        : { ...prev, proofScreenshotPaths: [...prev.proofScreenshotPaths, path] }
+    );
+    setNextProofSlot(newProofSlot(proofUploadId));
+  };
+
+  const removeProofScreenshot = (path: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      proofScreenshotPaths: prev.proofScreenshotPaths.filter((p) => p !== path),
+    }));
+  };
+
+  // Not async: openAttachmentInNewTab must open its tab synchronously inside the
+  // click (iOS Safari drops window.open after an await).
+  const viewProofScreenshot = (path: string) =>
+    openAttachmentInNewTab(async () => {
+      const token = await auth?.currentUser?.getIdToken();
+      const response = await fetch(
+        `/api/portal/forms/attachment?path=${encodeURIComponent(path)}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      if (!response.ok) throw new Error(`Attachment request failed (${response.status})`);
+      const data = await response.json();
+      return typeof data.url === 'string' ? data.url : null;
+    });
 
   const calculateTotalValue = () => products.reduce((sum, p) => sum + p.totalPrice, 0);
   const calculateTotalPoints = () => products.reduce((sum, p) => sum + p.points, 0);
@@ -169,6 +205,8 @@ export default function EditSalePage() {
       installDate?: string;
     } = {
       ...formData,
+      // The legacy single field mirrors the first screenshot for older readers.
+      proofScreenshotPath: formData.proofScreenshotPaths[0] ?? '',
       productSold: products.map((p) => p.productName).join(', '),
       products,
       totalValue: calculateTotalValue(),
@@ -349,23 +387,50 @@ export default function EditSalePage() {
                   <p className="sales-line-field-hint">Required unless you upload a screenshot below.</p>
                 </div>
                 <div>
-                  <label className="sales-line-field-label">Screenshot (if no order # / BTN)</label>
-                  <div className="sales-line-upload-frame">
-                    <FileUpload
-                      itemId="sale-proof"
-                      slot={proofUploadId}
-                      accept="image/*,application/pdf"
-                      allowedTypes={FORM_ATTACHMENT_TYPES}
-                      uploadUrl="/api/portal/forms/upload"
-                      extraFields={{ formType: 'sale-proof' }}
-                      existingPath={formData.proofScreenshotPath || undefined}
-                      getHeaders={async (): Promise<HeadersInit> => {
-                        const t = await auth?.currentUser?.getIdToken();
-                        return t ? { Authorization: `Bearer ${t}` } : {};
-                      }}
-                      onUploaded={(path) => setFormData((p) => ({ ...p, proofScreenshotPath: path }))}
-                    />
-                  </div>
+                  <label className="sales-line-field-label">Screenshots (if no order # / BTN)</label>
+                  {formData.proofScreenshotPaths.length > 0 && (
+                    <div className="sales-line-selected-plans">
+                      {formData.proofScreenshotPaths.map((path, index) => (
+                        <div key={path} className="sales-line-selected-plan-row">
+                          <div>
+                            <strong>Screenshot {index + 1}</strong>
+                          </div>
+                          <button type="button" className="sales-line-btn" onClick={() => void viewProofScreenshot(path)}>
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="sales-line-remove-plan"
+                            onClick={() => removeProofScreenshot(path)}
+                            aria-label={`Remove screenshot ${index + 1}`}
+                          >
+                            <Trash2 className="sales-line-icon" aria-hidden="true" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {formData.proofScreenshotPaths.length < MAX_PROOF_SCREENSHOTS ? (
+                    <div className="sales-line-upload-frame">
+                      <FileUpload
+                        key={nextProofSlot}
+                        itemId="sale-proof"
+                        slot={nextProofSlot}
+                        accept="image/*,application/pdf"
+                        allowedTypes={FORM_ATTACHMENT_TYPES}
+                        uploadUrl="/api/portal/forms/upload"
+                        extraFields={{ formType: 'sale-proof' }}
+                        label={formData.proofScreenshotPaths.length > 0 ? 'Add another screenshot' : undefined}
+                        getHeaders={async (): Promise<HeadersInit> => {
+                          const t = await auth?.currentUser?.getIdToken();
+                          return t ? { Authorization: `Bearer ${t}` } : {};
+                        }}
+                        onUploaded={addProofScreenshot}
+                      />
+                    </div>
+                  ) : (
+                    <p className="sales-line-field-hint">Up to {MAX_PROOF_SCREENSHOTS} screenshots. Remove one to add another.</p>
+                  )}
                 </div>
                 <div className="span-2">
                   <label className="sales-line-field-label" htmlFor="notes">Notes</label>

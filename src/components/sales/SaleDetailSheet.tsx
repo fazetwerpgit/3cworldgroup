@@ -21,6 +21,7 @@ import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
 import { dateToSaleDateInput, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
+import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 
@@ -111,7 +112,8 @@ export function SaleDetailSheet({
   onRestore,
   onSaleUpdated,
 }: SaleDetailSheetProps) {
-  const [proofLoading, setProofLoading] = useState(false);
+  /** Index of the screenshot being fetched, or null when none is. */
+  const [proofLoading, setProofLoading] = useState<number | null>(null);
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
 
@@ -225,23 +227,29 @@ export function SaleDetailSheet({
     onSaleUpdated?.();
   };
 
-  const openScreenshot = async () => {
-    if (!sale.proofScreenshotPath) return;
-    setProofLoading(true);
+  const proofPaths = saleProofPaths(sale);
+
+  const openScreenshot = async (index: number) => {
+    const path = proofPaths[index];
+    if (!path) return;
+    setProofLoading(index);
     setProofError(null);
     try {
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(
-        `/api/portal/forms/attachment?path=${encodeURIComponent(sale.proofScreenshotPath)}`,
+        `/api/portal/forms/attachment?path=${encodeURIComponent(path)}`,
         { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
       );
       const data = await response.json();
       if (!response.ok || !data.url) throw new Error('Could not load the screenshot. Try again.');
-      setProofImage({ url: data.url, alt: 'Sale proof screenshot' });
+      setProofImage({
+        url: data.url,
+        alt: proofPaths.length > 1 ? `Sale proof screenshot ${index + 1}` : 'Sale proof screenshot',
+      });
     } catch {
       setProofError('Could not load the screenshot. Try again.');
     } finally {
-      setProofLoading(false);
+      setProofLoading(null);
     }
   };
 
@@ -367,10 +375,21 @@ export function SaleDetailSheet({
             <span className="sales-line-sheet-label">Order / proof</span>
             <div className="sales-line-proof">
               {sale.orderNumberOrBtn && <span><FileText className="sales-line-proof-icon" />{sale.orderNumberOrBtn}</span>}
-              {sale.proofScreenshotPath ? (
-                <button type="button" onClick={() => void openScreenshot()} disabled={proofLoading}>
-                  {proofLoading ? 'Opening proof...' : 'View proof screenshot'}
-                </button>
+              {proofPaths.length > 0 ? (
+                proofPaths.map((path, proofIndex) => (
+                  <button
+                    key={path}
+                    type="button"
+                    onClick={() => void openScreenshot(proofIndex)}
+                    disabled={proofLoading !== null}
+                  >
+                    {proofLoading === proofIndex
+                      ? 'Opening proof...'
+                      : proofPaths.length > 1
+                        ? `Screenshot ${proofIndex + 1}`
+                        : 'View proof screenshot'}
+                  </button>
+                ))
               ) : !sale.orderNumberOrBtn ? (
                 <span>No order number or proof attached</span>
               ) : null}

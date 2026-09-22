@@ -152,3 +152,30 @@ describe('SaleDetailSheet install date', () => {
     expect(installInput()).toBeTruthy();
   });
 });
+
+describe('SaleDetailSheet proof screenshots', () => {
+  const A = 'form-attachments/rep1/sale-proof/slot_aaaaaa/';
+  const B = 'form-attachments/rep1/sale-proof/slot_bbbbbb/';
+
+  function proofButtons() {
+    return Array.from(document.body.querySelectorAll('.sales-line-proof button')).map(
+      (button) => button.textContent?.trim()
+    );
+  }
+
+  it('renders one control per screenshot', () => {
+    render({ ...SALE, proofScreenshotPaths: [A, B], proofScreenshotPath: A });
+    expect(proofButtons()).toEqual(['Screenshot 1', 'Screenshot 2']);
+  });
+
+  it('renders a single control for a legacy single-path sale', () => {
+    render({ ...SALE, proofScreenshotPath: A });
+    expect(proofButtons()).toEqual(['View proof screenshot']);
+  });
+
+  it('renders no control and the empty copy when there is no proof', () => {
+    render(SALE);
+    expect(proofButtons()).toEqual([]);
+    expect(document.body.textContent).toContain('No order number or proof attached');
+  });
+});
