@@ -117,7 +117,7 @@ function WeeklyChallengeCard() {
   return (
     <section className={`${s.panel} ${st.span}`} aria-labelledby="set-weekly">
       <PanelHead id="set-weekly" title="Weekly challenge">
-        {loadFailed ? null : <span className={`${u.status} ${u.toneLime}`}>Live</span>}
+        {loading || loadFailed ? null : <span className={`${u.status} ${u.toneLime}`}>Live</span>}
       </PanelHead>
 
       {loadFailed ? (
