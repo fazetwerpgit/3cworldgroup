@@ -7,7 +7,7 @@
   z-index: 120;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: calc(100dvh / var(--pz, 1));
   background: rgba(1, 3, 7, 0.96);
   color: var(--c-text);
   font-family: var(--f-ui);

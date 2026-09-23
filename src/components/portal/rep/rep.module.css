@@ -86,7 +86,7 @@
 .root {
   position: relative;
   isolation: isolate;
-  min-height: 100dvh;
+  min-height: calc(100dvh / var(--pz, 1));
   background: var(--c-ground);
   font-size: var(--t-body);
   line-height: 1.4;
@@ -124,6 +124,49 @@
 /* The global body is white; without this an overscroll bounce flashes it. */
 :global(body):has(.root) {
   background: #0b1424;
+}
+
+/* ---------- big screens ----------
+   The desktop layout is drawn for about 1600x1000. On bigger screens (1440p,
+   ultrawide) it scales up like browser zoom so it is not a small island in
+   empty navy: --pz steps by 0.1 while the zoomed viewport stays at least
+   1600x1000, so every breakpoint up to 1600px still sees the same width.
+   Zooming the root carries body-portaled sheets and drops along. Chrome and
+   Firefox scale viewport units by the zoom too, so every desktop dvh/vw in the
+   portal divides by --pz; JS that mixes rect and style px divides by
+   currentCSSZoom (RepTopBar drops). */
+:global(html):has(.root) {
+  zoom: var(--pz, 1);
+}
+
+@media (min-width: 1760px) and (min-height: 1100px) {
+  :global(html):has(.root) {
+    --pz: 1.1;
+  }
+}
+
+@media (min-width: 1920px) and (min-height: 1200px) {
+  :global(html):has(.root) {
+    --pz: 1.2;
+  }
+}
+
+@media (min-width: 2080px) and (min-height: 1300px) {
+  :global(html):has(.root) {
+    --pz: 1.3;
+  }
+}
+
+@media (min-width: 2240px) and (min-height: 1400px) {
+  :global(html):has(.root) {
+    --pz: 1.4;
+  }
+}
+
+@media (min-width: 2400px) and (min-height: 1500px) {
+  :global(html):has(.root) {
+    --pz: 1.5;
+  }
 }
 
 /* ---------- phone app shell ----------
@@ -814,7 +857,7 @@ h2.kicker::before {
     bottom: auto;
     left: 50%;
     width: min(560px, calc(100vw - 48px));
-    max-height: min(760px, calc(100dvh - 96px));
+    max-height: min(760px, calc(100dvh / var(--pz, 1) - 96px));
     padding-bottom: 0;
     border-bottom: 1px solid var(--c-line-strong);
     border-radius: var(--r-panel);
@@ -837,11 +880,11 @@ h2.kicker::before {
 .drop {
   position: fixed;
   top: calc(var(--topbar-h) + env(safe-area-inset-top) + 8px);
-  right: max(var(--gutter), calc((100vw - 1360px) / 2 + var(--gutter)));
+  right: max(var(--gutter), calc((100vw / var(--pz, 1) - 1360px) / 2 + var(--gutter)));
   z-index: 61;
   width: 320px;
   /* Under the top bar and above the home indicator, so the last row is reachable. */
-  max-height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
+  max-height: calc(100dvh / var(--pz, 1) - var(--topbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
   overflow-y: auto;
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-panel);

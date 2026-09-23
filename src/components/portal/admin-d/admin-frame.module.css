@@ -117,7 +117,7 @@
     position: sticky;
     top: calc(var(--topbar-h) + var(--s6));
     display: block;
-    max-height: calc(100dvh - var(--topbar-h) - var(--s6) - var(--s5));
+    max-height: calc(100dvh / var(--pz, 1) - var(--topbar-h) - var(--s6) - var(--s5));
     margin: 0 0 0 calc(var(--s3) * -1);
     overflow-y: auto;
     overscroll-behavior: contain;

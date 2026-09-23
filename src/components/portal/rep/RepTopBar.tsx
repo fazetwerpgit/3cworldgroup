@@ -138,6 +138,8 @@ export function RepTopBar({
   // Desktop drops sit under the button that opened them: More starts at the
   // button's left edge, account and notifications end at their button's right
   // edge. Clamped inside the viewport; phones keep the full-width CSS panel.
+  // Rects and the viewport are in screen px; the drop's own px are scaled by
+  // the big-screen shell zoom (rep.module.css --pz), so divide by it.
   useLayoutEffect(() => {
     if (panel !== 'more' && panel !== 'account' && panel !== 'notes') return;
     const place = () => {
@@ -152,16 +154,17 @@ export function RepTopBar({
         drop.style.removeProperty('max-height');
         return;
       }
+      const zoom = drop.currentCSSZoom || 1;
       const anchor = trigger.getBoundingClientRect();
-      const viewportWidth = document.documentElement.clientWidth;
+      const viewportWidth = document.documentElement.clientWidth / zoom;
       const width = drop.offsetWidth;
-      const wanted = panel === 'more' ? anchor.left : anchor.right - width;
+      const wanted = panel === 'more' ? anchor.left / zoom : anchor.right / zoom - width;
       const left = Math.max(DROP_MARGIN, Math.min(wanted, viewportWidth - DROP_MARGIN - width));
-      const top = bar.getBoundingClientRect().bottom + DROP_GAP;
+      const top = bar.getBoundingClientRect().bottom / zoom + DROP_GAP;
       drop.style.top = `${top}px`;
       drop.style.left = `${Math.round(left)}px`;
       drop.style.right = 'auto';
-      drop.style.maxHeight = `${window.innerHeight - top - DROP_MARGIN}px`;
+      drop.style.maxHeight = `${window.innerHeight / zoom - top - DROP_MARGIN}px`;
     };
     place();
     window.addEventListener('resize', place);

@@ -897,14 +897,14 @@
 
 .viewerImg {
   max-width: 100%;
-  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
+  max-height: calc(100dvh / var(--pz, 1) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
   border-radius: var(--r-control);
   object-fit: contain;
 }
 
 .viewerDoc {
   width: min(100%, 760px);
-  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
+  max-height: calc(100dvh / var(--pz, 1) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
   padding: 0 var(--s3) var(--s3);
   overflow-y: auto;
   overscroll-behavior: contain;

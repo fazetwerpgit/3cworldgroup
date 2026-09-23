@@ -36,7 +36,7 @@
 
 /* The pages scroll inside their own box so the steps below stay in reach. */
 .pages {
-  max-height: 60vh;
+  max-height: calc(60vh / var(--pz, 1));
   padding: 0 var(--s3) var(--s1);
   overflow-y: auto;
   /* The zoom scroller inside PdfPages owns the horizontal overflow, so this
@@ -183,7 +183,7 @@
   }
 
   .pages {
-    max-height: 70vh;
+    max-height: calc(70vh / var(--pz, 1));
   }
 }
 

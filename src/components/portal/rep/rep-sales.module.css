@@ -1878,7 +1878,7 @@
 
 /* ---------- sale detail sheet ---------- */
 .detail {
-  max-height: 92dvh;
+  max-height: calc(92dvh / var(--pz, 1));
 }
 
 .dBody {

@@ -26,7 +26,7 @@
     display: grid;
     grid-template-columns: 320px minmax(0, 1fr);
     gap: var(--s4);
-    height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - var(--s6) - var(--s5));
+    height: calc(100dvh / var(--pz, 1) - var(--topbar-h) - env(safe-area-inset-top) - var(--s6) - var(--s5));
     min-height: 560px;
   }
 
