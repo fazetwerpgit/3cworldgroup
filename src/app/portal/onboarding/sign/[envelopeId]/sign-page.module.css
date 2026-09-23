@@ -186,3 +186,13 @@
     max-height: 70vh;
   }
 }
+
+/* The last Sign attempt failed: the bar's status line says why. */
+.status[data-state='error'],
+.asideStatus[data-state='error'] {
+  color: var(--c-red);
+}
+
+.linkBtn {
+  text-decoration: none;
+}

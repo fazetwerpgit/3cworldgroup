@@ -708,7 +708,13 @@ function PhotoViewer({ src, name, onClose }: { src: string; name: string; onClos
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <button ref={closeRef} type="button" className={`${s.iconBtn} ${f.viewerClose}`} aria-label="Close" onClick={onClose}>
+        <button
+          ref={closeRef}
+          type="button"
+          className={`${s.iconBtn} ${f.viewerClose}`}
+          aria-label="Close"
+          onClick={onClose}
+        >
           <X size={22} aria-hidden="true" />
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
