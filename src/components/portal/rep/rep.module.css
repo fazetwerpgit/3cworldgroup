@@ -9,9 +9,14 @@
 
 .root,
 .layer {
+  /* Surface ladder (direction C): well < ground < panel < raised < panel-hi.
+     Depth is these steps plus neutral shadows and a 1px top-edge highlight;
+     never a glow, never an accent-coloured shadow. */
   --c-ground: #0b1424; /* the old portal navy (Jacob: "the background is way better") */
-  --c-panel: #131f33; /* the old portal's card: one flat step above the ground */
-  --c-panel-hi: #1a2840;
+  --c-well: #08101d; /* recessed wells: tracks, segmented controls, stamps */
+  --c-panel: #131f33; /* L1: the old portal's card, one flat step above the ground */
+  --c-raised: #172540; /* L2: the money and payout cards, sheets */
+  --c-panel-hi: #1d2c46; /* L3: lifted rows, hover */
   --c-line: rgba(163, 184, 214, 0.16);
   --c-line-strong: rgba(163, 184, 214, 0.28);
   --c-text: #f2f5f9;
@@ -29,10 +34,16 @@
   --c-track: rgba(163, 184, 214, 0.14);
   --c-bar: #070f1c; /* fixed bars: opaque, a step below the ground, never blurred */
   --c-panel-fill: var(--c-panel); /* flat, like the old portal's cards */
-  --c-lift: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --c-edge: inset 0 1px 0 rgba(255, 255, 255, 0.06); /* top-edge highlight */
+  --c-lift: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --c-lift-2: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+  --c-lift-3: var(--c-edge), 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -18px rgba(0, 0, 0, 0.8);
+  --c-sink: inset 0 1px 3px rgba(0, 0, 0, 0.45);
 
   --f-display: 'Bebas Neue', var(--font-geist-sans), system-ui, sans-serif;
   --f-ui: var(--font-geist-sans), system-ui, sans-serif;
+  /* Amounts: Geist 600 with tabular figures (Geist Mono spaces its commas). */
+  --f-num: var(--font-geist-sans), system-ui, sans-serif;
   --t-score: 76px;
   --t-d1: 48px;
   --t-d2: 32px;
@@ -43,6 +54,7 @@
   --t-min: 12px;
 
   --r-panel: 8px;
+  --r-card: 14px; /* raised cards (L2) */
   --r-control: 6px;
   --s1: 4px;
   --s2: 8px;
@@ -717,8 +729,8 @@ h2.kicker::before {
   border: 1px solid var(--c-line-strong);
   border-bottom: 0;
   border-radius: 14px 14px 0 0;
-  background: var(--c-panel);
-  box-shadow: 0 -24px 60px -20px rgba(0, 0, 0, 0.9);
+  background: var(--c-raised);
+  box-shadow: var(--c-edge), 0 -24px 60px -20px rgba(0, 0, 0, 0.9);
   color: var(--c-text);
   transform: translateZ(0);
   animation: sheetUp 260ms var(--ease) both;
