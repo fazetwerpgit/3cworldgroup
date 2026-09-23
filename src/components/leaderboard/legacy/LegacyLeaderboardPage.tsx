@@ -274,9 +274,6 @@ export function LegacyLeaderboardPage({
 
   return (
     <>
-      {/* The gold glow behind the top three stays; the flat ground and the
-          vignette that used to sit under it now come from the D shell. */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%)]" aria-hidden="true" />
       {/* No side padding: the D shell's gutter already lines the board up with its top bar. */}
       <div className="relative z-10 mx-auto w-full max-w-[1500px] pb-8">
         <PageTitle title="Leaderboard" meta={`${entries.length} ranked`} />
