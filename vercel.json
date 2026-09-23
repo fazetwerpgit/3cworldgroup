@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/onboarding-nudges",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-installs?slot=cdt",
+      "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/cron/weekly-installs?slot=cst",
+      "schedule": "0 14 * * 1"
     }
   ]
 }
