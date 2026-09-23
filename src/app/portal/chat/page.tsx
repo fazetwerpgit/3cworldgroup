@@ -30,6 +30,7 @@ import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import {
   SendRequestError,
   chatMessageDocId,
+  autoRetryExpired,
   classifySendError,
   decideAfterFailure,
   newClientMessageId,
@@ -909,11 +910,19 @@ export default function TeamChatPage() {
   // to the foreground, and after the outbox is restored on load.
   const flushOutbox = useCallback(() => {
     if (navigator.onLine === false) return;
+    const now = Date.now();
     for (const echo of pendingRef.current) {
       if (echo.pendingState !== 'sending' || echo.deliveredId || inFlightRef.current.has(echo.id)) continue;
+      // Waited for the connection past the auto-retry window: the user decides.
+      const windowStart = echo.retryWindowStart ?? echo.createdAt?.getTime() ?? now;
+      if (autoRetryExpired(windowStart, now)) {
+        clearRetryTimer(echo.id);
+        updateEcho(echo.id, { pendingState: 'failed', sendAttempts: 0, uploadProgress: undefined });
+        continue;
+      }
       void postMessageRef.current(echo);
     }
-  }, []);
+  }, [clearRetryTimer, updateEcho]);
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') flushOutbox();

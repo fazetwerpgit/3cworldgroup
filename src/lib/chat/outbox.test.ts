@@ -4,6 +4,7 @@ import {
   OUTBOX_MAX_AGE_MS,
   RETRY_DELAYS_MS,
   SendRequestError,
+  autoRetryExpired,
   chatMessageDocId,
   classifySendError,
   decideAfterFailure,
@@ -62,6 +63,14 @@ describe('retry policy', () => {
     expect(
       decideAfterFailure({ failure: { kind: 'network' }, attempts: RETRY_DELAYS_MS.length + 1, ageMs: 0, online: true })
     ).toEqual({ action: 'fail' });
+  });
+
+  it('stops auto-sending a message queued longer than the retry window', () => {
+    const start = Date.parse('2026-09-22T12:00:00Z');
+    expect(autoRetryExpired(start, start + AUTO_RETRY_MAX_AGE_MS - 1)).toBe(false);
+    expect(autoRetryExpired(start, start + AUTO_RETRY_MAX_AGE_MS)).toBe(true);
+    // Waiting offline for hours then coming back: not sent on its own.
+    expect(autoRetryExpired(start, start + 3 * 3_600_000)).toBe(true);
   });
 
   it('waits for connectivity instead of a timer while offline', () => {
