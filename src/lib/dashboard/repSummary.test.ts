@@ -139,7 +139,38 @@ describe('summarizePay', () => {
   });
 });
 
+describe('summarizePay missed installs', () => {
+  it('moves a missed install out of the month, the delta and the payout into estMissed', () => {
+    const missed = sale({ saleDate: d(2026, 9, 3), installDate: d(2026, 9, 16) });
+    const live = sale({ saleDate: d(2026, 9, 3), installDate: d(2026, 9, 17) });
+    const fiber = new Map<string, FiberOrder>([[missed.id!, { status: 'breakage' } as FiberOrder]]);
+    const summary = summarizePay([missed, live], fiber, rates, NOW);
+    expect(summary.estThisMonth).toBe(130);
+    expect(summary.estMissed).toBe(130);
+    expect(summary.estNoDate).toBe(0);
+    expect(summary.payout?.count).toBe(1);
+    expect(summary.payout?.amount).toBe(130);
+    // Still a sale this month: it counts as activity, in the attention bucket.
+    expect(summary.monthCount).toBe(2);
+    expect(summary.counts.attention).toBe(1);
+  });
+
+  it('reports estMissed as null without a plan and 0 with none missed', () => {
+    expect(summarizePay([sale()], noFiber, null, NOW).estMissed).toBeNull();
+    expect(summarizePay([sale()], noFiber, rates, NOW).estMissed).toBe(0);
+  });
+});
+
 describe('recentSaleRows', () => {
+  it('shows a missed install with its est. pay but no payout window', () => {
+    const missed = sale({ installDate: d(2026, 9, 16) });
+    const fiber = new Map<string, FiberOrder>([[missed.id!, { status: 'breakage' } as FiberOrder]]);
+    const [row] = recentSaleRows([missed], fiber, rates, NOW);
+    expect(row.status).toBe('missed');
+    expect(row.payoutLabel).toBeNull();
+    expect(row.estPay).toBe(130);
+  });
+
   it('labels status, est. pay and a payout window for every dated, live T-Fiber sale', () => {
     const rows = recentSaleRows(
       [

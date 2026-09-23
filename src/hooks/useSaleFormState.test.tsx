@@ -201,7 +201,7 @@ describe('useSaleFormState', () => {
   });
 
   it('sends every screenshot, the idempotency key, and clears the draft on success', async () => {
-    createSale.mockResolvedValue({ id: 'sale-1' });
+    createSale.mockResolvedValue({ sale: { id: 'sale-1' }, duplicate: false });
     await mount();
     await act(async () => {
       api.setField('customerAddress', '1 Main St');
@@ -214,6 +214,7 @@ describe('useSaleFormState', () => {
       vi.advanceTimersByTime(500);
     });
     expect(window.sessionStorage.getItem(DRAFT_KEY)).not.toBeNull();
+    const key = api.proofUploadId;
     await act(async () => {
       await api.submit();
     });
@@ -221,9 +222,104 @@ describe('useSaleFormState', () => {
     const payload = createSale.mock.calls[0][0];
     expect(payload.proofScreenshotPaths).toEqual([PROOF(1), PROOF(2)]);
     expect(payload.proofScreenshotPath).toBe(PROOF(1));
-    expect(payload.clientSaleId).toBe(api.proofUploadId);
+    expect(payload.clientSaleId).toBe(key);
+    // Confirmed: the next entry never reuses this sale's key.
+    expect(api.proofUploadId).not.toBe(key);
+    expect(api.proofUploadId).toMatch(/^[a-f0-9]{32}$/);
     expect(payload.salesRepId).toBe('r1');
     expect(payload.products).toHaveLength(1);
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  async function fillSale(name = 'Carla Diaz') {
+    await act(async () => {
+      api.setField('customerName', name);
+      api.setField('customerAddress', '1 Main St');
+      api.setField('installDate', todaySaleDateInput());
+      api.setField('orderNumberOrBtn', 'TMF-1');
+      api.addPlan(plan);
+    });
+  }
+
+  async function clearSale() {
+    await act(async () => {
+      for (const name of ['customerName', 'customerAddress', 'installDate', 'orderNumberOrBtn'] as const) {
+        api.setField(name, '');
+      }
+      api.removeProduct(0);
+    });
+  }
+
+  it('keeps the key for a retry after no answer, and a new key once the entry is cleared', async () => {
+    createSale.mockResolvedValue(null); // no signal: the request may still have landed
+    await mount();
+    await fillSale();
+    const key = api.proofUploadId;
+    await act(async () => void (await api.submit()));
+    expect(api.proofUploadId).toBe(key);
+    await act(async () => void (await api.submit()));
+    expect(createSale.mock.calls.map((call) => call[0].clientSaleId)).toEqual([key, key]);
+
+    await clearSale();
+    expect(api.proofUploadId).not.toBe(key);
+    await fillSale('Somebody Else');
+    await act(async () => void (await api.submit()));
+    expect(createSale.mock.calls[2][0].clientSaleId).toBe(api.proofUploadId);
+    expect(createSale.mock.calls[2][0].clientSaleId).not.toBe(key);
+  });
+
+  it('keeps the key when an entry that was never submitted is cleared', async () => {
+    await mount();
+    const key = api.proofUploadId;
+    await fillSale();
+    await clearSale();
+    expect(api.proofUploadId).toBe(key);
+  });
+
+  it('remembers a used key in the draft, so clearing after a reload still starts fresh', async () => {
+    const key = 'b'.repeat(32);
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        formData: fields({ customerName: 'Carla Diaz', orderNumberOrBtn: 'TMF-1' }),
+        products: [product],
+        saleDateTouched: false,
+        proofUploadId: key,
+        keyUsed: true,
+      })
+    );
+    await mount();
+    expect(api.proofUploadId).toBe(key);
+    await clearSale();
+    await act(async () => api.setField('customerAddress', ''));
+    expect(api.proofUploadId).not.toBe(key);
+  });
+
+  it('holds a duplicate for the page instead of treating it as a new sale', async () => {
+    const stored = { id: 'b'.repeat(32), customerName: 'Carla Diaz' };
+    createSale.mockResolvedValue({ sale: stored, duplicate: true });
+    await mount();
+    await fillSale('Somebody Else');
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    const key = api.proofUploadId;
+    let result: unknown;
+    await act(async () => {
+      result = await api.submit();
+    });
+    expect(result).toEqual({ sale: stored, duplicate: true });
+    expect(api.duplicateOf).toEqual(stored);
+    expect(api.proofUploadId).toBe(key);
+    // The entry on screen may be a different customer: it is not thrown away.
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).not.toBeNull();
+
+    createSale.mockResolvedValue({ sale: { id: 'new-sale' }, duplicate: false });
+    await act(async () => void (await api.logAsNew()));
+    const retried = createSale.mock.calls[1][0].clientSaleId;
+    expect(retried).not.toBe(key);
+    expect(retried).toMatch(/^[a-f0-9]{32}$/);
+    expect(api.duplicateOf).toBeNull();
     expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
   });
 

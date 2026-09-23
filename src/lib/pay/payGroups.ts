@@ -22,9 +22,29 @@ export function hasInstallDate(sale: Pick<Sale, 'installDate'>): boolean {
   return !Number.isNaN(installTime(sale));
 }
 
-/** Counted sales (not cancelled by us or the carrier) with an install date. */
+/**
+ * The carrier reports the install broke at the door (breakage): the customer
+ * missed, rescheduled or cancelled, so the date on the sale is stale. The sale
+ * still counts, but its money waits on a new install date like an undated one.
+ */
+export function isMissedInstall(sale: Pick<Sale, 'id' | 'installDate'>, fiberBySale: FiberMap): boolean {
+  return hasInstallDate(sale) && fiberBySale.get(sale.id || '')?.status === 'breakage';
+}
+
+/**
+ * Counted sales (not cancelled by us or the carrier) with an install date that
+ * still stands. A missed install is left out: its date is stale, so it has no
+ * month and no payout window until it is rescheduled.
+ */
 export function datedSales<T extends Sale>(sales: T[], fiberBySale: FiberMap): T[] {
-  return countedSales(sales, fiberBySale).filter(hasInstallDate);
+  return countedSales(sales, fiberBySale).filter(
+    (sale) => hasInstallDate(sale) && !isMissedInstall(sale, fiberBySale)
+  );
+}
+
+/** Counted sales whose install the carrier reports as missed (see isMissedInstall). */
+export function missedInstallSales<T extends Sale>(sales: T[], fiberBySale: FiberMap): T[] {
+  return countedSales(sales, fiberBySale).filter((sale) => isMissedInstall(sale, fiberBySale));
 }
 
 /** Counted sales with no install date on the calendar yet. */
@@ -38,12 +58,12 @@ export function sumExpectedPay(sales: Array<Pick<Sale, 'products'>>, rates: Comp
   return sales.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
 }
 
-export type PayGroupKind = 'window' | 'other' | 'undated';
+export type PayGroupKind = 'window' | 'other' | 'missed' | 'undated';
 
 export interface PayGroup<T extends Sale = Sale> {
   kind: PayGroupKind;
   key: string;
-  /** "Sep 21–25", "Other carriers · Sep", "No install date". */
+  /** "Sep 21–25", "Other carriers · Sep", "Missed install", "No install date". */
   label: string;
   /** The T-Fiber payout window ('window' groups only). */
   window: PayoutWindow | null;
@@ -61,7 +81,7 @@ const newestInstallFirst = (a: Sale, b: Sale) => installTime(b) - installTime(a)
 export interface GroupPayOptions {
   /** Only installs in this (local) month. Omitted, every install is grouped. */
   month?: MonthKey;
-  /** Add the "No install date" group. It is live state, not a month's history. */
+  /** Add the "Missed install" and "No install date" groups. They are live state, not a month's history. */
   includeUndated?: boolean;
 }
 
@@ -72,7 +92,9 @@ export interface GroupPayOptions {
  *      and completed installs alike, by the sale's current install date
  *   2. "Other carriers" by install month, newest first — no published schedule,
  *      so no window
- *   3. "No install date": counted sales with nothing on the calendar yet
+ *   3. "Missed install": the carrier says the install broke; no window until
+ *      it is rescheduled
+ *   4. "No install date": counted sales with nothing on the calendar yet
  *
  * Every figure is an estimate and every window is a range; nothing here ever
  * produces a single pay date.
@@ -130,6 +152,10 @@ export function groupPaySales<T extends Sale>(
   for (const group of groups) group.sales.sort(newestInstallFirst);
 
   if (includeUndated) {
+    const missed = missedInstallSales(sales, fiberBySale);
+    if (missed.length) {
+      groups.push({ kind: 'missed', key: 'missed', label: 'Missed install', window: null, month: null, sales: missed, amount: null });
+    }
     const undated = undatedSales(sales, fiberBySale);
     if (undated.length) {
       groups.push({ kind: 'undated', key: 'undated', label: 'No install date', window: null, month: null, sales: undated, amount: null });

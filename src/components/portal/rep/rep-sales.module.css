@@ -154,6 +154,54 @@
   font-weight: 600;
 }
 
+/* "Sale logged · Carla Diaz" after Log Sale. */
+.logged {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s1) var(--s1) var(--s1) var(--s4);
+  border: 1px solid rgba(141, 198, 63, 0.45);
+  border-radius: var(--r-panel);
+  background: var(--c-lime-wash);
+}
+
+.loggedIcon {
+  flex: none;
+  color: var(--c-lime);
+}
+
+.loggedText {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.loggedText strong {
+  font-weight: 600;
+}
+
+.loggedClose {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--c-text-2);
+  cursor: pointer;
+}
+
+/* "Couldn't load pay rates · Retry" in the Est. payout cell. */
+.kpiFailed {
+  padding: var(--s1) 0 0;
+}
+
 .kpiDash {
   color: var(--c-text-3);
 }
@@ -711,6 +759,11 @@
 
 .totalsPay .money {
   color: var(--c-lime);
+}
+
+/* "Couldn't load pay rates · Retry" above the pay list. */
+.planFailed {
+  border-bottom: 1px solid var(--c-line);
 }
 
 .note {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
 import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
@@ -33,8 +33,17 @@ interface SalesTableProps {
   onPayViewChange?: (payView: boolean) => void;
   /** The month the page's picker is on. Omitted, the whole book is listed. */
   month?: MonthKey;
-  /** The viewer's own comp-plan slice. A planless rep sees no dollar figures. */
-  payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
+  /**
+   * The viewer's own comp-plan slice. A planless rep sees no dollar figures;
+   * `error` means the rates failed to load (not "no plan"), with `onRetry`.
+   */
+  payPlan?: {
+    rates: CompPlanCompanyRates | null;
+    payDelayDays: number;
+    hasPlan: boolean;
+    error?: boolean;
+    onRetry?: () => void;
+  };
   /** Provider install status, fetched once by the page. */
   fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
   /** Refetches the book after the detail sheet edits a sale's install date. */
@@ -72,7 +81,7 @@ function statusLine(status: RowStatus, installDate: Date | string | null | undef
     case 'needs-date':
       return 'Needs install date';
     case 'missed':
-      return 'Missed install';
+      return 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
   }
@@ -93,6 +102,7 @@ function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan:
 const GROUP_NOTE: Record<PayGroup['kind'], string> = {
   window: 'T-Fiber payout window',
   other: 'No published payout window',
+  missed: 'Gets a window once it is rescheduled',
   undated: 'Gets a window once it has a date',
 };
 
@@ -172,7 +182,8 @@ export function SalesTable({
     [fiberBySale, hasPlan, month, rates, sales]
   );
   const paySales = useMemo(() => payGroups.flatMap((group) => group.sales), [payGroups]);
-  const datedPayGroups = payGroups.filter((group) => group.kind !== 'undated');
+  // Money with a date that stands: missed and undated sales wait on a new date.
+  const datedPayGroups = payGroups.filter((group) => group.kind === 'window' || group.kind === 'other');
   const datedPayCount = datedPayGroups.reduce((sum, group) => sum + group.sales.length, 0);
   const datedPayTotal = hasPlan
     ? datedPayGroups.reduce((sum, group) => sum + (group.amount ?? 0), 0)
@@ -195,8 +206,10 @@ export function SalesTable({
   const payoutBySale = useMemo(() => {
     const map: Record<string, string | null> = {};
     for (const sale of sales) {
-      // Scheduled and completed installs alike; only a cancellation has none.
-      const window = payoutWindowForSale(sale, statusBySale[sale.id || ''] !== 'cancelled');
+      // Scheduled and completed installs alike. A cancellation has none, and a
+      // missed install gets one again once it is rescheduled.
+      const status = statusBySale[sale.id || ''];
+      const window = payoutWindowForSale(sale, status !== 'cancelled' && status !== 'missed');
       map[sale.id || ''] = window ? formatPayoutWindow(window) : null;
     }
     return map;
@@ -380,9 +393,19 @@ export function SalesTable({
           </div>
         ) : showPay ? (
           <div>
-            {!hasPlan && (
-              <p className={`${x.note} ${x.noteWarn}`}>No pay plan assigned yet — ask an admin to set your role.</p>
-            )}
+            {payPlan?.error ? (
+              <div className={`${s.failed} ${x.planFailed}`} role="alert">
+                <span>Couldn&apos;t load pay rates</span>
+                {payPlan.onRetry ? (
+                  <button type="button" className={s.retry} onClick={payPlan.onRetry}>
+                    <RotateCw size={14} aria-hidden="true" />
+                    Retry
+                  </button>
+                ) : null}
+              </div>
+            ) : !hasPlan ? (
+              <p className={`${x.note} ${x.noteWarn}`}>No pay plan assigned yet. Ask an admin to set your role.</p>
+            ) : null}
             {/* Stated once, above the money, rather than as a footnote under it. */}
             <p className={x.note}>
               An estimate, not a statement of pay. Chargebacks, claims and cancellations are
@@ -409,7 +432,13 @@ export function SalesTable({
                     const payout = window ? (
                       <span className={x.payout}>Est. payout <b>{window}</b></span>
                     ) : (
-                      <span className={x.payout}>{sale.installDate ? 'No published window' : 'Once it has a date'}</span>
+                      <span className={x.payout}>
+                        {statusBySale[sale.id || ''] === 'missed'
+                          ? 'Once rescheduled'
+                          : sale.installDate
+                            ? 'No published window'
+                            : 'Once it has a date'}
+                      </span>
                     );
                     return (
                       <div

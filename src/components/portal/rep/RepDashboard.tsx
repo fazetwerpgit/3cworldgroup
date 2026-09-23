@@ -40,6 +40,7 @@ import {
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
 import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
+import { CarrierNotice } from './CarrierNotice';
 import { PAY_DISPUTE_HREF, PayHelpSheet } from './PayHelpSheet';
 import { LOG_SALE_HREF } from './repNav';
 import s from './rep.module.css';
@@ -78,7 +79,7 @@ function statusLine(row: RecentSaleRow) {
     case 'needs-date':
       return 'Needs install date';
     case 'missed':
-      return 'Missed install';
+      return 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
   }
@@ -99,6 +100,7 @@ function payoutLine(row: RecentSaleRow) {
   if (row.payoutLabel) return `Est. payout ${row.payoutLabel}`;
   if (row.status === 'cancelled') return 'No pay';
   if (row.status === 'installed') return '';
+  if (row.status === 'missed') return 'After reschedule';
   return 'After install';
 }
 
@@ -245,6 +247,10 @@ function Board({
         {/* Money on sales with nothing on the calendar yet: it has no month. */}
         {hasPlan && pay.estNoDate ? (
           <p className={d.noDate}>est. {money(pay.estNoDate)} no install date yet</p>
+        ) : null}
+        {/* Missed installs: their date is stale, so their money waits on a new one. */}
+        {hasPlan && pay.estMissed ? (
+          <p className={d.noDate}>est. {money(pay.estMissed)} needs a new install date</p>
         ) : null}
       </div>
 
@@ -838,13 +844,18 @@ export function RepDashboard() {
               ) : null}
             </section>
           ) : pay ? (
-            <Board
-              pay={pay}
-              hasPlan={rates !== null}
-              standing={standing}
-              onHelp={() => setHelpOpen(true)}
-              onRetryStanding={() => retry('standing')}
-            />
+            <>
+              {book?.carrierFailed ? (
+                <CarrierNotice onRetry={() => retry('book')} className={d.carrierNote} />
+              ) : null}
+              <Board
+                pay={pay}
+                hasPlan={rates !== null}
+                standing={standing}
+                onHelp={() => setHelpOpen(true)}
+                onRetryStanding={() => retry('standing')}
+              />
+            </>
           ) : null}
 
           {!payLoading && !payFailed && rows.length > 0 ? <RecentSales rows={rows} /> : null}

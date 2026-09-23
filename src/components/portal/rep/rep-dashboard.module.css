@@ -22,6 +22,7 @@
   .banners {
     order: 0;
   }
+  .carrierNote,
   .board,
   .welcome {
     order: 1;

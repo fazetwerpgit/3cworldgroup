@@ -10,7 +10,11 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 
 vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn() }));
 
-const state: { added: Array<Record<string, unknown>> } = { added: [] };
+const state: {
+  added: Array<Record<string, unknown>>;
+  notifications: Array<Record<string, unknown>>;
+  notificationFails: boolean;
+} = { added: [], notifications: [], notificationFails: false };
 
 vi.mock('@/lib/firebase/admin', () => ({
   initError: null,
@@ -33,7 +37,13 @@ vi.mock('@/lib/firebase/admin', () => ({
           where: vi.fn(() => ({ get: vi.fn(async () => ({ docs: [] })) })),
         };
       }
-      return { add: vi.fn(async () => ({ id: 'n1' })) };
+      return {
+        add: vi.fn(async (doc: Record<string, unknown>) => {
+          if (state.notificationFails) throw new Error('notifications unavailable');
+          state.notifications.push(doc);
+          return { id: 'n1' };
+        }),
+      };
     }),
   },
 }));
@@ -66,6 +76,8 @@ beforeEach(() => {
   mockUser.mockReset();
   mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Wil Teasdale', email: 'w@x.com' });
   state.added = [];
+  state.notifications = [];
+  state.notificationFails = false;
 });
 
 describe('POST /api/portal/sales proof screenshots', () => {
@@ -150,5 +162,24 @@ describe('POST /api/portal/sales proof screenshots', () => {
     expect(response.status).toBe(200);
     expect(state.added[0].proofScreenshotPaths).toEqual([]);
     expect(state.added[0].proofScreenshotPath).toBe('');
+  });
+});
+
+describe('POST /api/portal/sales after the write', () => {
+  it('confirms the sale without promising a pay date', async () => {
+    const response = await POST(post(baseBody));
+    expect(response.status).toBe(200);
+    expect(state.notifications).toHaveLength(1);
+    expect(String(state.notifications[0].message)).not.toMatch(/week|pay follows|paid/i);
+  });
+
+  it('still reports success when the notification write fails', async () => {
+    state.notificationFails = true;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const response = await POST(post(baseBody));
+    errorSpy.mockRestore();
+    expect(response.status).toBe(200);
+    expect(state.added).toHaveLength(1);
+    expect((await response.json()).success).toBe(true);
   });
 });

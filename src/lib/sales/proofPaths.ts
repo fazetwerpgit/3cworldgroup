@@ -35,10 +35,16 @@ export type ProofPathsResult = { ok: true; paths: string[] } | { ok: false; erro
  * Validate the proof paths a client sent (array and/or legacy single field) for
  * a sale owned by `repUid`. Every path must pass the ownership/prefix check, and
  * there may be at most MAX_PROOF_SCREENSHOTS.
+ *
+ * `options.alsoAllow` widens the check for an edit: the uploader's own uid when
+ * an admin attaches proof to a rep's sale (uploads land under the uploader's
+ * prefix), and the paths the sale already stores (they passed this check when
+ * they were written, whoever uploaded them).
  */
 export function validateProofPaths(
   input: { proofScreenshotPaths?: unknown; proofScreenshotPath?: unknown },
-  repUid: string
+  repUid: string,
+  options: { alsoAllow?: { uids?: string[]; paths?: string[] } } = {}
 ): ProofPathsResult {
   if (input.proofScreenshotPaths !== undefined && input.proofScreenshotPaths !== null) {
     if (!Array.isArray(input.proofScreenshotPaths) || input.proofScreenshotPaths.some((p) => typeof p !== 'string')) {
@@ -52,7 +58,11 @@ export function validateProofPaths(
   if (paths.length > MAX_PROOF_SCREENSHOTS) {
     return { ok: false, error: `Attach at most ${MAX_PROOF_SCREENSHOTS} proof screenshots` };
   }
-  if (paths.some((path) => !isOwnSaleProofPath(path, repUid))) {
+  const uids = [repUid, ...(options.alsoAllow?.uids ?? [])];
+  const stored = new Set(options.alsoAllow?.paths ?? []);
+  const allowed = (path: string) =>
+    stored.has(path) || uids.some((uid) => isOwnSaleProofPath(path, uid));
+  if (paths.some((path) => !allowed(path))) {
     return { ok: false, error: 'Invalid proof screenshot path' };
   }
   return { ok: true, paths };

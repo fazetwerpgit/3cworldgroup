@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileText, ImageIcon, ImagePlus, Loader2, RotateCcw, X } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
-import { checkFormFile, formFileMime, uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
+import {
+  checkFormFile,
+  formFileMime,
+  FormUploadError,
+  isUploadCancelled,
+  uploadFormAttachment,
+} from '@/lib/forms/uploadFormAttachment';
 import { MAX_PROOF_SCREENSHOTS, newProofSlot } from '@/lib/sales/proofPaths';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
@@ -43,6 +49,15 @@ async function signedProofUrl(path: string): Promise<string | null> {
   return response.ok ? data?.url ?? null : null;
 }
 
+/**
+ * What the tile says when an upload fails: our own wording (a wrong type, too
+ * big, timed out) as is, anything else (a browser's "Load failed", a server
+ * string) as a plain "Upload failed", since the tile offers Retry anyway.
+ */
+export function proofUploadMessage(error: unknown): string {
+  return error instanceof FormUploadError ? error.message : 'Upload failed';
+}
+
 function isPdfUrl(url: string): boolean {
   try {
     return new URL(url).pathname.toLowerCase().endsWith('.pdf');
@@ -69,13 +84,19 @@ export function useProofUploads({
 }) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [previews, setPreviews] = useState<Record<string, Preview>>({});
+  // The last pick went over the cap, so some files were left off.
+  const [overCap, setOverCap] = useState(false);
   const objectUrls = useRef<Set<string>>(new Set());
   const requested = useRef<Set<string>>(new Set());
+  // One controller per upload in flight, so the rep can cancel a stalled one.
+  const controllers = useRef<Map<string, AbortController>>(new Map());
 
   useEffect(() => {
     const urls = objectUrls.current;
+    const running = controllers.current;
     return () => {
       for (const url of urls) URL.revokeObjectURL(url);
+      for (const controller of running.values()) controller.abort();
     };
   }, []);
 
@@ -97,6 +118,8 @@ export function useProofUploads({
 
   const upload = useCallback(
     async (item: Pending) => {
+      const controller = new AbortController();
+      controllers.current.set(item.key, controller);
       try {
         const path = await uploadFormAttachment({
           file: item.file,
@@ -104,16 +127,21 @@ export function useProofUploads({
           formType: 'sale-proof',
           slot: newProofSlot(slotKey),
           getHeaders: authHeaders,
+          signal: controller.signal,
         });
         if (item.preview) setPreviews((prev) => ({ ...prev, [path]: item.preview as Preview }));
         requested.current.add(path);
         setPending((prev) => prev.filter((p) => p.key !== item.key));
         onAdd(path);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Upload failed';
+        // Cancelled by the rep: the tile is already gone.
+        if (isUploadCancelled(error) || controller.signal.aborted) return;
+        const message = proofUploadMessage(error);
         setPending((prev) =>
           prev.map((p) => (p.key === item.key ? { ...p, status: 'failed', error: message } : p))
         );
+      } finally {
+        if (controllers.current.get(item.key) === controller) controllers.current.delete(item.key);
       }
     },
     [onAdd, slotKey]
@@ -121,8 +149,12 @@ export function useProofUploads({
 
   const room = MAX_PROOF_SCREENSHOTS - paths.length - pending.length;
 
-  /** Queue picked files (beyond the cap they are ignored); returns how many were taken. */
+  /**
+   * Queue picked files; returns how many were taken. Files beyond the cap are
+   * left off, and `overCap` tells the rep so instead of dropping them silently.
+   */
   const addFiles = (files: File[]): number => {
+    if (files.length > 0) setOverCap(files.length > Math.max(0, room));
     const taken = files.slice(0, Math.max(0, room)).map<Pending>((file) => {
       const typeError = checkFormFile(file);
       let preview: Preview | null = null;
@@ -155,7 +187,18 @@ export function useProofUploads({
     void upload(next);
   };
 
-  const discard = (key: string) => setPending((prev) => prev.filter((p) => p.key !== key));
+  /** Drop a failed tile, or cancel one still uploading (aborts its request). */
+  const discard = (key: string) => {
+    controllers.current.get(key)?.abort();
+    controllers.current.delete(key);
+    setOverCap(false);
+    setPending((prev) => prev.filter((p) => p.key !== key));
+  };
+
+  const remove = (path: string) => {
+    setOverCap(false);
+    onRemove(path);
+  };
 
   const tiles: ProofTile[] = [
     ...paths.map<ProofTile>((path) => ({ kind: 'done', key: path, path, preview: previews[path] ?? null })),
@@ -171,8 +214,9 @@ export function useProofUploads({
     addFiles,
     retry,
     discard,
-    remove: onRemove,
+    remove,
     room,
+    overCap,
     uploadingCount: pending.filter((p) => p.status === 'uploading').length,
   };
 }
@@ -236,7 +280,12 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
                   ) : (
                     <span className={l.thumbState}>
                       <AlertTriangle size={18} aria-hidden="true" />
-                      <button type="button" className={l.thumbRetry} onClick={() => uploads.retry(tile.key)}>
+                      <button
+                        type="button"
+                        className={l.thumbRetry}
+                        onClick={() => uploads.retry(tile.key)}
+                        aria-label={`Retry ${label.toLowerCase()}`}
+                      >
                         <RotateCcw size={14} aria-hidden="true" />
                         Retry
                       </button>
@@ -244,16 +293,16 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
                   )}
                 </span>
               )}
-              {tile.kind !== 'uploading' ? (
-                <button
-                  type="button"
-                  className={l.thumbRemove}
-                  aria-label={`Remove ${label.toLowerCase()}`}
-                  onClick={() => (tile.kind === 'done' ? uploads.remove(tile.path) : uploads.discard(tile.key))}
-                >
-                  <X size={14} strokeWidth={2.75} aria-hidden="true" />
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className={l.thumbRemove}
+                aria-label={
+                  tile.kind === 'uploading' ? `Cancel upload of ${label.toLowerCase()}` : `Remove ${label.toLowerCase()}`
+                }
+                onClick={() => (tile.kind === 'done' ? uploads.remove(tile.path) : uploads.discard(tile.key))}
+              >
+                <X size={14} strokeWidth={2.75} aria-hidden="true" />
+              </button>
             </li>
           );
         })}
@@ -285,6 +334,11 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
           </p>
         ) : null
       )}
+      {uploads.overCap ? (
+        <p className={l.proofError} role="status">
+          Only {MAX_PROOF_SCREENSHOTS} screenshots per sale. The extra ones were left off.
+        </p>
+      ) : null}
       <p className={l.proofCap}>Up to {MAX_PROOF_SCREENSHOTS} screenshots</p>
     </section>
   );

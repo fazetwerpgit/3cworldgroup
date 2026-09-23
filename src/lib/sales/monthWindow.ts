@@ -39,6 +39,26 @@ export function isCurrentMonth(key: MonthKey, now: Date = new Date()): boolean {
   return key.year === now.getFullYear() && key.month === now.getMonth();
 }
 
+/** Negative when `a` is before `b`, 0 in the same month, positive after. */
+export function compareMonths(a: MonthKey, b: MonthKey): number {
+  return a.year * 12 + a.month - (b.year * 12 + b.month);
+}
+
+/**
+ * The latest month the Sales page can move to. The ledger lists what was SOLD,
+ * so it stops at this month. The pay list goes by install date, and scheduled
+ * installs land next month, so it may look one month ahead (never further).
+ */
+export function latestPickableMonth(payView: boolean, now: Date = new Date()): MonthKey {
+  const current = currentMonth(now);
+  return payView ? shiftMonth(current, 1) : current;
+}
+
+/** `month`, pulled back to `max` when it is past it. */
+export function clampMonth(month: MonthKey, max: MonthKey): MonthKey {
+  return compareMonths(month, max) > 0 ? max : month;
+}
+
 /** True when `value` falls inside `key`. An absent or unparseable date is not in any month. */
 export function isInMonth(value: Date | string | null | undefined, key: MonthKey): boolean {
   if (!value) return false;

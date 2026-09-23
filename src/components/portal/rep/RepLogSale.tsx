@@ -1,14 +1,28 @@
 'use client';
 
-import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Camera, Check, ChevronDown, ChevronRight, ImageUp, Keyboard, ScanLine, WifiOff, AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CopyCheck,
+  ImageUp,
+  Keyboard,
+  RotateCw,
+  ScanLine,
+  WifiOff,
+} from 'lucide-react';
 import { FIBER_COMPANIES, SALE_TYPES, getPlanById, getPlansByCompany } from '@/types';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useSaleFormState, type SaleFieldKey, type SaleFormFields } from '@/hooks/useSaleFormState';
 import { NO_SIGNAL_SALE_MESSAGE } from '@/hooks/useSales';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
 import { payoutLabelForDraft } from '@/lib/pay/payoutWindow';
+import { loggedSaleHref } from '@/lib/sales/loggedSale';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
@@ -26,6 +40,8 @@ import l from './rep-logsale.module.css';
 const FORM_ID = 'rep-log-sale';
 const DEFAULT_PROVIDER = 'tfiber';
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const shortSaleDate = (value: Date | string) =>
+  new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 /** Short provider names for the segmented control ("TFiber", not "TFiber (T-Mobile)"). */
 const PROVIDER_SHORT: Record<string, string> = {
@@ -135,7 +151,7 @@ function describe(id: string, error: string | undefined, hasHint: boolean) {
 export function RepLogSale() {
   const router = useRouter();
   const { formRef, errorRef, ...form } = useSaleFormState();
-  const { rates, hasPlan } = useCompPlan();
+  const { rates, hasPlan, error: planError, retry: retryPlan } = useCompPlan();
   const uploads = useProofUploads({
     paths: form.proofPaths,
     onAdd: form.addProofPath,
@@ -183,11 +199,29 @@ export function RepLogSale() {
     form.keepProvider(company);
   };
 
+  // A new sale opens Sales on the month it was sold in, confirmed by name. A
+  // duplicate stays here: it is the sale already stored under this entry.
+  const afterSubmit = (result: Awaited<ReturnType<typeof form.submit>>, saleDate: string) => {
+    if (!result || result.duplicate) return;
+    router.push(result.sale.id ? loggedSaleHref(result.sale.id, saleDate) : '/portal/sales');
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const sale = await form.submit({ pendingUploads: uploads.uploadingCount });
-    if (sale) router.push('/portal/sales');
+    const saleDate = formData.saleDate;
+    afterSubmit(await form.submit({ pendingUploads: uploads.uploadingCount }), saleDate);
   };
+
+  const logAsNew = async () => {
+    const saleDate = formData.saleDate;
+    afterSubmit(await form.logAsNew({ pendingUploads: uploads.uploadingCount }), saleDate);
+  };
+
+  const duplicate = form.duplicateOf;
+  const duplicateRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (duplicate) duplicateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [duplicate]);
 
   const input = (
     name: keyof SaleFormFields,
@@ -206,17 +240,29 @@ export function RepLogSale() {
 
   const submitBar = (fixed: boolean) => (
     <div className={fixed ? l.submitBar : l.submitInline} data-keyboard={keyboardOpen ? 'open' : undefined}>
-      <p className={l.estPay}>
-        <span className={s.kicker}>Est. pay</span>
-        {est !== null ? (
-          <span className={l.estNum}>{money(est)}</span>
-        ) : (
-          <span className={l.estNone}>{hasPlan ? 'Pick a plan' : '—'}</span>
-        )}
-        <span className={l.estWhen}>
-          {payoutLabel ? `est. payout ${payoutLabel}` : est !== null ? 'Once it installs' : ' '}
-        </span>
-      </p>
+      {planError ? (
+        // The rates failed to load. That is not "no plan", so say so and retry.
+        <button type="button" className={`${l.estPay} ${l.estRetry}`} onClick={retryPlan}>
+          <span className={s.kicker}>Est. pay</span>
+          <span className={l.estNone}>Couldn&apos;t load pay rates</span>
+          <span className={l.estRetryLabel}>
+            <RotateCw size={12} strokeWidth={2.5} aria-hidden="true" />
+            Retry
+          </span>
+        </button>
+      ) : (
+        <p className={l.estPay}>
+          <span className={s.kicker}>Est. pay</span>
+          {est !== null ? (
+            <span className={l.estNum}>{money(est)}</span>
+          ) : (
+            <span className={l.estNone}>{hasPlan ? 'Pick a plan' : '—'}</span>
+          )}
+          <span className={l.estWhen}>
+            {payoutLabel ? `est. payout ${payoutLabel}` : est !== null ? 'Once it installs' : ' '}
+          </span>
+        </p>
+      )}
       <button
         type="submit"
         form={FORM_ID}
@@ -341,6 +387,37 @@ export function RepLogSale() {
                 : 'Type it in from the confirmation.'}
             </p>
           </header>
+
+          {duplicate ? (
+            <div ref={duplicateRef} className={l.dupe} role="alert">
+              <CopyCheck size={20} strokeWidth={2} aria-hidden="true" />
+              <div className={l.dupeBody}>
+                <p>
+                  <strong>This sale was already logged.</strong>
+                </p>
+                <p className={l.dupeMeta}>
+                  {[
+                    duplicate.customerName || duplicate.customerAddress || 'Customer',
+                    duplicate.saleDate ? `sold ${shortSaleDate(duplicate.saleDate)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                <div className={l.dupeActions}>
+                  <Link
+                    href={duplicate.id ? `/portal/sales/${duplicate.id}` : '/portal/sales'}
+                    className={s.btnSecondary}
+                    onClick={form.discardDraft}
+                  >
+                    View it
+                  </Link>
+                  <button type="button" className={l.dupeNew} onClick={logAsNew} disabled={form.submitting}>
+                    Log as a new sale
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {blockError ? (
             <div ref={errorRef} className={l.alert} role="alert">

@@ -404,7 +404,8 @@ export async function POST(request: NextRequest) {
       salesRepId,
       'sale_submitted',
       'Sale logged',
-      'Your sale is on the board. Pay follows about two weeks after the install.',
+      // No timing promise: pay is only ever an estimate (owner rule).
+      'Your sale is on the board. Track it in Sales.',
       `/portal/sales/${docRef.id}`
     );
 

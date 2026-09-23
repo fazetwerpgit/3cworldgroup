@@ -1,0 +1,24 @@
+/* Calm, not an error: the numbers under it still stand. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-panel);
+  background: var(--c-amber-wash);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.icon {
+  flex: none;
+  color: var(--c-amber);
+}
+
+.text {
+  flex: 1 1 12em;
+  margin: 0;
+}

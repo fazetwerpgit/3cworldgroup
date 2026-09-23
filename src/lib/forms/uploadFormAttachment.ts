@@ -3,6 +3,27 @@ import { FORM_ATTACHMENT_TYPES, MAX_FORM_FILE_BYTES } from './formUploads';
 // Client-side half of POST /api/portal/forms/upload, shared by FileUpload and the
 // Log Sale proof capture so both shrink and send a file the same way.
 
+/** Weak signal can stall an upload forever; past this it is abandoned as failed. */
+export const UPLOAD_TIMEOUT_MS = 60_000;
+
+/**
+ * An error whose message was written for the rep (a wrong type, too big, a
+ * file the phone would not hand over, a timeout). Anything else, such as a
+ * browser's "Load failed" or a server string, is not, and a caller may swap in
+ * its own wording.
+ */
+export class FormUploadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FormUploadError';
+  }
+}
+
+/** True when the caller's own signal cancelled the upload (not a failure to show). */
+export function isUploadCancelled(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
 // MIME types we can safely re-encode on a canvas to shrink large phone photos.
 const DOWNSCALABLE = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -63,7 +84,7 @@ export async function snapshotFormFile(file: File): Promise<File> {
   try {
     bytes = await file.arrayBuffer();
   } catch {
-    throw new Error('That file could not be read from your phone. Pick it again.');
+    throw new FormUploadError('That file could not be read from your phone. Pick it again.');
   }
   return new File([bytes], file.name, { type: formFileMime(file), lastModified: file.lastModified });
 }
@@ -92,6 +113,8 @@ export async function uploadFormAttachment({
   getHeaders,
   uploadUrl = '/api/portal/forms/upload',
   maxBytes = MAX_FORM_FILE_BYTES,
+  signal,
+  timeoutMs = UPLOAD_TIMEOUT_MS,
 }: {
   file: File;
   itemId: string;
@@ -105,13 +128,17 @@ export async function uploadFormAttachment({
   getHeaders?: () => Promise<HeadersInit>;
   uploadUrl?: string;
   maxBytes?: number;
+  /** Cancels the upload; it then rejects with an AbortError (see isUploadCancelled). */
+  signal?: AbortSignal;
+  /** Abandon the request after this long and reject with "Upload timed out". */
+  timeoutMs?: number;
 }): Promise<string> {
   const typeError = checkFormFile(file, allowedTypes);
-  if (typeError) throw new Error(typeError);
+  if (typeError) throw new FormUploadError(typeError);
 
   const prepared = await maybeDownscale(await snapshotFormFile(file), maxBytes);
   if (prepared.size > maxBytes) {
-    throw new Error(`File must be ${Math.round(maxBytes / (1024 * 1024))} MB or smaller`);
+    throw new FormUploadError(`File must be ${Math.round(maxBytes / (1024 * 1024))} MB or smaller`);
   }
 
   const body = new FormData();
@@ -122,8 +149,32 @@ export async function uploadFormAttachment({
   body.set('file', prepared);
 
   const headers = getHeaders ? await getHeaders() : undefined;
-  const response = await fetch(uploadUrl, { method: 'POST', headers, body });
-  const json = (await response.json().catch(() => null)) as { path?: string; error?: string } | null;
-  if (!response.ok || !json?.path) throw new Error(json?.error || 'Upload failed');
-  return json.path;
+  signal?.throwIfAborted();
+
+  // One controller for the request: the caller's cancel and the timeout both
+  // abort it, and the timeout covers reading the response too.
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const cancel = () => controller.abort();
+  signal?.addEventListener('abort', cancel);
+  try {
+    const response = await fetch(uploadUrl, { method: 'POST', headers, body, signal: controller.signal });
+    const json = (await response.json().catch((error) => {
+      if (controller.signal.aborted) throw error;
+      return null;
+    })) as { path?: string; error?: string } | null;
+    if (!response.ok || !json?.path) throw new Error(json?.error || 'Upload failed');
+    return json.path;
+  } catch (error) {
+    if (timedOut) throw new FormUploadError('Upload timed out');
+    if (signal?.aborted) throw new DOMException('Upload cancelled', 'AbortError');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
+  }
 }
