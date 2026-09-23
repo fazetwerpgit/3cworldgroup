@@ -15,11 +15,12 @@ import {
   Ban,
   X,
 } from 'lucide-react';
-import { Sale, FIBER_COMPANIES, SaleStatusConfig, type FiberOrder } from '@/types';
+import { Sale, SaleStatusConfig, type FiberOrder } from '@/types';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
 import { isStandingBreakage } from '@/lib/sales/installBucket';
+import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import { firstRescheduleDay, missedInstallDay, rescheduleDayError } from '@/lib/sales/rescheduleDay';
 import { dateToSaleDateInput, installDayKey, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
@@ -88,29 +89,6 @@ function installDateAsDate(value: Date | string | null | undefined): Date | null
   if (parsed.ok) return parsed.date;
   const fallback = new Date(value);
   return Number.isNaN(fallback.getTime()) ? null : fallback;
-}
-
-/** Short carrier wordmarks, text placeholders until the real logo files exist. */
-const CARRIER_MARK: Record<string, string> = {
-  tfiber: 'T-Fiber',
-  att: 'AT&T',
-  frontier: 'Frontier',
-  xfinity: 'Xfinity',
-};
-
-/** The carrier's wordmark text for a product company id ("tfiber" → "T-Fiber"). */
-export function carrierMark(company: string) {
-  return CARRIER_MARK[company] || FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
-}
-
-// Plan names carry the carrier ("TFiber 1 Gig"); beside the carrier mark that
-// reads twice, so the mark keeps the carrier and the plan keeps the rest.
-const CARRIER_PREFIX = /^(T-?Fiber|AT&T(?: Internet| Fiber)?|Frontier(?: Fiber)?|Xfinity)\s+/i;
-
-/** "TFiber 1 Gig" → "1 Gig", for a plan shown next to its carrier mark. */
-export function planWithoutCarrier(name: string) {
-  const rest = name.replace(CARRIER_PREFIX, '');
-  return rest || name;
 }
 
 export function SaleDetailSheet({
@@ -402,8 +380,8 @@ export function SaleDetailSheet({
             <div>
               {sale.products?.map((product, productIndex) => (
                 <div className={x.dPlan} key={`${product.productId}-${productIndex}`}>
-                  <span className={x.carrierMark}>{carrierMark(product.company)}</span>
-                  <strong>{planWithoutCarrier(product.productName)}</strong>
+                  {carrierMark(product.company) ? <span className={x.carrierMark}>{carrierMark(product.company)}</span> : null}
+                  <strong>{planWithoutCarrier(product.productName, product.company)}</strong>
                   <b>{formatMoney(product.totalPrice || product.unitPrice)}/mo</b>
                   <em>{product.points} pts</em>
                 </div>

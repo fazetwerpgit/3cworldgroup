@@ -13,11 +13,12 @@ import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
 import { groupPaySales, type PayGroup } from '@/lib/pay/payGroups';
 import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
+import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import { countedSales, isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
-import { SaleDetailSheet, carrierMark, planWithoutCarrier } from './SaleDetailSheet';
+import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
 import { FiberRows, FiberStatusPill, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -62,14 +63,13 @@ function formatDate(value: Date | string | null | undefined) {
 
 /** The first product's carrier wordmark, or null when the sale has no products. */
 function saleCarrier(sale: Pick<Sale, 'products'>): string | null {
-  const company = sale.products?.[0]?.company;
-  return company ? carrierMark(company) : null;
+  return carrierMark(sale.products?.[0]?.company) || null;
 }
 
 /** The plan beside its carrier mark, without the carrier said twice. */
 function salePlan(sale: Pick<Sale, 'products' | 'productSold'>, mark: string | null): string {
   const label = planLabel(sale);
-  return mark ? planWithoutCarrier(label) : label;
+  return mark ? planWithoutCarrier(label, sale.products?.[0]?.company) : label;
 }
 
 const STAMP_MONTH = new Intl.DateTimeFormat('en-US', { month: 'short' });
