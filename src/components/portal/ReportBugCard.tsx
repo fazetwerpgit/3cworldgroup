@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Send } from 'lucide-react';
+import { Bug, CheckCircle2, ChevronDown, Send } from 'lucide-react';
 import { auth } from '@/lib/firebase/config';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
+import st from '@/components/portal/rep/rep-settings.module.css';
 
 const AREAS = ['Forms', 'Sales', 'Onboarding', 'Chat', 'Leaderboard', 'Other'];
 
@@ -52,78 +53,73 @@ export default function ReportBugCard() {
   };
 
   return (
-    <section id="report-bug" className="member-line-bug mt-8 border-t border-[var(--member-line-line)] pt-5">
+    <section id="report-bug" className={s.panel} aria-label="Report a bug">
+      <button type="button" className={st.toggle} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span>
+          <Bug size={20} aria-hidden="true" />
+          Found a problem? Report a bug
+        </span>
+        <ChevronDown size={18} className={st.toggleChev} aria-hidden="true" />
+      </button>
 
-      {done ? (
-        <div className="member-line-note flex items-center gap-2">
-          <CheckCircle2 className="size-4" />
-          Thanks — your report was sent to the team.
-        </div>
-      ) : (
-        <form onSubmit={submit}>
-          {error && <div className="member-line-note warn mb-3">{error}</div>}
-          {!open ? (
-            <button type="button" className="text-sm font-semibold text-[var(--member-line-lime)] underline-offset-4 hover:underline" onClick={() => setOpen(true)}>
-              Found a problem? Report a bug.
-            </button>
+      {open && (
+        <div className={st.drawer}>
+          {done ? (
+            <div className={`${p.notice} ${p.noticeLime}`} role="status">
+              <CheckCircle2 size={16} aria-hidden="true" />
+              <span>Thanks. Your report went to the team.</span>
+            </div>
           ) : (
-            <>
-              <div className="member-line-field">
-                <label>Area / choose one</label>
-                <div className="member-line-segmented" role="group" aria-label="Bug area">
+            <form onSubmit={submit} className={st.stack}>
+              {error && (
+                <p className={`${p.hint} ${p.hintError}`} role="alert">
+                  {error}
+                </p>
+              )}
+              <div className={p.field}>
+                <span className={p.label} id="member-bug-area">Where did it happen?</span>
+                <div className={st.areas} role="group" aria-labelledby="member-bug-area">
                   {AREAS.map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      aria-pressed={area === a}
-                      onClick={() => setArea(a)}
-                    >
+                    <button key={a} type="button" className={p.chip} aria-pressed={area === a} onClick={() => setArea(a)}>
                       {a}
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="member-line-field" style={{ marginTop: 13 }}>
-                <label htmlFor="member-bug-summary">Short summary / required</label>
-                <Input
+              <label className={p.field}>
+                <span className={p.label}>Short summary</span>
+                <input
                   id="member-bug-summary"
+                  className={p.input}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="What went wrong?"
                   required
                 />
-              </div>
-              <div className="member-line-field" style={{ marginTop: 12 }}>
-                <label htmlFor="member-bug-details">Details / optional</label>
-                <Textarea
+              </label>
+              <label className={p.field}>
+                <span className={p.label}>Details (optional)</span>
+                <textarea
                   id="member-bug-details"
+                  className={`${p.input} ${p.textarea}`}
                   value={details}
                   onChange={(e) => setDetails(e.target.value)}
                   placeholder="What were you doing? What did you expect to happen?"
                   rows={4}
                 />
-              </div>
-              <div className="member-line-actions">
-                <button
-                  type="submit"
-                  className="member-line-button primary small"
-                  disabled={saving || !summary}
-                >
-                  <Send className="mr-1.5 inline size-3.5" />
-                  {saving ? 'Sending…' : 'Send report'}
-                </button>
-                <button
-                  type="button"
-                  className="member-line-button small"
-                  onClick={() => setOpen(false)}
-                  disabled={saving}
-                >
+              </label>
+              <div className={st.actions}>
+                <button type="button" className={s.btnSecondary} onClick={() => setOpen(false)} disabled={saving}>
                   Cancel
                 </button>
+                <button type="submit" className={s.btnPrimary} disabled={saving || !summary}>
+                  <Send size={18} aria-hidden="true" />
+                  {saving ? 'Sending…' : 'Send report'}
+                </button>
               </div>
-            </>
+            </form>
           )}
-        </form>
+        </div>
       )}
     </section>
   );
