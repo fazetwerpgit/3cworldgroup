@@ -8,7 +8,6 @@ import {
   ChevronRight,
   FileText,
   Image as ImageIcon,
-  MapPin,
   Pencil,
   Phone,
   RotateCcw,
@@ -28,12 +27,15 @@ import { saveInstallDate as saveOwnInstallDate } from '@/lib/sales/saveInstallDa
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { FiberStatusPill } from './InstallStatusSection';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 
 interface SaleDetailSheetProps {
   sale: Sale | null;
   total: number;
+  /** The sale's place in the list behind the sheet ("4 of 10"); omitted or -1, not shown. */
+  index?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPrev: () => void;
@@ -88,13 +90,33 @@ function installDateAsDate(value: Date | string | null | undefined): Date | null
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
-function companyLabel(company: string) {
-  return FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
+/** Short carrier wordmarks, text placeholders until the real logo files exist. */
+const CARRIER_MARK: Record<string, string> = {
+  tfiber: 'T-Fiber',
+  att: 'AT&T',
+  frontier: 'Frontier',
+  xfinity: 'Xfinity',
+};
+
+/** The carrier's wordmark text for a product company id ("tfiber" → "T-Fiber"). */
+export function carrierMark(company: string) {
+  return CARRIER_MARK[company] || FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
+}
+
+// Plan names carry the carrier ("TFiber 1 Gig"); beside the carrier mark that
+// reads twice, so the mark keeps the carrier and the plan keeps the rest.
+const CARRIER_PREFIX = /^(T-?Fiber|AT&T(?: Internet| Fiber)?|Frontier(?: Fiber)?|Xfinity)\s+/i;
+
+/** "TFiber 1 Gig" → "1 Gig", for a plan shown next to its carrier mark. */
+export function planWithoutCarrier(name: string) {
+  const rest = name.replace(CARRIER_PREFIX, '');
+  return rest || name;
 }
 
 export function SaleDetailSheet({
   sale,
   total,
+  index = -1,
   open,
   onOpenChange,
   onPrev,
@@ -286,6 +308,13 @@ export function SaleDetailSheet({
         <div className={`${s.sheetHead} ${x.dHead}`}>
           <div className={x.sheetHeadText}>
             <h2 className={x.sheetName}>{sale.customerName || sale.customerAddress || 'Customer pending'}</h2>
+            <p className={x.dStatus}>
+              <span className={`${x.dTag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status]?.name ?? sale.status}</span>
+              <span className={x.dAge}>
+                Sold {formatDate(sale.saleDate)}
+                {index >= 0 && total > 1 ? ` · ${index + 1} of ${total}` : ''}
+              </span>
+            </p>
           </div>
           <button className={s.iconBtn} type="button" onClick={() => onOpenChange(false)} aria-label="Close detail">
             <X size={20} aria-hidden="true" />
@@ -293,11 +322,6 @@ export function SaleDetailSheet({
         </div>
 
         <div className={`${s.sheetBody} ${x.dBody}`}>
-          <div className={`${x.dBlock} ${x.dStatus}`}>
-            <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status]?.name ?? sale.status}</span>
-            <span className={x.dAge}>Sold {formatDate(sale.saleDate)}</span>
-          </div>
-
           {sale.status === 'cancelled' && (
             <p className={x.dCancelled}>
               Cancelled {sale.cancelledAt ? formatDate(sale.cancelledAt) : ''}
@@ -306,34 +330,29 @@ export function SaleDetailSheet({
             </p>
           )}
 
-          <section className={x.dBlock} aria-label="Customer">
-            <span className={x.dStrong}>{sale.customerName || 'Customer pending'}</span>
-            {sale.customerPhone ? (
-              <a className={x.dLine} href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}>
-                <Phone size={16} aria-hidden="true" />
-                {sale.customerPhone}
-              </a>
-            ) : (
-              <span className={x.dLine}>
-                <Phone size={16} aria-hidden="true" />
-                No phone provided
+          {/* The money sits in a well at the top: est. pay, then the value and points behind it. */}
+          <div className={x.dMoney}>
+            <div>
+              <span className={s.kicker}>Est. pay</span>
+              <span className={x.dMoneyNum}>
+                {typeof sale.commission === 'number' ? <><span className={x.amtEst}>est.</span>{formatMoney(sale.commission)}</> : '—'}
               </span>
-            )}
-            <span className={x.dLine}>
-              <MapPin size={16} aria-hidden="true" />
-              {sale.customerAddress || 'No address provided'}
-            </span>
-          </section>
+            </div>
+            <dl className={x.dSummary}>
+              <div><dt>Monthly value</dt><dd>{formatMoney(sale.totalValue || 0)}</dd></div>
+              <div><dt>Points</dt><dd>{sale.totalPoints || 0}</dd></div>
+            </dl>
+          </div>
 
           <section className={x.dBlock} aria-labelledby="sd-dates">
-            <h3 id="sd-dates" className={x.dHeading}>Dates</h3>
-            <div className={x.dDates}>
-              <div className={x.dDate}>
-                <span>Sold</span>
-                <b>{formatDate(sale.saleDate)}</b>
-              </div>
-              <div className={x.dDate}>
-                <span>Install</span>
+            <h3 id="sd-dates" className={`${s.kicker} ${x.dHeading}`}>Dates</h3>
+            <div className={x.dKv}>
+              <span>Sold</span>
+              <b>{formatDate(sale.saleDate)}</b>
+            </div>
+            <div className={x.dKv}>
+              <span>Install</span>
+              <span className={x.dKvEnd}>
                 <b>{formatDate(shownInstallDate)}</b>
                 {canEditInstallDate && installDraft === null && (
                   <button
@@ -345,9 +364,9 @@ export function SaleDetailSheet({
                     Change
                   </button>
                 )}
-              </div>
+              </span>
             </div>
-            {payout && <span className={x.payout}>Est. payout <b>{payout}</b></span>}
+            {payout && <p className={x.dSub}>Est. payout <b>{payout}</b></p>}
             {installDraft !== null && (
               <div className={x.dEditor}>
                 <label className={x.dEditorLabel} htmlFor="sale-install-date">
@@ -379,30 +398,46 @@ export function SaleDetailSheet({
           </section>
 
           <section className={x.dBlock} aria-labelledby="sd-plans">
-            <h3 id="sd-plans" className={x.dHeading}>Plans sold</h3>
+            <h3 id="sd-plans" className={`${s.kicker} ${x.dHeading}`}>Plans sold</h3>
             <div>
               {sale.products?.map((product, productIndex) => (
                 <div className={x.dPlan} key={`${product.productId}-${productIndex}`}>
-                  <strong>{product.productName}</strong>
+                  <span className={x.carrierMark}>{carrierMark(product.company)}</span>
+                  <strong>{planWithoutCarrier(product.productName)}</strong>
                   <b>{formatMoney(product.totalPrice || product.unitPrice)}/mo</b>
-                  <span>{companyLabel(product.company)}</span>
                   <em>{product.points} pts</em>
                 </div>
               ))}
             </div>
+            {fiberOrder ? (
+              <p className={x.dCarrier}>
+                <span>Carrier report</span>
+                <FiberStatusPill status={fiberOrder.status} />
+              </p>
+            ) : null}
           </section>
 
-          <dl className={x.dSummary}>
-            <div><dt>Monthly value</dt><dd>{formatMoney(sale.totalValue || 0)}</dd></div>
-            <div>
-              <dt>Est. pay</dt>
-              <dd>{typeof sale.commission === 'number' ? <><span className={x.est}>est.</span>{formatMoney(sale.commission)}</> : '—'}</dd>
+          <section className={x.dBlock} aria-label="Customer">
+            <h3 className={`${s.kicker} ${x.dHeading}`}>Customer</h3>
+            <div className={x.dKv}>
+              <span>Phone</span>
+              {sale.customerPhone ? (
+                <a className={x.dPhone} href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}>
+                  <Phone size={16} aria-hidden="true" />
+                  {sale.customerPhone}
+                </a>
+              ) : (
+                <span className={x.dNone}>No phone provided</span>
+              )}
             </div>
-            <div><dt>Points</dt><dd>{sale.totalPoints || 0}</dd></div>
-          </dl>
+            <div className={x.dKv}>
+              <span>Address</span>
+              <b className={x.dAddr}>{sale.customerAddress || <span className={x.dNone}>No address provided</span>}</b>
+            </div>
+          </section>
 
           <section className={x.dBlock} aria-labelledby="sd-proof">
-            <h3 id="sd-proof" className={x.dHeading}>Order / proof</h3>
+            <h3 id="sd-proof" className={`${s.kicker} ${x.dHeading}`}>Order / proof</h3>
             <div className={x.proofList} data-part="proof">
               {sale.orderNumberOrBtn && (
                 <span className={x.dLine}>
@@ -438,7 +473,7 @@ export function SaleDetailSheet({
           </section>
 
           <section className={x.dBlock} aria-labelledby="sd-notes">
-            <h3 id="sd-notes" className={x.dHeading}>Rep notes</h3>
+            <h3 id="sd-notes" className={`${s.kicker} ${x.dHeading}`}>Rep notes</h3>
             <p className={x.dNotes}>{sale.notes || 'No notes added.'}</p>
           </section>
 
@@ -470,8 +505,8 @@ export function SaleDetailSheet({
 
           {total > 1 && (
             <div className={x.dNav}>
-              <button type="button" className={x.actBtn} onClick={onPrev}><ChevronLeft size={16} aria-hidden="true" />Previous</button>
-              <button type="button" className={x.actBtn} onClick={onNext}>Next<ChevronRight size={16} aria-hidden="true" /></button>
+              <button type="button" className={`${x.actBtn} ${x.dNavBtn}`} onClick={onPrev}><ChevronLeft size={16} aria-hidden="true" />Previous</button>
+              <button type="button" className={`${x.actBtn} ${x.dNavBtn}`} onClick={onNext}>Next<ChevronRight size={16} aria-hidden="true" /></button>
             </div>
           )}
           <div className={x.dFoot}>

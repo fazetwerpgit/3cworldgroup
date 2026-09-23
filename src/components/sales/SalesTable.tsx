@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
-import { Pencil, RotateCw, Trash2 } from 'lucide-react';
+import { Check, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
 import type { FiberOrderStatus } from '@/types/fiberOrder';
 import type { FiberStatusResponse } from '@/types';
@@ -17,7 +17,7 @@ import { countedSales, isCarrierCancelled, isStandingBreakage } from '@/lib/sale
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
-import { SaleDetailSheet } from './SaleDetailSheet';
+import { SaleDetailSheet, carrierMark, planWithoutCarrier } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
 import { FiberRows, FiberStatusPill, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -60,8 +60,38 @@ function formatDate(value: Date | string | null | undefined) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function shortDate(value: Date | string | null | undefined) {
-  return value ? formatDate(value) : '—';
+/** The first product's carrier wordmark, or null when the sale has no products. */
+function saleCarrier(sale: Pick<Sale, 'products'>): string | null {
+  const company = sale.products?.[0]?.company;
+  return company ? carrierMark(company) : null;
+}
+
+/** The plan beside its carrier mark, without the carrier said twice. */
+function salePlan(sale: Pick<Sale, 'products' | 'productSold'>, mark: string | null): string {
+  const label = planLabel(sale);
+  return mark ? planWithoutCarrier(label) : label;
+}
+
+const STAMP_MONTH = new Intl.DateTimeFormat('en-US', { month: 'short' });
+
+/** "SEP / 22": the Bebas date stamp that leads a row. */
+function DateStamp({ value, label }: { value: Date | string | null | undefined; label: string }) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return (
+      <span className={x.stamp}>
+        <span className={s.srOnly}>{label}: not set</span>
+        <b aria-hidden="true">—</b>
+      </span>
+    );
+  }
+  return (
+    <span className={x.stamp}>
+      <span className={s.srOnly}>{label} </span>
+      {STAMP_MONTH.format(date)}
+      <b>{date.getDate()}</b>
+    </span>
+  );
 }
 
 const STATUS_CLASS: Record<RowStatus, string> = {
@@ -100,11 +130,11 @@ const LINE_SAYS: Record<FiberOrderStatus, RowStatus[]> = {
 
 /** Every dollar here is an estimate, and says so. */
 function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan: boolean }) {
-  if (!hasPlan || value === null || value === undefined) return <span className={`${x.money} ${x.muted}`}>—</span>;
-  if (value === 0) return <span className={`${x.money} ${x.moneyQuiet}`}>Rate pending</span>;
+  if (!hasPlan || value === null || value === undefined) return <span className={`${x.amt} ${x.muted}`}>—</span>;
+  if (value === 0) return <span className={`${x.amt} ${x.amtQuiet}`}>Rate pending</span>;
   return (
-    <span className={x.money}>
-      <small className={x.est}>est.</small>
+    <span className={x.amt}>
+      <small className={x.amtEst}>est.</small>
       {formatMoney(value)}
     </span>
   );
@@ -123,15 +153,15 @@ function PayGroupHead({ group, hasPlan }: { group: PayGroup; hasPlan: boolean })
     ? `installs ${formatDate(group.window.installFrom)}–${group.window.installTo.getDate()}`
     : null;
   return (
-    <div className={x.payGroup}>
+    <div className={x.pgHead}>
       <p className={x.payGroupText}>
-        <strong id={`pay-${group.key}`} className={x.payGroupTitle}>
+        <strong id={`pay-${group.key}`} className={x.pgTitle}>
           {group.label}
           {hasPlan && group.amount !== null ? (
-            <span className={x.payGroupAmt}> · est. {formatMoney(group.amount)}</span>
+            <span className={x.pgAmt}> · est. {formatMoney(group.amount)}</span>
           ) : null}
         </strong>
-        <span className={x.payGroupMeta}>
+        <span className={x.pgMeta}>
           {[GROUP_NOTE[group.kind], installs, `${group.sales.length} ${group.sales.length === 1 ? 'sale' : 'sales'}`]
             .filter(Boolean)
             .join(' · ')}
@@ -327,7 +357,11 @@ export function SalesTable({
         {/* A breakage the sale was rescheduled past is history, not a flag. */}
         {order &&
           !LINE_SAYS[order.status].includes(status) &&
-          !(order.status === 'breakage' && !isStandingBreakage(sale, order)) && <FiberStatusPill status={order.status} />}
+          !(order.status === 'breakage' && !isStandingBreakage(sale, order)) && (
+            <span className={x.carrierSays}>
+              <FiberStatusPill status={order.status} />
+            </span>
+          )}
         {(sale.status === 'pending' || sale.status === 'rejected') && (
           <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
         )}
@@ -343,25 +377,23 @@ export function SalesTable({
 
   return (
     <>
-      <section className={s.panel} aria-labelledby="ledger-h">
-        <div className={`${s.panelHead} ${x.panelHead}`}>
+      <section className={`${s.panel} ${x.ledger}`} aria-labelledby="ledger-h">
+        <div className={x.boardHead}>
           {/* NOT "What you get paid". The owner's words, via Jacob
               (2026-09-03): "if claims and final chargebacks are not accounted
               for I will have to pay that out", and "if final reports don't
               show that on the site I can be sued". The portal does not hold
               chargebacks or claims, so it must never state a rep's pay — only
               estimate it, and say so where the figure is. */}
-          <h2 id="ledger-h" className={x.panelTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
-          <p className={x.panelMeta}>{showPay
+          <h2 id="ledger-h" className={x.boardTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
+          <p className={x.boardMeta}>{showPay
             ? `${datedPayCount} ${datedPayCount === 1 ? 'sale' : 'sales'}`
             : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
         </div>
 
-        <div className={x.tabsRow}>
-          <div className={x.seg} role="tablist" aria-label="Sales views">
-            <button className={x.segBtn} role="tab" type="button" aria-selected={!showPay} onClick={() => selectView(null, false)}>Sales</button>
-            <button className={x.segBtn} role="tab" type="button" aria-selected={showPay} onClick={() => selectView(null, true)}>Pay</button>
-          </div>
+        <div className={x.segWell} role="tablist" aria-label="Sales views">
+          <button className={x.segTab} role="tab" type="button" aria-selected={!showPay} onClick={() => selectView(null, false)}>Sales</button>
+          <button className={x.segTab} role="tab" type="button" aria-selected={showPay} onClick={() => selectView(null, true)}>Pay</button>
         </div>
 
         {fiberOrders.length > 0 && !showPay && (
@@ -398,8 +430,8 @@ export function SalesTable({
         )}
 
         {showFiberView ? (
-          <div>
-            <p className={x.note}>
+          <div className={x.fiberView}>
+            <p className={x.srcNote}>
               From the provider report · updated {formatDate(fiber?.data?.lastReportAt)}
             </p>
             <FiberRows orders={fiberBucketOrders} />
@@ -420,16 +452,15 @@ export function SalesTable({
               <p className={`${x.note} ${x.noteWarn}`}>No pay plan assigned yet. Ask an admin to set your role.</p>
             ) : null}
             {/* Stated once, above the money, rather than as a footnote under it. */}
-            <p className={x.note}>
+            <p className={x.payNote}>
               Estimates before chargebacks and claims; the carrier&rsquo;s final report decides what pays. Tick a sale off yourself once the money lands.
             </p>
-            <div className={`${x.thead} ${x.payHead} ${hasPlan ? '' : x.noMoney}`} aria-hidden="true">
+            <div className={`${x.lhead} ${x.pRow} ${hasPlan ? '' : x.noMoney}`} aria-hidden="true">
+              <span className={x.lhStamp}>Install</span>
               <span>Customer</span>
-              {hasPlan && <span className={x.num}>Est. pay</span>}
-              <span>Install</span>
-              <span>Est. payout</span>
               <span>Status</span>
-              <span className={x.num}>Paid</span>
+              {hasPlan && <span className={x.num}>Est. pay</span>}
+              <span className={x.lhPaid}>Paid</span>
             </div>
             {payGroups.length ? (
               payGroups.map((group) => (
@@ -438,57 +469,56 @@ export function SalesTable({
                   {group.sales.map((sale) => {
                     const expected = expectedBySale[sale.id || ''] ?? null;
                     const paid = !!paidBySale[sale.id || ''];
-                    const window = payoutBySale[sale.id || ''];
-                    const payout = window ? (
-                      <span className={x.payout}>Est. payout <b>{window}</b></span>
-                    ) : (
-                      <span className={x.payout}>
-                        {statusBySale[sale.id || ''] === 'missed'
-                          ? 'Once rescheduled'
-                          : sale.installDate
-                            ? 'No published window'
-                            : 'Once it has a date'}
-                      </span>
-                    );
+                    const status = statusBySale[sale.id || ''];
+                    const mark = saleCarrier(sale);
+                    const name = sale.customerName || sale.customerAddress || 'Customer pending';
+                    // Money only lands on an install, so the tick shows there;
+                    // a tick already set stays reachable so it can be undone.
+                    const canTick = status === 'installed' || paid;
                     return (
                       <div
-                        className={`${x.row} ${x.payRow} ${hasPlan ? '' : x.noMoney}`}
+                        className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''}`}
                         data-part="pay-row"
                         key={sale.id}
                         {...openRow(sale)}
                       >
-                        <span className={x.cName}>
-                          <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
-                          <span>{planLabel(sale)}</span>
+                        <DateStamp value={sale.installDate} label="Install" />
+                        <span className={x.sName}>
+                          <strong>{name}</strong>
                         </span>
                         {hasPlan && (
-                          <span className={`${x.cPay} ${x.num}`}>
+                          <span className={x.sPay}>
                             <EstPay value={expected} hasPlan={hasPlan} />
                           </span>
                         )}
-                        <span className={x.cWhen}>
-                          <b>{shortDate(sale.installDate)}</b>
-                          <span>Sold {formatDate(sale.saleDate)}</span>
+                        <span className={x.sStatus}>{statusCell(sale)}</span>
+                        <span className={x.sMeta}>
+                          {mark ? <span className={x.carrierMark}>{mark}</span> : null}
+                          <span className={x.sMetaText}>
+                            {[salePlan(sale, mark), `Sold ${formatDate(sale.saleDate)}`].join(' · ')}
+                          </span>
                         </span>
-                        <span className={x.cPayout}>{payout}</span>
-                        <span className={x.cStatus}>
-                          {statusCell(sale)}
-                        </span>
-                        <span className={x.cMeta}>{window ? <>Est. payout {window}</> : `Sold ${formatDate(sale.saleDate)} · ${planLabel(sale)}`}</span>
                         <span
-                          className={x.cPaid}
+                          className={x.sPaid}
                           onClick={(event) => event.stopPropagation()}
                           onKeyDown={(event) => event.stopPropagation()}
                         >
-                          <label className={x.paid}>
-                            <span>Paid</span>
-                            <input
-                              type="checkbox"
-                              checked={paid}
-                              onChange={() => void togglePaid(sale.id || '')}
-                              aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
-                            />
-                          </label>
+                          {canTick ? (
+                            <label className={x.tick}>
+                              <span>Paid</span>
+                              <input
+                                type="checkbox"
+                                checked={paid}
+                                onChange={() => void togglePaid(sale.id || '')}
+                                aria-label={`Mark pay received for ${name === 'Customer pending' ? 'this sale' : name}`}
+                              />
+                              <span className={x.tickBox} aria-hidden="true">
+                                <Check size={16} strokeWidth={3} />
+                              </span>
+                            </label>
+                          ) : (
+                            <span className={x.noTick} aria-hidden="true">—</span>
+                          )}
                         </span>
                       </div>
                     );
@@ -502,7 +532,7 @@ export function SalesTable({
                 {month && <> Earlier months are behind the previous-month arrow above.</>}
               </p>
             )}
-            <div className={x.totals}>
+            <div className={x.ledgerTotals}>
               <span><b>{datedPayCount}</b> by install date{month ? ` in ${monthLabel(month)}` : ''}</span>
               {hasPlan && (
                 <span className={x.totalsPay}>
@@ -513,9 +543,9 @@ export function SalesTable({
           </div>
         ) : (
           <div>
-            <div className={`${x.thead} ${isAdmin ? x.hasAct : ''}`} aria-hidden="true">
+            <div className={`${x.lhead} ${x.sale} ${isAdmin ? x.hasAct : ''}`} aria-hidden="true">
+              <span className={x.lhStamp}>Sold</span>
               <span>Customer</span>
-              <span>Install / Sold</span>
               <span>Status</span>
               <span className={x.num}>Value</span>
               <span className={x.num}>Est. pay</span>
@@ -525,27 +555,29 @@ export function SalesTable({
               <div>
                 {listSales.map((sale) => {
                   const off = statusBySale[sale.id || ''] === 'cancelled';
+                  const mark = saleCarrier(sale);
                   return (
                     <div
-                      className={`${x.row} ${isAdmin ? x.hasAct : ''} ${off ? x.rowOff : ''}`}
+                      className={`${x.sale} ${isAdmin ? x.hasAct : ''} ${off ? x.saleOff : ''}`}
                       data-part="sale-row"
                       key={sale.id}
                       {...openRow(sale)}
                     >
-                      <span className={x.cName}>
+                      <DateStamp value={sale.saleDate} label="Sold" />
+                      <span className={x.sName}>
                         <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
-                        <span>{[planLabel(sale), sale.customerAddress].filter(Boolean).join(' · ')}</span>
                       </span>
-                      <span className={x.cWhen}>
-                        <b>{sale.installDate ? `Install ${formatDate(sale.installDate)}` : 'No install date'}</b>
-                        <span>Sold {formatDate(sale.saleDate)}</span>
-                      </span>
-                      <span className={x.cStatus}>{statusCell(sale)}</span>
-                      <span className={`${x.cValue} ${x.num}`}>{formatMoney(sale.totalValue || 0)}/mo</span>
-                      <span className={`${x.cPay} ${x.num}`}>
+                      <span className={x.sPay}>
                         <EstPay value={expectedBySale[sale.id || '']} hasPlan={hasPlan} />
                       </span>
-                      <span className={x.cMeta}>{[planLabel(sale), `Sold ${formatDate(sale.saleDate)}`].join(' · ')}</span>
+                      <span className={x.sStatus}>{statusCell(sale)}</span>
+                      <span className={x.sMeta}>
+                        {mark ? <span className={x.carrierMark}>{mark}</span> : null}
+                        <span className={x.sMetaText}>
+                          {[salePlan(sale, mark), sale.customerAddress].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                      <span className={x.sValue}>{formatMoney(sale.totalValue || 0)}/mo</span>
                       <span className={x.cActions}>{rowActions(sale)}</span>
                     </div>
                   );
@@ -557,7 +589,7 @@ export function SalesTable({
                 {month && <> Your earlier sales are still here — use the previous-month arrow above.</>}
               </p>
             )}
-            <div className={x.totals}>
+            <div className={x.ledgerTotals}>
               <span>
                 <b>{listSales.length}</b> {listSales.length === 1 ? 'sale' : 'sales'} · <b>{formatMoney(totalValue)}</b>/mo value
               </span>
@@ -574,6 +606,7 @@ export function SalesTable({
       <SaleDetailSheet
         sale={selectedSale}
         total={listSales.length}
+        index={selectedIndex}
         open={!!selectedSale}
         onOpenChange={(open) => { if (!open) setSelectedId(null); }}
         onPrev={() => moveSelection(-1)}

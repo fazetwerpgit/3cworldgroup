@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, ChevronLeft, ChevronRight, Plus, RotateCw, X } from 'lucide-react';
 import { CarrierNotice } from '@/components/portal/rep/CarrierNotice';
+import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
 import { RepShell } from '@/components/portal/rep/RepShell';
 import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
 import { AdminSalesBoard } from '@/components/sales/AdminSalesBoard';
@@ -16,7 +17,7 @@ import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOwner } from '@/types';
 import { datedSales } from '@/lib/pay/payGroups';
-import { formatPayoutWindow, nextPayout } from '@/lib/pay/payoutWindow';
+import { nextPayout } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
 import { monthFromParam } from '@/lib/sales/loggedSale';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
@@ -31,10 +32,9 @@ import {
   shiftMonth,
   type MonthKey,
 } from '@/lib/sales/monthWindow';
+import { PayoutCard } from './PayoutCard';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
-
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
 function MonthPicker({
   month,
@@ -176,6 +176,8 @@ function SalesContent() {
   // useSales starts idle (loading false, no sales). Until the first fetch
   // settles the page shows skeletons, never a zero it has not measured.
   const [fetched, setFetched] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
   const {
     rates,
     payDelayDays,
@@ -344,58 +346,39 @@ function SalesContent() {
             />
           ) : null}
 
-          <section className={`${s.panel} ${x.kpis}`} aria-label="Sales summary">
-            <p className={`${s.kicker} ${x.kpiLabel}`}>
-              Est. payout{upcoming ? ` · ${formatPayoutWindow(upcoming.window)}` : ''}
-            </p>
-            {planLoading ? (
-              <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
-            ) : planError ? (
-              <div className={`${s.failed} ${x.kpiFailed}`} role="alert">
-                <span>Couldn&apos;t load pay rates</span>
-                <button type="button" className={s.retry} onClick={retryPlan}>
-                  <RotateCw size={14} aria-hidden="true" />
-                  Retry
-                </button>
-              </div>
-            ) : hasPlan && upcoming ? (
-              <p className={x.kpiNum}>
-                <span className={x.est}>est.</span>
-                {money(upcoming.amount ?? 0)}
-              </p>
-            ) : (
-              <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
-            )}
-            <p className={x.kpiNote}>
-              <b>{payableMtd.length}</b> {payableMtd.length === 1 ? 'sale' : 'sales'} in {monthName}
-              {planLoading || planError ? null : !hasPlan ? (
-                <> · No pay plan assigned yet</>
-              ) : upcoming ? (
-                <>
-                  {' '}· {upcoming.count} T-Fiber {upcoming.count === 1 ? 'install' : 'installs'} in this payout
-                  {upcoming.scheduled > 0 ? <>, {upcoming.scheduled} scheduled</> : null}
-                </>
-              ) : (
-                <> · No T-Fiber payout window coming up</>
-              )}
-            </p>
-          </section>
+          {/* C · Split: the raised money card holds the pay; the ledger beside
+              (desktop) or under it (phone) holds the record. */}
+          <div className={x.split}>
+            <PayoutCard
+              upcoming={upcoming}
+              saleCount={payableMtd.length}
+              monthName={monthName}
+              hasPlan={hasPlan}
+              planLoading={planLoading}
+              planError={!!planError}
+              onRetryPlan={retryPlan}
+              onHelp={() => setHelpOpen(true)}
+            />
 
-          {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
+            <div className={x.ledgerCol}>
+              {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
 
-          <SalesTable
-            sales={sales}
-            month={month}
-            onDelete={deleteSale}
-            loading={loading}
-            payView={payView}
-            onPayViewChange={choosePayView}
-            payPlan={payPlan}
-            fiber={fiber}
-            onSaleUpdated={refreshSales}
-          />
+              <SalesTable
+                sales={sales}
+                month={month}
+                onDelete={deleteSale}
+                loading={loading}
+                payView={payView}
+                onPayViewChange={choosePayView}
+                payPlan={payPlan}
+                fiber={fiber}
+                onSaleUpdated={refreshSales}
+              />
+            </div>
+          </div>
         </>
       )}
+      {helpOpen ? <PayHelpSheet onClose={closeHelp} /> : null}
     </div>
   );
 }

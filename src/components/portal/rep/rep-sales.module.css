@@ -23,22 +23,16 @@
 
 .title {
   margin: 0;
-  font-family: var(--f-display);
-  font-size: var(--t-d2);
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  padding-top: 3px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-/* ‹ September 2026 › — the month picker, one bordered control. */
+/* ‹ September 2026 › — the month picker: two icon buttons around the month. */
 .month {
   display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
-  background: var(--c-panel);
-  overflow: hidden;
+  align-items: center;
 }
 
 .monthBtn {
@@ -48,9 +42,21 @@
   min-height: var(--tap);
   padding: 0;
   border: 0;
+  border-radius: 10px;
   background: transparent;
-  color: var(--c-text);
+  color: var(--c-text-2);
   cursor: pointer;
+  transition: background 120ms, transform 120ms;
+}
+
+.monthBtn:not(:disabled):active {
+  background: var(--c-raised);
+  transform: scale(0.94);
+}
+
+.monthBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
 }
 
 .monthBtn:disabled {
@@ -69,54 +75,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 132px;
-  padding: 0 var(--s2);
-  border-inline: 1px solid var(--c-line);
-  font-size: var(--t-ui);
+  min-width: 124px;
+  padding: 0 var(--s1);
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-}
-
-/* ---------- KPI strip ---------- */
-/* One line of pay, not a grid of stat tiles: est. payout leads, the month's
-   sale count rides under it. Flat 2px lime edge like every other hero. */
-.kpis {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  padding: var(--s4);
-  box-shadow:
-    inset 0 2px 0 var(--c-lime),
-    var(--c-lift);
-}
-
-.kpiLabel {
-  color: var(--c-text-2);
-}
-
-.kpiNum {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0;
-  padding-top: 4px;
-  color: var(--c-lime);
-  font-family: var(--f-display);
-  font-size: 64px;
-  font-weight: 400;
-  line-height: 0.9;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpiNote {
-  margin: 0;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.kpiNote b {
-  color: var(--c-text);
-  font-weight: 600;
 }
 
 /* "Sale logged · Carla Diaz" after Log Sale. */
@@ -165,10 +128,6 @@
 /* "Couldn't load pay rates · Retry" in the Est. payout cell. */
 .kpiFailed {
   padding: var(--s1) 0 0;
-}
-
-.kpiDash {
-  color: var(--c-text-3);
 }
 
 /* ---------- panels ---------- */
@@ -239,18 +198,6 @@
   .segBtn:not([aria-selected='true']):not([aria-pressed='true']):hover {
     color: var(--c-text);
   }
-}
-
-.tabsRow {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--c-line);
-}
-
-.tabsRow .seg {
-  flex: 1;
 }
 
 .chips {
@@ -394,37 +341,11 @@
   color: var(--c-amber);
 }
 
-/* Pay view: one band per pay period — "Sep 21–25 · est. $280". */
-.payGroup {
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line-strong);
-}
-
 .payGroupText {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin: 0;
-}
-
-.payGroupTitle {
-  color: var(--c-text);
-  font-size: var(--t-ui);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.payGroupAmt {
-  color: var(--c-lime);
-}
-
-.payGroupMeta {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-}
-
-.payGroup + .row {
-  border-top: 1px solid var(--c-line);
 }
 
 .statusStack {
@@ -455,160 +376,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.moneyQuiet {
-  color: var(--c-text-2);
-  font-family: var(--f-ui);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  padding-top: 0;
-}
-
 .muted {
   color: var(--c-text-3);
 }
 
-/* ---------- ledger rows ---------- */
-.list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.thead {
-  display: none;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'name pay'
-    'status status'
-    'meta value';
-  align-items: center;
-  gap: 4px var(--s3);
-  width: 100%;
-  min-height: 64px;
-  padding: var(--s3) var(--s4) 14px;
-  border: 0;
-  background: transparent;
-  color: var(--c-text);
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.row + .row,
-.list > li + li {
-  border-top: 1px solid var(--c-line);
-}
-
-.row:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
-}
-
-@media (hover: hover) {
-  .row:hover {
-    background: rgba(163, 184, 214, 0.04);
-  }
-}
-
-.rowOff .cName,
-.rowOff .cPay .money {
-  color: var(--c-text-3);
-}
-
-.cName {
-  grid-area: name;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.cName strong {
-  overflow: hidden;
-  font-size: var(--t-body);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cName span {
-  display: none;
-}
-
-.cPay {
-  grid-area: pay;
-  text-align: right;
-}
-
-.cStatus {
-  grid-area: status;
-  min-width: 0;
-}
-
-.cWhen {
-  grid-area: when;
-  /* On a phone the status line already carries the install date. */
-  display: none;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  text-align: right;
-  white-space: nowrap;
-}
-
-.cWhen b {
-  color: var(--c-text);
-  font-weight: 600;
-}
-
-.cWhen span {
-  display: none;
-}
-
-.cMeta {
-  grid-area: meta;
-  overflow: hidden;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cValue {
-  grid-area: value;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  text-align: right;
-  white-space: nowrap;
-}
-
-.cPayout {
-  display: none;
-}
-
 .cActions {
   display: none;
-}
-
-/* Pay rows: the Paid tick takes the "value" slot on a phone. */
-.payRow {
-  grid-template-areas:
-    'name pay'
-    'status paid'
-    'meta paid';
-}
-
-.payRow .cWhen {
-  display: none;
-}
-
-.payRow .cPaid {
-  grid-area: paid;
-  justify-self: end;
 }
 
 .payout {
@@ -691,23 +464,6 @@
 .quietBtn:focus-visible {
   outline: 2px solid var(--c-lime-hi);
   outline-offset: 2px;
-}
-
-.totals {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2) var(--s4);
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line-strong);
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.totals b {
-  color: var(--c-text);
-  font-weight: 600;
 }
 
 .totalsPay {
@@ -851,6 +607,692 @@
   color: var(--c-text);
   font-size: var(--t-sm);
   line-height: 1.45;
+}
+
+/* ==========================================================================
+   Rep Sales, direction C · Split. Money sits in a raised L2 card with the
+   heaviest shadow on the page; the ledger under it (beside it on desktop) is
+   the flatter scoreboard language: a well header band, Bebas date stamps.
+   ========================================================================== */
+.split {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.payCol {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ledgerCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+/* ---------- raised money card ---------- */
+.moneyCard {
+  position: relative;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  background: var(--c-raised);
+  box-shadow: var(--c-lift-3);
+}
+
+.payNum {
+  display: flex;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  color: var(--c-text);
+  font-family: var(--f-num);
+  font-size: 64px;
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+
+.payEst {
+  margin: 12px 6px 0 0;
+  color: var(--c-text-3);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.payCur {
+  margin: 5px 5px 0 0;
+  color: var(--c-text-2);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.payDash {
+  color: var(--c-text-3);
+}
+
+.payMeta {
+  margin: 14px 0 0;
+  color: var(--c-text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.payMeta b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* A recessed well inside the raised card: the installs in this payout. */
+.moneyWell {
+  margin-top: 18px;
+  padding: 14px 14px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
+}
+
+.wellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: 10px;
+}
+
+/* Carrier wordmark: a text placeholder until the official monochrome logos exist. */
+.carrierMark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--c-text-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wellHead .carrierMark {
+  height: 18px;
+  font-size: 10px;
+}
+
+/* One segment per sale: installed lime, scheduled blue. */
+.segs {
+  display: flex;
+  gap: 3px;
+}
+
+.segs > span {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--c-track);
+}
+
+.segs > span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--seg-c);
+  transform-origin: left;
+  animation: segIn 400ms var(--ease) both;
+  animation-delay: calc(500ms + var(--n, 0) * 55ms);
+}
+
+.segInstalled {
+  --seg-c: var(--c-lime);
+}
+
+.segScheduled {
+  --seg-c: var(--c-blue);
+}
+
+.wellLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  list-style: none;
+}
+
+.wellLegend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wellLegend b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.sw {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.swInstalled {
+  background: var(--c-lime);
+}
+
+.swScheduled {
+  background: var(--c-blue);
+}
+
+/* "How pay works": a full-width L1 text button under the money card. */
+.payHelp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift);
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+  transition: background 120ms, transform 120ms var(--ease);
+}
+
+.payHelp:active {
+  background: var(--c-panel-hi);
+  transform: scale(0.98);
+}
+
+.payHelp:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .payHelp:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- the ledger: flatter strip language ---------- */
+.ledger {
+  overflow: hidden;
+  border-radius: var(--r-card);
+}
+
+.boardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--s3);
+  padding: 11px var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-well);
+}
+
+.boardTitle {
+  margin: 0;
+  color: var(--c-text-2);
+  font: 400 20px / 1 var(--f-display);
+  letter-spacing: 0.08em;
+}
+
+.boardMeta {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+/* Sales | Pay, set in a well. */
+.segWell {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 12px var(--s4) 0;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
+}
+
+.segTab {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-3);
+  font: 600 14px / 1 var(--f-ui);
+  cursor: pointer;
+  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+}
+
+.segTab:active {
+  transform: scale(0.97);
+}
+
+.segTab[aria-selected='true'] {
+  background: var(--c-panel-hi);
+  box-shadow: var(--c-lift);
+  color: var(--c-text);
+}
+
+.segTab:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .segTab:not([aria-selected='true']):hover {
+    color: var(--c-text-2);
+  }
+}
+
+/* Carrier-status chips: the selected one inverts to white. */
+.ledger .chips {
+  padding: 12px var(--s4);
+  border-bottom: 0;
+}
+
+.ledger .chip {
+  min-height: 36px;
+  border-radius: 999px;
+  font-weight: 500;
+  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+}
+
+.ledger .chip:active {
+  transform: scale(0.95);
+}
+
+.ledger .chip[aria-pressed='true'] {
+  border-color: var(--c-text);
+  background: var(--c-text);
+  color: var(--c-ground);
+}
+
+.ledger .chip[aria-pressed='true'] b {
+  color: var(--c-ground);
+}
+
+.ledger .chip .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.srcNote {
+  margin: 0;
+  padding: 0 var(--s4) 10px;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.fiberView {
+  border-top: 1px solid var(--c-line);
+}
+
+.fiberView .srcNote {
+  padding-top: 10px;
+}
+
+.ledger .note {
+  border-top: 1px solid var(--c-line);
+}
+
+.payNote {
+  margin: 12px var(--s4) 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+/* Column labels: desktop only. */
+.ledger .lhead {
+  display: none;
+}
+
+/* A sale: Bebas sold-date stamp, name + est. amount, status line, carrier + plan. */
+.sale,
+.pRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'stamp name pay'
+    'stamp status status'
+    'stamp meta value';
+  align-items: center;
+  gap: 3px var(--s3);
+  width: 100%;
+  padding: var(--s3) var(--s4) var(--s3) 14px;
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms, transform 140ms var(--ease);
+}
+
+.sale[role='button']:active,
+.pRow[role='button']:active {
+  background: var(--c-panel-hi);
+  transform: scale(0.985);
+}
+
+.sale[role='button']:focus-visible,
+.pRow[role='button']:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .sale[role='button']:hover,
+  .pRow[role='button']:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+.stamp {
+  grid-area: stamp;
+  align-self: start;
+  color: var(--c-text-3);
+  font: 400 13px / 1 var(--f-display);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.stamp b {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.sName {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.sName strong {
+  overflow: hidden;
+  font-size: var(--t-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sPay {
+  grid-area: pay;
+  text-align: right;
+}
+
+.sStatus {
+  grid-area: status;
+  min-width: 0;
+}
+
+.sMeta {
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+}
+
+.sMetaText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sValue {
+  grid-area: value;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sale .cActions {
+  display: none;
+}
+
+.saleOff .sName strong,
+.saleOff .sPay .amt,
+.saleOff .stamp b {
+  color: var(--c-text-3);
+}
+
+/* Amounts: Geist 600, tabular; "est." rides in front, smaller and quieter. */
+.amt {
+  color: var(--c-text);
+  font: 600 15px / 1.4 var(--f-num);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.amtEst {
+  margin-right: 3px;
+  color: var(--c-text-3);
+  font-family: var(--f-ui);
+  font-size: 0.72em;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.amtQuiet {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* The carrier's word, only when the status line doesn't already say it. */
+.carrierSays .pill {
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 999px;
+}
+
+.carrierSays .pill .dot {
+  display: none;
+}
+
+.carrierSays .pill::before {
+  content: 'Carrier:';
+}
+
+/* ---------- pay view ---------- */
+.pgHead {
+  padding: 12px var(--s4) 10px;
+  border-top: 1px solid var(--c-line);
+}
+
+.pgTitle {
+  color: var(--c-text);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pgAmt {
+  color: var(--c-text-2);
+}
+
+.pgMeta {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.pRow {
+  grid-template-columns: 40px minmax(0, 1fr) auto 48px;
+  grid-template-areas:
+    'stamp name pay paid'
+    'stamp status status paid'
+    'stamp meta meta paid';
+  padding-block: 10px;
+}
+
+.pRow.noMoney {
+  grid-template-columns: 40px minmax(0, 1fr) 48px;
+  grid-template-areas:
+    'stamp name paid'
+    'stamp status paid'
+    'stamp meta paid';
+}
+
+.pRow .sName strong {
+  font-size: 15px;
+}
+
+.sPaid {
+  grid-area: paid;
+  display: flex;
+  justify-content: center;
+}
+
+/* "Paid": a self-set tick, a 44px target around a hidden native checkbox. */
+.tick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.tickBox {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--c-line-strong);
+  border-radius: 7px;
+  color: transparent;
+  transition: background 140ms, border-color 140ms, transform 140ms var(--ease);
+}
+
+.tick input:checked + .tickBox {
+  border-color: var(--c-lime);
+  background: var(--c-lime);
+  color: var(--c-on-lime);
+}
+
+.tick input:focus-visible + .tickBox {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.tick:active .tickBox {
+  transform: scale(0.88);
+}
+
+.noTick {
+  color: var(--c-text-3);
+}
+
+/* Totals ride in a well band at the foot of the ledger. */
+.ledgerTotals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  background: var(--c-well);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.ledgerTotals b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.ledgerTotals .amt {
+  font-size: var(--t-sm);
+}
+
+/* First load: blocks rise in like a sheet, staggered. */
+.moneyCard,
+.payHelp,
+.ledger {
+  animation: rise 720ms var(--ease) both;
+}
+
+.moneyCard {
+  animation-delay: 80ms;
+}
+
+.payHelp {
+  animation-delay: 150ms;
+}
+
+.ledger {
+  animation-delay: 220ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+}
+
+@keyframes segIn {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 /* ---------- company board (admin / owner) ---------- */
@@ -1448,63 +1890,280 @@
   max-height: 92dvh;
 }
 
-.dHead {
-  min-height: 72px;
-}
-
-.sheetHeadText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: var(--s2) 0;
-}
-
-.sheetName {
-  overflow: hidden;
-  margin: 0;
-  font-size: 20px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .dBody {
   display: flex;
   flex-direction: column;
 }
 
-.dBlock {
+.dHead {
+  align-items: flex-start;
+  min-height: 0;
+  padding-top: var(--s2);
+  padding-bottom: var(--s3);
+}
+
+.dHead > button {
+  flex: none;
+}
+
+.sheetHeadText {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
-  padding: var(--s4);
-  border-bottom: 1px solid var(--c-line);
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.sheetName {
+  overflow: hidden;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dStatus {
   display: flex;
-  flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--s2);
+  gap: 6px 10px;
+  margin: 0;
+}
+
+.dTag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--c-panel-hi);
+  box-shadow: var(--c-edge);
+  color: var(--c-text);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dTag.tagWarn {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
 }
 
 .dAge {
   color: var(--c-text-2);
   font-size: var(--t-sm);
-  font-weight: 600;
+}
+
+.dBody {
+  padding: 0 var(--s4) var(--s4);
 }
 
 .dCancelled {
-  margin: 0;
-  padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--c-line);
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: rgba(163, 184, 214, 0.06);
   color: var(--c-text-2);
   font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+/* Est. pay in a recessed well at the top of the sheet. */
+.dMoney {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s3);
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
+}
+
+.dMoneyNum {
+  display: block;
+  margin-top: 6px;
+  font: 600 34px / 1 var(--f-num);
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.dMoneyNum .amtEst {
+  font-size: 15px;
+}
+
+.dSummary {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--t-sm);
+  text-align: right;
+}
+
+.dSummary dt {
+  display: inline;
+  color: var(--c-text-3);
+}
+
+.dSummary dd {
+  display: inline;
+  margin: 0 0 0 6px;
+  color: var(--c-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dBlock {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--s4);
+  padding-top: 14px;
+  border-top: 1px solid var(--c-line);
+}
+
+.dHeading {
+  margin-bottom: 2px;
+}
+
+.dKv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: 36px;
+  font-size: 15px;
+}
+
+.dKv > span:first-child {
+  color: var(--c-text-2);
+}
+
+.dKv b {
+  font-weight: 600;
+}
+
+.dKvEnd {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dKvEnd .dChange {
+  min-height: 36px;
+  padding: 0 var(--s3);
+}
+
+.dSub {
+  margin: 6px 0 0;
+  color: var(--c-text-2);
+  font-size: 14px;
+}
+
+.dSub b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* Plans sold: carrier mark, plan, price; points under the price. */
+.dPlan {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--s2);
+  padding: var(--s2) 0;
+}
+
+.dPlan + .dPlan {
+  border-top: 1px solid var(--c-line);
+}
+
+.dPlan strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dPlan b {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dPlan em {
+  grid-column: 3;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-style: normal;
+  text-align: right;
+}
+
+.dCarrier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: 6px 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.dPhone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  color: var(--c-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--c-line-strong);
+  text-underline-offset: 3px;
+}
+
+.dPhone svg {
+  color: var(--c-text-3);
+}
+
+.dNone {
+  color: var(--c-text-3);
+  font-weight: 400;
+}
+
+.dAddr {
+  max-width: 65%;
+  text-align: right;
+}
+
+.dBody .dActions {
+  margin-top: var(--s4);
+  padding: var(--s4) 0 0;
+  border-top: 1px solid var(--c-line);
+  border-bottom: 0;
+}
+
+.dNav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.dNavBtn {
+  justify-content: center;
+}
+
+.dFoot {
+  margin-top: 10px;
 }
 
 .dLine {
@@ -1531,38 +2190,6 @@ a.dLine {
   font-weight: 600;
 }
 
-.dStrong {
-  font-size: var(--t-body);
-  font-weight: 600;
-}
-
-.dDates {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s3);
-}
-
-.dDate {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.dDate span {
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.dDate b {
-  font-size: var(--t-body);
-  font-weight: 600;
-}
-
-.dChange {
-  align-self: flex-start;
-  margin-top: 2px;
-}
-
 .dEditor {
   display: flex;
   flex-direction: column;
@@ -1586,75 +2213,6 @@ a.dLine {
 .dEditorActions {
   display: flex;
   gap: var(--s2);
-}
-
-.dPlan {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px var(--s3);
-  padding: var(--s2) 0;
-}
-
-.dPlan + .dPlan {
-  border-top: 1px solid var(--c-line);
-}
-
-.dPlan strong {
-  font-size: var(--t-ui);
-  font-weight: 600;
-}
-
-.dPlan span {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-}
-
-.dPlan b {
-  font-size: var(--t-ui);
-  font-weight: 600;
-  text-align: right;
-}
-
-.dPlan em {
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  font-style: normal;
-  text-align: right;
-}
-
-.dHeading {
-  margin: 0;
-  color: var(--c-text);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-/* Value, est. pay, points: plain key/value rows, not stat tiles. */
-.dSummary {
-  margin: 0;
-  padding: var(--s2) var(--s4);
-  border-bottom: 1px solid var(--c-line);
-}
-
-.dSummary > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s3);
-  padding: var(--s2) 0;
-}
-
-.dSummary dt {
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.dSummary dd {
-  margin: 0;
-  font-size: var(--t-ui);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
 }
 
 .proofList {
@@ -1724,21 +2282,6 @@ a.dLine {
   display: none;
 }
 
-.dNav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s2);
-  padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--c-line);
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.dFoot {
-  padding: var(--s4) var(--s4) var(--s5);
-}
-
 /* Confirm dialogs (delete, cancel, link). */
 .dialogBody {
   display: flex;
@@ -1781,109 +2324,20 @@ a.dLine {
     font-size: var(--t-d1);
   }
 
-  .kpis {
-    padding: var(--s5) var(--s6);
-  }
-
   .panelHead {
     padding-inline: var(--s5);
   }
 
-  .tabsRow {
-    padding: var(--s3) var(--s5);
-  }
-
-  .tabsRow .seg {
-    flex: none;
-  }
-
   .chips,
-  .note,
-  .totals,
-  .search,
-  .divider,
-  .assign {
+.note,
+.search,
+.divider,
+.assign {
     padding-inline: var(--s5);
-  }
-
-  .thead,
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.5fr) 96px 120px;
-    grid-template-areas: 'name when status value pay';
-    gap: var(--s4);
-    align-items: center;
-  }
-
-  /* Admins get an edit/delete column; reps do not. */
-  .hasAct {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.5fr) 96px 120px 48px;
-    grid-template-areas: 'name when status value pay act';
-  }
-
-  .thead {
-    min-height: 40px;
-    padding: 0 var(--s5);
-    border-bottom: 1px solid var(--c-line);
-    color: var(--c-text-3);
-    font-size: var(--t-min);
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .row {
-    min-height: 68px;
-    padding: var(--s2) var(--s5);
-  }
-
-  .payGroup {
-    padding: var(--s3) var(--s5);
   }
 
   .num {
     text-align: right;
-  }
-
-  .cName span {
-    display: block;
-    overflow: hidden;
-    color: var(--c-text-3);
-    font-size: var(--t-sm);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .cName strong {
-    font-size: var(--t-ui);
-  }
-
-  .cMeta {
-    display: none;
-  }
-
-  .cWhen {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    text-align: left;
-  }
-
-  .cWhen span {
-    display: block;
-    color: var(--c-text-3);
-  }
-
-  .cValue {
-    color: var(--c-text);
-    font-size: var(--t-ui);
-  }
-
-  /* Only admins have the column; an unplaced area would add implicit rows. */
-  .hasAct .cActions {
-    grid-area: act;
-    display: flex;
-    justify-content: flex-end;
   }
 
   .board > .seg {
@@ -1894,30 +2348,6 @@ a.dLine {
   .mgmt .chips {
     flex-wrap: wrap;
     overflow: visible;
-  }
-
-  .payHead,
-  .payRow {
-    grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr) 96px;
-    grid-template-areas: 'name pay when payout status paid';
-  }
-
-  .payRow .cWhen {
-    display: flex;
-  }
-
-  .cPayout {
-    grid-area: payout;
-    display: block;
-  }
-
-  .payRow .cStatus .payout {
-    display: none;
-  }
-
-  .noMoney {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr) 96px;
-    grid-template-areas: 'name when payout status paid';
   }
 
   .fiberRow {
@@ -2033,4 +2463,129 @@ a.dLine {
     animation: none;
     transition: none;
   }
+}
+
+/* ---------- C · Split on desktop: pay on the left, the ledger beside it ---------- */
+@media (min-width: 1024px) {
+  .title {
+    font-size: 32px;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--s5);
+  }
+
+  .payCol {
+    position: sticky;
+    top: var(--s4);
+  }
+
+  .payNum {
+    font-size: 68px;
+  }
+
+  .boardHead,
+  .srcNote,
+  .pgHead,
+  .ledgerTotals,
+  .ledger .chips {
+    padding-inline: var(--s5);
+  }
+
+  .ledger .chips {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .segWell {
+    max-width: 320px;
+    margin-inline: var(--s5);
+  }
+
+  .payNote {
+    margin-inline: var(--s5);
+  }
+
+  .sale {
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 96px 120px;
+    grid-template-areas:
+      'stamp name status value pay'
+      'stamp meta status value pay';
+    column-gap: var(--s4);
+    padding: var(--s3) var(--s5) var(--s3) var(--s4);
+  }
+
+  .sale.hasAct {
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 96px 120px 96px;
+    grid-template-areas:
+      'stamp name status value pay act'
+      'stamp meta status value pay act';
+  }
+
+  .sale.hasAct .cActions {
+    grid-area: act;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .sValue {
+    color: var(--c-text-2);
+    font-size: 15px;
+  }
+
+  .pRow {
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 120px 64px;
+    grid-template-areas:
+      'stamp name status pay paid'
+      'stamp meta status pay paid';
+    column-gap: var(--s4);
+    padding: 10px var(--s5) 10px var(--s4);
+  }
+
+  .pRow.noMoney {
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 64px;
+    grid-template-areas:
+      'stamp name status paid'
+      'stamp meta status paid';
+  }
+
+  .ledger .lhead {
+    display: grid;
+    grid-template-areas: none;
+    min-height: 36px;
+    padding-block: 0;
+    color: var(--c-text-3);
+    font-size: var(--t-min);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: default;
+  }
+
+  .lhStamp,
+  .lhPaid {
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moneyCard,
+  .payHelp,
+  .ledger,
+  .segs > span::after,
+  .sale,
+  .pRow,
+  .segTab,
+  .tickBox {
+    animation: none;
+    transition: none;
+  }
+}
+
+.dCarrier .pill {
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 999px;
 }
