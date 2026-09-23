@@ -3,7 +3,10 @@
 // the SDK hasn't noticed yet, so onSnapshot listeners sit silent until a manual
 // reload. Pure so the thresholds are testable.
 
-export type ResumeReason = 'visible' | 'pageshow' | 'online';
+// Not 'online': Firestore's own connectivity monitor already restarts its
+// streams on that event, and cycling the network on top of it knocked
+// AuthContext's profile getDoc (which retries on the same event) offline.
+export type ResumeReason = 'visible' | 'pageshow';
 
 // A quick glance away (notification centre, app switcher peek) keeps the socket
 // alive; anything longer is treated as a suspension.
@@ -20,9 +23,8 @@ export function shouldCycleNetwork(input: {
 }): boolean {
   if (!input.online) return false;
   if (input.sinceLastCycleMs < RESUME_MIN_INTERVAL_MS) return false;
-  // Coming back online or restored from the back/forward cache: the old
-  // connection is gone for certain.
-  if (input.reason === 'online' || input.reason === 'pageshow') return true;
+  // Restored from the back/forward cache: the old connection is gone for certain.
+  if (input.reason === 'pageshow') return true;
   return input.hiddenForMs >= RESUME_HIDDEN_THRESHOLD_MS;
 }
 

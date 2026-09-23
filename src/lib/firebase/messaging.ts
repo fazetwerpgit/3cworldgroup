@@ -2,6 +2,7 @@
 
 import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
 import { app } from './config';
+import { shouldResetPushSubscription } from '@/lib/push/tokenRecovery';
 
 // Public VAPID key (Web Push certificate) from Firebase console → Cloud Messaging →
 // Web Push certificates. Set as NEXT_PUBLIC_FIREBASE_VAPID_KEY. Until it's set, push
@@ -34,7 +35,8 @@ export async function requestPushToken(): Promise<string | null> {
 // an installed PWA with a DEAD push subscription (getToken then fails every time
 // while permission stays 'granted' and the server keeps sending to a token Apple
 // drops) — so on failure we unsubscribe the stale subscription and retry once,
-// which mints a fresh APNs channel.
+// which mints a fresh APNs channel. Only while online and for a non-network
+// failure, though (see shouldResetPushSubscription).
 export async function requestPushTokenDetailed(): Promise<{ token: string | null; detail: string }> {
   const m = await getMessagingInstance();
   if (!m) return { token: null, detail: 'not-configured' };
@@ -52,18 +54,22 @@ export async function requestPushTokenDetailed(): Promise<{ token: string | null
     .catch(() => null);
   if (!swReg) return { token: null, detail: 'sw-register-failed' };
 
+  const msg = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error));
   try {
     const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
     return { token, detail: 'ok' };
   } catch (firstError) {
+    // Weak signal fails getToken too; resetting then could leave no
+    // subscription at all. Keep it and let the next refresh try again.
+    if (!shouldResetPushSubscription({ online: navigator.onLine !== false, error: firstError })) {
+      return { token: null, detail: `token-failed-kept [${msg(firstError)}]`.slice(0, 200) };
+    }
     try {
       const stale = await swReg.pushManager.getSubscription();
       if (stale) await stale.unsubscribe();
       const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
       return { token, detail: stale ? 'ok-after-resubscribe' : 'ok-on-retry' };
     } catch (secondError) {
-      const msg = (error: unknown) =>
-        error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       return { token: null, detail: `token-failed [${msg(firstError)}] retry [${msg(secondError)}]`.slice(0, 200) };
     }
   }

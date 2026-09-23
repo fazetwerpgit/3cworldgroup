@@ -10,6 +10,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { NavGroupsList, NavSheet, useNavAccess, type NavSheetClasses } from '@/components/portal/NavSheet';
 import { BodyLayer } from './BodyLayer';
+import { ClearNotes } from './ClearNotes';
 import { LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, activeRepHref } from './repNav';
 import s from './rep.module.css';
 
@@ -399,11 +400,7 @@ export function RepTopBar({
               ))
             )}
             {notifications.length > 0 ? (
-              <div className={s.noteFoot}>
-                <button type="button" className={s.textBtn} onClick={() => void clearAll()}>
-                  Clear all
-                </button>
-              </div>
+              <ClearNotes clearAll={clearAll} />
             ) : null}
           </div>
         </BodyLayer>

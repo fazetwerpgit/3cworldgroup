@@ -108,7 +108,7 @@ function OnboardingChecklist() {
 
   // The upload is multipart: send only Authorization and let fetch set the
   // Content-Type boundary itself. userId is the TARGET whose folder is written.
-  const uploadFile = (item: WizardItem, file: File, allowedTypes: string[], slot?: string) =>
+  const uploadFile = (item: WizardItem, file: File, signal: AbortSignal, allowedTypes: string[], slot?: string) =>
     uploadFormAttachment({
       file,
       itemId: item.id,
@@ -117,6 +117,7 @@ function OnboardingChecklist() {
       fields: { userId: user?.uid ?? '' },
       allowedTypes,
       getHeaders: () => authHeaders(),
+      signal,
     });
 
   const handleSubmit = async (item: WizardItem | null = submitModal, submittedReference = reference) => {
@@ -210,7 +211,7 @@ function OnboardingChecklist() {
                 accept="image/*"
                 kinds="Photo"
                 preview={false}
-                upload={(file) => uploadFile(item, file, IMAGE_TYPES, 'front')}
+                upload={(file, signal) => uploadFile(item, file, signal, IMAGE_TYPES, 'front')}
                 onBusyChange={onBusyChange}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
@@ -224,7 +225,7 @@ function OnboardingChecklist() {
                 accept="image/*"
                 kinds="Photo"
                 preview={false}
-                upload={(file) => uploadFile(item, file, IMAGE_TYPES, 'back')}
+                upload={(file, signal) => uploadFile(item, file, signal, IMAGE_TYPES, 'back')}
                 onBusyChange={onBusyChange}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
@@ -239,7 +240,7 @@ function OnboardingChecklist() {
               label={item.label}
               accept="image/*,application/pdf"
               preview={!item.sensitive}
-              upload={(file) => uploadFile(item, file, DOC_TYPES)}
+              upload={(file, signal) => uploadFile(item, file, signal, DOC_TYPES)}
               onBusyChange={onBusyChange}
               onUploaded={(path) => startSubmission(item, path)}
             />

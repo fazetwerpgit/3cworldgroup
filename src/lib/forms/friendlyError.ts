@@ -10,6 +10,9 @@ const OFFLINE =
 const NOT_JSON =
   /unexpected token|not valid json|json\.parse|unexpected end of json|string did not match the expected pattern|unexpected character|unexpected eof/i;
 
+// uploadFormAttachment gives up on a stalled upload with this message.
+const UPLOAD_TIMEOUT = /^upload timed out/i;
+
 export interface FriendlyError {
   offline: boolean;
   message: string;
@@ -17,6 +20,7 @@ export interface FriendlyError {
 
 /** `action` is the verb the retry needs: "send", "sign", "upload". */
 export function friendlyError(raw: string, action = 'send'): FriendlyError {
+  if (UPLOAD_TIMEOUT.test(raw)) return { offline: true, message: 'Upload timed out' };
   if (OFFLINE.test(raw)) return { offline: true, message: `No signal. Check your connection and ${action} again.` };
   if (NOT_JSON.test(raw)) return { offline: false, message: 'Server hiccup, try again.' };
   return { offline: false, message: raw };

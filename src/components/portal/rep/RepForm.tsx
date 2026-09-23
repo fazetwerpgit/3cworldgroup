@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useReducer,
   useRef,
   useState,
   useSyncExternalStore,
@@ -22,8 +23,10 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
+import { PdfPages } from '@/components/esign/PdfPages';
 import { friendlyError } from '@/lib/forms/friendlyError';
 import { isEmailShaped } from '@/lib/forms/managerInterview';
+import { attachReducer, fileView, uploadFailure, type FileView } from './attachmentState';
 import { BodyLayer } from './BodyLayer';
 import { useHideRepTabBar } from './RepShell';
 import s from './rep.module.css';
@@ -517,17 +520,13 @@ function Meter({ done, total }: { done: number; total: number }) {
 }
 
 // ---------- attachments ----------
-type AttachState =
-  | { kind: 'idle' }
-  | { kind: 'uploading'; name: string }
-  | { kind: 'done'; name: string; localUrl: string | null; isImage: boolean }
-  | { kind: 'error'; message: string };
-
 /**
  * One file slot (photo, screenshot or PDF). `upload` does the work (snapshot,
- * shrink, POST) and resolves to the storage folder path. "View" shows an
- * attached photo in an in-page viewer (a new tab opens blank in the iPhone
- * home-screen app). `preview={false}` shows neither a thumbnail nor View, for
+ * shrink, POST) and resolves to the storage folder path; it gets a signal that
+ * Cancel (or leaving the page) aborts. While a file uploads the tile shows
+ * Cancel; a timeout or lost signal leaves Retry for the same file. "View" shows
+ * an attached photo or PDF in an in-page viewer (a new tab opens blank in the
+ * iPhone home-screen app, so a PDF is drawn page by page like the e-sign one). `preview={false}` shows neither a thumbnail nor View, for
  * sensitive documents (license, W-9).
  */
 export function Attachment({
@@ -553,41 +552,78 @@ export function Attachment({
   preview?: boolean;
   /** A file is already on record (resubmission): start in the attached state. */
   initialDone?: boolean;
-  upload: (file: File) => Promise<string>;
+  upload: (file: File, signal: AbortSignal) => Promise<string>;
   onUploaded: (path: string) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const [state, setState] = useState<AttachState>(
-    initialDone ? { kind: 'done', name: 'File on record', localUrl: null, isImage: false } : { kind: 'idle' }
+  const [state, dispatch] = useReducer(
+    attachReducer,
+    initialDone ? { kind: 'done', name: 'File on record', localUrl: null, view: null } : { kind: 'idle' }
   );
   const urlRef = useRef<string | null>(null);
   const [viewing, setViewing] = useState(false);
   const viewRef = useRef<HTMLButtonElement | null>(null);
+  const runRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const fileRef = useRef<File | null>(null);
+  const busyRef = useRef(false);
+  const busyChangeRef = useRef(onBusyChange);
+  useEffect(() => {
+    busyChangeRef.current = onBusyChange;
+  }, [onBusyChange]);
+
+  // Send is blocked only while a request is really in flight: Cancel, a result
+  // and unmounting each report not-busy once.
+  const setBusy = useCallback((busy: boolean) => {
+    if (busyRef.current === busy) return;
+    busyRef.current = busy;
+    busyChangeRef.current?.(busy);
+  }, []);
 
   useEffect(
     () => () => {
+      abortRef.current?.abort();
+      setBusy(false);
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     },
-    []
+    [setBusy]
   );
 
-  const pick = async (file: File | undefined) => {
+  const pick = async (file: File | null | undefined) => {
     if (!file) return;
-    setState({ kind: 'uploading', name: file.name });
-    onBusyChange?.(true);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const run = ++runRef.current;
+    fileRef.current = file;
+    dispatch({ type: 'start', run, name: file.name });
+    setBusy(true);
     try {
-      const path = await upload(file);
+      const path = await upload(file, controller.signal);
+      if (run !== runRef.current) return;
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       // Sensitive slots never get a local copy, so there is nothing to view.
       const localUrl = preview ? URL.createObjectURL(file) : null;
       urlRef.current = localUrl;
-      setState({ kind: 'done', name: file.name, localUrl, isImage: file.type.startsWith('image/') });
+      dispatch({ type: 'done', run, name: file.name, localUrl, view: fileView(file) });
       onUploaded(path);
     } catch (err) {
-      setState({ kind: 'error', message: err instanceof Error ? err.message : 'Upload failed' });
+      const failure = uploadFailure(err);
+      if (!failure.cancelled) dispatch({ type: 'fail', run, message: failure.message, retry: failure.retry });
     } finally {
-      onBusyChange?.(false);
+      if (run === runRef.current) {
+        abortRef.current = null;
+        setBusy(false);
+      }
     }
+  };
+
+  const cancel = () => {
+    runRef.current += 1; // whatever the stalled request says later is ignored
+    abortRef.current?.abort();
+    abortRef.current = null;
+    dispatch({ type: 'cancel' });
+    setBusy(false);
   };
 
   const input = (
@@ -603,7 +639,6 @@ export function Attachment({
         e.target.value = '';
         void pick(file);
       }}
-      disabled={state.kind === 'uploading'}
     />
   );
 
@@ -616,7 +651,7 @@ export function Attachment({
       </label>
       {state.kind === 'done' ? (
         <div className={f.fileRow}>
-          {preview && state.isImage && state.localUrl ? (
+          {preview && state.view === 'image' && state.localUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={state.localUrl} alt="" className={f.fileThumb} />
           ) : (
@@ -632,7 +667,7 @@ export function Attachment({
             </span>
           </span>
           <span className={f.fileActions}>
-            {state.localUrl && state.isImage ? (
+            {state.localUrl && state.view ? (
               <button ref={viewRef} type="button" className={f.fileBtn} onClick={() => setViewing(true)}>
                 View
               </button>
@@ -643,36 +678,59 @@ export function Attachment({
             </label>
           </span>
         </div>
+      ) : state.kind === 'uploading' ? (
+        <div className={f.fileRow} role="status">
+          <span className={f.fileIcon} aria-hidden="true">
+            <Loader2 size={20} className={f.spin} />
+          </span>
+          <span className={f.fileMeta}>
+            <span className={f.fileName}>{state.name}</span>
+            <span className={f.fileSub}>Uploading…</span>
+          </span>
+          <span className={f.fileActions}>
+            <button type="button" className={f.fileBtn} onClick={cancel}>
+              Cancel
+            </button>
+          </span>
+        </div>
+      ) : state.kind === 'error' && state.retry ? (
+        <div className={`${f.fileRow} ${f.fileFailed}`}>
+          <span className={f.fileIcon} aria-hidden="true">
+            <RotateCcw size={20} />
+          </span>
+          <span className={f.fileMeta}>
+            <span className={f.fileName}>{state.name}</span>
+            <span className={f.fileSub}>Not attached</span>
+          </span>
+          <span className={f.fileActions}>
+            <button type="button" className={f.fileBtn} onClick={() => void pick(fileRef.current)}>
+              Retry
+            </button>
+            <label className={f.fileBtn}>
+              {input}
+              Other file
+            </label>
+          </span>
+        </div>
       ) : (
-        <label className={`${f.drop} ${state.kind === 'uploading' ? f.dropBusy : ''}`}>
+        <label className={f.drop}>
           {input}
-          {state.kind === 'uploading' ? (
-            <>
-              <Loader2 size={20} className={f.spin} aria-hidden="true" />
-              <span className={f.dropText}>
-                <span className={f.dropTitle}>Uploading…</span>
-                <span className={f.dropSub}>{state.name}</span>
-              </span>
-            </>
+          {state.kind === 'error' ? (
+            <RotateCcw size={20} aria-hidden="true" className={f.dropIcon} />
           ) : (
-            <>
-              {state.kind === 'error' ? (
-                <RotateCcw size={20} aria-hidden="true" className={f.dropIcon} />
-              ) : (
-                <ImageUp size={20} aria-hidden="true" className={f.dropIcon} />
-              )}
-              <span className={f.dropText}>
-                <span className={f.dropTitle}>{state.kind === 'error' ? 'Try another file' : 'Choose a file'}</span>
-                <span className={f.dropSub}>{kinds} · 4 MB max</span>
-              </span>
-            </>
+            <ImageUp size={20} aria-hidden="true" className={f.dropIcon} />
           )}
+          <span className={f.dropText}>
+            <span className={f.dropTitle}>{state.kind === 'error' ? 'Try another file' : 'Choose a file'}</span>
+            <span className={f.dropSub}>{kinds} · 4 MB max</span>
+          </span>
         </label>
       )}
       <FieldNote id={id} error={shownError} hint={hint} />
-      {viewing && state.kind === 'done' && state.localUrl ? (
-        <PhotoViewer
+      {viewing && state.kind === 'done' && state.localUrl && state.view ? (
+        <FileViewer
           src={state.localUrl}
+          view={state.view}
           name={state.name}
           onClose={() => {
             setViewing(false);
@@ -684,8 +742,18 @@ export function Attachment({
   );
 }
 
-/** A full-screen look at an attached photo, portaled to <body>. */
-function PhotoViewer({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+/** A full-screen look at an attached photo or PDF, portaled to <body>. */
+function FileViewer({
+  src,
+  view,
+  name,
+  onClose,
+}: {
+  src: string;
+  view: Exclude<FileView, null>;
+  name: string;
+  onClose: () => void;
+}) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -718,8 +786,14 @@ function PhotoViewer({ src, name, onClose }: { src: string; name: string; onClos
         >
           <X size={22} aria-hidden="true" />
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={name} className={f.viewerImg} />
+        {view === 'pdf' ? (
+          <div className={f.viewerDoc}>
+            <PdfPages src={src} />
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={name} className={f.viewerImg} />
+        )}
       </div>
     </BodyLayer>
   );

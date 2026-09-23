@@ -77,6 +77,15 @@ export type RetryDecision =
   | { action: 'retry'; delayMs: number };
 
 /**
+ * A queued message stops sending on its own this long after it was written (or
+ * after the user last tapped Retry), so an hours-old message never goes out
+ * unattended when the connection finally comes back.
+ */
+export function autoRetryExpired(windowStartMs: number, nowMs: number): boolean {
+  return nowMs - windowStartMs >= AUTO_RETRY_MAX_AGE_MS;
+}
+
+/**
  * What to do after a send attempt failed. `attempts` counts attempts made so
  * far (including the one that just failed). Offline failures don't burn an
  * attempt: they wait for the 'online' event instead of a timer.
@@ -88,7 +97,7 @@ export function decideAfterFailure(input: {
   online: boolean;
 }): RetryDecision {
   if (!isRetryableFailure(input.failure)) return { action: 'fail' };
-  if (input.ageMs >= AUTO_RETRY_MAX_AGE_MS) return { action: 'fail' };
+  if (autoRetryExpired(0, input.ageMs)) return { action: 'fail' };
   if (!input.online) return { action: 'wait-online' };
   const delayMs = RETRY_DELAYS_MS[input.attempts - 1];
   return delayMs === undefined ? { action: 'fail' } : { action: 'retry', delayMs };

@@ -445,10 +445,6 @@
   outline-offset: 2px;
 }
 
-.dropBusy {
-  cursor: progress;
-}
-
 .dropIcon {
   color: var(--c-lime);
 }
@@ -524,6 +520,19 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fileSub {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.fileFailed {
+  border-color: rgba(255, 138, 128, 0.5);
+}
+
+.fileFailed .fileIcon {
+  color: var(--c-red);
 }
 
 .fileOk {
@@ -1049,6 +1058,16 @@
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
   border-radius: var(--r-control);
   object-fit: contain;
+}
+
+.viewerDoc {
+  width: min(100%, 760px);
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
+  padding: 0 var(--s3) var(--s3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--r-control);
+  background: var(--c-panel);
 }
 
 .viewerClose {
