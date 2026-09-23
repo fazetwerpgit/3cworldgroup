@@ -262,6 +262,7 @@ export function RepLogSale() {
   const clearSale = () => {
     for (const tile of uploads.tiles) if (tile.kind !== 'done') uploads.discard(tile.key);
     form.startOver();
+    scan.reset();
     setStep('entry');
     setProviderChoice(null);
     setMoreOpen(false);

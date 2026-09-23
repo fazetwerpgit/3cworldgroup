@@ -7,6 +7,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DRAFT_KEY_PREFIX } from '@/hooks/useSaleFormState';
 import type { SaleScanResponse } from '@/lib/sales/scan/types';
 
 const createSale = vi.fn();
@@ -263,5 +264,31 @@ describe('RepLogSale screenshot reader', () => {
     expect(field('customerAddress').value).toBe('');
     expect(field('customerAddress').getAttribute('aria-busy')).toBeNull();
     expect(field('customerName').value).toBe('Typed');
+  });
+
+  it('Start over forgets the old sale: the next screenshot is read and fills every empty field', async () => {
+    window.sessionStorage.setItem(
+      `${DRAFT_KEY_PREFIX}r1`,
+      JSON.stringify({ formData: { customerName: 'Alicia' }, products: [], proofUploadId: 'b'.repeat(32) })
+    );
+    await render();
+    expect(text()).toContain('Picking up where you left off');
+    await type('customerAddress', '9 Oak St, Waco, TX');
+    await upload(P1);
+    expect(scanBodies).toHaveLength(0);
+
+    const button = (name: string) => Array.from(container.querySelectorAll('button')).find((b) => b.textContent === name)!;
+    await act(async () => button('Start over').click());
+    await act(async () => button('Clear').click());
+    await act(async () =>
+      Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Enter manually'))!.click()
+    );
+    expect(text()).not.toContain('Filled from your screenshot');
+
+    scanReplies.push(READ);
+    await upload(P1);
+    expect(scanBodies).toEqual([{ paths: [P1] }]);
+    expect(field('customerAddress').value).toBe('2217 Juniper Hollow Dr, Round Rock, TX 78664');
+    expect(field('customerName').value).toBe('Marisol Keene');
   });
 });

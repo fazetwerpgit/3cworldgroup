@@ -219,6 +219,20 @@ export function useSaleScan({
     });
   }, []);
 
+  /** Start over: a new sale, so forget this one's reads, edits and flags. */
+  const reset = useCallback(() => {
+    controller.current?.abort();
+    controller.current = null;
+    queued.current = false;
+    stopped.current = false;
+    everFilled.current = false;
+    scanned.current.clear();
+    touchedRef.current.clear();
+    setTouched(new Set());
+    setFlags({});
+    setStatus('idle');
+  }, []);
+
   useEffect(() => () => controller.current?.abort(), []);
 
   const reading = status === 'reading';
@@ -232,6 +246,7 @@ export function useSaleScan({
     skip,
     edited,
     seen,
+    reset,
   };
 }
 
