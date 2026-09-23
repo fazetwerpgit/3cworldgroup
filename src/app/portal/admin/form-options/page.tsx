@@ -11,8 +11,10 @@ import {
   FORM_OPTION_LABELS,
   OptionKey,
 } from '@/lib/forms/formOptionsRegistry';
-import { AdminCatalogCard, AdminCatalogList } from '@/components/admin/AdminCatalogList';
-import '@/styles/sweep-admin-b.css';
+import { Check, Plus, X } from 'lucide-react';
+import rep from '@/components/portal/rep/rep.module.css';
+import { AdminHead, Banner, LoadFailed, SkeletonRows, cx } from '@/components/portal/admin-ops/AdminKit';
+import s from '@/components/portal/admin-ops/admin-ops.module.css';
 
 export default function AdminFormOptionsPage() {
   const { user } = useAuth();
@@ -26,6 +28,8 @@ export default function AdminFormOptionsPage() {
   const [savingKey, setSavingKey] = useState<OptionKey | null>(null);
   const [successKey, setSuccessKey] = useState<OptionKey | null>(null);
   const [error, setError] = useState('');
+  // Last server copy, so each list can say when it has unsaved edits.
+  const [savedOptions, setSavedOptions] = useState<Record<OptionKey, string[]>>(FORM_OPTION_DEFAULTS);
 
   const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
     const token = await auth?.currentUser?.getIdToken();
@@ -42,7 +46,10 @@ export default function AdminFormOptionsPage() {
       const res = await authedFetch('/api/portal/forms/options');
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load form options');
-      if (json.options) setOptions(json.options);
+      if (json.options) {
+        setOptions(json.options);
+        setSavedOptions(json.options);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load form options');
     } finally {
@@ -53,6 +60,19 @@ export default function AdminFormOptionsPage() {
   useEffect(() => {
     loadOptions();
   }, [loadOptions]);
+
+  // A failed first load shows "Couldn't load · Retry" (never the built-in defaults as
+  // if they were live); later save errors show a banner.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (!loading && !error) setLoaded(true);
+  }, [loading, error]);
+  const loadFailed = !loading && !loaded && Boolean(error);
+  const retry = () => {
+    setError('');
+    setLoading(true);
+    loadOptions();
+  };
 
   const removeValue = (key: OptionKey, index: number) => {
     setOptions((prev) => ({ ...prev, [key]: prev[key].filter((_, i) => i !== index) }));
@@ -82,6 +102,7 @@ export default function AdminFormOptionsPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to save options');
+      setSavedOptions((prev) => ({ ...prev, [key]: options[key] }));
       setSuccessKey(key);
       setTimeout(() => setSuccessKey((current) => (current === key ? null : current)), 3000);
     } catch (err) {
@@ -93,87 +114,118 @@ export default function AdminFormOptionsPage() {
 
   return (
     <ProtectedRoute roles={['admin']}>
-      <AdminCatalogList
-        title="Form Options"
-        meta={`${EDITABLE_OPTION_KEYS.length} option lists`}
-        loading={loading}
-        loadingLabel="Loading form options…"
-        error={error || null}
-        success={null}
-        isEmpty={false}
-        isFilteredEmpty={false}
-        emptyTrue={{ title: 'No lists.', body: '' }}
-        emptyFiltered={{ title: 'No lists match.', body: '' }}
-      >
-        {EDITABLE_OPTION_KEYS.map((key) => (
-          <AdminCatalogCard
-            key={key}
-            title={FORM_OPTION_LABELS[key]}
-            statusLabel={successKey === key ? 'saved' : undefined}
-            statusTone="lime"
-            metaLeft={`${options[key].length} option${options[key].length === 1 ? '' : 's'}`}
-            extra={
-              <div style={{ marginTop: 10 }}>
-                <div className="admin-line-value-chips" style={{ marginBottom: 10 }}>
-                  {options[key].length === 0 ? (
-                    <span className="admin-line-meta">No options yet.</span>
-                  ) : (
-                    options[key].map((value, index) => (
-                      <span key={`${value}-${index}`} className="admin-line-value-chip">
-                        {value}
-                        <button
-                          type="button"
-                          className="admin-line-value-chip-remove"
-                          aria-label={`Remove ${value}`}
-                          onClick={() => removeValue(key, index)}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-                <div className="admin-line-form-option-add">
-                  <input
-                    className="admin-line-search"
-                    style={{ flex: '1 1 auto' }}
-                    value={drafts[key]}
-                    onChange={(e) => setDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addValue(key);
-                      }
-                    }}
-                    placeholder="Type a value"
-                  />
-                  <button type="button" className="admin-line-action" onClick={() => addValue(key)}>
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-line-primary"
-                    onClick={() => saveValues(key)}
-                    disabled={savingKey === key}
-                  >
-                    {savingKey === key ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            }
-            actions={null}
-          />
-        ))}
-      </AdminCatalogList>
+      <div className={s.page}>
+        <AdminHead
+          kicker="Admin"
+          title="Form Options"
+          lede="The choices reps see in form dropdowns. Each list saves on its own."
+          count={loading || loadFailed ? null : EDITABLE_OPTION_KEYS.length}
+          countLabel="lists"
+        />
 
-      <div className="admin-line-main">
-        <div className="admin-line" style={{ paddingTop: 0 }}>
-          <FormAlertsCard />
-          <p className="admin-line-sub" style={{ marginTop: 12 }}>
-            Leads categories and reasons cannot be edited here because they control which fields
-            appear on the Leads Request form.
-          </p>
-        </div>
+        {error && !loadFailed ? <Banner tone="error">{error}</Banner> : null}
+
+        {loading ? (
+          <section className={cx(rep.panel, s.listPanel)}>
+            <SkeletonRows rows={4} />
+          </section>
+        ) : loadFailed ? (
+          <section className={cx(rep.panel, s.listPanel)}>
+            <LoadFailed what="form options" onRetry={retry} />
+          </section>
+        ) : (
+          <div className={s.oGrid}>
+            {EDITABLE_OPTION_KEYS.map((key) => {
+              const inputId = `option-add-${key}`;
+              const count = options[key].length;
+              const dirty = JSON.stringify(options[key]) !== JSON.stringify(savedOptions[key]);
+              return (
+                <section key={key} className={cx(rep.panel, s.oCard)} aria-labelledby={`${inputId}-title`}>
+                  <div className={rep.panelHead}>
+                    <h2 id={`${inputId}-title`} className={rep.kicker}>
+                      {FORM_OPTION_LABELS[key]}
+                    </h2>
+                    <span className={s.panelCount}>
+                      {count} option{count === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className={s.oBody}>
+                    {count === 0 ? (
+                      <p className={s.muted} style={{ margin: 0 }}>
+                        No options yet.
+                      </p>
+                    ) : (
+                      <ul className={s.chips}>
+                        {options[key].map((value, index) => (
+                          <li key={`${value}-${index}`} className={s.chip}>
+                            {value}
+                            <button
+                              type="button"
+                              className={s.chipX}
+                              aria-label={`Remove ${value}`}
+                              onClick={() => removeValue(key, index)}
+                            >
+                              <X size={16} aria-hidden="true" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className={s.addRow}>
+                      <label htmlFor={inputId} className={rep.srOnly}>
+                        Add to {FORM_OPTION_LABELS[key]}
+                      </label>
+                      <input
+                        id={inputId}
+                        className={s.input}
+                        value={drafts[key]}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addValue(key);
+                          }
+                        }}
+                        placeholder="Type a value"
+                        enterKeyHint="done"
+                      />
+                      <button type="button" className={s.btn} onClick={() => addValue(key)} disabled={!drafts[key].trim()}>
+                        <Plus size={16} aria-hidden="true" />
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                  <div className={s.oFoot}>
+                    {successKey === key ? (
+                      <span className={s.saved} role="status">
+                        <Check size={16} aria-hidden="true" />
+                        Saved
+                      </span>
+                    ) : dirty ? (
+                      <span className={s.unsaved}>Unsaved changes</span>
+                    ) : (
+                      <span />
+                    )}
+                    <button
+                      type="button"
+                      className={dirty ? s.btnLime : s.btn}
+                      onClick={() => saveValues(key)}
+                      disabled={savingKey === key}
+                    >
+                      {savingKey === key ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        <FormAlertsCard />
+        <p className={s.footnote}>
+          Leads categories and reasons can&apos;t be edited here because they control which fields appear on the Leads
+          Request form.
+        </p>
       </div>
     </ProtectedRoute>
   );
