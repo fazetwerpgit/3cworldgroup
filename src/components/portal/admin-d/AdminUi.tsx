@@ -88,20 +88,18 @@ export function AdminFailed({ what, onRetry, detail }: { what?: string; onRetry?
   );
 }
 
+/** Left-aligned text, no icon: the same empty state as the admin ops pages. */
 export function AdminEmpty({
-  icon,
   title,
   children,
   action,
 }: {
-  icon?: ReactNode;
   title: string;
   children?: ReactNode;
   action?: ReactNode;
 }) {
   return (
     <div className={u.empty}>
-      {icon ? <span className={u.emptyIcon}>{icon}</span> : null}
       <p className={u.emptyTitle}>{title}</p>
       {children ? <p className={u.emptyText}>{children}</p> : null}
       {action ? <div className={u.btnRow}>{action}</div> : null}
@@ -115,7 +113,6 @@ export function AdminSkeletonRows({ rows = 4, label = 'Loading' }: { rows?: numb
     <div role="status" aria-label={label}>
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className={u.skelRow} aria-hidden="true">
-          <span className={s.skel} style={{ width: 36, height: 36, borderRadius: '50%' }} />
           <span className={u.skelLines}>
             <span className={s.skel} style={{ width: `${58 - (index % 3) * 9}%`, height: 14 }} />
             <span className={s.skel} style={{ width: `${34 + (index % 2) * 12}%`, height: 12 }} />
@@ -123,22 +120,6 @@ export function AdminSkeletonRows({ rows = 4, label = 'Loading' }: { rows?: numb
         </div>
       ))}
     </div>
-  );
-}
-
-export function initialsOf(name?: string | null, fallback = 'U') {
-  const value = (name || '').trim();
-  if (!value) return fallback;
-  const parts = value.split(/[\s@._-]+/).filter(Boolean);
-  const letters = parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : value.slice(0, 2);
-  return letters.toUpperCase();
-}
-
-export function AdminAvatar({ name }: { name?: string | null }) {
-  return (
-    <span className={u.avatar} aria-hidden="true">
-      {initialsOf(name)}
-    </span>
   );
 }
 

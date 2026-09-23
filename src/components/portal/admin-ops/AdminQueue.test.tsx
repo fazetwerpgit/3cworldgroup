@@ -45,7 +45,7 @@ describe('AdminQueue', () => {
   it('shows skeletons and no count while loading', () => {
     const html = render({ loading: true });
     expect(html).toContain('aria-busy="true"');
-    expect(html).not.toContain('>open<');
+    expect(html).not.toContain(' open</span>');
   });
 
   it("says Couldn't load with a Retry instead of an empty queue or zero", () => {
@@ -53,7 +53,7 @@ describe('AdminQueue', () => {
     expect(html).toContain('Couldn&#x27;t load');
     expect(html).toContain('Retry');
     expect(html).not.toContain('Nothing to review');
-    expect(html).not.toContain('>open<');
+    expect(html).not.toContain(' open</span>');
   });
 
   it('shows a short empty state when there is nothing to review', () => {
@@ -70,7 +70,7 @@ describe('AdminQueue', () => {
     });
     expect(html).toContain('Marcus Hill');
     expect(html).not.toContain('Priya Nair');
-    expect(html).toMatch(/>1<\/span><span[^>]*>open</);
+    expect(html).toMatch(/<b>1<\/b><span> open<\/span>/);
     expect(html).toContain('All campaigns');
   });
 

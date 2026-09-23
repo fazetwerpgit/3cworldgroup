@@ -22,7 +22,12 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // Not "black-translucent": with viewport-fit=cover, iOS 26+ standalone
+    // sizes the web view one status bar (~59pt on Dynamic Island phones) short
+    // and leaves an unpaintable strip under the fixed tab bar (WebKit bug
+    // 301108). "default" gives an opaque status bar tinted by theme-color and
+    // a correctly sized view; safe-area-inset-top then reads 0.
+    statusBarStyle: "default",
     title: "3C Console",
   },
   icons: {

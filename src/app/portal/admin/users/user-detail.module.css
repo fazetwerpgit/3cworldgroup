@@ -26,10 +26,6 @@
   min-width: 0;
 }
 
-.single {
-  max-width: 760px;
-}
-
 .salesBody {
   display: grid;
   gap: 4px;

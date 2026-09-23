@@ -9,14 +9,14 @@
 
 .root,
 .layer {
-  --c-ground: #03070e;
-  --c-panel: #0e1726;
-  --c-panel-hi: #141f31;
-  --c-line: rgba(163, 184, 214, 0.14);
+  --c-ground: #0b1424; /* the old portal navy (Jacob: "the background is way better") */
+  --c-panel: #131f33; /* the old portal's card: one flat step above the ground */
+  --c-panel-hi: #1a2840;
+  --c-line: rgba(163, 184, 214, 0.16);
   --c-line-strong: rgba(163, 184, 214, 0.28);
   --c-text: #f2f5f9;
-  --c-text-2: #a7b2c3; /* 9.4:1 on panel */
-  --c-text-3: #8a96a9; /* 5.9:1 on panel, 5.2:1 on panel-hi */
+  --c-text-2: #a7b2c3; /* 7.7:1 on panel, 8.6:1 on ground */
+  --c-text-3: #8a96a9; /* 5.5:1 on panel, 4.9:1 on panel-hi, 6.2:1 on ground */
   --c-lime: #8dc63f;
   --c-lime-hi: #a6e052;
   --c-lime-wash: rgba(141, 198, 63, 0.13);
@@ -27,12 +27,9 @@
   --c-amber-wash: rgba(245, 185, 69, 0.11);
   --c-red: #ff8a80;
   --c-track: rgba(163, 184, 214, 0.14);
-  --c-bar: rgb(8, 14, 24); /* fixed bars: opaque, never blurred */
-  --c-panel-fill: linear-gradient(180deg, var(--c-panel-hi) 0, var(--c-panel) 180px);
-  --c-lift:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 2px rgba(0, 0, 0, 0.45),
-    0 22px 44px -22px rgba(0, 0, 0, 0.85);
+  --c-bar: #070f1c; /* fixed bars: opaque, a step below the ground, never blurred */
+  --c-panel-fill: var(--c-panel); /* flat, like the old portal's cards */
+  --c-lift: 0 1px 2px rgba(0, 0, 0, 0.3);
 
   --f-display: 'Bebas Neue', var(--font-geist-sans), system-ui, sans-serif;
   --f-ui: var(--font-geist-sans), system-ui, sans-serif;
@@ -96,7 +93,8 @@
   color: var(--c-text);
 }
 
-/* One fixed layer of navy light behind everything. Radial gradients only. */
+/* The old portal's ground (globals.css .dark .portal-canvas): flat navy with a
+   faint 24px grid, fixed behind everything. No glows, no vignette. */
 .root::before {
   content: '';
   position: fixed;
@@ -104,14 +102,14 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(140% 62% at 50% -6%, rgba(60, 110, 200, 0.2) 0%, rgba(60, 110, 200, 0.124) 35%, rgba(60, 110, 200, 0.052) 68%, transparent 100%),
-    radial-gradient(70% 34% at 80% 20%, rgba(141, 198, 63, 0.085) 0%, rgba(141, 198, 63, 0.053) 35%, rgba(141, 198, 63, 0.022) 68%, transparent 100%),
-    radial-gradient(120% 90% at 50% 38%, transparent 55%, rgba(0, 2, 6, 0.38) 82%, rgba(0, 2, 6, 0.6) 100%);
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 /* The global body is white; without this an overscroll bounce flashes it. */
 :global(body):has(.root) {
-  background: #03070e;
+  background: #0b1424;
 }
 
 /* ---------- phone app shell ----------
@@ -119,7 +117,10 @@
    fixed on <body>, the same lock the old chrome uses (globals.css "Mobile
    app-shell scroll lock") so WebKit has nothing to mis-anchor after a resume. */
 @media (max-width: 1023px) {
+  /* The bar's colour, so any strip iOS leaves below the fixed tab bar blends
+     into it instead of reading as a band. .root paints the ground over it. */
   :global(body):has(.root) {
+    background: #070f1c;
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
@@ -153,14 +154,6 @@
   .layer {
     --gutter: 40px;
     --topbar-h: 72px;
-  }
-
-  .root::before {
-    background:
-      radial-gradient(80% 75% at 38% -14%, rgba(60, 110, 200, 0.26) 0%, rgba(60, 110, 200, 0.161) 35%, rgba(60, 110, 200, 0.068) 68%, transparent 100%),
-      radial-gradient(30% 40% at 44% 24%, rgba(141, 198, 63, 0.09) 0%, rgba(141, 198, 63, 0.056) 35%, rgba(141, 198, 63, 0.023) 68%, transparent 100%),
-      radial-gradient(55% 70% at 96% 104%, rgba(60, 110, 200, 0.12) 0%, rgba(60, 110, 200, 0.074) 35%, rgba(60, 110, 200, 0.031) 68%, transparent 100%),
-      radial-gradient(100% 100% at 50% 40%, transparent 58%, rgba(0, 2, 6, 0.35) 84%, rgba(0, 2, 6, 0.55) 100%);
   }
 
   .scroller {
@@ -250,6 +243,18 @@
   text-transform: uppercase;
 }
 
+/* Section headers lead with a short lime rule. */
+h2.kicker::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  margin-right: 8px;
+  border-radius: 1px;
+  background: var(--c-lime);
+  vertical-align: 0.3em;
+}
+
 .panel {
   border: 1px solid var(--c-line);
   border-radius: var(--r-panel);
@@ -280,7 +285,6 @@
   inset: 0 auto 0 0;
   border-radius: 2px;
   background: var(--c-lime);
-  box-shadow: 0 0 14px var(--c-lime-glow);
 }
 
 .srOnly {
@@ -558,9 +562,12 @@
     cursor: pointer;
   }
 
-  .navLink[aria-current='page'],
   .navLink[aria-expanded='true'] {
     color: var(--c-text);
+  }
+
+  .navLink[aria-current='page'] {
+    color: var(--c-lime-hi);
   }
 
   .navLink[aria-current='page']::after {
@@ -571,7 +578,6 @@
     left: var(--s3);
     height: 2px;
     background: var(--c-lime);
-    box-shadow: 0 0 10px var(--c-lime-glow);
   }
 
   .navDot {
@@ -611,7 +617,6 @@
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--c-line-strong);
   background: var(--c-bar);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transform: translateZ(0);
 }
 
@@ -646,7 +651,7 @@
 }
 
 .tab[aria-current='page'] {
-  color: var(--c-text);
+  color: var(--c-lime-hi);
 }
 
 .tab[aria-current='page']::before {
@@ -658,7 +663,6 @@
   height: 2px;
   margin-left: -14px;
   background: var(--c-lime);
-  box-shadow: 0 0 10px var(--c-lime-glow);
 }
 
 .tabIcon {
@@ -885,6 +889,7 @@
 }
 
 .navItem[aria-current='page'] {
+  color: var(--c-lime-hi);
   background: var(--c-lime-wash);
   box-shadow: inset 3px 0 0 var(--c-lime);
 }

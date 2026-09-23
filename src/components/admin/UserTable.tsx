@@ -1,9 +1,9 @@
 'use client';
 
-import { ChevronRight, UserPlus } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
 import { isOnline } from '@/lib/presence/isOnline';
-import { AdminAvatar, AdminEmpty, StatusDot, type Tone } from '@/components/portal/admin-d/AdminUi';
+import { AdminEmpty, StatusDot, type Tone } from '@/components/portal/admin-d/AdminUi';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import t from './user-table.module.css';
@@ -48,7 +48,7 @@ export function UserTable({
 }: UserTableProps) {
   if (users.length === 0) {
     return (
-      <AdminEmpty icon={<UserPlus size={24} />} title="No people match this filter.">
+      <AdminEmpty title="No people match this filter.">
         Try a broader search or clear the filters.
       </AdminEmpty>
     );
@@ -85,7 +85,6 @@ export function UserTable({
             }}
           >
             <span className={`${u.cellMain} ${u.person}`}>
-              <AdminAvatar name={user.displayName || user.email} />
               <span className={u.personText}>
                 <button type="button" className={t.nameBtn} onClick={() => onPersonLink?.(user.uid)}>
                   <span className={u.personName}>

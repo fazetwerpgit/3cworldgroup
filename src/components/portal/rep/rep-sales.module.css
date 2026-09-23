@@ -78,40 +78,16 @@
 }
 
 /* ---------- KPI strip ---------- */
+/* One line of pay, not a grid of stat tiles: est. payout leads, the month's
+   sale count rides under it. Flat 2px lime edge like every other hero. */
 .kpis {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas:
-    'value count'
-    'pay pay';
-  overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(141, 198, 63, 0) 30%, rgba(141, 198, 63, 0.5) 82%, rgba(141, 198, 63, 0) 100%) top / 100% 1px no-repeat,
-    radial-gradient(70% 120% at 100% 0%, rgba(141, 198, 63, 0.1) 0%, rgba(141, 198, 63, 0.05) 45%, transparent 100%),
-    var(--c-panel-fill);
-}
-
-.kpi {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
-  min-width: 0;
   padding: var(--s4);
-}
-
-.kpiValue {
-  grid-area: value;
-  border-right: 1px solid var(--c-line);
-}
-
-.kpiCount {
-  grid-area: count;
-}
-
-.kpiPay {
-  grid-area: pay;
-  border-top: 1px solid var(--c-line);
+  box-shadow:
+    inset 0 2px 0 var(--c-lime),
+    var(--c-lift);
 }
 
 .kpiLabel {
@@ -123,24 +99,13 @@
   align-items: baseline;
   gap: 6px;
   margin: 0;
+  padding-top: 4px;
+  color: var(--c-lime);
   font-family: var(--f-display);
-  font-size: var(--t-d1);
+  font-size: 64px;
   font-weight: 400;
   line-height: 0.9;
-  padding-top: 4px;
   font-variant-numeric: tabular-nums;
-}
-
-.kpiPay .kpiNum {
-  color: var(--c-lime);
-  font-size: 64px;
-}
-
-.kpiUnit {
-  color: var(--c-text-2);
-  font-family: var(--f-ui);
-  font-size: var(--t-sm);
-  font-weight: 600;
 }
 
 .kpiNote {
@@ -429,16 +394,10 @@
   color: var(--c-amber);
 }
 
-.tagScheduled {
-  background: color-mix(in srgb, var(--c-blue) 14%, transparent);
-  color: var(--c-blue);
-}
-
 /* Pay view: one band per pay period — "Sep 21–25 · est. $280". */
 .payGroup {
   padding: var(--s3) var(--s4);
   border-top: 1px solid var(--c-line-strong);
-  background: rgba(3, 7, 14, 0.35);
 }
 
 .payGroupText {
@@ -877,17 +836,10 @@
 .welcomeTitle {
   margin: 0;
   font-family: var(--f-display);
-  font-size: var(--t-d1);
+  font-size: var(--t-d3);
   font-weight: 400;
-  line-height: 0.95;
+  line-height: 1;
   letter-spacing: 0.01em;
-}
-
-.welcomeText {
-  margin: 0 0 var(--s2);
-  max-width: 34em;
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
 }
 
 .alert {
@@ -971,17 +923,14 @@
 
 .seg_installed {
   background: var(--c-lime);
-  box-shadow: 0 0 10px rgba(141, 198, 63, 0.38);
 }
 
 .seg_scheduled {
   background: var(--c-blue);
-  box-shadow: 0 0 10px rgba(124, 184, 255, 0.24);
 }
 
 .seg_needs {
   background: var(--c-amber);
-  box-shadow: 0 0 10px rgba(245, 185, 69, 0.26);
 }
 
 .seg_empty {
@@ -1549,14 +1498,6 @@
   font-weight: 600;
 }
 
-.dAge_amber {
-  color: var(--c-amber);
-}
-
-.dAge_red {
-  color: var(--c-red);
-}
-
 .dCancelled {
   margin: 0;
   padding: var(--s3) var(--s4);
@@ -1681,41 +1622,39 @@ a.dLine {
   text-align: right;
 }
 
+.dHeading {
+  margin: 0;
+  color: var(--c-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Value, est. pay, points: plain key/value rows, not stat tiles. */
 .dSummary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: var(--s2) var(--s4);
   border-bottom: 1px solid var(--c-line);
 }
 
 .dSummary > div {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--s4);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s2) 0;
 }
 
-.dSummary > div + div {
-  border-left: 1px solid var(--c-line);
-}
-
-.dSummary small {
+.dSummary dt {
   color: var(--c-text-2);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
+}
+
+.dSummary dd {
+  margin: 0;
+  font-size: var(--t-ui);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.dSummary strong {
-  font-family: var(--f-display);
-  font-size: 30px;
-  font-weight: 400;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.dSummary .est {
-  font-size: var(--t-min);
+  font-variant-numeric: tabular-nums;
 }
 
 .proofList {
@@ -1843,25 +1782,7 @@ a.dLine {
   }
 
   .kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas: 'value count pay';
-  }
-
-  .kpi {
     padding: var(--s5) var(--s6);
-  }
-
-  .kpiCount {
-    border-right: 1px solid var(--c-line);
-  }
-
-  .kpiPay {
-    border-top: 0;
-  }
-
-  .kpiNum,
-  .kpiPay .kpiNum {
-    font-size: 64px;
   }
 
   .panelHead {

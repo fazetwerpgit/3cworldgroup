@@ -46,46 +46,6 @@
     'table table'
     'foot foot';
   overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(141, 198, 63, 0) 18%, rgba(141, 198, 63, 0.55) 74%, rgba(141, 198, 63, 0) 100%) top /
-      100% 1px no-repeat,
-    var(--c-panel-fill);
-}
-
-.board::before,
-.board::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-}
-
-/* Lime bloom behind the installs numeral, cool blue behind the money figure. */
-.board::before {
-  top: -22%;
-  right: -12%;
-  width: 72%;
-  height: 70%;
-  background: radial-gradient(
-    closest-side,
-    rgba(141, 198, 63, 0.2) 0%,
-    rgba(141, 198, 63, 0.124) 35%,
-    rgba(141, 198, 63, 0.052) 68%,
-    transparent 100%
-  );
-}
-
-.board::after {
-  top: -26%;
-  left: -18%;
-  width: 90%;
-  height: 72%;
-  background: radial-gradient(
-    closest-side,
-    rgba(80, 140, 240, 0.17) 0%,
-    rgba(80, 140, 240, 0.105) 35%,
-    rgba(80, 140, 240, 0.044) 68%,
-    transparent 100%
-  );
 }
 
 .boardFailed {
@@ -136,9 +96,6 @@
 
 .scoreLime {
   color: var(--c-lime);
-  text-shadow:
-    0 0 22px rgba(141, 198, 63, 0.45),
-    0 0 64px rgba(141, 198, 63, 0.22);
 }
 
 .heroSub {
@@ -238,10 +195,7 @@
 }
 
 .cellPrior {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px var(--s2);
+  display: block;
   margin-top: 6px;
   color: var(--c-text-3);
   font-size: var(--t-sm);
@@ -345,23 +299,10 @@
 }
 
 .clear {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--s3);
-  min-height: 64px;
   margin: 0;
-  padding: 10px var(--s4);
-}
-
-.clearTile {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-panel);
-  background: var(--c-lime-wash);
-  color: var(--c-lime);
+  padding: var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
 }
 
 /* ---------- recruiting ---------- */

@@ -12,11 +12,8 @@ import a from './auth.module.css';
  * pending approval, profile retry, the portal error boundary): the rep shell's
  * navy ground and light, the logo and Bebas wordmark, one panel. There is no
  * RepShell here because there is no user to build its nav for.
- *
- * `statement` puts a brand statement beside the panel (sign in, sign up). Left
- * out, the panel sits alone in the middle (status screens).
  */
-export function AuthShell({ children, statement }: { children: ReactNode; statement?: ReactNode }) {
+export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className={s.layer}>
       <div className={a.screen}>
@@ -28,8 +25,7 @@ export function AuthShell({ children, statement }: { children: ReactNode; statem
           <span className={a.brandTag}>Employee portal</span>
         </header>
 
-        <main className={statement ? a.stage : a.stageSolo}>
-          {statement ? <div className={a.statement}>{statement}</div> : null}
+        <main className={a.stage}>
           <div className={`${s.panel} ${a.card}`}>{children}</div>
         </main>
 
@@ -41,22 +37,5 @@ export function AuthShell({ children, statement }: { children: ReactNode; statem
         </footer>
       </div>
     </div>
-  );
-}
-
-/** The sign-in statement: the portal's line, in the scoreboard face. */
-export function PortalStatement() {
-  return (
-    <>
-      <h2 className={a.display}>
-        The day starts <em>here.</em>
-      </h2>
-      <p className={a.statementLede}>Your numbers, your team, your next move. All in one place.</p>
-      <ul className={a.features}>
-        <li>Live leaderboard</li>
-        <li>Team chat</li>
-        <li>Sales pipeline</li>
-      </ul>
-    </>
   );
 }

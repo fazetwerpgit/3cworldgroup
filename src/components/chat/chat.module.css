@@ -127,7 +127,7 @@
 }
 
 .listCount {
-  color: var(--c-text-3);
+  color: var(--c-lime);
   font-size: var(--t-sm);
 }
 
@@ -252,6 +252,12 @@
 
 .channelUnread .channelDesc {
   color: var(--c-text);
+}
+
+.channelUnread .channelMark {
+  border-color: rgba(141, 198, 63, 0.4);
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
 }
 
 .channelUnread .channelMeta {

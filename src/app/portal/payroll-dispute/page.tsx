@@ -111,7 +111,7 @@ function PayrollDisputeForm() {
       <FormSent
         title="Dispute sent"
         referenceId={referenceId}
-        message="Payroll has it with your proof. They follow up through the portal record."
+        message="Payroll has it with your proof."
         againLabel="Send another dispute"
         onAgain={() => {
           setReferenceId('');
@@ -135,13 +135,9 @@ function PayrollDisputeForm() {
       submitLabel="Send dispute"
       saving={saving}
       uploading={uploading}
-      done={check.done}
-      total={check.total}
       submitter={user?.displayName || user?.email || 'you'}
-      routeTo="Payroll review"
-      note="A clear screenshot with the order ID and pay line in one frame is the fastest way to a fix."
     >
-      <FormSection n={1} title="Who you are">
+      <FormSection title="Who you are">
         <Field id="contractor-name" label="Contractor name" required error={check.errors.contractorName}>
           <input {...text('contractorName', 'contractor-name')} autoComplete="name" />
         </Field>
@@ -150,7 +146,7 @@ function PayrollDisputeForm() {
         </Field>
       </FormSection>
 
-      <FormSection n={2} title="What happened">
+      <FormSection title="What happened">
         <Choices
           name="campaign"
           label="Campaign"
@@ -168,7 +164,7 @@ function PayrollDisputeForm() {
         </Field>
       </FormSection>
 
-      <FormSection n={3} title="Proof">
+      <FormSection title="Proof">
         <Attachment
           key={uploadId}
           id="payroll-proof"

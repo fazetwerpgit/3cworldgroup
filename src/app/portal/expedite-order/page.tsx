@@ -95,7 +95,7 @@ function ExpediteOrderForm() {
       <FormSent
         title="Request sent"
         referenceId={referenceId}
-        message="The expedite request is in the review queue. The team follows up through the portal record."
+        message="Your expedite request is in the review queue."
         againLabel="Send another request"
         onAgain={() => {
           setReferenceId('');
@@ -113,13 +113,9 @@ function ExpediteOrderForm() {
       alert={error ? <FormAlert message={error} alertRef={alertRef} /> : null}
       submitLabel="Send request"
       saving={saving}
-      done={check.done}
-      total={check.total}
       submitter={user?.displayName || user?.email || 'you'}
-      routeTo="Order review"
-      note="The dates and the reason help the team plan the install."
     >
-      <FormSection n={1} title="The customer">
+      <FormSection title="The customer">
         <Field id="customer-name" label="Customer name" required error={check.errors.customerName}>
           <input {...text('customerName', 'customer-name')} autoComplete="off" autoCapitalize="words" />
         </Field>
@@ -131,7 +127,7 @@ function ExpediteOrderForm() {
         </Field>
       </FormSection>
 
-      <FormSection n={2} title="The install">
+      <FormSection title="The install">
         <Field id="address" label="Street address" wide>
           <input {...text('address', 'address')} autoComplete="off" />
         </Field>

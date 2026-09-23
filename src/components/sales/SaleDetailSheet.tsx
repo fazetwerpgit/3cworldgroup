@@ -33,7 +33,6 @@ import x from '@/components/portal/rep/rep-sales.module.css';
 
 interface SaleDetailSheetProps {
   sale: Sale | null;
-  index: number;
   total: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -93,19 +92,8 @@ function companyLabel(company: string) {
   return FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
 }
 
-function ageLabel(sale: Sale) {
-  const days = Math.max(0, Math.floor((Date.now() - new Date(sale.saleDate).getTime()) / 86_400_000));
-  return days === 0 ? 'Today' : `${days}d idle`;
-}
-
-function ageTone(sale: Sale) {
-  const days = Math.max(0, Math.floor((Date.now() - new Date(sale.saleDate).getTime()) / 86_400_000));
-  return days >= 14 ? 'red' : days >= 7 ? 'amber' : '';
-}
-
 export function SaleDetailSheet({
   sale,
-  index,
   total,
   open,
   onOpenChange,
@@ -196,7 +184,6 @@ export function SaleDetailSheet({
   if (!sale || !open || typeof document === 'undefined') return null;
 
   const saleId = sale.id || '';
-  const tone = ageTone(sale);
   const storedInstallDate = installDateAsDate(sale.installDate);
   const shownInstallDate = installSaved && installSaved.saleId === saleId
     ? installSaved.date
@@ -298,7 +285,6 @@ export function SaleDetailSheet({
         <div className={s.sheetHandle} aria-hidden="true" />
         <div className={`${s.sheetHead} ${x.dHead}`}>
           <div className={x.sheetHeadText}>
-            <p className={s.kicker}>Sale {index + 1} of {total}</p>
             <h2 className={x.sheetName}>{sale.customerName || sale.customerAddress || 'Customer pending'}</h2>
           </div>
           <button className={s.iconBtn} type="button" onClick={() => onOpenChange(false)} aria-label="Close detail">
@@ -309,9 +295,7 @@ export function SaleDetailSheet({
         <div className={`${s.sheetBody} ${x.dBody}`}>
           <div className={`${x.dBlock} ${x.dStatus}`}>
             <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status]?.name ?? sale.status}</span>
-            <span className={`${x.dAge} ${tone ? x[`dAge_${tone}`] : ''}`}>
-              {sale.status === 'pending' ? ageLabel(sale) : `Sold ${formatDate(sale.saleDate)}`}
-            </span>
+            <span className={x.dAge}>Sold {formatDate(sale.saleDate)}</span>
           </div>
 
           {sale.status === 'cancelled' && (
@@ -322,8 +306,7 @@ export function SaleDetailSheet({
             </p>
           )}
 
-          <section className={x.dBlock} aria-labelledby="sd-customer">
-            <h3 id="sd-customer" className={s.kicker}>Customer</h3>
+          <section className={x.dBlock} aria-label="Customer">
             <span className={x.dStrong}>{sale.customerName || 'Customer pending'}</span>
             {sale.customerPhone ? (
               <a className={x.dLine} href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}>
@@ -343,7 +326,7 @@ export function SaleDetailSheet({
           </section>
 
           <section className={x.dBlock} aria-labelledby="sd-dates">
-            <h3 id="sd-dates" className={s.kicker}>Dates</h3>
+            <h3 id="sd-dates" className={x.dHeading}>Dates</h3>
             <div className={x.dDates}>
               <div className={x.dDate}>
                 <span>Sold</span>
@@ -382,11 +365,6 @@ export function SaleDetailSheet({
                 {missed && (
                   <p className={x.dEditorHint}>The carrier marked the last install as missed. Pick a day after it.</p>
                 )}
-                {ownSale && (
-                  <p className={x.dEditorHint}>
-                    We&apos;ll update this automatically when the carrier&apos;s report changes it.
-                  </p>
-                )}
                 <div className={x.dEditorActions}>
                   <button type="button" className={`${x.actBtn} ${x.actPrimary}`} disabled={savingInstall} onClick={() => void saveInstallDate()}>
                     {savingInstall ? 'Saving...' : 'Save'}
@@ -401,7 +379,7 @@ export function SaleDetailSheet({
           </section>
 
           <section className={x.dBlock} aria-labelledby="sd-plans">
-            <h3 id="sd-plans" className={s.kicker}>Plans sold</h3>
+            <h3 id="sd-plans" className={x.dHeading}>Plans sold</h3>
             <div>
               {sale.products?.map((product, productIndex) => (
                 <div className={x.dPlan} key={`${product.productId}-${productIndex}`}>
@@ -414,19 +392,17 @@ export function SaleDetailSheet({
             </div>
           </section>
 
-          <div className={x.dSummary}>
-            <div><small>Monthly value</small><strong>{formatMoney(sale.totalValue || 0)}</strong></div>
+          <dl className={x.dSummary}>
+            <div><dt>Monthly value</dt><dd>{formatMoney(sale.totalValue || 0)}</dd></div>
             <div>
-              <small>Commission</small>
-              <strong>
-                {typeof sale.commission === 'number' ? <><span className={x.est}>est.</span>{formatMoney(sale.commission)}</> : '—'}
-              </strong>
+              <dt>Est. pay</dt>
+              <dd>{typeof sale.commission === 'number' ? <><span className={x.est}>est.</span>{formatMoney(sale.commission)}</> : '—'}</dd>
             </div>
-            <div><small>Points</small><strong>{sale.totalPoints || 0}</strong></div>
-          </div>
+            <div><dt>Points</dt><dd>{sale.totalPoints || 0}</dd></div>
+          </dl>
 
           <section className={x.dBlock} aria-labelledby="sd-proof">
-            <h3 id="sd-proof" className={s.kicker}>Order / proof</h3>
+            <h3 id="sd-proof" className={x.dHeading}>Order / proof</h3>
             <div className={x.proofList} data-part="proof">
               {sale.orderNumberOrBtn && (
                 <span className={x.dLine}>
@@ -462,7 +438,7 @@ export function SaleDetailSheet({
           </section>
 
           <section className={x.dBlock} aria-labelledby="sd-notes">
-            <h3 id="sd-notes" className={s.kicker}>Rep notes</h3>
+            <h3 id="sd-notes" className={x.dHeading}>Rep notes</h3>
             <p className={x.dNotes}>{sale.notes || 'No notes added.'}</p>
           </section>
 
@@ -495,7 +471,6 @@ export function SaleDetailSheet({
           {total > 1 && (
             <div className={x.dNav}>
               <button type="button" className={x.actBtn} onClick={onPrev}><ChevronLeft size={16} aria-hidden="true" />Previous</button>
-              <span>{index + 1} / {total}</span>
               <button type="button" className={x.actBtn} onClick={onNext}>Next<ChevronRight size={16} aria-hidden="true" /></button>
             </div>
           )}

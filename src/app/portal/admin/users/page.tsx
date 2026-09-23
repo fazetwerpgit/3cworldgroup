@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, Search, UserPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { UserTable } from '@/components/admin/UserTable';
 import {
-  AdminAvatar,
   AdminEmpty,
   AdminFailed,
   AdminGate,
@@ -238,7 +237,6 @@ export default function UsersPage() {
               </>
             ) : null
           }
-          sub="Approve signups, set roles and managers, and open anyone's record."
         />
 
         {error && !approveUser ? (
@@ -267,7 +265,6 @@ export default function UsersPage() {
                 return (
                   <li key={user.uid} className={`${u.row} ${p.pendingRow}`}>
                     <Link href={`/portal/admin/users/${user.uid}`} className={`${u.person} ${p.personLink}`}>
-                      <AdminAvatar name={name} />
                       <span className={u.personText}>
                         <span className={u.personName}>
                           <span>{name}</span>
@@ -372,7 +369,7 @@ export default function UsersPage() {
           ) : failed ? (
             <AdminFailed what="members" onRetry={() => void fetchUsers()} />
           ) : isTrueEmpty ? (
-            <AdminEmpty icon={<UserPlus size={24} />} title="No members yet.">
+            <AdminEmpty title="No members yet.">
               Invite the first person to start the directory.
             </AdminEmpty>
           ) : isFilteredEmpty ? (

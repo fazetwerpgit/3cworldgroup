@@ -62,7 +62,7 @@
 }
 
 .who {
-  margin: calc(var(--s2) * -1) 0 0;
+  margin: 0;
   color: var(--c-text-3);
   font-size: var(--t-sm);
   line-height: 1.4;
@@ -111,14 +111,6 @@
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
-}
-
-.sectionHead b {
-  color: var(--c-lime);
-  font-family: var(--f-display);
-  font-size: 22px;
-  font-weight: 400;
-  line-height: 1;
 }
 
 .grid {
@@ -613,33 +605,6 @@
 }
 
 /* ---------- submit ---------- */
-.meter {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 96px;
-  margin: 0;
-}
-
-.meterLabel {
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.meterNum {
-  color: var(--c-text);
-  font-family: var(--f-display);
-  font-size: var(--t-d3);
-  font-weight: 400;
-  letter-spacing: 0.02em;
-}
-
-.meterTrack {
-  height: 4px;
-}
-
 .submit {
   flex: 1;
 }
@@ -681,82 +646,22 @@
   display: flex;
 }
 
-/* ---------- desktop side panel ---------- */
-.aside {
-  display: grid;
-  gap: var(--s3);
-  padding: var(--s5);
-}
-
-.asideRoute {
-  margin: calc(var(--s2) * -1) 0 0;
-  font-family: var(--f-display);
-  font-size: var(--t-d2);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1;
-}
-
-.asideNote {
-  margin: 0 0 var(--s2);
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  line-height: 1.45;
-}
-
-.aside .meter {
-  padding-top: var(--s4);
-  border-top: 1px solid var(--c-line);
-}
-
-.aside .submit {
-  width: 100%;
-  margin-top: var(--s2);
-}
-
-.asideWho {
-  margin: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  text-align: center;
-}
-
-.asideWho strong {
-  color: var(--c-text-2);
-  font-weight: 600;
-}
-
 /* ---------- sent ---------- */
 .sent {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   max-width: 640px;
-  margin: var(--s4) auto 0;
-  padding: var(--s6) var(--s5) var(--s5);
-  background:
-    radial-gradient(
-      90% 60% at 50% 0%,
-      rgba(141, 198, 63, 0.11) 0%,
-      rgba(141, 198, 63, 0.068) 35%,
-      rgba(141, 198, 63, 0.029) 68%,
-      transparent 100%
-    ),
-    var(--c-panel-fill);
-  text-align: center;
-}
-
-.sentIcon {
-  color: var(--c-lime);
+  margin: var(--s4) 0 0;
+  padding: var(--s5);
 }
 
 .sentTitle {
-  margin: var(--s4) 0 var(--s2);
-  font-family: var(--f-display);
-  font-size: 44px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 0.92;
+  margin: 0 0 var(--s2);
+  font-size: var(--t-d3);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
 }
 
 .sentTitle:focus {
@@ -772,21 +677,15 @@
 }
 
 .sentRef {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
   margin: 0 0 var(--s5);
-  padding: var(--s4) 0;
-  border-top: 1px solid var(--c-line);
-  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
 }
 
+/* Firestore ids are mixed case: a case-preserving mono face keeps them readable. */
 .sentRefId {
-  font-family: var(--f-display);
-  font-size: var(--t-d3);
-  letter-spacing: 0.06em;
+  color: var(--c-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-wrap: anywhere;
 }
 
@@ -799,7 +698,7 @@
 /* ---------- forms hub ---------- */
 .hubHead {
   display: flex;
-  max-width: 1120px;
+  max-width: 760px;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s3);
@@ -830,6 +729,7 @@
 
 .hubList {
   display: grid;
+  max-width: 760px;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -905,49 +805,6 @@
   }
 }
 
-.hubFeature {
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(
-      80% 90% at 0% 0%,
-      rgba(141, 198, 63, 0.1) 0%,
-      rgba(141, 198, 63, 0.06) 35%,
-      rgba(141, 198, 63, 0.025) 68%,
-      transparent 100%
-    ),
-    var(--c-panel-fill);
-}
-
-.hubAside {
-  margin-top: var(--s5);
-}
-
-.hubSteps {
-  display: grid;
-  gap: var(--s3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.hubSteps li {
-  display: grid;
-  grid-template-columns: 20px 1fr;
-  gap: var(--s3);
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  line-height: 1.45;
-}
-
-.hubSteps b {
-  color: var(--c-lime);
-  font-family: var(--f-display);
-  font-size: var(--t-d3);
-  font-weight: 400;
-  line-height: 1.05;
-}
-
 /* ---------- desktop ---------- */
 @media (min-width: 1024px) {
   .page {
@@ -955,10 +812,7 @@
   }
 
   .frame {
-    grid-template-columns: minmax(0, 1fr) 340px;
-    gap: var(--s7);
-    align-items: start;
-    max-width: 1120px;
+    max-width: 760px;
   }
 
   .title {
@@ -970,44 +824,31 @@
     gap: var(--s5);
   }
 
-  .aside {
-    position: sticky;
-    top: calc(var(--topbar-h) + var(--s5));
+  .submitBar {
+    display: none;
   }
 
-  .submitBar,
   .submitInline,
   .submitInline[data-keyboard='open'] {
-    display: none;
+    display: flex;
+  }
+
+  .submitInline .submit {
+    flex: 0 0 auto;
+    min-width: 240px;
   }
 
   .sent {
     margin-top: var(--s6);
-    padding: var(--s7);
-  }
-
-  .sentTitle {
-    font-size: 56px;
+    padding: var(--s6);
   }
 
   .sentActions {
     grid-template-columns: 1fr 1fr;
   }
 
-  .hubWrap {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
-    gap: var(--s7);
-    align-items: start;
-    max-width: 1120px;
-  }
-
   .hubRow {
     padding: var(--s4) var(--s5);
-  }
-
-  .hubAside {
-    margin-top: 0;
   }
 }
 

@@ -1,10 +1,5 @@
 /* System Settings (direction D). Shared pieces are admin-ui.module.css. */
 
-.grid {
-  display: grid;
-  gap: var(--s4);
-}
-
 .stack {
   display: grid;
   gap: var(--s4);
@@ -107,85 +102,9 @@
   font-weight: 600;
 }
 
-/* ---------- inert panels ---------- */
-.numberGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--s2);
-}
-
-.chipWrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-}
-
-.list {
-  display: grid;
-}
-
-.list > * + * {
-  border-top: 1px solid var(--c-line);
-}
-
-.toggleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s3);
-  min-height: 64px;
-}
-
-.list > .toggleRow {
-  padding: var(--s2) var(--s4);
-}
-
-.rowText {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.rowText strong {
-  font-size: var(--t-ui);
-  font-weight: 600;
-}
-
-.rowText span {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  line-height: 1.35;
-}
-
-.footnote {
-  margin: 0;
-  padding: var(--s3) var(--s4) var(--s4);
-  border-top: 1px solid var(--c-line);
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-}
-
 @media (min-width: 1024px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: var(--s5);
-  }
-
-  .span {
-    grid-column: 1 / -1;
-  }
-
   .weeklyGrid {
     grid-template-columns: minmax(0, 1fr) 200px;
     align-items: end;
-  }
-
-  .list > .toggleRow {
-    padding: var(--s2) var(--s5);
-  }
-
-  .footnote {
-    padding: var(--s3) var(--s5) var(--s5);
   }
 }

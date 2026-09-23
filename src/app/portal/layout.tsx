@@ -16,6 +16,11 @@ const archivo = Archivo({
   display: 'swap',
 });
 
+// Tints the opaque iOS standalone status bar to match the D top bar (--c-bar).
+export const viewport = {
+  themeColor: "#070f1c",
+};
+
 export const metadata = {
   title: "Employee Portal | 3C World Group",
   description: "3C World Group employee portal - access your dashboard, training, and resources.",

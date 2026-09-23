@@ -337,7 +337,6 @@ export default function EmailTemplatesPage() {
     <ProtectedRoute roles={['admin', 'operations']}>
       <div className={s.page}>
         <AdminHead
-          kicker="Admin"
           title="Email Templates"
           lede="Saved email copy. Copy a template into your own email; nothing is sent from here."
           count={loading || loadFailed ? null : templates.length}

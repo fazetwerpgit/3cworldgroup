@@ -345,7 +345,6 @@ export default function AdminChatChannelsPage() {
     <ProtectedRoute roles={['admin']}>
       <div className={s.page}>
         <AdminHead
-          kicker="Admin"
           title="Chat Channels"
           lede="Members are added automatically by role."
           count={loading || loadFailed ? null : activeCount}

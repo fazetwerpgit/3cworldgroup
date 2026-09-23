@@ -44,12 +44,6 @@
   line-height: 1.25;
 }
 
-.queueDesc {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  line-height: 1.35;
-}
-
 .queuePhoneMeta {
   color: var(--c-text-2);
   font-size: var(--t-sm);

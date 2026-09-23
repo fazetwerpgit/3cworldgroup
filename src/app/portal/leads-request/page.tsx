@@ -151,7 +151,7 @@ function LeadsRequestForm() {
       <FormSent
         title="Request sent"
         referenceId={referenceId}
-        message="The lead request is in the review queue. The team follows up through the portal record."
+        message="Your lead request is in the review queue."
         againLabel="Send another request"
         onAgain={() => {
           setReferenceId('');
@@ -161,7 +161,6 @@ function LeadsRequestForm() {
     );
   }
 
-  let n = 0;
   return (
     <FormFrame
       formId={FORM_ID}
@@ -171,13 +170,9 @@ function LeadsRequestForm() {
       submitLabel="Send request"
       saving={saving}
       uploading={uploading}
-      done={check.done}
-      total={check.total}
       submitter={user?.displayName || user?.email || 'you'}
-      routeTo="Lead review"
-      note="Your choices show the team what help is needed."
     >
-      <FormSection n={++n} title="Who it's for">
+      <FormSection title="Who it's for">
         <Choices
           name="campaign"
           label="Campaign"
@@ -216,7 +211,7 @@ function LeadsRequestForm() {
         />
       </FormSection>
 
-      <FormSection n={++n} title="The request">
+      <FormSection title="The request">
         <Choices
           name="category"
           label="Category"
@@ -234,7 +229,7 @@ function LeadsRequestForm() {
       </FormSection>
 
       {hasConditionalDetails ? (
-        <FormSection n={++n} title="Details">
+        <FormSection title="Details">
           {cond.needsSpecialRequest ? (
             <Field id="special-request" label="Special request explanation" wide>
               <textarea {...text('specialRequest', 'special-request')} className={`${f.input} ${f.textarea}`} rows={3} />
@@ -268,7 +263,7 @@ function LeadsRequestForm() {
       ) : null}
 
       {hasUploads ? (
-        <FormSection n={++n} title="Proof">
+        <FormSection title="Proof">
           {cond.needsHostile ? attachment('hostile', 'hostile-attachment', 'Hostile situation proof') : null}
           {cond.needsBlindKnock ? attachment('blind-knock', 'blind-knock-attachment', 'Blind-knock proof') : null}
           {cond.needsLasso ? attachment('lasso', 'lasso-attachment', 'Lasso attachment') : null}

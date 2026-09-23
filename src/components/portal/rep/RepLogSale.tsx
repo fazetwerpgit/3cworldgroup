@@ -5,15 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
-  Camera,
   Check,
   ChevronDown,
   ChevronRight,
   CopyCheck,
+  Eraser,
+  History,
   ImageUp,
   Keyboard,
   RotateCw,
-  ScanLine,
   WifiOff,
 } from 'lucide-react';
 import { FIBER_COMPANIES, SALE_TYPES, getPlanById, getPlansByCompany } from '@/types';
@@ -84,25 +84,8 @@ function useSoftKeyboardOpen(): boolean {
   return useSyncExternalStore(subscribeKeyboard, keyboardOpenNow, () => false);
 }
 
-function Steps({ onDetails, detailPct }: { onDetails: boolean; detailPct: number }) {
-  const steps = [
-    { label: 'Proof', pct: onDetails ? 100 : 0, current: !onDetails },
-    { label: 'Details', pct: onDetails ? detailPct : 0, current: onDetails },
-  ];
-  return (
-    <ol className={l.steps} aria-label="Progress">
-      {steps.map((st, i) => (
-        <li key={st.label} className={st.current ? l.stepOn : l.step} aria-current={st.current ? 'step' : undefined}>
-          <span className={s.track}>
-            <span className={s.fill} style={{ width: `${st.pct}%` }} />
-          </span>
-          <span className={l.stepLabel}>
-            <b>{i + 1}</b> {st.label}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
+function Steps({ onDetails }: { onDetails: boolean }) {
+  return <p className={l.steps}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>;
 }
 
 function Field({
@@ -211,6 +194,8 @@ export function RepLogSale() {
     slotKey: form.proofUploadId,
   });
   const [moreOpen, setMoreOpen] = useState(false);
+  // Start over was tapped on an entry with something in it: ask before clearing.
+  const [confirmClear, setConfirmClear] = useState(false);
   const keyboardOpen = useSoftKeyboardOpen();
   const pickId = useId();
 
@@ -231,13 +216,6 @@ export function RepLogSale() {
   const est = hasPlan && products.length > 0 ? expectedPayForSale({ products }, rates) : null;
   // T-Fiber + an install date: the estimated payout window, live as the date changes.
   const payoutLabel = payoutLabelForDraft(products, formData.installDate);
-
-  const requiredDone = [
-    Boolean(internetId || products.length),
-    Boolean(formData.customerAddress.trim()),
-    Boolean(formData.installDate),
-    Boolean(screenshotCount || formData.orderNumberOrBtn.trim()),
-  ].filter(Boolean).length;
 
   const pickFiles = (files: FileList | null) => {
     const taken = uploads.addFiles(Array.from(files ?? []));
@@ -267,6 +245,32 @@ export function RepLogSale() {
   const logAsNew = async () => {
     const saleDate = formData.saleDate;
     afterSubmit(await form.logAsNew({ pendingUploads: uploads.uploadingCount }), saleDate);
+  };
+
+  // A restored draft keeps its "Picking up where you left off" bar for as long
+  // as the entry lasts: hiding it on the first keystroke would shift the form
+  // up under the rep's thumb. Start over clears it all and goes back to Proof.
+  const startOverRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const confirmShown = useRef(false);
+  useEffect(() => {
+    if (confirmClear) keepRef.current?.focus();
+    else if (confirmShown.current) startOverRef.current?.focus();
+    confirmShown.current = confirmClear;
+  }, [confirmClear]);
+
+  const clearSale = () => {
+    for (const tile of uploads.tiles) if (tile.kind !== 'done') uploads.discard(tile.key);
+    form.startOver();
+    setStep('entry');
+    setProviderChoice(null);
+    setMoreOpen(false);
+    setConfirmClear(false);
+  };
+
+  const startOver = () => {
+    if (form.hasContent || proofTiles > 0) setConfirmClear(true);
+    else clearSale();
   };
 
   const duplicate = form.duplicateOf;
@@ -340,10 +344,9 @@ export function RepLogSale() {
   if (!onDetails) {
     return (
       <div className={l.main}>
-        <Steps onDetails={false} detailPct={0} />
+        <Steps onDetails={false} />
         <div className={l.defaultGrid}>
           <section className={`${s.panel} ${l.entry}`} aria-labelledby="entry-h">
-            <ScanLine size={36} strokeWidth={1.75} className={l.entryIcon} aria-hidden="true" />
             <h1 id="entry-h" className={l.entryTitle}>
               {scanOn ? 'Add the order confirmation' : 'Attach order confirmation'}
             </h1>
@@ -356,20 +359,6 @@ export function RepLogSale() {
               <label className={`${s.btnPrimary} ${s.btnBlock} ${s.phoneOnly}`}>
                 <input
                   type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className={s.srOnly}
-                  onChange={(e) => {
-                    pickFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-                <Camera size={20} strokeWidth={2.25} aria-hidden="true" />
-                Take photo
-              </label>
-              <label className={`${s.btnSecondary} ${s.btnBlock} ${s.phoneOnly}`}>
-                <input
-                  type="file"
                   accept={PROOF_ACCEPT}
                   multiple
                   className={s.srOnly}
@@ -378,7 +367,7 @@ export function RepLogSale() {
                     e.target.value = '';
                   }}
                 />
-                <ImageUp size={18} aria-hidden="true" />
+                <ImageUp size={20} strokeWidth={2.25} aria-hidden="true" />
                 Choose screenshot
               </label>
               <label className={`${s.btnPrimary} ${s.deskOnly}`} htmlFor={`${pickId}-desk`}>
@@ -397,31 +386,10 @@ export function RepLogSale() {
                 Choose screenshot
               </label>
             </div>
-            <p className={l.entryWorks}>
-              Up to {MAX_PROOF_SCREENSHOTS} screenshots. TFiber, AT&amp;T Fiber, Frontier, Xfinity.
-            </p>
+            <p className={l.entryWorks}>Whole confirmation page, up to {MAX_PROOF_SCREENSHOTS} screenshots.</p>
           </section>
 
           <div className={l.side}>
-            <section className={l.tips} aria-labelledby="tips-h">
-              <h2 id="tips-h" className={s.kicker}>
-                For good proof
-              </h2>
-              <ul>
-                <li>
-                  <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                  Whole page in frame, order number down to install date
-                </li>
-                <li>
-                  <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                  A screenshot is sharper than a photo of a screen
-                </li>
-                <li>
-                  <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                  Confirmation runs long? Attach up to {MAX_PROOF_SCREENSHOTS} screenshots
-                </li>
-              </ul>
-            </section>
             <button type="button" className={`${s.panel} ${l.manual}`} onClick={() => setStep('details')}>
               <Keyboard size={20} strokeWidth={1.75} aria-hidden="true" className={l.manualIcon} />
               <span className={l.manualText}>
@@ -438,7 +406,36 @@ export function RepLogSale() {
 
   return (
     <div className={`${l.main} ${l.mainDetails}`}>
-      <Steps onDetails detailPct={(requiredDone / 4) * 100} />
+      <Steps onDetails />
+      {form.fromDraft ? (
+        confirmClear ? (
+          <div className={`${l.dupe} ${l.draftConfirm}`} role="group" aria-labelledby="clear-h">
+            <Eraser size={20} strokeWidth={2} aria-hidden="true" />
+            <div className={l.dupeBody}>
+              <p id="clear-h">
+                <strong>Clear this sale?</strong>
+              </p>
+              <p className={l.dupeMeta}>Everything typed and attached goes. This can&apos;t be undone.</p>
+              <div className={l.dupeActions}>
+                <button type="button" className={s.btnSecondary} onClick={clearSale}>
+                  Clear
+                </button>
+                <button ref={keepRef} type="button" className={l.dupeNew} onClick={() => setConfirmClear(false)}>
+                  Keep
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={l.draftBar}>
+            <History size={18} strokeWidth={2} aria-hidden="true" />
+            <p>Picking up where you left off</p>
+            <button ref={startOverRef} type="button" className={l.draftStartOver} onClick={startOver}>
+              Start over
+            </button>
+          </div>
+        )
+      ) : null}
       <form id={FORM_ID} ref={formRef} className={l.reviewGrid} onSubmit={onSubmit} noValidate>
         <ProofCapture uploads={uploads} orderRequired={orderRequired && proofTiles === 0} />
 

@@ -12,7 +12,6 @@ import {
   FormSection,
   FormSent,
   useAlertScroll,
-  useFormCheck,
 } from '@/components/portal/rep/RepForm';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,7 +37,6 @@ function FiberReportForm() {
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
   const alertRef = useAlertScroll(error);
-  const check = useFormCheck(form, []);
 
   const text = (key: keyof Form, id: string, numeric = false) => ({
     id,
@@ -78,7 +76,7 @@ function FiberReportForm() {
       <FormSent
         title="Report sent"
         referenceId={referenceId}
-        message="Your fiber activity is in the review queue. The team follows up through the portal record."
+        message="Your fiber activity is in the review queue."
         againLabel="Send another report"
         onAgain={() => setReferenceId('')}
       />
@@ -93,13 +91,9 @@ function FiberReportForm() {
       alert={error ? <FormAlert message={error} alertRef={alertRef} /> : null}
       submitLabel="Send report"
       saving={saving}
-      done={check.done}
-      total={check.total}
       submitter={user?.displayName || user?.email || 'you'}
-      routeTo="Field review"
-      note="Keep the pack activity clear and easy to verify."
     >
-      <FormSection n={1} title="The pack">
+      <FormSection title="The pack">
         <Choices
           name="companySold"
           label="Company sold"
@@ -115,7 +109,7 @@ function FiberReportForm() {
         </Field>
       </FormSection>
 
-      <FormSection n={2} title="The numbers">
+      <FormSection title="The numbers">
         <Field id="number-of-reps" label="Number of reps">
           <input {...text('numberOfReps', 'number-of-reps', true)} />
         </Field>

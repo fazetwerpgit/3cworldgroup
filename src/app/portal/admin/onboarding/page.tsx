@@ -1,10 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle, ChevronDown, ClipboardCheck, FileText, Lock, RotateCw } from 'lucide-react';
+import { AlertTriangle, ChevronDown, FileText, Lock, RotateCw } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
 import {
-  AdminAvatar,
   AdminEmpty,
   AdminFailed,
   AdminGate,
@@ -119,7 +118,6 @@ function RepGroup({ group, children }: { group: SubmissionGroup; children: React
     <li className={o.group}>
       <div className={o.groupHead}>
         <span className={u.person}>
-          <AdminAvatar name={name} />
           <span className={u.personText}>
             <span className={u.personName}>
               <span>{name}</span>
@@ -389,54 +387,12 @@ export default function OnboardingReviewPage() {
             showStats ? (
               <>
                 <b>{submissions.length}</b> waiting
+                {waitingPeople ? ` from ${waitingPeople} ${waitingPeople === 1 ? 'person' : 'people'}` : null}
+                {atRiskPeople ? ` · ${atRiskPeople} at risk` : null}
               </>
             ) : null
           }
-          sub="Review submitted documents and send clear next steps."
         />
-
-        <div className={u.stats} aria-busy={loading}>
-          <div className={u.stat}>
-            <span className={s.kicker}>Waiting</span>
-            {showStats ? (
-              <strong className={`${u.statValue} ${submissions.length ? u.statHot : ''}`}>{submissions.length}</strong>
-            ) : (
-              <StatPlaceholder failed={loadFailed} />
-            )}
-            <span className={u.statNote}>
-              {showStats ? `from ${waitingPeople} ${waitingPeople === 1 ? 'person' : 'people'}` : '\u00a0'}
-            </span>
-          </div>
-          <div className={u.stat}>
-            <span className={s.kicker}>At risk</span>
-            {showStats ? (
-              <strong className={`${u.statValue} ${atRiskPeople ? u.statWarn : ''}`}>{atRiskPeople}</strong>
-            ) : (
-              <StatPlaceholder failed={loadFailed} />
-            )}
-            <span className={u.statNote}>
-              {showStats ? (atRiskPeople ? 'people behind' : 'Nobody behind') : '\u00a0'}
-            </span>
-          </div>
-          <div className={u.stat}>
-            <span className={s.kicker}>Out for signature</span>
-            {showStats ? (
-              <strong className={u.statValue}>{esignPending.length}</strong>
-            ) : (
-              <StatPlaceholder failed={loadFailed} />
-            )}
-            <span className={u.statNote}>{showStats ? 'with the rep' : '\u00a0'}</span>
-          </div>
-          <div className={u.stat}>
-            <span className={s.kicker}>Completed</span>
-            {showStats ? (
-              <strong className={u.statValue}>{completed.length}</strong>
-            ) : (
-              <StatPlaceholder failed={loadFailed} />
-            )}
-            <span className={u.statNote}>{showStats ? 'approved or rejected' : '\u00a0'}</span>
-          </div>
-        </div>
 
         <ActionQueue />
 
@@ -506,7 +462,7 @@ export default function OnboardingReviewPage() {
             <AdminFailed what="the review queue" onRetry={retryLoad} />
           ) : filtered.length === 0 ? (
             submissions.length === 0 ? (
-              <AdminEmpty icon={<ClipboardCheck size={28} aria-hidden="true" />} title="Review queue is clear">
+              <AdminEmpty title="Review queue is clear">
                 No onboarding submissions need review right now.
               </AdminEmpty>
             ) : (
@@ -891,9 +847,4 @@ export default function OnboardingReviewPage() {
       ) : null}
     </AdminGate>
   );
-}
-
-function StatPlaceholder({ failed }: { failed: boolean }) {
-  if (failed) return <strong className={`${u.statValue} ${u.toneMuted}`}>—</strong>;
-  return <span className={s.skel} style={{ width: 56, height: 40 }} aria-hidden="true" />;
 }

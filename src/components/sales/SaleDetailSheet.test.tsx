@@ -65,7 +65,6 @@ function render(sale: Sale, isAdmin = false, fiberOrder: FiberOrder | null = nul
     root.render(
       <SaleDetailSheet
         sale={sale}
-        index={0}
         total={1}
         open
         onOpenChange={() => {}}

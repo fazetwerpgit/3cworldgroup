@@ -17,6 +17,7 @@ vi.mock('@/hooks/useSales', () => ({
 
 import {
   DRAFT_KEY_PREFIX,
+  DRAFT_MAX_AGE_MS,
   isSameSaleEntry,
   useSaleFormState,
   validateSaleForm,
@@ -163,6 +164,113 @@ describe('useSaleFormState', () => {
     expect(api.proofPaths).toEqual([PROOF(7)]);
     expect(api.proofUploadId).toBe(id);
     expect(api.products).toHaveLength(1);
+  });
+
+  it('drops a draft older than 12 hours without restoring it', async () => {
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        formData: fields({ customerName: 'Yesterday' }),
+        products: [product],
+        saleDateTouched: false,
+        proofUploadId: 'a'.repeat(32),
+        savedAt: Date.now() - DRAFT_MAX_AGE_MS - 60_000,
+      })
+    );
+    await mount();
+    expect(api.fromDraft).toBe(false);
+    expect(api.formData.customerName).toBe('');
+    expect(api.products).toEqual([]);
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it('loads a draft saved before savedAt existed, then stamps it', async () => {
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        formData: fields({ customerName: 'No Stamp' }),
+        products: [product],
+        saleDateTouched: false,
+        proofUploadId: 'a'.repeat(32),
+      })
+    );
+    const before = Date.now();
+    await mount();
+    expect(api.fromDraft).toBe(true);
+    expect(api.formData.customerName).toBe('No Stamp');
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    const saved = JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!);
+    expect(saved.savedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it('keeps a draft’s age when it is only reopened, and restamps it on an edit', async () => {
+    const savedAt = Date.now() - 3 * 60 * 60 * 1000;
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        formData: fields({ customerName: 'Three Hours' }),
+        products: [product],
+        saleDateTouched: true,
+        proofUploadId: 'a'.repeat(32),
+        savedAt,
+      })
+    );
+    await mount();
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!).savedAt).toBe(savedAt);
+    await act(async () => api.setField('notes', 'Gate code 12'));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!).savedAt).toBeGreaterThan(savedAt);
+  });
+
+  it('does not restore a draft with nothing typed in it', async () => {
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ formData: { customerName: ' ', saleType: 'upgrade' }, products: [], proofUploadId: 'a'.repeat(32) })
+    );
+    await mount();
+    expect(api.fromDraft).toBe(false);
+    expect(api.formData.saleType).toBe('new_service');
+  });
+
+  it('starts over with every field, the proof and a fresh key cleared', async () => {
+    const key = 'b'.repeat(32);
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        formData: { ...fields({ customerName: 'Carla Diaz', orderNumberOrBtn: 'TMF-1', saleDate: '2026-08-01' }), proofScreenshotPaths: [PROOF(1)] },
+        products: [product],
+        saleDateTouched: true,
+        proofUploadId: key,
+        keyUsed: true,
+        savedAt: Date.now(),
+      })
+    );
+    await mount();
+    expect(api.fromDraft).toBe(true);
+    await act(async () => api.startOver());
+    expect(api.fromDraft).toBe(false);
+    expect(api.hasContent).toBe(false);
+    expect(api.formData).toEqual(fields({ customerAddress: '', installDate: '' }));
+    expect(api.products).toEqual([]);
+    expect(api.proofPaths).toEqual([]);
+    expect(api.proofUploadId).toMatch(/^[a-f0-9]{32}$/);
+    expect(api.proofUploadId).not.toBe(key);
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+
+    // A new entry after the clear goes out under the new key, not the used one.
+    createSale.mockResolvedValue({ sale: { id: 'n1' }, duplicate: false });
+    const fresh = api.proofUploadId;
+    await fillSale('Somebody Else');
+    expect(api.proofUploadId).toBe(fresh);
+    await act(async () => void (await api.submit()));
+    expect(createSale.mock.calls[0][0].clientSaleId).toBe(fresh);
   });
 
   it('mounts on a plain-http origin, where crypto.randomUUID does not exist', async () => {

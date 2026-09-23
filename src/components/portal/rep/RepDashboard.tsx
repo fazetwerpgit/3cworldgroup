@@ -8,8 +8,6 @@ import {
   CalendarPlus,
   ChevronRight,
   CircleHelp,
-  Clock,
-  FileWarning,
   Inbox,
   Plus,
   RotateCw,
@@ -41,7 +39,7 @@ import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
 import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
-import { PAY_DISPUTE_HREF, PayHelpSheet } from './PayHelpSheet';
+import { PayHelpSheet } from './PayHelpSheet';
 import { InstallDateSheet } from './InstallDateSheet';
 import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
@@ -60,9 +58,6 @@ function ordinalSuffix(n: number) {
 
 const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 const shortDate = (date: Date | null) => (date ? SHORT_DATE.format(date) : '');
-
-const FOOTNOTE =
-  "Estimates. You're paid when 3C receives funds from the carrier; missed installs are settled as claims by the 25th of the next month.";
 
 const STATUS_CLASS: Record<RowStatus, string> = {
   installed: d.st_installed,
@@ -141,27 +136,6 @@ function SkeletonPanel({ label, rows = 2, className = '' }: { label: string; row
         ))}
       </div>
     </section>
-  );
-}
-
-function Ring({ done, goal }: { done: number; goal: number }) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const share = goal > 0 ? Math.min(done / goal, 1) : 0;
-  return (
-    <svg className={d.ring} viewBox="0 0 72 72" aria-hidden="true">
-      <circle cx="36" cy="36" r={r} className={d.ringTrack} />
-      {share > 0 ? (
-        <circle
-          cx="36"
-          cy="36"
-          r={r}
-          className={d.ringFill}
-          strokeDasharray={`${share * c} ${c}`}
-          transform="rotate(-90 36 36)"
-        />
-      ) : null}
-    </svg>
   );
 }
 
@@ -278,12 +252,7 @@ function Board({
       ) : null}
 
       <div className={d.cellPeriod}>
-        <div className={d.periodHead}>
-          <p className={`${s.kicker} ${d.boardLabel}`}>This month</p>
-          <p className={d.periodCount}>
-            {pay.monthCount} {pay.monthCount === 1 ? 'sale' : 'sales'}
-          </p>
-        </div>
+        <p className={`${s.kicker} ${d.boardLabel} ${d.periodHead}`}>This month</p>
         {pay.monthCount > 0 ? (
           <>
             <MonthStack counts={pay.counts} total={pay.monthCount} />
@@ -309,10 +278,6 @@ function Board({
           <CircleHelp size={16} aria-hidden="true" />
           How pay works
         </button>
-        <Link href={PAY_DISPUTE_HREF} className={d.payLink}>
-          <FileWarning size={16} aria-hidden="true" />
-          Missing an install?
-        </Link>
       </div>
     </section>
   );
@@ -339,7 +304,7 @@ function BoardSkeleton() {
 
 // ---------------------------------------------------------------- standing
 
-function standLine(standing: Standing): ReactNode {
+export function standLine(standing: Standing): ReactNode {
   if (standing.ahead) {
     return (
       <>
@@ -364,7 +329,8 @@ function standLine(standing: Standing): ReactNode {
       <>Tied for 1st. One more sale breaks it.</>
     );
   }
-  return <>Top of the board this week</>;
+  // The rep above wasn't in the fetched board: only #1 is top of it.
+  return standing.rank === 1 ? <>Top of the board this week</> : <>Keep climbing</>;
 }
 
 function StandingPanels({ standing }: { standing: Standing }) {
@@ -417,22 +383,6 @@ function StandingPanels({ standing }: { standing: Standing }) {
             <ArrowUpRight size={16} aria-hidden="true" />
           </Link>
         </PanelHead>
-        <div className={d.statTiles}>
-          <div className={d.statTile}>
-            <p className={d.statLabel}>Rank · this week</p>
-            <p className={d.statValue}>
-              #{standing.rank}
-              <span className={d.statOf}> of {standing.of}</span>
-            </p>
-          </div>
-          <div className={d.statTile}>
-            <p className={d.statLabel}>Points</p>
-            <p className={d.statValue}>
-              {standing.points.toLocaleString('en-US')}
-              <span className={d.statOf}> pts</span>
-            </p>
-          </div>
-        </div>
         <p className={d.standGap}>{standLine(standing)}</p>
       </section>
     </>
@@ -441,7 +391,7 @@ function StandingPanels({ standing }: { standing: Standing }) {
 
 // ---------------------------------------------------------------- challenge
 
-function ChallengePanels({ target, done, timeLeft }: { target: number; done: number; timeLeft: string }) {
+function ChallengePanel({ target, done, timeLeft }: { target: number; done: number; timeLeft: string }) {
   const toGo = Math.max(target - done, 0);
   const title = `Close ${target} ${target === 1 ? 'sale' : 'sales'} by Saturday`;
   const progress =
@@ -454,58 +404,30 @@ function ChallengePanels({ target, done, timeLeft }: { target: number; done: num
         <strong>Done.</strong> Challenge closed.
       </>
     );
-  const ticks = Math.min(target, 20);
+  const pct = target > 0 ? Math.min(Math.round((done / target) * 100), 100) : 0;
 
   return (
-    <>
-      <section className={`${s.panel} ${s.deskOnly}`} aria-labelledby="ch-h">
-        <PanelHead id="ch-h" title="Weekly challenge">
-          <span className={d.clock}>
-            <Timer size={16} aria-hidden="true" />
-            {timeLeft}
-          </span>
-        </PanelHead>
-        <div className={d.challengeBody}>
-          <div className={d.challengeTop}>
-            <p className={d.challengeTitle}>{title}</p>
-            <p className={d.challengeScore} aria-label={`${done} of ${target}`}>
-              {done}
-              <span>/{target}</span>
-            </p>
-          </div>
-          <div className={d.ticks} style={{ gridTemplateColumns: `repeat(${ticks}, 1fr)` }} aria-hidden="true">
-            {Array.from({ length: ticks }, (_, i) => {
-              const filled = Math.min(done, ticks);
-              return (
-                <span key={i} className={i < filled ? (i === filled - 1 ? d.tickLead : d.tickOn) : undefined} />
-              );
-            })}
-          </div>
-          <p className={d.gapText}>{progress}</p>
-        </div>
-      </section>
-
-      <section className={`${s.panel} ${d.ringCard} ${s.phoneOnly}`} aria-label="Weekly challenge">
-        <div className={d.ringWrap}>
-          <Ring done={done} goal={target} />
-          <span className={d.ringText} aria-label={`${done} of ${target}`}>
+    <section className={`${s.panel} ${d.challenge}`} aria-labelledby="ch-h">
+      <PanelHead id="ch-h" title="Weekly challenge">
+        <span className={d.clock}>
+          <Timer size={16} aria-hidden="true" />
+          {timeLeft}
+        </span>
+      </PanelHead>
+      <div className={d.challengeBody}>
+        <div className={d.challengeTop}>
+          <p className={d.challengeTitle}>{title}</p>
+          <p className={d.challengeScore} aria-label={`${done} of ${target}`}>
             {done}
             <span>/{target}</span>
-          </span>
-        </div>
-        <div className={d.ringBody}>
-          <p className={s.kicker}>Weekly challenge</p>
-          <p className={d.ringTitle}>{title}</p>
-          <p className={d.ringMeta}>
-            <span>{toGo > 0 ? <><strong>{toGo} more</strong> to go</> : <strong>Done</strong>}</span>
-            <span className={d.ringTime}>
-              <Clock size={14} strokeWidth={2.25} aria-hidden="true" />
-              {timeLeft}
-            </span>
           </p>
         </div>
-      </section>
-    </>
+        <div className={`${s.track} ${d.challengeTrack}`} aria-hidden="true">
+          <span className={s.fill} style={{ width: `${pct}%` }} />
+        </div>
+        <p className={d.gapText}>{progress}</p>
+      </div>
+    </section>
   );
 }
 
@@ -604,11 +526,11 @@ function TodayPanels({
           const body = (
             <>
                 {item.kind === 'call' ? (
-                  <span className={`${d.tile} ${d.tileBlue}`} aria-hidden="true">
+                  <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
                     <Video size={18} strokeWidth={2} />
                   </span>
                 ) : item.kind === 'date' ? (
-                  <span className={`${d.tile} ${d.tileAmber}`} aria-hidden="true">
+                  <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
                     <CalendarPlus size={18} strokeWidth={2} />
                   </span>
                 ) : (
@@ -700,7 +622,6 @@ function RecentSales({ rows }: { rows: RecentSaleRow[] }) {
             </li>
           ))}
         </ul>
-        <p className={d.foot}>{FOOTNOTE}</p>
       </section>
 
       <section className={`${d.salesB} ${s.phoneOnly}`} aria-labelledby="sales-b-h">
@@ -728,7 +649,6 @@ function RecentSales({ rows }: { rows: RecentSaleRow[] }) {
             </Link>
           ))}
         </div>
-        <p className={d.footB}>{FOOTNOTE}</p>
       </section>
     </>
   );
@@ -856,13 +776,9 @@ export function RepDashboard() {
             </section>
           ) : zeroSales ? (
             <section className={`${s.panel} ${d.welcome}`} aria-labelledby="welcome-h">
-              <p className={s.kicker}>Your scoreboard</p>
               <h2 id="welcome-h" className={d.welcomeTitle}>
-                No sales yet
+                No sales yet.
               </h2>
-              <p className={d.welcomeText}>
-                Log a sale and your estimated pay, installs and rank start filling in here.
-              </p>
               {canLog ? (
                 <Link href={LOG_SALE_HREF} className={s.btnPrimary}>
                   <Plus size={20} strokeWidth={2.5} aria-hidden="true" />
@@ -900,13 +816,13 @@ export function RepDashboard() {
           ) : null}
 
           {data.challenge.status === 'loading' ? (
-            <SkeletonPanel label="Loading weekly challenge" rows={1} className={d.ringCard} />
+            <SkeletonPanel label="Loading weekly challenge" rows={1} className={d.challenge} />
           ) : data.challenge.status === 'error' ? (
-            <section className={`${s.panel} ${d.ringCard}`} aria-label="Weekly challenge">
+            <section className={`${s.panel} ${d.challenge}`} aria-label="Weekly challenge">
               <Failed what="the weekly challenge" onRetry={() => retry('challenge')} />
             </section>
           ) : challenge ? (
-            <ChallengePanels target={challenge.target} done={challenge.done} timeLeft={weekTimeLeft(now)} />
+            <ChallengePanel target={challenge.target} done={challenge.done} timeLeft={weekTimeLeft(now)} />
           ) : null}
 
           {canLog ? <ScanIntroCard now={now} /> : null}

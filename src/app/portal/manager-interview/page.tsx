@@ -129,13 +129,9 @@ function ManagerInterviewForm() {
       submitLabel="Send interview"
       saving={saving}
       disabled={!form.signatureDataUrl}
-      done={check.done}
-      total={check.total}
       submitter={user?.displayName || user?.email || 'you'}
-      routeTo="Manager review"
-      note="The signed decision goes to the hiring team to act on."
     >
-      <FormSection n={1} title="The role">
+      <FormSection title="The role">
         <Choices
           name="provider"
           label="Provider"
@@ -168,7 +164,7 @@ function ManagerInterviewForm() {
         </Field>
       </FormSection>
 
-      <FormSection n={2} title="The candidate">
+      <FormSection title="The candidate">
         <Field id="candidate-first-name" label="First name" required error={check.errors.candidateFirstName}>
           <input {...text('candidateFirstName', 'candidate-first-name')} autoCapitalize="words" />
         </Field>
@@ -204,7 +200,7 @@ function ManagerInterviewForm() {
         />
       </FormSection>
 
-      <FormSection n={3} title="The decision">
+      <FormSection title="The decision">
         <YesNo name="didShow" label="Did the candidate show?" value={form.didShow} onChange={(v) => set('didShow', v)} />
         <YesNo name="extendOffer" label="Extend an offer?" value={form.extendOffer} onChange={(v) => set('extendOffer', v)} />
         <Choices
@@ -240,7 +236,7 @@ function ManagerInterviewForm() {
         ) : null}
       </FormSection>
 
-      <FormSection n={4} title="Sign off">
+      <FormSection title="Sign off">
         <div id="manager-signature" className={`${f.field} ${f.wide} ${check.errors.signatureDataUrl ? f.fieldInvalid : ''}`}>
           <span className={f.label}>
             Manager signature for approval

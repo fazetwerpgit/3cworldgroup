@@ -22,7 +22,12 @@ import { randomHex } from '@/lib/randomHex';
 // v1 stays the key: a draft now also carries formData.proofScreenshotPaths,
 // and formData.proofScreenshotPath (the first path) is still written, so a
 // draft round-trips with the previous build in either direction.
+//
+// A draft carries savedAt (the last edit) and is dropped once it is older than
+// DRAFT_MAX_AGE_MS: by then it is a door from yesterday, not an interruption.
+// A draft from before savedAt existed is taken as fresh and stamped on save.
 export const DRAFT_KEY_PREFIX = 'sale-draft:v1:';
+export const DRAFT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const DRAFT_SAVE_DELAY_MS = 400;
 const CLIENT_SALE_ID_RE = /^[a-f0-9]{32}$/;
 
@@ -49,6 +54,8 @@ export interface SaleDraft {
   proofUploadId: string;
   /** A submit already went out under proofUploadId (it may have landed). */
   keyUsed?: boolean;
+  /** Epoch ms of the last edit; absent on a draft from an older build. */
+  savedAt?: number;
 }
 
 /** A fresh idempotency key: 32 hex, the CLIENT_SALE_ID_RE shape. */
@@ -87,7 +94,7 @@ function isDraftProduct(value: unknown): value is SaleProduct {
  * older build, or one damaged in storage, must never crash the page: a field
  * that is not a string is left empty and a product that is not whole is dropped.
  */
-export function readSaleDraft(key: string): SaleDraft | null {
+export function readSaleDraft(key: string, now = Date.now()): SaleDraft | null {
   try {
     const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
@@ -96,6 +103,11 @@ export function readSaleDraft(key: string): SaleDraft | null {
       return null;
     }
     if (!Array.isArray(draft.products)) return null;
+    const savedAt = isFiniteNumber(draft.savedAt) ? (draft.savedAt as number) : undefined;
+    if (savedAt !== undefined && now - savedAt > DRAFT_MAX_AGE_MS) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
     const saved = draft.formData as Record<string, unknown>;
     const formData: Partial<SaleDraft['formData']> = proofPathFields(saleProofPaths(saved));
     for (const name of DRAFT_TEXT_FIELDS) {
@@ -108,6 +120,7 @@ export function readSaleDraft(key: string): SaleDraft | null {
       saleDateTouched: draft.saleDateTouched === true,
       proofUploadId: typeof draft.proofUploadId === 'string' ? draft.proofUploadId : '',
       keyUsed: draft.keyUsed === true,
+      savedAt,
     };
   } catch {
     return null;
@@ -247,6 +260,13 @@ export function useSaleFormState() {
   const [draftRestored, setDraftRestored] = useState(false);
   /** The entry came back from a saved draft (drives "N screenshots attached"). */
   const [fromDraft, setFromDraft] = useState(false);
+  // Start over hides the useSales error of the entry it threw away.
+  const [serverErrorHidden, setServerErrorHidden] = useState(false);
+  // The restored draft's savedAt, kept by the first save after the restore so
+  // merely reopening the page never makes an old draft look fresh. A draft
+  // without one (an older build) is stamped with now.
+  const [restoredSavedAt, setRestoredSavedAt] = useState<number | undefined>();
+  const savedAtSpentRef = useRef(false);
   const submittedRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -254,11 +274,12 @@ export function useSaleFormState() {
   // Restore once the user is known — during render (React's "adjust state
   // when a prop changes" pattern), so the first paint already shows the draft.
   // An untouched sale date is re-derived rather than restored, so a draft from
-  // yesterday is not dated yesterday.
+  // yesterday is not dated yesterday. A draft with nothing typed in it is not
+  // restored: there is nothing to pick up.
   if (draftKey && !draftRestored) {
     setDraftRestored(true);
     const draft = readSaleDraft(draftKey);
-    if (draft) {
+    if (draft && hasDraftContent({ ...emptyFields(), ...draft.formData }, draft.products, saleProofPaths(draft.formData))) {
       const { proofScreenshotPath: _legacy, proofScreenshotPaths: _paths, ...fields } = draft.formData;
       void _legacy;
       void _paths;
@@ -277,6 +298,7 @@ export function useSaleFormState() {
         setKeyUsed(draft.keyUsed === true);
       }
       setFromDraft(true);
+      setRestoredSavedAt(draft.savedAt);
     }
   }
 
@@ -285,6 +307,8 @@ export function useSaleFormState() {
     if (!draftKey || !draftRestored || submittedRef.current) return;
     const timer = window.setTimeout(() => {
       if (submittedRef.current) return;
+      const savedAt = savedAtSpentRef.current ? Date.now() : (restoredSavedAt ?? Date.now());
+      savedAtSpentRef.current = true;
       writeSaleDraft(
         draftKey,
         hasDraftContent(formData, products, proofPaths)
@@ -294,12 +318,13 @@ export function useSaleFormState() {
               saleDateTouched,
               proofUploadId,
               keyUsed,
+              savedAt,
             }
           : null
       );
     }, DRAFT_SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [draftKey, draftRestored, formData, products, proofPaths, saleDateTouched, proofUploadId, keyUsed]);
+  }, [draftKey, draftRestored, formData, products, proofPaths, saleDateTouched, proofUploadId, keyUsed, restoredSavedAt]);
 
   // The rep cleared a submitted entry to start another: that one gets its own
   // key (React's "adjust state when a prop changes" pattern, during render).
@@ -311,7 +336,8 @@ export function useSaleFormState() {
 
   // Bring a server or offline error into view — on a phone the rep is at the
   // bottom of a long form and would otherwise never see why nothing happened.
-  const blockError = formError || serverError || '';
+  const shownServerError = serverErrorHidden ? '' : serverError || '';
+  const blockError = formError || shownServerError;
   useEffect(() => {
     if (blockError) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [blockError]);
@@ -456,6 +482,7 @@ export function useSaleFormState() {
     options: { pendingUploads?: number; clientSaleId?: string } = {}
   ): Promise<CreateSaleResult | null> => {
     setFormError('');
+    setServerErrorHidden(false);
     setDuplicateOf(null);
     const nextErrors = validateSaleForm({ formData, products, proofPaths });
     setErrors(nextErrors);
@@ -522,6 +549,29 @@ export function useSaleFormState() {
     if (draftKey) writeSaleDraft(draftKey, null);
   };
 
+  /**
+   * Throw the entry away and start a new sale: every field, the plan and
+   * extras, the proof paths and both dates go, the saved draft is removed, and
+   * the sale gets a fresh key, so nothing entered next can land on a sale the
+   * old key may already name. The page cancels its own uploads in flight.
+   */
+  const startOver = () => {
+    setFormData(emptyFields());
+    setProducts([]);
+    setProofPathsState([]);
+    setSaleDateTouched(false);
+    setSaleDateFromInstall(false);
+    setErrors({});
+    setFormError('');
+    setServerErrorHidden(true);
+    setDuplicateOf(null);
+    setProofUploadId(newClientSaleId());
+    setKeyUsed(false);
+    setFromDraft(false);
+    setRestoredSavedAt(undefined);
+    if (draftKey) writeSaleDraft(draftKey, null);
+  };
+
   const provider =
     products.find((p) => !isExtraPlanId(p.productId))?.company ?? products[0]?.company ?? null;
 
@@ -543,13 +593,15 @@ export function useSaleFormState() {
     saleDateFromInstall,
     errors,
     formError,
-    serverError: serverError || '',
+    serverError: shownServerError,
     blockError,
     submitting: loading,
     submit,
     logAsNew,
     duplicateOf,
     discardDraft,
+    startOver,
+    hasContent: hasDraftContent(formData, products, proofPaths),
     totals,
     productSold,
     draftRestored,

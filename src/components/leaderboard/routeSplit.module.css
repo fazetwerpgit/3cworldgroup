@@ -28,8 +28,6 @@
     display: none;
   }
 
-  /* The desktop board's own glow layers are absolutely positioned; this keeps
-     them to the board instead of the whole shell. */
   .desktopOnly {
     display: block;
     position: relative;
