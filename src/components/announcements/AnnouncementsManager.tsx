@@ -53,7 +53,9 @@ export function AnnouncementsManager() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [sendDate, setSendDate] = useState('');
-  const [busy, setBusy] = useState<'test' | 'schedule' | null>(null);
+  const [busy, setBusy] = useState<'test' | 'schedule' | 'count' | 'now' | null>(null);
+  // The open "Send now" confirm: its idempotency key and who it would reach.
+  const [sendNow, setSendNow] = useState<{ requestId: string; count: number } | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -138,6 +140,49 @@ export function AnnouncementsManager() {
     }
   };
 
+  const openSendNow = async () => {
+    setBusy('count');
+    setNotice(null);
+    try {
+      const res = await authedFetch('/api/portal/announcements/recipients');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to count recipients');
+      setSendNow({ requestId: crypto.randomUUID(), count: json.count });
+    } catch (err) {
+      setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to count recipients' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const confirmSendNow = async () => {
+    if (!sendNow) return;
+    setBusy('now');
+    setNotice(null);
+    try {
+      const res = await authedFetch('/api/portal/announcements/send-now', {
+        method: 'POST',
+        body: JSON.stringify({ title, body, requestId: sendNow.requestId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to send');
+      setNotice({
+        tone: 'ok',
+        text: `Sent to ${json.sentCount} ${json.sentCount === 1 ? 'person' : 'people'}${
+          json.failedCount ? `. ${json.failedCount} didn't get it.` : '.'
+        }`,
+      });
+      setSendNow(null);
+      setTitle('');
+      setBody('');
+    } catch (err) {
+      setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to send' });
+    } finally {
+      setBusy(null);
+      await load();
+    }
+  };
+
   const cancel = async (id: string) => {
     setCancellingId(id);
     setNotice(null);
@@ -188,7 +233,10 @@ export function AnnouncementsManager() {
                 id="announce-title"
                 className={s.input}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setSendNow(null);
+                }}
                 maxLength={ANNOUNCEMENT_TITLE_MAX + 10}
                 autoComplete="off"
                 enterKeyHint="next"
@@ -208,7 +256,10 @@ export function AnnouncementsManager() {
                 id="announce-body"
                 className={cx(s.input, s.textarea, a.message)}
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={(e) => {
+                  setBody(e.target.value);
+                  setSendNow(null);
+                }}
                 maxLength={ANNOUNCEMENT_BODY_MAX + 20}
                 rows={4}
               />
@@ -231,8 +282,21 @@ export function AnnouncementsManager() {
             </div>
 
             <div className={a.actions}>
-              <button type="button" className={s.btn} onClick={sendTest} disabled={!messageReady || busy !== null}>
+              <button
+                type="button"
+                className={cx(s.btn, a.testBtn)}
+                onClick={sendTest}
+                disabled={!messageReady || busy !== null}
+              >
                 {busy === 'test' ? 'Sending…' : 'Send a test to me'}
+              </button>
+              <button
+                type="button"
+                className={s.btn}
+                onClick={openSendNow}
+                disabled={!messageReady || busy !== null || sendNow !== null}
+              >
+                {busy === 'count' ? 'Counting…' : 'Send now'}
               </button>
               <button
                 type="button"
@@ -243,6 +307,28 @@ export function AnnouncementsManager() {
                 {busy === 'schedule' ? 'Scheduling…' : 'Schedule'}
               </button>
             </div>
+
+            {sendNow ? (
+              <div className={a.confirm} role="alertdialog" aria-labelledby="announce-now-q">
+                <p id="announce-now-q" className={a.confirmText}>
+                  Send to {sendNow.count.toLocaleString('en-US')} {sendNow.count === 1 ? 'person' : 'people'} now?
+                  <span className={a.confirmSub}>It goes out right away and can&apos;t be taken back.</span>
+                </p>
+                <div className={a.confirmBtns}>
+                  <button type="button" className={s.btnGhost} onClick={() => setSendNow(null)} disabled={busy === 'now'}>
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className={s.btnLime}
+                    onClick={confirmSendNow}
+                    disabled={busy === 'now' || sendNow.count === 0}
+                  >
+                    {busy === 'now' ? 'Sending…' : 'Send now'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </section>
 

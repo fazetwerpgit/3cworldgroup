@@ -103,3 +103,37 @@
 .rowCancel {
   margin: -10px -8px -10px 0;
 }
+
+.actions > .testBtn {
+  flex-basis: 100%;
+}
+
+/* Send-now confirm: neutral, not the red delete strip. Sending isn't destructive. */
+.confirm {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1.35 var(--f-ui);
+}
+
+.confirmSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.confirmBtns {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
