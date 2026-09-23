@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderWeeklyInstallsEmail > matches the plain-text snapshot 1`] = `
+"Morning, Braeden. Good week. Here's what went in and what's next.
+
+LAST WEEK: est. $471 from 4 installs (Sep 13–19)
+
+INSTALLED LAST WEEK (4)
+- James Whitfield, 918 Cedar Hollow Ln, TFiber 2 Gig
+  Installed Mon, Sep 14 · est. $168 · Est. payout Sep 21–25
+- Maria Lopez, 4417 Ridgecrest Dr, TFiber 1 Gig
+  Installed Tue, Sep 15 · est. $138 · Est. payout Sep 28–Oct 3
+- Tanya Brooks, 2210 Meadowview Ct, TFiber 500
+  Installed Thu, Sep 17 · est. $97.50 · Est. payout Sep 28–Oct 3
+- Derrick Owens, 65 Willow Bend Rd, TFiber 300
+  Installed Sat, Sep 19 · est. $67.50 · Est. payout Sep 28–Oct 3
+
+COMING UP THIS WEEK (2)
+- Priya Natarajan, 3120 Silver Maple Dr, TFiber 1 Gig. Tue, Sep 22.
+- Marcus Hill, 801 Oak Crest Trl, TFiber 500. Thu, Sep 24.
+
+CANCELLED BY THE CARRIER (2)
+Worth a call. Some of these are a scheduling mix-up you can still save.
+- Kevin Tran, 3301 Lakeside Blvd, TFiber 1 Gig. Cancelled Sep 16.
+- 77 Birchwood Pl, Fiber 500. Cancelled Sep 18.
+
+NEEDS A DATE (2)
+No date, no install, no pay. Get these on the calendar.
+- Alicia Gomez, 1450 Sunset Ridge, TFiber 1 Gig. No date, sold Sep 17.
+- Robert Chen, 52 Harbor Point Dr, TFiber 2 Gig. Missed install, sold Sep 1.
+
+Open my sales: https://www.3cworldgroup.com/portal/sales
+Missing an install? Tell us here: https://www.3cworldgroup.com/portal/payroll-dispute
+
+--
+Estimates only. You're paid when 3C receives funds from the carrier; missed installs are settled as claims by the 25th of the next month.
+T-Fiber only for now. You get this on Mondays when you have installs or open sales.
+"
+`;
