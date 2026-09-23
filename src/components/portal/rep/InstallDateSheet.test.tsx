@@ -39,7 +39,7 @@ function noon(days: number): Date {
   return date;
 }
 
-function render(props: { missed: boolean; installDate?: Date; missedDay?: string | null }) {
+function render(props: { missed: boolean; installDate?: Date; missedDay?: unknown }) {
   act(() => {
     root.render(
       <InstallDateSheet
@@ -133,6 +133,22 @@ describe('InstallDateSheet', () => {
     pick(dayFromToday(0));
     await submit();
     expect(saveMock).toHaveBeenCalledWith('s1', dayFromToday(0));
+  });
+
+  it("reads the carrier's missed day however it was stored", async () => {
+    // The sale says two days ago; the carrier's miss was yesterday, stored as
+    // a Timestamp, an ISO time or M/D/YYYY. None of them may fall back to the sale.
+    const missed = noon(-1);
+    const [y, m, d] = dayFromToday(-1).split('-').map(Number);
+    for (const missedDay of [{ toDate: () => missed }, missed.toISOString(), `${m}/${d}/${y}`]) {
+      render({ missed: true, installDate: noon(-2), missedDay });
+      expect(input().min).toBe(dayFromToday(0));
+      pick(dayFromToday(-1));
+      await submit();
+      expect(alertText()).toBe('Pick a day after the missed one.');
+      act(() => root.render(<></>));
+    }
+    expect(saveMock).not.toHaveBeenCalled();
   });
 
   it('keeps Close disabled while a save is in flight', async () => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { Sale } from '@/types';
 import { dateToSaleDateInput, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
+import { firstRescheduleDay, missedInstallDay } from '@/lib/sales/rescheduleDay';
 import { saveInstallDate } from '@/lib/sales/saveInstallDate';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
@@ -15,12 +16,6 @@ type SheetSale = Pick<Sale, 'id' | 'customerName' | 'installDate' | 'saleDate'>;
 /** A Date/ISO/Timestamp as the date input's YYYY-MM-DD, or '' when unreadable. */
 function inputDay(value: unknown): string {
   return installDayKey(value) ?? '';
-}
-
-/** The day after a YYYY-MM-DD, for the date input's min. */
-function nextDay(day: string): string {
-  const [year, month, date] = day.split('-').map(Number);
-  return dateToSaleDateInput(new Date(year, month - 1, date + 1, 12));
 }
 
 function maxInstallDay(): string {
@@ -49,8 +44,8 @@ export function InstallDateSheet({
   sale: SheetSale;
   plan?: string;
   missed: boolean;
-  /** The carrier's missed install day (YYYY-MM-DD), when it gave one. */
-  missedDay?: string | null;
+  /** The carrier's missed install day, however it was stored, when it gave one. */
+  missedDay?: unknown;
   onClose: () => void;
   onSaved: (saleId: string, installDate: string) => void;
 }) {
@@ -75,8 +70,8 @@ export function InstallDateSheet({
 
   const title = missed ? 'Reschedule the install' : current ? 'Change install date' : 'Add install date';
   const soldDay = inputDay(sale.saleDate);
-  const brokeDay = missed ? (/^\d{4}-\d{2}-\d{2}$/.test(missedDay ?? '') ? missedDay! : current) : '';
-  const firstDay = brokeDay && nextDay(brokeDay) > soldDay ? nextDay(brokeDay) : soldDay;
+  const brokeDay = missed ? missedInstallDay(missedDay, sale.installDate) : '';
+  const firstDay = firstRescheduleDay(brokeDay, soldDay);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
