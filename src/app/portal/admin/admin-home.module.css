@@ -1,0 +1,112 @@
+/* Ops Home (direction D): the queue board. Shared pieces are admin-ui.module.css. */
+
+.headRight {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-right: calc(var(--s2) * -1);
+}
+
+.cols {
+  --cols: 64px minmax(0, 1fr) 104px 96px 24px;
+}
+
+/* Phone row: count | text | chevron. (.cols lifts these over admin-ui's .row / .cell.) */
+.cols .queue {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+}
+
+.count {
+  font-family: var(--f-display);
+  font-size: 34px;
+  line-height: 1;
+  padding-top: 3px;
+  text-align: right;
+}
+
+.countHot {
+  color: var(--c-lime);
+}
+
+.countNone {
+  color: var(--c-text-3);
+}
+
+.queueText {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.queueName {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.queueDesc {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.35;
+}
+
+.queuePhoneMeta {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.queueFail {
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.cols .deskCell {
+  display: none;
+}
+
+.open {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: -10px -12px -10px 0;
+  color: var(--c-text-3);
+}
+
+.skelRow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelRow + .skelRow {
+  border-top: 1px solid var(--c-line);
+}
+
+@media (min-width: 1024px) {
+  .cols .queue {
+    grid-template-columns: var(--cols);
+  }
+
+  .count {
+    font-size: 40px;
+  }
+
+  .cols .deskCell {
+    display: block;
+    color: var(--c-text-2);
+  }
+
+  .queuePhoneMeta {
+    display: none;
+  }
+
+  .skelRow {
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: var(--s4) var(--s5);
+  }
+}

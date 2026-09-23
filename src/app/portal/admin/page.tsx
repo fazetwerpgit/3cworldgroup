@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-a.css';
+import { ChevronRight, RotateCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { AdminFailed, AdminGate, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import h from './admin-home.module.css';
 
 interface QueueCard {
   key: string;
@@ -176,6 +178,8 @@ export default function OpsHomePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const loaded = cards.length > 0;
+  const failedCount = cards.filter((c) => c.error).length;
   const totalOpen = cards.reduce((sum, c) => sum + c.count, 0);
   const activeQueues = cards.filter((c) => c.count > 0).length;
   const backedCards = useMemo(() => cards.filter(isBacked), [cards]);
@@ -188,34 +192,176 @@ export default function OpsHomePage() {
     const ageDiff = (b.oldestWaitMs ?? 0) - (a.oldestWaitMs ?? 0);
     return ageDiff !== 0 ? ageDiff : b.count - a.count;
   });
+  // Every queue failed: there is nothing honest to total.
+  const allFailed = loaded && failedCount === cards.length;
+  const showStats = loaded && !allFailed;
+  const updated = refreshedAt
+    ? refreshedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : null;
 
   return (
-    <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main sweep-admin-page -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Ops Home" meta={loading ? 'Loading…' : `${totalOpen} waiting`} />
-          <div className="sweep-admin-summary">
-            <div><span>Needs attention</span><strong>{loading ? '—' : totalOpen}</strong><small>{loading ? 'Loading queues…' : `${newTodayTotal} added today`}</small></div>
-            <div><span>Active queues</span><strong>{loading ? '—' : activeQueues}</strong><small>{cards.length || 9} total</small></div>
-            <div><span>Waiting over two days</span><strong>{loading ? '—' : backedCards.length}</strong><small>{overallOldest === null ? 'No wait time yet' : `Oldest ${waitAge(overallOldest)}`}</small></div>
-          </div>
-          {mostBackedUp.length > 0 && <p className="sweep-admin-note">Longest waits: {mostBackedUp.map((c) => `${c.label} (${waitAge(c.oldestWaitMs)})`).join(', ')}</p>}
-          <section aria-labelledby="ops-queues-heading">
-            <div className="sweep-admin-section-head"><h2 id="ops-queues-heading">What needs attention</h2><span>{refreshedAt ? `Updated ${refreshedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : 'Loading…'}</span></div>
-            {loading && cards.length === 0 ? <div className="ops-line-state-card">Loading queues…</div> : (
-              <div className="sweep-admin-queue-list">
-                {cards.map((card) => (
-                  <Link key={card.key} href={card.href} className="sweep-admin-queue-row">
-                    <span className="sweep-admin-queue-count">{card.error ? '—' : card.count}</span>
-                    <span className="sweep-admin-queue-copy"><strong>{card.error ? `${card.label} unavailable` : `${card.count} ${card.label.toLowerCase()} waiting`}</strong><small>{card.error ? 'Could not load this queue.' : card.description}</small></span>
-                    <span aria-hidden="true" className="sweep-admin-chevron">›</span>
-                  </Link>
-                ))}
-              </div>
+    <AdminGate roles={['admin', 'operations']}>
+      <div className={u.page}>
+        <AdminPageHead
+          title="Ops Home"
+          meta={showStats ? <><b>{totalOpen}</b> waiting</> : loading ? 'Loading…' : null}
+          sub="Every review queue in one place. Longest waits are flagged."
+        />
+
+        <div className={u.stats} aria-busy={loading && !loaded}>
+          <div className={u.stat}>
+            <span className={s.kicker}>Needs attention</span>
+            {showStats ? (
+              <strong className={`${u.statValue} ${totalOpen > 0 ? u.statHot : ''}`}>{totalOpen}</strong>
+            ) : (
+              <StatSkeleton failed={allFailed} />
             )}
-          </section>
+            <span className={u.statNote}>{showStats ? `${newTodayTotal} added today` : '\u00a0'}</span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Active queues</span>
+            {showStats ? <strong className={u.statValue}>{activeQueues}</strong> : <StatSkeleton failed={allFailed} />}
+            <span className={u.statNote}>{showStats ? `of ${cards.length}` : '\u00a0'}</span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Over 2 days</span>
+            {showStats ? (
+              <strong className={`${u.statValue} ${backedCards.length > 0 ? u.statWarn : ''}`}>{backedCards.length}</strong>
+            ) : (
+              <StatSkeleton failed={allFailed} />
+            )}
+            <span className={u.statNote}>{showStats ? (backedCards.length ? 'queues backed up' : 'Nothing backed up') : '\u00a0'}</span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Oldest wait</span>
+            {showStats ? (
+              <strong className={`${u.statValue} ${overallOldest !== null && overallOldest > BACKED_UP_THRESHOLD_MS ? u.statWarn : ''}`}>
+                {waitAge(overallOldest)}
+              </strong>
+            ) : (
+              <StatSkeleton failed={allFailed} />
+            )}
+            <span className={u.statNote}>
+              {showStats ? (mostBackedUp[0] ? mostBackedUp[0].label : overallOldest === null ? 'No wait time yet' : 'Within two days') : '\u00a0'}
+            </span>
+          </div>
         </div>
+
+        <section className={s.panel} aria-labelledby="ops-queues-heading">
+          <div className={s.panelHead}>
+            <h2 id="ops-queues-heading" className={s.kicker}>
+              What needs attention
+            </h2>
+            <span className={h.headRight}>
+              {updated ? <span className={u.panelMeta}>Updated {updated}</span> : null}
+              <button
+                type="button"
+                className={s.iconBtn}
+                aria-label="Refresh queues"
+                disabled={loading}
+                onClick={() => void load()}
+              >
+                <RotateCw size={18} className={loading ? u.spin : undefined} aria-hidden="true" />
+              </button>
+            </span>
+          </div>
+
+          {failedCount > 0 && !allFailed ? (
+            <AdminFailed
+              what={failedCount === 1 ? '1 queue' : `${failedCount} queues`}
+              detail="totals leave them out"
+              onRetry={() => void load()}
+            />
+          ) : null}
+
+          {!loaded ? (
+            <QueueSkeleton />
+          ) : allFailed ? (
+            <AdminFailed what="the queues" onRetry={() => void load()} />
+          ) : (
+            <ul className={`${u.rows} ${h.cols}`}>
+              <li className={u.tHead} aria-hidden="true">
+                <span className={u.alignEnd}>Open</span>
+                <span>Queue</span>
+                <span className={u.alignEnd}>New today</span>
+                <span className={u.alignEnd}>Oldest</span>
+                <span />
+              </li>
+              {cards.map((card) => (
+                <li key={card.key}>
+                  {card.error ? (
+                    <div className={`${u.row} ${h.queue}`}>
+                      <span className={`${h.count} ${h.countNone}`} aria-hidden="true">
+                        —
+                      </span>
+                      <span className={h.queueText}>
+                        <strong className={h.queueName}>{card.label}</strong>
+                        <span className={h.queueFail}>Couldn&apos;t load this queue</span>
+                      </span>
+                      <span className={`${u.cell} ${h.deskCell}`} />
+                      <span className={`${u.cell} ${h.deskCell}`} />
+                      <Link href={card.href} className={h.open} aria-label={`Open ${card.label}`}>
+                        <ChevronRight size={20} aria-hidden="true" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <Link
+                      href={card.href}
+                      className={`${u.row} ${h.queue} ${isBacked(card) ? u.rowWarn : ''}`}
+                    >
+                      <span className={`${h.count} ${card.count > 0 ? h.countHot : h.countNone}`}>{card.count}</span>
+                      <span className={h.queueText}>
+                        <strong className={h.queueName}>{card.label}</strong>
+                        <span className={h.queueDesc}>{card.description}</span>
+                        {card.count > 0 ? (
+                          <span className={h.queuePhoneMeta}>
+                            {[
+                              card.newToday ? `${card.newToday} new today` : null,
+                              card.oldestWaitMs !== null ? `oldest ${waitAge(card.oldestWaitMs)}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className={`${u.cell} ${u.alignEnd} ${h.deskCell} ${u.num}`}>
+                        {card.newToday === null ? '—' : card.newToday}
+                      </span>
+                      <span
+                        className={`${u.cell} ${u.alignEnd} ${h.deskCell} ${u.num} ${isBacked(card) ? u.toneAmber : ''}`}
+                      >
+                        {card.count > 0 ? waitAge(card.oldestWaitMs) : '—'}
+                      </span>
+                      <ChevronRight size={20} className={u.chev} aria-hidden="true" />
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
-    </ProtectedRoute>
+    </AdminGate>
+  );
+}
+
+function StatSkeleton({ failed }: { failed: boolean }) {
+  if (failed) return <strong className={`${u.statValue} ${u.toneMuted}`}>—</strong>;
+  return <span className={s.skel} style={{ width: 64, height: 44 }} aria-hidden="true" />;
+}
+
+function QueueSkeleton() {
+  return (
+    <div role="status" aria-label="Loading queues">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className={h.skelRow} aria-hidden="true">
+          <span className={s.skel} style={{ width: 34, height: 30 }} />
+          <span className={u.skelLines}>
+            <span className={s.skel} style={{ width: `${46 - (index % 3) * 8}%`, height: 14 }} />
+            <span className={s.skel} style={{ width: `${62 - (index % 2) * 14}%`, height: 12 }} />
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
