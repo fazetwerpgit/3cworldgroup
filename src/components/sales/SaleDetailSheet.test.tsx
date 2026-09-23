@@ -9,7 +9,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Sale } from '@/types';
+import type { FiberOrder, Sale } from '@/types';
 
 const viewer = vi.hoisted(() => ({ uid: 'rep1' }));
 const api = vi.hoisted(() => ({ updateSale: vi.fn(async () => true) }));
@@ -60,7 +60,7 @@ const SALE: Sale = {
   updatedAt: new Date(2026, 8, 1, 12, 0, 0),
 };
 
-function render(sale: Sale, isAdmin = false) {
+function render(sale: Sale, isAdmin = false, fiberOrder: FiberOrder | null = null) {
   act(() => {
     root.render(
       <SaleDetailSheet
@@ -73,6 +73,7 @@ function render(sale: Sale, isAdmin = false) {
         onNext={() => {}}
         isAdmin={isAdmin}
         onRequestDelete={() => {}}
+        fiberOrder={fiberOrder}
       />
     );
   });
@@ -87,6 +88,32 @@ function buttonByText(label: string) {
 
 function installInput() {
   return document.body.querySelector<HTMLInputElement>('#sale-install-date');
+}
+
+function type(value: string) {
+  const input = installInput();
+  if (!input) throw new Error('no install input');
+  act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function save() {
+  await act(async () => {
+    buttonByText('Save')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+
+/** The carrier's breakage row for SALE: it missed on 9/22, after the sale's 9/20. */
+function breakage(estInstallDate: unknown): FiberOrder {
+  return {
+    id: 'brk1',
+    status: 'breakage',
+    orderDate: null,
+    estInstallDate,
+    address: SALE.customerAddress,
+  } as unknown as FiberOrder;
 }
 
 function click(element: Element | undefined) {
@@ -181,6 +208,59 @@ describe('SaleDetailSheet install date', () => {
     expect(api.updateSale).toHaveBeenCalledWith('sale1', { installDate: '2026-09-20' });
     expect(own.save).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('Could not save the install date. Try again.');
+  });
+  it("moves a missed install only past the carrier's missed day", async () => {
+    render(SALE, false, breakage('2026-09-22'));
+    click(buttonByText('Change'));
+
+    // Starts empty (the old date is the one that broke), no earlier than the day after the miss.
+    expect(installInput()!.value).toBe('');
+    expect(installInput()!.min).toBe('2026-09-23');
+    expect(document.body.textContent).toContain('The carrier marked the last install as missed.');
+
+    await save();
+    expect(document.body.textContent).toContain('Pick the install day.');
+    type('2026-09-22');
+    await save();
+    expect(document.body.textContent).toContain('Pick a day after the missed one.');
+    expect(own.save).not.toHaveBeenCalled();
+
+    type('2026-09-23');
+    await save();
+    expect(own.save).toHaveBeenCalledWith('sale1', '2026-09-23');
+  });
+
+  it("reads the carrier's missed day however it was stored", async () => {
+    const missedAt = new Date('2026-09-22T17:00:00Z');
+    for (const day of [{ toDate: () => missedAt }, missedAt.toISOString(), '9/22/2026']) {
+      render(SALE, false, breakage(day));
+      click(buttonByText('Change'));
+      expect(installInput()!.min).toBe('2026-09-23');
+      type('2026-09-22');
+      await save();
+      expect(document.body.textContent).toContain('Pick a day after the missed one.');
+      click(buttonByText('Cancel'));
+    }
+    expect(own.save).not.toHaveBeenCalled();
+  });
+
+  it('applies the same rule to an admin moving a missed install', async () => {
+    viewer.uid = 'admin1';
+    render(SALE, true, breakage('2026-09-22'));
+    click(buttonByText('Change'));
+    type('2026-09-21');
+    await save();
+    expect(document.body.textContent).toContain('Pick a day after the missed one.');
+    expect(api.updateSale).not.toHaveBeenCalled();
+  });
+
+  it('leaves a sale rescheduled past the miss as a plain date change', () => {
+    // The sale's 9/20 is already after a 9/18 miss: that breakage is history.
+    render(SALE, false, breakage('2026-09-18'));
+    click(buttonByText('Change'));
+    expect(installInput()!.value).toBe('2026-09-20');
+    expect(installInput()!.min).toBe('');
+    expect(document.body.textContent).not.toContain('marked the last install as missed');
   });
 });
 

@@ -16,11 +16,13 @@ import {
   Ban,
   X,
 } from 'lucide-react';
-import { Sale, FIBER_COMPANIES, SaleStatusConfig } from '@/types';
+import { Sale, FIBER_COMPANIES, SaleStatusConfig, type FiberOrder } from '@/types';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
-import { dateToSaleDateInput, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
+import { isStandingBreakage } from '@/lib/sales/installBucket';
+import { firstRescheduleDay, missedInstallDay, rescheduleDayError } from '@/lib/sales/rescheduleDay';
+import { dateToSaleDateInput, installDayKey, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { saveInstallDate as saveOwnInstallDate } from '@/lib/sales/saveInstallDate';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
@@ -50,6 +52,12 @@ interface SaleDetailSheetProps {
   onSaleUpdated?: () => void;
   /** The T-Fiber estimated payout window ("Sep 21–25"), when the sale has installed. */
   payout?: string | null;
+  /**
+   * The carrier's current row for this sale, when the report has one. A
+   * standing missed install can only move to a day after the carrier's miss,
+   * as on Home's reschedule sheet; anything earlier would still count as missed.
+   */
+  fiberOrder?: FiberOrder | null;
 }
 
 const INSTALL_DATE_ERROR = 'Could not save the install date. Try again.';
@@ -110,6 +118,7 @@ export function SaleDetailSheet({
   onRestore,
   onSaleUpdated,
   payout = null,
+  fiberOrder = null,
 }: SaleDetailSheetProps) {
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
@@ -196,10 +205,16 @@ export function SaleDetailSheet({
   const ownSale = !!user?.uid && sale.salesRepId === user.uid;
   const canEditInstallDate =
     sale.status !== 'cancelled' && sale.status !== 'rejected' && (isAdmin || ownSale);
+  // A missed install: the new day has to land after the one that broke.
+  const missed = isStandingBreakage({ installDate: shownInstallDate ?? undefined }, fiberOrder);
+  const brokeDay = missed ? missedInstallDay(fiberOrder?.estInstallDate, shownInstallDate) : '';
+  const firstDay = missed ? firstRescheduleDay(brokeDay, installDayKey(sale.saleDate) ?? '') : '';
 
   const startEditingInstall = () => {
     setInstallError(null);
-    setInstallDraft(shownInstallDate ? dateToSaleDateInput(shownInstallDate) : todaySaleDateInput());
+    // A missed install starts empty: the old date is the one that broke.
+    if (missed) setInstallDraft('');
+    else setInstallDraft(shownInstallDate ? dateToSaleDateInput(shownInstallDate) : todaySaleDateInput());
   };
 
   const cancelEditingInstall = () => {
@@ -209,6 +224,11 @@ export function SaleDetailSheet({
 
   const saveInstallDate = async () => {
     if (installDraft === null || savingInstall) return;
+    const missedError = missed ? rescheduleDayError(installDraft, brokeDay) : null;
+    if (missedError) {
+      setInstallError(missedError);
+      return;
+    }
     const parsed = parseInstallDateInput(installDraft);
     if (!parsed.ok) {
       setInstallError(INSTALL_DATE_ERROR);
@@ -355,9 +375,13 @@ export function SaleDetailSheet({
                   className={x.input}
                   type="date"
                   value={installDraft}
+                  min={firstDay || undefined}
                   disabled={savingInstall}
                   onChange={(event) => setInstallDraft(event.target.value)}
                 />
+                {missed && (
+                  <p className={x.dEditorHint}>The carrier marked the last install as missed. Pick a day after it.</p>
+                )}
                 {ownSale && (
                   <p className={x.dEditorHint}>
                     We&apos;ll update this automatically when the carrier&apos;s report changes it.

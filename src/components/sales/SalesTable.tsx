@@ -577,6 +577,7 @@ export function SalesTable({
         onRequestDelete={(id) => setDeletingId(id)}
         onSaleUpdated={onSaleUpdated}
         payout={selectedSale ? payoutBySale[selectedSale.id || ''] ?? null : null}
+        fiberOrder={selectedSale ? fiberBySale.get(selectedSale.id || '') ?? null : null}
       />
 
       <SalesDialog

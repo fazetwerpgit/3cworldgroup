@@ -450,6 +450,13 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     }));
   }, [fullBook.reps, linkingRow]);
 
+  // The carrier row the book joined to the sale open in the sheet, so a missed
+  // install is moved past the carrier's missed day there too.
+  const selectedOrder = useMemo(
+    () => (selectedSale?.id ? fullBook.rows.find((row) => row.sale?.id === selectedSale.id)?.order ?? null : null),
+    [fullBook.rows, selectedSale?.id]
+  );
+
   // The T-Fiber estimated payout window for the sale open in the sheet — a
   // range, never a single date, and only once the install has happened.
   const selectedPayout = useMemo(() => {
@@ -934,6 +941,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onRestore={onSetCancelled ? (id) => { void onSetCancelled(id, false); } : undefined}
         onSaleUpdated={onSaleUpdated}
         payout={selectedPayout}
+        fiberOrder={selectedOrder}
       />
 
       <LinkOrderDialog
