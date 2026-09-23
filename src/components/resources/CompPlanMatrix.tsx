@@ -11,15 +11,21 @@ import {
   CompPlanRole,
   FIBER_COMPANIES,
   FIBER_PLANS,
+  FieldRole,
+  IBO_FIELD_ROLES,
   RoleDisplayNames,
 } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import c from './comp-plan.module.css';
 
-// Column headers: the full role names would make a 14-column table unreadable,
-// so the header carries the short form and the title attribute the full one.
-const ROLE_SHORT: Record<CompPlanRole, string> = {
+// IBO is hidden from the UI but kept in data: its rates never get a column,
+// yet ride through `draft` untouched, so a save writes them back as loaded.
+const SHOWN_ROLES = COMP_PLAN_ROLES.filter((role) => !IBO_FIELD_ROLES.includes(role as FieldRole));
+
+// Column headers: the full role names would make the table unreadable, so the
+// header carries the short form and the title attribute the full one.
+const ROLE_SHORT: Partial<Record<CompPlanRole, string>> = {
   ae_tier_1: 'AE T1',
   ae_tier_2: 'AE T2',
   gm_in_training: 'GM Trn',
@@ -28,10 +34,6 @@ const ROLE_SHORT: Record<CompPlanRole, string> = {
   regional_manager: 'Regional',
   director: 'Director',
   internal_rep: 'Internal',
-  ibo_level_1: 'IBO 1',
-  ibo_level_2: 'IBO 2',
-  ibo_level_3: 'IBO 3',
-  ibo_level_4: 'IBO 4',
   // TEMPORARY (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden). Revisit and move him to a real comp role later.
   operations: 'Ops',
 };
@@ -178,9 +180,9 @@ export function CompPlanMatrix() {
             <thead>
               <tr>
                 <th scope="col">Product</th>
-                {COMP_PLAN_ROLES.map((role) => (
+                {SHOWN_ROLES.map((role) => (
                   <th key={role} scope="col" title={RoleDisplayNames[role]}>
-                    {ROLE_SHORT[role]}
+                    {ROLE_SHORT[role] ?? RoleDisplayNames[role]}
                   </th>
                 ))}
                 <th scope="col" className={c.margin}>
@@ -191,14 +193,14 @@ export function CompPlanMatrix() {
             {FIBER_COMPANIES.map((company) => (
               <tbody key={company.value}>
                 <tr className={c.group}>
-                  <th scope="colgroup" colSpan={COMP_PLAN_ROLES.length + 2}>
+                  <th scope="colgroup" colSpan={SHOWN_ROLES.length + 2}>
                     {company.label}
                   </th>
                 </tr>
                 {FIBER_PLANS.filter((plan) => plan.company === company.value).map((plan) => (
                   <tr key={plan.id}>
                     <th scope="row">{plan.name}</th>
-                    {COMP_PLAN_ROLES.map((role) => {
+                    {SHOWN_ROLES.map((role) => {
                       const rate = shownRates[role]?.[company.value]?.[plan.id] ?? 0;
                       return (
                         <td key={role}>
@@ -206,6 +208,7 @@ export function CompPlanMatrix() {
                             <input
                               className={`${p.input} ${c.rateInput}`}
                               type="number"
+                              inputMode="decimal"
                               min="0"
                               step="0.5"
                               value={rate}
@@ -229,6 +232,7 @@ export function CompPlanMatrix() {
                         <input
                           className={`${p.input} ${c.rateInput}`}
                           type="number"
+                          inputMode="decimal"
                           min="0"
                           step="0.5"
                           value={shownMargin[company.value]?.[plan.id] ?? 0}

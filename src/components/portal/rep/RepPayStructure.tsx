@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Check, Clock3, Edit3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { ratesArePending, CommissionConfig, FieldRole, RoleDisplayNames, repFacingRoleLabel } from '@/types';
+import { ratesArePending, CommissionConfig, FieldRole, IBO_FIELD_ROLES, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
@@ -111,7 +111,9 @@ export function RepPayStructure() {
     }
   };
 
-  const tiers = editing ? draft : data?.tiers ?? [];
+  // IBO is hidden from the UI but kept in data: its tiers get no row, yet stay
+  // in `draft`, so a save writes them back as loaded.
+  const tiers = (editing ? draft : data?.tiers ?? []).filter((tier) => !IBO_FIELD_ROLES.includes(tier.fieldRole));
   const ratesPending = data ? ratesArePending(data.tiers) : false;
   const ownTier = data?.scope === 'own' ? data.tiers[0] : undefined;
   // IBO tiers are never named to reps (null drops the line).

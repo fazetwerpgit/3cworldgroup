@@ -34,6 +34,28 @@
   border-radius: var(--r-panel);
 }
 
+/* A styled scrollbar is always drawn, even where macOS would hide an overlay
+   one, so a table wider than its frame visibly scrolls. */
+.scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.scroll::-webkit-scrollbar-track {
+  background: var(--c-panel);
+}
+
+.scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--c-panel);
+  border-radius: 999px;
+  background: var(--c-line-strong);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .scroll {
+    scrollbar-color: var(--c-line-strong) var(--c-panel);
+  }
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -85,11 +107,18 @@
 }
 
 .table .rateInput {
-  width: 72px;
+  width: 64px;
   height: 36px;
-  padding: 0 var(--s2);
+  padding: 0 6px;
   font-size: var(--t-sm);
   text-align: right;
+  appearance: textfield;
+}
+
+.table .rateInput::-webkit-inner-spin-button,
+.table .rateInput::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .actions {
