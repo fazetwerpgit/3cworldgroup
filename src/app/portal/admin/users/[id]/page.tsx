@@ -161,7 +161,7 @@ export default function EditUserPage() {
 
                 {showVault ? (
                   <section className={`${s.panel} ${d.vault}`} aria-labelledby="person-vault-heading">
-                    <div className={s.panelHead}>
+                    <div className={`${s.panelHead} ${u.band}`}>
                       <h2 id="person-vault-heading" className={s.kicker}>
                         Sensitive information
                       </h2>

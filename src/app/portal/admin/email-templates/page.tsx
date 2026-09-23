@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import rep from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
 import {
   AdminHead,
   AdminSearch,
@@ -380,7 +381,7 @@ export default function EmailTemplatesPage() {
             aria-labelledby="template-editor-title"
             style={{ scrollMarginTop: 96 }}
           >
-            <div className={rep.panelHead}>
+            <div className={`${rep.panelHead} ${u.band}`}>
               <h2 id="template-editor-title" className={rep.kicker}>
                 {form.id ? `Edit · ${form.name || 'template'}` : 'New template'}
               </h2>

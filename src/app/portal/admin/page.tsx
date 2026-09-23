@@ -203,7 +203,7 @@ export default function OpsHomePage() {
         />
 
         <section className={s.panel} aria-labelledby="ops-queues-heading">
-          <div className={s.panelHead}>
+          <div className={`${s.panelHead} ${u.band}`}>
             <h2 id="ops-queues-heading" className={s.kicker}>
               What needs attention
             </h2>

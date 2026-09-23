@@ -155,7 +155,7 @@ function Section({
 }) {
   return (
     <section className={s.panel} aria-labelledby={id}>
-      <div className={s.panelHead}>
+      <div className={`${s.panelHead} ${u.band}`}>
         <h2 id={id} className={s.kicker}>
           {title}
         </h2>

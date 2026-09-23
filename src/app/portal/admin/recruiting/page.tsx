@@ -331,7 +331,7 @@ export default function RecruitingCommandCenterPage() {
         ) : null}
 
         <section className={s.panel} aria-labelledby="recruiting-invites-heading">
-          <div className={s.panelHead}>
+          <div className={`${s.panelHead} ${u.band}`}>
             <h2 id="recruiting-invites-heading" className={s.kicker}>Invites</h2>
             {showCounts && invites.length > 0 ? (
               <span className={u.panelMeta}>
@@ -464,7 +464,7 @@ export default function RecruitingCommandCenterPage() {
 
         <div className={r.grid}>
           <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
-            <div className={s.panelHead}>
+            <div className={`${s.panelHead} ${u.band}`}>
               <h2 id="recruiting-form-heading" className={s.kicker}>Start recruit onboarding</h2>
             </div>
             <div className={u.panelBody}>
@@ -600,7 +600,7 @@ export default function RecruitingCommandCenterPage() {
           </section>
 
           <section className={s.panel} aria-labelledby="recruiting-apps-heading">
-            <div className={s.panelHead}>
+            <div className={`${s.panelHead} ${u.band}`}>
               <h2 id="recruiting-apps-heading" className={s.kicker}>Website applications</h2>
               <button
                 type="button"

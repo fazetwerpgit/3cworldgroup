@@ -13,6 +13,7 @@ import {
 } from '@/lib/forms/formOptionsRegistry';
 import { Check, Plus, X } from 'lucide-react';
 import rep from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { AdminHead, Banner, LoadFailed, SkeletonRows, cx } from '@/components/portal/admin-ops/AdminKit';
 import s from '@/components/portal/admin-ops/admin-ops.module.css';
 
@@ -140,7 +141,7 @@ export default function AdminFormOptionsPage() {
               const dirty = JSON.stringify(options[key]) !== JSON.stringify(savedOptions[key]);
               return (
                 <section key={key} className={cx(rep.panel, s.oCard)} aria-labelledby={`${inputId}-title`}>
-                  <div className={rep.panelHead}>
+                  <div className={`${rep.panelHead} ${u.band}`}>
                     <h2 id={`${inputId}-title`} className={rep.kicker}>
                       {FORM_OPTION_LABELS[key]}
                     </h2>

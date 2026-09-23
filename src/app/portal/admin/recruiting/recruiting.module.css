@@ -59,7 +59,7 @@
 @media (hover: hover) {
   .activate:is(button):hover {
     border-color: var(--c-lime);
-    background: var(--c-lime-wash);
+    background: var(--c-raised);
   }
 }
 
@@ -110,9 +110,10 @@
   gap: var(--s3);
   margin-top: var(--s5);
   padding: var(--s4);
-  border: 1px solid rgba(141, 198, 63, 0.45);
-  border-radius: var(--r-control);
-  background: var(--c-lime-wash);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: inset 3px 0 0 var(--c-lime), var(--c-sink);
 }
 
 .readyTitle {

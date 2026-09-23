@@ -253,7 +253,7 @@ export default function UsersPage() {
 
         {pendingUsers.length > 0 ? (
           <section className={`${s.panel} ${p.pending}`} aria-labelledby="users-pending-heading">
-            <div className={s.panelHead}>
+            <div className={`${s.panelHead} ${u.band}`}>
               <h2 id="users-pending-heading" className={s.kicker}>
                 Pending approval
               </h2>
@@ -298,7 +298,7 @@ export default function UsersPage() {
         ) : null}
 
         <section className={s.panel} aria-labelledby="users-all-heading">
-          <div className={s.panelHead}>
+          <div className={`${s.panelHead} ${u.band}`}>
             <h2 id="users-all-heading" className={s.kicker}>
               All members
             </h2>

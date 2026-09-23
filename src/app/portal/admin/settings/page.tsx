@@ -18,7 +18,7 @@ const WEEKLY_CHALLENGE_PRESETS = [
 /** Panel title row: kicker on the left, a status or tag on the right. */
 function PanelHead({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
   return (
-    <div className={s.panelHead}>
+    <div className={`${s.panelHead} ${u.band}`}>
       <h2 id={id} className={s.kicker}>
         {title}
       </h2>

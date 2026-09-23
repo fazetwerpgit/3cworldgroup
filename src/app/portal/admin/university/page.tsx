@@ -269,7 +269,7 @@ function AdminUniversity() {
 
       {showAdd ? (
         <section className={s.panel} aria-labelledby="uni-add-heading">
-          <div className={s.panelHead}>
+          <div className={`${s.panelHead} ${u.band}`}>
             <h2 id="uni-add-heading" className={s.kicker}>
               Add content
             </h2>

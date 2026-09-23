@@ -181,7 +181,8 @@
 
 .choice[aria-pressed='true']::before {
   border-color: var(--c-red);
-  background: radial-gradient(circle, var(--c-red) 0 4px, transparent 5px);
+  background: var(--c-red);
+  box-shadow: inset 0 0 0 3px var(--c-panel);
 }
 
 .choice:focus-visible {

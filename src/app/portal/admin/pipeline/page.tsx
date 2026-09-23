@@ -334,7 +334,7 @@ export default function PipelinePage() {
         </div>
 
         <section className={s.panel} aria-labelledby="pipeline-reps-heading">
-          <div className={s.panelHead}>
+          <div className={`${s.panelHead} ${u.band}`}>
             <h2 id="pipeline-reps-heading" className={s.kicker}>
               {stageFilter ? PipelineStageConfig[stageFilter].name : 'Field reps'}
             </h2>

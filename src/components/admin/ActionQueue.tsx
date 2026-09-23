@@ -186,7 +186,7 @@ export default function ActionQueue() {
 
   return (
     <section className={s.panel} aria-labelledby="activation-tasks-heading">
-      <div className={s.panelHead}>
+      <div className={`${s.panelHead} ${u.band}`}>
         <h2 id="activation-tasks-heading" className={s.kicker}>
           Activation tasks
         </h2>

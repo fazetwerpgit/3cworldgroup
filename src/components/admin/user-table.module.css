@@ -6,11 +6,24 @@
 
 .row {
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 140ms var(--ease);
 }
 
 @media (hover: hover) {
   .row:hover {
-    background: rgba(163, 184, 214, 0.04);
+    background: var(--c-raised);
+  }
+}
+
+.row:active {
+  background: var(--c-panel-hi);
+}
+
+@media (max-width: 1023px) {
+  .row:active {
+    transform: scale(0.985);
   }
 }
 

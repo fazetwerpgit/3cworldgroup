@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase/config';
 import { Archive, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { ChatChannelAudience } from '@/types';
 import rep from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
 import {
   AdminHead,
   AdminSearch,
@@ -371,7 +372,7 @@ export default function AdminChatChannelsPage() {
 
         {creating ? (
           <section className={rep.panel} aria-labelledby="new-channel-title">
-            <div className={rep.panelHead}>
+            <div className={`${rep.panelHead} ${u.band}`}>
               <h2 id="new-channel-title" className={rep.kicker}>
                 New channel
               </h2>

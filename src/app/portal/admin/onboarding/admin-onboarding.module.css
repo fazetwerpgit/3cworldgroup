@@ -68,7 +68,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--c-lime-hi);
+  color: var(--c-text);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -87,9 +87,10 @@
   align-content: start;
   gap: var(--s3);
   padding: var(--s4);
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-control);
-  background: var(--c-ground);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
 }
 
 .files {
@@ -127,8 +128,12 @@
 @media (hover: hover) {
   .file:hover {
     border-color: var(--c-text-2);
-    background: rgba(163, 184, 214, 0.06);
+    background: var(--c-raised);
   }
+}
+
+.file:active {
+  background: var(--c-panel-hi);
 }
 
 .locked {
