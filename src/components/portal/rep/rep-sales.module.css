@@ -46,11 +46,11 @@
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
-  transition: background 120ms, transform 100ms ease-out;
+  transition: background 120ms, transform 120ms ease-out;
 }
 
 .monthBtn:not(:disabled):active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .monthBtn:focus-visible {
@@ -187,11 +187,11 @@
   font: 600 var(--t-ui) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms, transform 100ms ease-out;
+  transition: background 140ms, color 140ms, transform 120ms ease-out;
 }
 
 .segBtn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .segBtn[aria-selected='true'],
@@ -239,11 +239,11 @@
   font: 500 var(--t-sm) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms, transform 100ms ease-out;
+  transition: background 140ms, color 140ms, transform 120ms ease-out;
 }
 
 .chip:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .chip .dot {
@@ -805,11 +805,11 @@
   color: var(--c-text-2);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   cursor: pointer;
-  transition: background 120ms, transform 100ms ease-out;
+  transition: background 120ms, transform 120ms ease-out;
 }
 
 .payHelp:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .payHelp:focus-visible {
@@ -874,11 +874,11 @@
   color: var(--c-text-3);
   font: 600 14px / 1 var(--f-ui);
   cursor: pointer;
-  transition: background 140ms, color 140ms, transform 100ms ease-out;
+  transition: background 140ms, color 140ms, transform 120ms ease-out;
 }
 
 .segTab:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .segTab[aria-selected='true'] {
@@ -957,12 +957,12 @@
   color: var(--c-text);
   text-align: left;
   cursor: pointer;
-  transition: background 140ms, transform 100ms ease-out;
+  transition: background 140ms, transform 120ms ease-out;
 }
 
 .sale[role='button']:active,
 .pRow[role='button']:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 /* A sale just logged on this phone drops into its place once (SalesTable),
@@ -1416,7 +1416,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 140ms, transform 100ms ease-out;
+  transition: background 140ms, transform 120ms ease-out;
 }
 
 .expander:first-child {
@@ -1439,7 +1439,7 @@
 }
 
 .expander:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .chev {
@@ -1545,7 +1545,7 @@
   gap: 4px var(--s3);
   min-height: 64px;
   padding: var(--s3) var(--s4) var(--s3) calc(var(--s4) + 20px + var(--s3));
-  transition: background 140ms, transform 100ms ease-out;
+  transition: background 140ms, transform 120ms ease-out;
 }
 
 /* The viewer's own pay list: top level, so no nested indent; Paid on the right. */
@@ -1586,7 +1586,7 @@
 }
 
 .bRow[role='button']:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .bCust {

@@ -35,7 +35,7 @@
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .btnLime {
@@ -59,7 +59,7 @@
 .btnLime:active,
 .btnGhost:active,
 .btnDanger:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .btn:disabled,
@@ -227,11 +227,11 @@
   transition:
     background-color 140ms ease,
     color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .segBtn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .segBtn[aria-pressed='true'] {
@@ -492,7 +492,7 @@
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 @media (hover: hover) {
@@ -503,7 +503,7 @@
 
 @media (max-width: 1023px) {
   .qRow:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
   }
 }
 
@@ -1162,11 +1162,11 @@
   transition:
     background-color 140ms ease,
     color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .tokenBtn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 @media (hover: hover) {

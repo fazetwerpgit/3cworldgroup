@@ -205,7 +205,7 @@
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .btnPrimary {
@@ -231,7 +231,7 @@
 
 .btnPrimary:active,
 .btnSecondary:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 /* Press: the rest of the tappable chrome gives a little under the thumb too.
@@ -241,7 +241,7 @@
 .textBtn,
 .tab,
 .navItem {
-  transition: transform 100ms ease-out;
+  transition: transform 120ms ease-out;
 }
 
 .retry:active,
@@ -249,7 +249,7 @@
 .textBtn:not(:disabled):active,
 .tab:active,
 .navItem:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 @media (hover: hover) {

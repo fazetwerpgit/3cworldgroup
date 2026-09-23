@@ -335,11 +335,11 @@
     background-color 140ms ease,
     border-color 140ms ease,
     color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .chip:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 /* The selected filter inverts to white; lime is kept for what needs action. */
@@ -391,11 +391,11 @@
   transition:
     background-color 140ms ease,
     color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .segmented > button:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .segmented > button[aria-pressed='true'] {
@@ -778,7 +778,7 @@
   text-decoration: none;
   transition:
     background-color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .rows > li + li,
@@ -798,7 +798,7 @@
 
 @media (max-width: 1023px) {
   :is(a, button).row:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
   }
 }
 

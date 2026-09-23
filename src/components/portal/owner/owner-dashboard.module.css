@@ -256,6 +256,12 @@
   padding: 10px var(--s3) 10px var(--s4);
   color: var(--c-text);
   text-decoration: none;
+  transition: transform 120ms ease-out;
+}
+
+/* Press: the row gives a little under the thumb, like every other portal row. */
+.attnRow:active {
+  transform: scale(0.97);
 }
 
 .attnRow:focus-visible {

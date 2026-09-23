@@ -319,7 +319,7 @@
   transition:
     background 120ms,
     color 120ms,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .payHelp svg {
@@ -327,7 +327,7 @@
 }
 
 .payHelp:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 /* ---------- this week: rank | challenge ---------- */
@@ -451,7 +451,7 @@
   text-decoration: none;
   transition:
     background 140ms,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .chaseTrack {
@@ -507,7 +507,7 @@
   cursor: pointer;
   transition:
     background 140ms,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 /* A time stamp, not an icon tile: the condensed numeral carries the row. */
@@ -596,7 +596,7 @@
   text-decoration: none;
   transition:
     background 140ms,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .saleName {
@@ -689,7 +689,7 @@
 .sale:active,
 .tRow:active,
 .chase:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 @media (hover: hover) {

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight, RotateCw } from 'lucide-react';
+import { useCountUp } from '@/hooks/useCountUp';
 import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
 import type {
   MoneyComparison,
@@ -106,6 +107,12 @@ function MoneyCell({ comparison, row, priorLabel }: { comparison: MoneyCompariso
   );
 }
 
+/** The headline margin: counts up from $0 on the first Home of a session. */
+function MarginScore({ margin }: { margin: number }) {
+  const shown = useCountUp(Math.round(margin), { sessionKey: '3c:countup:owner-margin' });
+  return <>{money(shown)}</>;
+}
+
 function MoneyBoard({ data }: { data: MoneySummary }) {
   const month = data.month;
   const week = data.week;
@@ -127,7 +134,9 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
       </h2>
       <div className={o.cellMargin}>
         <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
-        <p className={o.score}>{money(month.current.margin)}</p>
+        <p className={o.score}>
+          <MarginScore margin={month.current.margin} />
+        </p>
         <p className={o.heroSub}>
           <Delta current={month.current.margin} prior={month.prior.margin} label={`vs ${monthPrior}`} />
           <span>

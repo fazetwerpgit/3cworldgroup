@@ -126,11 +126,11 @@
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    transform 100ms ease-out;
+    transform 120ms ease-out;
 }
 
 .manual:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .manual:focus-visible {
