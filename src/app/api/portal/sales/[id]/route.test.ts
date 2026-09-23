@@ -62,7 +62,9 @@ function del(id = 'sale-1') {
 beforeEach(() => {
   vi.clearAllMocks();
   gateMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin' });
-  requesterMock.mockResolvedValue({ ok: true, uid: 'rep-1', name: 'Rep One', isAdmin: false });
+  // PUT is management only, so the default caller is an operations user editing
+  // a sale they logged themselves; plain reps are covered in their own block.
+  requesterMock.mockResolvedValue({ ok: true, uid: 'rep-1', name: 'Rep One', isAdmin: false, isManagement: true });
   saleUpdateMock.mockResolvedValue(undefined);
   saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-1' }) });
   saleDeleteMock.mockResolvedValue(undefined);
@@ -147,6 +149,57 @@ function put(body: Record<string, unknown>, id = 'sale-1') {
   );
 }
 
+describe('PUT /api/portal/sales/[id] who may edit', () => {
+  it('refuses a rep on their own sale and writes nothing', async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'rep-1', name: 'Rep One', isAdmin: false, isManagement: false });
+
+    const response = await put({ notes: 'changed', totalValue: 999 });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'Ask an admin to change this sale' });
+    expect(saleGetMock).not.toHaveBeenCalled();
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a field manager too', async () => {
+    requesterMock.mockResolvedValue({
+      ok: true, uid: 'rep-1', name: 'Rep One', isAdmin: false, isManagement: false, isManagerOrAbove: true,
+    });
+
+    const response = await put({ installDate: dayInput(7) });
+
+    expect(response.status).toBe(403);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps operations off another rep's sale", async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false, isManagement: true });
+
+    const response = await put({ notes: 'changed' });
+
+    expect(response.status).toBe(403);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin edit any rep's sale", async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true });
+
+    const response = await put({ notes: 'fixed' });
+
+    expect(response.status).toBe(200);
+    expect(saleUpdateMock.mock.calls[0][0].notes).toBe('fixed');
+  });
+
+  it('passes an auth failure through', async () => {
+    requesterMock.mockResolvedValue({ ok: false, error: 'Unauthorized', status: 401 });
+
+    const response = await put({ notes: 'x' });
+
+    expect(response.status).toBe(401);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('PUT /api/portal/sales/[id] install date provenance', () => {
   it('stamps the owning rep as the source when they move the date', async () => {
     saleGetMock.mockResolvedValue({
@@ -161,10 +214,12 @@ describe('PUT /api/portal/sales/[id] install date provenance', () => {
     expect(written.installDateSource).toBe('rep');
     expect(written.installDateChangedAt).toBeInstanceOf(Date);
     expect(written.installDatePreviousDate).toEqual(new Date('2026-09-01T17:00:00.000Z'));
+    // A full edit drops any carrier date a rep's date-only edit recorded.
+    expect(written.repEditCarrierDate).toBeNull();
   });
 
   it('stamps admin when management edits another rep sale', async () => {
-    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true });
     saleGetMock.mockResolvedValue({
       exists: true,
       data: () => ({ salesRepId: 'rep-1', installDate: null }),
@@ -263,7 +318,7 @@ describe('PUT /api/portal/sales/[id] proof screenshots', () => {
   });
 
   it("lets an admin attach proof they uploaded to a rep's sale", async () => {
-    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true });
     existingSale({ orderNumberOrBtn: 'ORD-1' });
 
     const own = await put({ proofScreenshotPaths: [SHOT_A] });
@@ -276,7 +331,7 @@ describe('PUT /api/portal/sales/[id] proof screenshots', () => {
   });
 
   it("still refuses an admin a third party's prefix or a climb out of their own", async () => {
-    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true });
     existingSale({ orderNumberOrBtn: 'ORD-1' });
 
     const other = await put({ proofScreenshotPaths: ['form-attachments/rep-2/sale-proof/x_123456/'] });
