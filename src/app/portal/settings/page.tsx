@@ -16,12 +16,18 @@ import st from '@/components/portal/rep/rep-settings.module.css';
 
 // The chrome (top bar, tab bar, auth gate) comes from ./layout.tsx: RepShell.
 
+type PasswordField = 'current' | 'new' | 'confirm';
+
 export default function SettingsPage() {
   const { user, resetPassword, changePassword, refreshUser } = useAuth();
   const [resetSent, setResetSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  // Each message shows next to what it is about: on a phone a notice at the
+  // top of the page is off screen by the time the rep taps Save or Update.
+  const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [passwordError, setPasswordError] = useState<{ field: PasswordField | null; text: string } | null>(null);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  const [resetError, setResetError] = useState('');
 
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -34,6 +40,11 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Put the rep on the field that needs fixing.
+  useEffect(() => {
+    if (passwordError?.field) document.getElementById(`line-${passwordError.field}`)?.focus();
+  }, [passwordError]);
+
   useEffect(() => {
     if (user) {
       setDisplayName(user.displayName || '');
@@ -44,13 +55,12 @@ export default function SettingsPage() {
   const handlePasswordReset = async () => {
     if (!user?.email) return;
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setResetError('');
     try {
       await resetPassword(user.email);
       setResetSent(true);
     } catch {
-      setError('Failed to send password reset email. Please try again.');
+      setResetError("Couldn't send the reset email. Try again.");
     } finally {
       setLoading(false);
     }
@@ -58,38 +68,39 @@ export default function SettingsPage() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setPasswordError(null);
+    setPasswordSaved(false);
 
     if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters.');
+      setPasswordError({ field: 'new', text: 'Use at least 6 characters.' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match.');
+      setPasswordError({ field: 'confirm', text: "Doesn't match the new password." });
       return;
     }
 
     setChangingPassword(true);
     try {
       await changePassword(currentPassword, newPassword);
-      setSuccess('Password changed successfully!');
+      setPasswordSaved(true);
       setShowPasswordForm(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setPasswordSaved(false), 3000);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        if (err.message.includes('wrong-password') || err.message.includes('invalid-credential')) {
-          setError('Current password is incorrect.');
-        } else if (err.message.includes('weak-password')) {
-          setError('New password is too weak. Please choose a stronger password.');
-        } else {
-          setError('Failed to change password. Please try again.');
-        }
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('wrong-password') || message.includes('invalid-credential')) {
+        setPasswordError({ field: 'current', text: 'Current password is wrong.' });
+      } else if (message.includes('weak-password')) {
+        setPasswordError({ field: 'new', text: 'Too weak. Pick a longer password.' });
+      } else if (message.includes('too-many-requests')) {
+        setPasswordError({ field: null, text: 'Too many tries. Wait a few minutes, then try again.' });
+      } else if (message.includes('network-request-failed')) {
+        setPasswordError({ field: null, text: 'No signal. Check your connection and try again.' });
       } else {
-        setError('Failed to change password. Please try again.');
+        setPasswordError({ field: null, text: "Couldn't change your password. Try again." });
       }
     } finally {
       setChangingPassword(false);
@@ -99,8 +110,7 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
-    setError('');
-    setSuccess('');
+    setProfileMsg(null);
     try {
       // The route derives the target user from this token — profile edits are
       // always self-service.
@@ -115,10 +125,10 @@ export default function SettingsPage() {
       });
       if (!response.ok) throw new Error('Failed to update profile');
       await refreshUser();
-      setSuccess('Changes saved.');
-      setTimeout(() => setSuccess(''), 3000);
+      setProfileMsg({ ok: true, text: 'Changes saved.' });
+      setTimeout(() => setProfileMsg(null), 3000);
     } catch {
-      setError('Failed to update profile. Please try again.');
+      setProfileMsg({ ok: false, text: "Couldn't save. Try again." });
     } finally {
       setSaving(false);
     }
@@ -166,25 +176,25 @@ export default function SettingsPage() {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
-    setError('');
+    setPasswordError(null);
   };
+
+  const passwordFieldError = (field: PasswordField) =>
+    passwordError?.field === field ? (
+      <span id={`line-${field}-error`} className={`${p.hint} ${p.hintError}`}>
+        {passwordError.text}
+      </span>
+    ) : null;
+  const invalid = (field: PasswordField) =>
+    passwordError?.field === field
+      ? ({ 'aria-invalid': true, 'aria-describedby': `line-${field}-error` } as const)
+      : {};
 
   return (
     <div className={p.page}>
       <header className={p.head}>
         <h1 className={p.title}>Settings</h1>
       </header>
-
-      {success && (
-        <div className={`${p.notice} ${p.noticeLime}`} role="status">
-          <span>{success}</span>
-        </div>
-      )}
-      {error && (
-        <div className={`${p.notice} ${p.noticeRed}`} role="alert">
-          <span>{error}</span>
-        </div>
-      )}
 
       <div className={st.layout}>
         <div className={st.col}>
@@ -231,6 +241,14 @@ export default function SettingsPage() {
                 </button>
                 <p className={p.hint}>Don&apos;t enter card numbers or SSNs here.</p>
               </div>
+              {profileMsg ? (
+                <div
+                  className={`${p.notice} ${profileMsg.ok ? p.noticeLime : p.noticeRed}`}
+                  role={profileMsg.ok ? 'status' : 'alert'}
+                >
+                  <span>{profileMsg.text}</span>
+                </div>
+              ) : null}
             </form>
 
             <dl className={st.facts}>
@@ -279,6 +297,13 @@ export default function SettingsPage() {
               </span>
               <ChevronDown size={18} className={st.toggleChev} aria-hidden="true" />
             </button>
+            {passwordSaved ? (
+              <div className={st.drawer}>
+                <div className={`${p.notice} ${p.noticeLime}`} role="status">
+                  <span>Password changed.</span>
+                </div>
+              </div>
+            ) : null}
             {showPasswordForm && (
               <div className={st.drawer}>
                 <form onSubmit={handleChangePassword} className={st.stack}>
@@ -292,7 +317,9 @@ export default function SettingsPage() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       required
+                      {...invalid('current')}
                     />
+                    {passwordFieldError('current')}
                   </label>
                   <label className={p.field}>
                     <span className={p.label}>New password</span>
@@ -305,7 +332,9 @@ export default function SettingsPage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
+                      {...invalid('new')}
                     />
+                    {passwordFieldError('new')}
                   </label>
                   <label className={p.field}>
                     <span className={p.label}>Confirm new password</span>
@@ -318,8 +347,15 @@ export default function SettingsPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
+                      {...invalid('confirm')}
                     />
+                    {passwordFieldError('confirm')}
                   </label>
+                  {passwordError && !passwordError.field ? (
+                    <div className={`${p.notice} ${p.noticeRed}`} role="alert">
+                      <span>{passwordError.text}</span>
+                    </div>
+                  ) : null}
                   <div className={st.actions}>
                     <button type="button" className={s.btnSecondary} onClick={closePasswordForm}>
                       Cancel
@@ -332,9 +368,16 @@ export default function SettingsPage() {
                 {resetSent ? (
                   <p className={p.hint} role="status">Reset email sent. Check your inbox.</p>
                 ) : (
-                  <button type="button" className={st.linkBtn} onClick={handlePasswordReset} disabled={loading}>
-                    {loading ? 'Sending…' : 'Email me a reset link instead'}
-                  </button>
+                  <>
+                    <button type="button" className={st.linkBtn} onClick={handlePasswordReset} disabled={loading}>
+                      {loading ? 'Sending…' : 'Email me a reset link instead'}
+                    </button>
+                    {resetError ? (
+                      <p className={`${p.hint} ${p.hintError}`} role="alert">
+                        {resetError}
+                      </p>
+                    ) : null}
+                  </>
                 )}
               </div>
             )}
