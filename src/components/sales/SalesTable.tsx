@@ -421,7 +421,7 @@ export function SalesTable({
             ) : null}
             {/* Stated once, above the money, rather than as a footnote under it. */}
             <p className={x.note}>
-              Estimates before chargebacks and claims; the carrier&rsquo;s final report decides what pays.
+              Estimates before chargebacks and claims; the carrier&rsquo;s final report decides what pays. Tick a sale off yourself once the money lands.
             </p>
             <div className={`${x.thead} ${x.payHead} ${hasPlan ? '' : x.noMoney}`} aria-hidden="true">
               <span>Customer</span>
