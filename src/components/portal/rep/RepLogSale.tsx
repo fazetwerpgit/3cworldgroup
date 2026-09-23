@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
-  Camera,
   Check,
   ChevronDown,
   ChevronRight,
@@ -293,20 +292,6 @@ export function RepLogSale() {
               <label className={`${s.btnPrimary} ${s.btnBlock} ${s.phoneOnly}`}>
                 <input
                   type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className={s.srOnly}
-                  onChange={(e) => {
-                    pickFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-                <Camera size={20} strokeWidth={2.25} aria-hidden="true" />
-                Take photo
-              </label>
-              <label className={`${s.btnSecondary} ${s.btnBlock} ${s.phoneOnly}`}>
-                <input
-                  type="file"
                   accept={PROOF_ACCEPT}
                   multiple
                   className={s.srOnly}
@@ -315,7 +300,7 @@ export function RepLogSale() {
                     e.target.value = '';
                   }}
                 />
-                <ImageUp size={18} aria-hidden="true" />
+                <ImageUp size={20} strokeWidth={2.25} aria-hidden="true" />
                 Choose screenshot
               </label>
               <label className={`${s.btnPrimary} ${s.deskOnly}`} htmlFor={`${pickId}-desk`}>
@@ -348,10 +333,6 @@ export function RepLogSale() {
                 <li>
                   <Check size={16} strokeWidth={2.5} aria-hidden="true" />
                   Whole page in frame, order number down to install date
-                </li>
-                <li>
-                  <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                  A screenshot is sharper than a photo of a screen
                 </li>
                 <li>
                   <Check size={16} strokeWidth={2.5} aria-hidden="true" />
