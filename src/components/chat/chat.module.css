@@ -451,14 +451,26 @@
 /* Company line (All Company, phone): one quiet row of live numbers. */
 .tape {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 2px var(--s2);
+  gap: var(--s2);
   padding: var(--s2) var(--s4);
+  overflow-x: auto;
   border-bottom: 1px solid var(--c-line);
   color: var(--c-text-2);
   font-size: var(--t-sm);
   line-height: 1.4;
+  white-space: nowrap;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.tape::-webkit-scrollbar {
+  display: none;
+}
+
+.tape > * {
+  flex: none;
 }
 
 .tapeLabel {

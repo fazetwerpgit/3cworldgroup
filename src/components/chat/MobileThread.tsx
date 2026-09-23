@@ -12,6 +12,7 @@ import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import type { ConnectionNotice as ConnectionNoticeState } from '@/lib/chat/reconnect';
 import { useHideRepTabBar } from '@/components/portal/rep/RepShell';
@@ -642,26 +643,7 @@ export function MobileThread({
         </button>
       </div>
 
-      {companyStats && (
-        <p className={c.tape}>
-          <span className={c.tapeLabel}>Company</span>
-          <span>
-            <strong>{companyStats.mtdCount}</strong> sale{companyStats.mtdCount === 1 ? '' : 's'} this month
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>
-            <strong>${companyStats.mtdMonthlyValue.toLocaleString('en-US')}</strong>/mo on the board
-          </span>
-          {companyStats.lastSale && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>
-                Last: <strong>{companyStats.lastSale.repName}</strong>
-              </span>
-            </>
-          )}
-        </p>
-      )}
+      {companyStats && <CompanyTape stats={companyStats} />}
 
       {pinnedMessage && (
         <div className={c.pinned}>

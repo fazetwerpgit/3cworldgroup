@@ -10,6 +10,7 @@ import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
 import { prepareImageForUpload, uploadChatImageWithProgress, validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
+import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { MessageActions } from '@/components/chat/MessageActions';
 import { ChannelRows, MobileChannelList } from '@/components/chat/MobileChannelList';
@@ -71,6 +72,7 @@ function formatChatLineDayDivider(createdAt: Date | null) {
 // up; abort sooner and let the retry policy take over (the send is idempotent,
 // so an abort after the server stored it can't duplicate it).
 const SEND_TIMEOUT_MS = 20_000;
+const COMPANY_STATS_STALE_MS = 5 * 60_000;
 
 // Runs one network step of a send; its rejection (fetch failing, a timeout
 // abort, the ID-token refresh failing offline) becomes a retryable network
@@ -479,10 +481,11 @@ export default function TeamChatPage() {
     });
   }, []);
 
-  // Company sales tape (All Company channel only): fetched once on mount, not
-  // per channel switch — the numbers don't depend on which channel is active,
-  // only whether the tape renders does. Stays null (tape hidden) on any
-  // fetch/parse error so it never shows fabricated numbers.
+  // Company sales tape (All Company channel only): fetched on mount, not per
+  // channel switch — the numbers don't depend on which channel is active, only
+  // whether the tape renders does — and again when the app resumes after a few
+  // minutes away. Stays null (tape hidden) on any fetch/parse error so it never
+  // shows fabricated numbers.
   const [companyStats, setCompanyStats] = useState<CompanyStats | null>(null);
 
   useEffect(() => {
@@ -491,16 +494,26 @@ export default function TeamChatPage() {
     // and (fetching only once) the tape would never appear.
     if (!user || onboardingUser) return;
     let cancelled = false;
-    authedFetch('/api/portal/sales/company-stats')
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('company-stats fetch failed'))))
-      .then((json) => {
-        if (!cancelled) setCompanyStats(json);
-      })
-      .catch(() => {
-        if (!cancelled) setCompanyStats(null);
-      });
+    let fetchedAt = 0;
+    const load = () => {
+      fetchedAt = Date.now();
+      authedFetch('/api/portal/sales/company-stats')
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error('company-stats fetch failed'))))
+        .then((json) => {
+          if (!cancelled) setCompanyStats(json);
+        })
+        .catch(() => {
+          if (!cancelled) setCompanyStats(null);
+        });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - fetchedAt > COMPANY_STATS_STALE_MS) load();
+    };
+    load();
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [authedFetch, onboardingUser, user]);
 
@@ -1285,6 +1298,7 @@ export default function TeamChatPage() {
               </button>
             )}
           </header>
+          {activeChannelId === 'all-company' && companyStats && <CompanyTape stats={companyStats} />}
           {pinnedMessage && (
             <div className={c.pinned}>
               <Pin size={16} aria-hidden="true" />
