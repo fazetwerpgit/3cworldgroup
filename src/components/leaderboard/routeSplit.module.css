@@ -2,8 +2,18 @@
    the desktop board as it shipped on master above it. Which one shows is a
    media query, so it is right in the first painted frame; the components also
    skip building the hidden side (see useWideViewport).
-   The two pages sit on different grounds, so the page background and the main
-   scroller switch here too, rather than in either page. */
+   Both sit on the direction D shell (RepShell), whose navy ground is the page
+   background at every width. */
+
+/* The D shell sets its own UI face, line height and tabular figures on its
+   root. Both boards were approved in the portal's body type, so they keep it
+   (the same stack as the global body rule); the chrome around them is D's. */
+.phoneOnly,
+.desktopOnly {
+  font-family: var(--font-sans, system-ui), Arial, Helvetica, sans-serif;
+  font-variant-numeric: normal;
+  line-height: 1.5;
+}
 
 .phoneOnly {
   display: contents;
@@ -13,38 +23,15 @@
   display: none;
 }
 
-.ground {
-  background: var(--background);
-  color: var(--foreground);
-}
-
 @media (min-width: 1024px) {
   .phoneOnly {
     display: none;
   }
 
+  /* The desktop board's own glow layers are absolutely positioned; this keeps
+     them to the board instead of the whole shell. */
   .desktopOnly {
-    display: contents;
-  }
-
-  /* Master's leaderboard ground, kept literal rather than tokenised: this half
-     of the route is meant to render exactly as it does on master. */
-  .ground {
-    background: #f7f8f5;
-    color: #0a1f44;
-  }
-
-  :global(.dark) .ground {
-    background: #030916;
-    color: #f6f7f8;
-  }
-
-  .main {
-    overflow: auto;
-    background: #f7f8f5;
-  }
-
-  :global(.dark) .main {
-    background: #030916;
+    display: block;
+    position: relative;
   }
 }

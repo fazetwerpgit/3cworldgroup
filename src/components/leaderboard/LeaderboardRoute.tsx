@@ -44,19 +44,24 @@ export function LeaderboardRoute() {
           active={!wide}
         />
       </div>
-      <div className={split.desktopOnly}>
-        <LegacyLeaderboardPage
-          active={wide}
-          entries={leaderboard}
-          currentUser={currentUser}
-          loading={busy}
-          error={error}
-          period={period}
-          metric={metric}
-          onPeriodChange={setPeriod}
-          onMetricChange={setMetric}
-          viewerName={user?.displayName ?? user?.email ?? null}
-        />
+      {/* D is dark only, so the desktop board always takes its dark theme: the
+          wrapper pair re-creates the `.dark .portal-scope` context the board's
+          tokens and dark: variants read, whatever the portal theme setting. */}
+      <div className={`dark ${split.desktopOnly}`}>
+        <div className="portal-scope contents">
+          <LegacyLeaderboardPage
+            active={wide}
+            entries={leaderboard}
+            currentUser={currentUser}
+            loading={busy}
+            error={error}
+            period={period}
+            metric={metric}
+            onPeriodChange={setPeriod}
+            onMetricChange={setMetric}
+            viewerName={user?.displayName ?? user?.email ?? null}
+          />
+        </div>
       </div>
     </>
   );
