@@ -1,5 +1,6 @@
 import type { CallDay, CompPlanCompanyRates, FiberOrder, Sale } from '@/types';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
+import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import {
   formatPayoutWindow,
   nextPayout,
@@ -105,6 +106,10 @@ export interface RecentSaleRow {
   id: string;
   customer: string;
   plan: string;
+  /** Carrier wordmark ("T-Fiber", "AT&T"), '' when the sale has no known carrier. */
+  carrier: string;
+  /** The plan without its leading carrier name, for rows that show the wordmark. */
+  planShort: string;
   address: string;
   status: RowStatus;
   installDate: Date | null;
@@ -146,10 +151,14 @@ export function recentSaleRows(
     const status = rowStatus(sale, orderFor(sale, fiberBySale), now);
     // A missed install's date is stale, so it has no window until it is rescheduled.
     const window = payoutWindowForSale(sale, status !== 'cancelled' && status !== 'missed');
+    const plan = planLabel(sale);
+    const company = sale.products?.[0]?.company;
     return {
       id: sale.id || '',
       customer: sale.customerName || 'Customer',
-      plan: planLabel(sale),
+      plan,
+      carrier: carrierMark(company),
+      planShort: planWithoutCarrier(plan, company),
       address: sale.customerAddress || '',
       status,
       installDate: toDate(sale.installDate),
