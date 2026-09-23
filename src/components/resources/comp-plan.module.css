@@ -43,11 +43,16 @@
   white-space: nowrap;
 }
 
+/* Tight side padding so all 18 columns fit a 1280px laptop without scrolling. */
 .table th,
 .table td {
-  padding: var(--s2) var(--s3);
+  padding: var(--s2);
   border-bottom: 1px solid var(--c-line);
   text-align: right;
+}
+
+.table tr > :first-child {
+  padding-left: var(--s3);
 }
 
 .table thead th {
