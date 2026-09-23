@@ -75,6 +75,7 @@ type SaleDoc = {
   salesRepId?: string;
   customerName?: string;
   customerAddress?: string;
+  saleDate?: Date | null;
   installDate?: Date | null;
   status?: string;
   installDateSource?: string;
@@ -574,6 +575,24 @@ describe('the report and a door with history', () => {
 
     expect(result.updated).toBe(0);
     expect(updateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('a re-order at a door with an old install', () => {
+  it("moves the new sale to the new order's day, not the old install's", async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', saleDate: noon(-2), installDate: noon(2) },
+    ]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({ id: 'old', status: 'active', orderDate: reportDay(-200), estInstallDate: reportDay(-190), activationDate: reportDay(-190) }),
+        order({ id: 'new', orderDate: reportDay(-2), estInstallDate: reportDay(10) }),
+      ],
+      now: NOW,
+    });
+
+    expect(result.updated).toBe(1);
+    expect(installDayKey(updateMock.mock.calls[0][1].installDate)).toBe(reportDay(10));
   });
 });
 

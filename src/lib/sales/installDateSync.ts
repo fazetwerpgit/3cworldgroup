@@ -5,6 +5,7 @@ import {
   isAddressPrefixPair,
   latestDay,
   normalizeAddress,
+  ordersPlacedForSale,
   pickCurrentOrder,
 } from '@/lib/fiberReport/matchSales';
 import { formatInstallDay, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
@@ -49,6 +50,7 @@ interface SyncSale {
   customerName: string | null;
   customerAddress: string | null;
   normalizedAddress: string;
+  saleDate: unknown;
   installDate: unknown;
   status: string | null;
   /** Who set the date last: 'rep' | 'admin' | 'report', or null on older rows. */
@@ -98,6 +100,7 @@ function toSyncSale(
     customerName: text(data.customerName),
     customerAddress,
     normalizedAddress: normalizeAddress(customerAddress),
+    saleDate: data.saleDate ?? null,
     installDate: data.installDate ?? null,
     status: text(data.status),
     installDateSource: text(data.installDateSource),
@@ -130,9 +133,10 @@ type Current =
  * `saleLink` outranks everything — it is an admin saying out loud which sale an
  * order is (or that it is none) — and a linked order leaves the address pool
  * entirely, exactly as buildMergedBook does it. A sale named by two links is a
- * contradiction an admin has to settle. Otherwise the sale's door is read off
- * the address (doorOrders) and its current row picked (pickCurrentOrder), the
- * same two steps the page takes. A door that can't be told apart, or a pick
+ * contradiction an admin has to settle. Otherwise the orders placed too long
+ * before the sale are set aside (ordersPlacedForSale), the sale's door is read
+ * off the address (doorOrders) and its current row picked (pickCurrentOrder),
+ * the same steps the page takes. A door that can't be told apart, or a pick
  * that flips when the rows come in reverse (a tie the page settles by input
  * order), is ambiguous: a writer needs a real answer.
  */
@@ -142,7 +146,7 @@ function currentOrderForSale(sale: SyncSale, orders: FiberOrder[]): Current {
   if (links.length === 1) return { kind: 'order', order: links[0] };
 
   if (sale.normalizedAddress.length < 6) return { kind: 'none' };
-  const candidates = orders.filter((order) => {
+  const candidates = ordersPlacedForSale(sale.saleDate, orders).filter((order) => {
     if (order.saleLink) return false;
     const orderAddress = normalizeAddress(order.address);
     return orderAddress.length >= 6 && isAddressPrefixPair(sale.normalizedAddress, orderAddress);

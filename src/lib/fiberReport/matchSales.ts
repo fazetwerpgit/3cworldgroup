@@ -1,4 +1,5 @@
 import type { FiberOrder } from '@/types/fiberOrder';
+import { installDayKey } from '@/lib/sales/saleDate';
 
 export type LoggedSale = {
   salesRepId: string;
@@ -10,6 +11,8 @@ export type LoggedSale = {
 export type SaleForFiberMatch = {
   id?: string;
   customerAddress?: string | null;
+  /** The day the sale was made: orders placed well before it are not this sale's. */
+  saleDate?: unknown;
 };
 
 /** Normalize a free-text address for conservative street-prefix matching. */
@@ -178,6 +181,28 @@ export function doorOrders(
   };
 }
 
+/** How long before the sale day an order may have been placed and still be this sale's. */
+export const ORDER_BEFORE_SALE_DAYS = 7;
+
+/**
+ * The orders that can be a sale's, by date. An order placed well before the
+ * sale was made is an earlier customer's, or this customer's earlier install:
+ * at a door with an old active install, a re-order sale must not read as
+ * installed. Orders with no order day (breakage rows) are kept, and so is
+ * everything when the sale's day can't be read.
+ */
+export function ordersPlacedForSale(saleDate: unknown, orders: readonly FiberOrder[]): FiberOrder[] {
+  const soldDay = installDayKey(saleDate);
+  if (!soldDay) return [...orders];
+  const cutoff = new Date(`${soldDay}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - ORDER_BEFORE_SALE_DAYS);
+  const earliest = cutoff.toISOString().slice(0, 10);
+  return orders.filter((order) => {
+    const placed = isoDay(order.orderDate);
+    return !placed || placed >= earliest;
+  });
+}
+
 /** Match sales to the rep's own-scope API response in memory; callers own matchedUserId filtering. */
 export function matchFiberOrdersToSales(
   sales: SaleForFiberMatch[],
@@ -190,7 +215,7 @@ export function matchFiberOrdersToSales(
     const saleAddress = normalizeAddress(sale.customerAddress);
     if (!saleId?.trim() || saleAddress.length < 6) continue;
 
-    const atAddress = orders.filter((order) =>
+    const atAddress = ordersPlacedForSale(sale.saleDate, orders).filter((order) =>
       isAddressPrefixPair(saleAddress, normalizeAddress(order.address))
     );
     const selectedOrder = pickCurrentOrder(doorOrders(sale.customerAddress, atAddress).orders);

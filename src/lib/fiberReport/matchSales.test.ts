@@ -284,3 +284,35 @@ describe('apartment buildings: a neighbour is not this sale', () => {
     expect(doorOrders('5780 Hall St SE', [houseMiss, houseActive]).certain).toBe(true);
   });
 });
+
+describe('orders placed well before the sale', () => {
+  const pick = (saleDate: Date, orders: FiberOrder[]) =>
+    matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: '5780 Hall St SE', saleDate }], orders).get('sale-1');
+  const noonOn = (day: string) => new Date(`${day}T17:00:00Z`);
+  // Installed in the spring; the customer re-ordered at the door in September.
+  const oldActive = order({ id: 'old', status: 'active', orderDate: '2026-03-02', estInstallDate: '2026-03-09', activationDate: '2026-03-09' });
+  const newPending = order({ id: 'new', orderDate: '2026-09-15', estInstallDate: '2026-09-24' });
+
+  it('does not read a re-order sale as the old install at the same door', () => {
+    for (const orders of [[oldActive, newPending], [newPending, oldActive]]) {
+      expect(pick(noonOn('2026-09-15'), orders)).toBe(newPending);
+    }
+    expect(pick(noonOn('2026-09-15'), [oldActive])).toBeUndefined();
+  });
+
+  it('still matches an order placed within the week before the sale, or after it', () => {
+    const lastWeek = order({ id: 'o', orderDate: '2026-09-08', estInstallDate: '2026-09-20' });
+    expect(pick(noonOn('2026-09-15'), [lastWeek])).toBe(lastWeek);
+    const tooEarly = order({ id: 'o', orderDate: '2026-09-07', estInstallDate: '2026-09-20' });
+    expect(pick(noonOn('2026-09-15'), [tooEarly])).toBeUndefined();
+    const nextDay = order({ id: 'o', orderDate: '2026-09-16', estInstallDate: '2026-09-20' });
+    expect(pick(noonOn('2026-09-15'), [nextDay])).toBe(nextDay);
+  });
+
+  it('keeps undated orders and the old sale its own install', () => {
+    const miss = order({ id: 'brk', status: 'breakage', orderDate: null, estInstallDate: '2026-03-06' });
+    expect(pick(noonOn('2026-09-15'), [miss])).toBe(miss);
+    expect(pick(noonOn('2026-03-02'), [oldActive, newPending])).toBe(oldActive);
+    expect(matchFiberOrdersToSales([{ id: 's', customerAddress: '5780 Hall St SE' }], [oldActive]).get('s')).toBe(oldActive);
+  });
+});

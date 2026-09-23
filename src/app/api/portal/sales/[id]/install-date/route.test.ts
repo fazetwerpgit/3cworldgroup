@@ -141,7 +141,7 @@ describe('PATCH /api/portal/sales/[id]/install-date', () => {
     state.data = { ...state.data, customerAddress: '77 Elm Ct, Tulsa, OK' };
     carrier.orders = [
       { id: 'brk_1', status: 'breakage', address: '77 Elm Ct', unit: null, orderDate: null, estInstallDate: dayFromToday(-3) },
-      { id: 'TMO1', status: 'pending_install', address: '77 Elm Ct', unit: null, orderDate: dayFromToday(-20), estInstallDate: dayFromToday(4) },
+      { id: 'TMO1', status: 'pending_install', address: '77 Elm Ct', unit: null, orderDate: dayFromToday(-11), estInstallDate: dayFromToday(4) },
     ];
 
     await PATCH(patch({ installDate: dayFromToday(5) }), { params });
