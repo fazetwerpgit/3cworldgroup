@@ -20,11 +20,29 @@ export default function ReportBugCard() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
 
-  // Auto-open the form when arriving via the header "Report a Bug" link.
+  // Auto-open the form when arriving via the account menu's "Report a bug"
+  // link, and also when that link is tapped while already on Settings: Next
+  // changes only the hash then (pushState, no hashchange), so the tap itself
+  // is caught too.
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#report-bug') {
+    const openIfAsked = () => {
+      if (window.location.hash === '#report-bug') setOpen(true);
+    };
+    const onClick = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest('a[href$="#report-bug"]') : null;
+      if (!link) return;
       setOpen(true);
-    }
+      requestAnimationFrame(() => document.getElementById('report-bug')?.scrollIntoView({ block: 'start' }));
+    };
+    openIfAsked();
+    window.addEventListener('hashchange', openIfAsked);
+    window.addEventListener('popstate', openIfAsked);
+    document.addEventListener('click', onClick, true);
+    return () => {
+      window.removeEventListener('hashchange', openIfAsked);
+      window.removeEventListener('popstate', openIfAsked);
+      document.removeEventListener('click', onClick, true);
+    };
   }, []);
 
   const submit = async (e: React.FormEvent) => {

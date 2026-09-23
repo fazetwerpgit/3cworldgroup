@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { RotateCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RepBoot, RepShell } from '@/components/portal/rep/RepShell';
 import {
@@ -18,12 +19,13 @@ import {
   useFormCheck,
   type FieldRule,
 } from '@/components/portal/rep/RepForm';
+import s from '@/components/portal/rep/rep.module.css';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
-import { isPromotionRole } from '@/lib/forms/managerInterview';
+import { isPromotionRole, MANAGER_INTERVIEW_ROLES } from '@/lib/forms/managerInterview';
 
 // Manager interview, direction D. Managers only (same role list as before).
 
@@ -50,22 +52,9 @@ const RULES: FieldRule<Form>[] = [
   { key: 'signatureDataUrl', id: 'manager-signature', message: 'Sign to approve' },
 ];
 
-const managerInterviewRoles = [
-  'admin',
-  'operations',
-  'l1_manager',
-  'l2_manager',
-  'ibo_level_1',
-  'ibo_level_2',
-  'ibo_level_3',
-  'ibo_level_4',
-  'regional_manager',
-  'director',
-] as const;
-
 function ManagerInterviewForm() {
   const { user } = useAuth();
-  const { options } = useFormOptions();
+  const { options, loading: optionsLoading, failed: optionsFailed, retry: retryOptions } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   // Remounts the signature pad after a send so the next interview starts blank.
   const [round, setRound] = useState(0);
@@ -197,7 +186,21 @@ function ManagerInterviewForm() {
           onChange={(value) => set('market', value)}
           required
           error={check.errors.market}
-          emptyMessage="No markets set up yet. An admin can add them in Form Options."
+          emptyMessage={
+            optionsLoading ? (
+              'Loading markets…'
+            ) : optionsFailed ? (
+              <span className={f.emptyFailed}>
+                Couldn&apos;t load markets
+                <button type="button" className={s.retry} onClick={retryOptions}>
+                  <RotateCw size={14} aria-hidden="true" />
+                  Retry
+                </button>
+              </span>
+            ) : (
+              'No markets set up yet. An admin can add them in Form Options.'
+            )
+          }
         />
       </FormSection>
 
@@ -258,7 +261,7 @@ function ManagerInterviewForm() {
 export default function ManagerInterviewPage() {
   return (
     <RepShell task="Manager interview" back={FORMS_BACK}>
-      <ProtectedRoute roles={[...managerInterviewRoles]} fallback={<RepBoot />}>
+      <ProtectedRoute roles={[...MANAGER_INTERVIEW_ROLES]} fallback={<RepBoot />}>
         <ManagerInterviewForm />
       </ProtectedRoute>
     </RepShell>

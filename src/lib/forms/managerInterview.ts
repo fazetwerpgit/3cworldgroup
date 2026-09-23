@@ -1,3 +1,5 @@
+import type { UserRole } from '@/types';
+
 // The only non-promotion job position; everything else (manager tiers and any
 // future GM/Director/etc.) is treated as a promotion, which reveals the three
 // "For Promotion Only" questions. Kept as a single rule because job positions are
@@ -30,4 +32,25 @@ export function validateSignatureDataUrl(value: unknown): boolean {
 // just enough to reject obvious non-emails ("x", "not-an-email") server-side.
 export function isEmailShaped(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+// Who may open the manager interview form. The page gates on this list and the
+// forms hub shows its row on the same list, so a role the page turns away
+// (general or office manager) never sees the row.
+export const MANAGER_INTERVIEW_ROLES = [
+  'admin',
+  'operations',
+  'l1_manager',
+  'l2_manager',
+  'ibo_level_1',
+  'ibo_level_2',
+  'ibo_level_3',
+  'ibo_level_4',
+  'regional_manager',
+  'director',
+] as const satisfies readonly UserRole[];
+
+/** `isRole` is AuthContext's (it lets the owner through wherever admin is). */
+export function canOpenManagerInterview(isRole: (...roles: UserRole[]) => boolean): boolean {
+  return isRole(...MANAGER_INTERVIEW_ROLES);
 }

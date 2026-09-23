@@ -254,3 +254,10 @@
     padding: var(--s4) var(--s5);
   }
 }
+
+/* Keyboard up on a phone: the board sets --kb to the height the keys cover. */
+.sheet[data-kb='open'] {
+  bottom: var(--kb, 0px);
+  max-height: calc(100dvh - var(--kb, 0px) - 12px);
+  padding-bottom: 0;
+}

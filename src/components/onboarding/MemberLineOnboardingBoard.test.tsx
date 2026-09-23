@@ -124,3 +124,52 @@ describe('MemberLineOnboardingBoard esign sheet body', () => {
     expect(sheetText()).not.toContain(ESIGN_HELPER_TEXT);
   });
 });
+
+// Review finding 1: the page passes a fresh onOpenItem on every render, and
+// the sheet used to refocus Close each time, so typing in "Reference or note"
+// lost every keystroke after the first.
+describe('MemberLineOnboardingBoard sheet focus', () => {
+  const item = makeItem({ id: 'orientation', referenceKind: 'manual', label: 'Orientation' });
+
+  async function render(onOpenItem: (id: string | null) => void) {
+    await act(async () => {
+      root.render(
+        <MemberLineOnboardingBoard
+          memberLabel="Sam Rep"
+          items={[item]}
+          progress={{ approved: 0, total: 1, complete: false }}
+          renderItemAction={() => <input id="reference-orientation" />}
+          openItemId={item.id}
+          onOpenItem={onOpenItem}
+          onRefresh={() => {}}
+        />,
+      );
+    });
+  }
+
+  it('focuses Close when the sheet opens', async () => {
+    await render(() => {});
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Close');
+  });
+
+  it('keeps focus in the field when the page re-renders with a new handler', async () => {
+    await render(() => {});
+    const input = document.getElementById('reference-orientation') as HTMLInputElement;
+    input.focus();
+    await render(() => {});
+    await render(() => {});
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('still closes on Escape with the latest handler', async () => {
+    const first = vi.fn();
+    const latest = vi.fn();
+    await render(first);
+    await render(latest);
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(latest).toHaveBeenCalledWith(null);
+    expect(first).not.toHaveBeenCalled();
+  });
+});

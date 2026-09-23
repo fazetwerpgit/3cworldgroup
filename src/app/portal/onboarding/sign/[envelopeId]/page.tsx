@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Check, CircleCheck, RotateCw } from 'lucide-react';
+import { ArrowLeft, Check, CircleCheck, RotateCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RepBoot, RepShell, useHideRepTabBar } from '@/components/portal/rep/RepShell';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
@@ -22,7 +22,9 @@ import {
 } from '@/components/esign/signatureStore';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ESIGN_CONSENT_TEXT } from '@/lib/esign/documents';
+import { friendlyError } from '@/lib/forms/friendlyError';
 import { FieldRoles } from '@/types';
+import { envelopeLoadFailure, type EnvelopeLoadFailure } from './loadFailure';
 import styles from './sign-page.module.css';
 
 const CHECKLIST_HREF = '/portal/onboarding';
@@ -95,7 +97,9 @@ function EsignSign() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
+  // error: the last Sign attempt failed (shown in the sign bar's status line).
   const [error, setError] = useState('');
+  const [loadFailure, setLoadFailure] = useState<EnvelopeLoadFailure | null>(null);
   // Bumped by Retry after a failed load; re-runs the same GET.
   const [attempt, setAttempt] = useState(0);
   const keyboardOpen = useSoftKeyboardOpen();
@@ -121,11 +125,11 @@ function EsignSign() {
         cache: 'no-store',
       });
       const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok) {
-        const detail = (payload as { error?: string } | null)?.error;
-        throw new Error(detail || 'We could not open this document.');
-      }
       if (cancelled) return;
+      if (!response.ok) {
+        setLoadFailure(envelopeLoadFailure(response.status));
+        return;
+      }
 
       const view = payload as EnvelopeView;
       setEnvelope(view);
@@ -134,11 +138,11 @@ function EsignSign() {
     };
 
     setLoading(true);
-    setError('');
+    setLoadFailure(null);
     void load()
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        setError(cause instanceof Error ? cause.message : 'We could not open this document.');
+      .catch(() => {
+        // fetch itself threw: no answer from the server.
+        if (!cancelled) setLoadFailure(envelopeLoadFailure(null));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -150,12 +154,14 @@ function EsignSign() {
   }, [envelopeId, authHeaders, attempt]);
 
   const setFieldValue = (key: string, value: string | boolean) => {
+    setError('');
     setValues((current) => ({ ...current, [key]: value }));
   };
 
   // The pad reports a new PNG (or null when cleared); keep it for the next
   // document in the set so a rep signs once, not five times.
   const handleSignatureChange = useCallback((png: string | null, method: SignatureMethod) => {
+    setError('');
     if (!png) {
       setSignature(null);
       clearSignature();
@@ -204,9 +210,11 @@ function EsignSign() {
         return;
       }
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(payload?.error || 'We could not complete the signature.');
+      const fallback = response.status >= 500 ? 'Server hiccup, try again.' : 'Try again.';
+      throw new Error(payload?.error || fallback);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'We could not complete the signature.');
+      const raw = cause instanceof Error ? cause.message : '';
+      setError(raw ? friendlyError(raw, 'sign').message : 'Try again.');
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +274,13 @@ function EsignSign() {
     );
   };
 
-  const status = submitting ? 'Applying your signature…' : blocker ?? 'Ready to sign.';
+  // A failed Sign shows here, in the bar the rep is looking at, not at the top of the page.
+  const status = submitting
+    ? 'Applying your signature…'
+    : error
+      ? `Not signed. ${error}`
+      : (blocker ?? 'Ready to sign.');
+  const statusState = !submitting && error ? 'error' : undefined;
   const signButton = (
     <button
       type="button"
@@ -317,17 +331,28 @@ function EsignSign() {
   }
 
   if (!envelope) {
+    const failure = loadFailure ?? envelopeLoadFailure(null);
     return (
       <div className={f.page}>
-        <div className={styles.head}>
+        <header className={`${f.header} ${styles.head}`}>
+          <Link href={CHECKLIST_HREF} className={f.backLink}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            Onboarding
+          </Link>
           <h1 className={styles.title}>Sign document</h1>
-        </div>
+        </header>
         <div className={`${s.panel} ${s.failed}`} role="alert">
-          <span>Couldn&apos;t open this document. {error}</span>
-          <button type="button" className={s.retry} onClick={() => setAttempt((n) => n + 1)}>
-            <RotateCw size={14} aria-hidden="true" />
-            Retry
-          </button>
+          <span>{failure.message}</span>
+          {failure.retry ? (
+            <button type="button" className={s.retry} onClick={() => setAttempt((n) => n + 1)}>
+              <RotateCw size={14} aria-hidden="true" />
+              Retry
+            </button>
+          ) : (
+            <Link href={CHECKLIST_HREF} className={`${s.retry} ${styles.linkBtn}`}>
+              Back to checklist
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -345,15 +370,6 @@ function EsignSign() {
             <h1 className={styles.title}>{envelope.name}</h1>
             <p className={f.lede}>Read the document, fill in what is missing, then sign.</p>
           </header>
-
-          {error && (
-            <div className={f.alert} role="alert">
-              <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
-              <p>
-                <strong>Not signed.</strong> {error}
-              </p>
-            </div>
-          )}
 
           <section className={f.section} aria-labelledby="esign-read-h">
             <h2 id="esign-read-h" className={f.sectionHead}>
@@ -396,7 +412,9 @@ function EsignSign() {
 
           {/* Phones with the keyboard up: in the page flow. */}
           <div className={`${f.submitInline} ${styles.bar}`} data-keyboard={keyboardOpen ? 'open' : undefined}>
-            <p className={styles.status}>{status}</p>
+            <p className={styles.status} data-state={statusState}>
+              {status}
+            </p>
             {signButton}
           </div>
         </div>
@@ -405,7 +423,12 @@ function EsignSign() {
           <p className={s.kicker}>Signing as</p>
           <p className={f.asideRoute}>{envelope.signerName}</p>
           <p className={f.asideNote}>{envelope.signerEmail}</p>
-          <p className={styles.asideStatus} data-ready={blocker === null ? 'yes' : undefined}>
+          <p
+            className={styles.asideStatus}
+            data-ready={blocker === null && !error ? 'yes' : undefined}
+            data-state={statusState}
+            role={statusState ? 'alert' : undefined}
+          >
             {status}
           </p>
           {signButton}
@@ -416,7 +439,9 @@ function EsignSign() {
       {keyboardOpen ? null : (
         <BodyLayer>
           <div className={`${f.submitBar} ${styles.bar}`}>
-            <p className={styles.status}>{status}</p>
+            <p className={styles.status} data-state={statusState} role={statusState ? 'alert' : undefined}>
+              {status}
+            </p>
             {signButton}
           </div>
         </BodyLayer>
