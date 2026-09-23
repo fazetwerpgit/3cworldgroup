@@ -497,8 +497,10 @@ function TodayPanel({
             >
               <span className={d.stamp}>Tmrw</span>
               <span className={d.tText}>
-                <span className={d.tTitle}>{install.customer}</span>
-                <span className={d.tSub}>{[install.carrier, install.planShort].filter(Boolean).join(' ') || 'Install'}</span>
+                <span className={d.tTitle}>Install tomorrow</span>
+                <span className={d.tSub}>
+                  {[install.customer, [install.carrier, install.planShort].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                </span>
               </span>
               <span className={`${d.tAct} ${item.texted ? d.tActDone : ''}`}>{item.texted ? 'Texted' : 'Text'}</span>
             </a>
