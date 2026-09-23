@@ -187,7 +187,28 @@
   }
 }
 
-/* ---------- panels ---------- */
+/* ---------- panels ----------
+   Panels are rep .panel (L1: surface, top-edge highlight, neutral lift). Add
+   .band to a rep .panelHead to make it the strip's recessed header band with a
+   Bebas head, the same as the sales ledger. */
+.band {
+  min-height: 46px;
+  border-radius: calc(var(--r-panel) - 1px) calc(var(--r-panel) - 1px) 0 0;
+  background: var(--c-well);
+}
+
+.band.band > :is(h2, h3) {
+  color: var(--c-text-2);
+  font: 400 20px / 1 var(--f-display);
+  letter-spacing: 0.08em;
+  padding-top: 3px;
+  text-transform: uppercase;
+}
+
+.band.band > :is(h2, h3)::before {
+  display: none;
+}
+
 .panelBody {
   padding: var(--s4);
 }
@@ -302,9 +323,9 @@
   align-items: center;
   gap: var(--s2);
   min-height: var(--tap);
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
+  border-radius: 999px;
   background: transparent;
   color: var(--c-text-2);
   font: 600 14px / 1 var(--f-ui);
@@ -313,13 +334,19 @@
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
-    color 140ms ease;
+    color 140ms ease,
+    transform 140ms var(--ease);
 }
 
+.chip:active {
+  transform: scale(0.95);
+}
+
+/* The selected filter inverts to white; lime is kept for what needs action. */
 .chip[aria-pressed='true'] {
-  border-color: rgba(141, 198, 63, 0.55);
-  background: var(--c-lime-wash);
-  color: var(--c-lime-hi);
+  border-color: var(--c-text);
+  background: var(--c-text);
+  color: var(--c-ground);
 }
 
 @media (hover: hover) {
@@ -330,40 +357,57 @@
 }
 
 .chipCount {
-  color: var(--c-text-3);
-  font-weight: 600;
+  color: var(--c-text);
+  font-weight: 700;
 }
 
 .chip[aria-pressed='true'] .chipCount {
   color: inherit;
 }
 
-/* One segmented control (status, carrier …), same as Log Sale's provider row. */
+/* One segmented control (status, carrier …): options set in a recessed well,
+   the selected one lifted a step (L3) with the top-edge highlight. */
 .segmented {
   display: flex;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
-  background: var(--c-line-strong);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
 }
 
 .segmented > button {
   flex: 1 1 auto;
-  min-height: var(--tap);
+  min-height: 40px;
   padding: 0 var(--s3);
   border: 0;
-  background: var(--c-panel);
-  color: var(--c-text-2);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-3);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms var(--ease);
+}
+
+.segmented > button:active {
+  transform: scale(0.97);
 }
 
 .segmented > button[aria-pressed='true'] {
-  background: var(--c-lime-wash);
-  color: var(--c-lime-hi);
-  box-shadow: inset 0 -2px 0 var(--c-lime);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+@media (hover: hover) {
+  .segmented > button:hover:not([aria-pressed='true']) {
+    color: var(--c-text);
+  }
 }
 
 .segmented > button:focus-visible {
@@ -415,14 +459,13 @@
   padding: 0 14px;
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
-  background: var(--c-ground);
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
   color: var(--c-text);
   font: 400 var(--t-body) / 1.2 var(--f-ui);
   font-variant-numeric: tabular-nums;
   appearance: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .input::placeholder {
@@ -432,13 +475,14 @@
 .input:focus {
   border-color: var(--c-lime);
   outline: none;
-  box-shadow: 0 0 0 3px var(--c-lime-wash);
 }
 
+/* A <select> always matches :read-only; only real read-only fields step back. */
 .input:disabled,
-.input:read-only {
+.input:read-only:not(select) {
   border-color: var(--c-line);
-  background: rgba(163, 184, 214, 0.04);
+  background: transparent;
+  box-shadow: none;
   color: var(--c-text-2);
 }
 
@@ -494,6 +538,7 @@
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   background: var(--c-panel-hi);
+  box-shadow: var(--c-edge);
   color: var(--c-text);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   cursor: pointer;
@@ -597,9 +642,10 @@
   gap: var(--s3);
   margin: 0;
   padding: var(--s3) var(--s4);
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
   background: var(--c-panel);
+  box-shadow: var(--c-lift);
   color: var(--c-text);
   font-size: var(--t-ui);
   line-height: 1.4;
@@ -617,8 +663,7 @@
 }
 
 .noticeError {
-  border-color: rgba(255, 138, 128, 0.4);
-  background: rgba(255, 138, 128, 0.07);
+  box-shadow: inset 3px 0 0 var(--c-red), var(--c-lift);
 }
 
 .noticeError > svg {
@@ -626,8 +671,7 @@
 }
 
 .noticeOk {
-  border-color: rgba(141, 198, 63, 0.4);
-  background: var(--c-lime-wash);
+  box-shadow: inset 3px 0 0 var(--c-lime), var(--c-lift);
 }
 
 .noticeOk > svg {
@@ -635,8 +679,7 @@
 }
 
 .noticeWarn {
-  border-color: rgba(245, 185, 69, 0.4);
-  background: var(--c-amber-wash);
+  box-shadow: inset 3px 0 0 var(--c-amber), var(--c-lift);
 }
 
 .noticeWarn > svg {
@@ -725,6 +768,9 @@
   font: inherit;
   text-align: left;
   text-decoration: none;
+  transition:
+    background-color 140ms ease,
+    transform 140ms var(--ease);
 }
 
 .rows > li + li,
@@ -738,7 +784,17 @@
 
 @media (hover: hover) {
   :is(a, button).row:hover {
-    background: rgba(163, 184, 214, 0.04);
+    background: var(--c-raised);
+  }
+}
+
+:is(a, button).row:active {
+  background: var(--c-panel-hi);
+}
+
+@media (max-width: 1023px) {
+  :is(a, button).row:active {
+    transform: scale(0.985);
   }
 }
 
@@ -804,7 +860,8 @@
 }
 
 .num {
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
 }
 
 .chev {
@@ -975,15 +1032,17 @@
 }
 
 /* ---------- facts (label / value grid) ---------- */
+/* A recessed well, like the est. pay well on the sale sheet. */
 .facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-control);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
   background: var(--c-line);
+  box-shadow: var(--c-sink);
 }
 
 .facts > div {
@@ -991,7 +1050,7 @@
   gap: 4px;
   min-width: 0;
   padding: var(--s3);
-  background: var(--c-panel);
+  background: var(--c-well);
 }
 
 .facts dt {
@@ -1023,7 +1082,8 @@
   font-weight: 500;
 }
 
-/* ---------- sheet (AdminSheet) ---------- */
+/* ---------- sheet (AdminSheet) ----------
+   rep .sheet is already L2 (raised, edge highlight, heavy neutral shadow). */
 .sheet {
   color: var(--c-text);
   font-family: var(--f-ui);
