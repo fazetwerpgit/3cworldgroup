@@ -2,23 +2,22 @@ import { dispatchToUser, type DispatchInput } from '@/lib/alerts/dispatch';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { gatherAllReps } from '@/lib/weeklyInstalls/gather';
-import { REMINDER_LINK, reminderPush, tomorrowInstalls, tomorrowKey, type EveInstall } from './installEve';
+import { reminderPush, tomorrowInstalls, tomorrowKey, type EveInstall } from './installEve';
 
-// The 6 PM send. Kill switch first, then per rep: tomorrow's installs, a
-// claim on each sale, one push (bell + push, no email) for what was claimed.
+// The 6 PM send. Per rep: tomorrow's installs, a claim on each sale, one push
+// (bell + push, no email) for what was claimed. On by default (Jacob: automatic).
 //
-//   INSTALL_REMINDERS_ENABLED  must be exactly "true" or nothing is sent and
-//                              nothing is written (a dry run reports what
-//                              WOULD go out).
+//   INSTALL_REMINDERS_OFF      "true" stops every send; the run becomes a dry
+//                              run that reports what WOULD go out.
 //   INSTALL_REMINDERS_ONLY_TO  optional; one rep's uid or email. Only that rep
-//                              is reminded (the owner's test run). Set but not
-//                              one uid or one address (a typo, a list) forces a
-//                              dry run: it must never fall back to every rep.
+//                              is reminded (a test run). Set but not one uid or
+//                              one address (a typo, a list) forces a dry run:
+//                              it must never fall back to every rep.
 
 export interface ReminderRunConfig {
   enabled: boolean;
   onlyTo: string | null;
-  /** Why the run was forced dry despite ENABLED (a malformed ONLY_TO). */
+  /** Why the run was forced dry (a malformed ONLY_TO). */
   configError: string | null;
 }
 
@@ -33,16 +32,16 @@ export function reminderRunConfig(env: NodeJS.ProcessEnv = process.env): Reminde
   if (onlyTo && !EMAIL.test(onlyTo) && !UID.test(onlyTo)) {
     return { enabled: false, onlyTo: null, configError: ONLY_TO_INVALID };
   }
-  return { enabled: env.INSTALL_REMINDERS_ENABLED === 'true', onlyTo: onlyTo || null, configError: null };
+  return { enabled: env.INSTALL_REMINDERS_OFF !== 'true', onlyTo: onlyTo || null, configError: null };
 }
 
 export interface ReminderPreview {
   uid: string;
   name: string;
   installs: number;
-  withPhone: number;
   title: string;
   message: string;
+  link: string;
 }
 
 export interface ReminderRunSummary {
@@ -55,8 +54,6 @@ export interface ReminderRunSummary {
   /** Reps with at least one install tomorrow. */
   reps: number;
   installs: number;
-  /** Of those, how many have a number the rep can text. */
-  withPhone: number;
   /** Dry run: what each rep would get. Live: what was sent. */
   pushes: ReminderPreview[];
   sent: number;
@@ -99,7 +96,6 @@ export async function runInstallReminders(deps: ReminderRunDeps): Promise<Remind
     considered: 0,
     reps: 0,
     installs: 0,
-    withPhone: 0,
     pushes: [],
     sent: 0,
     alreadySent: 0,
@@ -122,7 +118,6 @@ export async function runInstallReminders(deps: ReminderRunDeps): Promise<Remind
     if (!installs.length) continue;
     summary.reps += 1;
     summary.installs += installs.length;
-    summary.withPhone += installs.filter((install) => install.phone).length;
 
     // Kill switch: off (or a bad config) means a read-only dry run. No claim, no send.
     if (!config.enabled || config.configError) {
@@ -155,7 +150,7 @@ export async function runInstallReminders(deps: ReminderRunDeps): Promise<Remind
         type: 'install_reminder',
         title: push.title,
         message: push.message,
-        link: REMINDER_LINK,
+        link: push.link,
         metadata: { forDate, saleIds: claimed.map((install) => install.saleId) },
       });
       summary.pushes.push(push);
@@ -170,11 +165,5 @@ export async function runInstallReminders(deps: ReminderRunDeps): Promise<Remind
 }
 
 function preview(rep: { uid: string; name: string }, installs: EveInstall[]): ReminderPreview {
-  return {
-    uid: rep.uid,
-    name: rep.name,
-    installs: installs.length,
-    withPhone: installs.filter((install) => install.phone).length,
-    ...reminderPush(installs),
-  };
+  return { uid: rep.uid, name: rep.name, installs: installs.length, ...reminderPush(installs) };
 }

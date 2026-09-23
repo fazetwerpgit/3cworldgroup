@@ -21,6 +21,9 @@ const WED_6PM = new Date('2026-09-23T23:00:00Z');
 const WED_7PM = new Date('2026-09-24T00:00:00Z');
 const THU_6PM = new Date('2026-09-24T23:00:00Z');
 
+/** fixtureSale's default product, as the push labels it. */
+const PLAN = 'T-Fiber 1 Gig';
+
 const chicagoNoon = (day: string) => new Date(`${day}T17:00:00Z`);
 
 function seed(): FakeDb {
@@ -62,7 +65,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(WED_6PM);
   vi.stubEnv('CRON_SECRET', SECRET);
-  vi.stubEnv('INSTALL_REMINDERS_ENABLED', 'true');
+  vi.stubEnv('INSTALL_REMINDERS_OFF', '');
   vi.stubEnv('INSTALL_REMINDERS_ONLY_TO', '');
   dispatchToUser.mockClear();
   fake = seed();
@@ -89,14 +92,14 @@ describe('GET /api/cron/install-reminders', () => {
     expect(fake.writes).toHaveLength(0);
   });
 
-  it('with the kill switch off, reports what it would send and writes nothing', async () => {
-    for (const value of ['', 'TRUE', '1']) {
-      vi.stubEnv('INSTALL_REMINDERS_ENABLED', value);
+  it('with INSTALL_REMINDERS_OFF=true, reports what it would send and writes nothing', async () => {
+    {
+      vi.stubEnv('INSTALL_REMINDERS_OFF', 'true');
       const body = await (await GET(request('?slot=cdt'))).json();
       expect(body).toMatchObject({ forDate: '2026-09-24', enabled: false, reps: 2, installs: 3, sent: 0 });
       expect(body.pushes).toEqual([
-        expect.objectContaining({ uid: 'rep-one', title: 'Install tomorrow', message: 'Jane D. · 1 Gig. Text a reminder so someone is home.' }),
-        expect.objectContaining({ uid: 'rep-two', title: '2 installs tomorrow', message: 'Text reminders so someone is home.' }),
+        expect.objectContaining({ uid: 'rep-one', title: 'Install tomorrow', message: `Jane D. · ${PLAN}. Make sure someone will be home.` }),
+        expect.objectContaining({ uid: 'rep-two', title: '2 installs tomorrow', message: 'Sam R. and Ana P. Make sure someone will be home.' }),
       ]);
     }
     expect(dispatchToUser).not.toHaveBeenCalled();
@@ -139,8 +142,8 @@ describe('GET /api/cron/install-reminders', () => {
       userId: 'rep-one',
       type: 'install_reminder',
       title: 'Install tomorrow',
-      message: 'Jane D. · 1 Gig. Text a reminder so someone is home.',
-      link: '/portal/dashboard?installs=tomorrow',
+      message: `Jane D. · ${PLAN}. Make sure someone will be home.`,
+      link: '/portal/sales/s1',
       metadata: { forDate: '2026-09-24', saleIds: ['s1'] },
     });
     expect(fake.docs('sales').get('s1')?.installReminder).toEqual({ forDate: '2026-09-24', at: WED_6PM.toISOString() });
