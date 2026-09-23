@@ -1,66 +1,137 @@
 'use client';
 
-import { Lock } from 'lucide-react';
-import { ChatChannel } from '@/types';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-rep-b.css';
+import { Hash, Lock, RotateCw, ShieldAlert } from 'lucide-react';
+import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
+import s from '@/components/portal/rep/rep.module.css';
+import c from './chat.module.css';
 
-const audienceCopy: Record<ChatChannel['audience'], string> = {
-  all: 'ALL',
-  field: 'FIELD',
-  managers: 'MGRS',
-  platform: 'ADMIN',
-};
-
-interface MobileChannelListProps {
-  channels: ChatChannel[];
-  loading: boolean;
-  error?: string;
-  unreadByChannel?: Record<string, boolean>;
-  onOpenChannel: (channelId: string) => void;
+/** "9:14 AM" today, "Yesterday", a weekday inside the week, else "Sep 3". */
+export function formatChannelTime(date: Date | null | undefined): string {
+  if (!date) return '';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfThat = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((startOfToday - startOfThat) / 86_400_000);
+  if (days <= 0) return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+interface ChannelRowsProps {
+  channels: ChatChannelDoc[];
+  loading: boolean;
+  /** The channel listener failed: say so, never show an empty list as if it were real. */
+  error?: string;
+  unreadByChannel?: Record<string, boolean>;
+  /** Desktop rail only: the open channel gets the current-row treatment. */
+  activeChannelId?: string;
+  onSelect: (channelId: string) => void;
+}
+
+/** Channel rows shared by the phone channel screen and the desktop rail. */
+export function ChannelRows({ channels, loading, error, unreadByChannel, activeChannelId, onSelect }: ChannelRowsProps) {
+  if (loading) {
+    return (
+      <div aria-hidden="true">
+        {[0, 1, 2, 3].map((row) => (
+          <div className={c.channelSkel} key={row}>
+            <span className={s.skel} style={{ width: 40, height: 40, borderRadius: 6 }} />
+            <span>
+              <span className={s.skel} style={{ width: '46%', height: 14 }} />
+              <span className={s.skel} style={{ width: '78%', height: 12 }} />
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (error && channels.length === 0) {
+    return (
+      <div className={s.failed} role="alert">
+        Couldn&apos;t load channels
+        <button type="button" className={s.retry} onClick={() => window.location.reload()}>
+          <RotateCw size={14} aria-hidden="true" /> Retry
+        </button>
+      </div>
+    );
+  }
+  if (channels.length === 0) {
+    return <p className={c.empty}>No channels yet. An admin can sync them from Chat channels.</p>;
+  }
+  return (
+    <ul className={c.channels}>
+      {channels.map((channel) => {
+        const unread = !!unreadByChannel?.[channel.id];
+        const Mark = channel.audience === 'managers' ? Lock : Hash;
+        return (
+          <li key={channel.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(channel.id)}
+              aria-current={activeChannelId === channel.id ? 'true' : undefined}
+              className={`${c.channel} ${unread ? c.channelUnread : ''}`}
+            >
+              <span className={c.channelMark} aria-hidden="true">
+                <Mark size={18} strokeWidth={2} />
+              </span>
+              <span className={c.channelCopy}>
+                <span className={c.channelName}>{channel.name}</span>
+                {channel.description ? <span className={c.channelDesc}>{channel.description}</span> : null}
+              </span>
+              <span className={c.channelMeta}>
+                {formatChannelTime(channel.lastMessageAt)}
+                {unread ? (
+                  <>
+                    <i className={c.unreadDot} aria-hidden="true" />
+                    <span className={s.srOnly}>Unread messages</span>
+                  </>
+                ) : null}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The phone's first chat screen: an ordinary page above the tab bar. */
 export function MobileChannelList({
   channels,
   loading,
   error,
   unreadByChannel,
   onOpenChannel,
-}: MobileChannelListProps) {
+}: {
+  channels: ChatChannelDoc[];
+  loading: boolean;
+  error?: string;
+  unreadByChannel?: Record<string, boolean>;
+  onOpenChannel: (channelId: string) => void;
+}) {
+  const unreadCount = channels.filter((channel) => unreadByChannel?.[channel.id]).length;
   return (
-    <section className="chat-line-mobile-channel-screen">
-      <PageTitle title="Team Chat" />
-
-      {error && <p className="chat-line-mobile-error" role="alert">{error}</p>}
-
-      {loading ? (
-        <div className="chat-line-mobile-channel-list" aria-hidden="true">
-          {[0, 1, 2, 3].map((row) => <div className="chat-line-mobile-channel-skeleton" key={row}><span /><span /><span /></div>)}
-        </div>
-      ) : channels.length === 0 ? (
-        <p className="chat-line-mobile-empty">No live channels yet. Ask an admin to sync chat channels.</p>
-      ) : (
-        <div className="chat-line-mobile-channel-list">
-          {channels.map((channel, index) => (
-            <button
-              key={channel.id}
-              type="button"
-              onClick={() => onOpenChannel(channel.id)}
-              className={`chat-line-mobile-channel ${index === 0 ? 'is-active' : ''}`}
-            >
-              <span className="chat-line-mobile-number" aria-hidden="true">#</span>
-              <span className="chat-line-mobile-tick" />
-              <span className="chat-line-mobile-copy">
-                <strong>{channel.name}{channel.audience === 'managers' && <Lock aria-hidden="true" />}</strong>
-                <small>{channel.description}</small>
-              </span>
-              <span className="chat-line-mobile-audience">{audienceCopy[channel.audience]}{unreadByChannel?.[channel.id] && <i aria-label="Unread messages" />}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <p className="chat-line-mobile-pii">Don&apos;t post customer card numbers or SSNs here.</p>
+    <section className={c.listScreen} aria-labelledby="chat-title">
+      <div className={c.listHead}>
+        <h1 id="chat-title" className={c.title}>
+          Team chat
+        </h1>
+        {unreadCount > 0 ? <span className={c.listCount}>{unreadCount} unread</span> : null}
+      </div>
+      <div className={`${s.panel} ${c.listPanel}`}>
+        <ChannelRows
+          channels={channels}
+          loading={loading}
+          error={error}
+          unreadByChannel={unreadByChannel}
+          onSelect={onOpenChannel}
+        />
+      </div>
+      <p className={c.guide}>
+        <ShieldAlert size={16} aria-hidden="true" />
+        Keep customer details out of chat. Never post card numbers or SSNs.
+      </p>
     </section>
   );
 }
