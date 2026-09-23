@@ -1,31 +1,10 @@
 'use client';
 
-import type { CSSProperties } from 'react';
 import { CircleHelp, RotateCw } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 import { formatPayoutWindow, type UpcomingPayout } from '@/lib/pay/payoutWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
-
-/** Past this many installs the well's bar stops drawing one segment per sale. */
-const MAX_SEGMENTS = 20;
-
-/** The next T-Fiber payout as its installs: one segment per sale, installed then scheduled. */
-function PayoutSegments({ count, scheduled }: { count: number; scheduled: number }) {
-  const total = Math.min(count, MAX_SEGMENTS);
-  const lit = count > MAX_SEGMENTS ? Math.round(((count - scheduled) / count) * total) : count - scheduled;
-  return (
-    <span className={x.segs} aria-hidden="true">
-      {Array.from({ length: total }, (_, i) => (
-        <span
-          key={i}
-          className={i < lit ? x.segInstalled : x.segScheduled}
-          style={{ '--n': i } as CSSProperties}
-        />
-      ))}
-    </span>
-  );
-}
 
 function PayNumeral({ amount }: { amount: number }) {
   const shown = useCountUp(Math.round(amount), 1100);
@@ -101,7 +80,6 @@ export function PayoutCard({
               </span>
               <span className={x.carrierMark}>T-Fiber</span>
             </div>
-            <PayoutSegments count={upcoming.count} scheduled={upcoming.scheduled} />
             <ul className={x.wellLegend}>
               {installed > 0 ? (
                 <li>

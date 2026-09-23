@@ -754,44 +754,11 @@
   font-size: 10px;
 }
 
-/* One segment per sale: installed lime, scheduled blue. */
-.segs {
-  display: flex;
-  gap: 3px;
-}
-
-.segs > span {
-  position: relative;
-  flex: 1;
-  height: 8px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: var(--c-track);
-}
-
-.segs > span::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--seg-c);
-  transform-origin: left;
-  animation: segIn 400ms var(--ease) both;
-  animation-delay: calc(500ms + var(--n, 0) * 55ms);
-}
-
-.segInstalled {
-  --seg-c: var(--c-lime);
-}
-
-.segScheduled {
-  --seg-c: var(--c-blue);
-}
-
 .wellLegend {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
-  margin: 10px 0 0;
+  margin: 0;
   padding: 0;
   color: var(--c-text-2);
   font-size: var(--t-sm);
@@ -1283,12 +1250,6 @@
   from {
     opacity: 0;
     transform: translateY(32px);
-  }
-}
-
-@keyframes segIn {
-  from {
-    transform: scaleX(0);
   }
 }
 
@@ -2433,18 +2394,6 @@ a.dLine {
     flex: 1.4;
   }
 
-  /* Owner / admin: the book on the left, the carrier's view on the right. */
-  .mgmt {
-    display: grid;
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    align-items: start;
-    gap: var(--s4);
-  }
-
-  .mgmtSolo {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   /* Detail: a right-hand panel beside the list, not a centred dialog. */
   .detail {
     top: 0;
@@ -2462,7 +2411,7 @@ a.dLine {
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .mgmt {
     display: flex;
     flex-direction: column;
@@ -2488,18 +2437,6 @@ a.dLine {
 @media (min-width: 1024px) {
   .title {
     font-size: 32px;
-  }
-
-  .split {
-    display: grid;
-    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-    align-items: start;
-    gap: var(--s5);
-  }
-
-  .payCol {
-    position: sticky;
-    top: var(--s4);
   }
 
   .payNum {
@@ -2529,16 +2466,16 @@ a.dLine {
   }
 
   .sale {
-    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 96px 120px;
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 80px 104px;
     grid-template-areas:
       'stamp name status value pay'
       'stamp meta status value pay';
-    column-gap: var(--s4);
+    column-gap: var(--s3);
     padding: var(--s3) var(--s5) var(--s3) var(--s4);
   }
 
   .sale.hasAct {
-    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 96px 120px 96px;
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 80px 104px 96px;
     grid-template-areas:
       'stamp name status value pay act'
       'stamp meta status value pay act';
@@ -2555,12 +2492,23 @@ a.dLine {
     font-size: 15px;
   }
 
+  /* The carrier pill stacks under the status line rather than widening it. */
+  .sStatus {
+    overflow: hidden;
+  }
+
+  .sStatus .statusStack {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
   .pRow {
-    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 120px 64px;
+    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 104px 64px;
     grid-template-areas:
       'stamp name status pay paid'
       'stamp meta status pay paid';
-    column-gap: var(--s4);
+    column-gap: var(--s3);
     padding: 10px var(--s5) 10px var(--s4);
   }
 
@@ -2590,11 +2538,65 @@ a.dLine {
   }
 }
 
+/* Full-width pay card (tablet up to the split): the payout well moves beside
+   the numeral instead of stretching under it. */
+@media (min-width: 720px) and (max-width: 1279px) {
+  .moneyCard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
+    column-gap: var(--s6);
+    align-items: start;
+  }
+
+  .moneyCard > * {
+    grid-column: 1;
+  }
+
+  .moneyCard > .moneyWell {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .payHelp {
+    align-self: flex-start;
+    width: auto;
+  }
+}
+
+/* The pay card and ledger sit side by side only once the ledger keeps
+   ~800px; below that, the ledger's table columns would crush Customer. */
+@media (min-width: 1280px) {
+  /* Owner / admin: the book on the left, the carrier's view on the right. */
+  .mgmt {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: start;
+    gap: var(--s4);
+  }
+
+  .mgmtSolo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--s5);
+  }
+
+  .payCol {
+    position: sticky;
+    top: var(--s4);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .moneyCard,
   .payHelp,
   .ledger,
-  .segs > span::after,
   .sale,
   .pRow,
   .segTab,
