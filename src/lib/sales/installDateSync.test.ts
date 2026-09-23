@@ -16,7 +16,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 
-import { syncInstallDatesFromOrders } from './installDateSync';
+import { carrierDateForSale, syncInstallDatesFromOrders } from './installDateSync';
 import { dateToSaleDateInput, installDayKey } from './saleDate';
 import type { FiberOrder } from '@/types/fiberOrder';
 
@@ -71,6 +71,8 @@ type SaleDoc = {
   customerAddress?: string;
   installDate?: Date | null;
   status?: string;
+  installDateSource?: string;
+  repEditCarrierDate?: string | null;
 };
 
 function setSales(sales: SaleDoc[]): void {
@@ -323,5 +325,98 @@ describe('syncInstallDatesFromOrders', () => {
     expect(result).toMatchObject({ updated: 1 });
     expect(updateMock.mock.calls[0][1].installDatePreviousDate).toBeNull();
     expect(dispatchMock.mock.calls[0][0].message).not.toContain('(was ');
+  });
+});
+
+describe('rep-set install dates and the report', () => {
+  const repEdited = (repEditCarrierDate: string | null): SaleDoc => ({
+    id: 'sale-1',
+    salesRepId: 'rep-1',
+    customerName: 'Dana Reyes',
+    customerAddress: '123 Main St',
+    installDate: noon(12),
+    status: 'approved',
+    installDateSource: 'rep',
+    repEditCarrierDate,
+  });
+
+  it("leaves the rep's date when the report still carries the date they corrected", async () => {
+    setSales([repEdited(reportDay(5))]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(5) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 0, unchanged: 1 });
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it("takes the carrier's news once its date moves after the rep's edit, and tells the rep", async () => {
+    setSales([repEdited(reportDay(5))]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(15) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 1 });
+    const [, written] = updateMock.mock.calls[0];
+    expect(dateToSaleDateInput(written.installDate as Date)).toBe(reportDay(15));
+    expect(written.installDateSource).toBe('report');
+    expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('treats a first carrier date after a rep edit made with none on record as news', async () => {
+    setSales([repEdited(null)]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(15) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 1 });
+  });
+
+  it('keeps moving report-set and unmarked dates as before', async () => {
+    setSales([
+      { ...repEdited(null), installDateSource: 'report', repEditCarrierDate: reportDay(15) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(15) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 1 });
+  });
+});
+
+describe('carrierDateForSale', () => {
+  const sale = { id: 'sale-1', data: { customerAddress: '123 Main St', salesRepId: 'rep-1' } };
+
+  it('reads the date off the one dated order that is this sale', () => {
+    expect(carrierDateForSale(sale, [order({ id: 'o-1', estInstallDate: '2026-10-02' })])).toBe('2026-10-02');
+  });
+
+  it('follows an admin link over the address', () => {
+    const linked = order({
+      id: 'o-2',
+      address: '9 Elsewhere Rd',
+      estInstallDate: '2026-10-09',
+      saleLink: { saleId: 'sale-1', by: 'a1', byName: 'Admin', at: NOW.toISOString() },
+    });
+    expect(carrierDateForSale(sale, [linked])).toBe('2026-10-09');
+  });
+
+  it('is null with no dated order, or with two claiming the sale', () => {
+    expect(carrierDateForSale(sale, [order({ id: 'o-1' })])).toBeNull();
+    expect(
+      carrierDateForSale(sale, [
+        order({ id: 'o-1', estInstallDate: '2026-10-02' }),
+        order({ id: 'o-3', estInstallDate: '2026-10-05' }),
+      ])
+    ).toBeNull();
   });
 });

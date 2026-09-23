@@ -45,6 +45,10 @@ interface SyncSale {
   normalizedAddress: string;
   installDate: unknown;
   status: string | null;
+  /** Who set the date last: 'rep' | 'admin' | 'report', or null on older rows. */
+  installDateSource: string | null;
+  /** The carrier's est install day when the rep last set the date (see carrierDateForSale). */
+  repEditCarrierDate: string | null;
 }
 
 function emptyResult(): InstallDateSyncResult {
@@ -73,6 +77,8 @@ function toSyncSale(id: string, data: FirebaseFirestore.DocumentData): SyncSale 
     normalizedAddress: normalizeAddress(customerAddress),
     installDate: data.installDate ?? null,
     status: text(data.status),
+    installDateSource: text(data.installDateSource),
+    repEditCarrierDate: text(data.repEditCarrierDate),
   };
 }
 
@@ -167,6 +173,24 @@ function resolveMatches(orders: FiberOrder[], sales: SyncSale[]): Resolved[] {
 }
 
 /**
+ * The carrier's est install day for one sale as this sync would read it: the
+ * single dated order that is this sale (by saleLink, or by address when no
+ * other dated order claims it too), else null. The rep's install-date edit
+ * stores it, so a later report can tell the carrier's news from the same old
+ * date the rep already corrected.
+ */
+export function carrierDateForSale(
+  sale: { id: string; data: FirebaseFirestore.DocumentData },
+  orders: FiberOrder[]
+): string | null {
+  const matches = resolveMatches(orders, [toSyncSale(sale.id, sale.data)]).filter(
+    (entry): entry is Extract<Resolved, { kind: 'match' }> => entry.kind === 'match'
+  );
+  if (matches.length !== 1) return null;
+  return text(matches[0].order.estInstallDate);
+}
+
+/**
  * Moves a sale's install date to the day the carrier's report gives, and tells
  * the rep it moved. Never throws: a report that already landed must not be
  * failed by a follow-up write, so every per-sale failure is logged and counted.
@@ -210,6 +234,18 @@ export async function syncInstallDatesFromOrders(
         `[installDateSync] order ${order.id} has an unusable est install date`,
         order.estInstallDate
       );
+      result.unchanged += 1;
+      continue;
+    }
+
+    // The rep set this date themselves after seeing the carrier's. The report
+    // only overrides them with news: a carrier date that differs from the one
+    // on record when they edited. The same old date again is not news, and
+    // writing it back would undo the rep's fix every morning.
+    if (
+      sale.installDateSource === 'rep' &&
+      text(order.estInstallDate) === sale.repEditCarrierDate
+    ) {
       result.unchanged += 1;
       continue;
     }

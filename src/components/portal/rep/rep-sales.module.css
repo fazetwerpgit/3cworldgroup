@@ -1635,6 +1635,13 @@ a.dLine {
   font-weight: 600;
 }
 
+.dEditorHint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
 .dEditorActions {
   display: flex;
   gap: var(--s2);
