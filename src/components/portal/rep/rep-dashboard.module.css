@@ -1343,3 +1343,10 @@ a.saleRow:focus-visible {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+/* "est. $X no install date yet" — quiet, under the hero figure. */
+.noDate {
+  margin: var(--s1, 4px) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}

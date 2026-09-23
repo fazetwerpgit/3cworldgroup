@@ -14,7 +14,8 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOwner } from '@/types';
-import { expectedPayForSale } from '@/lib/pay/expectedPay';
+import { datedSales } from '@/lib/pay/payGroups';
+import { formatPayoutWindow, nextPayout } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -149,8 +150,9 @@ function SalesContent() {
     refreshSales();
   }, [refreshSales]);
 
-  // Rep KPIs follow the month picker rather than always reading "this month",
-  // so the figures and the list underneath can never describe different months.
+  // The Value and Sales KPIs follow the month picker rather than always reading
+  // "this month", so the figures and the list underneath can never describe
+  // different months; Est. payout names its own pay period instead.
   // Every KPI here counts MONEY, so a cancelled customer leaves all three —
   // including one the carrier cancelled (Jacob 2026-09-10). The sale itself
   // stays in the list underneath, marked, because it is still the paper trail.
@@ -170,9 +172,13 @@ function SalesContent() {
     () => countedSales(mtdSales, fiberBySale),
     [fiberBySale, mtdSales]
   );
-  const expectedPayMtd = hasPlan
-    ? payableMtd.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0)
-    : null;
+  // Est. pay is PAY-PERIOD based (owner, 2026-09-22): the next T-Fiber payout
+  // window, live from each sale's current install date — scheduled installs
+  // included. It is "now", not the picked month; the window says which period.
+  const upcoming = useMemo(
+    () => nextPayout(datedSales(sales, fiberBySale), hasPlan ? rates : null),
+    [fiberBySale, hasPlan, rates, sales]
+  );
   const boardValue = payableMtd.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
 
   const booting = !fetched || (loading && sales.length === 0);
@@ -280,24 +286,31 @@ function SalesContent() {
               </p>
             </div>
             <div className={`${x.kpi} ${x.kpiPay}`}>
-              <p className={`${s.kicker} ${x.kpiLabel}`}>Est. pay</p>
+              <p className={`${s.kicker} ${x.kpiLabel}`}>
+                Est. payout{upcoming ? ` · ${formatPayoutWindow(upcoming.window)}` : ''}
+              </p>
               {planLoading ? (
                 <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
-              ) : expectedPayMtd === null ? (
+              ) : !hasPlan ? (
                 <>
                   <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
                   <p className={x.kpiNote}>No pay plan assigned yet</p>
                 </>
-              ) : (
+              ) : upcoming ? (
                 <>
                   <p className={x.kpiNum}>
                     <span className={x.est}>est.</span>
-                    {money(expectedPayMtd)}
+                    {money(upcoming.amount ?? 0)}
                   </p>
                   <p className={x.kpiNote}>
-                    Across <b>{payableMtd.length}</b> {payableMtd.length === 1 ? 'sale' : 'sales'} in {monthName} ·
-                    before chargebacks
+                    <b>{upcoming.count}</b> T-Fiber {upcoming.count === 1 ? 'install' : 'installs'}
+                    {upcoming.scheduled > 0 ? <> · {upcoming.scheduled} scheduled</> : null} · before chargebacks
                   </p>
+                </>
+              ) : (
+                <>
+                  <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
+                  <p className={x.kpiNote}>No T-Fiber payout window coming up</p>
                 </>
               )}
             </div>

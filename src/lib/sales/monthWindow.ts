@@ -61,3 +61,29 @@ export function salesSoldIn<T extends Pick<Sale, 'saleDate'>>(sales: T[], key: M
 export function salesInstalledIn<T extends Pick<Sale, 'installDate'>>(sales: T[], key: MonthKey): T[] {
   return sales.filter((sale) => isInMonth(sale.installDate, key));
 }
+
+const CHICAGO_MONTH = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Chicago',
+  year: 'numeric',
+  month: 'numeric',
+});
+
+/**
+ * The calendar month `date` falls in, read in America/Chicago — the office's
+ * clock — rather than whatever timezone the viewer's browser is set to. Sale and
+ * install dates are stored at noon, so the day never slips across the line.
+ */
+export function chicagoMonthKey(date: Date): MonthKey {
+  const parts = CHICAGO_MONTH.formatToParts(date);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return { year: get('year'), month: get('month') - 1 };
+}
+
+/** isInMonth, with the month read in America/Chicago. */
+export function isInChicagoMonth(value: Date | string | null | undefined, key: MonthKey): boolean {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const month = chicagoMonthKey(date);
+  return month.year === key.year && month.month === key.month;
+}

@@ -15,6 +15,12 @@ import { expectedPayForSale } from '@/lib/pay/expectedPay';
 // RANGE and always labelled an estimate. It never collapses to a single pay date
 // (see the note at the bottom of expectedPay.ts). Other carriers have no
 // published schedule, so they get no window at all.
+//
+// Owner, 2026-09-22: a window belongs to EVERY T-Fiber sale with an install
+// date, scheduled or completed. It is computed live from the sale's CURRENT
+// install date (the carrier's activation date wins, via
+// applyCarrierInstallDates), so a rescheduled install moves its window on its
+// own. Nothing is stored.
 
 /** FIBER_COMPANIES[].value for T-Fiber (T-Mobile). */
 export const TFIBER_COMPANY = 'tfiber';
@@ -34,6 +40,8 @@ export interface UpcomingPayout {
   /** Σ expected pay of the installs in that install week; null when the rep has no pay plan. */
   amount: number | null;
   count: number;
+  /** How many of `count` are still scheduled (install date after now). */
+  scheduled: number;
 }
 
 const noon = (year: number, month: number, day: number) => new Date(year, month, day, 12, 0, 0);
@@ -92,15 +100,16 @@ export function payoutWindowForInstall(installDate: Date): PayoutWindow {
 }
 
 /**
- * The payout window for one sale, or null. Only a T-Fiber sale that has
- * INSTALLED gets one — the caller decides "installed" (install bucket), since
- * that also depends on the carrier report.
+ * The payout window for one sale, or null. Only a dated T-Fiber sale gets one,
+ * and only when the caller says it is `eligible` — the rep's views pass "not
+ * cancelled" (scheduled and completed installs both get a window); the company
+ * board still passes "installed".
  */
 export function payoutWindowForSale(
   sale: Pick<Sale, 'products' | 'installDate'>,
-  installed: boolean
+  eligible: boolean
 ): PayoutWindow | null {
-  if (!installed || !isTFiberSale(sale)) return null;
+  if (!eligible || !isTFiberSale(sale)) return null;
   const install = toDate(sale.installDate as Date | string | undefined);
   return install ? payoutWindowForInstall(install) : null;
 }
@@ -111,9 +120,10 @@ function startOfDay(date: Date): number {
 
 /**
  * The next upcoming payout: the earliest window that ends today or later and
- * has installed T-Fiber sales in it. `installs` must already be the rep's
- * counted, INSTALLED sales (cancelled and carrier-cancelled removed); anything
- * that is not T-Fiber is ignored here.
+ * has T-Fiber sales in it. `installs` must already be the rep's counted sales
+ * (cancelled and carrier-cancelled removed); scheduled installs count toward
+ * their window and are tallied in `scheduled`. Anything that is not T-Fiber, or
+ * has no install date, is ignored here.
  */
 export function nextPayout(
   installs: Array<Pick<Sale, 'products' | 'installDate'>>,
@@ -128,12 +138,14 @@ export function nextPayout(
     if (!window || startOfDay(window.end) < today) continue;
     const key = window.start.getTime();
     const pay = expectedPayForSale(sale, rates);
+    const scheduled = (toDate(sale.installDate as Date | string | undefined)?.getTime() ?? 0) > now.getTime() ? 1 : 0;
     const entry = byWindow.get(key);
     if (entry) {
       entry.count += 1;
+      entry.scheduled += scheduled;
       entry.amount = entry.amount === null || pay === null ? null : entry.amount + pay;
     } else {
-      byWindow.set(key, { window, amount: pay, count: 1 });
+      byWindow.set(key, { window, amount: pay, count: 1, scheduled });
     }
   }
 
@@ -153,4 +165,24 @@ export function formatPayoutWindow(window: Pick<PayoutWindow, 'start' | 'end'>):
   return startMonth === endMonth
     ? `${startMonth} ${window.start.getDate()}–${window.end.getDate()}`
     : `${startMonth} ${window.start.getDate()}–${endMonth} ${window.end.getDate()}`;
+}
+
+const DATE_INPUT = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * The estimated window for a sale still being logged: its products and the
+ * install date typed into the form (YYYY-MM-DD). "Oct 7–11", or null when it is
+ * not T-Fiber or the date is missing or not a real day.
+ */
+export function payoutLabelForDraft(
+  products: Sale['products'] | undefined,
+  installDateInput: string | null | undefined
+): string | null {
+  if (!isTFiberSale({ products: products || [] })) return null;
+  const parts = DATE_INPUT.exec((installDateInput || '').trim());
+  if (!parts) return null;
+  const [year, month, day] = [Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])];
+  const date = noon(year, month, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+  return formatPayoutWindow(payoutWindowForInstall(date));
 }

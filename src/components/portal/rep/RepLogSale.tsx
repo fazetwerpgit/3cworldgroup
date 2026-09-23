@@ -8,6 +8,7 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useSaleFormState, type SaleFieldKey, type SaleFormFields } from '@/hooks/useSaleFormState';
 import { NO_SIGNAL_SALE_MESSAGE } from '@/hooks/useSales';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
+import { payoutLabelForDraft } from '@/lib/pay/payoutWindow';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
@@ -162,6 +163,8 @@ export function RepLogSale() {
   const showMore = moreOpen || Boolean(errors.saleDate);
 
   const est = hasPlan && products.length > 0 ? expectedPayForSale({ products }, rates) : null;
+  // T-Fiber + an install date: the estimated payout window, live as the date changes.
+  const payoutLabel = payoutLabelForDraft(products, formData.installDate);
 
   const requiredDone = [
     Boolean(internetId || products.length),
@@ -210,7 +213,9 @@ export function RepLogSale() {
         ) : (
           <span className={l.estNone}>{hasPlan ? 'Pick a plan' : '—'}</span>
         )}
-        <span className={l.estWhen}>{est !== null ? 'Once it installs' : ' '}</span>
+        <span className={l.estWhen}>
+          {payoutLabel ? `est. payout ${payoutLabel}` : est !== null ? 'Once it installs' : ' '}
+        </span>
       </p>
       <button
         type="submit"

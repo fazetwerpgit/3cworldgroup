@@ -191,10 +191,11 @@ function PayoutRow({ pay, className }: { pay: PaySummary; className: string }) {
     <div className={`${d.payday} ${className}`}>
       <CalendarClock size={20} strokeWidth={1.75} aria-hidden="true" className={d.paydayIcon} />
       <span className={d.paydayText}>
-        <span className={`${s.kicker} ${d.boardLabel}`}>Est. payout · T-Fiber</span>
-        <span className={d.paydayDate}>{range}</span>
+        <span className={`${s.kicker} ${d.boardLabel}`}>Next window · T-Fiber</span>
+        <span className={d.paydayDate}>Est. payout {range}</span>
         <span className={d.paydayMeta}>
-          {payout.count} {payout.count === 1 ? 'install' : 'installs'}
+          {payout.count} {payout.count === 1 ? 'sale' : 'sales'}
+          {payout.scheduled > 0 ? ` · ${payout.scheduled} scheduled` : ''}
         </span>
       </span>
       {payout.amount !== null ? (
@@ -240,6 +241,10 @@ function Board({
             {delta > 0 ? '+' : ''}
             {delta}% vs last month
           </p>
+        ) : null}
+        {/* Money on sales with nothing on the calendar yet: it has no month. */}
+        {hasPlan && pay.estNoDate ? (
+          <p className={d.noDate}>est. {money(pay.estNoDate)} no install date yet</p>
         ) : null}
       </div>
 
@@ -660,7 +665,7 @@ function RecentSales({ rows }: { rows: RecentSaleRow[] }) {
                   {statusLine(row)}
                 </span>
                 <span className={`${d.saleAmt} ${d.num}`}>{payCell(row)}</span>
-                <span className={`${d.saleWhen} ${d.num}`}>{row.payoutLabel ?? (payoutLine(row) || '—')}</span>
+                <span className={`${d.saleWhen} ${d.num}`}>{payoutLine(row) || '—'}</span>
               </Link>
             </li>
           ))}

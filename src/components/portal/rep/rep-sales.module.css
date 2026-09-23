@@ -381,6 +381,45 @@
   color: var(--c-amber);
 }
 
+.tagScheduled {
+  background: color-mix(in srgb, var(--c-blue) 14%, transparent);
+  color: var(--c-blue);
+}
+
+/* Pay view: one band per pay period — "Sep 21–25 · est. $280". */
+.payGroup {
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line-strong);
+  background: rgba(3, 7, 14, 0.35);
+}
+
+.payGroupText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.payGroupTitle {
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.payGroupAmt {
+  color: var(--c-lime);
+}
+
+.payGroupMeta {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.payGroup + .row {
+  border-top: 1px solid var(--c-line);
+}
+
 .statusStack {
   display: flex;
   flex-wrap: wrap;
@@ -1815,6 +1854,10 @@ a.dLine {
   .row {
     min-height: 68px;
     padding: var(--s2) var(--s5);
+  }
+
+  .payGroup {
+    padding: var(--s3) var(--s5);
   }
 
   .num {

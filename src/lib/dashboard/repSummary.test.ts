@@ -44,26 +44,66 @@ const rates = { tfiber: { 'tfiber-1gig': 130 }, att: { 'att-500': 90 } };
 const noFiber = new Map<string, FiberOrder>();
 
 describe('summarizePay', () => {
-  it('sums this calendar month by sale date and compares with last month', () => {
+  it('sums pay by INSTALL date this month, scheduled or completed, not by sale date', () => {
     const sales = [
-      sale({ saleDate: d(2026, 9, 3), installDate: d(2026, 9, 10) }),
-      sale({ saleDate: d(2026, 9, 18), installDate: d(2026, 9, 29) }),
-      sale({ saleDate: d(2026, 9, 20) }),
-      sale({ saleDate: d(2026, 9, 21), status: 'cancelled' }),
-      sale({ saleDate: d(2026, 8, 20), installDate: d(2026, 9, 2), products: [product('att', 'att-500')] }),
-      sale({ saleDate: d(2026, 8, 25), installDate: d(2026, 8, 30), products: [product('att', 'att-500')] }),
+      sale({ saleDate: d(2026, 9, 3), installDate: d(2026, 9, 10) }), // completed Sep: 130
+      sale({ saleDate: d(2026, 9, 18), installDate: d(2026, 9, 29) }), // scheduled Sep: 130
+      sale({ saleDate: d(2026, 9, 20) }), // no install date: 130
+      sale({ saleDate: d(2026, 9, 21), status: 'cancelled', installDate: d(2026, 9, 25) }), // dead: nowhere
+      sale({ saleDate: d(2026, 8, 20), installDate: d(2026, 9, 2), products: [product('att', 'att-500')] }), // sold Aug, installs Sep: 90
+      sale({ saleDate: d(2026, 9, 15), installDate: d(2026, 10, 2) }), // sold Sep, installs Oct: not this month
+      sale({ saleDate: d(2026, 8, 25), installDate: d(2026, 8, 30), products: [product('att', 'att-500')] }), // Aug: 90
+      sale({ saleDate: d(2026, 7, 28), installDate: d(2026, 8, 4) }), // Aug: 130
     ];
     const summary = summarizePay(sales, noFiber, rates, NOW);
-    expect(summary.estThisMonth).toBe(390);
-    expect(summary.deltaPct).toBe(117); // 390 vs 180
-    expect(summary.monthCount).toBe(3);
-    expect(summary.counts).toEqual({ installed: 1, scheduled: 1, attention: 1 });
+    expect(summary.estThisMonth).toBe(350); // 130 + 130 + 90
+    expect(summary.deltaPct).toBe(59); // 350 vs 220
+    expect(summary.estNoDate).toBe(130);
+    // The month's sales COUNT is still by sale date.
+    expect(summary.monthCount).toBe(4);
+    expect(summary.counts).toEqual({ installed: 1, scheduled: 2, attention: 1 });
+  });
+
+  it('keeps sales with no install date out of every month', () => {
+    const sales = [sale({ saleDate: d(2026, 9, 1) }), sale({ saleDate: d(2026, 8, 30) })];
+    const summary = summarizePay(sales, noFiber, rates, NOW);
+    expect(summary.estThisMonth).toBe(0);
+    expect(summary.deltaPct).toBeNull();
+    expect(summary.estNoDate).toBe(260);
+  });
+
+  it('keeps carrier cancellations out of the month and out of no-date', () => {
+    const churned = sale({ installDate: d(2026, 9, 9) });
+    const undatedCancel = sale({});
+    const fiber = new Map<string, FiberOrder>([
+      [churned.id!, { status: 'churned' } as FiberOrder],
+      [undatedCancel.id!, { status: 'cancelled' } as FiberOrder],
+    ]);
+    const summary = summarizePay([churned, undatedCancel], fiber, rates, NOW);
+    expect(summary.estThisMonth).toBe(0);
+    expect(summary.estNoDate).toBe(0);
+  });
+
+  it('follows a reschedule into the new month', () => {
+    const before = sale({ installDate: d(2026, 9, 29) });
+    expect(summarizePay([before], noFiber, rates, NOW).estThisMonth).toBe(130);
+    const after = { ...before, installDate: d(2026, 10, 3) };
+    expect(summarizePay([after], noFiber, rates, NOW).estThisMonth).toBe(0);
+  });
+
+  it('reads the month in America/Chicago', () => {
+    // 11pm Aug 31 in Chicago is already Sep 1 in UTC.
+    const lateAug31 = new Date('2026-09-01T04:00:00Z');
+    const summary = summarizePay([sale({ installDate: lateAug31 })], noFiber, rates, NOW);
+    expect(summary.estThisMonth).toBe(0);
+    expect(summary.deltaPct).toBe(-100); // it is August's money
   });
 
   it('reports no plan as null, never $0', () => {
     const summary = summarizePay([sale()], noFiber, null, NOW);
     expect(summary.estThisMonth).toBeNull();
     expect(summary.deltaPct).toBeNull();
+    expect(summary.estNoDate).toBeNull();
   });
 
   it('hides the delta when last month was zero', () => {
@@ -79,17 +119,28 @@ describe('summarizePay', () => {
     const { payout } = summarizePay(sales, noFiber, rates, NOW);
     expect(payout?.amount).toBe(260);
     expect(payout?.count).toBe(2);
+    expect(payout?.scheduled).toBe(0);
+  });
+
+  it('gives a scheduled T-Fiber install its payout window too', () => {
+    // Today is Sep 22; an install booked for Sep 23 pays Oct 7–11.
+    const { payout } = summarizePay([sale({ installDate: d(2026, 9, 23) })], noFiber, rates, NOW);
+    expect(payout?.window.start.getDate()).toBe(7);
+    expect(payout?.window.start.getMonth()).toBe(9);
+    expect(payout?.count).toBe(1);
+    expect(payout?.scheduled).toBe(1);
   });
 
   it('drops a carrier-cancelled sale from the money', () => {
     const cancelled = sale({ saleDate: d(2026, 9, 5), installDate: d(2026, 9, 9) });
     const fiber = new Map<string, FiberOrder>([[cancelled.id!, { status: 'cancelled' } as FiberOrder]]);
     expect(summarizePay([cancelled], fiber, rates, NOW).estThisMonth).toBe(0);
+    expect(summarizePay([cancelled], fiber, rates, NOW).payout).toBeNull();
   });
 });
 
 describe('recentSaleRows', () => {
-  it('labels status, est. pay and a payout window only for installed T-Fiber', () => {
+  it('labels status, est. pay and a payout window for every dated, live T-Fiber sale', () => {
     const rows = recentSaleRows(
       [
         sale({ installDate: d(2026, 9, 16) }),
@@ -103,7 +154,7 @@ describe('recentSaleRows', () => {
       NOW
     );
     expect(rows.map((r) => r.status)).toEqual(['installed', 'installed', 'scheduled', 'needs-date', 'cancelled']);
-    expect(rows.map((r) => r.payoutLabel)).toEqual(['Sep 28–Oct 3', null, null, null, null]);
+    expect(rows.map((r) => r.payoutLabel)).toEqual(['Sep 28–Oct 3', null, 'Oct 7–11', null, null]);
     expect(rows[1].estPay).toBe(90);
     expect(rows[4].estPay).toBeNull();
   });

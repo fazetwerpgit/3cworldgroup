@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
@@ -10,9 +10,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
+import { groupPaySales, type PayGroup } from '@/lib/pay/payGroups';
 import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
-import { monthLabel, salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
+import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import { SaleDetailSheet } from './SaleDetailSheet';
@@ -89,6 +90,36 @@ function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan:
   );
 }
 
+const GROUP_NOTE: Record<PayGroup['kind'], string> = {
+  window: 'T-Fiber payout window',
+  other: 'No published payout window',
+  undated: 'Gets a window once it has a date',
+};
+
+/** "Sep 21–25 · est. $280" — a pay period, always a range, always an estimate. */
+function PayGroupHead({ group, hasPlan }: { group: PayGroup; hasPlan: boolean }) {
+  const installs = group.window
+    ? `installs ${formatDate(group.window.installFrom)}–${group.window.installTo.getDate()}`
+    : null;
+  return (
+    <div className={x.payGroup}>
+      <p className={x.payGroupText}>
+        <strong id={`pay-${group.key}`} className={x.payGroupTitle}>
+          {group.label}
+          {hasPlan && group.amount !== null ? (
+            <span className={x.payGroupAmt}> · est. {formatMoney(group.amount)}</span>
+          ) : null}
+        </strong>
+        <span className={x.payGroupMeta}>
+          {[GROUP_NOTE[group.kind], installs, `${group.sales.length} ${group.sales.length === 1 ? 'sale' : 'sales'}`]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+      </p>
+    </div>
+  );
+}
+
 export function SalesTable({
   sales,
   onDelete,
@@ -127,12 +158,25 @@ export function SalesTable({
     () => (month ? salesSoldIn(sales, month) : sales),
     [month, sales]
   );
-  const paySales = useMemo(
-    () => (month ? salesInstalledIn(sales, month) : sales)
-      .filter((sale) => !!sale.installDate && isPayableSale(sale) && !isCarrierCancelled(fiberBySale.get(sale.id || '')))
-      .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
-    [fiberBySale, month, sales]
+  // The pay list is grouped by pay period (owner, 2026-09-22): one group per
+  // T-Fiber payout window, scheduled installs included, then other carriers by
+  // install month, then sales with no install date yet. Windows come live from
+  // each sale's current install date, so a reschedule moves the sale by itself.
+  // "No install date" is live state, not a month's history, so it only shows on
+  // the current month.
+  const payGroups = useMemo(
+    () => groupPaySales(sales, fiberBySale, hasPlan ? rates : null, {
+      month,
+      includeUndated: !month || isCurrentMonth(month),
+    }),
+    [fiberBySale, hasPlan, month, rates, sales]
   );
+  const paySales = useMemo(() => payGroups.flatMap((group) => group.sales), [payGroups]);
+  const datedPayGroups = payGroups.filter((group) => group.kind !== 'undated');
+  const datedPayCount = datedPayGroups.reduce((sum, group) => sum + group.sales.length, 0);
+  const datedPayTotal = hasPlan
+    ? datedPayGroups.reduce((sum, group) => sum + (group.amount ?? 0), 0)
+    : null;
   const expectedBySale = useMemo(() => {
     const map: Record<string, number | null> = {};
     for (const sale of sales) {
@@ -151,7 +195,8 @@ export function SalesTable({
   const payoutBySale = useMemo(() => {
     const map: Record<string, string | null> = {};
     for (const sale of sales) {
-      const window = payoutWindowForSale(sale, statusBySale[sale.id || ''] === 'installed');
+      // Scheduled and completed installs alike; only a cancellation has none.
+      const window = payoutWindowForSale(sale, statusBySale[sale.id || ''] !== 'cancelled');
       map[sale.id || ''] = window ? formatPayoutWindow(window) : null;
     }
     return map;
@@ -246,7 +291,7 @@ export function SalesTable({
     },
   });
 
-  const statusCell = (sale: Sale) => {
+  const statusCell = (sale: Sale, extra?: ReactNode) => {
     const order = fiberBySale.get(sale.id || '');
     const status = statusBySale[sale.id || ''] ?? 'needs-date';
     return (
@@ -259,6 +304,7 @@ export function SalesTable({
         {(sale.status === 'pending' || sale.status === 'rejected') && (
           <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
         )}
+        {extra}
       </span>
     );
   };
@@ -281,7 +327,7 @@ export function SalesTable({
               estimate it, and say so where the figure is. */}
           <h2 id="ledger-h" className={x.panelTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
           <p className={x.panelMeta}>{showPay
-            ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
+            ? `${datedPayCount} by install date · tick one off once it lands`
             : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
         </div>
 
@@ -346,78 +392,82 @@ export function SalesTable({
             <div className={`${x.thead} ${x.payHead} ${hasPlan ? '' : x.noMoney}`} aria-hidden="true">
               <span>Customer</span>
               {hasPlan && <span className={x.num}>Est. pay</span>}
-              <span>Installed</span>
+              <span>Install</span>
               <span>Est. payout</span>
               <span>Status</span>
               <span className={x.num}>Paid</span>
             </div>
-            {paySales.length ? (
-              <div>
-                {paySales.map((sale) => {
-                  const expected = expectedBySale[sale.id || ''] ?? null;
-                  const paid = !!paidBySale[sale.id || ''];
-                  const window = payoutBySale[sale.id || ''];
-                  const payout = window ? (
-                    <span className={x.payout}>Est. payout <b>{window}</b></span>
-                  ) : (
-                    <span className={x.payout}>{statusBySale[sale.id || ''] === 'installed' ? 'No published window' : 'After install'}</span>
-                  );
-                  return (
-                    <div
-                      className={`${x.row} ${x.payRow} ${hasPlan ? '' : x.noMoney}`}
-                      data-part="pay-row"
-                      key={sale.id}
-                      {...openRow(sale)}
-                    >
-                      <span className={x.cName}>
-                        <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
-                        <span>{planLabel(sale)}</span>
-                      </span>
-                      {hasPlan && (
-                        <span className={`${x.cPay} ${x.num}`}>
-                          <EstPay value={expected} hasPlan={hasPlan} />
-                        </span>
-                      )}
-                      <span className={x.cWhen}>
-                        <b>{shortDate(sale.installDate)}</b>
-                        <span>Sold {formatDate(sale.saleDate)}</span>
-                      </span>
-                      <span className={x.cPayout}>{payout}</span>
-                      <span className={x.cStatus}>
-                        {statusCell(sale)}
-                      </span>
-                      <span className={x.cMeta}>{window ? <>Est. payout {window}</> : `Sold ${formatDate(sale.saleDate)} · ${planLabel(sale)}`}</span>
-                      <span
-                        className={x.cPaid}
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
+            {payGroups.length ? (
+              payGroups.map((group) => (
+                <div key={group.key} role="group" aria-labelledby={`pay-${group.key}`}>
+                  <PayGroupHead group={group} hasPlan={hasPlan} />
+                  {group.sales.map((sale) => {
+                    const expected = expectedBySale[sale.id || ''] ?? null;
+                    const paid = !!paidBySale[sale.id || ''];
+                    const window = payoutBySale[sale.id || ''];
+                    const scheduled = statusBySale[sale.id || ''] === 'scheduled';
+                    const payout = window ? (
+                      <span className={x.payout}>Est. payout <b>{window}</b></span>
+                    ) : (
+                      <span className={x.payout}>{sale.installDate ? 'No published window' : 'Once it has a date'}</span>
+                    );
+                    return (
+                      <div
+                        className={`${x.row} ${x.payRow} ${hasPlan ? '' : x.noMoney}`}
+                        data-part="pay-row"
+                        key={sale.id}
+                        {...openRow(sale)}
                       >
-                        <label className={x.paid}>
-                          <span>Paid</span>
-                          <input
-                            type="checkbox"
-                            checked={paid}
-                            onChange={() => void togglePaid(sale.id || '')}
-                            aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
-                          />
-                        </label>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                        <span className={x.cName}>
+                          <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
+                          <span>{planLabel(sale)}</span>
+                        </span>
+                        {hasPlan && (
+                          <span className={`${x.cPay} ${x.num}`}>
+                            <EstPay value={expected} hasPlan={hasPlan} />
+                          </span>
+                        )}
+                        <span className={x.cWhen}>
+                          <b>{shortDate(sale.installDate)}</b>
+                          <span>Sold {formatDate(sale.saleDate)}</span>
+                        </span>
+                        <span className={x.cPayout}>{payout}</span>
+                        <span className={x.cStatus}>
+                          {statusCell(sale, scheduled ? <span className={`${x.tag} ${x.tagScheduled}`}>Scheduled</span> : null)}
+                        </span>
+                        <span className={x.cMeta}>{window ? <>Est. payout {window}</> : `Sold ${formatDate(sale.saleDate)} · ${planLabel(sale)}`}</span>
+                        <span
+                          className={x.cPaid}
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <label className={x.paid}>
+                            <span>Paid</span>
+                            <input
+                              type="checkbox"
+                              checked={paid}
+                              onChange={() => void togglePaid(sale.id || '')}
+                              aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
+                            />
+                          </label>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
             ) : (
               <p className={x.empty}>
-                {month ? `Nothing installed in ${monthLabel(month)}.` : 'Nothing installed yet.'}
+                {month ? `No install dates in ${monthLabel(month)}.` : 'No install dates yet.'}
                 {' '}Pay shows up here once a sale has an install date.
                 {month && <> Earlier months are behind the previous-month arrow above.</>}
               </p>
             )}
             <div className={x.totals}>
-              <span><b>{paySales.length}</b> {paySales.length === 1 ? 'install' : 'installs'}</span>
+              <span><b>{datedPayCount}</b> by install date{month ? ` in ${monthLabel(month)}` : ''}</span>
               {hasPlan && (
                 <span className={x.totalsPay}>
-                  Total <EstPay value={expectedTotal} hasPlan={hasPlan} />
+                  Total <EstPay value={datedPayTotal} hasPlan={hasPlan} />
                 </span>
               )}
             </div>

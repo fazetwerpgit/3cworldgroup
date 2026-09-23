@@ -13,7 +13,14 @@ import {
   isCarrierCancelled,
   type InstallCounts,
 } from '@/lib/sales/installBucket';
-import { currentMonth, salesSoldIn, shiftMonth } from '@/lib/sales/monthWindow';
+import {
+  chicagoMonthKey,
+  currentMonth,
+  isInChicagoMonth,
+  salesSoldIn,
+  shiftMonth,
+} from '@/lib/sales/monthWindow';
+import { datedSales, sumExpectedPay, undatedSales } from '@/lib/pay/payGroups';
 import { periodBounds } from '@/lib/leaderboard/periods';
 
 // Everything the rep dashboard shows, derived from the rep's OWN book. Pure, so
@@ -27,57 +34,56 @@ type FiberMap = Map<string, FiberOrder>;
 
 const orderFor = (sale: Pick<Sale, 'id'>, fiberBySale: FiberMap) => fiberBySale.get(sale.id || '');
 
-const sumPay = (sales: Sale[], rates: CompPlanCompanyRates) =>
-  sales.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
-
 // ---------------------------------------------------------------- pay card
 
 export interface PaySummary {
-  /** Est. pay on this calendar month's sales (by sale date). Null = no pay plan. */
+  /**
+   * Est. pay on non-cancelled sales whose INSTALL DATE — scheduled or completed
+   * — falls in this calendar month (America/Chicago). Owner, 2026-09-22: pay
+   * follows the install, not the sale. Null = no pay plan.
+   */
   estThisMonth: number | null;
-  /** % change vs last month. Null when there is no plan or last month was 0. */
+  /** % change vs last month, counted the same way. Null when there is no plan or last month was 0. */
   deltaPct: number | null;
-  /** This month's counted sales by install bucket. */
+  /** Est. pay on non-cancelled sales with no install date yet. Null = no pay plan. */
+  estNoDate: number | null;
+  /** This month's counted sales (by SALE date) by install bucket — a count, not money. */
   counts: InstallCounts;
   monthCount: number;
-  /** Next estimated T-Fiber payout window, or null. */
+  /** Next estimated T-Fiber payout window (scheduled or completed installs), or null. */
   payout: UpcomingPayout | null;
 }
 
-/**
- * Calendar month by SALE date, exactly like the Sales page KPI
- * (sales/page.tsx: salesSoldIn → countedSales → expectedPayForSale).
- */
 export function summarizePay(
   sales: Sale[],
   fiberBySale: FiberMap,
   rates: CompPlanCompanyRates | null,
   now: Date = new Date()
 ): PaySummary {
-  const month = currentMonth(now);
-  const thisMonth = countedSales(salesSoldIn(sales, month), fiberBySale);
-  const lastMonth = countedSales(salesSoldIn(sales, shiftMonth(month, -1)), fiberBySale);
+  const dated = datedSales(sales, fiberBySale);
+  const month = chicagoMonthKey(now);
+  const installsIn = (key: typeof month) =>
+    dated.filter((sale) => isInChicagoMonth(sale.installDate as Date | string | undefined, key));
 
-  const estThisMonth = rates ? sumPay(thisMonth, rates) : null;
-  const estLastMonth = rates ? sumPay(lastMonth, rates) : null;
+  const estThisMonth = sumExpectedPay(installsIn(month), rates);
+  const estLastMonth = sumExpectedPay(installsIn(shiftMonth(month, -1)), rates);
   const deltaPct =
     estThisMonth !== null && estLastMonth
       ? Math.round(((estThisMonth - estLastMonth) / estLastMonth) * 100)
       : null;
 
+  // The month's sales COUNT stays by sale date: it is activity, not money.
+  const soldThisMonth = countedSales(salesSoldIn(sales, currentMonth(now)), fiberBySale);
   const counts = emptyInstallCounts();
-  for (const sale of thisMonth) counts[installBucketForSale(sale, orderFor(sale, fiberBySale), now)] += 1;
-
-  const installed = countedSales(sales, fiberBySale).filter(
-    (sale) => installBucketForSale(sale, orderFor(sale, fiberBySale), now) === 'installed'
-  );
+  for (const sale of soldThisMonth) counts[installBucketForSale(sale, orderFor(sale, fiberBySale), now)] += 1;
 
   return {
     estThisMonth,
     deltaPct,
+    estNoDate: sumExpectedPay(undatedSales(sales, fiberBySale), rates),
     counts,
-    monthCount: thisMonth.length,
-    payout: nextPayout(installed, rates, now),
+    monthCount: soldThisMonth.length,
+    payout: nextPayout(dated, rates, now),
   };
 }
 
@@ -94,7 +100,7 @@ export interface RecentSaleRow {
   installDate: Date | null;
   /** Null = no pay plan (show a dash); 0 = no contracted rate yet. */
   estPay: number | null;
-  /** "Oct 7–11" for an installed T-Fiber sale, else null. */
+  /** "Oct 7–11" for a dated, non-cancelled T-Fiber sale (scheduled or completed), else null. */
   payoutLabel: string | null;
 }
 
@@ -128,7 +134,7 @@ export function recentSaleRows(
 ): RecentSaleRow[] {
   return sales.slice(0, limit).map((sale) => {
     const status = rowStatus(sale, orderFor(sale, fiberBySale), now);
-    const window = payoutWindowForSale(sale, status === 'installed');
+    const window = payoutWindowForSale(sale, status !== 'cancelled');
     return {
       id: sale.id || '',
       customer: sale.customerName || 'Customer',

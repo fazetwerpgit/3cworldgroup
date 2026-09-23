@@ -5,6 +5,7 @@ import {
   isTFiberSale,
   nextPayout,
   payoutWindowForInstall,
+  payoutLabelForDraft,
   payoutWindowForSale,
 } from './payoutWindow';
 
@@ -49,11 +50,18 @@ describe('payoutWindowForInstall', () => {
 });
 
 describe('payoutWindowForSale', () => {
-  it('gives installed T-Fiber sales a window', () => {
+  it('gives eligible dated T-Fiber sales a window', () => {
     expect(payoutWindowForSale(tfiber(d(2026, 9, 3)), true)).not.toBeNull();
   });
 
-  it('gives no window to other carriers, uninstalled sales or undated sales', () => {
+  it('moves the window when the install is rescheduled', () => {
+    const sale = tfiber(d(2026, 9, 12));
+    expect(formatPayoutWindow(payoutWindowForSale(sale, true)!)).toBe('Sep 21–25');
+    const moved = { ...sale, installDate: d(2026, 9, 17) };
+    expect(formatPayoutWindow(payoutWindowForSale(moved, true)!)).toBe('Sep 28–Oct 3');
+  });
+
+  it('gives no window to other carriers, ineligible sales or undated sales', () => {
     expect(payoutWindowForSale(att(d(2026, 9, 3)), true)).toBeNull();
     expect(payoutWindowForSale(tfiber(d(2026, 9, 3)), false)).toBeNull();
     expect(payoutWindowForSale(tfiber(undefined), true)).toBeNull();
@@ -107,6 +115,13 @@ describe('nextPayout', () => {
     expect(nextPayout([], rates, now)).toBeNull();
   });
 
+  it('counts scheduled installs toward their window and tallies them', () => {
+    const result = nextPayout([tfiber(d(2026, 9, 16)), tfiber(d(2026, 9, 21))], rates, d(2026, 9, 20));
+    expect(formatPayoutWindow(result!.window)).toBe('Sep 28–Oct 3');
+    expect(result!.count).toBe(2);
+    expect(result!.scheduled).toBe(1);
+  });
+
   it('keeps the window but drops the amount when the rep has no pay plan', () => {
     const result = nextPayout([tfiber(d(2026, 9, 16))], null, now);
     expect(result!.amount).toBeNull();
@@ -119,5 +134,22 @@ describe('formatPayoutWindow', () => {
     expect(formatPayoutWindow(payoutWindowForInstall(d(2026, 9, 22)))).toBe('Oct 7–11');
     expect(formatPayoutWindow(payoutWindowForInstall(d(2026, 9, 3)))).toBe('Sep 14–18');
     expect(formatPayoutWindow(payoutWindowForInstall(d(2026, 9, 20)))).toBe('Sep 28–Oct 3');
+  });
+});
+
+describe('payoutLabelForDraft', () => {
+  const plan = [product('tfiber', 'tfiber-1gig')];
+
+  it('labels a T-Fiber draft from the typed install date, live as it changes', () => {
+    expect(payoutLabelForDraft(plan, '2026-09-22')).toBe('Oct 7–11');
+    expect(payoutLabelForDraft(plan, '2026-09-18')).toBe('Sep 28–Oct 3');
+    expect(payoutLabelForDraft(plan, '2026-09-05')).toBe('Sep 14–18');
+  });
+
+  it('is null without T-Fiber or a real date', () => {
+    expect(payoutLabelForDraft([product('att', 'att-500')], '2026-09-22')).toBeNull();
+    expect(payoutLabelForDraft([], '2026-09-22')).toBeNull();
+    expect(payoutLabelForDraft(plan, '')).toBeNull();
+    expect(payoutLabelForDraft(plan, '2026-02-31')).toBeNull();
   });
 });
