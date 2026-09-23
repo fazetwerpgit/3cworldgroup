@@ -62,7 +62,7 @@ export interface InstallDateSyncCounts {
   /** Orders in the report that carried an est install date and were considered. */
   checked: number;
   updated: number;
-  /** The order matched no single sale, so nothing was safe to write. */
+  /** Sales (and linked orders) with no single current carrier row, so nothing was safe to write. */
   skippedAmbiguous: number;
   skippedCancelled: number;
   /** Matched a sale that already sat on that day (the ordinary case). */

@@ -92,6 +92,32 @@ describe('GET /api/portal/sales/company-stats', () => {
     expect(json.lastSale).toEqual({ repName: 'This Month', at: thisMonth.toISOString() });
   });
 
+  it('times Last by when the sale was logged, not its noon sale date', async () => {
+    const logged = new Date(thisMonth.getTime() + 3 * 60 * 60 * 1000 + 17 * 60 * 1000);
+    state.docs = [
+      { salesRepName: 'Cole', totalValue: 80, saleDate: stamp(thisMonth), createdAt: stamp(logged) },
+    ];
+
+    const json = await (await GET(get())).json();
+
+    expect(json.lastSale).toEqual({ repName: 'Cole', at: logged.toISOString() });
+  });
+
+  it('leaves the time off when the sale was logged on a later day', async () => {
+    state.docs = [
+      {
+        salesRepName: 'Cole',
+        totalValue: 80,
+        saleDate: stamp(lastMonth),
+        createdAt: stamp(new Date(lastMonth.getTime() + 2 * 24 * 60 * 60 * 1000)),
+      },
+    ];
+
+    const json = await (await GET(get())).json();
+
+    expect(json.lastSale).toEqual({ repName: 'Cole' });
+  });
+
   it('falls back to createdAt for older docs with no saleDate', async () => {
     state.docs = [
       { salesRepName: 'Legacy', totalValue: 60, createdAt: stamp(thisMonth) },

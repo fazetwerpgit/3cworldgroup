@@ -48,6 +48,10 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 vi.mock('@/lib/fiberReport/ordersCache', () => ({
   invalidateFiberOrdersCache: invalidateMock,
 }));
+const carrier = vi.hoisted(() => ({ orders: null as unknown[] | null }));
+vi.mock('@/lib/sales/carrierSnapshot', () => ({
+  loadCarrierOrders: vi.fn(async () => carrier.orders),
+}));
 
 import { DELETE, PUT } from './route';
 import { dateToSaleDateInput } from '@/lib/sales/saleDate';
@@ -66,6 +70,7 @@ beforeEach(() => {
   // a sale they logged themselves; plain reps are covered in their own block.
   requesterMock.mockResolvedValue({ ok: true, uid: 'rep-1', name: 'Rep One', isAdmin: false, isManagement: true });
   saleUpdateMock.mockResolvedValue(undefined);
+  carrier.orders = null;
   saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-1' }) });
   saleDeleteMock.mockResolvedValue(undefined);
   batchCommitMock.mockResolvedValue(undefined);
@@ -214,8 +219,41 @@ describe('PUT /api/portal/sales/[id] install date provenance', () => {
     expect(written.installDateSource).toBe('rep');
     expect(written.installDateChangedAt).toBeInstanceOf(Date);
     expect(written.installDatePreviousDate).toEqual(new Date('2026-09-01T17:00:00.000Z'));
-    // A full edit drops any carrier date a rep's date-only edit recorded.
+    expect(written.installDateSetAt).toBeInstanceOf(Date);
+    // Nothing on record when the carrier orders can't be read.
     expect(written.repEditCarrierDate).toBeNull();
+    expect(written.repEditOrderId).toBeNull();
+  });
+
+  it("records the carrier row an admin's reschedule was made against", async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true });
+    carrier.orders = [
+      { id: 'brk_1', status: 'breakage', address: '12 Birch Ln', unit: null, orderDate: null, estInstallDate: '2026-09-03' },
+    ];
+    saleGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ salesRepId: 'rep-1', customerAddress: '12 Birch Ln, Tulsa', installDate: new Date('2026-09-03T17:00:00.000Z') }),
+    });
+
+    await put({ installDate: dayInput(7) });
+
+    expect(saleUpdateMock.mock.calls[0][0]).toMatchObject({
+      installDateSource: 'admin',
+      repEditOrderId: 'brk_1',
+      repEditCarrierDate: '2026-09-03',
+    });
+  });
+
+  it('refuses to write over a sale that changed after it was read', async () => {
+    const updateTime = { seconds: 1 };
+    saleGetMock.mockResolvedValue({ exists: true, updateTime, data: () => ({ salesRepId: 'rep-1' }) });
+    saleUpdateMock.mockRejectedValueOnce(Object.assign(new Error('stale'), { code: 9 }));
+
+    const response = await put({ notes: 'late edit' });
+
+    expect(saleUpdateMock.mock.calls[0][1]).toEqual({ lastUpdateTime: updateTime });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'This sale just changed. Reload it and try again.' });
   });
 
   it('stamps admin when management edits another rep sale', async () => {

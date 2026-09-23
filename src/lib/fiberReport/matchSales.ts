@@ -46,8 +46,8 @@ function isoDay(value: string | null | undefined): string {
   return typeof value === 'string' && ISO_DAY.test(value) ? value : '';
 }
 
-/** The last day the report says anything happened on this order. */
-function latestDay(order: FiberOrder): string {
+/** The last day the report says anything happened on this order ('' when none). */
+export function latestDay(order: FiberOrder): string {
   let latest = '';
   for (const value of [
     order.orderDate,
@@ -115,6 +115,69 @@ export function pickCurrentOrder(orders: readonly FiberOrder[]): FiberOrder | un
   return latestOrder ?? breakage;
 }
 
+const UNIT_WORD = /^(?:apartment|apt|unit|suite|ste|lot|room|rm|building|bldg|no|number)\b\.?\s*/;
+
+/** A unit as one comparable token: 'Apt 4B', '#4b' and '4B' are all '4b'. '' when none. */
+export function unitId(value: string | null | undefined): string {
+  if (typeof value !== 'string') return '';
+  let unit = value.toLowerCase().trim().replace(/^#\s*/, '');
+  for (let previous = ''; previous !== unit; ) {
+    previous = unit;
+    unit = unit.replace(UNIT_WORD, '').replace(/^#\s*/, '');
+  }
+  return unit.replace(/[^a-z0-9]/g, '');
+}
+
+const SALE_UNIT =
+  /(?:\b(?:apartment|apt|unit|suite|ste|lot|room|rm)\b\.?|#)\s*#?\s*([a-z0-9][a-z0-9-]*)/i;
+
+/** The unit a rep typed into a sale's address ('123 Main St Apt 4B' is '4b'), or ''. */
+export function saleUnitId(address: string | null | undefined): string {
+  if (typeof address !== 'string') return '';
+  const match = SALE_UNIT.exec(address);
+  return match ? unitId(match[1]) : '';
+}
+
+/**
+ * The carrier rows at a sale's own door. The join matches on the street alone
+ * (the rep's typed address rarely lines up with the carrier's unit column), so
+ * in an apartment building the street brings in every neighbour's rows too.
+ *
+ * When the sale's address names a unit, rows printed with a DIFFERENT unit are
+ * a neighbour's and never count. Rows with no unit printed (the cancelled sheet
+ * never prints one) may be anyone's: they stay in, but only when the sale's own
+ * unit is on the report too, or no row prints a unit at all; otherwise only the
+ * ones that are not active, and the answer is not certain.
+ *
+ * With no unit on the sale, rows of one unit (or none) are one door, as before.
+ * Rows of several units cannot be told apart: every row stays except the
+ * active ones with a unit, so a neighbour's install never reads as this sale's.
+ *
+ * Not certain means the page shows its best guess and the install-date sync
+ * writes nothing.
+ */
+export function doorOrders(
+  saleAddress: string | null | undefined,
+  candidates: readonly FiberOrder[]
+): { orders: FiberOrder[]; certain: boolean } {
+  const units = new Set(candidates.map((order) => unitId(order.unit)).filter(Boolean));
+  const saleUnit = saleUnitId(saleAddress);
+
+  if (saleUnit) {
+    if (units.size === 0) return { orders: [...candidates], certain: true };
+    const own = candidates.filter((order) => unitId(order.unit) === saleUnit);
+    const unprinted = candidates.filter((order) => !unitId(order.unit));
+    if (own.length) return { orders: [...own, ...unprinted], certain: true };
+    return { orders: unprinted.filter((order) => order.status !== 'active'), certain: false };
+  }
+
+  if (units.size <= 1) return { orders: [...candidates], certain: true };
+  return {
+    orders: candidates.filter((order) => order.status !== 'active' || !unitId(order.unit)),
+    certain: false,
+  };
+}
+
 /** Match sales to the rep's own-scope API response in memory; callers own matchedUserId filtering. */
 export function matchFiberOrdersToSales(
   sales: SaleForFiberMatch[],
@@ -130,7 +193,7 @@ export function matchFiberOrdersToSales(
     const atAddress = orders.filter((order) =>
       isAddressPrefixPair(saleAddress, normalizeAddress(order.address))
     );
-    const selectedOrder = pickCurrentOrder(atAddress);
+    const selectedOrder = pickCurrentOrder(doorOrders(sale.customerAddress, atAddress).orders);
     if (selectedOrder) matches.set(saleId, selectedOrder);
   }
 

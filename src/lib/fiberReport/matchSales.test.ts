@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { FiberOrder } from '@/types/fiberOrder';
 import {
   attachLoggedCustomerNames,
+  doorOrders,
   matchFiberOrdersToSales,
   normalizeAddress,
+  saleUnitId,
+  unitId,
 } from './matchSales';
 
 function order(overrides: Partial<FiberOrder> = {}): FiberOrder {
@@ -230,5 +233,54 @@ describe('same-day re-order at one address', () => {
 
     expect(matchFiberOrdersToSales([sale], [dead, live]).get('s1')?.id).toBe('live');
     expect(matchFiberOrdersToSales([sale], [live, dead]).get('s1')?.id).toBe('live');
+  });
+});
+
+describe('apartment buildings: a neighbour is not this sale', () => {
+  const pick = (address: string, orders: FiberOrder[]) =>
+    matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: address }], orders).get('sale-1');
+  // Unit 3 installed last week; unit 2 is the rep's sale, rescheduled after a miss.
+  const neighbourActive = order({ id: 'u3', status: 'active', unit: '3', estInstallDate: '2026-09-09', activationDate: '2026-09-09' });
+  const ownPending = order({ id: 'u2', unit: 'Apt 2', orderDate: '2026-08-20', estInstallDate: '2026-09-15' });
+  const ownMiss = order({ id: 'u2-miss', status: 'breakage', unit: '2', estInstallDate: '2026-09-03' });
+
+  it('reads the unit off either side', () => {
+    expect(unitId('Apt 4B')).toBe('4b');
+    expect(unitId('#4b')).toBe('4b');
+    expect(unitId('Unit #12')).toBe('12');
+    expect(unitId(null)).toBe('');
+    expect(saleUnitId('5780 Hall St SE Apt 2, Grand Rapids MI')).toBe('2');
+    expect(saleUnitId('5780 Hall St SE #2')).toBe('2');
+    expect(saleUnitId('5780 Hall St SE, Suite 110')).toBe('110');
+    expect(saleUnitId('5780 Hall St SE')).toBe('');
+  });
+
+  it("follows the sale's own unit, whichever order the rows come in", () => {
+    for (const orders of [[neighbourActive, ownPending, ownMiss], [ownMiss, ownPending, neighbourActive]]) {
+      expect(pick('5780 Hall St SE Apt 2', orders)).toBe(ownPending);
+    }
+    expect(pick('5780 Hall St SE Apt 2', [neighbourActive, ownMiss])).toBe(ownMiss);
+  });
+
+  it("never shows a neighbour's install when the sale names no unit", () => {
+    for (const orders of [[neighbourActive, ownPending], [ownPending, neighbourActive]]) {
+      expect(pick('5780 Hall St SE', orders)).toBe(ownPending);
+    }
+    expect(doorOrders('5780 Hall St SE', [neighbourActive, ownPending]).certain).toBe(false);
+  });
+
+  it("never shows a neighbour's install when the sale's unit is not on the report", () => {
+    expect(pick('5780 Hall St SE Apt 7', [neighbourActive])).toBeUndefined();
+    expect(pick('5780 Hall St SE Apt 7', [neighbourActive, ownPending])).toBeUndefined();
+    expect(doorOrders('5780 Hall St SE Apt 7', [neighbourActive]).certain).toBe(false);
+  });
+
+  it('keeps unit-less rows with the own unit, and a house as before', () => {
+    const cancelled = order({ id: 'cx', status: 'cancelled', orderDate: '2026-09-10', cancellationDate: '2026-09-16' });
+    expect(pick('5780 Hall St SE Apt 2', [ownPending, cancelled, neighbourActive])).toBe(cancelled);
+    const houseActive = order({ id: 'h', status: 'active', activationDate: '2026-09-09' });
+    const houseMiss = order({ id: 'hm', status: 'breakage', estInstallDate: '2026-09-03' });
+    expect(pick('5780 Hall St SE', [houseMiss, houseActive])).toBe(houseActive);
+    expect(doorOrders('5780 Hall St SE', [houseMiss, houseActive]).certain).toBe(true);
   });
 });

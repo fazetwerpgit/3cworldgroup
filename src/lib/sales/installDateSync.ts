@@ -1,9 +1,14 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
-import { isAddressPrefixPair, normalizeAddress, pickCurrentOrder } from '@/lib/fiberReport/matchSales';
+import {
+  doorOrders,
+  isAddressPrefixPair,
+  latestDay,
+  normalizeAddress,
+  pickCurrentOrder,
+} from '@/lib/fiberReport/matchSales';
 import { formatInstallDay, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
 import type { FiberOrder, InstallDateSyncCounts } from '@/types/fiberOrder';
-import type { Sale } from '@/types/sales';
 
 // The carrier moves install dates and tells nobody. Until now the report only
 // ever landed in `fiberOrders`, so a rep's own sale kept the day they typed and
@@ -13,10 +18,11 @@ import type { Sale } from '@/types/sales';
 // It writes only where it is certain. A sale's install date drives the pipeline
 // bucket and expected pay, so a wrong auto-edit is worse than no edit: every
 // join here has to be unambiguous in BOTH directions (one sale for the order,
-// one dated order for the sale) or the row is left alone for a human. The
+// one current order for the sale) or the row is left alone for a human. The
 // matching itself is the same question matchFiberOrdersToSales asks at read
-// time — same normalisation, same prefix predicate, same saleLink override —
-// so the page and the writer can never disagree about which sale an order is.
+// time — same normalisation, same prefix predicate, same door and same
+// current-row pick (matchSales.ts), same saleLink override — so the page and
+// the writer can never disagree about which order a sale is.
 
 export interface InstallDateChange {
   saleId: string;
@@ -47,8 +53,17 @@ interface SyncSale {
   status: string | null;
   /** Who set the date last: 'rep' | 'admin' | 'report', or null on older rows. */
   installDateSource: string | null;
-  /** The carrier's est install day when the rep last set the date (see carrierDateForSale). */
+  /** The carrier's row and its est install day when a person last set the date (see carrierOrderForSale). */
+  repEditOrderId: string | null;
   repEditCarrierDate: string | null;
+  /** The snapshot's update time: the write is refused if the sale changed since. */
+  updateTime: FirebaseFirestore.Timestamp | null;
+}
+
+/** The carrier row a person's install-date edit was made against. */
+export interface CarrierSnapshot {
+  orderId: string;
+  estInstallDate: string | null;
 }
 
 function emptyResult(): InstallDateSyncResult {
@@ -67,7 +82,15 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function toSyncSale(id: string, data: FirebaseFirestore.DocumentData): SyncSale {
+function isDated(order: FiberOrder): boolean {
+  return text(order.estInstallDate) !== null;
+}
+
+function toSyncSale(
+  id: string,
+  data: FirebaseFirestore.DocumentData,
+  updateTime: FirebaseFirestore.Timestamp | null = null
+): SyncSale {
   const customerAddress = text(data.customerAddress);
   return {
     id,
@@ -78,7 +101,9 @@ function toSyncSale(id: string, data: FirebaseFirestore.DocumentData): SyncSale 
     installDate: data.installDate ?? null,
     status: text(data.status),
     installDateSource: text(data.installDateSource),
+    repEditOrderId: text(data.repEditOrderId),
     repEditCarrierDate: text(data.repEditCarrierDate),
+    updateTime,
   };
 }
 
@@ -94,218 +119,257 @@ function notificationMessage(sale: SyncSale, previous: Date | null, next: Date):
   return `The carrier moved ${saleLabel(sale)}'s install to ${nextDay}.${was}`;
 }
 
-/** One door: the street and the unit, as the carrier printed them. */
-function doorKey(order: FiberOrder): string {
-  return `${normalizeAddress(order.address)}|${normalizeAddress(order.unit)}`;
-}
+type Current =
+  | { kind: 'order'; order: FiberOrder }
+  | { kind: 'ambiguous' }
+  | { kind: 'none' };
 
 /**
- * The join, resolved for one batch of orders.
+ * The carrier row that stands for one sale, from `orders`.
  *
  * `saleLink` outranks everything — it is an admin saying out loud which sale an
- * order is (or that it is none) — and a sale it names leaves the address pool
- * entirely, exactly as buildMergedBook does it. What survives into the address
- * pass is then matched BOTH ways: an order claiming two sales, or a sale
- * claimed by two dated orders at different doors, is ambiguous and nothing is
- * written for it. Several rows for the SAME door (street and unit) are one
- * customer's history, say a missed install and the order the carrier moved
- * past it: the sale follows the row pickCurrentOrder picks, the same one the
- * page shows, and the older rows write nothing.
- *
- * Only DATED orders compete for a sale. An order with no est install date
- * cannot move a day, so letting it block one would mean a second carrier row at
- * the same address (a pre-sale row, say) silently switched the feature off.
+ * order is (or that it is none) — and a linked order leaves the address pool
+ * entirely, exactly as buildMergedBook does it. A sale named by two links is a
+ * contradiction an admin has to settle. Otherwise the sale's door is read off
+ * the address (doorOrders) and its current row picked (pickCurrentOrder), the
+ * same two steps the page takes. A door that can't be told apart, or a pick
+ * that flips when the rows come in reverse (a tie the page settles by input
+ * order), is ambiguous: a writer needs a real answer.
  */
+function currentOrderForSale(sale: SyncSale, orders: FiberOrder[]): Current {
+  const links = orders.filter((order) => text(order.saleLink?.saleId) === sale.id);
+  if (links.length > 1) return { kind: 'ambiguous' };
+  if (links.length === 1) return { kind: 'order', order: links[0] };
+
+  if (sale.normalizedAddress.length < 6) return { kind: 'none' };
+  const candidates = orders.filter((order) => {
+    if (order.saleLink) return false;
+    const orderAddress = normalizeAddress(order.address);
+    return orderAddress.length >= 6 && isAddressPrefixPair(sale.normalizedAddress, orderAddress);
+  });
+  if (!candidates.length) return { kind: 'none' };
+
+  const door = doorOrders(sale.customerAddress, candidates);
+  if (!door.certain) return { kind: 'ambiguous' };
+  const current = pickCurrentOrder(door.orders);
+  if (!current) return { kind: 'none' };
+  if (pickCurrentOrder([...door.orders].reverse()) !== current) return { kind: 'ambiguous' };
+  return { kind: 'order', order: current };
+}
+
 type Resolved =
   | { kind: 'match'; order: FiberOrder; sale: SyncSale }
-  | { kind: 'ambiguous'; order: FiberOrder }
-  | { kind: 'none'; order: FiberOrder };
+  | { kind: 'ambiguous' };
 
+/**
+ * The join, resolved for one batch of orders: each sale the batch touches,
+ * paired with its current row when that row can move a day.
+ *
+ * It writes only from a live, dated row. An active row's est day is history:
+ * the page already reads the activation date for an installed order, and an
+ * old install at the door must never be pushed onto a newer sale there. A row
+ * with no est day cannot move one. And an order that is the current row of two
+ * sales (two logs of one customer, say) writes neither.
+ */
 function resolveMatches(orders: FiberOrder[], sales: SyncSale[]): Resolved[] {
-  const salesById = new Map<string, SyncSale>();
+  const claimants = new Map<FiberOrder, SyncSale[]>();
+  const out: Resolved[] = [];
+
   for (const sale of sales) {
-    if (!salesById.has(sale.id)) salesById.set(sale.id, sale);
+    const current = currentOrderForSale(sale, orders);
+    if (current.kind === 'none') continue;
+    if (current.kind === 'ambiguous') {
+      out.push({ kind: 'ambiguous' });
+      continue;
+    }
+    const { order } = current;
+    if (order.status === 'active' || !isDated(order)) continue;
+    claimants.set(order, [...(claimants.get(order) ?? []), sale]);
   }
 
-  // Pass 1 — explicit links. A sale named by ANY link is out of the address
-  // pool whichever order named it, and a sale named by two orders is a
-  // contradiction an admin has to settle, not a date to write.
-  const linkedSaleIds = new Map<string, number>();
-  for (const order of orders) {
-    const saleId = text(order.saleLink?.saleId);
-    if (!saleId) continue;
-    linkedSaleIds.set(saleId, (linkedSaleIds.get(saleId) ?? 0) + 1);
+  for (const [order, claimed] of claimants) {
+    if (claimed.length > 1) out.push({ kind: 'ambiguous' });
+    else out.push({ kind: 'match', order, sale: claimed[0] });
   }
-
-  const dated = orders.filter((order) => text(order.estInstallDate) !== null);
-  const openSales = sales.filter((sale) => !linkedSaleIds.has(sale.id));
-  const openDatedOrders = dated.filter((order) => !order.saleLink);
-
-  // How many dated orders in this batch the address guess would hand a sale.
-  const claimsPerSale = new Map<string, number>();
-  const candidatesByOrder = new Map<FiberOrder, SyncSale[]>();
-  for (const order of openDatedOrders) {
-    const orderAddress = normalizeAddress(order.address);
-    const candidates =
-      orderAddress.length >= 6
-        ? openSales.filter(
-            (sale) =>
-              sale.normalizedAddress.length >= 6 &&
-              isAddressPrefixPair(sale.normalizedAddress, orderAddress)
-          )
-        : [];
-    candidatesByOrder.set(order, candidates);
-    for (const sale of candidates) {
-      claimsPerSale.set(sale.id, (claimsPerSale.get(sale.id) ?? 0) + 1);
-    }
-  }
-
-  // A sale claimed by several rows of one door follows the current one.
-  const claimsBySale = new Map<string, FiberOrder[]>();
-  for (const [order, candidates] of candidatesByOrder) {
-    for (const sale of candidates) {
-      claimsBySale.set(sale.id, [...(claimsBySale.get(sale.id) ?? []), order]);
-    }
-  }
-  const currentBySale = new Map<string, FiberOrder>();
-  for (const [saleId, claims] of claimsBySale) {
-    if (claims.length < 2) continue;
-    if (new Set(claims.map(doorKey)).size !== 1) continue;
-    // A tie (two orders on the same day, say) is picked by input order at
-    // read time; a writer needs a real answer, so a pick that flips when the
-    // rows come in reverse stays ambiguous.
-    const current = pickCurrentOrder(claims);
-    if (current && pickCurrentOrder([...claims].reverse()) === current) {
-      currentBySale.set(saleId, current);
-    }
-  }
-
-  return dated.map((order): Resolved => {
-    if (order.saleLink) {
-      const saleId = text(order.saleLink.saleId);
-      // saleId null is an admin's "this is not any sale" — deliberate, not a miss.
-      if (!saleId) return { kind: 'none', order };
-      if ((linkedSaleIds.get(saleId) ?? 0) > 1) return { kind: 'ambiguous', order };
-      const sale = salesById.get(saleId);
-      // A link pointing at a deleted sale: the board already renders that as a
-      // broken link for a human to fix. Nothing to write here.
-      return sale ? { kind: 'match', order, sale } : { kind: 'none', order };
-    }
-
-    const candidates = candidatesByOrder.get(order) ?? [];
-    if (candidates.length === 0) return { kind: 'none', order };
-    if (candidates.length > 1) return { kind: 'ambiguous', order };
-    const sale = candidates[0];
-    if ((claimsPerSale.get(sale.id) ?? 0) > 1) {
-      const current = currentBySale.get(sale.id);
-      if (!current) return { kind: 'ambiguous', order };
-      if (current !== order) return { kind: 'none', order };
-    }
-    return { kind: 'match', order, sale };
-  });
+  return out;
 }
 
 /**
- * The carrier's est install day for one sale as this sync would read it: the
- * single dated order that is this sale (by saleLink, or by address when no
- * other dated order claims it too), else null. The rep's install-date edit
- * stores it, so a later report can tell the carrier's news from the same old
- * date the rep already corrected.
+ * The carrier's current row for one sale, as this sync would read it from
+ * `orders` (every stored order, at edit time). A rep's or admin's install-date
+ * edit stores it, so a later report can tell the carrier's news from the same
+ * old row the person already corrected. null when no single row is the sale.
  */
-export function carrierDateForSale(
+export function carrierOrderForSale(
   sale: { id: string; data: FirebaseFirestore.DocumentData },
   orders: FiberOrder[]
-): string | null {
-  const matches = resolveMatches(orders, [toSyncSale(sale.id, sale.data)]).filter(
-    (entry): entry is Extract<Resolved, { kind: 'match' }> => entry.kind === 'match'
+): CarrierSnapshot | null {
+  const current = currentOrderForSale(toSyncSale(sale.id, sale.data), orders);
+  if (current.kind !== 'order') return null;
+  return { orderId: current.order.id, estInstallDate: text(current.order.estInstallDate) };
+}
+
+/**
+ * A person set this sale's date after seeing the carrier's (see
+ * carrierOrderForSale). The report overrides them only with news:
+ *   - the same carrier row, with an est day that differs from the one on record;
+ *   - a different row standing for the sale now, dated after the one on record
+ *     (a reschedule, or a new order). A different row saying nothing newer is
+ *     the same old news reached another way: the batch may carry the stale
+ *     order row where the edit saw the missed-install row, say.
+ * A date set with no row on record takes any carrier date that differs from
+ * the one recorded (none, for a date set before the report knew the sale).
+ */
+function isCarrierNews(sale: SyncSale, order: FiberOrder): boolean {
+  const day = text(order.estInstallDate);
+  if (!sale.repEditOrderId || order.id === sale.repEditOrderId) {
+    return day !== sale.repEditCarrierDate;
+  }
+  return !sale.repEditCarrierDate || latestDay(order) > sale.repEditCarrierDate;
+}
+
+type Decision =
+  | { write: true; next: Date; previous: Date | null; previousDay: string | null }
+  | { write: false; count: 'skippedCancelled' | 'unchanged' };
+
+function decide(sale: SyncSale, order: FiberOrder): Decision {
+  // A cancelled sale is history. Moving its date would put a dead row back
+  // into the pipeline and ping a rep about a customer who backed out.
+  if (sale.status === 'cancelled') return { write: false, count: 'skippedCancelled' };
+
+  const parsed = parseInstallDateInput(order.estInstallDate);
+  if (!parsed.ok) {
+    // An unreadable or absurd carrier date is not a change worth making.
+    console.error(
+      `[installDateSync] order ${order.id} has an unusable est install date`,
+      order.estInstallDate
+    );
+    return { write: false, count: 'unchanged' };
+  }
+
+  // A rep or an admin set this date themselves. Writing the same old carrier
+  // date back would undo their fix every morning.
+  const personSet = sale.installDateSource === 'rep' || sale.installDateSource === 'admin';
+  if (personSet && !isCarrierNews(sale, order)) return { write: false, count: 'unchanged' };
+
+  const previousDay = installDayKey(sale.installDate);
+  if (previousDay && previousDay === installDayKey(parsed.date)) {
+    return { write: false, count: 'unchanged' };
+  }
+  return { write: true, next: parsed.date, previous: toDate(sale.installDate), previousDay };
+}
+
+/** Firestore's FAILED_PRECONDITION: the sale changed after it was read. */
+function isStaleWrite(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 9 || code === 'failed-precondition';
+}
+
+/**
+ * The orders as stored, with the admin's saleLink. The report's parsed rows
+ * never carry one (it lives only on the stored doc, kept by the merge upsert),
+ * so without this an admin's "this order is that sale" or "not any sale" would
+ * be ignored by the one writer it matters most to.
+ */
+async function withStoredSaleLinks(orders: FiberOrder[]): Promise<FiberOrder[]> {
+  if (!adminDb) return orders;
+  const collection = adminDb.collection('fiberOrders');
+  const links = new Map<string, FiberOrder['saleLink']>();
+  for (let offset = 0; offset < orders.length; offset += 300) {
+    const refs = orders.slice(offset, offset + 300).map((order) => collection.doc(order.id));
+    const snapshots = await adminDb.getAll(...refs);
+    for (const snapshot of snapshots) {
+      const saleLink = snapshot.exists ? snapshot.data()?.saleLink : undefined;
+      if (saleLink !== undefined) links.set(snapshot.id, saleLink);
+    }
+  }
+  return orders.map((order) =>
+    order.saleLink === undefined && links.has(order.id)
+      ? { ...order, saleLink: links.get(order.id) }
+      : order
   );
-  if (matches.length !== 1) return null;
-  return text(matches[0].order.estInstallDate);
 }
 
 /**
  * Moves a sale's install date to the day the carrier's report gives, and tells
- * the rep it moved. Never throws: a report that already landed must not be
- * failed by a follow-up write, so every per-sale failure is logged and counted.
+ * the rep it moved. Per-sale failures never throw: a report that already landed
+ * must not be failed by a follow-up write, so each is logged and counted.
  */
 export async function syncInstallDatesFromOrders(
   input: SyncInstallDatesInput
 ): Promise<InstallDateSyncResult> {
   const result = emptyResult();
   const now = input.now ?? new Date();
-  const orders = input.orders ?? [];
-  if (!orders.length) return result;
+  if (!input.orders?.length) return result;
   if (!adminDb) {
     console.error('[installDateSync] database not configured');
     return result;
   }
 
+  const orders = await withStoredSaleLinks(input.orders);
   const snapshot = await adminDb.collection('sales').get();
-  const sales = snapshot.docs.map((doc) => toSyncSale(doc.id, doc.data() ?? {}));
+  const sales = snapshot.docs.map((doc) =>
+    toSyncSale(doc.id, doc.data() ?? {}, doc.updateTime ?? null)
+  );
   const resolved = resolveMatches(orders, sales);
-  result.checked = resolved.length;
+  result.checked = orders.filter(isDated).length;
 
   for (const entry of resolved) {
-    if (entry.kind === 'none') continue;
     if (entry.kind === 'ambiguous') {
       result.skippedAmbiguous += 1;
       continue;
     }
 
-    const { order, sale } = entry;
-    // A cancelled sale is history. Moving its date would put a dead row back
-    // into the pipeline and ping a rep about a customer who backed out.
-    if (sale.status === 'cancelled') {
-      result.skippedCancelled += 1;
-      continue;
-    }
+    const { order } = entry;
+    let sale = entry.sale;
+    let decision = decide(sale, order);
+    const ref = adminDb.collection('sales').doc(sale.id);
+    let written = false;
 
-    const parsed = parseInstallDateInput(order.estInstallDate);
-    if (!parsed.ok) {
-      // An unreadable or absurd carrier date is not a change worth making.
-      console.error(
-        `[installDateSync] order ${order.id} has an unusable est install date`,
-        order.estInstallDate
-      );
-      result.unchanged += 1;
-      continue;
-    }
-
-    // The rep set this date themselves after seeing the carrier's. The report
-    // only overrides them with news: a carrier date that differs from the one
-    // on record when they edited. The same old date again is not news, and
-    // writing it back would undo the rep's fix every morning.
-    if (
-      sale.installDateSource === 'rep' &&
-      text(order.estInstallDate) === sale.repEditCarrierDate
-    ) {
-      result.unchanged += 1;
-      continue;
-    }
-
-    const next = parsed.date;
-    const previousDay = installDayKey(sale.installDate);
-    if (previousDay && previousDay === installDayKey(next)) {
-      result.unchanged += 1;
-      continue;
-    }
-
-    const previous = toDate(sale.installDate);
-
-    try {
-      await adminDb.collection('sales').doc(sale.id).update({
-        installDate: next,
+    // The sales were read once for the whole batch; a rep or admin may have set
+    // the date since. The write is conditional on the sale being unchanged, and
+    // a refused write is decided again, once, on a fresh read.
+    for (let attempt = 0; decision.write && !written; attempt += 1) {
+      const update = {
+        installDate: decision.next,
         installDateSource: 'report',
-        installDatePreviousDate: previous,
+        installDatePreviousDate: decision.previous,
         installDateChangedAt: now,
         updatedAt: now,
-      });
-    } catch (error) {
-      console.error(`[installDateSync] failed to update sale ${sale.id}`, error);
-      result.errors += 1;
-      continue;
+      };
+      try {
+        if (sale.updateTime) await ref.update(update, { lastUpdateTime: sale.updateTime });
+        else await ref.update(update);
+        written = true;
+      } catch (error) {
+        let failure = error;
+        if (attempt === 0 && isStaleWrite(error)) {
+          try {
+            const fresh = await ref.get();
+            if (!fresh.exists) {
+              decision = { write: false, count: 'unchanged' };
+              break;
+            }
+            sale = toSyncSale(fresh.id, fresh.data() ?? {}, fresh.updateTime ?? null);
+            decision = decide(sale, order);
+            continue;
+          } catch (readError) {
+            failure = readError;
+          }
+        }
+        console.error(`[installDateSync] failed to update sale ${sale.id}`, failure);
+        result.errors += 1;
+        break;
+      }
     }
 
+    if (!decision.write) {
+      result[decision.count] += 1;
+      continue;
+    }
+    if (!written) continue;
+
+    const { next, previous, previousDay } = decision;
     result.updated += 1;
     result.changes.push({ saleId: sale.id, salesRepId: sale.salesRepId, previous, next });
 

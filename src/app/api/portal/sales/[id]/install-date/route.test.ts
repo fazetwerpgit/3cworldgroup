@@ -17,8 +17,24 @@ const update = vi.fn(async (payload: Record<string, unknown>) => {
 
 const carrier = vi.hoisted(() => ({ orders: [] as unknown[], fail: false }));
 
+// The route reads and writes the sale inside a transaction; this one runs the
+// callback once against the same doc mock and records that it was used.
+const tx = vi.hoisted(() => ({ runs: 0, reads: 0 }));
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
+    runTransaction: vi.fn(async (fn: (t: unknown) => Promise<unknown>) => {
+      tx.runs += 1;
+      return fn({
+        get: async (ref: { get: () => Promise<unknown> }) => {
+          tx.reads += 1;
+          return ref.get();
+        },
+        update: (ref: { update: (payload: Record<string, unknown>) => Promise<void> }, payload: Record<string, unknown>) => {
+          void ref.update(payload);
+        },
+      });
+    }),
     collection: vi.fn((name: string) => ({
       doc: vi.fn(() =>
         name === 'config'
@@ -77,6 +93,8 @@ beforeEach(() => {
   state.updates = [];
   carrier.orders = [];
   carrier.fail = false;
+  tx.runs = 0;
+  tx.reads = 0;
 });
 
 describe('PATCH /api/portal/sales/[id]/install-date', () => {
@@ -92,6 +110,9 @@ describe('PATCH /api/portal/sales/[id]/install-date', () => {
     expect(written.installDateChangedAt).toBeInstanceOf(Date);
     expect(written.installDateSetAt).toBeInstanceOf(Date);
     expect(written.repEditCarrierDate).toBeNull();
+    expect(written.repEditOrderId).toBeNull();
+    // Read and written in one transaction, so a sync landing in between is retried.
+    expect(tx).toEqual({ runs: 1, reads: 1 });
     expect(Object.keys(written).sort()).toEqual([
       'installDate',
       'installDateChangedAt',
@@ -99,6 +120,7 @@ describe('PATCH /api/portal/sales/[id]/install-date', () => {
       'installDateSetAt',
       'installDateSource',
       'repEditCarrierDate',
+      'repEditOrderId',
       'updatedAt',
     ]);
   });
@@ -112,6 +134,19 @@ describe('PATCH /api/portal/sales/[id]/install-date', () => {
     await PATCH(patch({ installDate: dayFromToday(5) }), { params });
 
     expect(state.updates[0].repEditCarrierDate).toBe(dayFromToday(-3));
+    expect(state.updates[0].repEditOrderId).toBe('brk_1');
+  });
+
+  it('records the row the page shows when a miss and the rescheduled order are both stored', async () => {
+    state.data = { ...state.data, customerAddress: '77 Elm Ct, Tulsa, OK' };
+    carrier.orders = [
+      { id: 'brk_1', status: 'breakage', address: '77 Elm Ct', unit: null, orderDate: null, estInstallDate: dayFromToday(-3) },
+      { id: 'TMO1', status: 'pending_install', address: '77 Elm Ct', unit: null, orderDate: dayFromToday(-20), estInstallDate: dayFromToday(4) },
+    ];
+
+    await PATCH(patch({ installDate: dayFromToday(5) }), { params });
+
+    expect(state.updates[0]).toMatchObject({ repEditOrderId: 'TMO1', repEditCarrierDate: dayFromToday(4) });
   });
 
   it("still saves when the carrier's date can't be read", async () => {
