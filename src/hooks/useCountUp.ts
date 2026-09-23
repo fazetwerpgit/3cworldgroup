@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { firstThisSession, markPlayedThisSession, motionAllowed } from '@/lib/motion/sessionOnce';
 
 export interface CountUpOptions {
   /** Length of the count, ease-out. */
@@ -12,28 +13,9 @@ export interface CountUpOptions {
   sessionKey?: string;
 }
 
-function reducedMotion(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
 /** Whether a count should play now. Reads only; the flag is written once it starts. */
 function shouldCount(sessionKey: string | undefined): boolean {
-  if (typeof window === 'undefined' || reducedMotion()) return false;
-  if (!sessionKey) return true;
-  try {
-    return window.sessionStorage.getItem(sessionKey) === null;
-  } catch {
-    return false;
-  }
-}
-
-function markCounted(sessionKey: string | undefined) {
-  if (!sessionKey) return;
-  try {
-    window.sessionStorage.setItem(sessionKey, '1');
-  } catch {
-    // Storage blocked: nothing to remember it by, and nothing breaks.
-  }
+  return sessionKey ? firstThisSession(sessionKey) : motionAllowed();
 }
 
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -54,7 +36,7 @@ export function useCountUp(target: number, { durationMs = 600, sessionKey }: Cou
 
   useEffect(() => {
     if (!counting) return;
-    markCounted(sessionKey);
+    if (sessionKey) markPlayedThisSession(sessionKey);
     let frame = requestAnimationFrame(function tick(now) {
       start.current ??= now;
       const t = Math.min(1, (now - start.current) / durationMs);
