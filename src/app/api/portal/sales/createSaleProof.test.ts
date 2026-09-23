@@ -8,7 +8,6 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedRequester: vi.fn(),
 }));
 
-vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn() }));
 
 const state: {
   added: Array<Record<string, unknown>>;
@@ -33,8 +32,6 @@ vi.mock('@/lib/firebase/admin', () => ({
           doc: vi.fn(() => ({
             get: vi.fn(async () => ({ data: () => ({ reportsToId: 'm1' }) })),
           })),
-          // No admin-level users, so the push fan-out stays out of the way.
-          where: vi.fn(() => ({ get: vi.fn(async () => ({ docs: [] })) })),
         };
       }
       return {

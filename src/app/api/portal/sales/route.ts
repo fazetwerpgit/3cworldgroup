@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
-import { sendPushToUser } from '@/lib/push/sendPush';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
-import { ADMIN_LEVEL_PLATFORM_ROLES, Sale, SaleStatus } from '@/types';
+import { Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
@@ -409,35 +408,8 @@ export async function POST(request: NextRequest) {
       `/portal/sales/${docRef.id}`
     );
 
-    // Admins and owners used to be notified that a sale needed approval. With
-    // approval gone there is no decision waiting on them, so the fan-out is too:
-    // a new sale is not an interruption, it shows up on the board on its own.
-    try {
-      const ownerIds = (
-        await adminDb
-          .collection('users')
-          .where('role', 'in', [...ADMIN_LEVEL_PLATFORM_ROLES])
-          .get()
-      ).docs.map((d) => d.id).filter((id) => id !== salesRepId);
-
-      // after() keeps the sends alive past the response without a detached
-      // promise the freeze would kill.
-      if (ownerIds.length > 0) {
-        after(async () => {
-          await Promise.all(
-            ownerIds.map((uid) =>
-              sendPushToUser(uid, {
-                title: 'New sale logged',
-                body: `${salesRepName || 'A team member'} — ${customerName || 'new sale'}`,
-                url: `/portal/sales/${docRef.id}`,
-              })
-            )
-          );
-        });
-      }
-    } catch (error) {
-      console.error('Error notifying owners of new sale:', error);
-    }
+    // No push to admins/owners per sale: reps announce sales in chat, and the
+    // sale shows up on the board on its own.
 
     return NextResponse.json({
       success: true,

@@ -6,7 +6,6 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: vi.fn(),
 }));
 
-vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn() }));
 
 // A tiny stand-in for a Firestore query: it records the wheres it was given so
 // the tests can assert the month range actually reached the QUERY rather than
