@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSales } from '@/hooks/useSales';
+import { useSales, type CreateSaleResult } from '@/hooks/useSales';
 import type { FiberPlan, Sale, SaleProduct, SaleType } from '@/types';
 import { addPlanToProducts, isExtraPlanId } from '@/lib/sales/planSelection';
 import { hasSaleProof } from '@/lib/sales/proof';
@@ -46,6 +46,13 @@ export interface SaleDraft {
   products: SaleProduct[];
   saleDateTouched: boolean;
   proofUploadId: string;
+  /** A submit already went out under proofUploadId (it may have landed). */
+  keyUsed?: boolean;
+}
+
+/** A fresh idempotency key: 32 hex, the CLIENT_SALE_ID_RE shape. */
+export function newClientSaleId(): string {
+  return crypto.randomUUID().replace(/-/g, '');
 }
 
 export function readSaleDraft(key: string): SaleDraft | null {
@@ -151,7 +158,13 @@ export function useSaleFormState() {
   // Doubles as the sale's idempotency key (sent as clientSaleId): a resubmit
   // after a lost response lands on the same sale instead of a duplicate. Also
   // the stem of every proof upload slot for this sale.
-  const [proofUploadId, setProofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
+  const [proofUploadId, setProofUploadId] = useState(newClientSaleId);
+  // A submit went out under the current key, so it may already name a stored
+  // sale. Once the entry is cleared the key must not carry over to the next
+  // one, or that sale would come back as the old one (duplicate) and be lost.
+  const [keyUsed, setKeyUsed] = useState(false);
+  /** The server already had a sale under this key: the one it returned. */
+  const [duplicateOf, setDuplicateOf] = useState<Sale | null>(null);
   const draftKey = user ? `${DRAFT_KEY_PREFIX}${user.uid}` : null;
   const [draftRestored, setDraftRestored] = useState(false);
   /** The entry came back from a saved draft (drives "N screenshots attached"). */
@@ -181,7 +194,10 @@ export function useSaleFormState() {
       setProducts(draft.products);
       setProofPathsState(saleProofPaths(draft.formData).slice(0, MAX_PROOF_SCREENSHOTS));
       setSaleDateTouched(Boolean(draft.saleDateTouched));
-      if (CLIENT_SALE_ID_RE.test(draft.proofUploadId)) setProofUploadId(draft.proofUploadId);
+      if (CLIENT_SALE_ID_RE.test(draft.proofUploadId)) {
+        setProofUploadId(draft.proofUploadId);
+        setKeyUsed(draft.keyUsed === true);
+      }
       setFromDraft(true);
     }
   }
@@ -199,12 +215,21 @@ export function useSaleFormState() {
               products,
               saleDateTouched,
               proofUploadId,
+              keyUsed,
             }
           : null
       );
     }, DRAFT_SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [draftKey, draftRestored, formData, products, proofPaths, saleDateTouched, proofUploadId]);
+  }, [draftKey, draftRestored, formData, products, proofPaths, saleDateTouched, proofUploadId, keyUsed]);
+
+  // The rep cleared a submitted entry to start another: that one gets its own
+  // key (React's "adjust state when a prop changes" pattern, during render).
+  if (keyUsed && !hasDraftContent(formData, products, proofPaths)) {
+    setKeyUsed(false);
+    setProofUploadId(newClientSaleId());
+    setDuplicateOf(null);
+  }
 
   // Bring a server or offline error into view — on a phone the rep is at the
   // bottom of a long form and would otherwise never see why nothing happened.
@@ -340,12 +365,18 @@ export function useSaleFormState() {
   const productSold = products.map((p) => p.productName).join(', ');
 
   /**
-   * Validate and create the sale. Resolves to the created sale, or null when a
-   * field, the network or the server said no (the reason is in `errors`,
-   * `formError` or `serverError`). The draft is cleared only on success.
+   * Validate and create the sale. Resolves to the result, or null when a field,
+   * the network or the server said no (the reason is in `errors`, `formError`
+   * or `serverError`). The draft is cleared only on a new sale. A `duplicate`
+   * result is the sale already stored under this entry's key: it is held in
+   * `duplicateOf` for the page to show, and the draft stays, since the entry
+   * may be a different customer (see `logAsNew`).
    */
-  const submit = async (options: { pendingUploads?: number } = {}): Promise<Sale | null> => {
+  const submit = async (
+    options: { pendingUploads?: number; clientSaleId?: string } = {}
+  ): Promise<CreateSaleResult | null> => {
     setFormError('');
+    setDuplicateOf(null);
     const nextErrors = validateSaleForm({ formData, products, proofPaths });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -372,15 +403,38 @@ export function useSaleFormState() {
       // The server re-prices products from the catalog; these are the preview.
       totalValue: totals.value,
       totalPoints: totals.points,
-      clientSaleId: proofUploadId,
+      clientSaleId: options.clientSaleId ?? proofUploadId,
     };
 
+    // From here the key may name a stored sale, even if no answer comes back.
+    setKeyUsed(true);
     const result = await createSale(saleData);
-    if (result) {
+    if (result?.duplicate) {
+      setDuplicateOf(result.sale);
+    } else if (result) {
       submittedRef.current = true;
       if (draftKey) writeSaleDraft(draftKey, null);
+      // Confirmed: whatever is entered next is a new sale with a new key.
+      setProofUploadId(newClientSaleId());
+      setKeyUsed(false);
     }
     return result;
+  };
+
+  /**
+   * The rep says the entry on screen is NOT the sale that came back as a
+   * duplicate: give it a new key and submit it as its own sale.
+   */
+  const logAsNew = async (options: { pendingUploads?: number } = {}) => {
+    const fresh = newClientSaleId();
+    setProofUploadId(fresh);
+    return submit({ ...options, clientSaleId: fresh });
+  };
+
+  /** The entry was already logged (the duplicate): drop the saved draft. */
+  const discardDraft = () => {
+    submittedRef.current = true;
+    if (draftKey) writeSaleDraft(draftKey, null);
   };
 
   const provider =
@@ -408,6 +462,9 @@ export function useSaleFormState() {
     blockError,
     submitting: loading,
     submit,
+    logAsNew,
+    duplicateOf,
+    discardDraft,
     totals,
     productSold,
     draftRestored,

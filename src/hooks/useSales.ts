@@ -24,7 +24,24 @@ interface SalesStats {
   valueChange: number;
 }
 
-export const NO_SIGNAL_SALE_MESSAGE = 'No signal — your entry is saved. Tap Submit to retry.';
+export const NO_SIGNAL_SALE_MESSAGE = 'No signal. Your entry is saved, tap Submit to retry.';
+
+/**
+ * A submit on one bar of signal can hang with no answer. Past this it is
+ * treated as no signal: the entry stays saved and the retry reuses the same
+ * clientSaleId, so a request that did land comes back as that sale.
+ */
+export const SALE_SUBMIT_TIMEOUT_MS = 45_000;
+
+export interface CreateSaleResult {
+  sale: Sale;
+  /**
+   * The server already had a sale under this clientSaleId and returned it
+   * instead of writing a new one. The caller must say so, never treat it as a
+   * fresh sale: the entry on screen may be a different customer.
+   */
+  duplicate: boolean;
+}
 
 /**
  * True for a failure that never got a usable answer from the server: fetch
@@ -110,13 +127,16 @@ export function useSales() {
     }
   }, []);
 
-  const createSale = useCallback(async (saleData: CreateSaleData): Promise<Sale | null> => {
+  const createSale = useCallback(async (saleData: CreateSaleData): Promise<CreateSaleResult | null> => {
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     try {
       // The create endpoint requires a verified token and stamps the rep from it.
       const token = await getIdToken();
+      timer = setTimeout(() => controller.abort(), SALE_SUBMIT_TIMEOUT_MS);
       const response = await fetch('/api/portal/sales', {
         method: 'POST',
         headers: {
@@ -124,6 +144,7 @@ export function useSales() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(saleData),
+        signal: controller.signal,
       });
       const data = await response.json();
 
@@ -131,16 +152,18 @@ export function useSales() {
         throw new Error(data.error || 'Failed to create sale');
       }
 
-      return data.sale;
+      return { sale: data.sale, duplicate: data.duplicate === true };
     } catch (err) {
-      const message = isNetworkFailure(err)
-        ? NO_SIGNAL_SALE_MESSAGE
-        : err instanceof Error
-          ? err.message
-          : 'Failed to create sale';
+      const message =
+        controller.signal.aborted || isNetworkFailure(err)
+          ? NO_SIGNAL_SALE_MESSAGE
+          : err instanceof Error
+            ? err.message
+            : 'Failed to create sale';
       setError(message);
       return null;
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   }, []);

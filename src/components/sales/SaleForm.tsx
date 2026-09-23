@@ -38,14 +38,16 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = await form.submit();
-    if (!result) return;
+    // A duplicate is a sale already logged under this entry, not a new one.
+    if (!result || result.duplicate) return;
     if (onSuccess) onSuccess();
     else router.push('/portal/sales');
   };
 
   // One message at a time, as before: the first field error, else the block error.
   const firstFieldError = Object.values(errors)[0];
-  const shownError = firstFieldError || form.blockError;
+  const shownError =
+    firstFieldError || form.blockError || (form.duplicateOf ? 'This sale was already logged.' : '');
   const invalid = (key: keyof typeof errors) => (errors[key] ? true : undefined);
 
   const productSoldPreview = products.map((p) => p.productName).join(', ');
