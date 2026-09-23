@@ -65,7 +65,7 @@ const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
 // create() on a messages.doc(id): the ids already "stored" reject like the
 // Admin SDK does (gRPC ALREADY_EXISTS), everything else records the write.
 const createdIds = new Set<string>();
-const createMock = vi.fn(async (messageId: string, _doc: Record<string, unknown>) => {
+const createMock = vi.fn<(messageId: string, doc: Record<string, unknown>) => Promise<void>>(async (messageId) => {
   if (createdIds.has(messageId)) throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
   createdIds.add(messageId);
 });
