@@ -120,24 +120,29 @@ interface Row {
   lines: string[];
   right?: string;
   rightSub?: string;
-  /** Small caps tag beside the title. */
-  tag?: string;
+  /** A short lime-green note after the last line ("Confirmed by carrier"). */
+  accent?: string;
+  /** A status rather than money: set lighter than an amount. */
+  rightIsStatus?: boolean;
 }
 
 function rowHtml(row: Row, last: boolean): string {
   const border = last ? '' : `border-bottom:1px solid ${RULE};`;
-  const tag = row.tag
-    ? ` <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:${LIME_WASH};color:#3f6b12;font-size:11px;font-weight:600;letter-spacing:0.02em;vertical-align:1px;white-space:nowrap">${escapeHtml(row.tag)}</span>`
-    : '';
   const lines = row.lines
     .map(
       (line) =>
         `<div style="font-size:13px;line-height:19px;color:${INK_2};margin-top:2px">${escapeHtml(line)}</div>`
     )
     .join('');
-  const right = row.right
-    ? `<td valign="top" align="right" style="padding:14px 0 14px 12px;${border}white-space:nowrap;width:1%">
-<div style="font-size:15px;line-height:21px;font-weight:700;color:${NAVY}">${escapeHtml(row.right)}</div>${
+  const accent = row.accent
+    ? `<div style="font-size:12px;line-height:18px;font-weight:600;color:#3f7a12;margin-top:3px">${escapeHtml(row.accent)}</div>`
+    : '';
+  const right = row.right || row.rightSub
+    ? `<td valign="top" align="right" style="padding:14px 0 14px 12px;${border}white-space:nowrap;width:1%">${
+        row.right
+          ? `<div style="font-size:${row.rightIsStatus ? '13px' : '15px'};line-height:21px;font-weight:${row.rightIsStatus ? 600 : 700};color:${NAVY}">${escapeHtml(row.right)}</div>`
+          : ''
+      }${
         row.rightSub
           ? `<div style="font-size:12px;line-height:18px;color:${INK_3};margin-top:2px">${escapeHtml(row.rightSub)}</div>`
           : ''
@@ -145,7 +150,7 @@ function rowHtml(row: Row, last: boolean): string {
     : '';
   return `<tr>
 <td valign="top" style="padding:14px 0;${border}">
-<div style="font-size:15px;line-height:21px;font-weight:600;color:${NAVY}">${escapeHtml(row.title)}${tag}</div>${lines}
+<div style="font-size:15px;line-height:21px;font-weight:600;color:${NAVY}">${escapeHtml(row.title)}</div>${lines}${accent}
 </td>${right}
 </tr>`;
 }
@@ -185,10 +190,13 @@ function button(href: string, label: string): string {
 function installRows(digest: RepDigest): Row[] {
   return digest.installed.map((install) => ({
     title: install.customer,
-    tag: install.carrierConfirmed ? 'Carrier confirmed' : undefined,
-    lines: [`${install.address} · ${install.plan}`, `Installed ${formatDay(install.installDay)}`],
+    lines: [
+      `${install.address} · ${install.plan}`,
+      `Installed ${formatDay(install.installDay)}`,
+      `Est. payout ${install.payoutWindow}`,
+    ],
+    accent: install.carrierConfirmed ? 'Confirmed by the carrier' : undefined,
     right: install.estPay !== null ? `est. ${money(install.estPay)}` : undefined,
-    rightSub: `Est. payout ${install.payoutWindow}`,
   }));
 }
 
@@ -197,6 +205,7 @@ function upcomingRows(digest: RepDigest): Row[] {
     title: sale.customer,
     lines: [`${sale.address} · ${sale.plan}`],
     right: formatDay(sale.installDay),
+    rightIsStatus: true,
   }));
 }
 
@@ -205,6 +214,7 @@ function cancelRows(digest: RepDigest): Row[] {
     title: order.customer ?? order.address,
     lines: [[order.customer ? order.address : null, order.plan].filter(Boolean).join(' · ')].filter(Boolean),
     right: `${order.kind === 'churned' ? 'Disconnected' : 'Cancelled'} ${shortDay(order.cancelledDay)}`,
+    rightIsStatus: true,
   }));
 }
 
@@ -213,6 +223,7 @@ function needsDateRows(digest: RepDigest): Row[] {
     title: sale.customer,
     lines: [`${sale.address} · ${sale.plan}`],
     right: sale.missed ? 'Missed install' : 'No date',
+    rightIsStatus: true,
     rightSub: sale.soldDay ? `Sold ${shortDay(sale.soldDay)}` : undefined,
   }));
 }
@@ -319,7 +330,7 @@ ${summaryHtml(digest)}
 ${sections}
 <tr><td class="px" style="padding:30px 32px 0 32px">
 ${button(salesUrl, 'Open my sales')}
-<div style="font-size:14px;line-height:20px;color:${INK_2};margin-top:14px">Missing an install? <a href="${escapeHtml(disputeUrl)}" style="color:${NAVY};font-weight:600;text-decoration:underline">Tell us here</a> and we'll chase it.</div>
+<div style="font-size:14px;line-height:20px;color:${INK_2};margin-top:14px">Missing an install? <a href="${escapeHtml(disputeUrl)}" style="color:${NAVY};font-weight:600;text-decoration:underline">Tell us here</a>.</div>
 </td></tr>
 <tr><td class="px" style="padding:28px 32px 28px 32px">
 <div style="border-top:1px solid ${RULE};padding-top:16px;font-size:12px;line-height:18px;color:${INK_3}">${escapeHtml(DISCLAIMER)}</div>
@@ -363,9 +374,9 @@ function renderText(
     'Installed last week',
     digest.installed.map((install) =>
       [
-        `- ${install.customer}, ${install.address}, ${install.plan}. Installed ${formatDay(install.installDay)}.`,
-        install.estPay !== null ? ` est. ${money(install.estPay)}.` : '',
-        ` Est. payout ${install.payoutWindow}.`,
+        `- ${install.customer}, ${install.address}, ${install.plan}\n  Installed ${formatDay(install.installDay)}`,
+        install.estPay !== null ? ` · est. ${money(install.estPay)}` : '',
+        ` · Est. payout ${install.payoutWindow}`,
       ].join('')
     )
   );
