@@ -1,6 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
-import { isAddressPrefixPair, normalizeAddress } from '@/lib/fiberReport/matchSales';
+import { isAddressPrefixPair, normalizeAddress, pickCurrentOrder } from '@/lib/fiberReport/matchSales';
 import { formatInstallDay, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
 import type { FiberOrder, InstallDateSyncCounts } from '@/types/fiberOrder';
 import type { Sale } from '@/types/sales';
@@ -94,6 +94,11 @@ function notificationMessage(sale: SyncSale, previous: Date | null, next: Date):
   return `The carrier moved ${saleLabel(sale)}'s install to ${nextDay}.${was}`;
 }
 
+/** One door: the street and the unit, as the carrier printed them. */
+function doorKey(order: FiberOrder): string {
+  return `${normalizeAddress(order.address)}|${normalizeAddress(order.unit)}`;
+}
+
 /**
  * The join, resolved for one batch of orders.
  *
@@ -101,7 +106,11 @@ function notificationMessage(sale: SyncSale, previous: Date | null, next: Date):
  * order is (or that it is none) — and a sale it names leaves the address pool
  * entirely, exactly as buildMergedBook does it. What survives into the address
  * pass is then matched BOTH ways: an order claiming two sales, or a sale
- * claimed by two dated orders, is ambiguous and nothing is written for it.
+ * claimed by two dated orders at different doors, is ambiguous and nothing is
+ * written for it. Several rows for the SAME door (street and unit) are one
+ * customer's history, say a missed install and the order the carrier moved
+ * past it: the sale follows the row pickCurrentOrder picks, the same one the
+ * page shows, and the older rows write nothing.
  *
  * Only DATED orders compete for a sale. An order with no est install date
  * cannot move a day, so letting it block one would mean a second carrier row at
@@ -151,6 +160,26 @@ function resolveMatches(orders: FiberOrder[], sales: SyncSale[]): Resolved[] {
     }
   }
 
+  // A sale claimed by several rows of one door follows the current one.
+  const claimsBySale = new Map<string, FiberOrder[]>();
+  for (const [order, candidates] of candidatesByOrder) {
+    for (const sale of candidates) {
+      claimsBySale.set(sale.id, [...(claimsBySale.get(sale.id) ?? []), order]);
+    }
+  }
+  const currentBySale = new Map<string, FiberOrder>();
+  for (const [saleId, claims] of claimsBySale) {
+    if (claims.length < 2) continue;
+    if (new Set(claims.map(doorKey)).size !== 1) continue;
+    // A tie (two orders on the same day, say) is picked by input order at
+    // read time; a writer needs a real answer, so a pick that flips when the
+    // rows come in reverse stays ambiguous.
+    const current = pickCurrentOrder(claims);
+    if (current && pickCurrentOrder([...claims].reverse()) === current) {
+      currentBySale.set(saleId, current);
+    }
+  }
+
   return dated.map((order): Resolved => {
     if (order.saleLink) {
       const saleId = text(order.saleLink.saleId);
@@ -167,7 +196,11 @@ function resolveMatches(orders: FiberOrder[], sales: SyncSale[]): Resolved[] {
     if (candidates.length === 0) return { kind: 'none', order };
     if (candidates.length > 1) return { kind: 'ambiguous', order };
     const sale = candidates[0];
-    if ((claimsPerSale.get(sale.id) ?? 0) > 1) return { kind: 'ambiguous', order };
+    if ((claimsPerSale.get(sale.id) ?? 0) > 1) {
+      const current = currentBySale.get(sale.id);
+      if (!current) return { kind: 'ambiguous', order };
+      if (current !== order) return { kind: 'none', order };
+    }
     return { kind: 'match', order, sale };
   });
 }

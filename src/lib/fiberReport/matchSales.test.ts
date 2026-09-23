@@ -132,13 +132,62 @@ describe('matchFiberOrdersToSales', () => {
     ], [matchingOrder])).toEqual(new Map([['sale-1', matchingOrder]]));
   });
 
-  it('prefers a breakage order over an active order at the same address', () => {
-    const activeOrder = order({ id: 'active-order', status: 'active' });
-    const breakageOrder = order({ id: 'breakage-order', status: 'breakage' });
+  it('shows an active order over an older breakage row at the same address', () => {
+    // Missed on Sep 3, installed on Sep 9: the miss is history.
+    const activeOrder = order({ id: 'active-order', status: 'active', estInstallDate: '2026-09-09', activationDate: '2026-09-09' });
+    const breakageOrder = order({ id: 'breakage-order', status: 'breakage', estInstallDate: '2026-09-03' });
 
-    expect(matchFiberOrdersToSales([
-      { id: 'sale-1', customerAddress: '5780 Hall St SE' },
-    ], [activeOrder, breakageOrder]).get('sale-1')).toBe(breakageOrder);
+    for (const orders of [[activeOrder, breakageOrder], [breakageOrder, activeOrder]]) {
+      expect(matchFiberOrdersToSales([
+        { id: 'sale-1', customerAddress: '5780 Hall St SE' },
+      ], orders).get('sale-1')).toBe(activeOrder);
+    }
+  });
+
+  it('shows the missed install while the order still carries the missed day', () => {
+    const staleOrder = order({ id: 'pending', orderDate: '2026-08-20', estInstallDate: '2026-09-03' });
+    const breakageOrder = order({ id: 'breakage-order', status: 'breakage', estInstallDate: '2026-09-03' });
+
+    for (const orders of [[staleOrder, breakageOrder], [breakageOrder, staleOrder]]) {
+      expect(matchFiberOrdersToSales([
+        { id: 'sale-1', customerAddress: '5780 Hall St SE' },
+      ], orders).get('sale-1')).toBe(breakageOrder);
+    }
+  });
+
+  it('shows the order the carrier rescheduled past the miss', () => {
+    const rescheduled = order({ id: 'pending', orderDate: '2026-08-20', estInstallDate: '2026-09-10' });
+    const breakageOrder = order({ id: 'breakage-order', status: 'breakage', estInstallDate: '2026-09-03' });
+
+    for (const orders of [[rescheduled, breakageOrder], [breakageOrder, rescheduled]]) {
+      expect(matchFiberOrdersToSales([
+        { id: 'sale-1', customerAddress: '5780 Hall St SE' },
+      ], orders).get('sale-1')).toBe(rescheduled);
+    }
+  });
+
+  it('shows a new order placed after the miss, and a cancellation after it', () => {
+    const breakageOrder = order({ id: 'breakage-order', status: 'breakage', estInstallDate: '2026-09-03' });
+    const reordered = order({ id: 'reorder', orderDate: '2026-09-05' });
+    const cancelled = order({ id: 'cancel', status: 'cancelled', orderDate: '2026-08-20', cancellationDate: '2026-09-04' });
+
+    const pick = (orders: FiberOrder[]) =>
+      matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: '5780 Hall St SE' }], orders).get('sale-1');
+    expect(pick([breakageOrder, reordered])).toBe(reordered);
+    expect(pick([breakageOrder, cancelled])).toBe(cancelled);
+  });
+
+  it('keeps the latest of two misses, and the miss when its day is unreadable', () => {
+    const first = order({ id: 'miss-1', status: 'breakage', estInstallDate: '2026-09-03' });
+    const second = order({ id: 'miss-2', status: 'breakage', estInstallDate: '2026-09-10' });
+    const unreadable = order({ id: 'miss-x', status: 'breakage', estInstallDate: null });
+    const pending = order({ id: 'pending', estInstallDate: '2026-09-12' });
+
+    const pick = (orders: FiberOrder[]) =>
+      matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: '5780 Hall St SE' }], orders).get('sale-1');
+    expect(pick([second, first])).toBe(second);
+    expect(pick([first, second])).toBe(second);
+    expect(pick([pending, unreadable])).toBe(unreadable);
   });
 
   it('uses the latest order date when no breakage order matches', () => {
