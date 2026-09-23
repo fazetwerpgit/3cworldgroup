@@ -109,6 +109,11 @@ export async function POST(request: NextRequest) {
     return quiet(result.reason);
   }
   const found = Object.keys(result.fields).length;
-  log({ outcome: 'ok', found, ...timing });
+  // Which fields came back and how sure (names and confidence only, never a
+  // value), so a field report like "the date didn't fill" can be checked.
+  const fields = Object.entries(result.fields)
+    .map(([key, read]) => `${key}:${read?.confidence ?? '?'}`)
+    .join(',');
+  log({ outcome: 'ok', found, fields, ...timing });
   return NextResponse.json<SaleScanResponse>(found > 0 ? { fields: result.fields } : { fields: null, reason: 'nothing_found' });
 }
