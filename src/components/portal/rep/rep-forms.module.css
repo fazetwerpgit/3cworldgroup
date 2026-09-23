@@ -251,6 +251,14 @@
   line-height: 1.4;
 }
 
+.emptyFailed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s3);
+}
+
 .fieldInvalid .input,
 .fieldInvalid .chips,
 .fieldInvalid .pair,

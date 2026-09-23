@@ -244,7 +244,8 @@ export function Choices({
   hint?: ReactNode;
   /** Fixed chip columns (a 1–5 rating reads as one row). */
   columns?: number;
-  emptyMessage?: string;
+  /** Shown in place of the choices when there are none (or they failed to load). */
+  emptyMessage?: ReactNode;
 }) {
   const isLong = (option: string) => option.length > 22;
   // Mostly long labels (leads categories): full-width rows. A stray long one in
@@ -262,7 +263,7 @@ export function Choices({
         {required ? <span className={f.req}>Required</span> : null}
       </legend>
       {options.length === 0 ? (
-        <p className={f.empty}>{emptyMessage}</p>
+        <div className={f.empty}>{emptyMessage}</div>
       ) : (
         <div
           className={rows ? f.rows : pair ? f.pair : f.chips}
