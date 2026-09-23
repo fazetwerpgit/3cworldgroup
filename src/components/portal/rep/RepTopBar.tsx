@@ -15,6 +15,9 @@ import s from './rep.module.css';
 
 type Panel = 'menu' | 'more' | 'account' | 'notes' | null;
 
+/** A task page's parent: the phone back chevron's target and its accessible name ("Back to forms"). */
+export type RepBackLink = { href: string; label: string };
+
 /** Same breakpoint as the desktop rules in rep.module.css. */
 const DESKTOP_QUERY = '(min-width: 1024px)';
 /** Viewport margin a drop panel never crosses, and its gap under the top bar. */
@@ -68,11 +71,14 @@ export function RepTopBar({
   chatUnread = false,
   pendingSignupsCount = 0,
   task,
+  back,
 }: {
   chatUnread?: boolean;
   pendingSignupsCount?: number;
   /** Task page title (Log a sale): phones get a back link and this in place of the brand. */
   task?: string;
+  /** Where a task page's back link goes (default: the dashboard), and its name for screen readers. */
+  back?: RepBackLink;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -161,6 +167,7 @@ export function RepTopBar({
   const groups = sheetGroups(REP_PRIMARY_HREFS);
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'You';
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
+  const backLink = back ?? { href: brandHref, label: 'dashboard' };
   const adminBadge = pendingSignupsCount;
   // An owner's More holds every admin group: too tall for one column at 1440x900.
   const moreCount = groups.reduce((sum, group) => sum + group.items.filter(canAccess).length, 0);
@@ -171,7 +178,7 @@ export function RepTopBar({
       <header ref={headerRef} className={s.topbar}>
         <div className={s.topbarInner}>
           {task ? (
-            <Link href={brandHref} className={`${s.back} ${s.phoneOnly}`} aria-label="Back to dashboard">
+            <Link href={backLink.href} className={`${s.back} ${s.phoneOnly}`} aria-label={`Back to ${backLink.label}`}>
               <ChevronLeft size={24} strokeWidth={2} aria-hidden="true" />
             </Link>
           ) : null}

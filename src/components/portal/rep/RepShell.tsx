@@ -10,7 +10,7 @@ import { useChatUnread } from '@/hooks/chat/useChatUnread';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { RepTabBar } from './RepTabBar';
-import { RepTopBar } from './RepTopBar';
+import { RepTopBar, type RepBackLink } from './RepTopBar';
 import s from './rep.module.css';
 
 /** Auth / first-paint placeholder on the D ground, so a load never flashes white. */
@@ -35,7 +35,7 @@ export function useHideRepTabBar(hidden: boolean) {
   }, [hidden, setHidden]);
 }
 
-function RepChrome({ children, task }: { children: ReactNode; task?: string }) {
+function RepChrome({ children, task, back }: { children: ReactNode; task?: string; back?: RepBackLink }) {
   const { user, isRole } = useAuth();
   usePresenceHeartbeat();
   const { channels } = useChatChannels();
@@ -47,7 +47,7 @@ function RepChrome({ children, task }: { children: ReactNode; task?: string }) {
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
       <div className={s.root} data-shell="rep">
-        <RepTopBar chatUnread={anyUnread} pendingSignupsCount={pendingSignupsCount} task={task} />
+        <RepTopBar chatUnread={anyUnread} pendingSignupsCount={pendingSignupsCount} task={task} back={back} />
         <main className={s.scroller} id="rep-main">
           <div className={s.main}>{children}</div>
         </main>
@@ -68,15 +68,20 @@ export function RepShell({
   children,
   permissions,
   task,
+  back,
 }: {
   children: ReactNode;
   permissions?: string[];
   /** A task page's title: on phones the top bar shows a back link and this instead of the brand. */
   task?: string;
+  /** The task page's parent for that back link. Defaults to the dashboard. */
+  back?: RepBackLink;
 }) {
   return (
     <ProtectedRoute permissions={permissions} fallback={<RepBoot />}>
-      <RepChrome task={task}>{children}</RepChrome>
+      <RepChrome task={task} back={back}>
+        {children}
+      </RepChrome>
     </ProtectedRoute>
   );
 }

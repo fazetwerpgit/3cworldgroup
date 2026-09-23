@@ -11,6 +11,6 @@ export function isEsignItem(itemId: string): boolean {
 
 // Single source for the rep-facing instruction on esign items.
 export const ESIGN_HELPER_TEXT =
-  'This document is signed electronically right here in the portal - it completes automatically once signed.';
+  'This document is signed electronically right here in the portal. It completes automatically once signed.';
 
-export const ESIGN_FAILURE_HELPER_TEXT = 'We hit a snag preparing this document. We are on it - no action needed from you.';
+export const ESIGN_FAILURE_HELPER_TEXT = 'We hit a snag preparing this document. We are on it, and there is nothing you need to do.';

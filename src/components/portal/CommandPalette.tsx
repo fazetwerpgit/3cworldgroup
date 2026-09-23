@@ -114,7 +114,7 @@ export const portalNavGroups: PortalNavGroup[] = [
     items: [
       { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', icon: PanelTop, roles: platformRoles },
       { label: 'Manager Interviews', href: '/portal/admin/manager-interviews', icon: CheckSquare, roles: platformRoles },
-      { label: 'Recruit Onboarding', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
+      { label: 'Recruiting', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
       { label: 'Onboarding Review', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
     ],
   },

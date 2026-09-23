@@ -9,6 +9,7 @@ import {
   FormAlert,
   FormFrame,
   FormHeader,
+  FORMS_BACK,
   FormSection,
   FormSent,
   UPLOADING_MESSAGE,
@@ -278,7 +279,7 @@ function LeadsRequestForm() {
 
 export default function LeadsRequestPage() {
   return (
-    <RepShell task="Leads request">
+    <RepShell task="Leads request" back={FORMS_BACK}>
       <LeadsRequestForm />
     </RepShell>
   );

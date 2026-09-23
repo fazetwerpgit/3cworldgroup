@@ -193,6 +193,16 @@ export const RoleDisplayNames: Record<PlatformRole | FieldRole, string> = {
   internal_rep: 'Internal Rep',
 };
 
+/**
+ * A role's name for rep-facing UI (Settings, pay structure). IBO roles are
+ * never named to reps, so they get null and the caller drops the line; admin
+ * pages keep RoleDisplayNames.
+ */
+export function repFacingRoleLabel(role: PlatformRole | FieldRole | null | undefined): string | null {
+  if (!role || IBO_FIELD_ROLES.includes(role as FieldRole)) return null;
+  return RoleDisplayNames[role] ?? null;
+}
+
 const PLATFORM_ROLE_VALUES: readonly string[] = Object.values(PlatformRoles);
 const FIELD_ROLE_VALUES: readonly string[] = Object.values(FieldRoles);
 

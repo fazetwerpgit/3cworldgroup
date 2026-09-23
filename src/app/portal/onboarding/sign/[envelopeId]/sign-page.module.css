@@ -1,187 +1,188 @@
-/* Committed OFL font (public/fonts/OFL-DancingScript.txt) so a typed signature
-   never depends on a third-party font CDN at signing time. */
-@font-face {
-  font-family: 'Dancing Script';
-  src: url('/fonts/DancingScript.ttf') format('truetype');
-  font-display: swap;
+/* E-sign signing page, direction D. Layout, fields, alert and the sign bar
+   come from rep-forms.module.css (the forms' FormFrame); this file holds only
+   what signing adds. Tokens live on .root / .layer in rep.module.css. */
+
+.head {
+  display: grid;
+  gap: var(--s2);
 }
 
-/* The shell already pads 16px; these only add the phone's own safe areas and
-   the room the sticky sign bar needs at the bottom of the scroll. */
-.page {
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
-}
-
-.section {
-  margin-top: 18px;
-}
-
-.sectionHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 12px;
-}
-
-.sectionTitle {
+/* The document's name stays visible on phones too (the top bar only says
+   "Sign document"). */
+.title {
   margin: 0;
-  font-family: var(--member-line-serif);
-  font-weight: 600;
-  font-size: 23px;
-  letter-spacing: -0.02em;
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  overflow-wrap: anywhere;
 }
 
-.step {
-  color: var(--member-line-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.skelPanel {
+  display: grid;
+  gap: var(--s3);
+  margin-top: var(--s5);
+  padding: var(--s4);
 }
 
+.stepMeta {
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The pages scroll inside their own box so the steps below stay in reach. */
 .pages {
   max-height: 60vh;
+  padding: 0 var(--s3) var(--s1);
   overflow-y: auto;
   /* The zoom scroller inside PdfPages owns the horizontal overflow, so this
      one never scrolls sideways and nothing widens the page body. */
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding-right: 2px;
-}
-
-.fields {
-  display: grid;
-  gap: 16px;
-}
-
-.field {
-  display: grid;
-  gap: 6px;
-}
-
-.fieldLabel {
-  display: flex;
-  align-items: center;
-  min-height: 22px;
-  justify-content: space-between;
-  gap: 10px;
-  color: var(--member-line-muted);
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.input {
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--member-line-line);
-  background: var(--member-line-panel-2);
-  color: var(--member-line-ink);
-  padding: 10px 12px;
-  /* 16px keeps iOS Safari from zooming the page when the field takes focus. */
-  font-size: 16px;
-  outline: none;
-}
-
-.input:focus {
-  border-color: var(--member-line-lime);
+  /* Solid so PdfPages' sticky toolbar (on --c-panel) blends in. */
+  background: var(--c-panel);
 }
 
 .input[readonly] {
-  color: var(--member-line-muted);
+  color: var(--c-text-2);
+  background: var(--c-panel);
 }
 
 .editButton {
-  border: none;
-  background: none;
-  color: var(--member-line-lime);
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  /* 44px is the iOS minimum; the label row grows to match, which is fine. */
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  padding: 0 10px;
-  margin-right: -10px;
+  min-height: var(--tap);
+  margin: calc((var(--tap) - 24px) / -2) calc(var(--s3) * -1) calc((var(--tap) - 24px) / -2) 0;
+  padding: 0 var(--s3);
+  border: 0;
+  background: none;
+  color: var(--c-lime);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
 }
 
-.checkboxRow,
-.consent {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: var(--member-line-ink);
-  font-size: 15px;
+/* Checkbox rows: Log Sale's extras (a 22px box, 52px row). */
+.checks {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+}
+
+.checks .check + .check {
+  border-top: 1px solid var(--c-line);
+}
+
+.check {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: var(--s3);
+  min-height: 52px;
+  padding: 15px var(--s4);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font-size: var(--t-ui);
   line-height: 1.45;
   cursor: pointer;
 }
 
-.consent {
-  margin-top: 16px;
-  font-size: 14px;
+.check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.checkboxRow input,
-.consent input {
+.box {
+  display: grid;
+  place-items: center;
   width: 22px;
   height: 22px;
-  margin: 1px 0 0;
-  flex: 0 0 auto;
-  accent-color: var(--member-line-lime);
+  border: 1.5px solid var(--c-line-strong);
+  border-radius: 4px;
+  color: var(--c-on-lime);
 }
 
-.hint {
+.check:has(input:checked) .box {
+  border-color: var(--c-lime);
+  background: var(--c-lime);
+}
+
+.check:has(input:focus-visible) {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.consent {
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.consent:has(input:checked) {
+  border-color: rgba(141, 198, 63, 0.45);
+  background: var(--c-lime-wash);
+  color: var(--c-text);
+}
+
+/* One action after signing, centred under the message. */
+.doneActions {
+  display: grid;
+  width: 100%;
+  max-width: 360px;
+}
+
+/* Sign bar (phone) / side panel (desktop). */
+.bar .signButton {
+  flex: none;
+  min-width: 128px;
+}
+
+.status {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  color: var(--member-line-muted);
-  font-size: 12px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.35;
 }
 
-.signBar {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 18px;
-  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-  border: 1px solid var(--member-line-line);
-  background: var(--member-line-panel);
-}
-
-.signButton {
-  min-height: 48px;
-  padding: 0 26px;
-  border: none;
-  background: #8dc63f;
-  color: #0a1f44;
-  font-weight: 700;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.signButton:disabled {
-  opacity: 0.55;
+/* Solid, not faded: the phone bar floats over the page, so a translucent
+   button would show the document through it. */
+.signButton:disabled,
+.signButton:disabled:hover {
+  background: var(--c-panel-hi);
+  color: var(--c-text-3);
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
   cursor: not-allowed;
 }
 
-.done {
-  display: grid;
-  gap: 10px;
-  justify-items: start;
+.asideStatus {
+  margin: 0;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
 }
 
-.doneLink {
-  color: var(--member-line-lime);
-  font-weight: 700;
-  text-decoration: underline;
+.asideStatus[data-ready] {
+  color: var(--c-lime-hi);
+}
+
+@media (min-width: 1024px) {
+  .title {
+    font-size: 56px;
+  }
+
+  .pages {
+    max-height: 70vh;
+  }
 }

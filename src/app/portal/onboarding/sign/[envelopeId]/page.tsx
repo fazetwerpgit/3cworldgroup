@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, CircleCheck, RotateCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { MemberLineShell } from '@/components/member/MemberLine';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-rep-b.css';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RepBoot, RepShell, useHideRepTabBar } from '@/components/portal/rep/RepShell';
+import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { useSoftKeyboardOpen } from '@/components/portal/rep/RepForm';
+import s from '@/components/portal/rep/rep.module.css';
+import f from '@/components/portal/rep/rep-forms.module.css';
 import PdfPages from '@/components/esign/PdfPages';
 import { fieldLabelWithOptional } from '@/components/esign/fieldLabel';
 import SignaturePad from '@/components/esign/SignaturePad';
@@ -23,6 +24,8 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ESIGN_CONSENT_TEXT } from '@/lib/esign/documents';
 import { FieldRoles } from '@/types';
 import styles from './sign-page.module.css';
+
+const CHECKLIST_HREF = '/portal/onboarding';
 
 /** Mirrors the envelope route's response (`EnvelopeView`). */
 interface EnvelopeFieldView {
@@ -81,7 +84,7 @@ function inputModeFor(key: string): 'numeric' | 'email' | 'text' {
   return 'text';
 }
 
-export default function EsignSignPage() {
+function EsignSign() {
   const { envelopeId } = useParams<{ envelopeId: string }>();
 
   const [envelope, setEnvelope] = useState<EnvelopeView | null>(null);
@@ -93,6 +96,9 @@ export default function EsignSignPage() {
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState('');
+  // Bumped by Retry after a failed load; re-runs the same GET.
+  const [attempt, setAttempt] = useState(0);
+  const keyboardOpen = useSoftKeyboardOpen();
 
   const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const token = await getIdToken();
@@ -128,6 +134,7 @@ export default function EsignSignPage() {
     };
 
     setLoading(true);
+    setError('');
     void load()
       .catch((cause: unknown) => {
         if (cancelled) return;
@@ -140,7 +147,7 @@ export default function EsignSignPage() {
     return () => {
       cancelled = true;
     };
-  }, [envelopeId, authHeaders]);
+  }, [envelopeId, authHeaders, attempt]);
 
   const setFieldValue = (key: string, value: string | boolean) => {
     setValues((current) => ({ ...current, [key]: value }));
@@ -205,27 +212,31 @@ export default function EsignSignPage() {
     }
   };
 
-  const renderField = (field: EnvelopeFieldView) => {
-    if (field.type === 'checkbox') {
-      return (
-        <label key={field.key} className={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            checked={values[field.key] === true}
-            onChange={(event) => setFieldValue(field.key, event.target.checked)}
-          />
-          <span>{field.label}</span>
-        </label>
-      );
-    }
+  // The sign bar takes the tab bar's place on phones while there is something to sign.
+  useHideRepTabBar(Boolean(envelope) && !completed);
 
+  const renderCheckbox = (field: EnvelopeFieldView) => (
+    <label key={field.key} className={styles.check}>
+      <input
+        type="checkbox"
+        checked={values[field.key] === true}
+        onChange={(event) => setFieldValue(field.key, event.target.checked)}
+      />
+      <span className={styles.box} aria-hidden="true">
+        {values[field.key] === true ? <Check size={14} strokeWidth={3} /> : null}
+      </span>
+      <span>{field.label}</span>
+    </label>
+  );
+
+  const renderField = (field: EnvelopeFieldView) => {
     // Prefilled values come from the rep's own profile; they stay read-only
     // until the rep asks to change them, so a stray tap cannot blank a name.
     const readOnly = field.prefilled && !unlocked[field.key];
     return (
-      <div key={field.key} className={styles.field}>
-        <label className={styles.fieldLabel} htmlFor={`esign-${field.key}`}>
-          <span>{fieldLabelWithOptional(field.label, field.required)}</span>
+      <div key={field.key} className={f.field}>
+        <div className={f.label}>
+          <label htmlFor={`esign-${field.key}`}>{fieldLabelWithOptional(field.label, field.required)}</label>
           {readOnly && (
             <button
               type="button"
@@ -235,10 +246,10 @@ export default function EsignSignPage() {
               Edit
             </button>
           )}
-        </label>
+        </div>
         <input
           id={`esign-${field.key}`}
-          className={styles.input}
+          className={`${f.input} ${styles.input}`}
           value={String(values[field.key] ?? '')}
           readOnly={readOnly}
           onChange={(event) => setFieldValue(field.key, event.target.value)}
@@ -249,119 +260,177 @@ export default function EsignSignPage() {
           maxLength={200}
         />
         {field.sensitive && (
-          <p className={styles.hint}>Written into this signed document only. Never saved to your profile.</p>
+          <p className={f.hint}>Written into this signed document only. Never saved to your profile.</p>
         )}
       </div>
     );
   };
 
+  const status = submitting ? 'Applying your signature…' : blocker ?? 'Ready to sign.';
+  const signButton = (
+    <button
+      type="button"
+      className={`${s.btnPrimary} ${styles.signButton}`}
+      onClick={() => void submit()}
+      disabled={submitting || blocker !== null}
+    >
+      {submitting ? 'Signing…' : 'Sign'}
+    </button>
+  );
+  const textFields = envelope?.fields.filter((field) => field.type !== 'checkbox') ?? [];
+  const checkFields = envelope?.fields.filter((field) => field.type === 'checkbox') ?? [];
+  const signStep = envelope && envelope.fields.length > 0 ? 3 : 2;
+
+  if (loading) {
+    return (
+      <div className={f.page} aria-busy="true" aria-label="Loading the document">
+        <div className={styles.head}>
+          <span className={s.skel} style={{ width: 96, height: 14 }} />
+          <span className={s.skel} style={{ width: '60%', height: 40 }} />
+        </div>
+        <div className={`${s.panel} ${styles.skelPanel}`}>
+          <span className={s.skel} style={{ width: '40%', height: 16 }} />
+          <span className={s.skel} style={{ width: '100%', height: 320 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (completed) {
+    return (
+      <section className={`${s.panel} ${f.sent}`} role="status" aria-labelledby="esign-done-h">
+        <CircleCheck size={40} strokeWidth={1.75} className={f.sentIcon} aria-hidden="true" />
+        <h1 id="esign-done-h" className={f.sentTitle}>
+          Signed
+        </h1>
+        <p className={f.sentMsg}>
+          {envelope?.name ? `${envelope.name} is complete. ` : 'This document is complete. '}
+          Your checklist already shows it approved. Nothing else is needed here.
+        </p>
+        <div className={styles.doneActions}>
+          <Link href={CHECKLIST_HREF} className={`${s.btnPrimary} ${f.sentBtn}`}>
+            Back to checklist
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  if (!envelope) {
+    return (
+      <div className={f.page}>
+        <div className={styles.head}>
+          <h1 className={styles.title}>Sign document</h1>
+        </div>
+        <div className={`${s.panel} ${s.failed}`} role="alert">
+          <span>Couldn&apos;t open this document. {error}</span>
+          <button type="button" className={s.retry} onClick={() => setAttempt((n) => n + 1)}>
+            <RotateCw size={14} aria-hidden="true" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <ProtectedRoute roles={Object.values(FieldRoles)}>
-      <MemberLineShell>
-        <div className={styles.page}>
-          <PageTitle
-            title={envelope?.name ?? 'Sign document'}
-            back={
-              <Link href="/portal/onboarding" className="member-line-sub">
-                Back to checklist
-              </Link>
-            }
-            subtitle={completed ? undefined : 'Read the document, fill in what is missing, then sign.'}
-          />
+    <div className={f.page}>
+      <div className={f.frame}>
+        <div className={f.body}>
+          <header className={`${f.header} ${styles.head}`}>
+            <Link href={CHECKLIST_HREF} className={f.backLink}>
+              <ArrowLeft size={16} aria-hidden="true" />
+              Onboarding
+            </Link>
+            <h1 className={styles.title}>{envelope.name}</h1>
+            <p className={f.lede}>Read the document, fill in what is missing, then sign.</p>
+          </header>
 
           {error && (
-            <div className="member-line-note warn" role="alert" style={{ marginTop: 16 }}>
-              <AlertCircle className="mr-1.5 inline size-3.5" />
-              {error}
+            <div className={f.alert} role="alert">
+              <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
+              <p>
+                <strong>Not signed.</strong> {error}
+              </p>
             </div>
           )}
 
-          {completed ? (
-            <section className="member-line-panel" style={{ marginTop: 18 }}>
-              <div className={styles.done}>
-                <h2 className={styles.sectionTitle}>
-                  <CheckCircle2 className="mr-2 inline size-5 text-[#5a8f1f]" />
-                  Signed. This document is complete.
-                </h2>
-                <p className="member-line-sub">
-                  Your checklist already shows it approved. Nothing else is needed here.
-                </p>
-                <Link href="/portal/onboarding" className={styles.doneLink}>
-                  Back to checklist
-                </Link>
-              </div>
-            </section>
-          ) : loading ? (
-            <div className="member-line-panel grid gap-3" style={{ marginTop: 18 }}>
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-64 w-full" />
+          <section className={f.section} aria-labelledby="esign-read-h">
+            <h2 id="esign-read-h" className={f.sectionHead}>
+              <b aria-hidden="true">1</b>
+              Read
+              <span className={styles.stepMeta}>
+                {envelope.pageCount} {envelope.pageCount === 1 ? 'page' : 'pages'}
+              </span>
+            </h2>
+            <div className={`${s.panel} ${styles.pages}`}>
+              <PdfPages src={`/api/portal/onboarding/esign/envelope/${envelopeId}/pdf`} authHeaders={authHeaders} />
             </div>
-          ) : envelope ? (
-            <>
-              <section className={`member-line-panel ${styles.section}`}>
-                <div className={styles.sectionHead}>
-                  <h2 className={styles.sectionTitle}>Read</h2>
-                  <span className={styles.step}>
-                    Step 1 · {envelope.pageCount} {envelope.pageCount === 1 ? 'page' : 'pages'}
-                  </span>
-                </div>
-                <div className={styles.pages}>
-                  <PdfPages
-                    src={`/api/portal/onboarding/esign/envelope/${envelopeId}/pdf`}
-                    authHeaders={authHeaders}
-                  />
-                </div>
-              </section>
+          </section>
 
-              {envelope.fields.length > 0 && (
-                <section className={`member-line-panel ${styles.section}`}>
-                  <div className={styles.sectionHead}>
-                    <h2 className={styles.sectionTitle}>Fill</h2>
-                    <span className={styles.step}>Step 2</span>
-                  </div>
-                  <div className={styles.fields}>{envelope.fields.map(renderField)}</div>
-                </section>
-              )}
+          {envelope.fields.length > 0 && (
+            <section className={f.section} aria-labelledby="esign-fill-h">
+              <h2 id="esign-fill-h" className={f.sectionHead}>
+                <b aria-hidden="true">2</b>
+                Fill
+              </h2>
+              {textFields.length > 0 && <div className={f.grid}>{textFields.map(renderField)}</div>}
+              {checkFields.length > 0 && <div className={styles.checks}>{checkFields.map(renderCheckbox)}</div>}
+            </section>
+          )}
 
-              <section className={`member-line-panel ${styles.section}`}>
-                <div className={styles.sectionHead}>
-                  <h2 className={styles.sectionTitle}>Sign</h2>
-                  <span className={styles.step}>
-                    Step {envelope.fields.length > 0 ? 3 : 2}
-                  </span>
-                </div>
-                <SignaturePad
-                  value={signature}
-                  signerName={envelope.signerName}
-                  onChange={handleSignatureChange}
-                />
-                <label className={styles.consent}>
-                  <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(event) => setConsent(event.target.checked)}
-                  />
-                  <span>{ESIGN_CONSENT_TEXT}</span>
-                </label>
-              </section>
+          <section className={f.section} aria-labelledby="esign-sign-h">
+            <h2 id="esign-sign-h" className={f.sectionHead}>
+              <b aria-hidden="true">{signStep}</b>
+              Sign
+            </h2>
+            <SignaturePad value={signature} signerName={envelope.signerName} onChange={handleSignatureChange} />
+            <label className={`${styles.check} ${styles.consent}`}>
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+              <span className={styles.box} aria-hidden="true">
+                {consent ? <Check size={14} strokeWidth={3} /> : null}
+              </span>
+              <span>{ESIGN_CONSENT_TEXT}</span>
+            </label>
+          </section>
 
-              <div className={styles.signBar}>
-                <p className={styles.hint}>
-                  {submitting ? 'Applying your signature...' : blocker ?? 'Ready to sign.'}
-                </p>
-                <button
-                  type="button"
-                  className={styles.signButton}
-                  onClick={() => void submit()}
-                  disabled={submitting || blocker !== null}
-                >
-                  {submitting ? 'Signing...' : 'Sign'}
-                </button>
-              </div>
-            </>
-          ) : null}
+          {/* Phones with the keyboard up: in the page flow. */}
+          <div className={`${f.submitInline} ${styles.bar}`} data-keyboard={keyboardOpen ? 'open' : undefined}>
+            <p className={styles.status}>{status}</p>
+            {signButton}
+          </div>
         </div>
-      </MemberLineShell>
-    </ProtectedRoute>
+
+        <aside className={`${s.panel} ${f.aside} ${s.deskOnly}`} aria-label="Sign">
+          <p className={s.kicker}>Signing as</p>
+          <p className={f.asideRoute}>{envelope.signerName}</p>
+          <p className={f.asideNote}>{envelope.signerEmail}</p>
+          <p className={styles.asideStatus} data-ready={blocker === null ? 'yes' : undefined}>
+            {status}
+          </p>
+          {signButton}
+        </aside>
+      </div>
+
+      {/* Phones with the keyboard down: fixed in the tab bar's place. */}
+      {keyboardOpen ? null : (
+        <BodyLayer>
+          <div className={`${f.submitBar} ${styles.bar}`}>
+            <p className={styles.status}>{status}</p>
+            {signButton}
+          </div>
+        </BodyLayer>
+      )}
+    </div>
+  );
+}
+
+export default function EsignSignPage() {
+  return (
+    <RepShell task="Sign document" back={{ href: CHECKLIST_HREF, label: 'onboarding' }}>
+      <ProtectedRoute roles={Object.values(FieldRoles)} fallback={<RepBoot />}>
+        <EsignSign />
+      </ProtectedRoute>
+    </RepShell>
   );
 }

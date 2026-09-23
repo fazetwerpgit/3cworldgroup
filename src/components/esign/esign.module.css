@@ -1,0 +1,234 @@
+/* E-sign pieces (PdfPages, SignaturePad) in direction D. Tokens come from
+   .root in rep.module.css; the signing page sits on RepShell. Paper surfaces
+   (PDF pages, the signature plate) stay light on purpose: that is what the
+   signed document looks like. */
+
+/* Committed OFL font (public/fonts/OFL-DancingScript.txt) so a typed signature
+   never depends on a third-party font CDN at signing time. */
+@font-face {
+  font-family: 'Dancing Script';
+  src: url('/fonts/DancingScript.ttf') format('truetype');
+  font-display: swap;
+}
+
+/* ---------- PdfPages ---------- */
+.pdfBar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s2);
+  padding: var(--s1) 0;
+  background: var(--c-panel);
+}
+
+.pdfHint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.pdfNote {
+  margin: 0;
+  padding: var(--s4) 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.pdfError {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid rgba(255, 138, 128, 0.5);
+  border-radius: var(--r-control);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.pdfFrame {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.pdfPage {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--s3);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Small secondary control (Zoom in, Clear): same as the forms' file buttons. */
+.smallBtn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.smallBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.smallBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .smallBtn:not(:disabled):hover {
+    border-color: var(--c-text-2);
+  }
+}
+
+/* ---------- SignaturePad ---------- */
+.pad {
+  display: grid;
+  gap: var(--s3);
+}
+
+.methods {
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-line-strong);
+}
+
+.method {
+  flex: 1 1 0;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.method[aria-selected='true'] {
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+  box-shadow: inset 0 -2px 0 var(--c-lime);
+}
+
+.method:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+/* Paper on purpose: the ink is black on a clear PNG. */
+.canvas {
+  display: block;
+  width: 100%;
+  height: 160px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: #f2f5f9;
+  touch-action: none;
+}
+
+.padBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.padHint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.label {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.typed {
+  display: grid;
+  gap: var(--s2);
+}
+
+.nameInput {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  font: 400 var(--t-body) / 1 var(--f-ui);
+  appearance: none;
+}
+
+.nameInput::placeholder {
+  color: var(--c-text-3);
+}
+
+.nameInput:focus {
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+.plate {
+  display: flex;
+  align-items: center;
+  min-height: 80px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: #f2f5f9;
+}
+
+.script {
+  color: #000;
+  font-family: 'Dancing Script', cursive;
+  font-size: 48px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.preview {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.previewImg {
+  width: auto;
+  max-width: 100%;
+  height: 64px;
+  object-fit: contain;
+}
+
+@media (min-width: 1024px) {
+  .methods {
+    display: inline-flex;
+    justify-self: start;
+  }
+
+  .method {
+    flex: none;
+    min-width: 140px;
+  }
+}

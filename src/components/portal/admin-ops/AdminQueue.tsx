@@ -91,6 +91,8 @@ export function queueValue(v: unknown): string {
 }
 
 type StatusFilter = 'all' | 'new' | 'handled';
+/** Queues open on what still needs handling (owner decision); All is one tap away. */
+const DEFAULT_STATUS: StatusFilter = 'new';
 
 export function AdminQueue({
   title,
@@ -133,7 +135,7 @@ export function AdminQueue({
   emptyBody: string;
 }) {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS);
   const [filter, setFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -158,7 +160,7 @@ export function AdminQueue({
 
   const clearFilters = () => {
     setSearch('');
-    setStatusFilter('all');
+    setStatusFilter(DEFAULT_STATUS);
     setFilter('all');
   };
 
@@ -166,6 +168,19 @@ export function AdminQueue({
   if (loading) body = <SkeletonRows rows={4} />;
   else if (failed) body = <LoadFailed onRetry={onRetry} />;
   else if (rows.length === 0) body = <EmptyState title={emptyTitle} body={emptyBody} />;
+  // Default view with nothing left to handle: say so, not "Nothing matches".
+  else if (statusFilter === 'new' && openCount === 0 && !search.trim() && filter === 'all')
+    body = (
+      <EmptyState
+        title="All caught up"
+        body={`Every ${itemNoun.toLowerCase()} here is handled.`}
+        action={
+          <button type="button" className={s.btn} onClick={() => setStatusFilter('all')}>
+            Show all
+          </button>
+        }
+      />
+    );
   else if (filtered.length === 0)
     body = (
       <EmptyState

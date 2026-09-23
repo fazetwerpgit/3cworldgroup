@@ -15,8 +15,12 @@ import {
 // sheet (MobileBottomNav) and the direction D shell's menu button. Both render
 // the same items behind the same gates; only the class names differ.
 
+/** Root pages (Dashboard, Ops Home) match only themselves; every other page owns its sub-paths. */
+const EXACT_MATCH_HREFS = new Set(['/portal/dashboard', '/portal/admin']);
+
 export function isNavItemActive(pathname: string, href: string) {
-  return href === '/portal/dashboard' ? pathname === href : pathname.startsWith(href);
+  if (EXACT_MATCH_HREFS.has(href)) return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 /** The portal's one nav gate (same as the sidebar and palette): role first, then permissions. */

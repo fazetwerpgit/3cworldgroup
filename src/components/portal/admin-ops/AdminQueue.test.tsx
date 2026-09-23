@@ -62,16 +62,33 @@ describe('AdminQueue', () => {
     expect(html).toContain('No bug reports need review right now.');
   });
 
-  it('lists rows with status and counts only the open ones', () => {
+  it('opens on New: lists only open rows and counts them', () => {
     const html = render({
       rows: [row({}), row({ id: 'r2', person: 'Priya Nair', status: 'handled' })],
       filterLabel: 'Campaign',
       filterOptions: ['T-Fiber DFW'],
     });
     expect(html).toContain('Marcus Hill');
-    expect(html).toContain('Priya Nair');
-    expect(html).toContain('Handled');
+    expect(html).not.toContain('Priya Nair');
     expect(html).toMatch(/>1<\/span><span[^>]*>open</);
     expect(html).toContain('All campaigns');
+  });
+
+  it('marks New as the selected status and keeps All and Handled one tap away', () => {
+    const html = render({ rows: [row({})] });
+    const pressed = (label: string) =>
+      html.match(new RegExp(`<button[^>]*aria-pressed="(true|false)"[^>]*>${label}`))?.[1];
+    expect(pressed('New')).toBe('true');
+    expect(pressed('All')).toBe('false');
+    expect(pressed('Handled')).toBe('false');
+  });
+
+  it('says All caught up, with Show all, when every row is handled', () => {
+    const html = render({ rows: [row({ status: 'handled', person: 'Priya Nair' })] });
+    expect(html).toContain('All caught up');
+    expect(html).toContain('Every bug report here is handled.');
+    expect(html).toContain('Show all');
+    expect(html).not.toContain('Nothing matches');
+    expect(html).not.toContain('Priya Nair');
   });
 });

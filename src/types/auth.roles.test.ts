@@ -10,6 +10,7 @@ import {
   PlatformRoles,
   resolveRoles,
   RoleDisplayNames,
+  repFacingRoleLabel,
   RolePermissions,
 } from './auth';
 import type { FieldRole, PlatformRole } from './auth';
@@ -117,5 +118,24 @@ describe('role predicates', () => {
     for (const permissions of Object.values(RolePermissions)) {
       expect(permissions).not.toContain('sales:approve');
     }
+  });
+});
+
+describe('repFacingRoleLabel', () => {
+  it('never names an IBO role', () => {
+    for (const role of ['ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4'] as const) {
+      expect(repFacingRoleLabel(role)).toBeNull();
+    }
+  });
+
+  it('names every other role as RoleDisplayNames does', () => {
+    expect(repFacingRoleLabel('entry_rep')).toBe(RoleDisplayNames.entry_rep);
+    expect(repFacingRoleLabel('l1_manager')).toBe('L1 Manager');
+    expect(repFacingRoleLabel('admin')).toBe('Administrator');
+  });
+
+  it('returns null when there is no role', () => {
+    expect(repFacingRoleLabel(undefined)).toBeNull();
+    expect(repFacingRoleLabel(null)).toBeNull();
   });
 });

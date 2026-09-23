@@ -27,7 +27,7 @@ describe('isEsignItem', () => {
 describe('ESIGN_HELPER_TEXT', () => {
   it('uses provider-neutral e-sign copy', () => {
     expect(ESIGN_HELPER_TEXT).toBe(
-      'This document is signed electronically right here in the portal - it completes automatically once signed.'
+      'This document is signed electronically right here in the portal. It completes automatically once signed.'
     );
   });
 });

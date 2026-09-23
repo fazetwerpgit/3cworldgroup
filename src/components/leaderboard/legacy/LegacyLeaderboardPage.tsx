@@ -16,6 +16,7 @@ import { LegacyLeaderboardTable } from './LegacyLeaderboardTable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { auth } from '@/lib/firebase/config';
+import { weekTimeLeft } from '@/lib/dashboard/repSummary';
 import { PageTitle } from '@/components/portal/PageTitle';
 import type { LeaderboardEntry } from '../LeaderboardTable';
 
@@ -37,16 +38,6 @@ const metricOptions: { value: Metric; label: string }[] = [
 ];
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en-US').format(n);
-
-function countdownToSunday(now: Date) {
-  const end = new Date(now);
-  end.setHours(0, 0, 0, 0);
-  end.setDate(end.getDate() + ((8 - end.getDay()) % 7 || 7));
-  const remaining = Math.max(0, end.getTime() - now.getTime());
-  const days = Math.floor(remaining / 86_400_000);
-  const hours = Math.floor((remaining % 86_400_000) / 3_600_000);
-  return days > 0 ? `${days}d ${hours}h left` : hours > 0 ? `${hours}h left` : 'Under 1h left';
-}
 
 function LegacyLeaderboardFilters({
   period,
@@ -106,7 +97,7 @@ function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loa
       <div>
         <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</h2>
         <span className="portal-display mt-2 block text-[12px] font-black whitespace-nowrap text-white/85">
-          {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${countdownToSunday(now)}`}
+          {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${weekTimeLeft(now)}`}
         </span>
         <span className="mt-2 block h-[3px] w-full bg-white/15" aria-hidden="true">
           <span
@@ -116,7 +107,7 @@ function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loa
         </span>
       </div>
       <strong className="portal-display text-[15px] font-black sm:text-[18px]">
-        {complete ? `Challenge complete. ${target} of ${target}` : `Close ${target} sales by Sunday`}
+        {complete ? `Challenge complete. ${target} of ${target}` : `Close ${target} sales by Saturday`}
       </strong>
     </div>
   );

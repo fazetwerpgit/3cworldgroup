@@ -9,7 +9,7 @@ import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
-import { RoleDisplayNames, getEffectiveRole } from '@/types';
+import { getEffectiveRole, repFacingRoleLabel } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
@@ -125,7 +125,9 @@ export default function SettingsPage() {
   };
 
   const effectiveRole = getEffectiveRole(user);
-  const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
+  // IBO roles are never named to reps: no Role row for them at all.
+  const roleLabel = repFacingRoleLabel(effectiveRole);
+  const showRole = !effectiveRole || roleLabel !== null;
 
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'Not on file';
@@ -150,7 +152,7 @@ export default function SettingsPage() {
   const facts: Array<[string, string]> = [
     // Some older user docs lack an email field — fall back to the auth account's.
     ['Email', email || 'Not on file'],
-    ['Role', roleLabel || 'Not assigned'],
+    ...(showRole ? [['Role', roleLabel || 'Not assigned'] as [string, string]] : []),
     ['Status', user?.status === 'active' ? 'Active' : 'Inactive'],
     ['Start date', formatDate(user?.hireDate)],
     ['Member since', formatShortDate(user?.createdAt)],

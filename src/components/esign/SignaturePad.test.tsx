@@ -42,21 +42,21 @@ async function renderTypeTab() {
 }
 
 describe('SignaturePad typed name field', () => {
-  // globals.css sets `.portal-scope input { color: var(--foreground) }`, which
-  // outranks any `text-*` utility class on the element. Only an inline style
-  // wins, and without it the typed name was light-on-white and unreadable.
-  it('states its ink inline so the portal-scope input rule cannot override it', async () => {
+  // The field is a dark D input now: the ink comes from the portal's
+  // foreground (.portal-scope input), so nothing may pin it to navy, which
+  // would be navy on navy.
+  it('does not force a navy ink onto the dark field', async () => {
     const input = await renderTypeTab();
 
-    expect(input.style.color).toBe('rgb(10, 31, 68)');
-    expect(input.style.caretColor).toBe('rgb(10, 31, 68)');
+    expect(input.style.color).toBe('');
+    expect(input.className).not.toMatch(/text-\[#0A1F44\]/i);
   });
 
-  it('does not rely on a text colour utility class for the ink', async () => {
+  it('keeps the name field labelled and off the autocorrect path', async () => {
     const input = await renderTypeTab();
 
-    expect(input.className).not.toMatch(/text-\[#0A1F44\]/i);
-    // The placeholder has no competing portal-scope rule, so it stays a class.
-    expect(input.className).toContain('placeholder:text-slate-500');
+    expect(container.querySelector('label[for="esign-typed-name"]')?.textContent).toBe('Type your full name');
+    expect(input.getAttribute('autocomplete')).toBe('name');
+    expect(input.getAttribute('spellcheck')).toBe('false');
   });
 });

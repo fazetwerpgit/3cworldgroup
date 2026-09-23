@@ -5,7 +5,7 @@ import { AlertCircle, Check, Clock3, Edit3 } from 'lucide-react';
 import { CompPlanMatrix } from '@/components/resources/CompPlanMatrix';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { ratesArePending, CommissionConfig, FieldRole, RoleDisplayNames } from '@/types';
+import { ratesArePending, CommissionConfig, FieldRole, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
@@ -119,6 +119,8 @@ export function RepPayStructure() {
   const tiers = editing ? draft : data?.tiers ?? [];
   const ratesPending = data ? ratesArePending(data.tiers) : false;
   const ownTier = data?.scope === 'own' ? data.tiers[0] : undefined;
+  // IBO tiers are never named to reps (null drops the line).
+  const ownRoleLabel = ownTier ? repFacingRoleLabel(ownTier.fieldRole) : 'Your tier';
 
   return (
     <section className={s.panel} aria-labelledby="pay-structure-title">
@@ -167,7 +169,7 @@ export function RepPayStructure() {
           {data.scope === 'own' ? (
             <div className={l.rate}>
               <p className={s.kicker}>Your rate</p>
-              <p className={l.rateRole}>{ownTier ? RoleDisplayNames[ownTier.fieldRole] : 'Your tier'}</p>
+              {ownRoleLabel !== null ? <p className={l.rateRole}>{ownRoleLabel}</p> : null}
               <dl className={l.rateFigures}>
                 <div>
                   <dt>Base</dt>

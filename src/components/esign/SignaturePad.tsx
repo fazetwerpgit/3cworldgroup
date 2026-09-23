@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import type { SignatureMethod, StoredSignature } from './signatureStore';
+import e from './esign.module.css';
 
 /** Ink width in CSS pixels; thick enough to survive being scaled into the PDF box. */
 const STROKE_WIDTH = 2.5;
@@ -232,64 +232,45 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
   }, [onChange]);
 
   return (
-    <div className="grid gap-3">
-      <div role="tablist" aria-label="Signature method" className="flex gap-2">
+    <div className={e.pad}>
+      <div role="tablist" aria-label="Signature method" className={e.methods}>
         {(['draw', 'type'] as const).map((method) => (
-          <Button
+          <button
             key={method}
             type="button"
             role="tab"
             aria-selected={tab === method}
-            variant={tab === method ? 'default' : 'outline'}
+            className={e.method}
             onClick={() => setTab(method)}
-            // min-h-11 is the 44px iOS tap target; it overrides the variant's h-9.
-            className={`min-h-11 px-5 ${
-              tab === method
-                ? 'border border-white/25 bg-[#0A1F44] text-white hover:bg-[#0A1F44]/90'
-                : ''
-            }`}
           >
             {method === 'draw' ? 'Draw' : 'Type'}
-          </Button>
+          </button>
         ))}
       </div>
 
       {tab === 'draw' ? (
-        <div className="grid gap-2">
+        <div className={e.typed}>
           <canvas
             ref={canvasRef}
             aria-label="Signature pad"
             // touch-action:none stops iOS from scrolling the page mid-stroke.
-            className="h-40 w-full touch-none rounded-md border border-slate-300 bg-white"
+            className={e.canvas}
             onPointerDown={startStroke}
             onPointerMove={extendStroke}
             onPointerUp={endStroke}
             onPointerCancel={endStroke}
             onPointerLeave={endStroke}
           />
-          <div className="flex items-center justify-between gap-3">
-            {/* The panel behind this is navy in the portal's dark theme, so the
-                copy takes its colour from the shell rather than a fixed slate. */}
-            <p className="text-sm text-[color:var(--member-line-muted,#5b6b7d)]">
-              Sign with your finger.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={clearDrawing}
-              disabled={!hasInk}
-              className="min-h-11 px-5"
-            >
+          <div className={e.padBar}>
+            <p className={e.padHint}>Sign with your finger.</p>
+            <button type="button" className={e.smallBtn} onClick={clearDrawing} disabled={!hasInk}>
               Clear
-            </Button>
+            </button>
           </div>
         </div>
       ) : (
-        <div className="grid gap-2">
-          <label
-            className="grid gap-1 text-sm font-medium text-[color:var(--member-line-ink,#0a1f44)]"
-            htmlFor="esign-typed-name"
-          >
+        <div className={e.typed}>
+          <label className={e.label} htmlFor="esign-typed-name">
             Type your full name
           </label>
           <input
@@ -303,44 +284,25 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             autoComplete="name"
             autoCapitalize="words"
             spellCheck={false}
-            // The field is white, so the ink has to be stated: inheriting the
-            // shell's light foreground left the text invisible in dark mode.
-            // 16px keeps iOS from zooming the page when the field is focused.
-            className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base placeholder:text-slate-500"
-            // Inline rather than a `text-[#0A1F44]` utility: globals.css has
-            // `.portal-scope input { color: var(--foreground) }`, which outranks
-            // the utility class and left the typed name light-on-white. An
-            // inline style wins regardless of selector specificity. The
-            // placeholder has no competing portal-scope rule, so its utility
-            // class still applies.
-            style={{ color: '#0A1F44', caretColor: '#0A1F44' }}
+            // A dark D field: the typed text takes the portal's light
+            // foreground (.portal-scope input). 16px keeps iOS from zooming.
+            className={e.nameInput}
           />
-          <div
-            aria-hidden="true"
-            className="min-h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-5xl leading-tight text-black"
-            style={{ fontFamily: SCRIPT_FONT_STACK }}
-          >
-            {typedName.trim()}
+          <div aria-hidden="true" className={e.plate}>
+            <span className={e.script}>{typedName.trim()}</span>
           </div>
         </div>
       )}
 
       {value ? (
-        <figure className="grid gap-1.5">
-          <figcaption className="text-sm text-[color:var(--member-line-muted,#5b6b7d)]">
-            Signature to be applied
-          </figcaption>
-          {/* The ink is black on a transparent PNG, so it needs the same white
-              plate it will land on in the document. On the navy panel alone it
-              was invisible. */}
-          <div className="flex min-h-20 items-center rounded-md border border-slate-300 bg-white px-3 py-2">
+        <figure className={e.preview}>
+          <figcaption className={e.padHint}>Signature to be applied</figcaption>
+          {/* The ink is black on a transparent PNG, so it needs the same paper
+              plate it will land on in the document. */}
+          <div className={e.plate}>
             {/* Client-generated data URL, so next/image would add nothing here. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={value.png}
-              alt="Your signature"
-              className="h-16 w-auto max-w-full object-contain"
-            />
+            <img src={value.png} alt="Your signature" className={e.previewImg} />
           </div>
         </figure>
       ) : null}
