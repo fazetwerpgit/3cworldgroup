@@ -54,10 +54,11 @@ describe('summarizePay', () => {
       sale({ saleDate: d(2026, 9, 15), installDate: d(2026, 10, 2) }), // sold Sep, installs Oct: not this month
       sale({ saleDate: d(2026, 8, 25), installDate: d(2026, 8, 30), products: [product('att', 'att-500')] }), // Aug: 90
       sale({ saleDate: d(2026, 7, 28), installDate: d(2026, 8, 4) }), // Aug: 130
+      sale({ saleDate: d(2026, 8, 5), installDate: d(2026, 8, 12), products: [product('att', 'att-500')] }), // Aug: 90
     ];
     const summary = summarizePay(sales, noFiber, rates, NOW);
     expect(summary.estThisMonth).toBe(350); // 130 + 130 + 90
-    expect(summary.deltaPct).toBe(59); // 350 vs 220
+    expect(summary.deltaPct).toBe(13); // 350 vs 310
     expect(summary.estNoDate).toBe(130);
     // The month's sales COUNT is still by sale date.
     expect(summary.monthCount).toBe(4);
@@ -94,7 +95,8 @@ describe('summarizePay', () => {
   it('reads the month in America/Chicago', () => {
     // 11pm Aug 31 in Chicago is already Sep 1 in UTC.
     const lateAug31 = new Date('2026-09-01T04:00:00Z');
-    const summary = summarizePay([sale({ installDate: lateAug31 })], noFiber, rates, NOW);
+    const august = [lateAug31, d(2026, 8, 10), d(2026, 8, 11)].map((installDate) => sale({ installDate }));
+    const summary = summarizePay(august, noFiber, rates, NOW);
     expect(summary.estThisMonth).toBe(0);
     expect(summary.deltaPct).toBe(-100); // it is August's money
   });
@@ -108,6 +110,18 @@ describe('summarizePay', () => {
 
   it('hides the delta when last month was zero', () => {
     expect(summarizePay([sale()], noFiber, rates, NOW).deltaPct).toBeNull();
+  });
+
+  it('hides the delta when last month had fewer than 3 installs', () => {
+    const sales = [
+      sale({ installDate: d(2026, 9, 10) }),
+      sale({ installDate: d(2026, 9, 11) }),
+      sale({ installDate: d(2026, 8, 10) }),
+      sale({ installDate: d(2026, 8, 11) }),
+    ];
+    expect(summarizePay(sales, noFiber, rates, NOW).deltaPct).toBeNull();
+    const withThird = [...sales, sale({ installDate: d(2026, 8, 12) })];
+    expect(summarizePay(withThird, noFiber, rates, NOW).deltaPct).toBe(-33); // 260 vs 390
   });
 
   it('finds the next T-Fiber payout window across months of installs', () => {

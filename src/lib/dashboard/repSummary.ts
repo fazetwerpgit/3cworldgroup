@@ -43,7 +43,10 @@ export interface PaySummary {
    * follows the install, not the sale. Null = no pay plan.
    */
   estThisMonth: number | null;
-  /** % change vs last month, counted the same way. Null when there is no plan or last month was 0. */
+  /**
+   * % change vs last month, counted the same way. Null when there is no plan or
+   * last month had fewer than MIN_DELTA_BASE installs (no "+315%" off one sale).
+   */
   deltaPct: number | null;
   /** Est. pay on non-cancelled sales with no install date yet. Null = no pay plan. */
   estNoDate: number | null;
@@ -55,6 +58,9 @@ export interface PaySummary {
   /** Next estimated T-Fiber payout window (scheduled or completed installs), or null. */
   payout: UpcomingPayout | null;
 }
+
+/** Last month needs this many installs before a % change means anything. */
+const MIN_DELTA_BASE = 3;
 
 export function summarizePay(
   sales: Sale[],
@@ -68,9 +74,10 @@ export function summarizePay(
     dated.filter((sale) => isInChicagoMonth(sale.installDate as Date | string | undefined, key));
 
   const estThisMonth = sumExpectedPay(installsIn(month), rates);
-  const estLastMonth = sumExpectedPay(installsIn(shiftMonth(month, -1)), rates);
+  const lastMonth = installsIn(shiftMonth(month, -1));
+  const estLastMonth = sumExpectedPay(lastMonth, rates);
   const deltaPct =
-    estThisMonth !== null && estLastMonth
+    estThisMonth !== null && estLastMonth && lastMonth.length >= MIN_DELTA_BASE
       ? Math.round(((estThisMonth - estLastMonth) / estLastMonth) * 100)
       : null;
 

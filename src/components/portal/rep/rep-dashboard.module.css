@@ -30,7 +30,7 @@
   .standB {
     order: 2;
   }
-  .ringCard {
+  .challenge {
     order: 3;
   }
   .todayB {
@@ -130,16 +130,7 @@
 }
 
 .periodHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: var(--s3);
-}
-
-.periodCount {
-  margin: 0;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
+  margin: 0 0 var(--s3);
 }
 
 .stack {
@@ -155,17 +146,14 @@
 
 .seg_installed {
   background: var(--c-lime);
-  box-shadow: 0 0 10px rgba(141, 198, 63, calc(0.38 * 1));
 }
 
 .seg_scheduled {
   background: var(--c-blue);
-  box-shadow: 0 0 10px rgba(124, 184, 255, calc(0.24 * 1));
 }
 
 .seg_needs {
   background: var(--c-amber);
-  box-shadow: 0 0 10px rgba(245, 185, 69, calc(0.26 * 1));
 }
 
 .legend {
@@ -273,64 +261,9 @@
   }
 }
 
-/* ---------- where you stand: phone (B's tiles, C's surface) ----------
-   The score panel above already carries the hero rank (76px lime).
-   These tiles restate it as plain facts: white 48px numerals, no glow, "#4 of 18". */
-.statTiles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.statTile {
-  padding: var(--s4);
-}
-
-.statTile + .statTile {
-  border-left: 1px solid var(--c-line);
-}
-
-.statLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.statTile:first-child .statValue,
-.rungYou .rungPos {
-  color: var(--c-lime);
-}
-
-.statValue {
-  margin: var(--s3) 0 0;
-  color: var(--c-text);
-  font-family: var(--f-display);
-  font-size: var(--t-d1);
-  font-weight: 400;
-  line-height: 0.9;
-  font-variant-numeric: tabular-nums;
-}
-
-.statOf {
-  margin-left: 2px;
-  color: var(--c-text-3);
-  font-family: var(--f-ui);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
 .standGap {
   margin: 0;
   padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
   color: var(--c-text-2);
   font-size: var(--t-sm);
   line-height: 1.4;
@@ -452,27 +385,8 @@
   font-size: 0.6em;
 }
 
-.ticks {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
-  height: 12px;
+.challengeTrack {
   margin-top: var(--s4);
-}
-
-.ticks > span {
-  border-radius: 2px;
-  background: var(--c-track);
-}
-
-.ticks > .tickOn {
-  background: var(--c-lime);
-  box-shadow: 0 0 8px rgba(141, 198, 63, calc(0.3 * 1));
-}
-
-.ticks > .tickLead {
-  background: var(--c-lime);
-  box-shadow: 0 0 12px var(--c-lime-glow);
 }
 
 /* ---------- today ---------- */
@@ -633,110 +547,6 @@
 .saleOff .saleName,
 .saleOff .saleAmt {
   color: var(--c-text-3);
-}
-
-/* ---------- footnote ---------- */
-.foot {
-  margin: 0;
-  padding: var(--s3) var(--s5);
-  border-top: 1px solid var(--c-line);
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-}
-
-.footB {
-  margin: var(--s3) var(--s1) 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-}
-
-/* ---------- phone lower half (from B, in D tokens) ---------- */
-.ringCard {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  padding: var(--s4);
-  box-shadow:
-    inset 2px 0 0 var(--c-lime),
-    var(--c-lift);
-}
-
-.ringWrap {
-  position: relative;
-  flex: none;
-  width: 72px;
-  height: 72px;
-}
-
-.ring {
-  display: block;
-  width: 72px;
-  height: 72px;
-}
-
-.ringTrack {
-  fill: none;
-  stroke: var(--c-track);
-  stroke-width: 7;
-}
-
-.ringFill {
-  fill: none;
-  stroke: var(--c-lime);
-  stroke-linecap: round;
-  stroke-width: 7;
-  filter: drop-shadow(0 0 5px var(--c-lime-glow));
-}
-
-.ringText {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  padding-top: 24px;
-  font-family: var(--f-display);
-  font-size: 28px;
-  line-height: 1;
-}
-
-.ringText span {
-  color: var(--c-text-3);
-  font-size: 0.6em;
-}
-
-.ringBody {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.ringTitle {
-  margin: 0;
-  font-size: var(--t-body);
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.ringMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px var(--s3);
-  margin: 0;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.ringMeta strong {
-  color: var(--c-text);
-  font-weight: 600;
-}
-
-.ringTime {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .tRow {
@@ -1106,17 +916,10 @@
 .welcomeTitle {
   margin: 0;
   font-family: var(--f-display);
-  font-size: var(--t-d1);
+  font-size: var(--t-d3);
   font-weight: 400;
-  line-height: 0.95;
+  line-height: 1;
   letter-spacing: 0.01em;
-}
-
-.welcomeText {
-  margin: 0 0 var(--s2);
-  max-width: 34em;
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
 }
 
 /* ---------- today: extra rows ---------- */

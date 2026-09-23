@@ -242,7 +242,6 @@ function SalesContent() {
     () => nextPayout(datedSales(sales, fiberBySale), hasPlan ? rates : null),
     [fiberBySale, hasPlan, rates, sales]
   );
-  const boardValue = payableMtd.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
 
   const booting = !fetched || (loading && sales.length === 0);
   const failed = !!error && sales.length === 0;
@@ -323,13 +322,9 @@ function SalesContent() {
         <LoadFailed onRetry={refreshSales} />
       ) : sales.length === 0 ? (
         <section className={`${s.panel} ${x.welcome}`} aria-labelledby="sales-empty-h">
-          <p className={s.kicker}>Your sales</p>
           <h2 id="sales-empty-h" className={x.welcomeTitle}>
-            No sales yet
+            No sales yet.
           </h2>
-          <p className={x.welcomeText}>
-            Log your first sale and it shows up here with its install status and estimated pay.
-          </p>
           {canLog ? (
             <Link href={LOG_SALE_HREF} className={s.btnPrimary}>
               <Plus size={20} strokeWidth={2.5} aria-hidden="true" />
@@ -350,63 +345,40 @@ function SalesContent() {
           ) : null}
 
           <section className={`${s.panel} ${x.kpis}`} aria-label="Sales summary">
-            <div className={`${x.kpi} ${x.kpiValue}`}>
-              <p className={`${s.kicker} ${x.kpiLabel}`}>Value</p>
+            <p className={`${s.kicker} ${x.kpiLabel}`}>
+              Est. payout{upcoming ? ` · ${formatPayoutWindow(upcoming.window)}` : ''}
+            </p>
+            {planLoading ? (
+              <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
+            ) : planError ? (
+              <div className={`${s.failed} ${x.kpiFailed}`} role="alert">
+                <span>Couldn&apos;t load pay rates</span>
+                <button type="button" className={s.retry} onClick={retryPlan}>
+                  <RotateCw size={14} aria-hidden="true" />
+                  Retry
+                </button>
+              </div>
+            ) : hasPlan && upcoming ? (
               <p className={x.kpiNum}>
-                {money(boardValue)}
-                <span className={x.kpiUnit}>/ mo</span>
+                <span className={x.est}>est.</span>
+                {money(upcoming.amount ?? 0)}
               </p>
-              <p className={x.kpiNote}>
-                <b>{payableMtd.length}</b> {payableMtd.length === 1 ? 'record' : 'records'} in {monthName}
-              </p>
-            </div>
-            <div className={`${x.kpi} ${x.kpiCount}`}>
-              <p className={`${s.kicker} ${x.kpiLabel}`}>Sales</p>
-              <p className={x.kpiNum}>
-                {payableMtd.length}
-                <span className={x.kpiUnit}>{payableMtd.length === 1 ? 'sale' : 'sales'}</span>
-              </p>
-              <p className={x.kpiNote}>
-                <b>{sales.length}</b> on your board all time
-              </p>
-            </div>
-            <div className={`${x.kpi} ${x.kpiPay}`}>
-              <p className={`${s.kicker} ${x.kpiLabel}`}>
-                Est. payout{upcoming ? ` · ${formatPayoutWindow(upcoming.window)}` : ''}
-              </p>
-              {planLoading ? (
-                <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
-              ) : planError ? (
-                <div className={`${s.failed} ${x.kpiFailed}`} role="alert">
-                  <span>Couldn&apos;t load pay rates</span>
-                  <button type="button" className={s.retry} onClick={retryPlan}>
-                    <RotateCw size={14} aria-hidden="true" />
-                    Retry
-                  </button>
-                </div>
-              ) : !hasPlan ? (
-                <>
-                  <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
-                  <p className={x.kpiNote}>No pay plan assigned yet</p>
-                </>
+            ) : (
+              <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
+            )}
+            <p className={x.kpiNote}>
+              <b>{payableMtd.length}</b> {payableMtd.length === 1 ? 'sale' : 'sales'} in {monthName}
+              {planLoading || planError ? null : !hasPlan ? (
+                <> · No pay plan assigned yet</>
               ) : upcoming ? (
                 <>
-                  <p className={x.kpiNum}>
-                    <span className={x.est}>est.</span>
-                    {money(upcoming.amount ?? 0)}
-                  </p>
-                  <p className={x.kpiNote}>
-                    <b>{upcoming.count}</b> T-Fiber {upcoming.count === 1 ? 'install' : 'installs'}
-                    {upcoming.scheduled > 0 ? <> · {upcoming.scheduled} scheduled</> : null} · before chargebacks
-                  </p>
+                  {' '}· {upcoming.count} T-Fiber {upcoming.count === 1 ? 'install' : 'installs'} in this payout
+                  {upcoming.scheduled > 0 ? <>, {upcoming.scheduled} scheduled</> : null}
                 </>
               ) : (
-                <>
-                  <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
-                  <p className={x.kpiNote}>No T-Fiber payout window coming up</p>
-                </>
+                <> · No T-Fiber payout window coming up</>
               )}
-            </div>
+            </p>
           </section>
 
           {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}

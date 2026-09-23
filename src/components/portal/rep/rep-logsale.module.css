@@ -861,7 +861,6 @@ span.thumbView {
   padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--c-line-strong);
   background: var(--c-bar);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transform: translateZ(0);
 }
 
