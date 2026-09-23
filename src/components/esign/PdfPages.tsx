@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import e from './esign.module.css';
 
 /**
  * A 3x backing store on a six-page W-9 is a lot of canvas memory for a phone.
@@ -129,7 +130,7 @@ export function PdfPages({ src, authHeaders }: Props) {
         // CSS size is the layout size; the backing store above is the sharp one.
         canvas.style.width = '100%';
         canvas.style.height = 'auto';
-        canvas.className = 'mb-3 block w-full rounded-md border border-slate-300 bg-white shadow-sm';
+        canvas.className = e.pdfPage;
         canvas.setAttribute('role', 'img');
         canvas.setAttribute('aria-label', `Page ${pageNumber} of ${doc.numPages}`);
         host.append(canvas);
@@ -161,8 +162,8 @@ export function PdfPages({ src, authHeaders }: Props) {
     <div>
       {/* Sticky: the pages sit in their own 60vh scroller, so a static toolbar
           would scroll out of reach on the second page. */}
-      <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-3 bg-[color:var(--member-line-panel,#ffffff)] py-1">
-        <p className="text-sm text-[color:var(--member-line-muted,#5b6b7d)]">
+      <div className={e.pdfBar}>
+        <p className={e.pdfHint}>
           {zoomed ? 'Scroll sideways to read across the page.' : 'Too small to read?'}
         </p>
         <button
@@ -170,20 +171,20 @@ export function PdfPages({ src, authHeaders }: Props) {
           onClick={() => setZoomed((current) => !current)}
           aria-pressed={zoomed}
           disabled={state !== 'ready'}
-          className="min-h-11 shrink-0 rounded-md border border-[color:var(--member-line-line,#26364a)] px-4 text-sm font-semibold text-[color:var(--member-line-ink,#0a1f44)] disabled:opacity-50"
+          className={e.smallBtn}
         >
           {zoomed ? 'Fit width' : 'Zoom in'}
         </button>
       </div>
-      {state === 'loading' && <p className="member-line-note">Loading the document...</p>}
+      {state === 'loading' && <p className={e.pdfNote}>Loading the document…</p>}
       {state === 'error' && (
-        <p role="alert" className="member-line-note warn">
+        <p role="alert" className={e.pdfError}>
           {message} Reload the page to try again.
         </p>
       )}
       {/* The scroller owns the horizontal overflow, so a zoomed page never
           widens the page body on a phone. */}
-      <div ref={frameRef} className="max-w-full overflow-x-auto overscroll-x-contain">
+      <div ref={frameRef} className={e.pdfFrame}>
         <div ref={hostRef} />
       </div>
     </div>

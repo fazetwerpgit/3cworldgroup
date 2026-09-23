@@ -47,7 +47,7 @@ function keyboardOpenNow(): boolean {
   return typing && window.matchMedia('(pointer: coarse)').matches;
 }
 
-function useSoftKeyboardOpen(): boolean {
+export function useSoftKeyboardOpen(): boolean {
   return useSyncExternalStore(subscribeKeyboard, keyboardOpenNow, () => false);
 }
 
