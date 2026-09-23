@@ -250,6 +250,18 @@
   text-transform: uppercase;
 }
 
+/* Section headers lead with a short lime rule. */
+h2.kicker::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  margin-right: 8px;
+  border-radius: 1px;
+  background: var(--c-lime);
+  vertical-align: 0.3em;
+}
+
 .panel {
   border: 1px solid var(--c-line);
   border-radius: var(--r-panel);
@@ -1053,87 +1065,5 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* ==========================================================================
-   Accent levels — how much brand lime the shell carries.
-   TEMP accent picker — remove after Jacob picks: fold the chosen level into
-   the base rules and drop the [data-accent] selectors (here and in the page
-   modules). Level 1 (Light) is the base rules themselves: lime on the active
-   tab/nav, primary buttons, the pay and rank numerals, positive deltas,
-   selected chips, progress fills, success states and focus rings.
-   Level 2 (Medium) adds a lime tick on section headers, lime icon tints on
-   key rows, a lime edge on hero/highlight cards. Level 3 (Strong) adds a
-   bounded lime glow behind the pay card and the podium, and a lime wash on
-   the active tab. Nothing here glows or blurs on a fixed bar.
-   ========================================================================== */
-.root,
-.layer {
-  --a-edge: 2px; /* hero / highlight card edge width at level 2+ */
-}
-
-/* Level 2+: a short lime rule leads every section header. */
-:is([data-accent='2'], [data-accent='3']) h2.kicker::before {
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 2px;
-  margin-right: 8px;
-  border-radius: 1px;
-  background: var(--c-lime);
-  vertical-align: 0.3em;
-}
-
-/* Level 3: the active tab's icon sits on a lime-tinted pill. A flat fill on an
-   opaque bar: no glow, no blur. The negative margin keeps the tab's layout. */
-.layer[data-accent='3'] .tab[aria-current='page'] .tabIcon {
-  margin: -3px -16px;
-  padding: 3px 16px;
-  border-radius: 999px;
-  background: rgba(141, 198, 63, 0.2);
-}
-
-/* ---------- TEMP accent picker — remove after Jacob picks ---------- */
-.accentPicker {
-  position: fixed;
-  right: var(--s3);
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--s2));
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 3px 3px 10px;
-  border: 1px solid var(--c-line-strong);
-  border-radius: 999px;
-  background: var(--c-bar);
-  color: var(--c-text-2);
-  font: 600 var(--t-min) / 1 var(--f-ui);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-}
-
-.accentPicker span {
-  margin-right: 4px;
-}
-
-.accentPicker button {
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--c-text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.accentPicker button[aria-pressed='true'] {
-  background: var(--c-lime);
-  color: var(--c-on-lime);
-}
-
-@media (min-width: 1024px) {
-  .accentPicker {
-    bottom: var(--s4);
   }
 }

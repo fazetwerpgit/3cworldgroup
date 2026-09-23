@@ -2,7 +2,6 @@
 
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useRepAccent } from './repAccent';
 import s from './rep.module.css';
 
 const noopSubscribe = () => () => {};
@@ -20,12 +19,6 @@ export function useIsClient(): boolean {
  */
 export function BodyLayer({ children }: { children: ReactNode }) {
   const isClient = useIsClient();
-  const accent = useRepAccent(); // TEMP accent picker — remove after Jacob picks
   if (!isClient) return null;
-  return createPortal(
-    <div className={s.layer} data-accent={accent}>
-      {children}
-    </div>,
-    document.body,
-  );
+  return createPortal(<div className={s.layer}>{children}</div>, document.body);
 }

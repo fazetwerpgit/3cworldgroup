@@ -9,8 +9,6 @@ import { useChatUnread } from '@/hooks/chat/useChatUnread';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { RepBoot } from './RepBoot';
-import { BodyLayer } from './BodyLayer';
-import { AccentPicker, useRepAccent } from './repAccent';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
 import s from './rep.module.css';
@@ -38,22 +36,15 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   const pendingSignupsCount = usePendingSignupsCount(isRole('admin'));
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tabBarHidden, setTabBarHidden] = useState(false);
-  const accent = useRepAccent(); // TEMP accent picker — remove after Jacob picks
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
-      <div className={s.root} data-shell="rep" data-accent={accent}>
+      <div className={s.root} data-shell="rep">
         <RepTopBar chatUnread={anyUnread} pendingSignupsCount={pendingSignupsCount} task={task} back={back} />
         <main className={s.scroller} id="rep-main">
           <div className={s.main}>{children}</div>
         </main>
         {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} />}
-        {/* TEMP accent picker — remove after Jacob picks */}
-        {process.env.NODE_ENV !== 'production' ? (
-          <BodyLayer>
-            <AccentPicker />
-          </BodyLayer>
-        ) : null}
         {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>

@@ -127,7 +127,7 @@
 }
 
 .listCount {
-  color: var(--c-text-3);
+  color: var(--c-lime);
   font-size: var(--t-sm);
 }
 
@@ -252,6 +252,12 @@
 
 .channelUnread .channelDesc {
   color: var(--c-text);
+}
+
+.channelUnread .channelMark {
+  border-color: rgba(141, 198, 63, 0.4);
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
 }
 
 .channelUnread .channelMeta {
@@ -2015,16 +2021,4 @@ button.person {
   color: var(--c-text);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   cursor: pointer;
-}
-
-/* Accent level 2+ (data-accent on the rep shell): unread channels tint their
-   icon lime and the unread count reads lime. TEMP accent picker — remove after Jacob picks. */
-:is([data-accent='2'], [data-accent='3']) .channelUnread .channelMark {
-  border-color: rgba(141, 198, 63, 0.4);
-  background: var(--c-lime-wash);
-  color: var(--c-lime);
-}
-
-:is([data-accent='2'], [data-accent='3']) .listCount {
-  color: var(--c-lime);
 }

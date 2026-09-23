@@ -604,11 +604,11 @@ function TodayPanels({
           const body = (
             <>
                 {item.kind === 'call' ? (
-                  <span className={`${d.tile} ${d.tileBlue}`} aria-hidden="true">
+                  <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
                     <Video size={18} strokeWidth={2} />
                   </span>
                 ) : item.kind === 'date' ? (
-                  <span className={`${d.tile} ${d.tileAmber}`} aria-hidden="true">
+                  <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
                     <CalendarPlus size={18} strokeWidth={2} />
                   </span>
                 ) : (

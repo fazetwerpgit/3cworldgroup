@@ -47,7 +47,7 @@
 }
 
 .stepOn .stepLabel {
-  color: var(--c-text);
+  color: var(--c-lime-hi);
 }
 
 .stepOn .stepLabel b {
@@ -93,6 +93,9 @@
       transparent 100%
     ),
     var(--c-panel-fill);
+  box-shadow:
+    inset 0 2px 0 var(--c-lime),
+    var(--c-lift);
   text-align: center;
 }
 
@@ -993,18 +996,4 @@ span.thumbView {
     flex: none;
     min-width: 300px;
   }
-}
-
-/* ==========================================================================
-   Accent levels (see rep.module.css). TEMP accent picker — remove after Jacob picks.
-   ========================================================================== */
-/* Level 2+: the current step names itself in lime; the entry card gets a lime top edge. */
-:is([data-accent='2'], [data-accent='3']) .stepOn .stepLabel {
-  color: var(--c-lime-hi);
-}
-
-:is([data-accent='2'], [data-accent='3']) .entry {
-  box-shadow:
-    inset 0 var(--a-edge) 0 var(--c-lime),
-    var(--c-lift);
 }
