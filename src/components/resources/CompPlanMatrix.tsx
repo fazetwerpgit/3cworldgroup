@@ -29,6 +29,8 @@ const ROLE_SHORT: Record<CompPlanRole, string> = {
   ibo_level_2: 'IBO 2',
   ibo_level_3: 'IBO 3',
   ibo_level_4: 'IBO 4',
+  // TEMPORARY (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden). Revisit and move him to a real comp role later.
+  operations: 'Ops',
 };
 
 function money(value: number) {

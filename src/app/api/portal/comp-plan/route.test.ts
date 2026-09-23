@@ -115,14 +115,26 @@ describe('GET /api/portal/comp-plan', () => {
     expect(json.ownRates).toEqual(json.rates.internal_rep);
   });
 
-  it('gives operations no own slice', async () => {
+  it('gives operations its own T-Fiber slice and never the margin', async () => {
     mockRequester.mockResolvedValue({
       ok: true, uid: 'op1', name: 'Ops', email: 'op@x.com',
       role: 'operations', isManagement: true, isAdmin: false, isManagerOrAbove: true,
     });
     const json = await (await GET(get())).json();
+    expect(json.compRole).toBe('operations');
+    expect(json.ownRates).toEqual({ tfiber: { 'tfiber-1gig': 280, 'tfiber-2gig': 302, 'tfiber-300': 100 } });
+    expect('margin' in json).toBe(false);
+  });
+
+  it('never gives a rep the operations slice, even with a stray operations field role', async () => {
+    mockRequester.mockResolvedValue({
+      ok: true, uid: 'r9', name: 'Rep', email: 'r@x.com',
+      fieldRole: 'operations', isManagement: false, isAdmin: false, isManagerOrAbove: false,
+    });
+    const json = await (await GET(get())).json();
+    expect(json.scope).toBe('own');
     expect(json.compRole).toBeNull();
-    expect(json.ownRates).toBeNull();
+    expect(json.rates).toBeNull();
   });
 
   it('gives the owner the margin', async () => {
@@ -158,6 +170,16 @@ describe('PUT /api/portal/comp-plan', () => {
     const res = await PUT(put({ rates: { entry_rep: { att: { 'att-1gig': 1 } } } }));
     expect(res.status).toBe(400);
     expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the operations table through a full-plan save', async () => {
+    // The owner editor PUTs back the whole table it fetched.
+    mockManagement.mockResolvedValue({ ok: true, uid: 'o1', name: 'Owner', isAdmin: true, isOwner: true });
+    const res = await PUT(put({ rates: COMP_PLAN_RATES }));
+    expect(res.status).toBe(200);
+    const [, saved] = setSpy.mock.calls[0];
+    expect(saved.rates.operations).toEqual({ tfiber: { 'tfiber-1gig': 280, 'tfiber-2gig': 302, 'tfiber-300': 100 } });
+    expect(Object.keys(saved.rates).sort()).toEqual(Object.keys(COMP_PLAN_RATES).sort());
   });
 
   it('rejects a negative or non-numeric rate', async () => {

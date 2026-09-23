@@ -5,8 +5,12 @@ import type { FieldRole, PlatformRole } from './auth';
 // which stays untouched — this is the per-product dollar plan from the
 // "3C World Group 7.1.26 Comp" sheet.
 
-/** Field roles that carry a comp-plan rate table. Extract<> keeps every entry a real FieldRole. */
-export type CompPlanRole = Extract<
+/**
+ * Roles that carry a comp-plan rate table. Extract<> keeps every entry a real
+ * FieldRole — or, for `operations`, a real PlatformRole.
+ */
+export type CompPlanRole =
+  | Extract<
   FieldRole,
   | 'ae_tier_1'
   | 'ae_tier_2'
@@ -20,7 +24,9 @@ export type CompPlanRole = Extract<
   | 'ibo_level_2'
   | 'ibo_level_3'
   | 'ibo_level_4'
->;
+    >
+  // TEMPORARY (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden). Revisit and move him to a real comp role later.
+  | Extract<PlatformRole, 'operations'>;
 
 export const COMP_PLAN_ROLES: readonly CompPlanRole[] = [
   'ae_tier_1',
@@ -35,6 +41,8 @@ export const COMP_PLAN_ROLES: readonly CompPlanRole[] = [
   'ibo_level_2',
   'ibo_level_3',
   'ibo_level_4',
+  // TEMPORARY (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden). Revisit and move him to a real comp role later.
+  'operations',
 ];
 
 /** FIBER_PLANS[].id → dollars paid on an install. Zero means "no contracted rate yet". */
@@ -67,11 +75,13 @@ export const PAY_DELAY_DAYS = 14;
  * Back-office roles that also sell. Assigning a platform role clears `fieldRole`
  * (see PATCH /api/portal/auth/users/[id]), so an admin or owner has no field
  * role to be paid from — they are paid on the Internal Rep scale. Operations is
- * deliberately absent: they are paid from their own field role or not at all.
+ * paid from its own (T-Fiber only) table.
  */
 export const PLATFORM_ROLE_COMP_FALLBACK: Partial<Record<PlatformRole, CompPlanRole>> = {
   admin: 'internal_rep',
   owner: 'internal_rep',
+  // TEMPORARY (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden). Revisit and move him to a real comp role later.
+  operations: 'operations',
 };
 
 export function isCompPlanRole(value: string | undefined | null): value is CompPlanRole {
@@ -91,7 +101,9 @@ export function resolveCompRole(
   role?: PlatformRole | string | null
 ): CompPlanRole | null {
   if (fieldRole) {
-    if (isCompPlanRole(fieldRole)) return fieldRole;
+    // `operations` is a platform role's table: only the platform fallback below
+    // may hand it out, never a (mis)stored field role.
+    if (isCompPlanRole(fieldRole) && fieldRole !== 'operations') return fieldRole;
     const legacy = LEGACY_ROLE_RATE_FALLBACK[fieldRole as FieldRole];
     if (legacy) return legacy;
   }

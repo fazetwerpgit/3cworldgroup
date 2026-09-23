@@ -7,6 +7,10 @@
 // products exist in FIBER_PLANS. Zero means "no contracted rate yet" —
 // intentional, per Jacob.
 //
+// Hand-added, not from the sheet: `operations` (T-Fiber only). TEMPORARY
+// (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden). Revisit
+// and move him to a real comp role later.
+//
 // The numbers live in compPlan.generated.json so scripts/seed-comp-plan.mjs
 // seeds Firestore from this exact file — one source of truth for app and seed.
 import data from './compPlan.generated.json';
