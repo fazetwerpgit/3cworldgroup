@@ -319,7 +319,7 @@
   transition:
     background 120ms,
     color 120ms,
-    transform 120ms var(--ease);
+    transform 100ms ease-out;
 }
 
 .payHelp svg {
@@ -327,7 +327,6 @@
 }
 
 .payHelp:active {
-  background: var(--c-panel-hi);
   transform: scale(0.98);
 }
 
@@ -450,7 +449,9 @@
   color: var(--c-text-2);
   font-size: 14px;
   text-decoration: none;
-  transition: background 140ms;
+  transition:
+    background 140ms,
+    transform 100ms ease-out;
 }
 
 .chaseTrack {
@@ -506,7 +507,7 @@
   cursor: pointer;
   transition:
     background 140ms,
-    transform 140ms var(--ease);
+    transform 100ms ease-out;
 }
 
 /* A time stamp, not an icon tile: the condensed numeral carries the row. */
@@ -595,7 +596,7 @@
   text-decoration: none;
   transition:
     background 140ms,
-    transform 140ms var(--ease);
+    transform 100ms ease-out;
 }
 
 .saleName {
@@ -688,8 +689,7 @@
 .sale:active,
 .tRow:active,
 .chase:active {
-  background: var(--c-panel-hi);
-  transform: scale(0.985);
+  transform: scale(0.98);
 }
 
 @media (hover: hover) {

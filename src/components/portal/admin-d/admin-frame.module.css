@@ -33,12 +33,11 @@
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    transform 140ms var(--ease);
+    transform 100ms ease-out;
 }
 
 .switcher:active {
-  background: var(--c-panel-hi);
-  transform: scale(0.985);
+  transform: scale(0.98);
 }
 
 .switcher[aria-expanded='true'] {

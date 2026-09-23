@@ -68,6 +68,8 @@
   --topbar-h: 60px;
   --nav-h: 64px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Bottom sheets: a soft, spring-like settle with no overshoot. */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 
   color-scheme: dark;
   color: var(--c-text);
@@ -201,7 +203,7 @@
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
-    transform 180ms var(--ease);
+    transform 100ms ease-out;
 }
 
 .btnPrimary {
@@ -227,6 +229,24 @@
 
 .btnPrimary:active,
 .btnSecondary:active {
+  transform: scale(0.98);
+}
+
+/* Press: the rest of the tappable chrome gives a little under the thumb too.
+   Scale only, no colour flash. */
+.retry,
+.iconBtn,
+.textBtn,
+.tab,
+.navItem {
+  transition: transform 100ms ease-out;
+}
+
+.retry:active,
+.iconBtn:active,
+.textBtn:not(:disabled):active,
+.tab:active,
+.navItem:active {
   transform: scale(0.98);
 }
 
@@ -713,7 +733,7 @@ h2.kicker::before {
   z-index: 60;
   border: 0;
   background: rgba(1, 4, 10, 0.72);
-  animation: fadeIn 160ms ease both;
+  animation: fadeIn 280ms ease-out both;
 }
 
 .sheet {
@@ -733,7 +753,21 @@ h2.kicker::before {
   box-shadow: var(--c-edge), 0 -24px 60px -20px rgba(0, 0, 0, 0.9);
   color: var(--c-text);
   transform: translateZ(0);
-  animation: sheetUp 260ms var(--ease) both;
+  animation: sheetUp 280ms var(--ease-sheet) both;
+}
+
+/* Closing (SaleDetailSheet): quicker than the open, and no longer tappable. */
+.backdrop[data-closing],
+.sheet[data-closing] {
+  pointer-events: none;
+}
+
+.backdrop[data-closing] {
+  animation: fadeOut 180ms ease-in both;
+}
+
+.sheet[data-closing] {
+  animation: sheetDown 180ms ease-in both;
 }
 
 .sheetHandle {
@@ -780,7 +814,11 @@ h2.kicker::before {
     border-bottom: 1px solid var(--c-line-strong);
     border-radius: var(--r-panel);
     transform: translate(-50%, -50%);
-    animation: fadeIn 160ms ease both;
+    animation: fadeIn 160ms ease-out both;
+  }
+
+  .sheet[data-closing] {
+    animation: fadeOut 140ms ease-in both;
   }
 
   .sheetHandle {
@@ -852,8 +890,20 @@ h2.kicker::before {
   }
 }
 
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes sheetUp {
   from {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes sheetDown {
+  to {
     transform: translate3d(0, 100%, 0);
   }
 }

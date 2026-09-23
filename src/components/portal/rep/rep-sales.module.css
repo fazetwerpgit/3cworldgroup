@@ -46,12 +46,11 @@
   background: transparent;
   color: var(--c-text-2);
   cursor: pointer;
-  transition: background 120ms, transform 120ms;
+  transition: background 120ms, transform 100ms ease-out;
 }
 
 .monthBtn:not(:disabled):active {
-  background: var(--c-raised);
-  transform: scale(0.94);
+  transform: scale(0.98);
 }
 
 .monthBtn:focus-visible {
@@ -188,11 +187,11 @@
   font: 600 var(--t-ui) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+  transition: background 140ms, color 140ms, transform 100ms ease-out;
 }
 
 .segBtn:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .segBtn[aria-selected='true'],
@@ -240,11 +239,11 @@
   font: 500 var(--t-sm) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+  transition: background 140ms, color 140ms, transform 100ms ease-out;
 }
 
 .chip:active {
-  transform: scale(0.95);
+  transform: scale(0.98);
 }
 
 .chip .dot {
@@ -806,11 +805,10 @@
   color: var(--c-text-2);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   cursor: pointer;
-  transition: background 120ms, transform 120ms var(--ease);
+  transition: background 120ms, transform 100ms ease-out;
 }
 
 .payHelp:active {
-  background: var(--c-panel-hi);
   transform: scale(0.98);
 }
 
@@ -876,11 +874,11 @@
   color: var(--c-text-3);
   font: 600 14px / 1 var(--f-ui);
   cursor: pointer;
-  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+  transition: background 140ms, color 140ms, transform 100ms ease-out;
 }
 
 .segTab:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .segTab[aria-selected='true'] {
@@ -959,13 +957,12 @@
   color: var(--c-text);
   text-align: left;
   cursor: pointer;
-  transition: background 140ms, transform 140ms var(--ease);
+  transition: background 140ms, transform 100ms ease-out;
 }
 
 .sale[role='button']:active,
 .pRow[role='button']:active {
-  background: var(--c-panel-hi);
-  transform: scale(0.985);
+  transform: scale(0.98);
 }
 
 .sale[role='button']:focus-visible,
@@ -1406,7 +1403,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 140ms;
+  transition: background 140ms, transform 100ms ease-out;
 }
 
 .expander:first-child {
@@ -1429,7 +1426,7 @@
 }
 
 .expander:active {
-  background: var(--c-panel-hi);
+  transform: scale(0.98);
 }
 
 .chev {
@@ -1535,7 +1532,7 @@
   gap: 4px var(--s3);
   min-height: 64px;
   padding: var(--s3) var(--s4) var(--s3) calc(var(--s4) + 20px + var(--s3));
-  transition: background 140ms;
+  transition: background 140ms, transform 100ms ease-out;
 }
 
 /* The viewer's own pay list: top level, so no nested indent; Paid on the right. */
@@ -1576,7 +1573,7 @@
 }
 
 .bRow[role='button']:active {
-  background: var(--c-panel-hi);
+  transform: scale(0.98);
 }
 
 .bCust {
@@ -2408,7 +2405,11 @@ a.dLine {
     border-right: 0;
     border-bottom: 0;
     transform: translateZ(0);
-    animation: slideIn 240ms var(--ease) both;
+    animation: slideIn 280ms var(--ease-sheet) both;
+  }
+
+  .detail[data-closing] {
+    animation: slideOut 180ms ease-in both;
   }
 }
 
@@ -2422,6 +2423,12 @@ a.dLine {
 
 @keyframes slideIn {
   from {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+@keyframes slideOut {
+  to {
     transform: translate3d(100%, 0, 0);
   }
 }

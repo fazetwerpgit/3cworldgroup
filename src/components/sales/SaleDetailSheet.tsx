@@ -19,6 +19,7 @@ import { Sale, FIBER_COMPANIES, SaleStatusConfig, type FiberOrder } from '@/type
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
+import { useSheetExit } from '@/hooks/useSheetExit';
 import { isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
 import { isPayableSale } from '@/lib/pay/expectedPay';
 import { rowStatus } from '@/lib/dashboard/repSummary';
@@ -103,24 +104,30 @@ function installDateAsDate(value: Date | string | null | undefined): Date | null
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
-export function SaleDetailSheet({
-  sale,
-  total,
-  index = -1,
-  open,
-  onOpenChange,
-  onPrev,
-  onNext,
-  isAdmin,
-  loading,
-  onRequestDelete,
-  onRequestCancel,
-  onRestore,
-  onSaleUpdated,
-  payout = null,
-  fiberOrder = null,
-  estPay,
-}: SaleDetailSheetProps) {
+export function SaleDetailSheet(props: SaleDetailSheetProps) {
+  const { open } = props;
+  // Closing plays a short exit, and the parent has already let go of the sale
+  // by then: the sheet keeps drawing the last sale it was open on until it ends.
+  const { rendered, closing } = useSheetExit(open);
+  const [kept, setKept] = useState(props);
+  if (open && props !== kept) setKept(props);
+  const {
+    sale,
+    total,
+    index = -1,
+    onOpenChange,
+    onPrev,
+    onNext,
+    isAdmin,
+    loading,
+    onRequestDelete,
+    onRequestCancel,
+    onRestore,
+    onSaleUpdated,
+    payout = null,
+    fiberOrder = null,
+    estPay,
+  } = closing ? kept : props;
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
   const [proofImage, setProofImage] = useState<LightboxImage | null>(null);
@@ -194,7 +201,7 @@ export function SaleDetailSheet({
     historyPushedRef.current = false;
   };
 
-  if (!sale || !open || typeof document === 'undefined') return null;
+  if (!sale || !rendered || typeof document === 'undefined') return null;
 
   const saleId = sale.id || '';
   const storedInstallDate = installDateAsDate(sale.installDate);
@@ -298,11 +305,19 @@ export function SaleDetailSheet({
       <button
         type="button"
         className={s.backdrop}
+        data-closing={closing || undefined}
         aria-label="Close sale detail"
         tabIndex={-1}
         onClick={() => onOpenChange(false)}
       />
-      <aside className={`${s.sheet} ${x.detail}`} role="dialog" aria-modal="true" aria-label="Sale detail">
+      <aside
+        className={`${s.sheet} ${x.detail}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sale detail"
+        data-closing={closing || undefined}
+        inert={closing || undefined}
+      >
         <div className={s.sheetHandle} aria-hidden="true" />
         <div className={`${s.sheetHead} ${x.dHead}`}>
           <div className={x.sheetHeadText}>
