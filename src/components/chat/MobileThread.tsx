@@ -19,6 +19,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import { GROW_STEP, MAX_WINDOW } from '@/hooks/chat/useMessages';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
+import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 import c from './chat.module.css';
 
@@ -362,51 +363,26 @@ export function MobileThread({
   // adjusted during render (React's "info from previous renders" pattern —
   // avoids a cascading setState inside an effect).
   const [prevLen, setPrevLen] = useState(messages.length);
-  // The previous render's last (newest) message id — the unseen-count math
-  // below locates it in the new array to count only messages appended AFTER
-  // it, so a loadOlder prepend of older history (which doesn't move the tail)
-  // never gets mistaken for new arrivals.
-  const [prevNewestId, setPrevNewestId] = useState<string | undefined>(messages[messages.length - 1]?.id);
+  // The previous render's newest DELIVERED message id — the unseen-count math
+  // (countNewArrivals) counts only delivered messages from others that landed
+  // after it, so a loadOlder prepend of older history never counts, and an
+  // arrival above an unsent echo (echoes render at the tail) still does.
+  const [prevNewestId, setPrevNewestId] = useState<string | undefined>(newestDeliveredId(messages));
   const [prevChannel, setPrevChannel] = useState(channelId);
   const contextRef = useRef('');
   const signalRef = useRef(scrollToBottomSignal);
 
+  const newestId = newestDeliveredId(messages);
   if (channelId !== prevChannel) {
     setPrevChannel(channelId);
     setPrevLen(messages.length);
-    setPrevNewestId(messages[messages.length - 1]?.id);
+    setPrevNewestId(newestId);
     setNewCount(0);
-  } else if (
-    messages.length !== prevLen ||
-    // Also run on a tail-id-only change (own echo reconciling to its delivered
-    // doc id at unchanged length) so prevNewestId never goes stale — a stale
-    // pending-… id would make the next real arrival unfindable and undercount.
-    messages[messages.length - 1]?.id !== prevNewestId
-  ) {
+  } else if (messages.length !== prevLen || newestId !== prevNewestId) {
     setPrevLen(messages.length);
-    const previousNewestId = prevNewestId;
-    const newest = messages[messages.length - 1];
-    setPrevNewestId(newest?.id);
-    // Count only messages appended AFTER the previous newest one — a loadOlder
-    // prepend adds older history at the FRONT and leaves the tail untouched,
-    // so it must never inflate this. Locate the previous newest id from the
-    // end: still last element → 0 (pure prepend); not found at all (e.g. it
-    // was deleted) → fall back to 0 rather than a fabricated count.
-    let grew = 0;
-    if (previousNewestId) {
-      let foundIndex = -1;
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].id === previousNewestId) {
-          foundIndex = i;
-          break;
-        }
-      }
-      grew = foundIndex === -1 ? 0 : messages.length - (foundIndex + 1);
-    }
-    // Own sends force-scroll to the bottom anyway — don't flash the pill when
-    // the newest arrival is the reader's own message (or echo).
-    const ownArrival = !!newest && newest.authorId === currentUserId;
-    if (grew > 0 && !pinned && !ownArrival) setNewCount((count) => count + grew);
+    setPrevNewestId(newestId);
+    const grew = countNewArrivals(messages, prevNewestId, currentUserId);
+    if (grew > 0 && !pinned) setNewCount((count) => count + grew);
   }
 
   // Pinned detection: the bottom anchor is "intersecting" while the reader is

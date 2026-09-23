@@ -37,6 +37,7 @@ import {
   reconcileEchoes,
   toOutboxEntries,
 } from '@/lib/chat/outbox';
+import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
@@ -181,10 +182,7 @@ export default function TeamChatPage() {
   const desktopPinnedRef = useRef(true);
   const [desktopNewCount, setDesktopNewCount] = useState(0);
   const [desktopPrevLen, setDesktopPrevLen] = useState(0);
-  // The previous render's last (newest) message id — the unseen-count math
-  // below locates it in the new array to count only messages appended AFTER
-  // it, so a loadOlder prepend of older history (which doesn't move the tail)
-  // never gets mistaken for new arrivals.
+  // The previous render's newest delivered message id (see countNewArrivals).
   const [desktopPrevNewestId, setDesktopPrevNewestId] = useState<string | undefined>(undefined);
   const [desktopPrevChannel, setDesktopPrevChannel] = useState('');
   const desktopSignalRef = useRef(0);
@@ -638,42 +636,19 @@ export default function TeamChatPage() {
 
   // Adjust the unseen counter during render (React's "info from previous
   // renders" pattern) so we never setState synchronously inside an effect.
+  const desktopNewestId = newestDeliveredId(threadMessages);
   if (activeChannelId !== desktopPrevChannel) {
     setDesktopPrevChannel(activeChannelId);
     setDesktopPrevLen(threadMessages.length);
-    setDesktopPrevNewestId(threadMessages[threadMessages.length - 1]?.id);
+    setDesktopPrevNewestId(desktopNewestId);
     setDesktopNewCount(0);
-  } else if (
-    threadMessages.length !== desktopPrevLen ||
-    // Also run on a tail-id-only change (own echo reconciling to its delivered
-    // doc id at unchanged length) so prevNewestId never goes stale — a stale
-    // pending-… id would make the next real arrival unfindable and undercount.
-    threadMessages[threadMessages.length - 1]?.id !== desktopPrevNewestId
-  ) {
+  } else if (threadMessages.length !== desktopPrevLen || desktopNewestId !== desktopPrevNewestId) {
     setDesktopPrevLen(threadMessages.length);
-    const previousNewestId = desktopPrevNewestId;
-    const newest = threadMessages[threadMessages.length - 1];
-    setDesktopPrevNewestId(newest?.id);
-    // Count only messages appended AFTER the previous newest one — a loadOlder
-    // prepend adds older history at the FRONT and leaves the tail untouched,
-    // so it must never inflate this. Locate the previous newest id from the
-    // end: still last element → 0 (pure prepend); not found at all (e.g. it
-    // was deleted) → fall back to 0 rather than a fabricated count.
-    let grew = 0;
-    if (previousNewestId) {
-      let foundIndex = -1;
-      for (let i = threadMessages.length - 1; i >= 0; i--) {
-        if (threadMessages[i].id === previousNewestId) {
-          foundIndex = i;
-          break;
-        }
-      }
-      grew = foundIndex === -1 ? 0 : threadMessages.length - (foundIndex + 1);
-    }
-    // Own sends force-scroll to the bottom anyway — don't flash the pill when
-    // the newest arrival is the reader's own message (or echo).
-    const ownArrival = !!newest && newest.authorId === user?.uid;
-    if (grew > 0 && !desktopPinned && !ownArrival) setDesktopNewCount((count) => count + grew);
+    setDesktopPrevNewestId(desktopNewestId);
+    // Delivered messages from others after the previous newest delivered one
+    // (see countNewArrivals): history prepends and own sends never count.
+    const grew = countNewArrivals(threadMessages, desktopPrevNewestId, user?.uid);
+    if (grew > 0 && !desktopPinned) setDesktopNewCount((count) => count + grew);
   }
 
   // Desktop pinned detection: the bottom anchor is "intersecting" while the
