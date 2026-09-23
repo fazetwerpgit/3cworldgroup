@@ -3,7 +3,7 @@ import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { PORTAL_LOGGING_START } from '@/lib/sales/mergeBook';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES } from '@/data/compPlan.generated';
 import type { CompPlanMargin, CompPlanRates, FiberOrder, Sale } from '@/types';
-import type { OwnerSummarySource, RepRoles } from './companySummary';
+import type { ActivatedUser, OwnerSummarySource, RepRoles } from './companySummary';
 
 // Admin SDK reads behind the owner summary. READ ONLY — nothing here writes.
 //
@@ -135,17 +135,27 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
       return snap.data().count;
     },
 
+    // Users activated since `since` by either stamp: activatedAt (every pending ->
+    // active flip) or hireDate (docs from before activatedAt existed). Merged by
+    // id; activationsByWeek picks activatedAt first.
     async loadActivatedSince(since) {
-      const snap = await db()
-        .collection('users')
-        .where('hireDate', '>=', since)
-        .select('status', 'fieldRole', 'hireDate')
-        .get();
-      return snap.docs.map((doc) => ({
-        status: doc.get('status') ?? null,
-        fieldRole: doc.get('fieldRole') ?? null,
-        hireDate: toDate(doc.get('hireDate')) ?? null,
-      }));
+      const users = db().collection('users');
+      const fields = ['status', 'fieldRole', 'hireDate', 'activatedAt'] as const;
+      const [byActivated, byHire] = await Promise.all([
+        users.where('activatedAt', '>=', since).select(...fields).get(),
+        users.where('hireDate', '>=', since).select(...fields).get(),
+      ]);
+      const byId = new Map<string, ActivatedUser>();
+      for (const doc of [...byActivated.docs, ...byHire.docs]) {
+        if (byId.has(doc.id)) continue;
+        byId.set(doc.id, {
+          status: doc.get('status') ?? null,
+          fieldRole: doc.get('fieldRole') ?? null,
+          activatedAt: toDate(doc.get('activatedAt')) ?? null,
+          hireDate: toDate(doc.get('hireDate')) ?? null,
+        });
+      }
+      return [...byId.values()];
     },
   };
 }

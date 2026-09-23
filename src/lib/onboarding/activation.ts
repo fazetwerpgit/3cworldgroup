@@ -73,6 +73,8 @@ export async function activateUser(
       ? { fieldRole: graduatedFieldRole(fieldRole) }
       : {}),
     hireDate: now,
+    // When the account went active; the owner "Activated" tile counts by this.
+    activatedAt: FieldValue.serverTimestamp(),
     atRisk: FieldValue.delete(),
     updatedAt: now,
   });

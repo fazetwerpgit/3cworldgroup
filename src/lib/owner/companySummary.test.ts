@@ -278,6 +278,26 @@ describe('small counters', () => {
     ).toEqual({ thisWeek: 1, lastWeek: 0 });
   });
 
+  it('counts activations by activatedAt, falling back to hireDate', () => {
+    const p = ownerPeriods(NOW);
+    expect(
+      activationsByWeek(
+        [
+          // Accepted this week; hireDate is the months-old signup date.
+          { status: 'active', fieldRole: 'ae_tier_1', activatedAt: noonChicago(9, 21), hireDate: noonChicago(6, 2) },
+          // activatedAt wins over a later hireDate.
+          { status: 'active', fieldRole: 'ae_tier_1', activatedAt: noonChicago(9, 16), hireDate: noonChicago(9, 21) },
+          // Older doc without activatedAt: hireDate decides.
+          { status: 'active', fieldRole: 'ae_tier_1', activatedAt: null, hireDate: noonChicago(9, 20) },
+          { status: 'active', fieldRole: 'ae_tier_1', hireDate: noonChicago(9, 16) },
+          // Activated long ago: counted in neither week.
+          { status: 'active', fieldRole: 'ae_tier_1', activatedAt: noonChicago(8, 1), hireDate: noonChicago(9, 21) },
+        ],
+        p
+      )
+    ).toEqual({ thisWeek: 2, lastWeek: 2 });
+  });
+
   it('credits a first install to the week of the rep’s earliest install only', () => {
     const p = ownerPeriods(NOW);
     const s = sale({ rep: 'x' });

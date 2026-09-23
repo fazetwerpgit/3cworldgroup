@@ -77,11 +77,18 @@ export interface CompPlanTables {
   margin: CompPlanMargin;
 }
 
-/** A user doc as the recruiting count needs it (activation stamp only). */
+/** A user doc as the recruiting count needs it (activation stamps only). */
 export interface ActivatedUser {
   status?: string | null;
   fieldRole?: string | null;
+  /** Set on every pending -> active flip. Older docs lack it. */
+  activatedAt?: Date | null;
   hireDate: Date | null;
+}
+
+/** When a user went active: activatedAt, else hireDate for docs written before it existed. */
+export function activationDate(user: ActivatedUser): Date | null {
+  return user.activatedAt ?? user.hireDate;
 }
 
 export type OpenQueue = 'payrollDisputes' | 'expediteOrders' | 'leadsRequests' | 'bugReports';
@@ -349,13 +356,14 @@ export function firstInstallsByWeek(installs: InstallRecord[], periods: OwnerPer
   return counts;
 }
 
-/** Active field reps whose activation (hireDate) lands in each week. */
+/** Active field reps whose activation (activatedAt, else hireDate) lands in each week. */
 export function activationsByWeek(users: ActivatedUser[], periods: OwnerPeriods): WeekCount {
   const counts: WeekCount = { thisWeek: 0, lastWeek: 0 };
   for (const user of users) {
     if (user.status !== 'active' || !user.fieldRole) continue;
-    if (inWindow(user.hireDate, periods.thisWeek)) counts.thisWeek += 1;
-    else if (inWindow(user.hireDate, periods.lastWeek)) counts.lastWeek += 1;
+    const date = activationDate(user);
+    if (inWindow(date, periods.thisWeek)) counts.thisWeek += 1;
+    else if (inWindow(date, periods.lastWeek)) counts.lastWeek += 1;
   }
   return counts;
 }
