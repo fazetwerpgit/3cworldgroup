@@ -23,7 +23,7 @@ import { CommandPalette } from '@/components/portal/CommandPalette';
 import { useNotifications } from '@/hooks/useNotifications';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { NotificationType } from '@/types/notifications';
-import { RoleDisplayNames, getEffectiveRole } from '@/types';
+import { getEffectiveRole, repFacingRoleLabel } from '@/types';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 
 function getInitials(name?: string | null, email?: string | null) {
@@ -93,7 +93,8 @@ export function PortalHeader() {
   }, []);
 
   const effectiveRole = getEffectiveRole(user);
-  const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
+  // IBO roles are never named to reps.
+  const roleLabel = repFacingRoleLabel(effectiveRole);
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
 
@@ -251,7 +252,7 @@ export function PortalHeader() {
               <span className="portal-avatar">{getInitials(user?.displayName, user?.email)}</span>
               <span className="portal-user-copy">
                 <strong>{displayName}</strong>
-                <small>{roleLabel}</small>
+                {roleLabel ? <small>{roleLabel}</small> : null}
               </span>
               <ChevronDown className={showDropdown ? 'is-open' : undefined} aria-hidden="true" />
             </button>
