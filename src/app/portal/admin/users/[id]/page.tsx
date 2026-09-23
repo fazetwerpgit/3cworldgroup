@@ -145,7 +145,7 @@ export default function EditUserPage() {
 
             <div className={d.layout}>
               <div className={d.main}>
-                <UserForm user={user} isEdit />
+                <UserForm user={user} />
               </div>
 
               <aside className={d.aside} aria-label="Record summary">

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock, Search, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { AdminAvatar, AdminNotice } from '@/components/portal/admin-d/AdminUi';
+import { AdminNotice } from '@/components/portal/admin-d/AdminUi';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import f from './user-form.module.css';
@@ -22,8 +22,7 @@ import {
 import type { FieldRole, PlatformRole } from '@/types';
 
 interface UserFormProps {
-  user?: User;
-  isEdit?: boolean;
+  user: User;
 }
 
 // The user-management routes verify the caller from the ID token and check
@@ -97,7 +96,7 @@ interface ManagerCandidate {
 const roleLabel = (role?: string) =>
   (role && RoleDisplayNames[role as UserRole]) || role || '—';
 
-export function UserForm({ user, isEdit = false }: UserFormProps) {
+export function UserForm({ user }: UserFormProps) {
   const router = useRouter();
   const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -112,21 +111,18 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   const [loadedRole, setLoadedRole] = useState<UserRole | ''>(getEffectiveRole(user) ?? '');
 
   const [formData, setFormData] = useState({
-    email: user?.email || '',
-    password: '',
-    displayName: user?.displayName || '',
-    // Default for admin-created users stays entry_rep (Account Executive), as
-    // before the redesign — entry_level_rep is the onboarding-gated signup role.
-    // An existing user with no role (a pending signup) gets NO default: the
-    // admin must pick one from the empty "Select a role" option.
-    role: (getEffectiveRole(user) ?? (user ? '' : 'entry_rep')) as UserRole | '',
-    phone: user?.phone || '',
-    address: user?.address || '',
-    city: user?.city || '',
-    state: user?.state || '',
-    zip: user?.zip || '',
-    managerId: user?.reportsToId || '',
-    status: (user?.status || 'active') as 'pending' | 'active' | 'inactive',
+    email: user.email || '',
+    displayName: user.displayName || '',
+    // A user with no role (a pending signup) gets NO default: the admin must
+    // pick one from the empty "Select a role" option.
+    role: (getEffectiveRole(user) ?? '') as UserRole | '',
+    phone: user.phone || '',
+    address: user.address || '',
+    city: user.city || '',
+    state: user.state || '',
+    zip: user.zip || '',
+    managerId: user.reportsToId || '',
+    status: (user.status || 'active') as 'pending' | 'active' | 'inactive',
   });
 
   const [managerSearch, setManagerSearch] = useState('');
@@ -165,12 +161,12 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
 
   const managerResults = useMemo(() => {
     const q = managerSearch.trim().toLowerCase();
-    const pool = managerCandidates.filter((c) => c.uid !== user?.uid);
+    const pool = managerCandidates.filter((c) => c.uid !== user.uid);
     if (!q) return pool.slice(0, 8);
     return pool
       .filter((c) => (c.displayName || c.email || '').toLowerCase().includes(q))
       .slice(0, 8);
-  }, [managerCandidates, managerSearch, user?.uid]);
+  }, [managerCandidates, managerSearch, user.uid]);
 
   const handleChange = (name: string, value: string, markDirty = true) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -192,52 +188,27 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           : { role: formData.role };
       const roleChanged = !!formData.role && formData.role !== loadedRole;
 
-      if (isEdit && user) {
-        const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
-          method: 'PUT',
-          headers: await authHeaders(true),
-          body: JSON.stringify({
-            displayName: formData.displayName,
-            ...(roleChanged ? rolePayload : {}),
-            phone: formData.phone,
-            address: formData.address,
-            city: formData.city,
-            state: formData.state,
-            zip: formData.zip,
-            managerId: formData.managerId || null,
-            ...(formData.status !== user.status ? { status: formData.status } : {}),
-          }),
-        });
+      const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
+        method: 'PUT',
+        headers: await authHeaders(true),
+        body: JSON.stringify({
+          displayName: formData.displayName,
+          ...(roleChanged ? rolePayload : {}),
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          managerId: formData.managerId || null,
+          ...(formData.status !== user.status ? { status: formData.status } : {}),
+        }),
+      });
 
-        const data = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(data.error || 'Failed to update user');
-        setDirty(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1800);
-      } else {
-        if (!formData.password) throw new Error('Password is required for new users');
-        if (!formData.role) throw new Error('Select a role for the new user');
-
-        const response = await fetch('/api/portal/auth/create-user', {
-          method: 'POST',
-          headers: await authHeaders(true),
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            displayName: formData.displayName,
-            ...rolePayload,
-            phone: formData.phone,
-            address: formData.address,
-            city: formData.city,
-            state: formData.state,
-            zip: formData.zip,
-            managerId: formData.managerId || null,
-          }),
-        });
-
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to create user');
-      }
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || 'Failed to update user');
+      setDirty(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
 
       router.push('/portal/admin/users');
     } catch (err) {
@@ -248,7 +219,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   };
 
   const updateStatus = async (status: 'active' | 'inactive') => {
-    if (!user || actionBusy) return;
+    if (actionBusy) return;
     if (status === 'inactive' && !window.confirm(`Deactivate ${user.displayName || user.email || 'this user'}?`)) return;
     setActionBusy(true);
     setError('');
@@ -269,7 +240,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   };
 
   const deleteUser = async () => {
-    if (!user || actionBusy) return;
+    if (actionBusy) return;
     if (!window.confirm(`Delete ${user.displayName || user.email || 'this user'}? This cannot be undone.`)) return;
     setActionBusy(true);
     setError('');
@@ -288,7 +259,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
   };
 
   const acceptPending = async () => {
-    if (!user?.fieldRole || actionBusy) return;
+    if (!user.fieldRole || actionBusy) return;
     if (!window.confirm(`Accept and activate ${user.displayName || user.email || 'this user'}?`)) return;
     setActionBusy(true);
     setError('');
@@ -315,7 +286,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
       : isAdminLevel(currentUser?.role) || !isPlatformRole(seg.value)
   );
   const personName = formData.displayName || 'this person';
-  const showSaveBar = isEdit && (dirty || saved);
+  const showSaveBar = dirty || saved;
 
   return (
     <div className={f.form}>
@@ -330,7 +301,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           <h2 id="person-details-heading" className={s.kicker}>
             Account details
           </h2>
-          {isEdit ? <span className={u.panelMeta}>Email is locked</span> : null}
+          <span className={u.panelMeta}>Email is locked</span>
         </div>
         <div className={`${u.panelBody} ${u.formGrid} ${u.formGrid2}`}>
           <div className={u.field}>
@@ -362,7 +333,7 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
           </div>
           <div className={u.field}>
             <label className={u.label} htmlFor="person-email">
-              Email {isEdit ? <Lock size={14} aria-label="Locked" /> : null}
+              Email <Lock size={14} aria-label="Locked" />
             </label>
             <input
               id="person-email"
@@ -370,52 +341,30 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
               type="email"
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value, false)}
-              readOnly={isEdit}
-              disabled={isEdit}
-              required
-              placeholder="employee@3cworldgroup.com"
+              readOnly
+              disabled
             />
           </div>
-          {isEdit ? (
-            <div className={u.field}>
-              <label className={u.label} htmlFor="person-hire">
-                Hire date <Lock size={14} aria-label="Locked" />
-              </label>
-              <input
-                id="person-hire"
-                className={u.input}
-                readOnly
-                disabled
-                value={
-                  user?.hireDate
-                    ? new Date(user.hireDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : 'N/A'
-                }
-              />
-            </div>
-          ) : (
-            <div className={u.field}>
-              <label className={u.label} htmlFor="new-password">
-                Temporary password
-              </label>
-              <input
-                id="new-password"
-                className={u.input}
-                type="password"
-                minLength={6}
-                value={formData.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-                required
-                autoComplete="new-password"
-                placeholder="Minimum 6 characters"
-              />
-              <p className={u.hint}>Set a temporary password for this new user.</p>
-            </div>
-          )}
+          <div className={u.field}>
+            <label className={u.label} htmlFor="person-hire">
+              Hire date <Lock size={14} aria-label="Locked" />
+            </label>
+            <input
+              id="person-hire"
+              className={u.input}
+              readOnly
+              disabled
+              value={
+                user.hireDate
+                  ? new Date(user.hireDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : 'N/A'
+              }
+            />
+          </div>
           <div className={`${u.field} ${u.wide}`}>
             <label className={u.label} htmlFor="person-address">
               Address
@@ -476,25 +425,23 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
               </span>
             </div>
 
-            {isEdit ? (
-              <div className={u.field}>
-                <span className={u.label} id="person-status-label">
-                  Status
-                </span>
-                <div className={u.segmented} role="group" aria-labelledby="person-status-label">
-                  {statusSegments.map((seg) => (
-                    <button
-                      key={seg.value}
-                      type="button"
-                      aria-pressed={formData.status === seg.value}
-                      onClick={() => handleChange('status', seg.value)}
-                    >
-                      {seg.label}
-                    </button>
-                  ))}
-                </div>
+            <div className={u.field}>
+              <span className={u.label} id="person-status-label">
+                Status
+              </span>
+              <div className={u.segmented} role="group" aria-labelledby="person-status-label">
+                {statusSegments.map((seg) => (
+                  <button
+                    key={seg.value}
+                    type="button"
+                    aria-pressed={formData.status === seg.value}
+                    onClick={() => handleChange('status', seg.value)}
+                  >
+                    {seg.label}
+                  </button>
+                ))}
               </div>
-            ) : null}
+            </div>
           </div>
 
           <div className={u.field}>
@@ -532,7 +479,6 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
                           setManagerSearch('');
                         }}
                       >
-                        <AdminAvatar name={m.displayName || m.email} />
                         <span className={u.personText}>
                           <span className={u.personName}>
                             <span>{m.displayName || m.email || 'Unnamed'}</span>
@@ -565,62 +511,43 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
         </div>
       </section>
 
-      {!isEdit ? (
-        <div className={f.createRow}>
-          <button
-            type="button"
-            className={`${s.btnSecondary} ${u.sm}`}
-            onClick={() => router.back()}
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button type="button" className={s.btnPrimary} onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating…' : 'Create user'}
-          </button>
+      <section className={`${s.panel} ${f.actions}`} aria-labelledby="person-actions-heading">
+        <div className={s.panelHead}>
+          <h2 id="person-actions-heading" className={s.kicker}>
+            Account actions
+          </h2>
         </div>
-      ) : null}
-
-      {isEdit && user ? (
-        <section className={`${s.panel} ${f.actions}`} aria-labelledby="person-actions-heading">
-          <div className={s.panelHead}>
-            <h2 id="person-actions-heading" className={s.kicker}>
-              Account actions
-            </h2>
-          </div>
-          <div className={`${u.panelBody} ${f.actionsBody}`}>
-            <p className={u.hint}>Deactivate an account temporarily, or delete it permanently.</p>
-            <div className={u.btnRow}>
-              {formData.status === 'pending' && user.fieldRole ? (
-                <button
-                  type="button"
-                  className={`${s.btnPrimary} ${u.primarySm}`}
-                  onClick={() => void acceptPending()}
-                  disabled={actionBusy}
-                >
-                  {actionBusy ? 'Working…' : 'Accept'}
-                </button>
-              ) : null}
+        <div className={`${u.panelBody} ${f.actionsBody}`}>
+          <div className={u.btnRow}>
+            {formData.status === 'pending' && user.fieldRole ? (
               <button
                 type="button"
-                className={`${s.btnSecondary} ${u.sm}`}
-                onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')}
+                className={`${s.btnPrimary} ${u.primarySm}`}
+                onClick={() => void acceptPending()}
                 disabled={actionBusy}
               >
-                {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
+                {actionBusy ? 'Working…' : 'Accept'}
               </button>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                onClick={() => void deleteUser()}
-                disabled={actionBusy}
-              >
-                Delete
-              </button>
-            </div>
+            ) : null}
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm}`}
+              onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')}
+              disabled={actionBusy}
+            >
+              {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
+            </button>
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+              onClick={() => void deleteUser()}
+              disabled={actionBusy}
+            >
+              Delete
+            </button>
           </div>
-        </section>
-      ) : null}
+        </div>
+      </section>
 
       {/* Sticky, not fixed: it rides the bottom of the scroller while the form is
           in view and settles under it at the end, so nothing is ever covered and

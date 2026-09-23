@@ -77,26 +77,6 @@
   font-weight: 600;
 }
 
-/* ---------- create (new user) ---------- */
-.createRow {
-  display: flex;
-  gap: var(--s2);
-}
-
-.createRow > * {
-  flex: 1 1 0;
-}
-
-@media (min-width: 1024px) {
-  .createRow {
-    justify-content: flex-end;
-  }
-
-  .createRow > * {
-    flex: none;
-  }
-}
-
 /* ---------- account actions ---------- */
 .actions {
   border-color: rgba(255, 138, 128, 0.2);
