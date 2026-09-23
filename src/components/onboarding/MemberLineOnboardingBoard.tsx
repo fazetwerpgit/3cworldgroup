@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  ESIGN_FAILURE_HELPER_TEXT,
-  ESIGN_HELPER_TEXT,
-  isEsignItem,
-} from '@/lib/onboarding/esign';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { X } from 'lucide-react';
+import { ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
 import { EsignSignAction } from '@/components/onboarding/EsignSignAction';
 import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
 import type { OnboardingStatus } from '@/types/onboarding';
+import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import s from '@/components/portal/rep/rep.module.css';
+import o from './onboarding.module.css';
 
 const STATUS_LABEL: Record<OnboardingStatus, string> = {
   not_started: 'To do',
@@ -18,27 +17,35 @@ const STATUS_LABEL: Record<OnboardingStatus, string> = {
   rejected: 'Needs attention',
 };
 
-const STATUS_CLASS: Record<OnboardingStatus, string> = {
-  not_started: 'todo',
-  submitted: 'review',
-  approved: 'done',
-  rejected: 'attention',
-};
-
 function nextActionLabel(item: WizardItem) {
   if (item.status === 'approved') return 'View';
   if (isEsignItem(item.id)) {
     return item.esignDispatch?.state === 'failed' ? 'Preparing' : 'Sign now';
   }
   if (item.status === 'rejected') return 'Resubmit';
-  if (item.status === 'submitted') return 'In review';
+  if (item.status === 'submitted') return 'View';
   // Manual-reference items (e.g. Onboarding Submission) are not uploads (B-18).
   if (item.referenceKind === 'manual') return 'Submit';
   return 'Upload';
 }
 
+/** The row button leads (lime outline) only when the next move is the rep's. */
+function isRepsMove(item: WizardItem) {
+  if (item.status === 'approved' || item.status === 'submitted') return false;
+  if (isEsignItem(item.id)) return item.esignDispatch?.state !== 'failed';
+  return true;
+}
+
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function StatusPill({ status }: { status: OnboardingStatus }) {
+  return (
+    <span className={o.state} data-state={status}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
 }
 
 interface Props {
@@ -51,11 +58,9 @@ interface Props {
   onRefresh: () => void;
 }
 
-// Full always-visible checklist board — the mockup's primary/default onboarding
-// view (Orchestrator ruling 1: hybrid). Row next-actions that need real data
-// entry open a focused sheet rather than rendering inline forms in the row.
-// Zero changes to completion predicates, write paths, or step data here —
-// presentation only; renderItemAction (passed in from the page) still owns
+// Full always-visible checklist, direction D. Row next-actions that need real
+// data entry open a focused sheet rather than rendering inline forms in the row.
+// Presentation only: renderItemAction (passed in from the page) still owns
 // every real upload/submit/reference interaction.
 export default function MemberLineOnboardingBoard({
   memberLabel,
@@ -69,97 +74,107 @@ export default function MemberLineOnboardingBoard({
   const ordered = [...items].sort((a, b) => a.order - b.order);
   const openItem = ordered.find((item) => item.id === openItemId) ?? null;
   const pct = progress.total === 0 ? 0 : Math.round((progress.approved / progress.total) * 100);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!openItem) return;
+    closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onOpenItem(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openItem, onOpenItem]);
+    // Focus the close button when a different item opens, not on every refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openItem?.id, onOpenItem]);
 
   return (
     <>
-      <section className="member-line-panel">
-        <div className="member-line-panel-head">
-          <div>
-            <h2>
-              Onboarding items for {memberLabel}
-            </h2>
-          </div>
-          <span className="member-line-meta">{progress.approved} approved</span>
-        </div>
-
-        <div className="member-line-progress">
-          <span style={{ width: `${pct}%` }} />
-        </div>
-        <p className="member-line-meta">
-          {progress.approved} of {progress.total} approved
-        </p>
-
-        <div className="member-line-board" style={{ marginTop: 16 }}>
-          {ordered.map((item) => (
-            <div key={item.id} className={`member-line-row ${item.status === 'rejected' ? 'attention' : ''}`}>
-              <span className={`member-line-state ${STATUS_CLASS[item.status]}`}>{STATUS_LABEL[item.status]}</span>
-              <div>
-                <strong>{item.label}</strong>
-                <small>{rowDescription(item)}</small>
-              </div>
-              <button type="button" className="member-line-next" onClick={() => onOpenItem(item.id)}>
-                {nextActionLabel(item)}
-              </button>
-            </div>
-          ))}
-          {ordered.length === 0 && (
-            <div className="member-line-row">
-              <span className="member-line-state todo">Not started</span>
-              <div>
-                <strong>No onboarding items assigned</strong>
-              </div>
-              <span className="member-line-next" />
-            </div>
-          )}
+      <section className={s.panel} aria-labelledby="onboarding-progress-h">
+        <div className={o.progress}>
+          <h2 id="onboarding-progress-h" className={s.kicker}>
+            Checklist for {memberLabel}
+          </h2>
+          <p className={o.score}>
+            <span className={`${o.scoreNum} ${progress.complete ? o.progressDone : ''}`}>{progress.approved}</span>
+            <span className={o.scoreOf}>/{progress.total}</span>
+            <span className={o.scoreLabel}>{progress.complete ? 'All approved' : 'approved'}</span>
+          </p>
+          <span className={s.track} aria-hidden="true">
+            <span className={s.fill} style={{ width: `${pct}%` }} />
+          </span>
         </div>
       </section>
 
-      {/* Portaled to <body>: iOS WebKit breaks position:fixed inside the
-          app-shell <main> scroller (sheet clipped under the header with no
-          way out — see SaleDetailSheet). The display:contents wrapper keeps
-          the .member-line custom-property palette in scope. */}
-      {openItem && typeof document !== 'undefined' && createPortal(
-        <div className="member-line" style={{ display: 'contents' }}>
-        <div
-          className="member-line-sheet-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={openItem.label}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) onOpenItem(null);
-          }}
-        >
-          <div className="member-line-sheet">
-            <div className="member-line-sheet-head">
-              <div>
-                <span className={`member-line-state ${STATUS_CLASS[openItem.status]}`}>{STATUS_LABEL[openItem.status]}</span>
-                <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif', fontWeight: 700, fontSize: 20 }}>
-                  {openItem.label}
-                </h2>
-              </div>
-              <button type="button" className="member-line-sheet-close" onClick={() => onOpenItem(null)}>
-                Close
-              </button>
+      <ul className={`${s.panel} ${o.list}`} aria-label="Onboarding items">
+        {ordered.map((item) => (
+          <li key={item.id} className={o.row} data-state={item.status}>
+            <div className={o.rowText}>
+              <StatusPill status={item.status} />
+              <span className={o.rowName}>{item.label}</span>
+              <span className={o.rowDesc}>{rowDescription(item)}</span>
             </div>
-            <MemberLineOnboardingSheetBody
-              item={openItem}
-              renderItemAction={renderItemAction}
-              onRefresh={onRefresh}
-            />
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${o.rowBtn} ${isRepsMove(item) ? o.rowBtnPrimary : ''}`}
+              onClick={() => onOpenItem(item.id)}
+              aria-label={`${nextActionLabel(item)}: ${item.label}`}
+            >
+              {nextActionLabel(item)}
+            </button>
+          </li>
+        ))}
+        {ordered.length === 0 && <li className={o.empty}>No onboarding items assigned yet. Your manager adds them.</li>}
+      </ul>
+
+      {/* Portaled to <body> through BodyLayer: iOS WebKit breaks position:fixed
+          inside the app-shell <main> scroller (see SaleDetailSheet). */}
+      {openItem ? (
+        <BodyLayer>
+          <div
+            className={s.backdrop}
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) onOpenItem(null);
+            }}
+          >
+            <section
+              className={s.sheet}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="onboarding-sheet-title"
+              data-onboarding-sheet=""
+            >
+              <div className={s.sheetHandle} aria-hidden="true" />
+              <div className={s.sheetHead}>
+                <div className={o.sheetStatus}>
+                  <StatusPill status={openItem.status} />
+                  <h2 id="onboarding-sheet-title" className={s.sheetTitle}>
+                    {openItem.label}
+                  </h2>
+                </div>
+                <button
+                  ref={closeRef}
+                  type="button"
+                  className={s.iconBtn}
+                  aria-label="Close"
+                  onClick={() => onOpenItem(null)}
+                >
+                  <X size={20} aria-hidden="true" />
+                </button>
+              </div>
+              <div className={s.sheetBody}>
+                <div className={o.sheetInner}>
+                  <MemberLineOnboardingSheetBody
+                    item={openItem}
+                    renderItemAction={renderItemAction}
+                    onRefresh={onRefresh}
+                  />
+                </div>
+              </div>
+            </section>
           </div>
-        </div>
-        </div>,
-        document.body
-      )}
+        </BodyLayer>
+      ) : null}
     </>
   );
 }
@@ -170,6 +185,7 @@ function rowDescription(item: WizardItem) {
     return item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT;
   }
   if (item.status === 'approved') return 'Complete.';
+  if (item.status === 'submitted') return 'Waiting for your manager to review it.';
   return 'Open the item for the next step.';
 }
 
@@ -184,34 +200,33 @@ function MemberLineOnboardingSheetBody({
 }) {
   if (item.status === 'approved') {
     return (
-      <div className="member-line-note">
+      <p className={o.note}>
         Approved{item.reviewedAt ? ` ${formatDate(item.reviewedAt)}` : ''}
         {item.reviewerName ? ` by ${item.reviewerName}` : ''}.
-      </div>
+      </p>
     );
   }
 
   return (
-    <div className="grid gap-3">
+    <>
       {item.status === 'rejected' && item.rejectionReason && (
-        <div className="member-line-note warn">
+        <p className={`${o.note} ${o.noteWarn}`}>
           <strong>Returned{item.reviewerName ? ` by ${item.reviewerName}` : ''}</strong>
-          <br />
           {item.rejectionReason}
-        </div>
+        </p>
       )}
 
       {isEsignItem(item.id) ? (
         item.esignSigningUrl ? (
           <EsignSignAction itemId={item.id} signingUrl={item.esignSigningUrl} onRefresh={onRefresh} />
         ) : (
-          <div className="member-line-note warn">
+          <p className={item.esignDispatch?.state === 'failed' ? `${o.note} ${o.noteWarn}` : o.note}>
             {item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT}
-          </div>
+          </p>
         )
       ) : (
         renderItemAction(item)
       )}
-    </div>
+    </>
   );
 }

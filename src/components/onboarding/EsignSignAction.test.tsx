@@ -108,7 +108,7 @@ describe('EsignSignAction', () => {
       capturedEvents!.completed!({ id: 'doc_1' });
     });
 
-    expect(container.textContent).toContain('Signature received - confirming');
+    expect(container.textContent).toContain('Signature received. Confirming');
     expect(container.textContent).not.toMatch(/approved/i);
 
     // First poll tick fires after CONFIRM_POLL_MS (3000ms).
@@ -172,7 +172,7 @@ describe('EsignSignAction', () => {
     await clickSignNow();
 
     expect(loadSignWellEmbedMock).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('Signature received - confirming');
+    expect(container.textContent).toContain('Signature received. Confirming');
     expect(fetchMock).not.toHaveBeenCalledWith(
       '/api/portal/onboarding/esign-embed-error',
       expect.anything()
@@ -201,7 +201,7 @@ describe('EsignSignAction', () => {
     await act(async () => {
       capturedEvents!.completed!({ id: 'doc_1' });
     });
-    expect(container.textContent).toContain('Signature received - confirming');
+    expect(container.textContent).toContain('Signature received. Confirming');
 
     // First tick fires and schedules the next one; unmount before it lands.
     await act(async () => {

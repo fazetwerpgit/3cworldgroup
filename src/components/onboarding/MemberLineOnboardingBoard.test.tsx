@@ -58,7 +58,7 @@ async function renderBoard(item: WizardItem) {
         openItemId={item.id}
         onOpenItem={() => {}}
         onRefresh={() => {}}
-      />
+      />,
     );
   });
 }
@@ -84,15 +84,20 @@ afterEach(() => {
 // flagged as untested.
 // The sheet overlay portals to document.body (iOS app-shell scroller fix),
 // so queries go through body rather than the render container.
+function signNowButton(): HTMLButtonElement | null {
+  const buttons = document.body.querySelectorAll<HTMLButtonElement>('[data-onboarding-sheet] button');
+  return Array.from(buttons).find((button) => button.textContent?.includes('Sign now')) ?? null;
+}
+
 function sheetText(): string {
-  return document.body.querySelector('.member-line-sheet')?.textContent ?? '';
+  return document.body.querySelector('[data-onboarding-sheet]')?.textContent ?? '';
 }
 
 describe('MemberLineOnboardingBoard esign sheet body', () => {
   it('renders the Sign now action when a signing url is present', async () => {
     await renderBoard(makeItem({ status: 'submitted', esignSigningUrl: 'https://www.signwell.com/e/abc' }));
 
-    expect(document.body.querySelector('button.bg-\\[\\#8dc63f\\]')?.textContent).toContain('Sign now');
+    expect(signNowButton()).not.toBeNull();
     expect(sheetText()).not.toContain(ESIGN_HELPER_TEXT);
     expect(sheetText()).not.toContain(ESIGN_FAILURE_HELPER_TEXT);
   });
@@ -103,7 +108,7 @@ describe('MemberLineOnboardingBoard esign sheet body', () => {
     expect(sheetText()).toContain(ESIGN_HELPER_TEXT);
     expect(sheetText()).not.toContain(ESIGN_FAILURE_HELPER_TEXT);
     // No signing url means no EsignSignAction - never a "Sign now" button.
-    expect(container.querySelector('button.bg-\\[\\#8dc63f\\]')).toBeNull();
+    expect(signNowButton()).toBeNull();
   });
 
   it('shows the honest failure copy when there is no url and the dispatch is marked failed', async () => {
@@ -112,7 +117,7 @@ describe('MemberLineOnboardingBoard esign sheet body', () => {
         status: 'submitted',
         esignSigningUrl: null,
         esignDispatch: { state: 'failed', attempts: 1 },
-      })
+      }),
     );
 
     expect(sheetText()).toContain(ESIGN_FAILURE_HELPER_TEXT);
