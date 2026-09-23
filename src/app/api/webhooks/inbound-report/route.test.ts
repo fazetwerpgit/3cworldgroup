@@ -10,6 +10,8 @@ const {
   batchSetMock,
   batchCommitMock,
   syncMock,
+  readStoredMock,
+  sendNoticesMock,
 } = vi.hoisted(() => {
   const addMock = vi.fn();
   const setMock = vi.fn();
@@ -18,6 +20,8 @@ const {
   const batchSetMock = vi.fn();
   const batchCommitMock = vi.fn();
   const syncMock = vi.fn();
+  const readStoredMock = vi.fn();
+  const sendNoticesMock = vi.fn();
   const collectionMock = vi.fn((name: string) => ({
     add: addMock,
     get: collectionGetMock,
@@ -33,6 +37,8 @@ const {
     batchSetMock,
     batchCommitMock,
     syncMock,
+    readStoredMock,
+    sendNoticesMock,
   };
 });
 
@@ -48,6 +54,10 @@ vi.mock('@/lib/fiberReport/parseReport', () => ({
 vi.mock('@/lib/sales/installDateSync', () => ({
   syncInstallDatesFromOrders: syncMock,
 }));
+vi.mock('@/lib/fiberReport/carrierNotices', () => ({
+  readStoredOrders: readStoredMock,
+  sendCarrierNotices: sendNoticesMock,
+}));
 
 import { POST } from './route';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
@@ -60,6 +70,7 @@ const NO_CHANGES = {
   unchanged: 0,
   errors: 0,
   changes: [],
+  orderSales: new Map(),
 };
 
 beforeEach(() => {
@@ -71,6 +82,8 @@ beforeEach(() => {
   collectionGetMock.mockResolvedValue({ docs: [] });
   batchCommitMock.mockResolvedValue(undefined);
   syncMock.mockResolvedValue(NO_CHANGES);
+  readStoredMock.mockResolvedValue(new Map());
+  sendNoticesMock.mockResolvedValue({ found: 0, alreadySent: 0, sent: 0, summarized: 0, errors: 0 });
 });
 
 /** One parsed order, posted as a report with an xlsx attachment. */
@@ -161,12 +174,18 @@ describe('POST /api/webhooks/inbound-report install-date sync', () => {
       orders: [expect.objectContaining({ id: 'TMO20260824UZMTV' })],
       now: expect.any(Date),
     });
-    // `changes` is the caller's detail, not something the webhook echoes back.
-    const { changes: _changes, ...counts } = NO_CHANGES;
+    // `changes` and `orderSales` are the caller's detail, not something the webhook echoes back.
     expect(json).toEqual({
       ok: true,
       upserted: 1,
-      installDateSync: { ...counts, checked: 1, updated: 1 },
+      installDateSync: {
+        checked: 1,
+        updated: 1,
+        skippedAmbiguous: 0,
+        skippedCancelled: 0,
+        unchanged: 0,
+        errors: 0,
+      },
     });
     expect(addMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -191,6 +210,20 @@ describe('POST /api/webhooks/inbound-report install-date sync', () => {
     expect(batchCommitMock).toHaveBeenCalledOnce();
     expect(addMock).toHaveBeenCalledWith(
       expect.objectContaining({ error: null, upserted: 1, installDateSync: null })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('still stores the report when the carrier notices throw', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    sendNoticesMock.mockRejectedValue(new Error('bell down'));
+
+    const response = await postReport();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, upserted: 1 });
+    expect(addMock).toHaveBeenCalledWith(
+      expect.objectContaining({ error: null, upserted: 1, carrierNotices: null })
     );
     consoleError.mockRestore();
   });

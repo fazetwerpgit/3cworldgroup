@@ -53,6 +53,11 @@ export interface FiberOrder {
   //   saleId: null    -> explicitly NOT any sale (suppresses the address guess)
   // Written only by POST /api/portal/sales/status/link (admin/owner).
   saleLink?: { saleId: string | null; by: string; byName: string; at: string } | null;
+  // PERSISTED: the last missed-install / cancelled / churned status the rep
+  // was told about for this order (lib/fiberReport/carrierNotices). The report
+  // upsert merges, so it survives every later report; a status already told is
+  // never told again.
+  carrierNotice?: { status: FiberOrderStatus; at: string } | null;
 }
 
 // What the install-date sync did with one report (see lib/sales/installDateSync).
@@ -71,6 +76,20 @@ export interface InstallDateSyncCounts {
   errors: number;
 }
 
+// What the carrier notices did with one report (see lib/fiberReport/carrierNotices).
+export interface CarrierNoticeCounts {
+  /** Orders that newly reached breakage / cancelled / churned for a rep. */
+  found: number;
+  /** Of those, already told by an earlier delivery of a report. */
+  alreadySent: number;
+  /** Bell + push notifications sent (a capped rep's summary counts once). */
+  sent: number;
+  /** Reps who got one summary instead of a notice per order. */
+  summarized: number;
+  /** Claim or dispatch failures. Logged, never thrown at the webhook. */
+  errors: number;
+}
+
 // Import log entry, one per received report email (collection: fiberReportImports).
 export interface FiberReportImport {
   receivedAt: string;
@@ -83,6 +102,7 @@ export interface FiberReportImport {
   unmatchedRepNames: string[];
   error: string | null;
   installDateSync?: InstallDateSyncCounts | null;
+  carrierNotices?: CarrierNoticeCounts | null;
 }
 
 export interface FiberStatusResponse {

@@ -33,8 +33,23 @@ export interface InstallDateChange {
   next: Date;
 }
 
+/**
+ * The sale a report order stands for: the one sale whose current carrier row
+ * it is (same join as the date writes, same saleLink override). The carrier
+ * notices (lib/fiberReport/carrierNotices) read it rather than joining again.
+ */
+export interface OrderSale {
+  saleId: string;
+  salesRepId: string;
+  customerName: string | null;
+  customerAddress: string | null;
+  status: string | null;
+}
+
 export interface InstallDateSyncResult extends InstallDateSyncCounts {
   changes: InstallDateChange[];
+  /** Order id → its sale. Orders that are no single sale's current row are absent. */
+  orderSales: Map<string, OrderSale>;
 }
 
 export interface SyncInstallDatesInput {
@@ -77,6 +92,7 @@ function emptyResult(): InstallDateSyncResult {
     unchanged: 0,
     errors: 0,
     changes: [],
+    orderSales: new Map(),
   };
 }
 
@@ -165,6 +181,9 @@ type Resolved =
   | { kind: 'match'; order: FiberOrder; sale: SyncSale }
   | { kind: 'ambiguous' };
 
+/** Each sale with the carrier row that stands for it in this batch. */
+type SaleCurrent = { sale: SyncSale; current: Current };
+
 /**
  * The join, resolved for one batch of orders: each sale the batch touches,
  * paired with its current row when that row can move a day.
@@ -175,12 +194,11 @@ type Resolved =
  * with no est day cannot move one. And an order that is the current row of two
  * sales (two logs of one customer, say) writes neither.
  */
-function resolveMatches(orders: FiberOrder[], sales: SyncSale[]): Resolved[] {
+function resolveMatches(currents: SaleCurrent[]): Resolved[] {
   const claimants = new Map<FiberOrder, SyncSale[]>();
   const out: Resolved[] = [];
 
-  for (const sale of sales) {
-    const current = currentOrderForSale(sale, orders);
+  for (const { sale, current } of currents) {
     if (current.kind === 'none') continue;
     if (current.kind === 'ambiguous') {
       out.push({ kind: 'ambiguous' });
@@ -194,6 +212,29 @@ function resolveMatches(orders: FiberOrder[], sales: SyncSale[]): Resolved[] {
   for (const [order, claimed] of claimants) {
     if (claimed.length > 1) out.push({ kind: 'ambiguous' });
     else out.push({ kind: 'match', order, sale: claimed[0] });
+  }
+  return out;
+}
+
+/** Every batch order that is exactly one sale's current row, whatever its status. */
+function orderSalesFor(currents: SaleCurrent[]): Map<string, OrderSale> {
+  const claimed = new Map<string, SyncSale[]>();
+  for (const { sale, current } of currents) {
+    if (current.kind !== 'order') continue;
+    const id = current.order.id;
+    claimed.set(id, [...(claimed.get(id) ?? []), sale]);
+  }
+  const out = new Map<string, OrderSale>();
+  for (const [orderId, sales] of claimed) {
+    if (sales.length !== 1) continue;
+    const [sale] = sales;
+    out.set(orderId, {
+      saleId: sale.id,
+      salesRepId: sale.salesRepId,
+      customerName: sale.customerName,
+      customerAddress: sale.customerAddress,
+      status: sale.status,
+    });
   }
   return out;
 }
@@ -315,7 +356,9 @@ export async function syncInstallDatesFromOrders(
   const sales = snapshot.docs.map((doc) =>
     toSyncSale(doc.id, doc.data() ?? {}, doc.updateTime ?? null)
   );
-  const resolved = resolveMatches(orders, sales);
+  const currents = sales.map((sale) => ({ sale, current: currentOrderForSale(sale, orders) }));
+  const resolved = resolveMatches(currents);
+  result.orderSales = orderSalesFor(currents);
   result.checked = orders.filter(isDated).length;
 
   for (const entry of resolved) {

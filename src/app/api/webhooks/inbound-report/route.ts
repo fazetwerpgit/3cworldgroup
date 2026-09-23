@@ -4,8 +4,14 @@ import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
-import { syncInstallDatesFromOrders } from '@/lib/sales/installDateSync';
-import type { FiberOrder, FiberReportImport, InstallDateSyncCounts } from '@/types/fiberOrder';
+import { syncInstallDatesFromOrders, type OrderSale } from '@/lib/sales/installDateSync';
+import { readStoredOrders, sendCarrierNotices } from '@/lib/fiberReport/carrierNotices';
+import type {
+  CarrierNoticeCounts,
+  FiberOrder,
+  FiberReportImport,
+  InstallDateSyncCounts,
+} from '@/types/fiberOrder';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -27,7 +33,7 @@ function importLog(
   filename: string,
   fromEmail: string,
   subject: string,
-  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync'>>
+  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync' | 'carrierNotices'>>
 ): FiberReportImport {
   return {
     receivedAt,
@@ -40,6 +46,7 @@ function importLog(
     unmatchedRepNames: values.unmatchedRepNames ?? [],
     error: values.error ?? null,
     installDateSync: values.installDateSync ?? null,
+    carrierNotices: values.carrierNotices ?? null,
   };
 }
 
@@ -185,6 +192,10 @@ export async function POST(request: NextRequest) {
       await adminDb.collection('config').doc('fiberRepMap').set({ map: mappedDealerIds }, { merge: true });
     }
 
+    // What each order was before this report: the carrier notices tell a rep
+    // only about changes. Never throws; null when it could not be read.
+    const storedOrders = await readStoredOrders(orders);
+
     const fiberOrders = adminDb.collection('fiberOrders');
     for (let offset = 0; offset < orders.length; offset += 450) {
       const batch = adminDb.batch();
@@ -200,14 +211,26 @@ export async function POST(request: NextRequest) {
     // failure here must not fail a report that already landed, or the next
     // delivery would be the only way to recover data we already have.
     let installDateSync: InstallDateSyncCounts | null = null;
+    let orderSales = new Map<string, OrderSale>();
     try {
-      const { changes, ...counts } = await syncInstallDatesFromOrders({ orders, now: new Date() });
+      const { changes, orderSales: linked, ...counts } = await syncInstallDatesFromOrders({ orders, now: new Date() });
       installDateSync = counts;
+      orderSales = linked;
       if (changes.length) {
         console.log(`[inbound-report] moved ${changes.length} install date(s) from the report`);
       }
     } catch (error) {
       console.error('[inbound-report] install date sync failed', error);
+    }
+
+    // Missed installs, carrier cancels and disconnects, told to the rep once.
+    let carrierNotices: CarrierNoticeCounts | null = null;
+    if (storedOrders) {
+      try {
+        carrierNotices = await sendCarrierNotices({ orders, stored: storedOrders, orderSales, now: new Date() });
+      } catch (error) {
+        console.error('[inbound-report] carrier notices failed', error);
+      }
     }
 
     await adminDb.collection('config').doc('fiberReportStatus').set(
@@ -222,6 +245,7 @@ export async function POST(request: NextRequest) {
         unmatchedRepNames: [...unmatchedRepNames],
         error: null,
         installDateSync,
+        carrierNotices,
       })
     );
 

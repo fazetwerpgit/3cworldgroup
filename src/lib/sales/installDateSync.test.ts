@@ -280,6 +280,38 @@ describe('syncInstallDatesFromOrders', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
+  it("returns each order that is exactly one sale's current row, whatever its status", async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerName: 'Dana Reyes', customerAddress: '123 Main St', status: 'approved' },
+      { id: 'sale-2', salesRepId: 'rep-2', customerAddress: '77 Oak Ave' },
+      { id: 'sale-3', salesRepId: 'rep-3', customerAddress: '77 Oak Avenue' },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({ id: 'o-1', address: '123 Main St', estInstallDate: '2026-09-10' }),
+        // The miss is newer than anything the order row says: it is the sale's row now.
+        order({ id: 'brk_1', address: '123 Main St', status: 'breakage', orderDate: null, estInstallDate: '2026-09-12' }),
+        // Two sales at one door: no single sale, so no link.
+        order({ id: 'o-2', address: '77 Oak Ave', status: 'cancelled' }),
+      ],
+      now: NOW,
+    });
+
+    expect([...result.orderSales]).toEqual([
+      [
+        'brk_1',
+        {
+          saleId: 'sale-1',
+          salesRepId: 'rep-1',
+          customerName: 'Dana Reyes',
+          customerAddress: '123 Main St',
+          status: 'approved',
+        },
+      ],
+    ]);
+  });
+
   it('counts a failed write and keeps going', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     setSales([
