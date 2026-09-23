@@ -2,8 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowDown, Check, Clock, ImagePlus, Loader2, Pin, RotateCw, Send, X } from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { AlertCircle, ArrowDown, Check, Clock, Hash, ImagePlus, Loader2, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
@@ -12,24 +11,22 @@ import type { GifResult } from '@/components/chat/GifPicker';
 import { prepareImageForUpload, uploadChatImage, validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { MessageActions } from '@/components/chat/MessageActions';
-import { MobileChannelList } from '@/components/chat/MobileChannelList';
+import { ChannelRows, MobileChannelList } from '@/components/chat/MobileChannelList';
+import { clockTime, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import c from '@/components/chat/chat.module.css';
+import s from '@/components/portal/rep/rep.module.css';
 import { MobileThread } from '@/components/chat/MobileThread';
 import { isAbortError } from '@/lib/fetch/isAbortError';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
-import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
-import { getAuthorColor, getInitials, isDeveloperAuthor } from '@/lib/chat/authorColor';
+import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-rep-b.css';
 
 function getLocalDayKey(createdAt: Date | null) {
   const date = createdAt ?? new Date();
@@ -51,9 +48,9 @@ function formatChatLineDayDivider(createdAt: Date | null) {
   yesterday.setDate(today.getDate() - 1);
   const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-  if (isSameLocalDay(date, today)) return 'TODAY';
-  if (isSameLocalDay(date, yesterday)) return `YESTERDAY · ${dateLabel}`;
-  return dateLabel.toUpperCase();
+  if (isSameLocalDay(date, today)) return 'Today';
+  if (isSameLocalDay(date, yesterday)) return `Yesterday · ${dateLabel}`;
+  return dateLabel;
 }
 
 // Probe the GIF feature at most once per browser session (shared across mounts):
@@ -98,9 +95,7 @@ function DesktopAttachment({
       disabled={isPendingLocal}
       aria-label="Open image"
       data-attachment-type={message.attachment?.type ?? 'image'}
-      className={`chat-line-attachment relative mt-2 block w-full max-w-xs overflow-hidden rounded-lg bg-[#0A1F44]/5 ring-1 transition disabled:cursor-default dark:bg-white/5 ${
-        isFailed ? 'ring-red-400/70 dark:ring-red-500/50' : 'ring-slate-200 dark:ring-border'
-      }`}
+      className={`${c.attachment} ${isFailed ? c.attachmentFailed : ''}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -109,11 +104,8 @@ function DesktopAttachment({
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         style={aspectStyle}
-        className={`chat-line-attachment-image max-h-64 w-full object-contain ${isUploading ? 'opacity-70' : ''}`}
       />
-      {isUploading && (
-        <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
-      )}
+      {isUploading && <span className={c.uploading} />}
     </button>
   );
 }
@@ -324,13 +316,13 @@ export default function TeamChatPage() {
   // user's own read receipts. All-read until reads settle (see the hook).
   const { unreadByChannel } = useChatUnread(channels, user?.uid);
 
-  // Whether the desktop (lg+) layout is the one on screen. Both layouts render in
+  // Whether the desktop (>=1024px, the D shell's breakpoint) layout is the one on screen. Both layouts render in
   // the DOM (CSS toggles them), so mark-read needs the breakpoint to know which
   // channel is actually being viewed: desktop always shows its active channel,
   // while mobile only "opens" a channel in the thread view.
   const [isLgUp, setIsLgUp] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 721px)');
+    const mq = window.matchMedia('(min-width: 1024px)');
     const update = () => setIsLgUp(mq.matches);
     update();
     mq.addEventListener('change', update);
@@ -482,11 +474,7 @@ export default function TeamChatPage() {
   // per channel switch — the numbers don't depend on which channel is active,
   // only whether the tape renders does. Stays null (tape hidden) on any
   // fetch/parse error so it never shows fabricated numbers.
-  const [companyStats, setCompanyStats] = useState<{
-    mtdCount: number;
-    mtdMonthlyValue: number;
-    lastSale: { repName: string } | null;
-  } | null>(null);
+  const [companyStats, setCompanyStats] = useState<CompanyStats | null>(null);
 
   useEffect(() => {
     // Wait for the signed-in user: on first mount auth?.currentUser is still
@@ -506,23 +494,6 @@ export default function TeamChatPage() {
       cancelled = true;
     };
   }, [authedFetch, onboardingUser, user]);
-
-  // "COMPANY LINE · N SALES THIS MONTH · $X/MO ON THE BOARD · LAST: REPNAME" —
-  // uppercase, dot-separated (mockup: design-mockups/chat-ticker-round1/
-  // option-1-the-tape.html). The LAST segment is dropped entirely when there's
-  // no approved sale yet, rather than showing a fabricated name.
-  const companyTapeText = useMemo(() => {
-    if (!companyStats) return '';
-    const segments = [
-      'COMPANY LINE',
-      `${companyStats.mtdCount} SALE${companyStats.mtdCount === 1 ? '' : 'S'} THIS MONTH`,
-      `$${companyStats.mtdMonthlyValue.toLocaleString('en-US')}/MO ON THE BOARD`,
-    ];
-    if (companyStats.lastSale) {
-      segments.push(`LAST: ${companyStats.lastSale.repName.toUpperCase()}`);
-    }
-    return segments.join(' · ');
-  }, [companyStats]);
 
   // Cheap bootstrap call: keeps server-side membership current for this caller, then
   // Firestore rules allow the realtime channel/message listeners to read member docs.
@@ -744,16 +715,6 @@ export default function TeamChatPage() {
     setDesktopNewCount(0);
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
-
-  // Flag <body> while the phone conversation is open so globals.css hides the
-  // bottom nav and reclaims its reserved scroll room (composer owns the edge).
-  useEffect(() => {
-    if (mobileView !== 'thread') return;
-    document.body.dataset.chatThread = 'on';
-    return () => {
-      delete document.body.dataset.chatThread;
-    };
-  }, [mobileView]);
 
   // POSTs an echo; on failure marks it 'failed' (retry flips it back). On success
   // the echo stays put until the realtime feed delivers the real message and
@@ -1084,118 +1045,393 @@ export default function TeamChatPage() {
   }, [displayMessages]);
   const pinnedCopy = pinnedMessage
     ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
-    : 'No pinned message yet';
-  const pinnedAuthor = pinnedMessage?.authorName;
-  const pinnedTime = pinnedMessage ? formatTime(pinnedMessage.createdAt) : '';
+    : '';
+  // Role labels carry comp tiers, manager titles and IBO levels: admins only.
+  const showRoles = isRole('admin');
+  const activeMemberCount = activeChannel ? memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0 : 0;
+  const ActiveMark = activeChannel?.audience === 'managers' ? Lock : Hash;
+  const openChannelOnPhone = (channelId: string) => {
+    setActiveChannelId(channelId);
+    setMobileView('thread');
+  };
 
   return (
-    <ProtectedRoute permissions={['chat:read']}>
-      <div className="chat-line-portal min-h-screen portal-canvas lg:flex lg:h-dvh lg:flex-col">
-        <PortalHeader />
-        <div className="flex min-h-0 lg:flex-1">
-          <PortalSidebar />
-          <main className="chat-line-main flex-1 min-h-0 overflow-hidden">
-            <div className="chat-line-page">
-              {shownError && <div className="chat-line-alert" role="alert">{shownError}</div>}
-              <div className="chat-line-desktop-shell">
-                <PageTitle title="Team Chat" />
-                <div className="chat-line-desktop">
-                <aside className="chat-line-rail">
-                  <h1 className="chat-line-rail-title">Channels</h1>
-                  <div className="chat-line-channel-list">
-                    {loadingChannels ? [0, 1, 2, 3].map((row) => <div className="chat-line-channel-skeleton" key={row} aria-hidden="true"><span /><span /><span /></div>) : channels.length === 0 ? <p className="chat-line-empty">No live channels yet. Ask an admin to sync chat channels.</p> : channels.map((channel) => {
-                      const memberCount = memberCounts[channel.id] ?? channel.memberIds?.length ?? 0;
-                      return <button key={channel.id} type="button" onClick={() => setActiveChannelId(channel.id)} className={`chat-line-channel ${channel.id === activeChannelId ? 'is-active' : ''}`}>
-                        <span className="chat-line-channel-number" aria-hidden="true">#</span>
-                        <span className="chat-line-channel-tick" />
-                        <span className="chat-line-channel-copy"><strong>{channel.name}</strong><small>{channel.description}</small><span className="chat-line-channel-tail">{unreadByChannel[channel.id] && <i aria-label="Unread messages" />}{channel.audience.toUpperCase()} · {memberCount} member{memberCount === 1 ? '' : 's'}</span></span>
-                      </button>;
-                    })}
-                  </div>
-                  <p className="chat-line-rail-note"><strong>Chat guidelines</strong><br />Keep customer details out of chat.<br /><br />Don&apos;t post customer card numbers or SSNs.</p>
-                </aside>
-                <section className="chat-line-conversation">
-                  <header className="chat-line-conversation-head">
-                    <div className="chat-line-head-copy">
-                      <button type="button" onClick={() => setInfoOpen(true)} disabled={!activeChannel} className="chat-line-title-button" aria-label="Channel details">
-                        <h2 className="chat-line-thread-title portal-display">{activeChannel?.name ?? 'Select a channel'}</h2>
-                        <p className="chat-line-head-description">{activeChannel?.description ?? 'Choose a channel to view messages.'}</p>
-                      </button>
-                    </div>
-                    <div className="chat-line-head-meta"><span>{activeChannel ? `${memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0} members` : 'No members'}</span></div>
-                  </header>
-                  <div className="chat-line-pinned-band"><span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span><span className="chat-line-pinned-copy">{pinnedCopy || 'No pinned message yet'}{pinnedAuthor && <em> · {pinnedAuthor}</em>}</span><span className="chat-line-pinned-time">{pinnedTime}</span></div>
-                  <div className="chat-line-message-stage">
-                    <div ref={desktopScrollRef} onScroll={handleDesktopScroll} className="chat-line-messages">
-                      <div aria-hidden="true" className="chat-line-scroll-spacer" />
-                      {!loadingMessages && threadMessages.length > 0 && hasMoreMessages && (
-                        <div className="chat-line-history-pager">Earlier messages load as you scroll</div>
-                      )}
-                      {loadingMessages ? <div className="chat-line-message-skeletons" aria-hidden="true">{[0, 1, 2, 3, 4].map((row) => <span key={row} />)}</div> : threadMessages.length === 0 ? <div className="chat-line-empty-message"><strong>No messages yet</strong><span>Start with a short update, question, or field note.</span></div> : displayMessages.map((message, index) => {
-                        const previousMessage = displayMessages[index - 1];
-                        const showDayDivider = !previousMessage || getLocalDayKey(previousMessage.createdAt) !== getLocalDayKey(message.createdAt);
-                        const grouped = !!previousMessage && !showDayDivider && previousMessage.authorId === message.authorId && Math.abs((message.createdAt?.getTime() ?? 0) - (previousMessage.createdAt?.getTime() ?? 0)) <= 300000;
-                        const isPending = !!message.pendingState;
-                        const isFailed = message.pendingState === 'failed';
-                        const isOwn = message.authorId === user?.uid;
-                        const canEdit = isOwn && !!message.text;
-                        const canDelete = canModerate || isOwn;
-                        return <Fragment key={message.id}>
-                          {showDayDivider && <div className="chat-line-day-divider"><span>{formatChatLineDayDivider(message.createdAt)}</span></div>}
-                          <article data-mid={message.id} className={`chat-line-message ${isOwn ? 'is-own' : ''} ${grouped ? 'is-grouped' : ''} ${isFailed ? 'is-failed' : ''} ${message.pendingState === 'sending' ? 'is-sending' : ''}`}>
-                            <div className="chat-line-avatar-column">{grouped ? <span className="chat-line-avatar-spacer" aria-hidden="true" /> : isOwn ? <span className="chat-line-avatar chat-line-avatar-own" aria-hidden="true">{getInitials(message.authorName)}</span> : <ChatAvatar authorId={message.authorId} authorName={message.authorName} avatarUrl={authorAvatars[message.authorId]} size="sm" className="chat-line-avatar" />}</div>
-                            <div className="chat-line-message-content">
-                              <div className="chat-line-message-top"><strong style={isDeveloperAuthor(message.authorId) ? undefined : ({ '--an': getAuthorColor(message.authorId).name, '--an-dark': getAuthorColor(message.authorId).nameDark } as CSSProperties)} className={isDeveloperAuthor(message.authorId) ? 'chat-dev-name' : 'chat-line-author'}>{message.authorName}</strong>{isDeveloperAuthor(message.authorId) && <span className="chat-dev-badge">DEV</span>}{message.authorRole && <span className="chat-line-role">{message.authorRole.replace(/_/g, ' ')}</span>}<span className="chat-line-timestamp">{formatTime(message.createdAt)}</span></div>
-                              <div className="chat-line-bubble-row">
-                                <div className="chat-line-bubble">
-                                  {message.isPinned && <span className="chat-line-pinned-mini"><Pin aria-hidden="true" /> PINNED</span>}
-                                  {message.replyTo && <div className="chat-line-quote"><strong>{message.replyTo.authorName}</strong><span>{message.replyTo.text}</span></div>}
-                                  <DesktopAttachment message={message} eager={index >= displayMessages.length - 12} onOpen={() => openLightbox({ url: message.attachment?.url ?? message.localPreviewUrl ?? '', author: message.authorName, time: formatTime(message.createdAt) })} />
-                                  {message.text && <p>{message.text}{message.editedAt && <span className="chat-line-edited"> (edited)</span>}</p>}
-                                  {isPending ? isFailed ? <div className="chat-line-failed-actions"><button type="button" onClick={() => retryPending(message)}><RotateCw aria-hidden="true" /> Failed — tap to retry</button><button type="button" onClick={() => discardPending(message.id)} aria-label="Discard message"><X aria-hidden="true" /></button></div> : <span className="chat-line-message-status"><Clock aria-hidden="true" /> Sending…</span> : <ReactionBar channelId={activeChannelId} messageId={message.id} reactionCounts={message.reactionCounts} myReactions={message.myReactions} onError={setError} />}
-                                </div>
-                                {!isPending && <MessageActions triggerClassName="chat-line-message-actions" config={{ hasText: !!message.text, canEdit, canDelete, canPin, isPinned: !!message.isPinned, onReply: () => startReply(message), onCopy: () => copyMessageText(message.text), onEdit: () => startEdit(message), onDelete: () => deleteMessage(message.id), onTogglePin: () => void togglePin(message) }} />}
-                              </div>
-                            </div>
-                          </article>
-                        </Fragment>;
-                      })}
-                      <div ref={messagesEndRef} />
-                    </div>
-                    {desktopNewCount > 0 && <button type="button" onClick={jumpToLatestDesktop} className="chat-line-jump-pill">{desktopNewCount} new message{desktopNewCount > 1 ? 's' : ''} <ArrowDown aria-hidden="true" /></button>}
-                  </div>
-                  <div className="chat-line-composer-wrap">
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; onDesktopFilePicked(file); }} />
-                    {attachFile && attachPreview && (
-                      <div className="chat-line-attachment-preview">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={attachPreview} alt="Selected image preview" />
-                        <span>{attachFile.name}</span>
-                        <button type="button" onClick={clearDesktopAttachment} aria-label="Remove image"><X aria-hidden="true" /></button>
-                      </div>
-                    )}
-                    {replyTarget && <div className="chat-line-compose-strip"><div><strong>REPLYING TO {replyTarget.authorName}</strong><span>{makeReplySnippet(replyTarget).text}</span></div><button type="button" onClick={cancelReply} aria-label="Cancel reply"><X aria-hidden="true" /></button></div>}
-                    {editTarget && <div className="chat-line-compose-strip"><div><strong>EDITING MESSAGE</strong><span>{editTarget.text}</span></div><button type="button" onClick={cancelEdit} aria-label="Cancel edit"><X aria-hidden="true" /></button></div>}
-                    <div className="chat-line-composer">
-                      <button type="button" className="chat-line-tool" onClick={() => fileInputRef.current?.click()} disabled={!activeChannelId || !!editTarget} aria-label="Attach an image"><ImagePlus aria-hidden="true" /></button>
-                      <Textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (editTarget) void saveEdit(); else handleDesktopSend(); } else if (event.key === 'Escape' && editTarget) { event.preventDefault(); cancelEdit(); } }} placeholder={editTarget ? 'Edit your message...' : 'Write an update…'} disabled={!activeChannelId} rows={1} className="chat-line-textarea" />
-                      {gifEnabled && <div className="chat-line-gif-wrap"><button type="button" className="chat-line-tool chat-line-gif-button" onClick={() => setGifOpen((open) => !open)} disabled={!activeChannelId || !!editTarget} aria-label="Add a GIF" aria-expanded={gifOpen}>GIF</button>{gifOpen && activeChannelId && <GifPicker authedFetch={authedFetch} onSelect={sendGif} onClose={() => setGifOpen(false)} />}</div>}
-                      <button type="button" className="chat-line-send" onClick={editTarget ? () => void saveEdit() : handleDesktopSend} disabled={!activeChannelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}>{sending ? <Loader2 aria-hidden="true" /> : editTarget ? <Check aria-hidden="true" /> : <Send aria-hidden="true" />}<span className="chat-line-send-label">{editTarget ? 'Save' : 'Send'}</span></button>
-                    </div>
-                    <div className="chat-line-composer-meta"><span>Don&apos;t post customer card numbers or SSNs.</span><span>Enter to send</span></div>
-                  </div>
-                </section>
-                </div>
-              </div>
-              <div className="chat-line-mobile">
-                {mobileView === 'thread' ? <MobileThread pinnedMessage={pinnedMessage} channel={activeChannel} memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined} channelId={activeChannelId} messages={displayMessages} snapshotVersion={snapshotVersion} windowSize={messagesWindowSize} lastSnapshotWindow={lastSnapshotWindow} hasMore={hasMoreMessages} onLoadOlder={loadOlderMessages} companyTapeText={activeChannelId === 'all-company' ? companyTapeText : ''} authorAvatars={authorAvatars} loading={loadingMessages} renderedChannel={renderedChannel} error={shownError} currentUserId={user?.uid} canModerate={canModerate} canPin={canPin} draft={draft} sending={sending} gifEnabled={gifEnabled} authedFetch={authedFetch} messagesEndRef={mobileMessagesEndRef} scrollToBottomSignal={scrollToBottomSignal} formatTime={formatTime} replyTarget={replyTarget} editTarget={editTarget} replySnippet={makeReplySnippet} onBack={() => setMobileView('list')} onOpenInfo={() => setInfoOpen(true)} onDraftChange={setDraft} onSend={sendMessage} onSendImage={sendImage} onSendGif={sendGif} onOpenImage={openLightbox} onError={setError} onDelete={deleteMessage} onReactionError={setError} onRetryPending={retryPending} onDiscardPending={discardPending} onReply={startReply} onEdit={startEdit} onCopy={copyMessageText} onTogglePin={togglePin} onCancelReply={cancelReply} onCancelEdit={cancelEdit} onSaveEdit={saveEdit} /> : <MobileChannelList channels={channels} loading={loadingChannels} error={shownError} unreadByChannel={unreadByChannel} onOpenChannel={(channelId) => { setActiveChannelId(channelId); setMobileView('thread'); }} />}
-              </div>
-              <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
-              <ChatLightbox image={lightbox} onClose={closeLightbox} />
+    <div className={c.app}>
+      {shownError && (
+        <p className={`${c.alert} ${s.deskOnly}`} role="alert">
+          <AlertCircle size={16} aria-hidden="true" />
+          {shownError}
+        </p>
+      )}
+
+      {/* Desktop: channel rail + conversation, sized to the viewport. */}
+      <div className={c.desk}>
+        <aside className={`${s.panel} ${c.rail}`} aria-label="Channels">
+          <div className={c.panelHead}>
+            <h1 className={s.kicker}>Team chat</h1>
+          </div>
+          <div className={c.railList}>
+            <ChannelRows
+              channels={channels}
+              loading={loadingChannels}
+              error={channelsError}
+              unreadByChannel={unreadByChannel}
+              activeChannelId={activeChannelId}
+              onSelect={setActiveChannelId}
+            />
+          </div>
+          <div className={c.railFoot}>
+            <p className={c.guide}>
+              <ShieldAlert size={16} aria-hidden="true" />
+              Keep customer details out of chat. Never post card numbers or SSNs.
+            </p>
+          </div>
+        </aside>
+
+        <section className={`${s.panel} ${c.convo}`} aria-label={activeChannel ? `${activeChannel.name} conversation` : 'Conversation'}>
+          <header className={c.convoHead}>
+            <button type="button" onClick={() => setInfoOpen(true)} disabled={!activeChannel} className={c.titleBtn} aria-label={activeChannel ? `#${activeChannel.name}, channel details` : 'Channel details'}>
+              <span className={c.convoTitle}>
+                <ActiveMark size={18} aria-hidden="true" />
+                {activeChannel?.name ?? 'Select a channel'}
+              </span>
+              <span className={c.convoDesc}>{activeChannel?.description ?? 'Choose a channel to view messages.'}</span>
+            </button>
+            {activeChannel && (
+              <button type="button" onClick={() => setInfoOpen(true)} className={c.membersBtn}>
+                <Users size={16} aria-hidden="true" />
+                {activeMemberCount} member{activeMemberCount === 1 ? '' : 's'}
+              </button>
+            )}
+          </header>
+          {pinnedMessage && (
+            <div className={c.pinned}>
+              <Pin size={16} aria-hidden="true" />
+              <span className={s.srOnly}>Pinned:</span>
+              <span className={c.pinnedText}>{pinnedCopy}</span>
+              <span className={c.pinnedBy}>
+                {pinnedMessage.authorName} · {formatTime(pinnedMessage.createdAt)}
+              </span>
             </div>
-          </main>
-        </div>
+          )}
+          <div className={c.stage}>
+            <div ref={desktopScrollRef} onScroll={handleDesktopScroll} className={c.scroller}>
+              {!loadingMessages && threadMessages.length > 0 && hasMoreMessages && (
+                <p className={c.pager}>Earlier messages load as you scroll</p>
+              )}
+              {loadingMessages ? (
+                <div className={c.msgSkels} aria-hidden="true">
+                  {[58, 36, 72, 44, 30].map((width, row) => (
+                    <div key={row} className={c.msgSkel}>
+                      <span className={s.skel} style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                      <span>
+                        <span className={s.skel} style={{ width: '18%', height: 12 }} />
+                        <span className={s.skel} style={{ width: `${width}%`, height: 14 }} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : threadMessages.length === 0 ? (
+                <div className={c.emptyThread}>
+                  <strong>No messages yet</strong>
+                  <span>Start with a short update, question, or field note.</span>
+                </div>
+              ) : (
+                displayMessages.map((message, index) => {
+                  const previousMessage = displayMessages[index - 1];
+                  const showDayDivider = !previousMessage || getLocalDayKey(previousMessage.createdAt) !== getLocalDayKey(message.createdAt);
+                  const grouped =
+                    !!previousMessage &&
+                    !showDayDivider &&
+                    previousMessage.authorId === message.authorId &&
+                    Math.abs((message.createdAt?.getTime() ?? 0) - (previousMessage.createdAt?.getTime() ?? 0)) <= 300000;
+                  const isPending = !!message.pendingState;
+                  const isFailed = message.pendingState === 'failed';
+                  const isOwn = message.authorId === user?.uid;
+                  const canEdit = isOwn && !!message.text;
+                  const canDelete = canModerate || isOwn;
+                  const isDev = isDeveloperAuthor(message.authorId);
+                  return (
+                    <Fragment key={message.id}>
+                      {showDayDivider && <div className={c.day}>{formatChatLineDayDivider(message.createdAt)}</div>}
+                      <article
+                        data-mid={message.id}
+                        className={`${c.row} ${grouped ? c.rowGrouped : ''} ${message.pendingState === 'sending' ? c.rowSending : ''}`}
+                      >
+                        <div className={c.rowAvatar}>
+                          {grouped ? null : (
+                            <ChatAvatar authorId={message.authorId} authorName={message.authorName} avatarUrl={authorAvatars[message.authorId]} size="md" />
+                          )}
+                        </div>
+                        <div className={c.rowBody}>
+                          {!grouped && (
+                            <div className={c.rowTop}>
+                              {isDev ? (
+                                <>
+                                  <strong className="chat-dev-name">{message.authorName}</strong>
+                                  <span className="chat-dev-badge">DEV</span>
+                                </>
+                              ) : (
+                                <strong className={c.author} style={{ '--an': getAuthorColor(message.authorId).nameDark } as CSSProperties}>
+                                  {message.authorName}
+                                </strong>
+                              )}
+                              {showRoles && message.authorRole && <span className={c.role}>{roleLabel(message.authorRole)}</span>}
+                              <span className={c.time}>{clockTime(message.createdAt)}</span>
+                              {message.isPinned && (
+                                <span className={c.pinTag}>
+                                  <Pin size={12} aria-hidden="true" /> Pinned
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {grouped && message.isPinned && (
+                            <span className={c.pinTag}>
+                              <Pin size={12} aria-hidden="true" /> Pinned
+                            </span>
+                          )}
+                          {message.replyTo && (
+                            <div className={c.quote}>
+                              <strong>{message.replyTo.authorName}</strong>
+                              <span>{message.replyTo.text}</span>
+                            </div>
+                          )}
+                          <DesktopAttachment
+                            message={message}
+                            eager={index >= displayMessages.length - 12}
+                            onOpen={() => openLightbox({ url: message.attachment?.url ?? message.localPreviewUrl ?? '', author: message.authorName, time: formatTime(message.createdAt) })}
+                          />
+                          {message.text && (
+                            <p className={c.text}>
+                              {message.text}
+                              {message.editedAt && <span className={c.edited}> (edited)</span>}
+                            </p>
+                          )}
+                          {isPending ? (
+                            isFailed ? (
+                              <div className={c.failed}>
+                                <button type="button" onClick={() => retryPending(message)} className={c.retryBtn}>
+                                  <RotateCw size={14} aria-hidden="true" /> Not sent · Retry
+                                </button>
+                                <button type="button" onClick={() => discardPending(message.id)} aria-label="Discard message" className={c.discardBtn}>
+                                  <X size={16} aria-hidden="true" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={c.status}>
+                                <Clock size={12} aria-hidden="true" /> Sending…
+                              </span>
+                            )
+                          ) : (
+                            <ReactionBar
+                              channelId={activeChannelId}
+                              messageId={message.id}
+                              reactionCounts={message.reactionCounts}
+                              myReactions={message.myReactions}
+                              onError={setError}
+                            />
+                          )}
+                        </div>
+                        {!isPending && (
+                          <div className={c.rowActions}>
+                            <MessageActions
+                              config={{
+                                hasText: !!message.text,
+                                canEdit,
+                                canDelete,
+                                canPin,
+                                isPinned: !!message.isPinned,
+                                onReply: () => startReply(message),
+                                onCopy: () => copyMessageText(message.text),
+                                onEdit: () => startEdit(message),
+                                onDelete: () => deleteMessage(message.id),
+                                onTogglePin: () => void togglePin(message),
+                              }}
+                            />
+                          </div>
+                        )}
+                      </article>
+                    </Fragment>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            {desktopNewCount > 0 && (
+              <button type="button" onClick={jumpToLatestDesktop} className={c.jump}>
+                {desktopNewCount} new message{desktopNewCount > 1 ? 's' : ''} <ArrowDown size={16} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          <div className={c.composer}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                onDesktopFilePicked(file);
+              }}
+            />
+            {attachFile && attachPreview && (
+              <div className={c.strip}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={attachPreview} alt="Selected image preview" className={c.stripThumb} />
+                <div className={c.stripCopy}>
+                  <strong>Photo ready</strong>
+                  <span>{attachFile.name}</span>
+                </div>
+                <button type="button" onClick={clearDesktopAttachment} aria-label="Remove image" className={c.iconBtn}>
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            {replyTarget && (
+              <div className={c.strip}>
+                <div className={c.stripCopy}>
+                  <strong>Replying to {replyTarget.authorName}</strong>
+                  <span>{makeReplySnippet(replyTarget).text}</span>
+                </div>
+                <button type="button" onClick={cancelReply} aria-label="Cancel reply" className={c.iconBtn}>
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            {editTarget && (
+              <div className={c.strip}>
+                <div className={c.stripCopy}>
+                  <strong>Editing message</strong>
+                  <span>{editTarget.text}</span>
+                </div>
+                <button type="button" onClick={cancelEdit} aria-label="Cancel edit" className={c.iconBtn}>
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            <div className={c.composeRow}>
+              <button type="button" className={c.tool} onClick={() => fileInputRef.current?.click()} disabled={!activeChannelId || !!editTarget} aria-label="Attach an image">
+                <ImagePlus size={22} aria-hidden="true" />
+              </button>
+              {gifEnabled && (
+                <div className={c.gifWrap}>
+                  <button type="button" className={c.tool} onClick={() => setGifOpen((open) => !open)} disabled={!activeChannelId || !!editTarget} aria-label="Add a GIF" aria-expanded={gifOpen}>
+                    GIF
+                  </button>
+                  {gifOpen && activeChannelId && <GifPicker authedFetch={authedFetch} onSelect={sendGif} onClose={() => setGifOpen(false)} />}
+                </div>
+              )}
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value.slice(0, 1000))}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    if (editTarget) void saveEdit();
+                    else handleDesktopSend();
+                  } else if (event.key === 'Escape' && editTarget) {
+                    event.preventDefault();
+                    cancelEdit();
+                  }
+                }}
+                placeholder={editTarget ? 'Edit your message' : `Message #${activeChannel?.name ?? 'channel'}`}
+                aria-label={editTarget ? 'Edit your message' : 'Message'}
+                disabled={!activeChannelId}
+                rows={1}
+                className={c.input}
+              />
+              <button
+                type="button"
+                className={c.send}
+                onClick={editTarget ? () => void saveEdit() : handleDesktopSend}
+                disabled={!activeChannelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}
+              >
+                {sending ? <Loader2 size={18} className={c.spin} aria-hidden="true" /> : editTarget ? <Check size={18} aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
+                {editTarget ? 'Save' : 'Send'}
+              </button>
+            </div>
+            <p className={c.composeMeta}>
+              <span>Don&apos;t post customer card numbers or SSNs.</span>
+              <span>Enter to send · Shift+Enter for a new line</span>
+            </p>
+          </div>
+        </section>
       </div>
-    </ProtectedRoute>
+
+      {/* Phone: channel list screen, or the full-height conversation. */}
+      <div className={c.phone}>
+        {mobileView === 'thread' ? (
+          <MobileThread
+            pinnedMessage={pinnedMessage}
+            channel={activeChannel}
+            memberCount={activeChannel ? memberCounts[activeChannel.id] : undefined}
+            channelId={activeChannelId}
+            messages={displayMessages}
+            snapshotVersion={snapshotVersion}
+            windowSize={messagesWindowSize}
+            lastSnapshotWindow={lastSnapshotWindow}
+            hasMore={hasMoreMessages}
+            onLoadOlder={loadOlderMessages}
+            companyStats={activeChannelId === 'all-company' ? companyStats : null}
+            authorAvatars={authorAvatars}
+            loading={loadingMessages}
+            renderedChannel={renderedChannel}
+            error={shownError}
+            currentUserId={user?.uid}
+            canModerate={canModerate}
+            canPin={canPin}
+            showRoles={showRoles}
+            draft={draft}
+            sending={sending}
+            gifEnabled={gifEnabled}
+            authedFetch={authedFetch}
+            messagesEndRef={mobileMessagesEndRef}
+            scrollToBottomSignal={scrollToBottomSignal}
+            formatTime={formatTime}
+            replyTarget={replyTarget}
+            editTarget={editTarget}
+            replySnippet={makeReplySnippet}
+            onBack={() => setMobileView('list')}
+            onOpenInfo={() => setInfoOpen(true)}
+            onDraftChange={setDraft}
+            onSend={sendMessage}
+            onSendImage={sendImage}
+            onSendGif={sendGif}
+            onOpenImage={openLightbox}
+            onError={setError}
+            onDelete={deleteMessage}
+            onReactionError={setError}
+            onRetryPending={retryPending}
+            onDiscardPending={discardPending}
+            onReply={startReply}
+            onEdit={startEdit}
+            onCopy={copyMessageText}
+            onTogglePin={togglePin}
+            onCancelReply={cancelReply}
+            onCancelEdit={cancelEdit}
+            onSaveEdit={saveEdit}
+          />
+        ) : (
+          <>
+            {shownError && !channelsError && (
+              <p className={c.alert} role="alert">
+                <AlertCircle size={16} aria-hidden="true" />
+                {shownError}
+              </p>
+            )}
+            <MobileChannelList
+              channels={channels}
+              loading={loadingChannels}
+              error={channelsError}
+              unreadByChannel={unreadByChannel}
+              onOpenChannel={openChannelOnPhone}
+            />
+          </>
+        )}
+      </div>
+      <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
+      <ChatLightbox image={lightbox} onClose={closeLightbox} />
+    </div>
   );
 }
