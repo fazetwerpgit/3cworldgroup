@@ -1,41 +1,23 @@
 'use client';
 
-import Link from 'next/link';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserForm } from '@/components/admin/UserForm';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-leftovers.css';
+import { AdminGate, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import d from '../user-detail.module.css';
 
 export default function NewUserPage() {
   return (
-    <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="admin-line-main">
-        <div className="admin-line">
-          <PageTitle
-            title="New user"
-            meta="Pending"
-            back={(
-              <Link className="admin-line-clear-button" href="/portal/admin/users">
-                ← Back to users
-              </Link>
-            )}
-          />
-
-          <div className="admin-line-person-layout">
-            <main className="admin-line-panel">
-              <UserForm />
-            </main>
-            <aside className="admin-line-panel">
-              <h2 style={{ margin: '7px 0 0', fontSize: 20, fontWeight: 900 }}>
-                Account details
-              </h2>
-              <p className="admin-line-sub">
-                Set the role and manager while you create the account.
-              </p>
-            </aside>
-          </div>
+    <AdminGate roles={['admin', 'operations']}>
+      <div className={u.page}>
+        <AdminPageHead
+          back={{ href: '/portal/admin/users', label: 'Users' }}
+          title="New user"
+          sub="Set the role and manager while you create the account."
+        />
+        <div className={d.single}>
+          <UserForm />
         </div>
       </div>
-    </ProtectedRoute>
+    </AdminGate>
   );
 }

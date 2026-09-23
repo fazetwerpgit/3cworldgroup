@@ -1,20 +1,32 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-a.css';
+import { ChevronDown, ChevronRight, Search, UserPlus } from 'lucide-react';
 import { UserTable } from '@/components/admin/UserTable';
+import {
+  AdminAvatar,
+  AdminEmpty,
+  AdminFailed,
+  AdminGate,
+  AdminNotice,
+  AdminPageHead,
+  AdminSkeletonRows,
+} from '@/components/portal/admin-d/AdminUi';
+import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import p from './users.module.css';
 
 // Assignable field roles only — retired tiers (IBO levels, L1/L2 manager)
 // stay valid for users who already hold them but are never offered here.
 const FIELD_ROLE_OPTIONS = (Object.values(FieldRoles) as FieldRole[]).filter(
-  (role) => !role.startsWith('ibo_level_') && role !== 'l1_manager' && role !== 'l2_manager'
+  (role) => !role.startsWith('ibo_level_') && role !== 'l1_manager' && role !== 'l2_manager',
 );
 
 // The user-management routes verify the caller from the ID token. The userId in
@@ -30,6 +42,21 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
 
 type RoleBucket = 'all' | 'owner' | 'admin' | 'operations' | 'field rep';
 type StatusBucket = 'all' | 'pending' | 'active' | 'inactive';
+
+const ROLE_BUCKETS: { value: RoleBucket; label: string }[] = [
+  { value: 'all', label: 'All roles' },
+  { value: 'owner', label: 'Owner' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'operations', label: 'Operations' },
+  { value: 'field rep', label: 'Field rep' },
+];
+
+const STATUS_BUCKETS: { value: StatusBucket; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
 
 function bucketForUser(user: User): RoleBucket {
   const role = user.role ?? user.fieldRole;
@@ -54,6 +81,7 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleBucket>('all');
   const [statusFilter, setStatusFilter] = useState<StatusBucket>('all');
@@ -66,14 +94,16 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     if (!currentUser) return;
     setLoading(true);
-    setError('');
+    setLoadError('');
     try {
-      const response = await fetch('/api/portal/auth/users', { headers: await authHeaders() });
+      const response = await fetch('/api/portal/auth/users', {
+        headers: await authHeaders(),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
       setUsers(data.users);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+      setLoadError(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -103,7 +133,7 @@ export default function UsersPage() {
         }
         setSalesCounts(map);
       } catch {
-        // fail-soft, sales column shows "—"
+        // fail-soft, sales column shows "0"
       }
     })();
     return () => {
@@ -115,21 +145,46 @@ export default function UsersPage() {
     const q = query.trim().toLowerCase();
     return users.filter((u) => {
       const matchesQuery =
-        !q ||
-        (u.displayName || '').toLowerCase().includes(q) ||
-        (u.email || '').toLowerCase().includes(q);
+        !q || (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
       const matchesRole = roleFilter === 'all' || bucketForUser(u) === roleFilter;
       const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
       return matchesQuery && matchesRole && matchesStatus;
     });
   }, [users, query, roleFilter, statusFilter]);
 
+  const roleCounts = useMemo(() => {
+    const counts: Record<RoleBucket, number> = {
+      all: users.length,
+      owner: 0,
+      admin: 0,
+      operations: 0,
+      'field rep': 0,
+    };
+    for (const user of users) counts[bucketForUser(user)] += 1;
+    return counts;
+  }, [users]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusBucket, number> = {
+      all: users.length,
+      pending: 0,
+      active: 0,
+      inactive: 0,
+    };
+    for (const user of users) if (user.status && user.status in counts) counts[user.status as StatusBucket] += 1;
+    return counts;
+  }, [users]);
+
   // Same real data this page already fetched — the "needs a decision" strip
   // is not a new query, per orchestrator ruling.
-  const pendingUsers = useMemo(
-    () => users.filter((u) => u.status === 'pending' && !u.suspectedBot),
-    [users]
-  );
+  const pendingUsers = useMemo(() => users.filter((u) => u.status === 'pending' && !u.suspectedBot), [users]);
+
+  const approveUser = users.find((user) => user.uid === approvePanel) ?? null;
+
+  const openAssignRole = (uid: string) => {
+    setApproveFieldRole('entry_level_rep');
+    setApprovePanel(uid);
+  };
 
   const handleApproveConfirm = async (userId: string) => {
     setApproving(true);
@@ -159,183 +214,243 @@ export default function UsersPage() {
     setStatusFilter('all');
   };
 
+  const loaded = !loading || users.length > 0;
+  const failed = !!loadError && users.length === 0;
+  const filtersActive = !!query || roleFilter !== 'all' || statusFilter !== 'all';
   const isFilteredEmpty = users.length > 0 && filteredUsers.length === 0;
-  const isTrueEmpty = !loading && users.length === 0;
+  const isTrueEmpty = !loading && !loadError && users.length === 0;
 
   return (
-    <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="admin-line-main">
-        <div className="admin-line">
-          <PageTitle title="User Management" meta={`${users.length} members`} subtitle={`${pendingUsers.length} pending approval`} />
+    <AdminGate roles={['admin', 'operations']}>
+      <div className={u.page}>
+        <AdminPageHead
+          title="User Management"
+          meta={
+            loaded && !failed ? (
+              <>
+                <b>{users.length}</b> members
+                {pendingUsers.length ? (
+                  <>
+                    {' · '}
+                    <b className={u.toneAmber}>{pendingUsers.length}</b> pending
+                  </>
+                ) : null}
+              </>
+            ) : null
+          }
+          sub="Approve signups, set roles and managers, and open anyone's record."
+        />
 
-          <div className="admin-line-toolbar">
-            <input
-              className="admin-line-search"
-              type="search"
-              placeholder="Search name or email"
-              aria-label="Search people"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <div className="admin-line-pill-row" role="group" aria-label="Filter by role">
-              {(['all', 'owner', 'admin', 'operations', 'field rep'] as RoleBucket[]).map((bucket) => (
-                <button
-                  key={bucket}
-                  type="button"
-                  aria-pressed={roleFilter === bucket}
-                  onClick={() => setRoleFilter(bucket)}
-                >
-                  {bucket === 'all' ? 'All Roles' : bucket === 'field rep' ? 'Field Rep' : bucket.charAt(0).toUpperCase() + bucket.slice(1)}
-                </button>
-              ))}
-            </div>
-            <div className="admin-line-segmented" role="group" aria-label="Filter by status">
-              {(['all', 'pending', 'active', 'inactive'] as StatusBucket[]).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  aria-pressed={statusFilter === s}
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                </button>
-              ))}
-            </div>
-            <button type="button" className="admin-line-clear-button" onClick={clearFilters}>
-              Clear
-            </button>
-          </div>
+        {error && !approveUser ? (
+          <AdminNotice tone="error" onDismiss={() => setError('')}>
+            {error}
+          </AdminNotice>
+        ) : null}
 
-          {error && (
-            <div className="admin-line-empty-state" style={{ display: 'block', borderColor: 'var(--admin-line-red)', color: 'var(--admin-line-red)' }}>
-              {error}
-            </div>
-          )}
+        {loadError && users.length > 0 ? (
+          <AdminNotice tone="error" onDismiss={() => setLoadError('')}>
+            Couldn&apos;t refresh the member list. {loadError}
+          </AdminNotice>
+        ) : null}
 
-          {pendingUsers.length > 0 && (
-            <div className="admin-line-decision-strip">
-              <div className="admin-line-decision-head">
-                <div>
-                  <h3>
-                    Pending approval <span className="sweep-admin-heading-count">· {pendingUsers.length}</span>
-                  </h3>
-                </div>
-              </div>
-              {pendingUsers.map((u) => {
-                const name = u.displayName || u.email || 'this user';
+        {pendingUsers.length > 0 ? (
+          <section className={`${s.panel} ${p.pending}`} aria-labelledby="users-pending-heading">
+            <div className={s.panelHead}>
+              <h2 id="users-pending-heading" className={s.kicker}>
+                Pending approval
+              </h2>
+              <span className={u.panelMeta}>{pendingUsers.length} waiting</span>
+            </div>
+            <ul className={u.rows}>
+              {pendingUsers.map((user) => {
+                const name = user.displayName || user.email || 'this user';
                 return (
-                  <div
-                    className="admin-line-decision-row sweep-user-row"
-                    key={u.uid}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(`/portal/admin/users/${u.uid}`)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        router.push(`/portal/admin/users/${u.uid}`);
-                      }
-                    }}
-                  >
-                    <div className="admin-line-person">
-                      <span className="admin-line-avatar">{(name.charAt(0) || 'U').toUpperCase()}</span>
-                      <span>
-                        <strong>{name}</strong>
-                        <small>
-                          {u.email} · requested {timeAgo(u.createdAt)}
-                        </small>
+                  <li key={user.uid} className={`${u.row} ${p.pendingRow}`}>
+                    <Link href={`/portal/admin/users/${user.uid}`} className={`${u.person} ${p.personLink}`}>
+                      <AdminAvatar name={name} />
+                      <span className={u.personText}>
+                        <span className={u.personName}>
+                          <span>{name}</span>
+                        </span>
+                        <span className={u.personSub}>
+                          {user.email} · requested {timeAgo(user.createdAt)}
+                        </span>
                       </span>
-                    </div>
-                    <div className="admin-line-decision-actions">
-                      {!u.fieldRole ? (
+                    </Link>
+                    <span className={p.pendingAction}>
+                      {!user.fieldRole ? (
                         <button
                           type="button"
-                          className="admin-line-action"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setApproveFieldRole('entry_level_rep');
-                            setApprovePanel(approvePanel === u.uid ? null : u.uid);
-                          }}
+                          className={`${s.btnSecondary} ${u.sm}`}
+                          onClick={() => openAssignRole(user.uid)}
                         >
-                          Assign Role
+                          Assign role
                         </button>
                       ) : (
-                        <span className="sweep-admin-label">Open profile to accept</span>
+                        <Link href={`/portal/admin/users/${user.uid}`} className={p.acceptLink}>
+                          Open profile to accept
+                          <ChevronRight size={18} aria-hidden="true" />
+                        </Link>
                       )}
-                    </div>
-                    {approvePanel === u.uid && (
-                      <div className="admin-line-approval-panel open">
-                        <div className="admin-line-meta">Assign role before approval</div>
-                        <div className="admin-line-field">
-                          <select
-                            aria-label="Field role"
-                            value={approveFieldRole}
-                            onChange={(e) => setApproveFieldRole(e.target.value as FieldRole)}
-                          >
-                            {FIELD_ROLE_OPTIONS.map((value) => (
-                              <option key={value} value={value}>
-                                {RoleDisplayNames[value]}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={{ marginTop: 8 }}>
-                          <button
-                            type="button"
-                            className="admin-line-primary"
-                            disabled={approving}
-                            onClick={() => handleApproveConfirm(u.uid)}
-                          >
-                            {approving ? 'Assigning…' : 'Confirm Role'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </span>
+                  </li>
                 );
               })}
-            </div>
-          )}
+            </ul>
+          </section>
+        ) : null}
 
-          <div className="admin-line-section-head">
-            <div>
-              <h2>
-                All members <span className="sweep-admin-heading-count">· {filteredUsers.length}</span>
-              </h2>
-            </div>
+        <section className={s.panel} aria-labelledby="users-all-heading">
+          <div className={s.panelHead}>
+            <h2 id="users-all-heading" className={s.kicker}>
+              All members
+            </h2>
+            {loaded && !failed ? (
+              <span className={u.panelMeta}>
+                {filtersActive ? `${filteredUsers.length} of ${users.length}` : `${users.length}`}
+              </span>
+            ) : null}
           </div>
 
-          {loading ? (
-            <div className="admin-line-empty-state" style={{ display: 'block' }}>
-              <strong>Loading roster…</strong>
+          {!failed && !isTrueEmpty ? (
+            <div className={p.filters}>
+              <div className={u.toolbar}>
+                <label className={`${u.search} ${p.searchBox}`}>
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    className={u.input}
+                    type="search"
+                    placeholder="Search name or email"
+                    aria-label="Search people"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </label>
+                <div className={`${u.segmented} ${p.status}`} role="group" aria-label="Filter by status">
+                  {STATUS_BUCKETS.map((bucket) => (
+                    <button
+                      key={bucket.value}
+                      type="button"
+                      aria-pressed={statusFilter === bucket.value}
+                      onClick={() => setStatusFilter(bucket.value)}
+                    >
+                      {bucket.label}
+                      {bucket.value !== 'all' && loaded && !failed ? (
+                        <span className={p.segCount}>{statusCounts[bucket.value]}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${p.clear}`}
+                  onClick={clearFilters}
+                  disabled={!filtersActive}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className={`${u.chips} ${p.roleChips}`} role="group" aria-label="Filter by role">
+                {ROLE_BUCKETS.map((bucket) => (
+                  <button
+                    key={bucket.value}
+                    type="button"
+                    className={u.chip}
+                    aria-pressed={roleFilter === bucket.value}
+                    onClick={() => setRoleFilter(bucket.value)}
+                  >
+                    {bucket.label}
+                    {loaded && !failed ? <span className={u.chipCount}>{roleCounts[bucket.value]}</span> : null}
+                  </button>
+                ))}
+              </div>
             </div>
+          ) : null}
+
+          {loading && users.length === 0 ? (
+            <AdminSkeletonRows rows={6} label="Loading members" />
+          ) : failed ? (
+            <AdminFailed what="members" onRetry={() => void fetchUsers()} />
           ) : isTrueEmpty ? (
-            <div className="admin-line-empty-state" id="directory-empty" style={{ display: 'block' }}>
-              <strong>No members yet.</strong>
+            <AdminEmpty icon={<UserPlus size={24} />} title="No members yet.">
               Invite the first person to start the directory.
-            </div>
+            </AdminEmpty>
           ) : isFilteredEmpty ? (
-            <div className="admin-line-empty-state" id="people-empty" style={{ display: 'block' }}>
-              <strong>No people match this filter.</strong>
-              Try a broader search or clear the filters.{' '}
-              <button type="button" className="admin-line-primary" onClick={clearFilters}>
-                Clear filters
-              </button>
-            </div>
+            <AdminEmpty
+              title="No people match this filter."
+              action={
+                <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={clearFilters}>
+                  Clear filters
+                </button>
+              }
+            >
+              Try a broader search or clear the filters.
+            </AdminEmpty>
           ) : (
             <UserTable
               users={filteredUsers}
-              onApprove={(uid) => {
-                setApproveFieldRole('entry_level_rep');
-                setApprovePanel(uid);
-              }}
+              onApprove={openAssignRole}
               onPersonLink={(uid) => router.push(`/portal/admin/users/${uid}`)}
               loading={loading || approving}
               salesCounts={salesCounts}
             />
           )}
-        </div>
+        </section>
       </div>
-    </ProtectedRoute>
+
+      {approveUser ? (
+        <AdminSheet
+          title="Assign role"
+          description={`${approveUser.displayName || approveUser.email || 'This person'} needs a role before approval.`}
+          onClose={() => {
+            if (!approving) setApprovePanel(null);
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm}`}
+                onClick={() => setApprovePanel(null)}
+                disabled={approving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${s.btnPrimary} ${u.primarySm}`}
+                disabled={approving}
+                onClick={() => handleApproveConfirm(approveUser.uid)}
+              >
+                {approving ? 'Assigning…' : 'Confirm role'}
+              </button>
+            </>
+          }
+        >
+          <div className={u.sheetPad}>
+            {error ? <AdminNotice tone="error">{error}</AdminNotice> : null}
+            <div className={u.field}>
+              <label className={u.label} htmlFor="assign-field-role">
+                Field role
+              </label>
+              <span className={u.selectWrap}>
+                <select
+                  id="assign-field-role"
+                  className={u.input}
+                  value={approveFieldRole}
+                  onChange={(e) => setApproveFieldRole(e.target.value as FieldRole)}
+                >
+                  {FIELD_ROLE_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {RoleDisplayNames[value]}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} aria-hidden="true" />
+              </span>
+            </div>
+          </div>
+        </AdminSheet>
+      ) : null}
+    </AdminGate>
   );
 }

@@ -1,8 +1,12 @@
 'use client';
 
-import { UserPlus } from 'lucide-react';
+import { ChevronRight, UserPlus } from 'lucide-react';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
 import { isOnline } from '@/lib/presence/isOnline';
+import { AdminAvatar, AdminEmpty, StatusDot, type Tone } from '@/components/portal/admin-d/AdminUi';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import t from './user-table.module.css';
 
 interface UserTableProps {
   users: User[];
@@ -16,6 +20,12 @@ interface UserTableProps {
   salesCounts?: Record<string, number>;
 }
 
+const STATUS_TONE: Record<string, Tone> = {
+  active: 'lime',
+  pending: 'amber',
+  inactive: 'muted',
+};
+
 function formatDate(date: Date | string | undefined) {
   if (!date) return null;
   return new Date(date).toLocaleDateString('en-US', {
@@ -25,16 +35,10 @@ function formatDate(date: Date | string | undefined) {
   });
 }
 
-function initials(name?: string, email?: string) {
-  const source = name || email || 'U';
-  return source
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p.charAt(0).toUpperCase())
-    .join('') || 'U';
-}
-
+/**
+ * The member directory. Desktop: a D table. Phone: each person is a stacked
+ * card (name + status on top, then role, date and sales as label lines).
+ */
 export function UserTable({
   users,
   onApprove,
@@ -44,83 +48,95 @@ export function UserTable({
 }: UserTableProps) {
   if (users.length === 0) {
     return (
-      <div className="admin-line-empty-state" style={{ display: 'block' }}>
-        <UserPlus className="mb-2 h-6 w-6" style={{ color: 'var(--admin-line-muted)' }} />
-        <strong>No people match this filter.</strong>
+      <AdminEmpty icon={<UserPlus size={24} />} title="No people match this filter.">
         Try a broader search or clear the filters.
-      </div>
+      </AdminEmpty>
     );
   }
 
   return (
-    <div className="admin-line-people-shell" id="people-list">
+    <ul className={`${u.rows} ${t.cols}`} id="people-list">
+      <li className={u.tHead} aria-hidden="true">
+        <span>Person</span>
+        <span>Role</span>
+        <span>Status</span>
+        <span>Hired</span>
+        <span className={u.alignEnd}>Sales</span>
+        <span />
+        <span />
+      </li>
       {users.map((user) => {
-        const hireDate = formatDate(user.hireDate);
         const roleKey = getEffectiveRole(user);
-        const roleLabel = roleKey ? RoleDisplayNames[roleKey as UserRole] : '—';
+        const roleLabel = roleKey ? RoleDisplayNames[roleKey as UserRole] : null;
         const status = user.status || 'active';
+        const isPending = status === 'pending';
+        const dateValue = isPending ? formatDate(user.createdAt) : formatDate(user.hireDate);
         const displayName = user.displayName || user.email || 'this user';
         const approvedSales = salesCounts?.[user.uid] ?? 0;
+        const canAssign = !!onApprove && isPending && !user.fieldRole;
 
         return (
-          <div
-            className="admin-line-people-row sweep-user-row"
+          <li
             key={user.uid}
-            role="button"
-            tabIndex={0}
-            onClick={() => onPersonLink?.(user.uid)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onPersonLink?.(user.uid);
-              }
+            className={`${u.row} ${t.row} ${isPending ? u.rowWarn : ''}`}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest('button')) return;
+              onPersonLink?.(user.uid);
             }}
           >
-            <div className="admin-line-person">
-              <span className="admin-line-avatar">{initials(user.displayName, user.email)}</span>
-              <span>
-                <strong>
-                  {displayName}
-                  {isOnline(user.lastActiveAt) && <span className="admin-line-online-dot" />}
-                </strong>
-                <small>{user.email}</small>
+            <span className={`${u.cellMain} ${u.person}`}>
+              <AdminAvatar name={user.displayName || user.email} />
+              <span className={u.personText}>
+                <button type="button" className={t.nameBtn} onClick={() => onPersonLink?.(user.uid)}>
+                  <span className={u.personName}>
+                    <span>{displayName}</span>
+                    {isOnline(user.lastActiveAt) ? (
+                      <span className={u.online} role="img" aria-label="Online now" />
+                    ) : null}
+                  </span>
+                </button>
+                <span className={u.personSub}>{user.email}</span>
               </span>
-            </div>
-            <div className="admin-line-row-cell">
-              <span className="admin-line-role">{roleLabel}</span>
-            </div>
-            <div className="admin-line-row-cell">
-              <span className={`admin-line-status ${status}`}>
+            </span>
+
+            <span className={`${u.cell} ${t.role}`} data-label="Role">
+              {roleLabel ? <span>{roleLabel}</span> : <span className={u.toneMuted}>No role yet</span>}
+            </span>
+
+            <span className={`${u.cellEnd} ${t.statusCell}`}>
+              <StatusDot tone={STATUS_TONE[status] ?? 'muted'}>
                 {status.charAt(0).toUpperCase() + status.slice(1)}
+              </StatusDot>
+            </span>
+
+            <span className={`${u.cell} ${u.num}`} data-label={isPending ? 'Requested' : 'Hire date'}>
+              <span>
+                {dateValue || (isPending ? '—' : 'N/A')}
+                {isPending ? <span className={`${u.cellSub} ${t.deskOnly}`}>requested</span> : null}
               </span>
-            </div>
-            <div className="admin-line-row-cell">
-              <strong>{hireDate || (status === 'pending' ? '—' : 'N/A')}</strong>
-              <small>{status === 'pending' ? 'requested' : 'hire date'}</small>
-            </div>
-            <div className="admin-line-row-cell">
-              <strong>{approvedSales}</strong>
-              <small>approved sales</small>
-            </div>
-            <div className="admin-line-row-actions">
-              {onApprove && status === 'pending' && !user.fieldRole && (
+            </span>
+
+            <span className={`${u.cell} ${u.num} ${u.alignEnd}`} data-label="Approved sales">
+              {approvedSales}
+            </span>
+
+            <span className={`${u.cell} ${t.action}`}>
+              {canAssign ? (
                 <button
                   type="button"
-                  className="admin-line-primary"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onApprove(user.uid);
-                  }}
+                  className={`${s.btnSecondary} ${u.sm}`}
+                  onClick={() => onApprove?.(user.uid)}
                   disabled={loading}
                 >
-                  Assign Role
+                  Assign role
                 </button>
-              )}
-              <span className="sweep-user-chevron" aria-hidden="true">›</span>
-            </div>
-          </div>
+              ) : null}
+            </span>
+
+            <ChevronRight size={20} className={`${u.chev} ${t.chev}`} aria-hidden="true" />
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }

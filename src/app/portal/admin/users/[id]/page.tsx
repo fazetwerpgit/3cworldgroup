@@ -1,17 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { Lock } from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { Eye, Lock } from 'lucide-react';
 import { UserForm } from '@/components/admin/UserForm';
+import {
+  AdminFailed,
+  AdminGate,
+  AdminNotice,
+  AdminPageHead,
+  AdminSkeletonRows,
+  StatusDot,
+  type Tone,
+} from '@/components/portal/admin-d/AdminUi';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole, isAdminLevel } from '@/types';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-leftovers.css';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import d from '../user-detail.module.css';
+
+const STATUS_TONE: Record<string, Tone> = { active: 'lime', pending: 'amber', inactive: 'muted' };
 
 export default function EditUserPage() {
   const params = useParams();
@@ -27,27 +37,30 @@ export default function EditUserPage() {
 
   const userId = params.id as string;
 
-  useEffect(() => {
-    async function fetchUser() {
-      if (!currentUser) return;
-      try {
-        // The route verifies the caller from the token; userId is the TARGET
-        // account being opened.
-        const token = await getIdToken();
-        const response = await fetch(`/api/portal/auth/users/${userId}`, {
-          headers: { Authorization: `Bearer ${token ?? ''}` },
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to fetch user');
-        setUser(data.user);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch user');
-      } finally {
-        setLoading(false);
-      }
+  const fetchUser = useCallback(async () => {
+    if (!currentUser || !userId) return;
+    setLoading(true);
+    setError('');
+    try {
+      // The route verifies the caller from the token; userId is the TARGET
+      // account being opened.
+      const token = await getIdToken();
+      const response = await fetch(`/api/portal/auth/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token ?? ''}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to fetch user');
+      setUser(data.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch user');
+    } finally {
+      setLoading(false);
     }
-    if (userId) fetchUser();
   }, [userId, currentUser]);
+
+  useEffect(() => {
+    void fetchUser();
+  }, [fetchUser]);
 
   // Real approved-sales count for this specific person, same existing
   // leaderboard endpoint used on the People view — no new route. Absence
@@ -110,108 +123,129 @@ export default function EditUserPage() {
   const userRoleLabel = userRole ? RoleDisplayNames[userRole as UserRole] : 'Role not set';
   const userStatusLabel = user?.status ? user.status.replace(/^./, (c) => c.toUpperCase()) : 'Active';
 
+  const back = { href: '/portal/admin/users', label: 'Users' };
+  const showVault = isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4);
+
   return (
-    <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="admin-line-main">
-        <div className="admin-line">
-          {loading && (
-            <div className="admin-line-empty-state" style={{ display: 'block' }}>
-              <strong>Loading record…</strong>
-            </div>
-          )}
+    <AdminGate roles={['admin', 'operations']}>
+      <div className={u.page}>
+        {user ? (
+          <>
+            <AdminPageHead
+              back={back}
+              title={user.displayName || user.email || 'User'}
+              meta={
+                <span className={d.headMeta}>
+                  <span>{userRoleLabel}</span>
+                  <StatusDot tone={STATUS_TONE[user.status || 'active'] ?? 'muted'}>{userStatusLabel}</StatusDot>
+                </span>
+              }
+              sub={user.email}
+            />
 
-          {error && (
-            <div className="admin-line-empty-state" style={{ display: 'block', borderColor: 'var(--admin-line-red)', color: 'var(--admin-line-red)' }}>
-              {error}
-            </div>
-          )}
+            <div className={d.layout}>
+              <div className={d.main}>
+                <UserForm user={user} isEdit />
+              </div>
 
-          {user && (
-            <>
-              <PageTitle
-                title={user.displayName || user.email || 'User'}
-                meta={`${userRoleLabel} · ${userStatusLabel}`}
-                back={(
-                  <Link className="admin-line-clear-button" href="/portal/admin/users">
-                    ← Back to users
-                  </Link>
-                )}
-              />
+              <aside className={d.aside} aria-label="Record summary">
+                <section className={s.panel} aria-labelledby="person-sales-heading">
+                  <div className={`${u.panelBody} ${d.salesBody}`}>
+                    <h2 id="person-sales-heading" className={s.kicker}>
+                      Approved sales
+                    </h2>
+                    <strong className={`${u.statValue} ${salesCount > 0 ? u.statHot : ''}`}>{salesCount}</strong>
+                    <span className={u.statNote}>All time</span>
+                  </div>
+                </section>
 
-              <div className="admin-line-person-layout">
-                <main className="admin-line-panel">
-                  <UserForm user={user} isEdit />
-
-                  {isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4) && (
-                    <div className="admin-line-form-section admin-line-vault">
-                      <h3>Sensitive information</h3>
-                      <p className="admin-line-sub">
-                        Admin-only values stay masked until you choose to view them.
-                      </p>
-                      <div className="admin-line-vault-grid">
-                        <div className="admin-line-vault-item">
-                          <strong>{revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}</strong>
-                          <small>
-                            Social security number <Lock className="admin-line-lock" />
-                          </small>
+                {showVault ? (
+                  <section className={`${s.panel} ${d.vault}`} aria-labelledby="person-vault-heading">
+                    <div className={s.panelHead}>
+                      <h2 id="person-vault-heading" className={s.kicker}>
+                        Sensitive information
+                      </h2>
+                      <span className={u.tag}>
+                        <Lock size={12} aria-hidden="true" />
+                        Admin only
+                      </span>
+                    </div>
+                    <div className={`${u.panelBody} ${d.vaultBody}`}>
+                      <p className={u.hint}>Admin-only values stay masked until you choose to view them.</p>
+                      <dl className={`${u.facts} ${d.vaultFacts}`}>
+                        <div>
+                          <dt>Social security number</dt>
+                          <dd className={u.num}>
+                            {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
+                          </dd>
                         </div>
-                        <div className="admin-line-vault-item">
-                          <strong>{revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}</strong>
-                          <small>
-                            Driver license reference <Lock className="admin-line-lock" />
-                          </small>
+                        <div>
+                          <dt>Driver license reference</dt>
+                          <dd className={u.num}>
+                            {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
+                          </dd>
                         </div>
-                      </div>
-                      {!revealed && (
-                        <div className="admin-line-vault-actions">
+                      </dl>
+
+                      {!revealed && !revealOpen ? (
+                        <div className={d.revealRow}>
                           <button
                             type="button"
-                            className="admin-line-action"
+                            className={`${s.btnSecondary} ${u.sm}`}
                             onClick={() => setRevealOpen(true)}
                           >
+                            <Eye size={16} aria-hidden="true" />
                             Reveal for this session
                           </button>
-                          <span className="admin-line-meta">This view is recorded.</span>
+                          <span className={u.hint}>This view is recorded.</span>
                         </div>
-                      )}
-                      {revealOpen && !revealed && (
-                        <div className="admin-line-reveal-confirm" style={{ display: 'block' }}>
-                          Confirm reveal? This is a one-session view of sensitive records.{' '}
-                          <button type="button" className="admin-line-action" onClick={doReveal}>
-                            Continue
-                          </button>
+                      ) : null}
+
+                      {revealOpen && !revealed ? (
+                        <div className={d.revealConfirm} role="alert">
+                          <p>Confirm reveal? This is a one-session view of sensitive records, and it is recorded.</p>
+                          <div className={u.btnRow}>
+                            <button
+                              type="button"
+                              className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
+                              onClick={() => setRevealOpen(false)}
+                            >
+                              Cancel
+                            </button>
+                            <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.danger}`} onClick={doReveal}>
+                              Continue
+                            </button>
+                          </div>
                         </div>
-                      )}
-                      {revealLogged && (
-                        <div className="admin-line-reveal-confirm" style={{ display: 'block' }}>
-                          Reveal logged for this session.
-                        </div>
-                      )}
+                      ) : null}
+
+                      {revealLogged ? <AdminNotice tone="ok">Reveal logged for this session.</AdminNotice> : null}
                     </div>
-                  )}
-                </main>
-                <aside className="admin-line-panel">
-                  <h2 style={{ margin: '7px 0 0', fontSize: 20, fontWeight: 900 }}>
-                    Account details
-                  </h2>
-                  <p className="admin-line-sub">
-                    Review the role, status, and manager details here.
-                  </p>
-                  <div className="admin-line-quick-rail">
-                    <span className="admin-line-chip lime">{salesCount} sales</span>
-                  </div>
-                  <div className="admin-line-form-section">
-                    <h3>Saving changes</h3>
-                    <p className="admin-line-sub">
-                      Profile edits save in the form. Unsaved changes show a save action.
-                    </p>
-                  </div>
-                </aside>
-              </div>
-            </>
-          )}
-        </div>
+                  </section>
+                ) : null}
+              </aside>
+            </div>
+          </>
+        ) : loading ? (
+          <>
+            <div className={d.headSkel} role="status" aria-label="Loading record">
+              <span className={s.skel} style={{ width: 72, height: 16 }} />
+              <span className={s.skel} style={{ width: 'min(320px, 70%)', height: 40 }} />
+              <span className={s.skel} style={{ width: 180, height: 14 }} />
+            </div>
+            <section className={s.panel}>
+              <AdminSkeletonRows rows={4} label="Loading record" />
+            </section>
+          </>
+        ) : (
+          <>
+            <AdminPageHead back={back} title="Member record" />
+            <section className={s.panel}>
+              <AdminFailed what="this record" detail={error || undefined} onRetry={() => void fetchUser()} />
+            </section>
+          </>
+        )}
       </div>
-    </ProtectedRoute>
+    </AdminGate>
   );
 }
