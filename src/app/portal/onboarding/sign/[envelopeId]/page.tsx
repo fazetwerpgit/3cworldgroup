@@ -307,7 +307,7 @@ function EsignSign() {
           {envelope?.name ? `${envelope.name} is complete. ` : 'This document is complete. '}
           Your checklist already shows it approved. Nothing else is needed here.
         </p>
-        <div className={f.sentActions}>
+        <div className={styles.doneActions}>
           <Link href={CHECKLIST_HREF} className={`${s.btnPrimary} ${f.sentBtn}`}>
             Back to checklist
           </Link>

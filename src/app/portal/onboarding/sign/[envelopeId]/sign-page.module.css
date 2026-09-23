@@ -44,6 +44,8 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  /* Solid so PdfPages' sticky toolbar (on --c-panel) blends in. */
+  background: var(--c-panel);
 }
 
 .input[readonly] {
@@ -130,6 +132,13 @@
   color: var(--c-text);
 }
 
+/* One action after signing, centred under the message. */
+.doneActions {
+  display: grid;
+  width: 100%;
+  max-width: 360px;
+}
+
 /* Sign bar (phone) / side panel (desktop). */
 .bar .signButton {
   flex: none;
@@ -145,8 +154,13 @@
   line-height: 1.35;
 }
 
-.signButton:disabled {
-  opacity: 0.5;
+/* Solid, not faded: the phone bar floats over the page, so a translucent
+   button would show the document through it. */
+.signButton:disabled,
+.signButton:disabled:hover {
+  background: var(--c-panel-hi);
+  color: var(--c-text-3);
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
   cursor: not-allowed;
 }
 
