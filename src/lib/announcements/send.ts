@@ -118,6 +118,45 @@ async function claim(db: Firestore, id: string, now: Date): Promise<FirebaseFire
   });
 }
 
+export type SendOutcome =
+  | ({ status: 'sent' } & FanOutResult)
+  | { status: 'skipped' }
+  | { status: 'failed'; error: string };
+
+type Recipients = Array<{ uid: string; tokens: string[] }>;
+
+/**
+ * The one send path, shared by the cron and the owner's "Send now": claim the
+ * announcement, push it to every recipient, record the counts. Anything not
+ * claimable (already claimed, cancelled, not yet due) is skipped.
+ */
+export async function sendAnnouncement(
+  db: Firestore,
+  id: string,
+  now: Date,
+  recipients?: () => Promise<Recipients>
+): Promise<SendOutcome> {
+  const data = await claim(db, id, now);
+  if (!data) return { status: 'skipped' };
+  const ref = db.collection(ANNOUNCEMENTS).doc(id);
+  try {
+    const list = await (recipients ?? (() => announcementRecipients(db)))();
+    const result = await sendToRecipients(list, {
+      title: String(data.title),
+      body: String(data.body),
+      url: ANNOUNCEMENT_URL,
+    });
+    await ref.update({ status: 'sent', sentAt: FieldValue.serverTimestamp(), ...result });
+    return { status: 'sent', ...result };
+  } catch (err) {
+    console.error('Announcement send failed', id, err);
+    const error = err instanceof Error ? err.message.slice(0, 240) : 'Send failed';
+    // Never back to 'scheduled': a partial send retried would double-notify.
+    await ref.update({ status: 'failed', error }).catch(() => undefined);
+    return { status: 'failed', error };
+  }
+}
+
 /** Sends every scheduled announcement whose sendAt has passed. */
 export async function runDueAnnouncements({ db, now }: { db: Firestore; now: Date }): Promise<CronSummary> {
   // Equality-only query (no composite index); the due check runs here and again
@@ -133,31 +172,12 @@ export async function runDueAnnouncements({ db, now }: { db: Firestore; now: Dat
   const summary: CronSummary = { due: due.length, sent: [], skipped: [], failed: [] };
   if (!due.length) return summary;
 
-  let recipients: Array<{ uid: string; tokens: string[] }> | null = null;
+  // One recipients read per run, however many announcements are due.
+  let cached: Promise<Recipients> | null = null;
+  const recipients = () => (cached ??= announcementRecipients(db));
   for (const doc of due) {
-    const data = await claim(db, doc.id, now);
-    if (!data) {
-      summary.skipped.push(doc.id);
-      continue;
-    }
-    const ref = db.collection(ANNOUNCEMENTS).doc(doc.id);
-    try {
-      recipients ??= await announcementRecipients(db);
-      const result = await sendToRecipients(recipients, {
-        title: String(data.title),
-        body: String(data.body),
-        url: ANNOUNCEMENT_URL,
-      });
-      await ref.update({ status: 'sent', sentAt: FieldValue.serverTimestamp(), ...result });
-      summary.sent.push(doc.id);
-    } catch (err) {
-      console.error('Announcement send failed', doc.id, err);
-      // Never back to 'scheduled': a partial send retried would double-notify.
-      await ref
-        .update({ status: 'failed', error: err instanceof Error ? err.message.slice(0, 240) : 'Send failed' })
-        .catch(() => undefined);
-      summary.failed.push(doc.id);
-    }
+    const outcome = await sendAnnouncement(db, doc.id, now, recipients);
+    summary[outcome.status].push(doc.id);
   }
   return summary;
 }

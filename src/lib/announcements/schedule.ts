@@ -43,6 +43,15 @@ export const announcementCreateSchema = announcementMessageSchema.extend({
   sendDate: z.string().refine(isDayKey, 'Pick a send date'),
 });
 
+/**
+ * "Send now": the client mints requestId once per confirmed send and it becomes
+ * the announcement's doc id, so a double tap or a retried request can't create
+ * (and send) a second copy.
+ */
+export const announcementSendNowSchema = announcementMessageSchema.extend({
+  requestId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, 'Invalid request'),
+});
+
 /** The 8:00 AM Chicago instant on `day` (13:00 UTC in CDT, 14:00 UTC in CST). */
 export function sendAtForDay(day: DayKey): Date {
   const [year, month, date] = day.split('-').map(Number);

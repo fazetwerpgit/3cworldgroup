@@ -6,7 +6,7 @@ import type { Firestore } from 'firebase-admin/firestore';
 const { sendPushToTokens } = vi.hoisted(() => ({ sendPushToTokens: vi.fn() }));
 vi.mock('@/lib/push/sendPush', () => ({ sendPushToTokens }));
 
-import { announcementRecipients, runDueAnnouncements, sendTestToSelf } from './send';
+import { announcementRecipients, runDueAnnouncements, sendAnnouncement, sendTestToSelf } from './send';
 
 type Doc = Record<string, unknown>;
 
@@ -173,6 +173,34 @@ describe('runDueAnnouncements', () => {
       due: { title: 't', body: 'b', status: 'scheduled', sendAt: { toDate: () => past } },
     });
     expect((await runDueAnnouncements({ db, now: NOW })).sent).toEqual(['due']);
+  });
+});
+
+describe('sendAnnouncement (Send now)', () => {
+  it('sends a due announcement once and records the counts', async () => {
+    const { db, store } = seed({ now1: { title: 't', body: 'b', status: 'scheduled', sendAt: NOW } });
+    expect(await sendAnnouncement(db, 'now1', NOW)).toEqual({ status: 'sent', sentCount: 3, failedCount: 0 });
+    expect(store.get('announcements')!.get('now1')?.status).toBe('sent');
+  });
+
+  it('shares the claim with the cron: overlapping them sends once', async () => {
+    const { db } = seed({ now1: { title: 't', body: 'b', status: 'scheduled', sendAt: NOW } });
+    const [direct, cron] = await Promise.all([
+      sendAnnouncement(db, 'now1', NOW),
+      runDueAnnouncements({ db, now: NOW }),
+    ]);
+    expect([direct.status, cron.sent.length ? 'sent' : 'skipped'].sort()).toEqual(['sent', 'skipped']);
+    expect(sendPushToTokens).toHaveBeenCalledTimes(3);
+  });
+
+  it('skips a cancelled or already-sent announcement', async () => {
+    const { db } = seed({
+      gone: { title: 't', body: 'b', status: 'cancelled', sendAt: past },
+      done: { title: 't', body: 'b', status: 'sent', sendAt: past },
+    });
+    expect(await sendAnnouncement(db, 'gone', NOW)).toEqual({ status: 'skipped' });
+    expect(await sendAnnouncement(db, 'done', NOW)).toEqual({ status: 'skipped' });
+    expect(sendPushToTokens).not.toHaveBeenCalled();
   });
 });
 
