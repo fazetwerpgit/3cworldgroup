@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOnboardingBucket } from '@/lib/firebase/admin';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { ATTACHMENT_ROOT, isCleanAttachmentPath } from '@/lib/forms/attachmentPath';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
-// GET /api/portal/forms/attachment?path=form-attachments/... - management only.
+// GET /api/portal/forms/attachment?path=form-attachments/... - management, or
+// a user reading their OWN uploads (form-attachments/{their uid}/...) such as a
+// rep's sale-proof thumbnails.
 // Mints a 15-min signed URL for the file in the folder. Never exposes the raw
 // path back as a usable storage URL. `path` is the folder stored on the record:
 // new submissions store their own per-submission folder
@@ -12,12 +15,17 @@ const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 // shared folder (form-attachments/{uid}/{formType}/[{slot}/]).
 export async function GET(request: NextRequest) {
   try {
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRequester(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const path = request.nextUrl.searchParams.get('path') ?? '';
-    if (!path.startsWith('form-attachments/')) {
+    if (!isCleanAttachmentPath(path)) {
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+    }
+    // Everyone else's uploads (onboarding documents, disputes, other reps'
+    // proof) stay management-only. The uid comes from the token, never the query.
+    if (!gate.isManagement && !path.startsWith(`${ATTACHMENT_ROOT}${gate.uid}/`)) {
+      return NextResponse.json({ error: 'Forbidden: you can only view your own uploads' }, { status: 403 });
     }
 
     const bucket = getOnboardingBucket();
