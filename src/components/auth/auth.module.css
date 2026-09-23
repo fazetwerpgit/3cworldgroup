@@ -16,7 +16,7 @@
   line-height: 1.4;
 }
 
-/* Same navy light as the rep shell, fixed behind everything. */
+/* Same ground as the rep shell: flat navy with the faint 24px grid. */
 .screen::before {
   content: '';
   position: fixed;
@@ -24,14 +24,14 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(140% 62% at 50% -6%, rgba(60, 110, 200, 0.2) 0%, rgba(60, 110, 200, 0.124) 35%, rgba(60, 110, 200, 0.052) 68%, transparent 100%),
-    radial-gradient(70% 34% at 80% 20%, rgba(141, 198, 63, 0.085) 0%, rgba(141, 198, 63, 0.053) 35%, rgba(141, 198, 63, 0.022) 68%, transparent 100%),
-    radial-gradient(120% 90% at 50% 38%, transparent 55%, rgba(0, 2, 6, 0.38) 82%, rgba(0, 2, 6, 0.6) 100%);
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 /* The global body is white; without this an overscroll bounce flashes it. */
 :global(body):has(.screen) {
-  background: #03070e;
+  background: #0b1424;
 }
 
 /* globals.css colours every .portal-scope field with the light theme's

@@ -84,15 +84,7 @@
   align-items: center;
   padding: var(--s6) var(--s5) var(--s5);
   overflow: hidden;
-  background:
-    radial-gradient(
-      90% 60% at 50% 0%,
-      rgba(141, 198, 63, 0.11) 0%,
-      rgba(141, 198, 63, 0.068) 35%,
-      rgba(141, 198, 63, 0.029) 68%,
-      transparent 100%
-    ),
-    var(--c-panel-fill);
+  background: var(--c-panel-fill);
   box-shadow:
     inset 0 2px 0 var(--c-lime),
     var(--c-lift);

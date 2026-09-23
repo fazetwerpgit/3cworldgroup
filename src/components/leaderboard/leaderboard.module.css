@@ -22,8 +22,6 @@
   --silver: #9ba4af;
   --bronze: #b1723e;
   --accent-ink: var(--c-lime);
-  --glow: rgba(163, 230, 53, 0.12);
-  --glow-hot: rgba(110, 231, 170, 0.28);
   --row-surface: var(--c-panel);
   --row-line: var(--c-line);
   --standing-surface: var(--c-panel-hi);
@@ -41,37 +39,6 @@
   margin: calc(-1 * var(--s4, 16px)) auto 0;
   padding: 18px 0 calc(20px + env(safe-area-inset-bottom));
 }
-
-/* A faint accent glow behind the header that has faded back to the page colour
-   well before the podium. The page ground stays the portal navy. */
-.shell::before {
-  content: '';
-  position: absolute;
-  /* Behind the shell's own content. `isolation` on .shell keeps this negative
-     index from escaping into the page, which is what lets every child stack
-     naturally without carrying a z-index of its own. */
-  z-index: -1;
-  top: 0;
-  /* Out through the shell's gutter, so the glow still runs edge to edge. */
-  right: calc(-1 * var(--gutter, 16px));
-  left: calc(-1 * var(--gutter, 16px));
-  height: 320px;
-  background:
-    radial-gradient(ellipse 98% 86% at 50% -20%, var(--glow-hot), transparent 72%),
-    linear-gradient(180deg, var(--glow) 0%, transparent 84%);
-  pointer-events: none;
-}
-
-/* On a phone the shell is the whole width, so the glow runs edge to edge. Once
-   the column stops growing it is narrower than the page and the glow's two
-   vertical edges read as seams, so fade it out sideways as well. */
-@media (min-width: 641px) {
-  .shell::before {
-    mask-image: linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
-  }
-}
-
-
 
 /* ---------- header ---------- */
 

@@ -53,48 +53,12 @@
   overflow: hidden;
 }
 
-/* The hero panel: a lime top edge, a lime bloom behind the rank numeral and a
-   cool blue bloom behind the pay figure. */
+/* The hero panel: a lime top edge on a flat panel. */
 .board {
   background: var(--c-panel-fill);
   box-shadow:
     inset 0 2px 0 var(--c-lime),
     var(--c-lift);
-}
-
-.board::before,
-.board::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-}
-
-.board::before {
-  top: -30%;
-  right: -12%;
-  width: 72%;
-  height: 110%;
-  background: radial-gradient(
-    closest-side,
-    rgba(141, 198, 63, calc(0.2 * 1)) 0%,
-    rgba(141, 198, 63, calc(0.124 * 1)) 35%,
-    rgba(141, 198, 63, calc(0.052 * 1)) 68%,
-    transparent 100%
-  );
-}
-
-.board::after {
-  top: -34%;
-  left: -18%;
-  width: 90%;
-  height: 110%;
-  background: radial-gradient(
-    closest-side,
-    rgba(80, 140, 240, calc(0.17 * 1)) 0%,
-    rgba(80, 140, 240, calc(0.105 * 1)) 35%,
-    rgba(80, 140, 240, calc(0.044 * 1)) 68%,
-    transparent 100%
-  );
 }
 
 .cellPay,
@@ -927,15 +891,7 @@
     min-height: 0;
     padding: var(--s4) var(--s4) var(--s4) var(--s5);
     border-top: 1px solid var(--c-line);
-    background:
-      radial-gradient(
-        80% 120% at 100% 0%,
-        rgba(80, 140, 240, calc(0.12 * 1)) 0%,
-        rgba(80, 140, 240, calc(0.074 * 1)) 35%,
-        rgba(80, 140, 240, calc(0.031 * 1)) 68%,
-        transparent 100%
-      ),
-      var(--c-panel-fill);
+    background: var(--c-panel-fill);
   }
 
   .paydayCard .paydayAmt {

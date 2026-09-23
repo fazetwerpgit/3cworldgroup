@@ -88,7 +88,6 @@
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(141, 198, 63, 0) 30%, rgba(141, 198, 63, 0.5) 82%, rgba(141, 198, 63, 0) 100%) top / 100% 1px no-repeat,
-    radial-gradient(70% 120% at 100% 0%, rgba(141, 198, 63, 0.1) 0%, rgba(141, 198, 63, 0.05) 45%, transparent 100%),
     var(--c-panel-fill);
 }
 
