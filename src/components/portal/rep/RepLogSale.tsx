@@ -29,13 +29,15 @@ import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { BodyLayer } from './BodyLayer';
 import { PROOF_ACCEPT, ProofCapture, useProofUploads } from './ProofCapture';
 import { useHideRepTabBar } from './RepShell';
+import { useSaleScan, type ScanFill, type ScanTarget } from './useSaleScan';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
 
 // Log a sale, direction D. Two steps: attach the carrier's confirmation
-// screenshot(s) as proof, then type the sale in. Nothing is read from the
-// screenshot; it is proof only. "Enter manually" skips the screenshot, which
-// makes the order number the proof (the hasSaleProof rule).
+// screenshot(s) as proof, then check the sale details. The first screenshot is
+// read (useSaleScan) to prefill the fields the rep has not typed in; the rep
+// checks them and submits. "Enter manually" skips the screenshot, which makes
+// the order number the proof (the hasSaleProof rule).
 
 const FORM_ID = 'rep-log-sale';
 const DEFAULT_PROVIDER = 'tfiber';
@@ -109,6 +111,8 @@ function Field({
   hint,
   required,
   wide,
+  flag,
+  reading,
   children,
 }: {
   id: string;
@@ -117,15 +121,34 @@ function Field({
   hint?: ReactNode;
   required?: boolean;
   wide?: boolean;
+  /** Filled from the screenshot without full confidence: the rep should check it. */
+  flag?: 'low' | 'medium';
+  /** The screenshot is being read and may fill this field. */
+  reading?: boolean;
   children: ReactNode;
 }) {
+  const flagClass = flag === 'low' ? l.flagLow : flag === 'medium' ? l.flagMedium : '';
   return (
-    <div className={`${l.field} ${error ? l.fieldInvalid : ''} ${wide ? l.wide : ''}`}>
+    <div className={`${l.field} ${error ? l.fieldInvalid : flagClass} ${wide ? l.wide : ''}`}>
       <label htmlFor={id} className={l.label}>
         {label}
-        {required ? <span className={l.req}>Required</span> : null}
+        {flag && !error ? (
+          <span className={l.flagTag}>
+            <AlertTriangle size={14} strokeWidth={2.25} aria-hidden="true" />
+            Check this
+          </span>
+        ) : required ? (
+          <span className={l.req}>Required</span>
+        ) : null}
       </label>
-      {children}
+      {reading ? (
+        <span className={l.readWrap}>
+          {children}
+          <span className={`${s.skel} ${l.readSkel}`} aria-hidden="true" />
+        </span>
+      ) : (
+        children
+      )}
       {error ? (
         <p id={`${id}-error`} className={l.fieldError}>
           <AlertTriangle size={14} strokeWidth={2.25} aria-hidden="true" />
@@ -152,14 +175,38 @@ export function RepLogSale() {
   const router = useRouter();
   const { formRef, errorRef, ...form } = useSaleFormState();
   const { rates, hasPlan, error: planError, retry: retryPlan } = useCompPlan();
+  const [step, setStep] = useState<'entry' | 'details'>('entry');
+  const [providerChoice, setProviderChoice] = useState<string | null>(null);
+
+  const hasInternetPlan = form.products.some((p) => !isExtraPlanId(p.productId));
+  const scan = useSaleScan({
+    paths: form.proofPaths,
+    isEmpty: (target) =>
+      target === 'plan' ? !hasInternetPlan : !form.formData[target].trim(),
+    apply: (fills: ScanFill[]) => {
+      for (const fill of fills) {
+        if (fill.target === 'plan') {
+          setProviderChoice(fill.provider);
+          form.keepProvider(fill.provider);
+          const plan = fill.planId ? getPlanById(fill.planId) : undefined;
+          if (plan) form.addPlan(plan);
+        } else {
+          form.setField(fill.target, fill.value);
+        }
+      }
+    },
+  });
   const uploads = useProofUploads({
     paths: form.proofPaths,
-    onAdd: form.addProofPath,
+    // An upload can finish long after it started, so this may run from an old
+    // render: both calls are stable and read the latest state themselves.
+    onAdd: (path) => {
+      form.addProofPath(path);
+      scan.proofAdded(path);
+    },
     onRemove: form.removeProofPath,
     slotKey: form.proofUploadId,
   });
-  const [step, setStep] = useState<'entry' | 'details'>('entry');
-  const [providerChoice, setProviderChoice] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const keyboardOpen = useSoftKeyboardOpen();
   const pickId = useId();
@@ -195,6 +242,7 @@ export function RepLogSale() {
   };
 
   const chooseProvider = (company: string) => {
+    scan.edited('plan');
     setProviderChoice(company);
     form.keepProvider(company);
   };
@@ -227,14 +275,24 @@ export function RepLogSale() {
   const input = (
     name: keyof SaleFormFields,
     options: { error?: SaleFieldKey; hint?: boolean } = {}
-  ) => ({
-    id: name,
-    name,
-    value: formData[name],
-    onChange: form.handleChange,
-    className: l.input,
-    ...describe(name, options.error ? errors[options.error] : undefined, Boolean(options.hint)),
-  });
+  ) => {
+    const reading = scan.pending(name as ScanTarget);
+    return {
+      id: name,
+      name,
+      value: formData[name],
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        scan.edited(name as ScanTarget);
+        form.handleChange(e);
+      },
+      onFocus: () => scan.seen(name as ScanTarget),
+      className: reading ? `${l.input} ${l.inputReading}` : l.input,
+      'aria-busy': reading || undefined,
+      ...describe(name, options.error ? errors[options.error] : undefined, Boolean(options.hint)),
+    };
+  };
+  /** Field props for a field the screenshot reader can fill. */
+  const scanned = (target: ScanTarget) => ({ flag: scan.flags[target], reading: scan.pending(target) });
 
   const blockError = form.blockError;
   const offline = blockError === NO_SIGNAL_SALE_MESSAGE;
@@ -382,11 +440,26 @@ export function RepLogSale() {
         <div className={l.reviewMain}>
           <header>
             <h1 className={l.title}>Sale details</h1>
-            <p className={l.lede}>
-              {orderRequired && proofTiles === 0
-                ? 'No screenshot, so the order number is the proof.'
-                : 'Type it in from the confirmation.'}
-            </p>
+            {scan.status === 'reading' ? (
+              <div className={l.scanRow}>
+                <p className={l.lede} role="status">
+                  Reading your screenshot…
+                </p>
+                <button type="button" className={l.scanSkip} onClick={scan.skip}>
+                  Skip
+                </button>
+              </div>
+            ) : (
+              <p className={l.lede} role="status">
+                {scan.status === 'filled'
+                  ? 'Filled from your screenshot. Check before you submit.'
+                  : scan.status === 'failed'
+                    ? "Couldn't read it. Fill it in below."
+                    : orderRequired && proofTiles === 0
+                      ? 'No screenshot, so the order number is the proof.'
+                      : 'Type it in from the confirmation.'}
+              </p>
+            )}
           </header>
 
           {duplicate ? (
@@ -452,16 +525,19 @@ export function RepLogSale() {
               </div>
             </fieldset>
 
-            <Field id="plan" label="Plan" error={errors.plan} required>
+            <Field id="plan" label="Plan" error={errors.plan} required {...scanned('plan')}>
               <span className={l.selectWrap}>
                 <select
                   id="plan"
-                  className={l.input}
+                  className={scan.pending('plan') ? `${l.input} ${l.inputReading}` : l.input}
                   value={internetId}
                   onChange={(e) => {
+                    scan.edited('plan');
                     const plan = getPlanById(e.target.value);
                     if (plan) form.addPlan(plan);
                   }}
+                  onFocus={() => scan.seen('plan')}
+                  aria-busy={scan.pending('plan') || undefined}
                   {...describe('plan', errors.plan, false)}
                 >
                   <option value="" disabled>
@@ -483,6 +559,7 @@ export function RepLogSale() {
               required={orderRequired}
               error={errors.orderNumberOrBtn}
               hint={orderRequired ? 'Needed when there is no screenshot.' : undefined}
+              {...scanned('orderNumberOrBtn')}
             >
               <input
                 {...input('orderNumberOrBtn', { error: 'orderNumberOrBtn', hint: orderRequired })}
@@ -515,15 +592,21 @@ export function RepLogSale() {
               </fieldset>
             ) : null}
 
-            <Field id="customerName" label="Customer name">
+            <Field id="customerName" label="Customer name" {...scanned('customerName')}>
               <input {...input('customerName')} type="text" autoComplete="off" autoCapitalize="words" />
             </Field>
 
-            <Field id="customerPhone" label="Phone">
+            <Field id="customerPhone" label="Phone" {...scanned('customerPhone')}>
               <input {...input('customerPhone')} type="tel" inputMode="tel" autoComplete="off" />
             </Field>
 
-            <Field id="customerAddress" label="Service address" required error={errors.customerAddress}>
+            <Field
+              id="customerAddress"
+              label="Service address"
+              required
+              error={errors.customerAddress}
+              {...scanned('customerAddress')}
+            >
               <input
                 {...input('customerAddress', { error: 'customerAddress' })}
                 type="text"
@@ -532,7 +615,7 @@ export function RepLogSale() {
               />
             </Field>
 
-            <Field id="installDate" label="Install date" required error={errors.installDate}>
+            <Field id="installDate" label="Install date" required error={errors.installDate} {...scanned('installDate')}>
               <input {...input('installDate', { error: 'installDate' })} type="date" />
             </Field>
 
@@ -579,7 +662,10 @@ export function RepLogSale() {
                     id="notes"
                     name="notes"
                     value={formData.notes}
-                    onChange={form.handleChange}
+                    onChange={(e) => {
+                      scan.edited('notes');
+                      form.handleChange(e);
+                    }}
                     className={`${l.input} ${l.textarea}`}
                     rows={3}
                     placeholder="Anything the reviewer should know"
