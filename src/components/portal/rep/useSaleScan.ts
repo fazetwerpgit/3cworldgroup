@@ -9,7 +9,10 @@ import type { SaleScanFields, SaleScanResponse, ScanConfidence, ScanValue } from
 // uploading and the form is still blank, ask /api/portal/sales/scan to read it
 // and prefill what it found. The rep's own typing always wins: a field they
 // typed in (even one they then cleared) is never filled, and nothing is ever
-// submitted for them. Any failure is quiet; the manual form always works.
+// submitted for them. A later read (it sees every screenshot so far) may
+// correct what an earlier read filled, but only when it is surer: the first
+// screenshot often has no install date, and the real one arrives on the
+// second. Any failure is quiet; the manual form always works.
 
 /** Form fields the reader can fill. `plan` covers the provider and plan picker. */
 export type ScanTarget = 'orderNumberOrBtn' | 'customerName' | 'customerPhone' | 'customerAddress' | 'installDate' | 'plan' | 'notes';
@@ -30,20 +33,31 @@ const KEY_TARGETS: ScanTarget[] = ['plan', 'orderNumberOrBtn', 'customerAddress'
 const CLIENT_TIMEOUT_MS = 30_000;
 
 export type ScanFill =
-  | { target: Exclude<ScanTarget, 'plan'>; value: string }
+  | { target: Exclude<ScanTarget, 'plan'>; value: string; confidence: ScanConfidence }
   | { target: 'plan'; provider: string; planId: string | null };
 
 export type ScanStatus = 'idle' | 'reading' | 'filled' | 'failed';
 
 type Flag = Exclude<ScanConfidence, 'high'>;
 
+const SURENESS: Record<ScanConfidence, number> = { low: 0, medium: 1, high: 2 };
+
+/** Text fields a surer later read may correct (plan and notes stay fill-once). */
+const CORRECTABLE = ['orderNumberOrBtn', 'customerName', 'customerPhone', 'customerAddress', 'installDate'] as const;
+type Correctable = (typeof CORRECTABLE)[number];
+const isCorrectable = (target: ScanTarget): target is Correctable =>
+  (CORRECTABLE as readonly ScanTarget[]).includes(target);
+
+/** Can `read` go into `target`: it is open, or it beats what an earlier read put there. */
+export type CanFill = (target: ScanTarget, confidence: ScanConfidence) => boolean;
+
 /**
- * What to put where, given the reader's answer and which fields are still
- * open (empty and never typed in). Pure, so the fill rule is testable alone.
+ * What to put where, given the reader's answer and which fields may take it.
+ * Pure, so the fill rule is testable alone.
  */
 export function planScanFills(
   fields: SaleScanFields,
-  isOpen: (target: ScanTarget) => boolean
+  canFill: CanFill
 ): { fills: ScanFill[]; flags: Partial<Record<ScanTarget, Flag>> } {
   const fills: ScanFill[] = [];
   const flags: Partial<Record<ScanTarget, Flag>> = {};
@@ -51,23 +65,26 @@ export function planScanFills(
     if (read.confidence !== 'high') flags[target] = read.confidence;
   };
 
-  const text = ['orderNumberOrBtn', 'customerName', 'customerPhone', 'customerAddress', 'installDate'] as const;
-  for (const target of text) {
+  for (const target of CORRECTABLE) {
     const read = fields[target];
-    if (!read?.value || !isOpen(target)) continue;
-    fills.push({ target, value: read.value });
+    if (!read?.value || !canFill(target, read.confidence)) continue;
+    fills.push({ target, value: read.value, confidence: read.confidence });
     flag(target, read);
   }
 
-  if (fields.provider && isOpen('plan')) {
+  if (fields.provider && canFill('plan', fields.provider.confidence)) {
     const planId = fields.plan?.value ?? null;
     fills.push({ target: 'plan', provider: fields.provider.value, planId });
     // A provider with no plan is flagged too: the rep still has to pick one.
     flag('plan', fields.plan ?? { value: '', confidence: 'medium' });
   }
 
-  if (fields.installWindow?.value && isOpen('notes')) {
-    fills.push({ target: 'notes', value: `Install window: ${fields.installWindow.value}` });
+  if (fields.installWindow?.value && canFill('notes', fields.installWindow.confidence)) {
+    fills.push({
+      target: 'notes',
+      value: `Install window: ${fields.installWindow.value}`,
+      confidence: fields.installWindow.confidence,
+    });
   }
 
   return { fills, flags };
@@ -120,10 +137,22 @@ export function useSaleScan({
   const everFilled = useRef(false);
   // Skipped by the rep, or the reader is switched off: no more reads this sale.
   const stopped = useRef(false);
+  // What earlier reads put in the correctable fields, and how sure they were.
+  const filledRef = useRef(new Map<Correctable, ScanConfidence>());
 
   const isOpen = useCallback(
     (target: ScanTarget) => !touchedRef.current.has(target) && latest.current.isEmpty(target),
     []
+  );
+
+  const canFill = useCallback<CanFill>(
+    (target, confidence) => {
+      if (isOpen(target)) return true;
+      if (touchedRef.current.has(target)) return false;
+      const earlier = isCorrectable(target) ? filledRef.current.get(target) : undefined;
+      return earlier !== undefined && SURENESS[confidence] > SURENESS[earlier];
+    },
+    [isOpen]
   );
 
   const run = useCallback(
@@ -139,7 +168,9 @@ export function useSaleScan({
       }
       const first = scanned.current.size === 0;
       for (const p of all) scanned.current.add(p);
-      const worth = first ? KEY_TARGETS.every(isOpen) : SCAN_SKELETON_TARGETS.some(isOpen);
+      // A later read is worth it for an empty field, or to firm up a guess.
+      const unsure = [...filledRef.current.values()].some((confidence) => confidence !== 'high');
+      const worth = first ? KEY_TARGETS.every(isOpen) : unsure || SCAN_SKELETON_TARGETS.some(isOpen);
       if (!worth) return;
 
       const abort = new AbortController();
@@ -164,13 +195,21 @@ export function useSaleScan({
         return;
       }
       const { fills, flags: newFlags } = result.fields
-        ? planScanFills(result.fields, isOpen)
+        ? planScanFills(result.fields, canFill)
         : { fills: [], flags: {} };
       if (fills.length > 0) {
         latest.current.apply(fills);
+        for (const fill of fills) {
+          if (fill.target !== 'plan' && isCorrectable(fill.target)) filledRef.current.set(fill.target, fill.confidence);
+        }
         everFilled.current = true;
         markScanIntroUsed();
-        setFlags((prev) => ({ ...prev, ...newFlags }));
+        // A refilled field takes the new read's flag (or none, when it is sure).
+        setFlags((prev) => {
+          const next = { ...prev };
+          for (const fill of fills) delete next[fill.target];
+          return { ...next, ...newFlags };
+        });
         setStatus('filled');
       } else {
         // Nothing read, or nothing left to fill: only a first read that found
@@ -182,7 +221,7 @@ export function useSaleScan({
         void run();
       }
     },
-    [isOpen]
+    [isOpen, canFill]
   );
 
   /** A proof upload finished (called from the upload queue, so it may be stale-bound). */
@@ -200,6 +239,7 @@ export function useSaleScan({
   /** The rep typed in (or picked) this field: never fill it, and it is checked. */
   const edited = useCallback((target: ScanTarget) => {
     touchedRef.current.add(target);
+    if (isCorrectable(target)) filledRef.current.delete(target);
     setTouched((prev) => (prev.has(target) ? prev : new Set(prev).add(target)));
     setFlags((prev) => {
       if (!prev[target]) return prev;
@@ -226,6 +266,7 @@ export function useSaleScan({
     queued.current = false;
     stopped.current = false;
     everFilled.current = false;
+    filledRef.current.clear();
     scanned.current.clear();
     touchedRef.current.clear();
     setTouched(new Set());

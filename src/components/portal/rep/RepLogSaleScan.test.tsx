@@ -186,7 +186,7 @@ describe('RepLogSale screenshot reader', () => {
     expect(scanBodies).toHaveLength(1);
   });
 
-  it('never reads the same screenshot twice; a new one fills only what is still empty', async () => {
+  it('never reads the same screenshot twice; a new one fills what is still empty, never over a sure read', async () => {
     await mount();
     const partial: SaleScanResponse = {
       fields: { ...READ.fields, customerPhone: undefined },
@@ -207,6 +207,34 @@ describe('RepLogSale screenshot reader', () => {
     expect(scanBodies[1]).toEqual({ paths: [P1, P2] });
     expect(field('customerPhone').value).toBe('(512) 555-0187');
     expect(field('customerName').value).toBe('Marisol Keene');
+  });
+
+  // Field report 9/23 (Braeden): the first screenshot had no install date, the
+  // reader guessed today, and the second screenshot's real date never replaced it.
+  it('a later, surer read corrects what an earlier read guessed, but never what the rep typed', async () => {
+    await mount();
+    scanReplies.push({
+      fields: {
+        ...READ.fields,
+        installDate: { value: '2099-09-23', confidence: 'medium' },
+        customerPhone: { value: '(512) 555-0100', confidence: 'medium' },
+      },
+    });
+    await upload(P1);
+    expect(field('installDate').value).toBe('2099-09-23');
+    await type('customerPhone', '(512) 555-0199');
+
+    scanReplies.push({
+      fields: {
+        installDate: { value: '2099-09-24', confidence: 'high' },
+        customerPhone: { value: '(512) 555-0187', confidence: 'high' },
+      },
+    });
+    await upload(P2);
+    expect(field('installDate').value).toBe('2099-09-24');
+    expect(field('customerPhone').value).toBe('(512) 555-0199');
+    // Sure now: no "Check this" left on the corrected date.
+    expect(checkTags().map((l) => l.htmlFor)).not.toContain('installDate');
   });
 
   it('does not read at all once the rep has started the sale by hand', async () => {
