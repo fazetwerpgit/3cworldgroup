@@ -43,6 +43,7 @@ import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/Push
 import { CarrierNotice } from './CarrierNotice';
 import { PAY_DISPUTE_HREF, PayHelpSheet } from './PayHelpSheet';
 import { InstallDateSheet } from './InstallDateSheet';
+import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
 import s from './rep.module.css';
 import d from './rep-dashboard.module.css';
@@ -907,6 +908,8 @@ export function RepDashboard() {
           ) : challenge ? (
             <ChallengePanels target={challenge.target} done={challenge.done} timeLeft={weekTimeLeft(now)} />
           ) : null}
+
+          {canLog ? <ScanIntroCard now={now} /> : null}
 
           {todayLoading && todayItems.length === 0 ? (
             <SkeletonPanel label="Loading today" rows={2} className={`${d.todayB} ${d.today}`} />

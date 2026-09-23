@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { markScanIntroUsed } from '@/lib/sales/scan/intro';
 import type { SaleScanFields, SaleScanResponse, ScanConfidence, ScanValue } from '@/lib/sales/scan/types';
 
 // The Log Sale screenshot reader, client side. When a proof screenshot finishes
@@ -86,10 +87,13 @@ async function requestScan(paths: string[], signal: AbortSignal): Promise<SaleSc
 }
 
 export function useSaleScan({
+  enabled,
   paths,
   isEmpty,
   apply,
 }: {
+  /** The reader is switched on (saleScanEnabled). Off, nothing is ever read or shown. */
+  enabled: boolean;
   /** The proof paths on the form now. */
   paths: string[];
   /** True while the form field has no value. */
@@ -101,9 +105,9 @@ export function useSaleScan({
   const [flags, setFlags] = useState<Partial<Record<ScanTarget, Flag>>>({});
 
   // Read at call time, from async upload callbacks: always the latest render.
-  const latest = useRef({ paths, isEmpty, apply });
+  const latest = useRef({ enabled, paths, isEmpty, apply });
   useEffect(() => {
-    latest.current = { paths, isEmpty, apply };
+    latest.current = { enabled, paths, isEmpty, apply };
   });
 
   // Fields the rep typed in or picked. The ref serves async reads; the state
@@ -124,7 +128,7 @@ export function useSaleScan({
 
   const run = useCallback(
     async (extraPath?: string) => {
-      if (stopped.current) return;
+      if (stopped.current || !latest.current.enabled) return;
       const all = [...new Set([...latest.current.paths, ...(extraPath ? [extraPath] : [])])];
       const fresh = all.filter((p) => !scanned.current.has(p));
       if (fresh.length === 0) return;
@@ -165,6 +169,7 @@ export function useSaleScan({
       if (fills.length > 0) {
         latest.current.apply(fills);
         everFilled.current = true;
+        markScanIntroUsed();
         setFlags((prev) => ({ ...prev, ...newFlags }));
         setStatus('filled');
       } else {

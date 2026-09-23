@@ -5,6 +5,13 @@ import type { NextConfig } from "next";
 const LOGIN_ALIASES = ['/login', '/signin', '/employee'];
 
 const nextConfig: NextConfig = {
+  // The Log Sale screenshot reader's kill switch, ONE variable for both sides:
+  // the scan route reads it, and this inlines it into the client bundle so the
+  // page never shows the reader when it is off. Set at build time, so flipping
+  // it needs a redeploy (as any Vercel env change does). See src/lib/sales/scan/flag.ts.
+  env: {
+    SALE_SCAN_ENABLED: process.env.SALE_SCAN_ENABLED ?? '',
+  },
   // Dev only: lets a phone on the LAN load the dev server through the
   // firewall-forwarded port without Next blocking /_next/* as cross-origin.
   allowedDevOrigins: ['192.168.4.88', '127.0.0.1'],

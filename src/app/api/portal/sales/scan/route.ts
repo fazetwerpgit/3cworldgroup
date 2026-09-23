@@ -5,6 +5,7 @@ import { ATTACHMENT_ROOT, isCleanAttachmentPath } from '@/lib/forms/attachmentPa
 import { MAX_FORM_FILE_BYTES } from '@/lib/forms/formUploads';
 import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { extractSaleFields, type ScanImage } from '@/lib/sales/scan/extract';
+import { saleScanEnabled } from '@/lib/sales/scan/flag';
 import { scanLimiter } from '@/lib/sales/scan/limiter';
 import type { SaleScanResponse } from '@/lib/sales/scan/types';
 
@@ -52,7 +53,7 @@ async function readProofImages(paths: string[]): Promise<ScanImage[]> {
 
 export async function POST(request: NextRequest) {
   // Kill switch: off unless explicitly on, and then the route does not exist.
-  if (process.env.SALE_SCAN_ENABLED !== 'true') {
+  if (!saleScanEnabled()) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

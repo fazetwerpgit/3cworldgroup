@@ -26,6 +26,7 @@ import { loggedSaleHref } from '@/lib/sales/loggedSale';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
+import { saleScanEnabled } from '@/lib/sales/scan/flag';
 import { BodyLayer } from './BodyLayer';
 import { PROOF_ACCEPT, ProofCapture, useProofUploads } from './ProofCapture';
 import { useHideRepTabBar } from './RepShell';
@@ -179,7 +180,9 @@ export function RepLogSale() {
   const [providerChoice, setProviderChoice] = useState<string | null>(null);
 
   const hasInternetPlan = form.products.some((p) => !isExtraPlanId(p.productId));
+  const scanOn = saleScanEnabled();
   const scan = useSaleScan({
+    enabled: scanOn,
     paths: form.proofPaths,
     isEmpty: (target) =>
       target === 'plan' ? !hasInternetPlan : !form.formData[target].trim(),
@@ -342,10 +345,12 @@ export function RepLogSale() {
           <section className={`${s.panel} ${l.entry}`} aria-labelledby="entry-h">
             <ScanLine size={36} strokeWidth={1.75} className={l.entryIcon} aria-hidden="true" />
             <h1 id="entry-h" className={l.entryTitle}>
-              Attach order confirmation
+              {scanOn ? 'Add the order confirmation' : 'Attach order confirmation'}
             </h1>
             <p className={l.entryLede}>
-              Attach the carrier&apos;s confirmation page as proof. You type the details next.
+              {scanOn
+                ? "Screenshot it and we'll fill in the details. You check them and submit."
+                : "Attach the carrier's confirmation page as proof. You type the details next."}
             </p>
             <div className={l.entryActions}>
               <label className={`${s.btnPrimary} ${s.btnBlock} ${s.phoneOnly}`}>

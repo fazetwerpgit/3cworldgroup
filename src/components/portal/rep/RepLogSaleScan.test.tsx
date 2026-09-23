@@ -71,11 +71,15 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
-async function mount() {
+async function render() {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => root.render(<RepLogSale />));
+}
+
+async function mount() {
+  await render();
   const manual = Array.from(container.querySelectorAll('button')).find((b) =>
     b.textContent?.includes('Enter manually')
   )!;
@@ -104,7 +108,9 @@ async function upload(path: string) {
 }
 
 beforeEach(() => {
+  vi.stubEnv('SALE_SCAN_ENABLED', 'true');
   window.sessionStorage.clear();
+  window.localStorage.clear();
   scanReplies = [];
   scanBodies = [];
   vi.stubGlobal(
@@ -126,6 +132,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('RepLogSale screenshot reader', () => {
@@ -206,6 +213,33 @@ describe('RepLogSale screenshot reader', () => {
     await type('customerAddress', '9 Oak St, Waco, TX');
     await upload(P1);
     expect(scanBodies).toHaveLength(0);
+  });
+
+  it('records the first filled read, so the Home intro card retires', async () => {
+    await mount();
+    scanReplies.push(READ);
+    await upload(P1);
+    expect(JSON.parse(window.localStorage.getItem('portal-scan-intro')!)).toMatchObject({ used: true });
+  });
+
+  it('switched off: never reads, never shows the reading state, keeps the proof-only copy', async () => {
+    vi.stubEnv('SALE_SCAN_ENABLED', '');
+    await render();
+    expect(text()).toContain('Attach order confirmation');
+    expect(text()).not.toContain("we'll fill in the details");
+    const manual = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Enter manually'))!;
+    await act(async () => manual.click());
+    await upload(P1);
+    expect(scanBodies).toHaveLength(0);
+    expect(text()).not.toContain('Reading your screenshot');
+    expect(text()).not.toContain("Couldn't read it");
+  });
+
+  it('switched on: the proof step says the details fill in', async () => {
+    await render();
+    expect(container.querySelector('h1')!.textContent).toBe('Add the order confirmation');
+    expect(text()).toContain("Screenshot it and we'll fill in the details. You check them and submit.");
+    expect(text()).toContain('Enter manually');
   });
 
   it('shows the reading state, and Skip cancels it without filling', async () => {
