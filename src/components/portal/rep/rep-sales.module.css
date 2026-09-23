@@ -1263,7 +1263,8 @@
 
 .figs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* The value cell carries "$2,065 / mo"; the two counts need far less. */
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
   border-bottom: 1px solid var(--c-line);
 }
 
@@ -1282,7 +1283,7 @@
 .fig strong {
   color: var(--c-text);
   font-family: var(--f-display);
-  font-size: 40px;
+  font-size: 36px;
   font-weight: 400;
   line-height: 0.9;
   padding-top: 3px;
@@ -1291,7 +1292,7 @@
 }
 
 .fig strong small {
-  margin-left: 3px;
+  margin-left: 4px;
   color: var(--c-text-2);
   font-family: var(--f-ui);
   font-size: var(--t-sm);
