@@ -46,10 +46,6 @@
     'table table'
     'foot foot';
   overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(141, 198, 63, 0) 18%, rgba(141, 198, 63, 0.55) 74%, rgba(141, 198, 63, 0) 100%) top /
-      100% 1px no-repeat,
-    var(--c-panel-fill);
 }
 
 .boardFailed {
@@ -199,10 +195,7 @@
 }
 
 .cellPrior {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px var(--s2);
+  display: block;
   margin-top: 6px;
   color: var(--c-text-3);
   font-size: var(--t-sm);
@@ -306,23 +299,10 @@
 }
 
 .clear {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--s3);
-  min-height: 64px;
   margin: 0;
-  padding: 10px var(--s4);
-}
-
-.clearTile {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-panel);
-  background: var(--c-lime-wash);
-  color: var(--c-lime);
+  padding: var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
 }
 
 /* ---------- recruiting ---------- */

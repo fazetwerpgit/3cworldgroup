@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, ChevronRight, RotateCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronRight, RotateCw } from 'lucide-react';
 import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
 import type {
   MoneyComparison,
@@ -69,17 +69,12 @@ function PanelHead({ id, title, children }: { id: string; title: string; childre
   );
 }
 
-function Delta({ current, prior, label, neutral = false }: { current: number; prior: number; label: string; neutral?: boolean }) {
+/** The hero figures' change against the prior cut. Table cells don't carry one. */
+function Delta({ current, prior, label }: { current: number; prior: number; label: string }) {
   const pct = deltaPct(current, prior);
   if (pct === null) return null;
-  const down = pct < 0;
   return (
-    <span className={`${o.delta} ${down || neutral ? o.deltaFlat : ''}`} aria-label={`${pct > 0 ? '+' : ''}${pct}% ${label}`}>
-      {down ? (
-        <TrendingDown size={14} strokeWidth={2.25} aria-hidden="true" />
-      ) : (
-        <TrendingUp size={14} strokeWidth={2.25} aria-hidden="true" />
-      )}
+    <span className={`${o.delta} ${pct < 0 ? o.deltaFlat : ''}`} aria-label={`${pct > 0 ? '+' : ''}${pct}% ${label}`}>
       {pct > 0 ? '+' : ''}
       {pct}%
     </span>
@@ -88,10 +83,10 @@ function Delta({ current, prior, label, neutral = false }: { current: number; pr
 
 // ---------------------------------------------------------------- money
 
-const MONEY_ROWS: Array<{ key: keyof MoneyFigures; label: string; format: (n: number) => string; neutral?: boolean }> = [
+const MONEY_ROWS: Array<{ key: keyof MoneyFigures; label: string; format: (n: number) => string }> = [
   { key: 'installs', label: 'Installs', format: count },
   { key: 'revenue', label: 'Est. revenue', format: money },
-  { key: 'commissions', label: 'Rep commissions', format: money, neutral: true },
+  { key: 'commissions', label: 'Rep commissions', format: money },
   { key: 'margin', label: 'Est. margin', format: money },
 ];
 
@@ -102,12 +97,10 @@ function MoneyCell({ comparison, row, priorLabel }: { comparison: MoneyCompariso
     <td className={o.cell}>
       <span className={o.cellValue}>{row.format(current)}</span>
       <span className={o.cellPrior}>
-        <Delta current={current} prior={prior} label={priorLabel} neutral={row.neutral} />
-        <span>
-          <span className={s.srOnly}>{priorLabel}: </span>
-          <span aria-hidden="true">vs </span>
-          {row.format(prior)}
-        </span>
+        <span className={s.srOnly}>{priorLabel}: </span>
+        <span aria-hidden="true">vs </span>
+        {row.format(prior)}
+        <span aria-hidden="true"> prior</span>
       </span>
     </td>
   );
@@ -147,6 +140,7 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
         <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
         <p className={`${o.score} ${o.scoreLime}`}>{count(week.current.installs)}</p>
         <p className={o.heroSub}>
+          <Delta current={week.current.installs} prior={week.prior.installs} label={`vs ${weekPrior}`} />
           <span>
             <strong>installs</strong> · vs {count(week.prior.installs)} by {priorDay(week.priorEnd)}
           </span>
@@ -231,15 +225,7 @@ function Attention({ rows }: { rows: ProblemRow[] }) {
     <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
       <PanelHead id="attn-h" title="Needs attention" />
       {open.length === 0 ? (
-        <p className={o.clear}>
-          <span className={o.clearTile} aria-hidden="true">
-            <CheckCircle2 size={18} strokeWidth={2} />
-          </span>
-          <span className={o.tText}>
-            <span className={o.tTitle}>All clear</span>
-            <span className={o.tSub}>Nothing is waiting in any queue.</span>
-          </span>
-        </p>
+        <p className={o.clear}>All clear</p>
       ) : (
         <ul className={o.attnList}>
           {open.map((row) => {

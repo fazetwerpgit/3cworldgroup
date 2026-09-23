@@ -60,6 +60,12 @@ describe('OwnerDashboard', () => {
     expect(html).toContain('Estimates from installs');
   });
 
+  it('puts the change on the two hero figures only; table cells say vs the prior value', () => {
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html.match(/aria-label="[+−-]?\d+%/g)).toEqual(['aria-label="+12%', 'aria-label="+27%']);
+    expect(html).toContain('$44,750<span aria-hidden="true"> prior</span>');
+  });
+
   it('lists only non-zero problems, each linking to its page', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).toContain('Open pay disputes');

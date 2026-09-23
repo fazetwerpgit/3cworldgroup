@@ -996,7 +996,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
       <SalesDialog
         open={!!deletingId}
         title="Delete sale"
-        description="Are you sure you want to delete this sale? This action cannot be undone."
+        description="Delete this sale? It comes off the book and the rep's estimate."
         onClose={() => setDeletingId(null)}
         footer={
           <>
