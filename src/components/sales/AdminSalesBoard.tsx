@@ -18,6 +18,7 @@ import { isInMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
 import { SalesDialog } from './SalesDialog';
+import { Collapse } from '@/components/portal/Collapse';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
 // reps logged and the carrier's morning report merged into a single list, so the
@@ -629,7 +630,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             <span className={x.exBadge} data-part="drawer-count">{count}</span>
           </span>
         </button>
-        {open && <div className={x.nested}>{body}</div>}
+        <Collapse open={open} className={x.nested}>{body}</Collapse>
       </div>
     );
   };
@@ -764,7 +765,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                     <span className={x.exCount}>{rep.count} sale{rep.count === 1 ? '' : 's'}</span>
                   </button>
 
-                  {open && <div className={x.nested}>{rep.rows.map(renderRow)}</div>}
+                  <Collapse open={open} className={x.nested}>{rep.rows.map(renderRow)}</Collapse>
                 </div>
               );
             })}

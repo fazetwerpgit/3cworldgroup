@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Bug, CheckCircle2, ChevronDown, Send } from 'lucide-react';
 import { auth } from '@/lib/firebase/config';
+import { Collapse } from './Collapse';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
@@ -80,8 +81,7 @@ export default function ReportBugCard() {
         <ChevronDown size={18} className={st.toggleChev} aria-hidden="true" />
       </button>
 
-      {open && (
-        <div className={st.drawer}>
+      <Collapse open={open} className={st.drawer}>
           {done ? (
             <div className={`${p.notice} ${p.noticeLime}`} role="status">
               <CheckCircle2 size={16} aria-hidden="true" />
@@ -137,8 +137,7 @@ export default function ReportBugCard() {
               </div>
             </form>
           )}
-        </div>
-      )}
+      </Collapse>
     </section>
   );
 }

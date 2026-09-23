@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 
-function reducedMotion(): boolean {
+/** Motion is on: a browser that can say so, and does not ask for less. */
+function canAnimate(): boolean {
   return (
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
 
@@ -14,13 +15,14 @@ function reducedMotion(): boolean {
  * Keeps a sheet on screen for its closing animation. `rendered` stays true for
  * `exitMs` after `open` turns false, with `closing` set, so the sheet can play
  * its exit (the CSS keys off data-closing). Reduced motion closes at once.
+ * Used by sheets and by Collapse.
  */
 export function useSheetExit(open: boolean, exitMs = 180): { rendered: boolean; closing: boolean } {
   const [closing, setClosing] = useState(false);
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    setClosing(!open && !reducedMotion());
+    setClosing(!open && canAnimate());
   }
 
   useEffect(() => {

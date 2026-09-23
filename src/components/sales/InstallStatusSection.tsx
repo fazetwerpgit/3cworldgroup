@@ -9,6 +9,7 @@ import { SubmittedRows } from './SubmittedSales';
 import { submittedByRep, submissionMatches } from '@/lib/sales/submittedByRep';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import { Collapse } from '@/components/portal/Collapse';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
 export type FiberBucket = Exclude<FiberFilter, 'all'>;
@@ -545,8 +546,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                       statusSummary(group.orders),
                       open,
                     )}
-                    {open && (
-                      <div id={groupDomId(groupKey)} className={x.nested}>
+                    <Collapse open={open} id={groupDomId(groupKey)} className={x.nested}>
                         <FiberRows orders={group.orders} />
                         {showLogged && (
                           <div className={x.logged}>
@@ -559,8 +559,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                             <SubmittedRows sales={logged} />
                           </div>
                         )}
-                      </div>
-                    )}
+                    </Collapse>
                   </section>
                 );
               })}
@@ -585,8 +584,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                           statusSummary(assignment.orders),
                           open,
                         )}
-                        {open && (
-                          <div id={groupDomId(groupKey)} className={x.nested}>
+                        <Collapse open={open} id={groupDomId(groupKey)} className={x.nested}>
                             <div className={x.assign}>
                               {usersLoading && <p className={x.inlineNote}>Loading portal users…</p>}
                               {usersError && <p className={x.inlineError} role="alert">{usersError}</p>}
@@ -621,8 +619,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                               )}
                             </div>
                             <FiberRows orders={assignment.orders} />
-                          </div>
-                        )}
+                        </Collapse>
                       </section>
                     );
                   })}
