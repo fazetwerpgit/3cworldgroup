@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         repKey: typeof data.salesRepId === 'string' && data.salesRepId ? data.salesRepId : `name:${repName}`,
         repName,
         effectiveMs: effectiveDate.getTime(),
+        loggedMs: toDate(data.createdAt)?.getTime() ?? null,
         monthlyValue:
           typeof data.totalValue === 'number' && Number.isFinite(data.totalValue) ? data.totalValue : 0,
       });

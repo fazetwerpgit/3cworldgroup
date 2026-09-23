@@ -3,20 +3,28 @@
 // the client formats names and times with tapeRepName / relativeSaleTime.
 // Counts and names only: no customer data and no per-rep money.
 
+import { installDayKey } from './saleDate';
+
 export interface TapeSale {
   // Groups a rep's sales; salesRepId when present, else the name.
   repKey: string;
   repName: string;
   // When the sale happened (saleDate, falling back to approvedAt/createdAt).
+  // saleDate is a calendar day stored at noon, so it has no time of day.
   effectiveMs: number;
+  // When the rep logged it (createdAt), the only real time of day on a sale.
+  loggedMs?: number | null;
   monthlyValue: number;
 }
 
 export interface CompanyTapeStats {
   mtdCount: number;
   mtdMonthlyValue: number;
-  // Most recent approved sale of all time, by sale date.
-  lastSale: { repName: string; at: string } | null;
+  // Most recent approved sale of all time, by sale date, then by when it was
+  // logged. `at` is when it was logged, and only when that was on the sale's
+  // own day: a noon sale date would make "12m ago" up, and a sale logged days
+  // after it happened did not happen when it was logged.
+  lastSale: { repName: string; at?: string } | null;
   // Most sales this month; ties go to the rep who got there first.
   topRep: { repName: string; count: number } | null;
 }
@@ -28,7 +36,13 @@ export function summarizeCompanySales(sales: TapeSale[], monthStartMs: number): 
   const reps = new Map<string, { repName: string; count: number; latestMs: number }>();
 
   for (const sale of sales) {
-    if (!last || sale.effectiveMs > last.effectiveMs) last = sale;
+    if (
+      !last ||
+      sale.effectiveMs > last.effectiveMs ||
+      (sale.effectiveMs === last.effectiveMs && (sale.loggedMs ?? -Infinity) > (last.loggedMs ?? -Infinity))
+    ) {
+      last = sale;
+    }
     if (sale.effectiveMs < monthStartMs) continue;
     mtdCount += 1;
     mtdMonthlyValue += sale.monthlyValue;
@@ -61,9 +75,18 @@ export function summarizeCompanySales(sales: TapeSale[], monthStartMs: number): 
   return {
     mtdCount,
     mtdMonthlyValue,
-    lastSale: last ? { repName: last.repName, at: new Date(last.effectiveMs).toISOString() } : null,
+    lastSale: last ? lastSaleOf(last) : null,
     topRep: top ? { repName: top.repName, count: top.count } : null,
   };
+}
+
+function lastSaleOf(sale: TapeSale): { repName: string; at?: string } {
+  const logged = sale.loggedMs;
+  if (typeof logged !== 'number' || !Number.isFinite(logged)) return { repName: sale.repName };
+  const sameDay = installDayKey(new Date(logged)) === installDayKey(new Date(sale.effectiveMs));
+  return sameDay
+    ? { repName: sale.repName, at: new Date(logged).toISOString() }
+    : { repName: sale.repName };
 }
 
 const LONG_NAME = 12;

@@ -32,7 +32,30 @@ describe('summarizeCompanySales', () => {
     expect(stats.mtdCount).toBe(3);
     expect(stats.mtdMonthlyValue).toBe(300);
     expect(stats.topRep).toEqual({ repName: 'Rep b', count: 2 });
-    expect(stats.lastSale).toEqual({ repName: 'Rep b', at: '2026-09-04T15:00:00.000Z' });
+    // No logged time on these, so no time of day to show.
+    expect(stats.lastSale).toEqual({ repName: 'Rep b' });
+  });
+
+  it('times the last sale by when it was logged, never by the noon sale date', () => {
+    const noonSep4 = '2026-09-04T17:00:00Z';
+    const stats = summarizeCompanySales(
+      [
+        sale('a', noonSep4, { loggedMs: Date.parse('2026-09-04T14:10:00Z') }),
+        sale('b', noonSep4, { loggedMs: Date.parse('2026-09-04T21:48:00Z') }),
+        sale('c', noonSep4, { loggedMs: Date.parse('2026-09-04T16:02:00Z') }),
+      ],
+      MONTH_START
+    );
+    // Same sale day: the one logged last is the last sale, at its logged time.
+    expect(stats.lastSale).toEqual({ repName: 'Rep b', at: '2026-09-04T21:48:00.000Z' });
+  });
+
+  it('shows no time for a sale logged on a later day than it happened', () => {
+    const stats = summarizeCompanySales(
+      [sale('a', '2026-09-04T17:00:00Z', { loggedMs: Date.parse('2026-09-06T15:00:00Z') })],
+      MONTH_START
+    );
+    expect(stats.lastSale).toEqual({ repName: 'Rep a' });
   });
 
   it('breaks a tie for the lead by who reached the count first', () => {
