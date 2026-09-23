@@ -148,7 +148,18 @@ describe('RepLogSale', () => {
     createSale.mockResolvedValue({ sale: { id: 'new-sale' }, duplicate: false });
     await mountFilled('2026-08-30');
     await submitForm();
-    expect(push).toHaveBeenCalledWith('/portal/sales?logged=new-sale&month=2026-08');
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/portal/sales?logged=new-sale&month=2026-08'));
+  });
+
+  it('says "Logged" on the button for a beat before Sales opens', async () => {
+    createSale.mockResolvedValue({ sale: { id: 'new-sale' }, duplicate: false });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    const submit = document.querySelector<HTMLButtonElement>('button[type="submit"][data-logged]');
+    expect(submit?.disabled).toBe(true);
+    expect(submit?.querySelector('[aria-hidden="true"]')?.textContent).toBe('Submit sale');
+    expect(push).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
   });
 
   it('says a duplicate was already logged and stays put', async () => {
@@ -232,7 +243,7 @@ describe('RepLogSale', () => {
     expect(push).not.toHaveBeenCalled();
     await submitForm();
     expect(createSale.mock.calls.map((call) => call[0].clientSaleId)).toEqual([key, key]);
-    expect(push).toHaveBeenCalledWith(`/portal/sales?logged=${key}&month=2026-08`);
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith(`/portal/sales?logged=${key}&month=2026-08`));
     expect(document.body.textContent).not.toContain('This sale was already logged.');
     expect(hasLogAsNew()).toBe(false);
     expect(window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}r1`)).toBeNull();
@@ -242,7 +253,7 @@ describe('RepLogSale', () => {
     createSale.mockResolvedValue({ sale: { ...storedEntry, id: 'e'.repeat(32) }, duplicate: true });
     await mountFilled('2026-08-30');
     await submitForm();
-    expect(push).toHaveBeenCalledWith(`/portal/sales?logged=${'e'.repeat(32)}&month=2026-08`);
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith(`/portal/sales?logged=${'e'.repeat(32)}&month=2026-08`));
     expect(hasLogAsNew()).toBe(false);
   });
 

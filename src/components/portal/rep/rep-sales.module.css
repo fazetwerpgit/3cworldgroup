@@ -965,6 +965,19 @@
   transform: scale(0.98);
 }
 
+/* A sale just logged on this phone drops into its place once (SalesTable),
+   held until the ledger's own first-load rise has mostly settled. */
+.arrive {
+  animation: arrive 280ms ease-out 480ms backwards;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
 .sale[role='button']:focus-visible,
 .pRow[role='button']:focus-visible {
   outline: 2px solid var(--c-lime-hi);
@@ -2605,6 +2618,7 @@ a.dLine {
   .moneyCard,
   .payHelp,
   .ledger,
+  .arrive,
   .sale,
   .pRow,
   .segTab,

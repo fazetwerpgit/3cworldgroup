@@ -1071,6 +1071,40 @@ span.thumbView {
   opacity: 0.6;
 }
 
+/* Sale logged: the label crossfades to a check and "Logged" in place (both sit
+   in one grid cell, so the button keeps its width), then Sales opens. */
+.submit[data-logged]:disabled {
+  opacity: 1;
+}
+
+.submitSwap {
+  display: inline-grid;
+}
+
+.submitSwap > span {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: opacity 200ms ease-out;
+}
+
+.submitSwap > span:last-child,
+.submit[data-logged] .submitSwap > span:first-child {
+  opacity: 0;
+}
+
+.submit[data-logged] .submitSwap > span:last-child {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submitSwap > span {
+    transition: none;
+  }
+}
+
 /* ---------- desktop ---------- */
 @media (min-width: 1024px) {
   .mainDetails {

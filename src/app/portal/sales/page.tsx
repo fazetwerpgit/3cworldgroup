@@ -373,6 +373,7 @@ function SalesContent() {
                 payPlan={payPlan}
                 fiber={fiber}
                 onSaleUpdated={refreshSales}
+                arriveId={loggedId}
               />
             </div>
           </div>

@@ -50,6 +50,8 @@ interface SalesTableProps {
   fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
   /** Refetches the book after the detail sheet edits a sale's install date. */
   onSaleUpdated?: () => void;
+  /** A sale just logged on this phone (Log Sale's `?logged=`): its row slides in once. */
+  arriveId?: string | null;
 }
 
 function formatMoney(value: number) {
@@ -147,6 +149,7 @@ export function SalesTable({
   payPlan,
   fiber,
   onSaleUpdated,
+  arriveId = null,
 }: SalesTableProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
@@ -226,6 +229,18 @@ export function SalesTable({
   const listSales = showPay ? paySales : monthSales;
   const selectedIndex = selectedId ? listSales.findIndex((sale) => sale.id === selectedId) : -1;
   const selectedSale = selectedIndex >= 0 ? listSales[selectedIndex] : null;
+
+  // The just-logged row plays its arrival on the first render that has it, and
+  // only then: the mark clears once it has played, or after 10s if it never
+  // shows, so a refresh or a month switch back never replays it.
+  const [arriving, setArriving] = useState(arriveId);
+  const arrivingShown = !!arriving && listSales.some((sale) => sale.id === arriving);
+  useEffect(() => {
+    if (!arriving) return;
+    const timer = setTimeout(() => setArriving(null), arrivingShown ? 1000 : 10_000);
+    return () => clearTimeout(timer);
+  }, [arriving, arrivingShown]);
+  const arriveClass = (sale: Sale) => (arriving && sale.id === arriving ? x.arrive : '');
   // The total under the list is MONEY, so a cancellation leaves it — whoever
   // cancelled it, us or the carrier. The row itself stays on screen, marked.
   const totalValue = countedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
@@ -432,7 +447,7 @@ export function SalesTable({
                     const canTick = status === 'installed' || paid;
                     return (
                       <div
-                        className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''}`}
+                        className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''} ${arriveClass(sale)}`}
                         data-part="pay-row"
                         key={sale.id}
                         {...openRow(sale)}
@@ -513,7 +528,7 @@ export function SalesTable({
                   const mark = saleCarrier(sale);
                   return (
                     <div
-                      className={`${x.sale} ${isAdmin ? x.hasAct : ''} ${off ? x.saleOff : ''}`}
+                      className={`${x.sale} ${isAdmin ? x.hasAct : ''} ${off ? x.saleOff : ''} ${arriveClass(sale)}`}
                       data-part="sale-row"
                       key={sale.id}
                       {...openRow(sale)}

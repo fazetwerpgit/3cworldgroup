@@ -162,6 +162,25 @@ function describe(id: string, error: string | undefined, hasHint: boolean) {
   } as const;
 }
 
+/** How long "Logged" shows on the button before Sales opens. */
+export const LOGGED_HOLD_MS = 320;
+
+/**
+ * The submit button's label, stacked over "Logged" in one grid cell so the
+ * swap crossfades in place (rep-logsale.module.css) with no change of width.
+ */
+export function SubmitLabel({ logged, children }: { logged: boolean; children: ReactNode }) {
+  return (
+    <span className={l.submitSwap}>
+      <span aria-hidden={logged || undefined}>{children}</span>
+      <span aria-hidden={!logged || undefined}>
+        <Check size={20} strokeWidth={2.75} aria-hidden="true" />
+        Logged
+      </span>
+    </span>
+  );
+}
+
 export function RepLogSale() {
   const router = useRouter();
   const { formRef, errorRef, ...form } = useSaleFormState();
@@ -238,9 +257,17 @@ export function RepLogSale() {
   // A new sale opens Sales on the month it was sold in, confirmed by name. So
   // does a retry that finds this same entry already stored (the form reports it
   // as a plain success). A duplicate left over is a different entry: it stays.
+  // The button confirms "Logged" for a beat (LOGGED_HOLD_MS) before Sales opens.
+  const [logged, setLogged] = useState(false);
+  const loggedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (loggedTimer.current) clearTimeout(loggedTimer.current);
+  }, []);
   const afterSubmit = (result: Awaited<ReturnType<typeof form.submit>>, saleDate: string) => {
     if (!result || result.duplicate) return;
-    router.push(result.sale.id ? loggedSaleHref(result.sale.id, saleDate) : '/portal/sales');
+    const href = result.sale.id ? loggedSaleHref(result.sale.id, saleDate) : '/portal/sales';
+    setLogged(true);
+    loggedTimer.current = setTimeout(() => router.push(href), LOGGED_HOLD_MS);
   };
 
   const onSubmit = async (event: React.FormEvent) => {
@@ -343,10 +370,13 @@ export function RepLogSale() {
         type="submit"
         form={FORM_ID}
         className={`${s.btnPrimary} ${l.submit}`}
-        disabled={form.submitting}
+        disabled={form.submitting || logged}
         aria-disabled={uploads.uploadingCount > 0 || undefined}
+        data-logged={logged || undefined}
       >
-        {form.submitting ? 'Submitting…' : uploads.uploadingCount > 0 ? 'Uploading…' : 'Submit sale'}
+        <SubmitLabel logged={logged}>
+          {form.submitting ? 'Submitting…' : uploads.uploadingCount > 0 ? 'Uploading…' : 'Submit sale'}
+        </SubmitLabel>
       </button>
     </div>
   );
