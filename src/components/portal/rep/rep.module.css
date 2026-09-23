@@ -153,7 +153,9 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--s5));
+    /* The tab bar drops by --pwa-bottom-gap (below), so it covers that much
+       less of the scroller. */
+    padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--s5) - var(--pwa-bottom-gap, 0px));
   }
 }
 
@@ -639,11 +641,14 @@ h2.kicker::before {
   }
 }
 
-/* ---------- phone tab bar (portaled to <body>) ---------- */
+/* ---------- phone tab bar (portaled to <body>) ----------
+   --pwa-bottom-gap (PwaBottomGap): the strip an iOS 26 install leaves under
+   bottom: 0. Every fixed bottom bar drops by it onto the screen edge; it is 0
+   everywhere else. */
 .tabbar {
   position: fixed;
   right: 0;
-  bottom: 0;
+  bottom: calc(0px - var(--pwa-bottom-gap, 0px));
   left: 0;
   z-index: 40;
   padding-bottom: env(safe-area-inset-bottom);
@@ -729,7 +734,7 @@ h2.kicker::before {
 /* ---------- overlays (portaled to <body>) ---------- */
 .backdrop {
   position: fixed;
-  inset: 0;
+  inset: 0 0 calc(0px - var(--pwa-bottom-gap, 0px));
   z-index: 60;
   border: 0;
   background: rgba(1, 4, 10, 0.72);
@@ -739,7 +744,7 @@ h2.kicker::before {
 .sheet {
   position: fixed;
   right: 0;
-  bottom: 0;
+  bottom: calc(0px - var(--pwa-bottom-gap, 0px));
   left: 0;
   z-index: 61;
   display: flex;

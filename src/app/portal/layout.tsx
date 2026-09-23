@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import OnboardingGate from '@/components/portal/OnboardingGate';
 import FirestoreResumeGuard from '@/components/portal/FirestoreResumeGuard';
 import PushTokenRefresher from '@/components/portal/PushTokenRefresher';
+import PwaBottomGap from '@/components/portal/PwaBottomGap';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 import '@/styles/sweep-shell.css';
 
@@ -41,6 +42,8 @@ export default function PortalLayout({
           <PushTokenRefresher />
           {/* Reconnects live data (chat, unread dot) when the app resumes. */}
           <FirestoreResumeGuard />
+          {/* Drops the bottom bars onto the screen edge in iOS 26 installs. */}
+          <PwaBottomGap />
           {/* .portal-scope gates the portal reskin tokens/overrides in
               globals.css; display:contents keeps it out of the layout. */}
           <div className={`portal-scope contents ${archivo.variable}`}>
