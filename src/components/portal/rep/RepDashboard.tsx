@@ -478,7 +478,7 @@ function TodayPanel({
                   {item.row.customer}
                   {item.row.plan ? `, ${item.row.plan}` : ''}
                 </span>
-                {item.row.missedNote ? <span className={d.tSub}>{item.row.missedNote}</span> : null}
+                {item.row.missedNote ? <span className={d.tNote}>{item.row.missedNote}</span> : null}
               </span>
               <span className={d.tAct}>{verb}</span>
             </button>
