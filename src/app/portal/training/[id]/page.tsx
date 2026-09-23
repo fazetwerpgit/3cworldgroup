@@ -102,7 +102,8 @@ export default function TrainingDetailPage() {
 
   return (
     <div className={p.page}>
-      <Link href="/portal/training" className={p.back}>
+      {/* Desktop only: on phones the top bar's back link (see ../layout.tsx) does this job. */}
+      <Link href="/portal/training" className={`${p.back} ${s.deskOnly}`}>
         <ArrowLeft size={18} aria-hidden="true" />
         University
       </Link>

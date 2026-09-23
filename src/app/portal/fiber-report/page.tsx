@@ -8,6 +8,7 @@ import {
   FormAlert,
   FormFrame,
   FormHeader,
+  FORMS_BACK,
   FormSection,
   FormSent,
   useAlertScroll,
@@ -137,7 +138,7 @@ function FiberReportForm() {
 
 export default function FiberReportPage() {
   return (
-    <RepShell task="Fiber report">
+    <RepShell task="Fiber report" back={FORMS_BACK}>
       <FiberReportForm />
     </RepShell>
   );

@@ -118,12 +118,15 @@ export function useFormCheck<T extends object>(form: T, rules: FieldRule<T>[]) {
 }
 
 // ---------- layout ----------
+/** The forms hub: the phone top bar's back link on every form page (desktop uses FormHeader's). */
+export const FORMS_BACK = { href: '/portal/forms', label: 'forms' };
+
 /** Page header. On phones the top bar already carries the form name, so the h1 is visually hidden there. */
 export function FormHeader({ title, lede, back = true }: { title: string; lede: ReactNode; back?: boolean }) {
   return (
     <header className={f.header}>
       {back ? (
-        <Link href="/portal/forms" className={f.backLink}>
+        <Link href={FORMS_BACK.href} className={f.backLink}>
           <ArrowLeft size={16} aria-hidden="true" />
           All forms
         </Link>

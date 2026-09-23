@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NavSheet, useNavAccess } from '@/components/portal/NavSheet';
+import { NavSheet, isNavItemActive, useNavAccess } from '@/components/portal/NavSheet';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, repSheetClasses } from './RepTopBar';
 import { REP_PRIMARY_HREFS, activeRepHref } from './repNav';
@@ -109,6 +109,18 @@ describe('RepTopBar', () => {
     expect(html).toContain('href="/portal/sales/new"');
   });
 
+  it('sends a task page back to its parent, or the dashboard by default', () => {
+    setUser({ status: 'active', fieldRole: 'entry_rep', uid: 'rep-1' });
+    const backLink = (html: string) => html.match(/<a\b[^>]*aria-label="Back to [^"]*"[^>]*>/)?.[0] ?? '';
+    expect(backLink(renderToStaticMarkup(<RepTopBar />))).toBe('');
+    const plain = backLink(renderToStaticMarkup(<RepTopBar task="Log a sale" />));
+    expect(plain).toContain('href="/portal/dashboard"');
+    expect(plain).toContain('aria-label="Back to dashboard"');
+    const form = backLink(renderToStaticMarkup(<RepTopBar task="Fiber report" back={{ href: '/portal/forms', label: 'forms' }} />));
+    expect(form).toContain('href="/portal/forms"');
+    expect(form).toContain('aria-label="Back to forms"');
+  });
+
   it('points a pending hire at onboarding', () => {
     setUser({ status: 'pending', fieldRole: 'entry_level_rep', uid: 'hire-1' });
     const brand = renderToStaticMarkup(<RepTopBar />).match(/<a\b[^>]*3C World Group home[^>]*>/)?.[0] ?? '';
@@ -136,6 +148,21 @@ describe('rep menu sheet', () => {
     expect(renderToStaticMarkup(<RepMenu />)).not.toContain('User Management');
     setUser({ status: 'active', role: 'admin', uid: 'a-1' }, [...REP_PERMISSIONS, 'users:read']);
     expect(renderToStaticMarkup(<RepMenu />)).toContain('User Management');
+  });
+});
+
+describe('isNavItemActive', () => {
+  it('matches Dashboard and Ops Home only on their own page', () => {
+    expect(isNavItemActive('/portal/admin', '/portal/admin')).toBe(true);
+    expect(isNavItemActive('/portal/admin/users', '/portal/admin')).toBe(false);
+    expect(isNavItemActive('/portal/dashboard/x', '/portal/dashboard')).toBe(false);
+  });
+
+  it('lets every other page own its sub-paths, on segment boundaries', () => {
+    expect(isNavItemActive('/portal/admin/users', '/portal/admin/users')).toBe(true);
+    expect(isNavItemActive('/portal/admin/users/abc', '/portal/admin/users')).toBe(true);
+    expect(isNavItemActive('/portal/training/abc', '/portal/training')).toBe(true);
+    expect(isNavItemActive('/portal/sales-archive', '/portal/sales')).toBe(false);
   });
 });
 

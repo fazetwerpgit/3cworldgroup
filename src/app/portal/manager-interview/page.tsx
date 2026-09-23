@@ -9,6 +9,7 @@ import {
   FormAlert,
   FormFrame,
   FormHeader,
+  FORMS_BACK,
   FormSection,
   FormSent,
   YesNo,
@@ -256,7 +257,7 @@ function ManagerInterviewForm() {
 
 export default function ManagerInterviewPage() {
   return (
-    <RepShell task="Manager interview">
+    <RepShell task="Manager interview" back={FORMS_BACK}>
       <ProtectedRoute roles={[...managerInterviewRoles]} fallback={<RepBoot />}>
         <ManagerInterviewForm />
       </ProtectedRoute>

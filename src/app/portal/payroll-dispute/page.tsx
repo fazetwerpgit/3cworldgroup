@@ -9,6 +9,7 @@ import {
   FormAlert,
   FormFrame,
   FormHeader,
+  FORMS_BACK,
   FormSection,
   FormSent,
   UPLOADING_MESSAGE,
@@ -193,7 +194,7 @@ function PayrollDisputeForm() {
 
 export default function PayrollDisputePage() {
   return (
-    <RepShell task="Payroll dispute">
+    <RepShell task="Payroll dispute" back={FORMS_BACK}>
       <PayrollDisputeForm />
     </RepShell>
   );

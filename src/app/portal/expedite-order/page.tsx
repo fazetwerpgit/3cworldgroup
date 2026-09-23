@@ -9,6 +9,7 @@ import {
   FormAlert,
   FormFrame,
   FormHeader,
+  FORMS_BACK,
   FormSection,
   FormSent,
   describe,
@@ -181,7 +182,7 @@ function ExpediteOrderForm() {
 
 export default function ExpediteOrderPage() {
   return (
-    <RepShell task="Expedite order">
+    <RepShell task="Expedite order" back={FORMS_BACK}>
       <ExpediteOrderForm />
     </RepShell>
   );
