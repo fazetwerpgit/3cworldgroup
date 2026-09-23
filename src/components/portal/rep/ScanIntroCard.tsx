@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { ScanLine, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { saleScanEnabled } from '@/lib/sales/scan/flag';
 import {
   dismissScanIntro,
@@ -33,9 +33,6 @@ export function ScanIntroCard({ now }: { now: Date }) {
 
   return (
     <section className={`${s.panel} ${d.scanIntro}`} aria-labelledby="scan-intro-h">
-      <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
-        <ScanLine size={20} strokeWidth={2} />
-      </span>
       <div className={d.scanIntroBody}>
         <h2 id="scan-intro-h" className={d.scanIntroTitle}>
           New: log a sale from a screenshot
