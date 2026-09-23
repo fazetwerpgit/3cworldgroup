@@ -472,6 +472,44 @@
   border-top: 1px solid var(--c-line);
 }
 
+/* First time a queue shows this session, rows rise in a short stagger. */
+.qList[data-reveal] > li:not(.qLeaving) {
+  animation: qRise 280ms ease-out backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 30ms);
+}
+
+@keyframes qRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* A row handled from its sheet folds out of the list once the sheet closes:
+   it fades, then its height closes up (the grid-row 1fr to 0fr trick). */
+.qLeaving {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: qLeave 280ms ease-in forwards;
+}
+
+.qFold {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@keyframes qLeave {
+  40% {
+    opacity: 0;
+  }
+
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    border-top-color: transparent;
+  }
+}
+
 .qRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -779,6 +817,18 @@
   color: var(--c-lime);
   font-size: var(--t-ui);
   font-weight: 650;
+}
+
+/* Just marked handled: the confirmation rises into the button's place. */
+.doneLineIn {
+  animation: doneIn 240ms ease-out backwards;
+}
+
+@keyframes doneIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
 }
 
 .actionErr {
@@ -1437,5 +1487,11 @@
   .btnGhost,
   .btnDanger {
     transition: none;
+  }
+
+  .qLeaving,
+  .doneLineIn,
+  .qList[data-reveal] > li {
+    animation: none;
   }
 }

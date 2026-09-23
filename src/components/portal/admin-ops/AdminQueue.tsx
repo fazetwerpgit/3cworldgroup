@@ -1,6 +1,7 @@
 'use client';
 
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useFirstReveal } from '@/hooks/useFirstReveal';
 import { Check, ChevronRight, Download, FileText, Paperclip, PenLine } from 'lucide-react';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
 import rep from '@/components/portal/rep/rep.module.css';
@@ -94,6 +95,14 @@ type StatusFilter = 'all' | 'new' | 'handled';
 /** Queues open on what still needs handling (owner decision); All is one tap away. */
 const DEFAULT_STATUS: StatusFilter = 'new';
 
+const NO_IDS: ReadonlySet<string> = new Set();
+/** The handled row's fold-out (admin-ops.module.css .qLeaving). */
+const ROW_EXIT_MS = 280;
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function AdminQueue({
   title,
   lede,
@@ -138,19 +147,47 @@ export function AdminQueue({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS);
   const [filter, setFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
+  // Handled from the sheet on this visit: the row holds its place (now marked
+  // Handled) while the sheet is open, then folds out of the list on close.
+  const [kept, setKept] = useState<ReadonlySet<string>>(NO_IDS);
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(NO_IDS);
+
+  useEffect(() => {
+    if (leaving.size === 0) return;
+    const timer = setTimeout(() => setLeaving(NO_IDS), ROW_EXIT_MS);
+    return () => clearTimeout(timer);
+  }, [leaving]);
 
   const openCount = rows.filter((r) => r.status === 'new').length;
   const failed = !loading && Boolean(error);
+  const reveal = useFirstReveal(`3c:reveal:queue:${title}`, !loading && !failed && rows.length > 0);
 
-  const filtered = useMemo(() => {
+  const passes = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((row) => {
+    return (row: QueueRow) => {
       if (statusFilter !== 'all' && row.status !== statusFilter) return false;
       if (filterLabel && filter !== 'all' && row.filterValue !== filter) return false;
       if (q && !row.searchText.includes(q)) return false;
       return true;
-    });
-  }, [rows, search, statusFilter, filter, filterLabel]);
+    };
+  }, [search, statusFilter, filter, filterLabel]);
+  const filtered = useMemo(
+    () => rows.filter((row) => passes(row) || kept.has(row.id) || leaving.has(row.id)),
+    [rows, passes, kept, leaving]
+  );
+
+  const markHandled = async (id: string) => {
+    await onMarkHandled(id);
+    setKept((prev) => new Set(prev).add(id));
+  };
+  const closeSheet = () => {
+    setOpenId(null);
+    if (kept.size === 0) return;
+    setKept(NO_IDS);
+    if (prefersReducedMotion()) return;
+    const out = rows.filter((row) => kept.has(row.id) && !passes(row)).map((row) => row.id);
+    if (out.length > 0) setLeaving(new Set(out));
+  };
 
   const openRow = openId ? rows.find((r) => r.id === openId) ?? null : null;
   const canExport = Boolean(downloadFilename && csvColumns && csvRows);
@@ -169,7 +206,7 @@ export function AdminQueue({
   else if (failed) body = <LoadFailed onRetry={onRetry} />;
   else if (rows.length === 0) body = <EmptyState title={emptyTitle} body={emptyBody} />;
   // Default view with nothing left to handle: say so, not "Nothing matches".
-  else if (statusFilter === 'new' && openCount === 0 && !search.trim() && filter === 'all')
+  else if (statusFilter === 'new' && openCount === 0 && !search.trim() && filter === 'all' && filtered.length === 0)
     body = (
       <EmptyState
         title="Nothing waiting"
@@ -204,10 +241,20 @@ export function AdminQueue({
           <span>Status</span>
           <span />
         </div>
-        <ul className={s.qList}>
-          {filtered.map((row) => (
-            <li key={row.id}>
-              <QueueRowButton row={row} onOpen={() => setOpenId(row.id)} />
+        <ul className={s.qList} data-reveal={reveal || undefined}>
+          {filtered.map((row, index) => (
+            <li
+              key={row.id}
+              className={leaving.has(row.id) ? s.qLeaving : undefined}
+              style={{ '--i': index } as CSSProperties}
+            >
+              {leaving.has(row.id) ? (
+                <div className={s.qFold} inert>
+                  <QueueRowButton row={row} onOpen={() => setOpenId(row.id)} />
+                </div>
+              ) : (
+                <QueueRowButton row={row} onOpen={() => setOpenId(row.id)} />
+              )}
             </li>
           ))}
         </ul>
@@ -268,7 +315,7 @@ export function AdminQueue({
       </section>
 
       {openRow ? (
-        <QueueSheet row={openRow} itemNoun={itemNoun} onClose={() => setOpenId(null)} onMarkHandled={onMarkHandled} />
+        <QueueSheet row={openRow} itemNoun={itemNoun} onClose={closeSheet} onMarkHandled={markHandled} />
       ) : null}
     </div>
   );
@@ -337,6 +384,9 @@ function QueueSheet({
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState('');
   const done = row.status === 'handled';
+  // Handled while the sheet is open: the confirmation slides in. Already
+  // handled when it opened: it is simply there.
+  const [openedDone] = useState(done);
 
   const markHandled = async () => {
     setSaving(true);
@@ -358,7 +408,7 @@ function QueueSheet({
       onClose={onClose}
       footer={
         done ? (
-          <p className={s.doneLine} style={{ margin: 0 }}>
+          <p className={cx(s.doneLine, !openedDone && s.doneLineIn)} style={{ margin: 0 }}>
             <Check size={18} aria-hidden="true" />
             Handled
           </p>
