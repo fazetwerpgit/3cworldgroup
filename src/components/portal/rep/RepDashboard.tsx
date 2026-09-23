@@ -1,6 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, TrendingDown, TrendingUp, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +32,15 @@ import {
   type Standing,
 } from '@/lib/dashboard/repSummary';
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
+import {
+  reminderText,
+  showsInstallRows,
+  smsHref,
+  textedKey,
+  tomorrowInstalls,
+  type EveInstall,
+} from '@/lib/reminders/installEve';
+import { markTexted, parseTexted, readTextedRaw, subscribeTexted } from '@/lib/reminders/texted';
 import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
@@ -439,6 +457,7 @@ function WeekStrip({
 
 export type TodayItem =
   | { kind: 'call'; call: DashboardCall }
+  | { kind: 'install'; install: EveInstall; href: string; texted: boolean }
   | { kind: 'date'; row: NeedsDateRow }
   | { kind: 'queue'; key: string; title: string; sub: string; href: string };
 
@@ -450,6 +469,7 @@ function TodayPanel({
   callsFailed,
   onRetryCalls,
   onSetDate,
+  onTexted,
 }: {
   items: TodayItem[];
   extraDates: number;
@@ -457,11 +477,33 @@ function TodayPanel({
   onRetryCalls: () => void;
   /** Opens the install-date sheet: the rep's own sale, never the admin edit page. */
   onSetDate: (row: NeedsDateRow) => void;
+  onTexted: (install: EveInstall) => void;
 }) {
   return (
     <section className={`${s.panel} ${d.card} ${d.today}`} style={rise(3)} aria-labelledby="today-h">
       <PanelHead id="today-h" title="Today" />
       {items.map((item) => {
+        if (item.kind === 'install') {
+          const { install } = item;
+          // An sms: link, not a page: Messages opens with the reminder filled
+          // in, from the rep's own number. The text itself never shows here.
+          return (
+            <a
+              key={`install-${install.saleId}`}
+              href={item.href}
+              className={d.tRow}
+              aria-label={`${item.texted ? 'Texted' : 'Text'} ${install.customer} a reminder about tomorrow's install`}
+              onClick={() => onTexted(install)}
+            >
+              <span className={d.stamp}>Tmrw</span>
+              <span className={d.tText}>
+                <span className={d.tTitle}>{install.customer}</span>
+                <span className={d.tSub}>{[install.carrier, install.planShort].filter(Boolean).join(' ') || 'Install'}</span>
+              </span>
+              <span className={`${d.tAct} ${item.texted ? d.tActDone : ''}`}>{item.texted ? 'Texted' : 'Text'}</span>
+            </a>
+          );
+        }
         if (item.kind === 'date') {
           const verb = item.row.missed ? 'Reschedule' : 'Add date';
           return (
@@ -597,6 +639,7 @@ export interface RepHomeViewProps {
   onHelp: () => void;
   onRetry: (key: RepSectionKey | 'pay') => void;
   onSetDate: (row: NeedsDateRow) => void;
+  onTexted: (install: EveInstall) => void;
 }
 
 /**
@@ -671,6 +714,7 @@ export function RepHomeView(p: RepHomeViewProps) {
               callsFailed={p.callsFailed}
               onRetryCalls={() => p.onRetry('calls')}
               onSetDate={p.onSetDate}
+              onTexted={p.onTexted}
             />
           ) : null}
 
@@ -727,6 +771,43 @@ export function RepDashboard() {
   const dates = useMemo(() => (book ? needsDateRows(book.sales, book.fiberBySale, now) : []), [book, now]);
   const dateSale = dateRow ? book?.sales.find((sale) => sale.id === dateRow.id) ?? null : null;
 
+  // Tomorrow's installs with a number to text, from noon the day before.
+  const textedRaw = useSyncExternalStore(subscribeTexted, readTextedRaw, () => null);
+  const repFirst = user?.displayName?.trim().split(/\s+/)[0] || null;
+  const installItems = useMemo(() => {
+    if (!book || !showsInstallRows(now)) return [];
+    const texted = new Set(parseTexted(textedRaw));
+    return tomorrowInstalls(book.sales, book.fiberBySale, now).flatMap((install) =>
+      install.phone
+        ? [
+            {
+              kind: 'install',
+              install,
+              href: smsHref(install.phone, reminderText({ ...install, repFirst })),
+              texted: texted.has(textedKey(install)),
+            } as const,
+          ]
+        : []
+    );
+  }, [book, now, textedRaw, repFirst]);
+
+  // The reminder push lands on ?installs=tomorrow: bring Today into view once
+  // the rows are there. A ref, read once: the query stays in the URL.
+  const jumpToInstalls = useRef<boolean | null>(null);
+  const hasInstallRows = installItems.length > 0;
+  useEffect(() => {
+    if (jumpToInstalls.current === null) {
+      jumpToInstalls.current = new URLSearchParams(window.location.search).get('installs') === 'tomorrow';
+    }
+    if (!jumpToInstalls.current || !hasInstallRows) return;
+    jumpToInstalls.current = false;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document
+      .getElementById('today-h')
+      ?.closest('section')
+      ?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  }, [hasInstallRows]);
+
   const standing: Section<Standing | null> =
     data.standing.status === 'ready'
       ? {
@@ -739,6 +820,7 @@ export function RepDashboard() {
     ...(data.calls.status === 'ready' ? callsToday(data.calls.data, now) : []).map(
       (call) => ({ kind: 'call', call }) as const
     ),
+    ...installItems,
     ...dates.slice(0, MAX_DATE_ROWS).map((row) => ({ kind: 'date', row }) as const),
   ];
   if (isAdmin && pendingSignups > 0) {
@@ -802,6 +884,7 @@ export function RepDashboard() {
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}
         onSetDate={setDateRow}
+        onTexted={(install) => markTexted(textedKey(install))}
       />
 
       {helpOpen ? <PayHelpSheet onClose={closeHelp} /> : null}

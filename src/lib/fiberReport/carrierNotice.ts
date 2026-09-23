@@ -151,7 +151,7 @@ function noticeCopy(
 }
 
 /** 'MAIN ST' reads as 'Main St'; anything already mixed-case is left as typed. */
-function unshout(value: string): string {
+export function unshout(value: string): string {
   if (/[a-z]/.test(value)) return value;
   return value.toLowerCase().replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }

@@ -19,6 +19,14 @@
     {
       "path": "/api/cron/announcements?slot=cst",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/install-reminders?slot=cdt",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/install-reminders?slot=cst",
+      "schedule": "0 0 * * *"
     }
   ]
 }

@@ -569,6 +569,13 @@
   white-space: nowrap;
 }
 
+/* Already texted from this phone: still tappable to text again, but quiet. */
+.tActDone {
+  border-color: transparent;
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
 .todayMore {
   display: flex;
   align-items: center;
