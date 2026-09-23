@@ -14,6 +14,7 @@ import { SalesTable } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOwner } from '@/types';
 import { datedSales } from '@/lib/pay/payGroups';
@@ -192,8 +193,8 @@ function SalesContent() {
     [compRole, hasPlan, payDelayDays, planError, rates, retryPlan]
   );
 
-  const refreshSales = useCallback(() => {
-    if (!user) return;
+  const salesFilters = useMemo(() => {
+    if (!user) return null;
     // Both books are fetched WHOLE and sliced by month in the browser.
     //
     // A rep's pay list is keyed on the INSTALL date, so a month-bounded fetch on
@@ -206,14 +207,27 @@ function SalesContent() {
     // nothing to join to, and the order rendered red as "never logged" — the
     // board accusing somebody of not logging a sale they had logged. The month
     // is applied to the merged book instead, where both sides see it.
-    const filters: { salesRepId?: string; limit?: number } =
-      canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
-    void fetchSales(filters).finally(() => setFetched(true));
-  }, [canViewAll, fetchSales, user]);
+    return canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
+  }, [canViewAll, user]);
+
+  const refreshSales = useCallback(() => {
+    if (!salesFilters) return;
+    void fetchSales(salesFilters).finally(() => setFetched(true));
+  }, [fetchSales, salesFilters]);
 
   useEffect(() => {
     refreshSales();
   }, [refreshSales]);
+
+  // Reopened after a while: reload the book and the carrier report in place,
+  // keeping the list on screen (and on a failure, keeping it as it was).
+  const { refetch: refetchFiber } = fiber;
+  const refreshQuietly = useCallback(() => {
+    if (!salesFilters) return;
+    void fetchSales(salesFilters, { quiet: true });
+    void refetchFiber().catch(() => undefined);
+  }, [fetchSales, refetchFiber, salesFilters]);
+  useRefreshOnResume(refreshQuietly, { enabled: !!salesFilters });
 
   // The Value and Sales KPIs follow the month picker rather than always reading
   // "this month", so the figures and the list underneath can never describe

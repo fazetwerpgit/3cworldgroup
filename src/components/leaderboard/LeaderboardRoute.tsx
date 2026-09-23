@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { LeaderboardPageContent } from './LeaderboardPageContent';
 import { LegacyLeaderboardPage } from './legacy/LegacyLeaderboardPage';
 import type { LeaderboardMetric, LeaderboardPeriod } from './LeaderboardTable';
@@ -25,6 +26,13 @@ export function LeaderboardRoute() {
   useEffect(() => {
     if (user) fetchLeaderboard(period, metric, 100, 'approved', { team: true });
   }, [user, period, metric, fetchLeaderboard]);
+
+  // Reopened after a while: the same board, reloaded in place. A load already
+  // under way (a filter tap) is left to land on its own.
+  const refreshQuietly = useCallback(() => {
+    if (user && !loading) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true });
+  }, [user, loading, period, metric, fetchLeaderboard]);
+  useRefreshOnResume(refreshQuietly, { enabled: !!user });
 
   const busy = loading || !user;
 

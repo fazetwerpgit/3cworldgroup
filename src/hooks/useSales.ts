@@ -67,10 +67,17 @@ export function useSales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSales = useCallback(async (filters?: SalesFilters) => {
-    setLoading(true);
-    setError(null);
-    setTruncated(false);
+  /**
+   * `quiet` reloads without touching what is on screen: no loading flag, and a
+   * failure keeps the current list (and any earlier error) instead of flagging
+   * a new one. For the refresh when the app is reopened.
+   */
+  const fetchSales = useCallback(async (filters?: SalesFilters, { quiet = false }: { quiet?: boolean } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError(null);
+      setTruncated(false);
+    }
 
     try {
       const params = new URLSearchParams();
@@ -93,11 +100,13 @@ export function useSales() {
 
       setSales(data.sales);
       setTruncated(data.truncated === true);
+      setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch sales';
-      setError(message);
+      if (quiet) console.error('Quiet sales refresh failed:', message);
+      else setError(message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
