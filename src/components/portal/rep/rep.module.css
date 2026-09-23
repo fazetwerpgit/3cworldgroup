@@ -27,7 +27,7 @@
   --c-amber-wash: rgba(245, 185, 69, 0.11);
   --c-red: #ff8a80;
   --c-track: rgba(163, 184, 214, 0.14);
-  --c-bar: rgba(8, 14, 24, 0.97); /* fixed bars: near-opaque, never blurred */
+  --c-bar: rgb(8, 14, 24); /* fixed bars: opaque, never blurred */
   --c-panel-fill: linear-gradient(180deg, var(--c-panel-hi) 0, var(--c-panel) 180px);
   --c-lift:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
