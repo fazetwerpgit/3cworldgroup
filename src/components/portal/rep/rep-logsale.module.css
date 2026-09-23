@@ -745,6 +745,49 @@ span.thumbView {
   font-weight: 600;
 }
 
+/* A restored draft: one quiet row under the step meter, with a way out. */
+.draftBar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: calc(-1 * var(--s2)) 0 var(--s5);
+  padding-left: var(--s3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  background: var(--c-panel);
+  color: var(--c-text-3);
+}
+
+.draftBar > svg {
+  flex: none;
+}
+
+.draftBar p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.3;
+}
+
+.draftStartOver {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 0;
+  background: none;
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.draftConfirm {
+  margin: calc(-1 * var(--s2)) 0 var(--s5);
+}
+
 /* The server already had this entry: the sale it returned, not an error. */
 .dupe {
   display: flex;

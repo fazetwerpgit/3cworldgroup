@@ -147,6 +147,54 @@ describe('RepLogSale', () => {
     expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'Log as a new sale')).toBe(true);
   });
 
+  const buttonNamed = (name: string) =>
+    Array.from(container.querySelectorAll('button')).find((b) => b.textContent === name);
+
+  it('offers Start over on a restored draft with content, not on an empty one', async () => {
+    await mountFilled('2026-08-30');
+    expect(document.body.textContent).toContain('Picking up where you left off');
+    expect(buttonNamed('Start over')).toBeDefined();
+    await act(async () => root.unmount());
+    container.remove();
+
+    window.sessionStorage.setItem(
+      `${DRAFT_KEY_PREFIX}r1`,
+      JSON.stringify({ formData: { customerName: '  ', saleType: 'upgrade' }, products: [], proofUploadId: 'c'.repeat(32) })
+    );
+    await mount();
+    expect(document.body.textContent).not.toContain('Picking up where you left off');
+    expect(document.body.textContent).toContain('Attach order confirmation');
+  });
+
+  it('asks before Start over; Keep leaves the entry, Clear wipes it back to Proof', async () => {
+    await mountFilled('2026-08-30');
+    await act(async () => buttonNamed('Start over')!.click());
+    expect(document.body.textContent).toContain('Clear this sale?');
+    expect(container.querySelector<HTMLInputElement>('#customerName')!.value).toBe('Carla Diaz');
+
+    await act(async () => buttonNamed('Keep')!.click());
+    expect(document.body.textContent).not.toContain('Clear this sale?');
+    expect(document.body.textContent).toContain('Picking up where you left off');
+    expect(container.querySelector<HTMLInputElement>('#customerName')!.value).toBe('Carla Diaz');
+    expect(window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}r1`)).not.toBeNull();
+
+    await act(async () => buttonNamed('Start over')!.click());
+    await act(async () => buttonNamed('Clear')!.click());
+    expect(window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}r1`)).toBeNull();
+    expect(document.body.textContent).toContain('Attach order confirmation');
+    expect(document.body.textContent).not.toContain('Picking up where you left off');
+
+    const manual = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Enter manually')
+    )!;
+    await act(async () => manual.click());
+    for (const id of ['customerName', 'customerAddress', 'installDate', 'orderNumberOrBtn']) {
+      expect(container.querySelector<HTMLInputElement>(`#${id}`)!.value).toBe('');
+    }
+    expect(container.querySelector<HTMLSelectElement>('#plan')!.value).toBe('');
+    expect(document.body.textContent).not.toContain('Picking up where you left off');
+  });
+
   const storedEntry = {
     customerName: 'carla diaz',
     customerAddress: '1  MAIN ST',

@@ -9,6 +9,8 @@ import {
   ChevronDown,
   ChevronRight,
   CopyCheck,
+  Eraser,
+  History,
   ImageUp,
   Keyboard,
   RotateCw,
@@ -160,6 +162,8 @@ export function RepLogSale() {
   const [step, setStep] = useState<'entry' | 'details'>('entry');
   const [providerChoice, setProviderChoice] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Start over was tapped on an entry with something in it: ask before clearing.
+  const [confirmClear, setConfirmClear] = useState(false);
   const keyboardOpen = useSoftKeyboardOpen();
   const pickId = useId();
 
@@ -215,6 +219,32 @@ export function RepLogSale() {
   const logAsNew = async () => {
     const saleDate = formData.saleDate;
     afterSubmit(await form.logAsNew({ pendingUploads: uploads.uploadingCount }), saleDate);
+  };
+
+  // A restored draft keeps its "Picking up where you left off" bar for as long
+  // as the entry lasts: hiding it on the first keystroke would shift the form
+  // up under the rep's thumb. Start over clears it all and goes back to Proof.
+  const startOverRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const confirmShown = useRef(false);
+  useEffect(() => {
+    if (confirmClear) keepRef.current?.focus();
+    else if (confirmShown.current) startOverRef.current?.focus();
+    confirmShown.current = confirmClear;
+  }, [confirmClear]);
+
+  const clearSale = () => {
+    for (const tile of uploads.tiles) if (tile.kind !== 'done') uploads.discard(tile.key);
+    form.startOver();
+    setStep('entry');
+    setProviderChoice(null);
+    setMoreOpen(false);
+    setConfirmClear(false);
+  };
+
+  const startOver = () => {
+    if (form.hasContent || proofTiles > 0) setConfirmClear(true);
+    else clearSale();
   };
 
   const duplicate = form.duplicateOf;
@@ -357,6 +387,35 @@ export function RepLogSale() {
   return (
     <div className={`${l.main} ${l.mainDetails}`}>
       <Steps onDetails detailPct={(requiredDone / 4) * 100} />
+      {form.fromDraft ? (
+        confirmClear ? (
+          <div className={`${l.dupe} ${l.draftConfirm}`} role="group" aria-labelledby="clear-h">
+            <Eraser size={20} strokeWidth={2} aria-hidden="true" />
+            <div className={l.dupeBody}>
+              <p id="clear-h">
+                <strong>Clear this sale?</strong>
+              </p>
+              <p className={l.dupeMeta}>Everything typed and attached goes. This can&apos;t be undone.</p>
+              <div className={l.dupeActions}>
+                <button type="button" className={s.btnSecondary} onClick={clearSale}>
+                  Clear
+                </button>
+                <button ref={keepRef} type="button" className={l.dupeNew} onClick={() => setConfirmClear(false)}>
+                  Keep
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={l.draftBar}>
+            <History size={18} strokeWidth={2} aria-hidden="true" />
+            <p>Picking up where you left off</p>
+            <button ref={startOverRef} type="button" className={l.draftStartOver} onClick={startOver}>
+              Start over
+            </button>
+          </div>
+        )
+      ) : null}
       <form id={FORM_ID} ref={formRef} className={l.reviewGrid} onSubmit={onSubmit} noValidate>
         <ProofCapture uploads={uploads} orderRequired={orderRequired && proofTiles === 0} />
 
