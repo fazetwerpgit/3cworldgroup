@@ -14,7 +14,10 @@ import { shouldCycleNetwork, type ResumeReason } from '@/lib/chat/reconnect';
 // The fix is one disableNetwork/enableNetwork cycle on resume rather than
 // resubscribing each hook: it rebuilds the single shared stream, every active
 // listener re-attaches with its resume token (only changed docs are re-read),
-// and no hook has to know about app lifecycle. Renders nothing.
+// and no hook has to know about app lifecycle. Coming back online needs nothing
+// from here: the SDK restarts its streams on the 'online' event itself (and a
+// cycle then would reject AuthContext's profile getDoc, which retries on that
+// same event, with "client is offline"). Renders nothing.
 export default function FirestoreResumeGuard() {
   useEffect(() => {
     const firestore = db;
@@ -31,9 +34,7 @@ export default function FirestoreResumeGuard() {
         sinceLastCycleMs: now - lastCycleAt,
         online: navigator.onLine !== false,
       });
-      // 'online' can fire while still hidden; keep the hidden clock for the
-      // visibilitychange that follows.
-      if (reason !== 'online') hiddenAt = 0;
+      hiddenAt = 0;
       if (!decision || cycling) return;
       lastCycleAt = now;
       cycling = disableNetwork(firestore)
@@ -58,15 +59,12 @@ export default function FirestoreResumeGuard() {
     const onPageShow = (event: PageTransitionEvent) => {
       if (event.persisted) resume('pageshow');
     };
-    const onOnline = () => resume('online');
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pageshow', onPageShow);
-    window.addEventListener('online', onOnline);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
-      window.removeEventListener('online', onOnline);
     };
   }, []);
 
