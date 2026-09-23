@@ -345,7 +345,9 @@ export default function TeamChatPage() {
     'regional_manager',
     'director'
   );
-  const shownError = error || channelsError || messagesError;
+  // Channel-listener failures show in the channel list itself (rail / phone
+  // list: "Chat's offline · Retry"), so they aren't repeated here.
+  const shownError = error || messagesError;
 
   // Unread badges: compare each channel's streamed lastMessageAt against this
   // user's own read receipts. All-read until reads settle (see the hook).
@@ -1611,7 +1613,7 @@ export default function TeamChatPage() {
           />
         ) : (
           <>
-            {shownError && !channelsError && (
+            {shownError && (
               <p className={c.alert} role="alert">
                 <AlertCircle size={16} aria-hidden="true" />
                 {shownError}
