@@ -100,7 +100,7 @@ function LeadsRequestForm() {
       id={id}
       label={label}
       accept="image/*,application/pdf"
-      upload={(file) =>
+      upload={(file, signal) =>
         uploadFormAttachment({
           file,
           itemId: `leads-request-${slot}`,
@@ -108,6 +108,7 @@ function LeadsRequestForm() {
           slot,
           fields: { uploadId },
           getHeaders,
+          signal,
         })
       }
       onUploaded={(path) => setForm((p) => ({ ...p, [SLOT_FIELD[slot]]: path }))}

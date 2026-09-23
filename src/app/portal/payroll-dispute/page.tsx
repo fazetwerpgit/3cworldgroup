@@ -175,13 +175,14 @@ function PayrollDisputeForm() {
           label="Screenshot or proof"
           accept="image/*,application/pdf"
           hint="Order ID, campaign and pay line visible in one frame."
-          upload={(file) =>
+          upload={(file, signal) =>
             uploadFormAttachment({
               file,
               itemId: 'payroll-dispute',
               formType: 'payroll-dispute',
               fields: { uploadId },
               getHeaders,
+              signal,
             })
           }
           onUploaded={(path) => setForm((p) => ({ ...p, orderScreenshotPath: path }))}
