@@ -9,7 +9,10 @@ export default function ServiceWorkerRegistrar() {
     if (!('serviceWorker' in navigator)) return;
     // Register after load so it never competes with first paint.
     const register = () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Same script the FCM token code registers (src/lib/firebase/messaging.ts):
+      // two different scripts at one scope keep replacing each other, and the
+      // push handler lives in this one.
+      navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {
         // best-effort; a failed SW registration must not break the app
       });
     };

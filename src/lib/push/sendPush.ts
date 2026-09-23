@@ -11,9 +11,9 @@ export interface PushPayload {
 // Sends a web push to every device token registered on a user. Best-effort: never
 // throws into the caller's request flow (mirrors notifySubmission). Prunes tokens
 // FCM reports as invalid so the user's token list stays clean.
-// Messages MUST stay data-only: a notification field makes the FCM SDK auto-display
-// in addition to firebase-messaging-sw.js's onBackgroundMessage showNotification,
-// producing duplicate notifications on iOS.
+// Messages MUST stay data-only: public/firebase-messaging-sw.js builds the one
+// notification itself from data.title/body/url (a notification field has
+// historically produced duplicate notifications on iOS).
 export async function sendPushToUser(uid: string, payload: PushPayload): Promise<void> {
   if (!app || !adminDb) return;
   try {

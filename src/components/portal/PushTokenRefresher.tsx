@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { pushSupported } from '@/lib/firebase/messaging';
@@ -11,13 +11,34 @@ import { enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
 // requestPermission() resolves without any UI). iOS can rotate the underlying
 // push subscription when the installed app updates — the server then keeps
 // sending to a token Apple silently drops, and nothing ever heals it because
-// registration otherwise only runs from the explicit "Turn on" gesture.
+// registration otherwise only runs from the explicit "Turn on" gesture. Never
+// asks for permission itself (requestPushTokenDetailed only calls
+// requestPermission when the permission isn't already granted, and this only
+// runs when it is).
+// An installed app is mostly resumed from the background rather than relaunched,
+// so the refresh also re-runs when it returns to the foreground, at most this often.
+const RESUME_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+
 export default function PushTokenRefresher() {
   const { user, loading } = useAuth();
   const signedIn = !loading && !!user;
+  const [resumeTick, setResumeTick] = useState(0);
+  const lastRunRef = useRef(0);
 
   useEffect(() => {
     if (!signedIn) return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastRunRef.current < RESUME_REFRESH_INTERVAL_MS) return;
+      setResumeTick((tick) => tick + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    lastRunRef.current = Date.now();
     let cancelled = false;
     (async () => {
       const supported = await pushSupported();
@@ -54,7 +75,7 @@ export default function PushTokenRefresher() {
     return () => {
       cancelled = true;
     };
-  }, [signedIn]);
+  }, [signedIn, resumeTick]);
 
   return null;
 }
