@@ -14,13 +14,12 @@ describe('shouldCycleNetwork', () => {
     expect(shouldCycleNetwork({ ...idle, reason: 'visible', hiddenForMs: RESUME_HIDDEN_THRESHOLD_MS - 1 })).toBe(false);
   });
 
-  it('always reconnects on online and back/forward-cache restores', () => {
-    expect(shouldCycleNetwork({ ...idle, reason: 'online' })).toBe(true);
+  it('always reconnects on a back/forward-cache restore', () => {
     expect(shouldCycleNetwork({ ...idle, reason: 'pageshow' })).toBe(true);
   });
 
   it('never cycles while offline or twice in quick succession', () => {
-    expect(shouldCycleNetwork({ ...idle, reason: 'online', online: false })).toBe(false);
+    expect(shouldCycleNetwork({ ...idle, reason: 'pageshow', online: false })).toBe(false);
     expect(
       shouldCycleNetwork({ ...idle, reason: 'pageshow', sinceLastCycleMs: RESUME_MIN_INTERVAL_MS - 1 })
     ).toBe(false);
