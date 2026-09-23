@@ -10,6 +10,7 @@
 
 .col {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s3);
   min-width: 0;
 }
@@ -442,9 +443,8 @@
 }
 
 .matrix {
+  min-width: 0;
   padding: var(--s4);
-  border-top: 1px solid var(--c-line);
-  overflow-x: auto;
 }
 
 .skelBody {

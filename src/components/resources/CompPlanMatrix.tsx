@@ -141,7 +141,7 @@ export function CompPlanMatrix() {
   return (
     <section aria-labelledby="comp-plan-title">
       <div className={c.head}>
-        <h3 id="comp-plan-title" className={c.title}>Comp plan</h3>
+        <h2 id="comp-plan-title" className={c.title}>Comp plan</h2>
         {!editing && !loading && (
           <button className={p.headLink} type="button" onClick={startEditing}>
             <Edit3 size={14} aria-hidden="true" /> Edit plan

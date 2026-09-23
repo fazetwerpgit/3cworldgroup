@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Check, Clock3, Edit3 } from 'lucide-react';
-import { CompPlanMatrix } from '@/components/resources/CompPlanMatrix';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ratesArePending, CommissionConfig, FieldRole, RoleDisplayNames, repFacingRoleLabel } from '@/types';
@@ -43,7 +42,7 @@ const TIER_NOTES: Record<FieldRole, string> = {
  * admins can edit rates. The owner-only comp plan (with margin) sits below.
  */
 export function RepPayStructure() {
-  const { user, isRole, hasPermission } = useAuth();
+  const { user, isRole } = useAuth();
   const [data, setData] = useState<PayStructureResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -53,10 +52,6 @@ export function RepPayStructure() {
   const [success, setSuccess] = useState('');
 
   const isAdmin = isRole('admin');
-  // The comp plan carries the "3C Receives" margin, which is the finance tier's
-  // alone: owner AND the finance permission, never an isRole('admin') check
-  // (an owner satisfies that, but an admin must not satisfy this).
-  const showCompPlan = isRole('owner') && hasPermission('finance:read');
 
   const fetchStructure = useCallback(async () => {
     if (!user) return;
@@ -245,12 +240,6 @@ export function RepPayStructure() {
             </p>
           )}
         </>
-      )}
-
-      {showCompPlan && (
-        <div className={l.matrix}>
-          <CompPlanMatrix />
-        </div>
       )}
     </section>
   );

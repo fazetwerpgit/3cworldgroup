@@ -1,8 +1,9 @@
-/* Owner comp plan matrix, direction D. Mounted inside the Pay structure panel
-   (RepPayStructure), so the rep shell tokens from rep.module.css apply. */
+/* Owner comp plan matrix, direction D. Mounted in its own panel below the
+   Resources columns, so the rep shell tokens from rep.module.css apply. */
 
 .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--s3);
