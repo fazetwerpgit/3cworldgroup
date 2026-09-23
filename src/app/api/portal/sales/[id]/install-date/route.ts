@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
-import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
-import { carrierDateForSale } from '@/lib/sales/installDateSync';
+import { loadCarrierOrders } from '@/lib/sales/carrierSnapshot';
+import { carrierOrderForSale } from '@/lib/sales/installDateSync';
 
 // A rep setting or moving the install date on their OWN sale — the one edit a
 // rep is allowed (owner decision, Sep 2026). The customer reschedules at the
@@ -16,30 +16,15 @@ import { carrierDateForSale } from '@/lib/sales/installDateSync';
 //
 // The carrier report still moves install dates on its own (installDateSync);
 // the rep's edit is the fallback. To keep the two from undoing each other, the
-// edit records what the carrier's report said at that moment. The sync then
-// overrides the rep only when the carrier's date has changed since.
+// edit records the carrier row the sale stood on and its date at that moment.
+// The sync then overrides the rep only when the carrier has news since.
+//
+// The read and the write are one transaction: a report sync or an admin edit
+// landing in between makes Firestore run it again on the fresh sale, so no one
+// decides on a sale that has already moved.
 
 const ALLOWED_KEYS = new Set(['installDate']);
 const CLOSED_STATUSES = new Set(['cancelled', 'rejected']);
-
-/**
- * The carrier's est install day for this sale right now, or null. A failed read
- * must not cost the rep their save: null only means the next report's date, if
- * it has one, counts as news.
- */
-async function currentCarrierDate(
-  saleId: string,
-  sale: FirebaseFirestore.DocumentData
-): Promise<string | null> {
-  try {
-    const status = await adminDb!.collection('config').doc('fiberReportStatus').get();
-    const orders = await getAllFiberOrders(status.exists ? (status.data()?.lastReportAt ?? null) : null);
-    return carrierDateForSale({ id: saleId, data: sale }, orders);
-  } catch (error) {
-    console.error('Error reading carrier date for install date edit:', error);
-    return null;
-  }
-}
 
 // PATCH /api/portal/sales/[id]/install-date - the sale's rep sets its install date
 export async function PATCH(
@@ -72,45 +57,53 @@ export async function PATCH(
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
+    // Loaded before the transaction (it is a cached read of every order, not a
+    // sale field) and matched inside it against the sale as the transaction saw it.
+    const carrierOrders = await loadCarrierOrders();
     const docRef = adminDb.collection('sales').doc(id);
-    const doc = await docRef.get();
-    if (!doc.exists) {
-      return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
-    }
+    const refusal = await adminDb.runTransaction(async (tx) => {
+      const doc = await tx.get(docRef);
+      if (!doc.exists) {
+        return { error: 'Sale not found', status: 404 };
+      }
 
-    // Ownership is the STORED salesRepId against the token uid, admins included:
-    // management corrects other reps' sales through the full edit, not here.
-    const existing = doc.data() ?? {};
-    if (existing.salesRepId !== requester.uid) {
-      return NextResponse.json(
-        { error: 'Forbidden: you can only change your own sales' },
-        { status: 403 }
-      );
-    }
-    if (CLOSED_STATUSES.has(String(existing.status ?? ''))) {
-      return NextResponse.json({ error: 'This sale is cancelled' }, { status: 409 });
-    }
+      // Ownership is the STORED salesRepId against the token uid, admins included:
+      // management corrects other reps' sales through the full edit, not here.
+      const existing = doc.data() ?? {};
+      if (existing.salesRepId !== requester.uid) {
+        return { error: 'Forbidden: you can only change your own sales', status: 403 };
+      }
+      if (CLOSED_STATUSES.has(String(existing.status ?? ''))) {
+        return { error: 'This sale is cancelled', status: 409 };
+      }
 
-    // An install never comes before the sale; that is a typo, not a reschedule.
-    const nextDay = installDayKey(parsed.date);
-    const soldDay = installDayKey(existing.saleDate);
-    if (nextDay && soldDay && nextDay < soldDay) {
-      return NextResponse.json({ error: 'Install date is before the sale date' }, { status: 400 });
-    }
+      // An install never comes before the sale; that is a typo, not a reschedule.
+      const nextDay = installDayKey(parsed.date);
+      const soldDay = installDayKey(existing.saleDate);
+      if (nextDay && soldDay && nextDay < soldDay) {
+        return { error: 'Install date is before the sale date', status: 400 };
+      }
 
-    // Stamped only when the day actually moves, as the full edit does, so the
-    // carrier sync and the admin view can tell who set the date last.
-    if (installDayKey(existing.installDate) !== nextDay) {
-      const now = new Date();
-      await docRef.update({
-        installDate: parsed.date,
-        installDateSource: 'rep',
-        installDatePreviousDate: existing.installDate ?? null,
-        installDateChangedAt: now,
-        installDateSetAt: now,
-        repEditCarrierDate: await currentCarrierDate(id, existing),
-        updatedAt: now,
-      });
+      // Stamped only when the day actually moves, as the full edit does, so the
+      // carrier sync and the admin view can tell who set the date last.
+      if (installDayKey(existing.installDate) !== nextDay) {
+        const carrier = carrierOrders ? carrierOrderForSale({ id, data: existing }, carrierOrders) : null;
+        const now = new Date();
+        tx.update(docRef, {
+          installDate: parsed.date,
+          installDateSource: 'rep',
+          installDatePreviousDate: existing.installDate ?? null,
+          installDateChangedAt: now,
+          installDateSetAt: now,
+          repEditOrderId: carrier?.orderId ?? null,
+          repEditCarrierDate: carrier?.estInstallDate ?? null,
+          updatedAt: now,
+        });
+      }
+      return null;
+    });
+    if (refusal) {
+      return NextResponse.json({ error: refusal.error }, { status: refusal.status });
     }
 
     return NextResponse.json({ success: true, installDate: parsed.date.toISOString() });

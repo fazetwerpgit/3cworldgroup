@@ -1,23 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { salesGetMock, updateMock, docMock, collectionMock, dispatchMock } = vi.hoisted(() => {
+const { salesGetMock, updateMock, freshGetMock, getAllMock, collectionMock, dispatchMock } = vi.hoisted(() => {
   const salesGetMock = vi.fn();
   const updateMock = vi.fn();
+  const freshGetMock = vi.fn();
+  const getAllMock = vi.fn();
   const docMock = vi.fn((id: string) => ({
-    update: (data: Record<string, unknown>) => updateMock(id, data),
+    id,
+    update: (data: Record<string, unknown>, precondition?: unknown) =>
+      precondition === undefined ? updateMock(id, data) : updateMock(id, data, precondition),
+    get: () => freshGetMock(id),
   }));
   const collectionMock = vi.fn(() => ({ get: salesGetMock, doc: docMock }));
   const dispatchMock = vi.fn();
-  return { salesGetMock, updateMock, docMock, collectionMock, dispatchMock };
+  return { salesGetMock, updateMock, freshGetMock, getAllMock, collectionMock, dispatchMock };
 });
 
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { collection: collectionMock },
+  adminDb: { collection: collectionMock, getAll: getAllMock },
 }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 
-import { carrierDateForSale, syncInstallDatesFromOrders } from './installDateSync';
+import { carrierOrderForSale, syncInstallDatesFromOrders } from './installDateSync';
 import { dateToSaleDateInput, installDayKey } from './saleDate';
+import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import type { FiberOrder } from '@/types/fiberOrder';
 
 const NOW = new Date('2026-09-14T17:00:00.000Z');
@@ -72,6 +78,7 @@ type SaleDoc = {
   installDate?: Date | null;
   status?: string;
   installDateSource?: string;
+  repEditOrderId?: string | null;
   repEditCarrierDate?: string | null;
 };
 
@@ -81,12 +88,28 @@ function setSales(sales: SaleDoc[]): void {
   });
 }
 
+/** fiberOrders docs as stored: only what the sync reads back (the admin's saleLink). */
+let storedLinks: Record<string, FiberOrder['saleLink']> = {};
+
 beforeEach(() => {
   vi.clearAllMocks();
   updateMock.mockResolvedValue(undefined);
   dispatchMock.mockResolvedValue(undefined);
+  storedLinks = {};
+  getAllMock.mockImplementation(async (...refs: { id: string }[]) =>
+    refs.map((ref) => ({
+      id: ref.id,
+      exists: ref.id in storedLinks,
+      data: () => ({ saleLink: storedLinks[ref.id] }),
+    }))
+  );
   setSales([]);
 });
+
+/** carrierDateForSale's old shape: just the recorded day. */
+function carrierDateForSale(sale: { id: string; data: Record<string, unknown> }, orders: FiberOrder[]) {
+  return carrierOrderForSale(sale, orders)?.estInstallDate ?? null;
+}
 
 describe('syncInstallDatesFromOrders', () => {
   it('moves the sale to the carrier day at local noon and tells the rep once', async () => {
@@ -187,7 +210,8 @@ describe('syncInstallDatesFromOrders', () => {
       now: NOW,
     });
 
-    expect(result).toMatchObject({ checked: 2, updated: 0, skippedAmbiguous: 2 });
+    // Counted once per sale left alone.
+    expect(result).toMatchObject({ checked: 2, updated: 0, skippedAmbiguous: 1 });
     expect(updateMock).not.toHaveBeenCalled();
   });
 
@@ -412,7 +436,9 @@ describe('several carrier rows at one door', () => {
     }
   });
 
-  it('follows an active order over an older miss', async () => {
+  it('writes nothing from an active row, even over an older miss', async () => {
+    // The page reads the activation date for an installed order; the est day
+    // on an active row is history and never moves a sale.
     setSales([sale]);
     const result = await syncInstallDatesFromOrders({
       orders: [
@@ -422,8 +448,8 @@ describe('several carrier rows at one door', () => {
       now: NOW,
     });
 
-    expect(result).toMatchObject({ updated: 1, skippedAmbiguous: 0 });
-    expect(installDayKey(updateMock.mock.calls[0][1].installDate)).toBe(reportDay(4));
+    expect(result).toMatchObject({ updated: 0, skippedAmbiguous: 0 });
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it('follows the miss while the order still shows the missed day', async () => {
@@ -450,7 +476,7 @@ describe('several carrier rows at one door', () => {
       now: NOW,
     });
 
-    expect(result).toMatchObject({ updated: 0, skippedAmbiguous: 2 });
+    expect(result).toMatchObject({ updated: 0, skippedAmbiguous: 1 });
     expect(updateMock).not.toHaveBeenCalled();
   });
 
@@ -517,5 +543,215 @@ describe('carrierDateForSale', () => {
         order({ id: 'o-3', estInstallDate: '2026-10-05' }),
       ])
     ).toBeNull();
+  });
+});
+
+describe('the report and a door with history', () => {
+  const sale = { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) };
+
+  it("never pushes an old install's day onto a newer sale at the same door", async () => {
+    setSales([{ ...sale, installDate: noon(8) }]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [
+        order({ id: 'old', status: 'active', orderDate: reportDay(-200), estInstallDate: reportDay(-190), activationDate: reportDay(-190) }),
+        order({ id: 'new', orderDate: reportDay(-3), estInstallDate: reportDay(10) }),
+      ],
+      now: NOW,
+    });
+
+    expect(result.updated).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('agrees with the page when the newest order has no date yet', async () => {
+    setSales([sale]);
+    const miss = order({ id: 'brk', status: 'breakage', orderDate: null, estInstallDate: reportDay(1) });
+    const reorder = order({ id: 'new', orderDate: reportDay(3), estInstallDate: null });
+
+    expect(matchFiberOrdersToSales([sale], [miss, reorder]).get('sale-1')).toBe(reorder);
+    const result = await syncInstallDatesFromOrders({ orders: [miss, reorder], now: NOW });
+
+    expect(result.updated).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('a person-set date and a batch that differs from what they saw', () => {
+  // The rep's edit read every stored order and recorded the miss; the next
+  // batch carries only the stale order row, still on the missed day.
+  const repSale = {
+    id: 'sale-1',
+    salesRepId: 'rep-1',
+    customerAddress: '123 Main St',
+    installDate: noon(6),
+    installDateSource: 'rep',
+    repEditOrderId: 'brk',
+    repEditCarrierDate: reportDay(1),
+  };
+
+  it('keeps the date when a different row carries nothing newer', async () => {
+    setSales([repSale]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', orderDate: reportDay(-10), estInstallDate: reportDay(1) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 0, unchanged: 1 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('takes a different row that was moved past the recorded day', async () => {
+    setSales([repSale]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', orderDate: reportDay(-10), estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result.updated).toBe(1);
+    expect(installDayKey(updateMock.mock.calls[0][1].installDate)).toBe(reportDay(9));
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes the recorded row once its own day changes, even to an earlier one', async () => {
+    setSales([{ ...repSale, repEditOrderId: 'o-1', repEditCarrierDate: reportDay(4) }]);
+    const same = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(4) })],
+      now: NOW,
+    });
+    expect(same.updated).toBe(0);
+
+    const moved = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(3) })],
+      now: NOW,
+    });
+    expect(moved.updated).toBe(1);
+    expect(installDayKey(updateMock.mock.calls[0][1].installDate)).toBe(reportDay(3));
+  });
+
+  it("protects an admin's reschedule the same way, and leaves older admin dates as before", async () => {
+    setSales([{ ...repSale, installDateSource: 'admin' }]);
+    const kept = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'brk', status: 'breakage', estInstallDate: reportDay(1) })],
+      now: NOW,
+    });
+    expect(kept).toMatchObject({ updated: 0, unchanged: 1 });
+
+    setSales([{ id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(6), installDateSource: 'admin' }]);
+    const legacy = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'brk', status: 'breakage', estInstallDate: reportDay(1) })],
+      now: NOW,
+    });
+    expect(legacy.updated).toBe(1);
+  });
+});
+
+describe("the admin's stored saleLink", () => {
+  it('honours "not any sale" stored on the order, though the parsed row has none', async () => {
+    setSales([{ id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) }]);
+    storedLinks = { 'o-1': { saleId: null, by: 'a1', byName: 'Admin', at: NOW.toISOString() } };
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(getAllMock).toHaveBeenCalled();
+    expect(result.updated).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('follows a stored link to the sale it names', async () => {
+    setSales([
+      { id: 'sale-1', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) },
+      { id: 'sale-2', salesRepId: 'rep-2', customerAddress: '9 Elsewhere Rd', installDate: noon(2) },
+    ]);
+    storedLinks = { 'o-1': { saleId: 'sale-2', by: 'a1', byName: 'Admin', at: NOW.toISOString() } };
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result.updated).toBe(1);
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    expect(updateMock.mock.calls[0][0]).toBe('sale-2');
+  });
+});
+
+describe('a sale that changes while the report runs', () => {
+  const updateTime = { isEqual: () => false, label: 'read-1' };
+  const freshTime = { isEqual: () => false, label: 'read-2' };
+
+  function setSaleWithTime(data: Record<string, unknown>) {
+    salesGetMock.mockResolvedValue({ docs: [{ id: 'sale-1', updateTime, data: () => data }] });
+  }
+  const base = { salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2) };
+  const stale = Object.assign(new Error('stale'), { code: 9 });
+
+  it('writes only if the sale is as it was read', async () => {
+    setSaleWithTime(base);
+    await syncInstallDatesFromOrders({ orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })], now: NOW });
+
+    expect(updateMock.mock.calls[0][2]).toEqual({ lastUpdateTime: updateTime });
+  });
+
+  it("re-reads and keeps a rep's date set mid-run", async () => {
+    setSaleWithTime(base);
+    updateMock.mockRejectedValueOnce(stale);
+    freshGetMock.mockResolvedValue({
+      id: 'sale-1',
+      exists: true,
+      updateTime: freshTime,
+      data: () => ({
+        ...base,
+        installDate: noon(12),
+        installDateSource: 'rep',
+        repEditOrderId: 'o-1',
+        repEditCarrierDate: reportDay(9),
+      }),
+    });
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ updated: 0, unchanged: 1, errors: 0 });
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('re-reads and writes when the change was something else', async () => {
+    setSaleWithTime(base);
+    updateMock.mockRejectedValueOnce(stale);
+    freshGetMock.mockResolvedValue({
+      id: 'sale-1',
+      exists: true,
+      updateTime: freshTime,
+      data: () => ({ ...base, notes: 'called the customer' }),
+    });
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 1, errors: 0 });
+    expect(updateMock.mock.calls[1][2]).toEqual({ lastUpdateTime: freshTime });
+  });
+
+  it('counts an error when it changes again', async () => {
+    setSaleWithTime(base);
+    updateMock.mockRejectedValue(stale);
+    freshGetMock.mockResolvedValue({ id: 'sale-1', exists: true, updateTime: freshTime, data: () => base });
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(updateMock).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ updated: 0, errors: 1 });
   });
 });

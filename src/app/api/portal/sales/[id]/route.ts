@@ -9,6 +9,8 @@ import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { priceSaleProducts } from '@/lib/sales/pricing';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, saleProofPaths, validateProofPaths } from '@/lib/sales/proofPaths';
+import { loadCarrierOrders } from '@/lib/sales/carrierSnapshot';
+import { carrierOrderForSale } from '@/lib/sales/installDateSync';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -238,10 +240,17 @@ export async function PUT(
           existing?.salesRepId === requester.uid ? 'rep' : 'admin';
         updateData.installDatePreviousDate = existing?.installDate ?? null;
         updateData.installDateChangedAt = new Date();
-        // A full edit is not the rep's date-only fallback: drop the carrier date
-        // an earlier install-date edit recorded, so the report sync treats this
-        // date like any other and a stale value cannot shield it.
-        updateData.repEditCarrierDate = null;
+        updateData.installDateSetAt = updateData.installDateChangedAt;
+        // An admin's reschedule is protected like a rep's: the carrier row the
+        // sale stands on now is recorded, and the report sync overrides the
+        // date only with carrier news since (installDateSync). Without it the
+        // next morning's report would put back the day the admin just fixed.
+        const carrierOrders = await loadCarrierOrders();
+        const carrier = carrierOrders
+          ? carrierOrderForSale({ id, data: existing ?? {} }, carrierOrders)
+          : null;
+        updateData.repEditOrderId = carrier?.orderId ?? null;
+        updateData.repEditCarrierDate = carrier?.estInstallDate ?? null;
       }
     }
 
@@ -267,7 +276,21 @@ export async function PUT(
       updateData.totalValue = priced.totalValue;
     }
 
-    await docRef.update(updateData);
+    // Written only if the sale is as it was read: a report sync or a rep's date
+    // edit landing mid-edit must not be silently undone by this older view.
+    try {
+      if (doc.updateTime) await docRef.update(updateData, { lastUpdateTime: doc.updateTime });
+      else await docRef.update(updateData);
+    } catch (error) {
+      const code = (error as { code?: unknown } | null)?.code;
+      if (code === 9 || code === 'failed-precondition') {
+        return NextResponse.json(
+          { error: 'This sale just changed. Reload it and try again.' },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

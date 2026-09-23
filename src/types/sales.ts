@@ -99,10 +99,12 @@ export interface Sale {
   // moved rather than just the new day. null when there was no date before.
   installDatePreviousDate?: Date | null;
   installDateChangedAt?: Date;
-  // Set by the rep's install-date edit: when they set it, and the carrier's est
+  // Set when a person sets the install date (the rep's install-date edit, or an
+  // admin's full edit): when, and the carrier row the sale stood on with its est
   // install day at that moment (null when the report had none). The report sync
-  // overrides a rep's date only once the carrier's date differs from this.
+  // overrides a person's date only with carrier news since (installDateSync).
   installDateSetAt?: Date;
+  repEditOrderId?: string | null;
   repEditCarrierDate?: string | null;
   createdAt: Date;
   updatedAt: Date;
