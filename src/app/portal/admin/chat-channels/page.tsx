@@ -59,6 +59,7 @@ export default function AdminChatChannelsPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState('');
 
   const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
@@ -72,13 +73,14 @@ export default function AdminChatChannelsPage() {
   const loadChannels = useCallback(async () => {
     if (!user) return;
     try {
-      setError('');
       const res = await authedFetch('/api/portal/chat/channels/manage');
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load chat channels');
       setChannels(json.channels || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load chat channels');
+      setLoadFailed(false);
+    } catch {
+      // Load failures show "Couldn't load · Retry" in the list; `error` is for actions.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -88,14 +90,7 @@ export default function AdminChatChannelsPage() {
     loadChannels();
   }, [loadChannels]);
 
-  // A failed first load shows "Couldn't load · Retry"; later action errors show a banner.
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    if (!loading && !error) setLoaded(true);
-  }, [loading, error]);
-  const loadFailed = !loading && !loaded && Boolean(error);
   const retry = () => {
-    setError('');
     setLoading(true);
     loadChannels();
   };
@@ -372,7 +367,7 @@ export default function AdminChatChannelsPage() {
           </div>
         </div>
 
-        {error && !loadFailed ? <Banner tone="error">{error}</Banner> : null}
+        {error ? <Banner tone="error">{error}</Banner> : null}
         {success ? <Banner tone="ok">{success}</Banner> : null}
 
         {creating ? (
