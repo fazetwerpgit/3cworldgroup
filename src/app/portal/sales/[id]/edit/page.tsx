@@ -21,7 +21,7 @@ import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { MAX_PROOF_SCREENSHOTS, newProofSlot, saleProofPaths } from '@/lib/sales/proofPaths';
-import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
+import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
 import { randomHex } from '@/lib/randomHex';
 import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
@@ -153,10 +153,10 @@ export default function EditSalePage() {
     }));
   };
 
-  // Not async: openAttachmentInNewTab must open its tab synchronously inside the
-  // click (iOS Safari drops window.open after an await).
-  const viewProofScreenshot = (path: string) =>
-    openAttachmentInNewTab(async () => {
+  // In-app viewer, not a new tab: a tab strands the rep in the home-screen app.
+  const proofViewer = useAttachmentViewer();
+  const viewProofScreenshot = (path: string, label: string, trigger: HTMLElement) =>
+    proofViewer.open(async () => {
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(
         `/api/portal/forms/attachment?path=${encodeURIComponent(path)}`,
@@ -165,7 +165,7 @@ export default function EditSalePage() {
       if (!response.ok) throw new Error(`Attachment request failed (${response.status})`);
       const data = await response.json();
       return typeof data.url === 'string' ? data.url : null;
-    });
+    }, label, trigger);
 
   const calculateTotalValue = () => products.reduce((sum, p) => sum + p.totalPrice, 0);
   const calculateTotalPoints = () => products.reduce((sum, p) => sum + p.points, 0);
@@ -396,7 +396,7 @@ export default function EditSalePage() {
                           <div>
                             <strong>Screenshot {index + 1}</strong>
                           </div>
-                          <button type="button" className="sales-line-btn" onClick={() => void viewProofScreenshot(path)}>
+                          <button type="button" className="sales-line-btn" onClick={(event) => viewProofScreenshot(path, `Screenshot ${index + 1}`, event.currentTarget)}>
                             View
                           </button>
                           <button
@@ -467,6 +467,7 @@ export default function EditSalePage() {
             </button>
           </div>
         </form>
+        {proofViewer.viewer}
       </SalesLineShell>
     </ProtectedRoute>
   );

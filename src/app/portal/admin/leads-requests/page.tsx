@@ -5,7 +5,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminQueue, QueueEvidence, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
+import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 
 interface Row {
   id: string;
@@ -70,17 +70,21 @@ export default function LeadsRequestsReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  // Not async: openAttachmentInNewTab must open its tab synchronously inside the
-  // click (iOS Safari drops window.open after an await).
+  // In-app viewer, not a new tab: a tab strands an iPhone home-screen app.
+  const viewer = useAttachmentViewer();
+  const openViewer = viewer.open;
   const viewAttachment = useCallback(
-    (path: string) =>
-      openAttachmentInNewTab(async () => {
-        const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
-        if (!res.ok) throw new Error(`Attachment request failed (${res.status})`);
-        const json = await res.json();
-        return typeof json.url === 'string' ? json.url : null;
-      }),
-    [authedFetch]
+    (path: string, label: string) =>
+      openViewer(
+        async () => {
+          const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
+          if (!res.ok) throw new Error(`Attachment request failed (${res.status})`);
+          const json = await res.json();
+          return typeof json.url === 'string' ? json.url : null;
+        },
+        label
+      ),
+    [authedFetch, openViewer]
   );
 
   const campaigns = useMemo(
@@ -93,16 +97,16 @@ export default function LeadsRequestsReviewPage() {
       rows.map((row) => {
         const evidenceItems: QueueEvidence[] = [];
         if (row.hostileUploadPath) {
-          evidenceItems.push({ label: 'hostile', onClick: () => viewAttachment(row.hostileUploadPath as string) });
+          evidenceItems.push({ label: 'hostile', onClick: () => viewAttachment(row.hostileUploadPath as string, 'Hostile upload') });
         }
         if (row.blindKnockUploadPath) {
           evidenceItems.push({
             label: 'blind-knock',
-            onClick: () => viewAttachment(row.blindKnockUploadPath as string),
+            onClick: () => viewAttachment(row.blindKnockUploadPath as string, 'Blind-knock upload'),
           });
         }
         if (row.lassoUploadPath) {
-          evidenceItems.push({ label: 'lasso', onClick: () => viewAttachment(row.lassoUploadPath as string) });
+          evidenceItems.push({ label: 'lasso', onClick: () => viewAttachment(row.lassoUploadPath as string, 'Lasso upload') });
         }
         return {
           id: row.id,
@@ -134,24 +138,27 @@ export default function LeadsRequestsReviewPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <AdminQueue
-        title="Leads Requests"
-        lede="Lead requests to route to the right manager."
-        columns={['Submitted by', 'Request', 'Submitted']}
-        itemNoun="Leads request"
-        searchPlaceholder="Search by rep, campaign or location"
-        rows={queueRows}
-        loading={loading}
-        error={error}
-        onRetry={retry}
-        onMarkHandled={markHandled}
-        filterLabel="Campaign"
-        filterOptions={campaigns}
-        downloadFilename="leads-requests.csv"
-        csvColumns={COLUMNS}
-        csvRows={rows}
-        emptyBody="No leads requests need review right now."
-      />
+      <>
+        <AdminQueue
+          title="Leads Requests"
+          lede="Lead requests to route to the right manager."
+          columns={['Submitted by', 'Request', 'Submitted']}
+          itemNoun="Leads request"
+          searchPlaceholder="Search by rep, campaign or location"
+          rows={queueRows}
+          loading={loading}
+          error={error}
+          onRetry={retry}
+          onMarkHandled={markHandled}
+          filterLabel="Campaign"
+          filterOptions={campaigns}
+          downloadFilename="leads-requests.csv"
+          csvColumns={COLUMNS}
+          csvRows={rows}
+          emptyBody="No leads requests need review right now."
+        />
+        {viewer.viewer}
+      </>
     </ProtectedRoute>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileText, ImageIcon, ImagePlus, Loader2, RotateCcw, X } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
+import { isPdfUrl, openAttachmentInNewTab } from '@/lib/forms/openAttachment';
 import {
   checkFormFile,
   formFileMime,
@@ -14,6 +14,7 @@ import {
 } from '@/lib/forms/uploadFormAttachment';
 import { MAX_PROOF_SCREENSHOTS, newProofSlot } from '@/lib/sales/proofPaths';
 import { randomHex } from '@/lib/randomHex';
+import { useAttachmentViewer } from './ImageViewer';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
 
@@ -58,14 +59,6 @@ async function signedProofUrl(path: string): Promise<string | null> {
  */
 export function proofUploadMessage(error: unknown): string {
   return error instanceof FormUploadError ? error.message : 'Upload failed';
-}
-
-function isPdfUrl(url: string): boolean {
-  try {
-    return new URL(url).pathname.toLowerCase().endsWith('.pdf');
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -254,10 +247,19 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
   const { tiles, room } = uploads;
   const count = tiles.filter((t) => t.kind === 'done').length;
 
-  const view = (tile: ProofTile & { kind: 'done' }) => {
-    // Called straight from the click so iOS Safari allows the new tab.
+  const viewer = useAttachmentViewer();
+
+  // Images open in the in-app viewer: a new tab strands a rep in the home-screen
+  // app with no way back. PDFs have no reliable inline preview on iOS, so they
+  // still get a tab, opened straight from the click so Safari allows it.
+  const view = (tile: ProofTile & { kind: 'done' }, label: string, thumb: HTMLElement) => {
+    if (tile.preview?.isPdf) {
+      void openAttachmentInNewTab(() => signedProofUrl(tile.path));
+      return;
+    }
     const local = tile.preview?.url && tile.preview.url.startsWith('blob:') ? tile.preview.url : null;
-    void openAttachmentInNewTab(async () => local ?? (await signedProofUrl(tile.path)));
+    if (local) viewer.show(local, label, thumb);
+    else viewer.open(() => signedProofUrl(tile.path), label, thumb);
   };
 
   return (
@@ -280,7 +282,7 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
           return (
             <li key={tile.key} className={`${l.thumb} ${tile.kind === 'failed' ? l.thumbFailed : ''}`}>
               {tile.kind === 'done' ? (
-                <button type="button" className={l.thumbView} onClick={() => view(tile)} aria-label={`View ${label.toLowerCase()}`}>
+                <button type="button" className={l.thumbView} onClick={(event) => view(tile, label, event.currentTarget)} aria-label={`View ${label.toLowerCase()}`}>
                   <Thumb preview={tile.preview} label={label} />
                 </button>
               ) : (
@@ -354,6 +356,7 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
         </p>
       ) : null}
       <p className={l.proofCap}>Up to {MAX_PROOF_SCREENSHOTS} screenshots</p>
+      {viewer.viewer}
     </section>
   );
 }

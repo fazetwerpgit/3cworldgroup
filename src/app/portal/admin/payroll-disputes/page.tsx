@@ -5,7 +5,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
+import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 
 interface Row { id: string; status: string; orderScreenshotPath?: string; [key: string]: unknown }
 
@@ -62,17 +62,21 @@ export default function PayrollDisputesReviewPage() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  // Not async: openAttachmentInNewTab must open its tab synchronously inside the
-  // click (iOS Safari drops window.open after an await).
+  // In-app viewer, not a new tab: a tab strands an iPhone home-screen app.
+  const viewer = useAttachmentViewer();
+  const openViewer = viewer.open;
   const viewScreenshot = useCallback(
-    (path: string) =>
-      openAttachmentInNewTab(async () => {
-        const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
-        if (!res.ok) throw new Error(`Attachment request failed (${res.status})`);
-        const json = await res.json();
-        return typeof json.url === 'string' ? json.url : null;
-      }),
-    [authedFetch]
+    (path: string, label: string) =>
+      openViewer(
+        async () => {
+          const res = await authedFetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
+          if (!res.ok) throw new Error(`Attachment request failed (${res.status})`);
+          const json = await res.json();
+          return typeof json.url === 'string' ? json.url : null;
+        },
+        label
+      ),
+    [authedFetch, openViewer]
   );
 
   const campaigns = useMemo(
@@ -93,7 +97,7 @@ export default function PayrollDisputesReviewPage() {
         secondarySub: queueValue(row.createdAt),
         evidenceKind: row.orderScreenshotPath ? 'files' : 'none',
         evidenceItems: row.orderScreenshotPath
-          ? [{ label: 'screenshot', onClick: () => viewScreenshot(row.orderScreenshotPath as string) }]
+          ? [{ label: 'screenshot', onClick: () => viewScreenshot(row.orderScreenshotPath as string, 'Order screenshot') }]
           : undefined,
         detailFields: [
           { label: 'Contractor', value: queueValue(row.contractorName) },
@@ -109,24 +113,27 @@ export default function PayrollDisputesReviewPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <AdminQueue
-        title="Payroll Disputes"
-        lede="Pay questions submitted by reps."
-        columns={['Rep', 'Dispute', 'Install date']}
-        itemNoun="Payroll dispute"
-        searchPlaceholder="Search by rep, contractor or order type"
-        rows={queueRows}
-        loading={loading}
-        error={error}
-        onRetry={retry}
-        onMarkHandled={markHandled}
-        filterLabel="Campaign"
-        filterOptions={campaigns}
-        downloadFilename="payroll-disputes.csv"
-        csvColumns={COLUMNS}
-        csvRows={rows}
-        emptyBody="No payroll disputes need review right now."
-      />
+      <>
+        <AdminQueue
+          title="Payroll Disputes"
+          lede="Pay questions submitted by reps."
+          columns={['Rep', 'Dispute', 'Install date']}
+          itemNoun="Payroll dispute"
+          searchPlaceholder="Search by rep, contractor or order type"
+          rows={queueRows}
+          loading={loading}
+          error={error}
+          onRetry={retry}
+          onMarkHandled={markHandled}
+          filterLabel="Campaign"
+          filterOptions={campaigns}
+          downloadFilename="payroll-disputes.csv"
+          csvColumns={COLUMNS}
+          csvRows={rows}
+          emptyBody="No payroll disputes need review right now."
+        />
+        {viewer.viewer}
+      </>
     </ProtectedRoute>
   );
 }

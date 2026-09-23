@@ -1,0 +1,126 @@
+/* In-app image viewer (ImageViewer.tsx). Portaled to <body> inside BodyLayer's
+   .layer, which supplies the D tokens. The bar is opaque, never blurred. */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: rgba(1, 3, 7, 0.96);
+  color: var(--c-text);
+  font-family: var(--f-ui);
+  overscroll-behavior: contain;
+}
+
+.bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s3);
+  padding: env(safe-area-inset-top) max(var(--gutter), env(safe-area-inset-right)) 0
+    max(var(--gutter), env(safe-area-inset-left));
+  min-height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-bar);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s2);
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--s4) 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font-family: var(--f-ui);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.close:active {
+  transform: scale(0.98);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .close:hover {
+    border-color: var(--c-text-3);
+  }
+}
+
+.stage {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: var(--s4) max(var(--s4), env(safe-area-inset-right))
+    max(var(--s4), env(safe-area-inset-bottom)) max(var(--s4), env(safe-area-inset-left));
+}
+
+.img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r-control);
+  touch-action: pinch-zoom;
+}
+
+.panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--s3);
+  max-width: 320px;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  text-align: center;
+}
+
+.panel p {
+  margin: 0;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 2400ms;
+  }
+
+  .close:active {
+    transform: none;
+  }
+}

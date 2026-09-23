@@ -25,3 +25,12 @@ export async function openAttachmentInNewTab(
     console.error('Failed to open attachment:', error);
   }
 }
+
+/** True when a signed URL points at a PDF (judged by the path's extension). */
+export function isPdfUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.toLowerCase().endsWith('.pdf');
+  } catch {
+    return false;
+  }
+}
