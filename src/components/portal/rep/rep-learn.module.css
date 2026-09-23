@@ -1,0 +1,469 @@
+/* University (module list + shorts), lesson pages and the Resources hub on
+   the D shell. Shared row/field/tab pieces come from rep-page.module.css. */
+
+/* ---------- two-column layouts ---------- */
+.layout {
+  display: grid;
+  gap: var(--s3);
+  align-items: start;
+}
+
+.col {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: var(--s4);
+  }
+  /* University: the progress card sits on the right on desktop, first on phones. */
+  .side {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hub {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- progress card ---------- */
+.progress {
+  position: relative;
+  overflow: hidden;
+}
+
+.progressBody {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.progressFigure {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin: 0;
+}
+
+.progressNum {
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  line-height: 0.9;
+}
+
+.progressNum small {
+  color: var(--c-text-3);
+  font-size: 0.55em;
+}
+
+.progressLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.required {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.required svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--c-amber);
+}
+
+.required strong {
+  color: var(--c-amber);
+  font-weight: 650;
+}
+
+.progressLink {
+  border-top: 1px solid var(--c-line);
+}
+
+/* ---------- toolbar (tabs + filters) ---------- */
+.toolbar {
+  display: grid;
+  gap: var(--s3);
+}
+
+.filters {
+  display: grid;
+  gap: var(--s2);
+}
+
+/* ---------- module rows ---------- */
+.module {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.moduleBar {
+  width: 100%;
+  max-width: 220px;
+  height: 4px;
+  margin-top: 4px;
+}
+
+.moduleBar > span {
+  background: var(--c-blue);
+  box-shadow: none;
+}
+
+.status {
+  justify-self: end;
+}
+
+.statusDone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-lime);
+  font-size: var(--t-min);
+  font-weight: 650;
+}
+
+.statusIdle {
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .module .chevCell {
+    display: none;
+  }
+}
+
+/* ---------- lesson ---------- */
+.lessonHead {
+  display: grid;
+  gap: var(--s3);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s3);
+}
+
+.lessonTitle {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.lessonMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+@media (min-width: 1024px) {
+  .lessonTitle {
+    font-size: 32px;
+  }
+  .lesson {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  }
+}
+
+.media {
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  background: #000;
+  box-shadow: var(--c-lift);
+}
+
+.frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  background: #000;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  max-height: 70dvh;
+  background: #000;
+}
+
+.pdf {
+  display: block;
+  width: 100%;
+  height: 75dvh;
+  border: 0;
+  background: #fff;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  max-height: 75dvh;
+  object-fit: contain;
+  background: #000;
+}
+
+.mediaLoading {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.openLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.docCard {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s5) var(--s4);
+}
+
+.docCard .thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+}
+
+.docTop {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.docTop strong {
+  display: block;
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.docTop span {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.about {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.about p {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.55;
+}
+
+.complete {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.completeTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.completeDone {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.completeDone svg {
+  flex: none;
+  color: var(--c-lime);
+}
+
+.complete button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- resources hub ---------- */
+.toolIcon {
+  color: var(--c-text-3);
+}
+
+.rate {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+}
+
+.rateRole {
+  margin: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.rateFigures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s5);
+  margin: var(--s1) 0 0;
+}
+
+.rateFigures div {
+  display: grid;
+  gap: 4px;
+}
+
+.rateFigures dt {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.rateFigures dd {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 40px;
+  line-height: 0.9;
+}
+
+.rateNote {
+  margin: var(--s1) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.payNotices {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4) 0;
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 52px;
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--c-line);
+  font-size: var(--t-ui);
+}
+
+.tier:first-child {
+  border-top: 0;
+}
+
+.tierRate {
+  font-weight: 650;
+}
+
+.tierInputs {
+  display: flex;
+  gap: var(--s2);
+}
+
+.tierInputs label {
+  display: grid;
+  gap: 4px;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+}
+
+.tierInputs input {
+  width: 88px;
+  height: var(--tap);
+}
+
+.editActions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: var(--s2);
+  padding: var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.editActions button:disabled {
+  opacity: 0.6;
+}
+
+.updated {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+}
+
+.matrix {
+  padding: var(--s4);
+  border-top: 1px solid var(--c-line);
+  overflow-x: auto;
+}
+
+.skelBody {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelTitle {
+  width: 80%;
+  height: 28px;
+}
+
+.skelMedia {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.skelFigure {
+  width: 120px;
+  height: 44px;
+}

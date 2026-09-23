@@ -1,0 +1,493 @@
+/* ==========================================================================
+   Shared page pieces for the rep content pages on the D shell (Calls,
+   University + lessons, Resources, Settings): page head, segmented tabs,
+   filter chips, list rows, fields, empty states. Tokens come from .root /
+   .layer in rep.module.css; page-specific layout lives in each page module.
+   ========================================================================== */
+
+.page {
+  display: grid;
+  gap: var(--s3);
+}
+
+/* ---------- page head ---------- */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  margin-bottom: var(--s2);
+}
+
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  padding-top: 4px;
+}
+
+.titleMeta {
+  color: var(--c-text-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.lede {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .title {
+    font-size: var(--t-d1);
+  }
+  .head {
+    margin-bottom: var(--s3);
+  }
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  margin-left: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .back:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- segmented tabs (one per page, full width on phones) ---------- */
+.tabs {
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-line-strong);
+}
+
+.tab {
+  flex: 1 1 0;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'],
+.tab[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+  box-shadow: inset 0 -2px 0 var(--c-lime);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (min-width: 1024px) {
+  .tabs {
+    display: inline-flex;
+    justify-self: start;
+    align-self: start;
+  }
+  .tab {
+    flex: none;
+    min-width: 140px;
+  }
+}
+
+/* ---------- filter chips: one scrolling row per group on phones ---------- */
+.chipRow {
+  display: flex;
+  gap: var(--s2);
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 2px var(--gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .chipRow {
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}
+
+.chip {
+  flex: none;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 40px chip + the 2px row padding keeps a >=44px touch band. */
+.chip[aria-pressed='true'] {
+  border-color: var(--c-lime);
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+@media (hover: hover) {
+  .chip:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- list rows inside a panel ---------- */
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 64px;
+  padding: var(--s3) var(--s4);
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.rows > li + li > .row,
+.row + .row {
+  border-top: 1px solid var(--c-line);
+}
+
+a.row,
+button.row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+@media (hover: hover) {
+  a.row:hover,
+  button.row:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+a.row:focus-visible,
+button.row:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowTitle {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rowSub {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.35;
+}
+
+.chev {
+  color: var(--c-text-3);
+}
+
+/* Icon tile (the dashboard's Today tiles). */
+.tile {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-control);
+  background: rgba(124, 184, 255, 0.12);
+  color: var(--c-blue);
+}
+
+.tileLime {
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.tileAmber {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+}
+
+.tileMuted {
+  background: rgba(163, 184, 214, 0.08);
+  color: var(--c-text-2);
+}
+
+/* ---------- small status tags ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tag::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tagLime {
+  color: var(--c-lime);
+}
+
+.tagAmber {
+  color: var(--c-amber);
+}
+
+.tagBlue {
+  color: var(--c-blue);
+}
+
+/* ---------- fields ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.label {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font: 400 var(--t-body) / 1 var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  appearance: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--c-text-3);
+}
+
+.input:focus {
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+.textarea {
+  height: auto;
+  min-height: 112px;
+  padding: 14px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.hint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.hintError {
+  color: var(--c-red);
+  font-weight: 600;
+}
+
+/* ---------- notices ---------- */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.notice svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.notice strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.noticeAmber {
+  border-color: rgba(245, 185, 69, 0.3);
+  background: var(--c-amber-wash);
+}
+
+.noticeAmber svg {
+  color: var(--c-amber);
+}
+
+.noticeLime {
+  border-color: rgba(141, 198, 63, 0.3);
+  background: var(--c-lime-wash);
+}
+
+.noticeLime svg {
+  color: var(--c-lime);
+}
+
+.noticeRed {
+  border-color: rgba(255, 138, 128, 0.35);
+  background: rgba(255, 138, 128, 0.08);
+}
+
+.noticeRed svg {
+  color: var(--c-red);
+}
+
+/* ---------- empty + loading ---------- */
+.empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4);
+}
+
+.empty strong {
+  display: block;
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.empty p {
+  margin: 4px 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.skelRow {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 64px;
+  padding: var(--s3) var(--s4);
+}
+
+.skelRow + .skelRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.skelTile {
+  width: 40px;
+  height: 40px;
+}
+
+.skelLines {
+  display: grid;
+  gap: 8px;
+}
+
+.skelLine {
+  height: 12px;
+}
+
+.skelLineShort {
+  width: 45%;
+  height: 10px;
+}
+
+/* Text button in a panel head (lime, like "Mark all read"). */
+.headLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--tap);
+  margin-right: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+  border: 0;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .headLink:hover {
+    color: var(--c-text);
+  }
+}
+
+.foot {
+  margin: var(--s2) 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
