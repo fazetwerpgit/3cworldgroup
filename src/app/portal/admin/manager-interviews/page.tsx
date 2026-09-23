@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-a.css';
-import { opsFormatValue } from '@/components/forms/OpsQueueList';
-import { downloadCsv, toCsv } from '@/lib/export/csv';
+import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -29,10 +26,6 @@ export default function ManagerInterviewsReviewPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'handled'>('all');
-  const [providerFilter, setProviderFilter] = useState('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
     const token = await auth?.currentUser?.getIdToken();
@@ -57,76 +50,83 @@ export default function ManagerInterviewsReviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const retry = () => {
+    setError('');
+    setLoading(true);
+    load();
+  };
+
   const markHandled = async (id: string) => {
     const res = await authedFetch('/api/portal/forms/manager-interview/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
+    if (!res.ok) throw new Error('Failed to mark handled');
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
   const providers = useMemo(
-    () => Array.from(new Set(rows.map((r) => opsFormatValue(r.provider)).filter((c) => c !== '—'))).sort(),
+    () => Array.from(new Set(rows.map((r) => queueValue(r.provider)).filter((c) => c !== '—'))).sort(),
     [rows]
   );
 
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter((row) => {
-      const status = row.status === 'handled' ? 'handled' : 'new';
-      const text = [row.repName, row.candidateFirstName, row.candidateLastName, row.provider].map(opsFormatValue).join(' ').toLowerCase();
-      return (statusFilter === 'all' || status === statusFilter) && (providerFilter === 'all' || opsFormatValue(row.provider) === providerFilter) && (!q || text.includes(q));
-    });
-  }, [rows, search, statusFilter, providerFilter]);
+  const queueRows: QueueRow[] = useMemo(
+    () =>
+      rows.map((row) => {
+        const candidate = `${queueValue(row.candidateFirstName)} ${queueValue(row.candidateLastName)}`.replace('— —', '—').trim();
+        return {
+          id: row.id,
+          status: row.status === 'handled' ? 'handled' : 'new',
+          person: queueValue(row.repName),
+          personSub: queueValue(row.hiringManager),
+          subject: candidate,
+          subjectSub: queueValue(row.jobPosition),
+          secondary: queueValue(row.provider),
+          secondarySub: queueValue(row.market),
+          evidenceKind: row.signatureDataUrl ? 'signature' : 'none',
+          signatureUrl: row.signatureDataUrl,
+          detailTitle: `${queueValue(row.jobPosition)} interview`,
+          detailFields: [
+            { label: 'Candidate', value: candidate },
+            { label: 'Hiring manager', value: queueValue(row.hiringManager) },
+            { label: 'Provider', value: queueValue(row.provider) },
+            { label: 'Market', value: queueValue(row.market) },
+            { label: 'Did show', value: queueValue(row.didShow) },
+            { label: 'Offer', value: queueValue(row.extendOffer) },
+            { label: 'Rating', value: queueValue(row.rating) },
+            { label: 'Submitted', value: queueValue(row.createdAt) },
+          ],
+          searchText: [row.repName, row.candidateFirstName, row.candidateLastName, row.provider]
+            .map(queueValue)
+            .join(' ')
+            .toLowerCase(),
+          filterValue: queueValue(row.provider),
+        };
+      }),
+    [rows]
+  );
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Manager Interviews" meta={`${rows.filter((row) => row.status !== 'handled').length} waiting`} subtitle="Review interview notes and record the next step." />
-          <div className="ops-line-toolbar">
-            <input type="search" className="ops-line-search" placeholder="Search interviews" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search interviews" />
-            <div className="ops-line-segmented" role="group" aria-label="Status filter">{(['all', 'new', 'handled'] as const).map((value) => <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}>{value === 'all' ? 'All' : value === 'new' ? 'New' : 'Handled'}</button>)}</div>
-            <select className="ops-line-select" value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)} aria-label="Filter by provider"><option value="all">All providers</option>{providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}</select>
-            <button type="button" className="ops-line-export" onClick={() => downloadCsv('manager-interviews.csv', toCsv(COLUMNS, rows))}>Export CSV</button>
-          </div>
-          {error && <div className="ops-line-error-banner">{error}</div>}
-          {loading ? <div className="ops-line-state-card">Loading interviews…</div> : filteredRows.length === 0 ? <div className="ops-line-state-card"><strong>{rows.length ? 'No interviews match this view.' : 'Nothing to review.'}</strong></div> : <div className="ops-line-list">{filteredRows.map((row) => {
-            const expanded = expandedId === row.id;
-            const candidate = `${opsFormatValue(row.candidateFirstName)} ${opsFormatValue(row.candidateLastName)}`.trim();
-            return <article key={row.id} className={`ops-line-row${row.status === 'handled' ? ' done' : ' new'}`}>
-              <button type="button" className="ops-line-row-main" onClick={() => setExpandedId(expanded ? null : row.id)} aria-expanded={expanded}>
-                <span className="ops-line-person ops-line-cell"><span className="ops-line-avatar">{opsFormatValue(row.repName).charAt(0)}</span><span><strong>{opsFormatValue(row.repName)}</strong><small>{opsFormatValue(row.hiringManager)}</small></span></span>
-                <span className="ops-line-cell"><strong>{opsFormatValue(row.jobPosition)}</strong><small>{candidate}</small></span>
-                <span className="ops-line-cell"><strong>{opsFormatValue(row.provider)}</strong><small>{opsFormatValue(row.market)}</small></span>
-                <span className="ops-line-status-chip">{row.status === 'handled' ? 'handled' : 'new'}</span><span className="ops-line-chevron">{expanded ? '−' : '+'}</span>
-              </button>
-              {expanded && (
-                <div className="ops-line-detail-panel">
-                  <div className="ops-line-detail-copy">
-                    <h3>{opsFormatValue(row.jobPosition)} interview</h3>
-                    <div className="ops-line-detail-fields">
-                      <div><span>Hiring manager</span><b>{opsFormatValue(row.hiringManager)}</b></div>
-                      <div><span>Did show</span><b>{opsFormatValue(row.didShow)}</b></div>
-                      <div><span>Offer</span><b>{opsFormatValue(row.extendOffer)}</b></div>
-                      <div><span>Rating</span><b>{opsFormatValue(row.rating)}</b></div>
-                    </div>
-                    {row.signatureDataUrl && (
-                      <>
-                        <span className="sr-only">Captured signature</span>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={row.signatureDataUrl} alt="Captured signature" className="sweep-signature" />
-                      </>
-                    )}
-                    {row.status !== 'handled' && <button type="button" className="ops-line-action resolve" onClick={() => void markHandled(row.id)}>Mark handled</button>}
-                  </div>
-                </div>
-              )}
-            </article>;
-          })}</div>}
-        </div>
-      </div>
+      <AdminQueue
+        title="Manager Interviews"
+        lede="Interview notes from managers. Record the next step."
+        columns={['Submitted by', 'Candidate', 'Provider']}
+        itemNoun="Manager interview"
+        searchPlaceholder="Search by rep, candidate or provider"
+        rows={queueRows}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        onMarkHandled={markHandled}
+        filterLabel="Provider"
+        filterOptions={providers}
+        downloadFilename="manager-interviews.csv"
+        csvColumns={COLUMNS}
+        csvRows={rows}
+        emptyBody="No manager interviews need review right now."
+      />
     </ProtectedRoute>
   );
 }

@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
+import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-b.css';
 
 interface Row { id: string; status: string; [key: string]: unknown }
 
@@ -47,61 +45,63 @@ export default function BugReportsReviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const retry = () => {
+    setError('');
+    setLoading(true);
+    load();
+  };
+
   const markHandled = async (id: string) => {
     const res = await authedFetch('/api/portal/forms/bug-report/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
+    if (!res.ok) throw new Error('Failed to mark handled');
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  const queueRows: OpsQueueRowVM[] = useMemo(
+  const queueRows: QueueRow[] = useMemo(
     () =>
       rows.map((row) => ({
         id: row.id,
         status: row.status === 'handled' ? 'handled' : 'new',
-        person: opsFormatValue(row.repName),
-        personSub: opsFormatValue(row.repEmail),
-        subject: opsFormatValue(row.summary),
-        subjectSub: opsFormatValue(row.area),
-        secondary: opsFormatValue(row.createdAt),
-        secondarySub: opsFormatValue(row.pageUrl),
+        person: queueValue(row.repName),
+        personSub: queueValue(row.repEmail),
+        subject: queueValue(row.summary),
+        subjectSub: queueValue(row.area),
+        secondary: queueValue(row.createdAt),
+        secondarySub: queueValue(row.pageUrl),
         evidenceKind: 'none',
         detailFields: [
-          { label: 'Area', value: opsFormatValue(row.area) },
-          { label: 'Details', value: opsFormatValue(row.details) },
-          { label: 'Page', value: opsFormatValue(row.pageUrl) },
-          { label: 'Submitted', value: opsFormatValue(row.createdAt) },
+          { label: 'Area', value: queueValue(row.area) },
+          { label: 'Details', value: queueValue(row.details) },
+          { label: 'Page', value: queueValue(row.pageUrl) },
+          { label: 'Submitted', value: queueValue(row.createdAt) },
         ],
-        searchText: [row.repName, row.summary, row.area].map(opsFormatValue).join(' ').toLowerCase(),
+        searchText: [row.repName, row.summary, row.area].map(queueValue).join(' ').toLowerCase(),
       })),
     [rows]
   );
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Bug Reports" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
-          <OpsQueueList
-            kicker="Bug Reports"
-            heroWord="Bug"
-            heroRest="Reports"
-            intro="Review issues reported by reps."
-            itemsLabel="open"
-            rows={queueRows}
-            loading={loading}
-            error={error}
-            downloadFilename="bug-reports.csv"
-            csvColumns={COLUMNS}
-            csvRows={rows}
-            onMarkHandled={markHandled}
-            emptyStateTitle="Nothing to review"
-            emptyStateBody="No bug reports need review right now."
-          />
-        </div>
-      </div>
+      <AdminQueue
+        title="Bug Reports"
+        lede="Issues reported by reps."
+        columns={['Reported by', 'Issue', 'Submitted']}
+        itemNoun="Bug report"
+        searchPlaceholder="Search by rep, issue or area"
+        rows={queueRows}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        onMarkHandled={markHandled}
+        downloadFilename="bug-reports.csv"
+        csvColumns={COLUMNS}
+        csvRows={rows}
+        emptyBody="No bug reports need review right now."
+      />
     </ProtectedRoute>
   );
 }

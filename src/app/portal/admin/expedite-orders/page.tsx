@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
+import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-b.css';
 
 interface Row { id: string; status: string; [key: string]: unknown }
 
@@ -51,63 +49,67 @@ export default function ExpediteOrdersReviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const retry = () => {
+    setError('');
+    setLoading(true);
+    load();
+  };
+
   const markHandled = async (id: string) => {
     const token = await auth?.currentUser?.getIdToken();
-    if (!token) return;
+    if (!token) throw new Error('Not signed in');
     const res = await fetch('/api/portal/forms/expedite-order/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
+    if (!res.ok) throw new Error('Failed to mark handled');
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  const queueRows: OpsQueueRowVM[] = useMemo(
+  const queueRows: QueueRow[] = useMemo(
     () =>
       rows.map((row) => ({
         id: row.id,
         status: row.status === 'handled' ? 'handled' : 'new',
-        person: opsFormatValue(row.repName),
-        personSub: opsFormatValue(row.customerName),
-        subject: opsFormatValue(row.customerName),
-        subjectSub: opsFormatValue(row.orderNumber),
-        secondary: opsFormatValue(row.createdAt),
-        secondarySub: opsFormatValue(row.expediteDates),
+        person: queueValue(row.repName),
+        personSub: queueValue(row.customerName),
+        subject: queueValue(row.customerName),
+        subjectSub: queueValue(row.orderNumber),
+        secondary: queueValue(row.createdAt),
+        secondarySub: queueValue(row.expediteDates),
         evidenceKind: 'none',
         detailFields: [
-          { label: 'Phone', value: opsFormatValue(row.customerPhone) },
-          { label: 'Email', value: opsFormatValue(row.customerEmail) },
-          { label: 'Address', value: `${opsFormatValue(row.address)}, ${opsFormatValue(row.zip)}` },
-          { label: 'Expedite dates', value: opsFormatValue(row.expediteDates) },
+          { label: 'Order #', value: queueValue(row.orderNumber) },
+          { label: 'Reason', value: queueValue(row.reason) },
+          { label: 'Phone', value: queueValue(row.customerPhone) },
+          { label: 'Email', value: queueValue(row.customerEmail) },
+          { label: 'Address', value: `${queueValue(row.address)}, ${queueValue(row.zip)}` },
+          { label: 'Expedite dates', value: queueValue(row.expediteDates) },
         ],
-        searchText: [row.repName, row.customerName, row.orderNumber].map(opsFormatValue).join(' ').toLowerCase(),
+        searchText: [row.repName, row.customerName, row.orderNumber].map(queueValue).join(' ').toLowerCase(),
       })),
     [rows]
   );
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Expedite Orders" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
-          <OpsQueueList
-            kicker="Expedite Orders"
-            heroWord="Expedite"
-            heroRest="Orders"
-            intro="Review customer orders that need faster scheduling."
-            itemsLabel="open"
-            rows={queueRows}
-            loading={loading}
-            error={error}
-            downloadFilename="expedite-orders.csv"
-            csvColumns={COLUMNS}
-            csvRows={rows}
-            onMarkHandled={markHandled}
-            emptyStateTitle="Nothing to review"
-            emptyStateBody="No expedite orders need review right now."
-          />
-        </div>
-      </div>
+      <AdminQueue
+        title="Expedite Orders"
+        lede="Customer orders that need faster scheduling."
+        columns={['Rep', 'Customer', 'Submitted']}
+        itemNoun="Expedite order"
+        searchPlaceholder="Search by rep, customer or order #"
+        rows={queueRows}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        onMarkHandled={markHandled}
+        downloadFilename="expedite-orders.csv"
+        csvColumns={COLUMNS}
+        csvRows={rows}
+        emptyBody="No expedite orders need review right now."
+      />
     </ProtectedRoute>
   );
 }

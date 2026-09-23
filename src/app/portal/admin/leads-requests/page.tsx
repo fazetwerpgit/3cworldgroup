@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import OpsQueueList, { OpsQueueEvidenceItem, OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
+import { AdminQueue, QueueEvidence, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { PageTitle } from '@/components/portal/PageTitle';
 import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
-import '@/styles/sweep-admin-b.css';
 
 interface Row {
   id: string;
@@ -56,13 +54,20 @@ export default function LeadsRequestsReviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const retry = () => {
+    setError('');
+    setLoading(true);
+    load();
+  };
+
   const markHandled = async (id: string) => {
     const res = await authedFetch('/api/portal/forms/leads-request/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
+    if (!res.ok) throw new Error('Failed to mark handled');
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
   // Not async: openAttachmentInNewTab must open its tab synchronously inside the
@@ -79,14 +84,14 @@ export default function LeadsRequestsReviewPage() {
   );
 
   const campaigns = useMemo(
-    () => Array.from(new Set(rows.map((r) => opsFormatValue(r.campaign)).filter((c) => c !== '—'))).sort(),
+    () => Array.from(new Set(rows.map((r) => queueValue(r.campaign)).filter((c) => c !== '—'))).sort(),
     [rows]
   );
 
-  const queueRows: OpsQueueRowVM[] = useMemo(
+  const queueRows: QueueRow[] = useMemo(
     () =>
       rows.map((row) => {
-        const evidenceItems: OpsQueueEvidenceItem[] = [];
+        const evidenceItems: QueueEvidence[] = [];
         if (row.hostileUploadPath) {
           evidenceItems.push({ label: 'hostile', onClick: () => viewAttachment(row.hostileUploadPath as string) });
         }
@@ -102,26 +107,26 @@ export default function LeadsRequestsReviewPage() {
         return {
           id: row.id,
           status: row.status === 'handled' ? 'handled' : 'new',
-          person: opsFormatValue(row.repName),
-          personSub: opsFormatValue(row.repFirstName),
-          subject: opsFormatValue(row.category),
-          subjectSub: opsFormatValue(row.location),
-          secondary: opsFormatValue(row.createdAt),
-          secondarySub: opsFormatValue(row.campaign),
+          person: queueValue(row.repName),
+          personSub: queueValue(row.repFirstName),
+          subject: queueValue(row.category),
+          subjectSub: queueValue(row.location),
+          secondary: queueValue(row.createdAt),
+          secondarySub: queueValue(row.campaign),
           evidenceKind: evidenceItems.length > 0 ? 'files' : 'none',
           evidenceItems,
           detailFields: [
-            { label: 'Manager', value: opsFormatValue(row.managerName) },
-            { label: 'Rep', value: opsFormatValue(row.repFirstName) },
-            { label: 'Location', value: opsFormatValue(row.location) },
-            { label: 'Category', value: opsFormatValue(row.category) },
-            { label: 'Reason', value: opsFormatValue(row.reason) },
+            { label: 'Manager', value: queueValue(row.managerName) },
+            { label: 'Rep', value: queueValue(row.repFirstName) },
+            { label: 'Location', value: queueValue(row.location) },
+            { label: 'Category', value: queueValue(row.category) },
+            { label: 'Reason', value: queueValue(row.reason) },
           ],
           searchText: [row.repName, row.repFirstName, row.campaign, row.location]
-            .map(opsFormatValue)
+            .map(queueValue)
             .join(' ')
             .toLowerCase(),
-          filterValue: opsFormatValue(row.campaign),
+          filterValue: queueValue(row.campaign),
         };
       }),
     [rows, viewAttachment]
@@ -129,29 +134,24 @@ export default function LeadsRequestsReviewPage() {
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Leads Requests" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
-          <OpsQueueList
-            kicker="Leads Requests"
-            heroWord="Leads"
-            heroRest="Requests"
-            intro="Review lead requests and send them to the right manager."
-            itemsLabel="open"
-            rows={queueRows}
-            loading={loading}
-            error={error}
-            downloadFilename="leads-requests.csv"
-            csvColumns={COLUMNS}
-            csvRows={rows}
-            filterLabel="Campaign"
-            filterOptions={campaigns}
-            onMarkHandled={markHandled}
-            emptyStateTitle="Nothing to review"
-            emptyStateBody="No leads requests need review right now."
-          />
-        </div>
-      </div>
+      <AdminQueue
+        title="Leads Requests"
+        lede="Lead requests to route to the right manager."
+        columns={['Submitted by', 'Request', 'Submitted']}
+        itemNoun="Leads request"
+        searchPlaceholder="Search by rep, campaign or location"
+        rows={queueRows}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        onMarkHandled={markHandled}
+        filterLabel="Campaign"
+        filterOptions={campaigns}
+        downloadFilename="leads-requests.csv"
+        csvColumns={COLUMNS}
+        csvRows={rows}
+        emptyBody="No leads requests need review right now."
+      />
     </ProtectedRoute>
   );
 }

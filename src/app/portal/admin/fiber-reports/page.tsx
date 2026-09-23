@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import OpsQueueList, { OpsQueueRowVM, opsFormatValue } from '@/components/forms/OpsQueueList';
+import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-b.css';
 
 interface Row { id: string; status: string; [key: string]: unknown }
 
@@ -49,63 +47,67 @@ export default function FiberReportsReviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const retry = () => {
+    setError('');
+    setLoading(true);
+    load();
+  };
+
   const markHandled = async (id: string) => {
     const token = await auth?.currentUser?.getIdToken();
-    if (!token) return;
+    if (!token) throw new Error('Not signed in');
     const res = await fetch('/api/portal/forms/fiber-report/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
+    if (!res.ok) throw new Error('Failed to mark handled');
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
   };
 
-  const queueRows: OpsQueueRowVM[] = useMemo(
+  const queueRows: QueueRow[] = useMemo(
     () =>
       rows.map((row) => ({
         id: row.id,
         status: row.status === 'handled' ? 'handled' : 'new',
-        person: opsFormatValue(row.repName),
-        personSub: opsFormatValue(row.companySold),
-        subject: opsFormatValue(row.companySold),
-        subjectSub: opsFormatValue(row.orderNumber),
-        secondary: opsFormatValue(row.dateKnocked),
-        secondarySub: opsFormatValue(row.createdAt),
+        person: queueValue(row.repName),
+        personSub: queueValue(row.companySold),
+        subject: queueValue(row.companySold),
+        subjectSub: queueValue(row.orderNumber),
+        secondary: queueValue(row.dateKnocked),
+        secondarySub: queueValue(row.createdAt),
         evidenceKind: 'none',
         detailFields: [
-          { label: 'Reps', value: opsFormatValue(row.numberOfReps) },
-          { label: 'Doors knocked', value: opsFormatValue(row.doorsKnocked) },
-          { label: 'Contacts', value: opsFormatValue(row.customerContacts) },
-          { label: 'Submitted', value: opsFormatValue(row.createdAt) },
+          { label: 'Sales', value: queueValue(row.numberOfSales) },
+          { label: 'Pack #', value: queueValue(row.packNumber) },
+          { label: 'Reps', value: queueValue(row.numberOfReps) },
+          { label: 'Doors knocked', value: queueValue(row.doorsKnocked) },
+          { label: 'Contacts', value: queueValue(row.customerContacts) },
+          { label: 'Submitted', value: queueValue(row.createdAt) },
         ],
-        searchText: [row.repName, row.companySold, row.orderNumber].map(opsFormatValue).join(' ').toLowerCase(),
+        searchText: [row.repName, row.companySold, row.orderNumber].map(queueValue).join(' ').toLowerCase(),
       })),
     [rows]
   );
 
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Fiber Reports" meta={`${rows.filter((row) => row.status !== 'handled').length} open`} />
-          <OpsQueueList
-            kicker="Fiber Reports"
-            heroWord="Fiber"
-            heroRest="Reports"
-            intro="Review reports submitted by reps."
-            itemsLabel="open"
-            rows={queueRows}
-            loading={loading}
-            error={error}
-            downloadFilename="fiber-reports.csv"
-            csvColumns={COLUMNS}
-            csvRows={rows}
-            onMarkHandled={markHandled}
-            emptyStateTitle="Nothing to review"
-            emptyStateBody="No fiber reports need review right now."
-          />
-        </div>
-      </div>
+      <AdminQueue
+        title="Fiber Reports"
+        lede="Daily knock reports submitted by reps."
+        columns={['Rep', 'Company', 'Date knocked']}
+        itemNoun="Fiber report"
+        searchPlaceholder="Search by rep, company or order #"
+        rows={queueRows}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        onMarkHandled={markHandled}
+        downloadFilename="fiber-reports.csv"
+        csvColumns={COLUMNS}
+        csvRows={rows}
+        emptyBody="No fiber reports need review right now."
+      />
     </ProtectedRoute>
   );
 }
