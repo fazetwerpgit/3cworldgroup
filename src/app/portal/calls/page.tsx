@@ -1,18 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ArrowRight, CalendarClock, Check, ExternalLink, Plus, ShieldCheck, Users } from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, CalendarClock, Check, ChevronDown, Plus, RotateCw, ShieldCheck, Users, Video, X } from 'lucide-react';
+import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
+import c from '@/components/portal/rep/rep-calls.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   CALL_DAY_ORDER,
   CallAudience,
@@ -20,7 +15,6 @@ import {
   CallDay,
   CallDayLabels,
 } from '@/types';
-import '@/styles/sweep-rep-a.css';
 
 interface CallEntry {
   id: string;
@@ -45,16 +39,6 @@ interface CentralNow {
 }
 
 const CENTRAL_TIME_ZONE = 'America/Chicago';
-const CALL_DAY_SHORT: Record<CallDay, string> = {
-  monday: 'M',
-  tuesday: 'T',
-  wednesday: 'W',
-  thursday: 'T',
-  friday: 'F',
-  saturday: 'S',
-  sunday: 'S',
-};
-
 const EMPTY_FORM = {
   title: '',
   description: '',
@@ -193,9 +177,11 @@ function isPastOccurrence(call: CallEntry, now: CentralNow): boolean {
   return call.day === now.day && timeToMinutes(call.time) < now.minutes;
 }
 
-function formatCountdown(minutes: number | null): string {
-  if (minutes === null) return 'IN —';
-  return `IN ${Math.floor(minutes / 60)}H ${minutes % 60}M`;
+/** "3h 12m", "45m", or "1d 13h" once the call is a day or more away. */
+function formatCountdown(minutes: number): string {
+  if (minutes >= 1440) return `${Math.floor(minutes / 1440)}d ${Math.floor((minutes % 1440) / 60)}h`;
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return `${minutes}m`;
 }
 
 function getCentralDateNumber(day: CallDay, date: Date): string {
@@ -211,30 +197,12 @@ function getCentralDateNumber(day: CallDay, date: Date): string {
   return String(centralDate.getUTCDate());
 }
 
-function CallsSkeleton() {
-  return (
-    <div className="calls-line-skeleton" aria-label="Loading calls schedule">
-      <div className="calls-line-skeleton-command">
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-kicker" />
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-title" />
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-copy" />
-      </div>
-      <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-broadcast" />
-      <div className="calls-line-skeleton-section">
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-section-head" />
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-week" />
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-card" />
-        <Skeleton className="calls-line-skeleton-bar calls-line-skeleton-card" />
-      </div>
-    </div>
-  );
-}
-
 export default function CallsSchedulePage() {
   const { user } = useAuth();
   const [data, setData] = useState<CallsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -266,8 +234,9 @@ export default function CallsSchedulePage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load call schedule');
       setData(json);
+      setLoadError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load call schedule');
+      setLoadError(err instanceof Error ? err.message : 'Failed to load call schedule');
     } finally {
       setLoading(false);
     }
@@ -354,239 +323,340 @@ export default function CallsSchedulePage() {
     });
   };
 
+  const retryLoad = () => {
+    setLoading(true);
+    void fetchCalls();
+  };
+
   const closeForm = () => {
     setShowForm(false);
     setForm(EMPTY_FORM);
   };
 
+  const dayHasCalls = (day: CallDay) => orderedCalls.some((call) => call.day === day);
+  const formReady = Boolean(form.title.trim() && form.meetLink.trim());
+
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="calls-line-main flex-1 overflow-auto">
-            <div className="calls-line">
-              <PageTitle title="Calls" meta={`${todayCalls.length} today`} />
+    <div className={p.page}>
+      <header className={p.head}>
+        <h1 className={p.title}>
+          Calls
+          {data && <span className={p.titleMeta}>{todayCalls.length} today</span>}
+        </h1>
+      </header>
 
-              {error && (
-                <Alert className="calls-line-alert">
-                  <AlertCircle aria-hidden="true" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {loading ? (
-                <CallsSkeleton />
-              ) : (
-                <>
-                  {!scheduleIsEmpty && <section className="calls-line-command">
-                    <div className="calls-line-broadcast" aria-label="Next call">
-                      <span className="calls-line-broadcast-label">Next call</span>
-                      <div>
-                        <strong className="calls-line-broadcast-title">{nextCall?.title ?? 'No upcoming calls'}</strong>
-                        <span className="calls-line-broadcast-meta">
-                          {nextCall ? `${formatTime(nextCall.time)} CT · ${CallAudienceLabels[nextCall.audience]}` : '—'}
-                        </span>
-                      </div>
-                      <strong className="calls-line-countdown">{formatCountdown(nextCallMinutes)}</strong>
-                      <span className="calls-line-broadcast-arrow" aria-hidden="true"><ArrowRight /></span>
-                      {nextCall ? (
-                        <a className="calls-line-join" href={nextCall.meetLink} target="_blank" rel="noreferrer">
-                          <ExternalLink aria-hidden="true" />
-                          Join Meet
-                        </a>
-                      ) : (
-                        <span className="calls-line-join calls-line-join-disabled">Join Meet</span>
-                      )}
-                    </div>
-                  </section>}
-
-                  {data?.canManage && (
-                    <div className="calls-line-manage-bar">
-                      <p><strong>Call settings</strong><br />Manage recurring calls and times.</p>
-                      <button className="calls-line-add-call" onClick={() => setShowForm(true)} type="button">
-                        <Plus aria-hidden="true" />
-                        Add Call
-                      </button>
-                    </div>
-                  )}
-
-                  {scheduleIsEmpty ? (
-                    <div className="calls-line-empty-state calls-line-empty-state-published" role="status">
-                      <CalendarClock aria-hidden="true" />
-                      <div>
-                        <strong>Call schedule not published yet.</strong>
-                        {data?.canManage && (
-                          <div className="calls-line-required-calls">
-                            {REQUIRED_CALLS.map((call) => (
-                              <button key={call.title} onClick={() => applyRequiredCall(call)} type="button">
-                                <strong>{call.title}</strong>
-                                <span>{CallDayLabels[call.day]} · {CallAudienceLabels[call.audience]}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : <section className="calls-line-air-times">
-                    <div className="calls-line-section-head">
-                      <div>
-                        <h2>Weekly calls</h2>
-                      </div>
-                      <p>{CallDayLabels[selectedDay]}</p>
-                    </div>
-
-                    <div className="calls-line-week-strip" role="tablist" aria-label="Select day">
-                      {CALL_DAY_ORDER.map((day) => (
-                        <button
-                          key={day}
-                          className="calls-line-day-tab"
-                          type="button"
-                          role="tab"
-                          aria-label={`${CallDayLabels[day]} ${getCentralDateNumber(day, new Date(nowTick))}`}
-                          aria-selected={selectedDay === day}
-                          onClick={() => setSelectedDay(day)}
-                        >
-                          <span className="calls-line-day-dow">{CALL_DAY_SHORT[day]}</span>
-                          <span className="calls-line-day-date">{getCentralDateNumber(day, new Date(nowTick))}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="calls-line-air-pane">
-                      <div className="calls-line-pane-head">
-                        <h3>{CallDayLabels[selectedDay]} {selectedDay === now.day && <span>/ today</span>}</h3>
-                        <p>{selectedCalls.length} call{selectedCalls.length === 1 ? '' : 's'} · Central Time</p>
-                      </div>
-
-                      {selectedCalls.length > 0 ? (
-                        <div className="calls-line-broadcast-cards">
-                          {selectedCalls.map((call) => {
-                            const past = isPastOccurrence(call, now);
-                            return (
-                              <article className={`calls-line-air-card ${past ? 'past' : ''}`} key={call.id}>
-                                <div className="calls-line-air-time">
-                                  <strong>{formatTime(call.time)}</strong>
-                                  <small>Central Time<br />{past ? 'Completed' : 'Upcoming'}</small>
-                                </div>
-                                <div className="calls-line-air-copy">
-                                  <h4>{call.title}</h4>
-                                  <span className={`calls-line-audience ${call.audience === 'managers' ? 'manager' : ''}`}>
-                                    {call.audience === 'managers' ? <ShieldCheck aria-hidden="true" /> : <Users aria-hidden="true" />}
-                                    {CallAudienceLabels[call.audience]}
-                                  </span>
-                                  <p>{call.description || 'Recurring team call.'}</p>
-                                  <div className="calls-line-air-actions">
-                                    {past ? (
-                                      <span className="calls-line-done"><Check aria-hidden="true" />Completed</span>
-                                    ) : (
-                                      <a className="calls-line-join" href={call.meetLink} target="_blank" rel="noreferrer">
-                                        <ExternalLink aria-hidden="true" />
-                                        Join Meet
-                                      </a>
-                                    )}
-                                    {data?.canManage && (
-                                      <button
-                                        className="calls-line-remove"
-                                        type="button"
-                                        onClick={() => handleDelete(call)}
-                                        disabled={deletingId === call.id}
-                                      >
-                                        {deletingId === call.id ? 'Removing...' : 'Remove'}
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </article>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="calls-line-empty-state">
-                          <CalendarClock aria-hidden="true" />
-                          <div>
-                            <strong>No calls scheduled for this day.</strong>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                  }
-
-                  {!scheduleIsEmpty && <footer className="calls-line-footer">
-                    <span>Times shown in CT · Google Meet links only.</span>
-                    <span>Click any day to filter</span>
-                  </footer>}
-                </>
-              )}
-            </div>
-          </main>
+      {error && (
+        <div className={`${p.notice} ${p.noticeRed}`} role="alert">
+          <AlertCircle size={18} aria-hidden="true" />
+          <span>{error}</span>
         </div>
-      </div>
+      )}
 
-      <Dialog open={showForm} onOpenChange={(open) => (open ? setShowForm(true) : closeForm())}>
-        <DialogContent className="calls-line-modal" showCloseButton>
-          <DialogHeader className="calls-line-modal-header">
-            <p className="calls-line-eyebrow">Call settings</p>
-            <DialogTitle>Add recurring call</DialogTitle>
-            <DialogDescription>Set a weekly Meet call for the team.</DialogDescription>
-          </DialogHeader>
+      {loading ? (
+        <CallsSkeleton />
+      ) : !data ? (
+        <section className={s.panel}>
+          <div className={s.failed} role="alert">
+            <span>Couldn&apos;t load the call schedule</span>
+            <button type="button" className={s.retry} onClick={retryLoad}>
+              <RotateCw size={14} aria-hidden="true" /> Retry
+            </button>
+            {loadError ? <span className={s.srOnly}>{loadError}</span> : null}
+          </div>
+        </section>
+      ) : (
+        <div className={c.layout}>
+          <div className={c.colA}>
+            {nextCall && nextCallMinutes !== null ? (
+              <section className={`${s.panel} ${c.next}`} aria-labelledby="next-call-title">
+                <div className={c.nextBody}>
+                  <div>
+                    <p className={s.kicker}>Next call</p>
+                    <h2 id="next-call-title" className={c.nextTitle}>{nextCall.title}</h2>
+                    <p className={c.nextMeta}>
+                      {nextCall.day === now.day ? 'Today' : CallDayLabels[nextCall.day]} · {formatTime(nextCall.time)} CT ·{' '}
+                      {CallAudienceLabels[nextCall.audience]}
+                    </p>
+                  </div>
+                  <p className={c.count}>
+                    <span className={c.countLabel}>Starts in</span>
+                    <strong className={c.countNum}>{formatCountdown(nextCallMinutes)}</strong>
+                  </p>
+                </div>
+                <a
+                  className={`${s.btnPrimary} ${c.nextJoin}`}
+                  href={nextCall.meetLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Video size={20} aria-hidden="true" />
+                  Join Meet
+                </a>
+              </section>
+            ) : null}
 
-          <div className="calls-line-starter-row">
-            {CALL_STARTERS.map((starter) => (
-              <button key={starter.label} className="calls-line-starter" type="button" onClick={() => applyStarter(starter)}>
-                {starter.label}
-              </button>
-            ))}
+            {data.canManage && (
+              <section className={`${s.panel} ${c.manage}`} aria-label="Call settings">
+                <p>
+                  <strong>Call settings</strong>
+                  Manage recurring calls and times.
+                </p>
+                <button className={`${s.btnSecondary} ${c.addBtn}`} onClick={() => setShowForm(true)} type="button">
+                  <Plus size={18} aria-hidden="true" />
+                  Add call
+                </button>
+              </section>
+            )}
           </div>
 
+          <div className={c.colB}>
+            {scheduleIsEmpty ? (
+              <section className={s.panel}>
+                <div className={p.empty} role="status">
+                  <span className={`${p.tile} ${p.tileMuted}`}>
+                    <CalendarClock size={20} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <strong>No calls on the schedule yet</strong>
+                    <p>Team calls show up here with a join link once they&apos;re set.</p>
+                  </div>
+                </div>
+                {data.canManage && (
+                  <div className={c.presets}>
+                    {REQUIRED_CALLS.map((call) => (
+                      <button key={call.title} className={c.preset} onClick={() => applyRequiredCall(call)} type="button">
+                        {call.title}
+                        <span>
+                          {CallDayLabels[call.day]} · {CallAudienceLabels[call.audience]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : (
+              <section className={s.panel} aria-labelledby="week-title">
+                <div className={s.panelHead}>
+                  <h2 id="week-title" className={s.kicker}>This week</h2>
+                  <span className={p.rowSub}>Central Time</span>
+                </div>
+                <div className={c.week} role="tablist" aria-label="Select day">
+                  {CALL_DAY_ORDER.map((day) => {
+                    const date = getCentralDateNumber(day, new Date(nowTick));
+                    return (
+                      <button
+                        key={day}
+                        className={`${c.day} ${day === now.day ? c.dayToday : ''}`}
+                        type="button"
+                        role="tab"
+                        aria-label={`${CallDayLabels[day]} ${date}`}
+                        aria-selected={selectedDay === day}
+                        onClick={() => setSelectedDay(day)}
+                      >
+                        <span className={c.dayDow}>{CallDayLabels[day].slice(0, 3)}</span>
+                        <span className={c.dayDate}>{date}</span>
+                        <span className={`${c.dayMark} ${dayHasCalls(day) ? '' : c.dayMarkNone}`} aria-hidden="true" />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={c.dayHead}>
+                  <h3 className={c.dayName}>
+                    {CallDayLabels[selectedDay]}
+                    {selectedDay === now.day && <span> · today</span>}
+                  </h3>
+                  <p className={c.dayCount}>
+                    {selectedCalls.length} call{selectedCalls.length === 1 ? '' : 's'}
+                  </p>
+                </div>
+
+                {selectedCalls.length > 0 ? (
+                  <ul className={p.rows}>
+                    {selectedCalls.map((call) => {
+                      const past = isPastOccurrence(call, now);
+                      return (
+                        <li key={call.id} className={`${c.call} ${past ? c.callPast : ''}`}>
+                          <span className={c.callTime}>
+                            {formatTime(call.time)}
+                            <small>CT</small>
+                          </span>
+                          <div className={c.callBody}>
+                            <h4 className={c.callTitle}>{call.title}</h4>
+                            <span className={`${c.audience} ${call.audience === 'managers' ? c.audienceMgr : ''}`}>
+                              {call.audience === 'managers' ? (
+                                <ShieldCheck size={14} aria-hidden="true" />
+                              ) : (
+                                <Users size={14} aria-hidden="true" />
+                              )}
+                              {CallAudienceLabels[call.audience]}
+                            </span>
+                            <p className={c.callDesc}>{call.description || 'Recurring team call.'}</p>
+                          </div>
+                          <div className={c.callActions}>
+                            {past ? (
+                              <span className={c.done}>
+                                <Check size={16} aria-hidden="true" />
+                                Done for today
+                              </span>
+                            ) : (
+                              <a className={`${s.btnSecondary} ${c.join}`} href={call.meetLink} target="_blank" rel="noreferrer">
+                                <Video size={18} aria-hidden="true" />
+                                Join
+                              </a>
+                            )}
+                            {data.canManage && (
+                              <button
+                                className={c.remove}
+                                type="button"
+                                onClick={() => handleDelete(call)}
+                                disabled={deletingId === call.id}
+                              >
+                                {deletingId === call.id ? 'Removing…' : 'Remove'}
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className={`${p.hint} ${c.dayHead}`}>No calls this day.</p>
+                )}
+              </section>
+            )}
+
+            {!scheduleIsEmpty && <p className={p.foot}>Times are Central. Join opens Google Meet.</p>}
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <AddCallSheet onClose={closeForm} title="Add a recurring call">
           <form
-            className="calls-line-form"
+            className={c.sheetForm}
             onSubmit={(event) => {
               event.preventDefault();
               void handleCreate();
             }}
           >
-            <div className="calls-line-form-grid">
-              <div className="calls-line-field calls-line-field-full">
-                <Label htmlFor="call-title">Title</Label>
-                <Input className="calls-line-field-control" id="call-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Team huddle" required />
-              </div>
-              <div className="calls-line-field">
-                <Label htmlFor="call-day">Day</Label>
-                <select className="calls-line-field-control" id="call-day" value={form.day} onChange={(event) => setForm({ ...form, day: event.target.value as CallDay })}>
-                  {CALL_DAY_ORDER.map((day) => <option key={day} value={day}>{CallDayLabels[day]}</option>)}
-                </select>
-              </div>
-              <div className="calls-line-field">
-                <Label htmlFor="call-time">Time CT</Label>
-                <Input className="calls-line-field-control" id="call-time" type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} required />
-              </div>
-              <div className="calls-line-field calls-line-field-full">
-                <Label htmlFor="call-link">Google Meet link</Label>
-                <Input className="calls-line-field-control" id="call-link" type="url" value={form.meetLink} onChange={(event) => setForm({ ...form, meetLink: event.target.value })} placeholder="https://meet.google.com/abc-defg-hij" required />
-              </div>
-              <div className="calls-line-field">
-                <Label htmlFor="call-audience">Audience</Label>
-                <select className="calls-line-field-control" id="call-audience" value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value as CallAudience })}>
-                  {(Object.keys(CallAudienceLabels) as CallAudience[]).map((audience) => <option key={audience} value={audience}>{CallAudienceLabels[audience]}</option>)}
-                </select>
-              </div>
-              <div className="calls-line-field">
-                <Label htmlFor="call-description">Description</Label>
-                <Input className="calls-line-field-control" id="call-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="One-line purpose" />
-              </div>
+            <p className={p.hint}>Set a weekly Meet call for the team.</p>
+            <div className={c.starters} aria-label="Start from">
+              {CALL_STARTERS.map((starter) => (
+                <button key={starter.label} className={p.chip} type="button" onClick={() => applyStarter(starter)}>
+                  {starter.label}
+                </button>
+              ))}
             </div>
-            <div className="calls-line-form-actions">
-              <button className="calls-line-secondary" type="button" onClick={closeForm} disabled={saving}>Cancel</button>
-              <button className="calls-line-add-call" type="submit" disabled={saving || !form.title.trim() || !form.meetLink.trim()}>
-                {saving ? 'Adding...' : 'Save recurring call'}
+            <div className={c.formGrid}>
+              <label className={`${p.field} ${c.wide}`}>
+                <span className={p.label}>Title</span>
+                <input className={p.input} id="call-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Team huddle" required />
+              </label>
+              <label className={p.field}>
+                <span className={p.label}>Day</span>
+                <span className={c.selectWrap}>
+                  <select className={p.input} id="call-day" value={form.day} onChange={(event) => setForm({ ...form, day: event.target.value as CallDay })}>
+                    {CALL_DAY_ORDER.map((day) => <option key={day} value={day}>{CallDayLabels[day]}</option>)}
+                  </select>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </span>
+              </label>
+              <label className={p.field}>
+                <span className={p.label}>Time (Central)</span>
+                <input className={p.input} id="call-time" type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} required />
+              </label>
+              <label className={`${p.field} ${c.wide}`}>
+                <span className={p.label}>Google Meet link</span>
+                <input className={p.input} id="call-link" type="url" value={form.meetLink} onChange={(event) => setForm({ ...form, meetLink: event.target.value })} placeholder="https://meet.google.com/abc-defg-hij" required />
+              </label>
+              <label className={p.field}>
+                <span className={p.label}>Who joins</span>
+                <span className={c.selectWrap}>
+                  <select className={p.input} id="call-audience" value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value as CallAudience })}>
+                    {(Object.keys(CallAudienceLabels) as CallAudience[]).map((audience) => <option key={audience} value={audience}>{CallAudienceLabels[audience]}</option>)}
+                  </select>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </span>
+              </label>
+              <label className={p.field}>
+                <span className={p.label}>Description</span>
+                <input className={p.input} id="call-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="One-line purpose" />
+              </label>
+            </div>
+            <div className={c.sheetActions}>
+              <button className={s.btnSecondary} type="button" onClick={closeForm} disabled={saving}>Cancel</button>
+              <button className={s.btnPrimary} type="submit" disabled={saving || !formReady}>
+                {saving ? 'Adding…' : 'Save call'}
               </button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
-    </ProtectedRoute>
+        </AddCallSheet>
+      )}
+    </div>
+  );
+}
+
+function CallsSkeleton() {
+  return (
+    <div className={c.layout} aria-busy="true" aria-label="Loading calls">
+      <section className={s.panel}>
+        <div className={c.nextBody}>
+          <span className={`${s.skel} ${p.skelLineShort}`} />
+          <span className={`${s.skel} ${p.skelLine}`} style={{ height: 22, width: '70%' }} />
+          <span className={`${s.skel}`} style={{ height: 44, width: 140 }} />
+        </div>
+      </section>
+      <section className={s.panel}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={p.skelRow}>
+            <span className={`${s.skel} ${p.skelTile}`} />
+            <span className={p.skelLines}>
+              <span className={`${s.skel} ${p.skelLine}`} />
+              <span className={`${s.skel} ${p.skelLineShort}`} />
+            </span>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+/** Manager-only add form: bottom sheet on phone, centred dialog on desktop, portaled to <body>. */
+function AddCallSheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <BodyLayer>
+      <div
+        className={s.backdrop}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
+      >
+        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="add-call-title">
+          <div className={s.sheetHandle} aria-hidden="true" />
+          <div className={s.sheetHead}>
+            <h2 id="add-call-title" className={s.sheetTitle}>{title}</h2>
+            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={onClose}>
+              <X size={20} aria-hidden="true" />
+            </button>
+          </div>
+          <div className={s.sheetBody}>{children}</div>
+        </section>
+      </div>
+    </BodyLayer>
   );
 }

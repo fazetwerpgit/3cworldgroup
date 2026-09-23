@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
+import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
+import st from '@/components/portal/rep/rep-settings.module.css';
 
 // Chrome/Edge/Android fire `beforeinstallprompt`; we stash it and trigger on click.
 interface BeforeInstallPromptEvent extends Event {
@@ -64,44 +68,38 @@ export default function InstallAppCard() {
   };
 
   const manualSteps = isIOS ? (
-    <p className="member-line-sub">
-      On iPhone/iPad: open this site in <strong>Safari</strong>, tap the <strong>Share</strong>{' '}
-      button (square with an arrow), then <strong>Add to Home Screen</strong>.
+    <p className={`${p.hint} ${st.settingWide}`}>
+      On iPhone: open this site in <strong>Safari</strong>, tap <strong>Share</strong>, then{' '}
+      <strong>Add to Home Screen</strong>.
     </p>
   ) : (
-    <p className="member-line-sub">
-      Manual install: browser menu (⋮) → <strong>Add to Home screen</strong> (or{' '}
-      <strong>Install app</strong>). Chrome and Edge also show an install icon in the address bar.
+    <p className={`${p.hint} ${st.settingWide}`}>
+      Or use the browser menu, then <strong>Add to Home screen</strong> (or <strong>Install app</strong>). Chrome
+      and Edge also show an install icon in the address bar.
     </p>
   );
 
   return (
-    <div>
-      <div className="member-line-toggle-row">
-        <div>
-          <strong>Install the app</strong>
-          <small>One device, quick access.</small>
-        </div>
-        {installed ? (
-          <span className="member-line-chip lime">Installed</span>
-        ) : deferred ? (
-          <button type="button" className="member-line-button small" onClick={install}>
-            Install app
-          </button>
-        ) : (
-          <span className="member-line-status-text">Available to install</span>
-        )}
+    <div className={st.setting}>
+      <div className={st.settingText}>
+        <span className={st.settingTitle}>Install the app</span>
+        <span className={st.settingSub}>Opens full screen from your home screen.</span>
       </div>
-      {!installed && (
-        <div style={{ paddingBottom: 13 }}>
-          {promptFailed && (
-            <p className="member-line-sub" style={{ color: 'var(--member-line-gold)' }}>
-              The one-tap install didn&apos;t start — use the manual steps below:
-            </p>
-          )}
-          {manualSteps}
-        </div>
+      {installed ? (
+        <span className={st.on}>
+          <Check size={16} aria-hidden="true" /> Installed
+        </span>
+      ) : deferred ? (
+        <button type="button" className={`${s.btnSecondary} ${st.settingBtn}`} onClick={install}>
+          Install
+        </button>
+      ) : null}
+      {!installed && promptFailed && (
+        <p className={`${p.hint} ${p.hintError} ${st.settingWide}`}>
+          The one-tap install didn&apos;t start. Use the steps below.
+        </p>
       )}
+      {!installed && manualSteps}
     </div>
   );
 }

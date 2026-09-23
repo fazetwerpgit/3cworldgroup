@@ -4,15 +4,17 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { MemberLineShell, MemberLineLock } from '@/components/member/MemberLine';
+import { ChevronDown, KeyRound, Lock } from 'lucide-react';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
 import { RoleDisplayNames, getEffectiveRole } from '@/types';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-rep-b.css';
+import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
+import st from '@/components/portal/rep/rep-settings.module.css';
+
+// The chrome (top bar, tab bar, auth gate) comes from ./layout.tsx: RepShell.
 
 export default function SettingsPage() {
   const { user, resetPassword, changePassword, refreshUser } = useAuth();
@@ -126,7 +128,7 @@ export default function SettingsPage() {
   const roleLabel = effectiveRole ? RoleDisplayNames[effectiveRole] : '';
 
   const formatDate = (date: Date | string | undefined) => {
-    if (!date) return 'N/A';
+    if (!date) return 'Not on file';
     return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
@@ -137,224 +139,208 @@ export default function SettingsPage() {
 
   const addressLine = [user?.city, user?.state].filter(Boolean).join(', ') + (user?.zip ? ` ${user.zip}` : '');
   const fullAddress = user?.address ? `${user.address}${addressLine ? `, ${addressLine}` : ''}` : addressLine || 'Not on file';
+  const email = user?.email || auth?.currentUser?.email || '';
+  const initials = (user?.displayName || email || '?')
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  const facts: Array<[string, string]> = [
+    // Some older user docs lack an email field — fall back to the auth account's.
+    ['Email', email || 'Not on file'],
+    ['Role', roleLabel || 'Not assigned'],
+    ['Status', user?.status === 'active' ? 'Active' : 'Inactive'],
+    ['Start date', formatDate(user?.hireDate)],
+    ['Member since', formatShortDate(user?.createdAt)],
+    ['Territory', user?.territoryId || 'Not assigned'],
+    ['Employee ID', user?.uid ? user.uid.slice(-6) : 'Not available'],
+    ['Address', fullAddress],
+  ];
+
+  const closePasswordForm = () => {
+    setShowPasswordForm(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
+  };
 
   return (
-    <ProtectedRoute>
-      <MemberLineShell>
-        <PageTitle title="Settings" />
+    <div className={p.page}>
+      <header className={p.head}>
+        <h1 className={p.title}>Settings</h1>
+      </header>
 
-        {(success || error) && (
-          <div className="member-line-tools" style={{ marginTop: 16 }}>
-            {success && <div className="member-line-note">{success}</div>}
-            {error && <div className="member-line-note warn">{error}</div>}
-          </div>
-        )}
+      {success && (
+        <div className={`${p.notice} ${p.noticeLime}`} role="status">
+          <span>{success}</span>
+        </div>
+      )}
+      {error && (
+        <div className={`${p.notice} ${p.noticeRed}`} role="alert">
+          <span>{error}</span>
+        </div>
+      )}
 
-        <div className="member-line-arena">
-          <div className="member-line-stack">
-            {/* Profile panel */}
-            <section className="member-line-panel">
-              <div className="member-line-panel-head">
-                <div>
-                  <h2>Your profile</h2>
-                  <p className="member-line-sub">
-                    {user?.displayName || 'Member'}
-                  </p>
-                </div>
+      <div className={st.layout}>
+        <div className={st.col}>
+          <section className={s.panel} aria-labelledby="profile-title">
+            <div className={s.panelHead}>
+              <h2 id="profile-title" className={s.kicker}>Your profile</h2>
+            </div>
+            <div className={st.who}>
+              <span className={st.initials} aria-hidden="true">{initials}</span>
+              <div>
+                <p className={st.whoName}>{user?.displayName || 'Member'}</p>
+                {email ? <p className={st.whoSub}>{email}</p> : null}
               </div>
+            </div>
 
-              <div className="member-line-profile-grid">
-                <div className="member-line-field">
-                  <label htmlFor="line-name">Display name</label>
-                  <input
-                    id="line-name"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                  />
-                </div>
-                <div className="member-line-field">
-                  <label htmlFor="line-phone">Phone</label>
+            <form
+              className={st.form}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSaveProfile();
+              }}
+            >
+              <div className={st.fields}>
+                <label className={p.field}>
+                  <span className={p.label}>Display name</span>
+                  <input id="line-name" className={p.input} value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
+                </label>
+                <label className={p.field}>
+                  <span className={p.label}>Phone</span>
                   <input
                     id="line-phone"
+                    className={p.input}
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(555) 123-4567"
+                    autoComplete="tel"
                   />
-                </div>
-                <div className="member-line-field locked">
-                  <label htmlFor="line-email">
-                    Email <MemberLineLock />
-                  </label>
-                  {/* Some older user docs lack an email field — fall back to the auth account's. */}
-                  <input id="line-email" value={user?.email || auth?.currentUser?.email || ''} readOnly />
-                </div>
-                <div className="member-line-field locked">
-                  <label htmlFor="line-role">
-                    Role <MemberLineLock />
-                  </label>
-                  <input id="line-role" value={roleLabel} readOnly />
-                </div>
-                <div className="member-line-field locked">
-                  <label htmlFor="line-status">
-                    Status <MemberLineLock />
-                  </label>
-                  <input id="line-status" value={user?.status === 'active' ? 'Active' : 'Inactive'} readOnly />
-                </div>
-                <div className="member-line-field locked">
-                  <label htmlFor="line-hire">
-                    Member since <MemberLineLock />
-                  </label>
-                  <input id="line-hire" value={formatDate(user?.hireDate)} readOnly />
-                </div>
-                <div className="member-line-field locked full">
-                  <label htmlFor="line-address">
-                    Address <MemberLineLock />
-                  </label>
-                  <input id="line-address" value={fullAddress} readOnly />
-                </div>
+                </label>
               </div>
-
-              <dl className="member-line-details">
-                <div>
-                  <dt>Member since</dt>
-                  <dd>{formatShortDate(user?.createdAt)}</dd>
-                </div>
-                <div>
-                  <dt>Territory</dt>
-                  <dd>{user?.territoryId || 'Not assigned'}</dd>
-                </div>
-                <div>
-                  <dt>Employee ID</dt>
-                  <dd className="font-mono">{user?.uid ? user.uid.slice(-6) : 'Not available'}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd>{user?.status === 'active' ? 'Active' : 'Inactive'}</dd>
-                </div>
-              </dl>
-
-              <div className="member-line-actions">
-                <button
-                  type="button"
-                  className="member-line-button primary small"
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                >
+              <div className={st.saveRow}>
+                <button type="submit" className={s.btnPrimary} disabled={saving}>
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
-                <span className="member-line-status-text">
-                  Contact your admin for role, territory, or address changes.
-                </span>
+                <p className={p.hint}>Don&apos;t enter card numbers or SSNs here.</p>
               </div>
-              <p className="member-line-sensitive-note">Don&apos;t enter card numbers or SSNs here.</p>
-            </section>
+            </form>
 
-          </div>
-
-          <aside className="member-line-stack">
-            {/* Change password panel */}
-            <section className="member-line-panel">
-              <div className="member-line-panel-head">
-                <div>
-                  <h2>Change password</h2>
+            <dl className={st.facts}>
+              {facts.map(([label, value]) => (
+                <div className={st.fact} key={label}>
+                  <dt>
+                    <Lock size={12} aria-hidden="true" />
+                    {label}
+                  </dt>
+                  <dd>{value}</dd>
                 </div>
-              </div>
-              <button
-                type="button"
-                className="member-line-button small"
-                onClick={() => setShowPasswordForm((v) => !v)}
-              >
+              ))}
+            </dl>
+            <div className={st.factsNote}>
+              <p className={p.hint}>Locked details come from your admin. Ask them to change your role, territory or address.</p>
+            </div>
+          </section>
+        </div>
+
+        <div className={st.col}>
+          <section className={s.panel} aria-labelledby="app-title">
+            <div className={s.panelHead}>
+              <h2 id="app-title" className={s.kicker}>Notifications and app</h2>
+            </div>
+            <PushNotificationsCard />
+            <InstallAppCard />
+          </section>
+
+          <section className={s.panel} aria-labelledby="theme-title">
+            <div className={s.panelHead}>
+              <h2 id="theme-title" className={s.kicker}>Theme</h2>
+            </div>
+            <ThemeToggleCard />
+          </section>
+
+          <section className={s.panel} aria-label="Password">
+            <button
+              type="button"
+              className={st.toggle}
+              aria-expanded={showPasswordForm}
+              onClick={() => (showPasswordForm ? closePasswordForm() : setShowPasswordForm(true))}
+            >
+              <span>
+                <KeyRound size={20} aria-hidden="true" />
                 Change password
-              </button>
-              <div className={`member-line-collapsed ${showPasswordForm ? 'open' : ''}`}>
-                <form onSubmit={handleChangePassword}>
-                  <div className="member-line-profile-grid" style={{ marginTop: 14 }}>
-                    <div className="member-line-field full">
-                      <label htmlFor="line-current">Current password</label>
-                      <input
-                        id="line-current"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="member-line-field">
-                      <label htmlFor="line-new">New password</label>
-                      <input
-                        id="line-new"
-                        type="password"
-                        minLength={6}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="member-line-field">
-                      <label htmlFor="line-confirm">Confirm password</label>
-                      <input
-                        id="line-confirm"
-                        type="password"
-                        minLength={6}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="member-line-actions">
-                    <button type="submit" className="member-line-button primary small" disabled={changingPassword}>
-                      {changingPassword ? 'Updating…' : 'Update password'}
-                    </button>
-                    <button
-                      type="button"
-                      className="member-line-button small"
-                      onClick={() => {
-                        setShowPasswordForm(false);
-                        setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmPassword('');
-                        setError('');
-                      }}
-                    >
+              </span>
+              <ChevronDown size={18} className={st.toggleChev} aria-hidden="true" />
+            </button>
+            {showPasswordForm && (
+              <div className={st.drawer}>
+                <form onSubmit={handleChangePassword} className={st.stack}>
+                  <label className={p.field}>
+                    <span className={p.label}>Current password</span>
+                    <input
+                      id="line-current"
+                      className={p.input}
+                      type="password"
+                      autoComplete="current-password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className={p.field}>
+                    <span className={p.label}>New password</span>
+                    <input
+                      id="line-new"
+                      className={p.input}
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={6}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className={p.field}>
+                    <span className={p.label}>Confirm new password</span>
+                    <input
+                      id="line-confirm"
+                      className={p.input}
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <div className={st.actions}>
+                    <button type="button" className={s.btnSecondary} onClick={closePasswordForm}>
                       Cancel
+                    </button>
+                    <button type="submit" className={s.btnPrimary} disabled={changingPassword}>
+                      {changingPassword ? 'Updating…' : 'Update password'}
                     </button>
                   </div>
                 </form>
-                <div className="member-line-actions" style={{ marginTop: 6 }}>
-                  {resetSent ? (
-                    <span className="member-line-status-text">Reset email sent!</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="member-line-button small"
-                      onClick={handlePasswordReset}
-                      disabled={loading}
-                    >
-                      {loading ? 'Sending…' : 'Email me a reset link instead'}
-                    </button>
-                  )}
-                </div>
+                {resetSent ? (
+                  <p className={p.hint} role="status">Reset email sent. Check your inbox.</p>
+                ) : (
+                  <button type="button" className={st.linkBtn} onClick={handlePasswordReset} disabled={loading}>
+                    {loading ? 'Sending…' : 'Email me a reset link instead'}
+                  </button>
+                )}
               </div>
-            </section>
+            )}
+          </section>
 
-            {/* App and theme panel */}
-            <section className="member-line-panel">
-              <div className="member-line-panel-head">
-                <div>
-                  <h2>App and theme</h2>
-                </div>
-              </div>
-              <InstallAppCard />
-              <PushNotificationsCard />
-              <ThemeToggleCard />
-            </section>
-
-          </aside>
+          <ReportBugCard />
         </div>
-        <ReportBugCard />
-      </MemberLineShell>
-    </ProtectedRoute>
+      </div>
+    </div>
   );
 }

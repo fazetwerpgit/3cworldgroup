@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
+import { Check } from 'lucide-react';
+import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
+import st from '@/components/portal/rep/rep-settings.module.css';
 
 type State = 'checking' | 'unsupported' | 'off' | 'on' | 'working';
 
@@ -46,24 +50,26 @@ export default function PushNotificationsCard() {
   }
 
   return (
-    <div className="member-line-toggle-row">
-      <div>
-        <strong>Push notifications</strong>
-        <small>Mentions, DMs, activity.</small>
-        {error && <small style={{ color: 'var(--member-line-red)' }}>{error}</small>}
+    <div className={st.setting}>
+      <div className={st.settingText}>
+        <span className={st.settingTitle}>Push notifications</span>
+        <span className={st.settingSub}>Mentions, DMs and form activity on this device.</span>
       </div>
       {state === 'on' ? (
-        <span className="member-line-chip lime">On</span>
+        <span className={st.on}>
+          <Check size={16} aria-hidden="true" /> On
+        </span>
       ) : (
         <button
           type="button"
-          className="member-line-button small"
+          className={`${s.btnSecondary} ${st.settingBtn}`}
           onClick={enable}
           disabled={state === 'working' || state === 'checking'}
         >
-          {state === 'working' ? 'Enabling…' : 'Enable'}
+          {state === 'working' ? 'Turning on…' : 'Turn on'}
         </button>
       )}
+      {error && <p className={`${p.hint} ${p.hintError} ${st.settingWide}`} role="alert">{error}</p>}
     </div>
   );
 }
