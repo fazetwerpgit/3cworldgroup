@@ -2,8 +2,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { PORTAL_LOGGING_START } from '@/lib/sales/mergeBook';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES } from '@/data/compPlan.generated';
-import type { CompPlanMargin, CompPlanRates, FiberOrder, Sale } from '@/types';
-import type { ActivatedUser, OwnerSummarySource, RepRoles } from './companySummary';
+import type { CompPlanMargin, CompPlanRates, Sale } from '@/types';
+import type { ActivatedUser, OwnerBook, OwnerSummarySource, RepRoles } from './companySummary';
 
 // Admin SDK reads behind the owner summary. READ ONLY — nothing here writes.
 //
@@ -56,7 +56,7 @@ function db() {
 
 /** One source per request: the book is read once however many sections ask for it. */
 export function createFirestoreOwnerSource(): OwnerSummarySource {
-  let book: Promise<{ sales: Sale[]; orders: FiberOrder[] }> | null = null;
+  let book: Promise<OwnerBook> | null = null;
 
   return {
     loadBook() {
@@ -82,7 +82,7 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
             createdAt: toDate(data.createdAt),
           } as Sale;
         });
-        return { sales, orders };
+        return { sales, orders, reportAt: lastReportAt };
       })();
       return book;
     },

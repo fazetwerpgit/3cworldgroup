@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, RotateCw } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
+import { useMinuteClock } from '@/components/leaderboard/belowPodium';
 import type {
   MoneyComparison,
   MoneyFigures,
@@ -14,6 +15,7 @@ import type {
   RecruitingSummary,
   WeekCount,
 } from '@/lib/owner/companySummary';
+import { carrierReportStamp } from '@/lib/owner/reportFreshness';
 import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import s from '../rep/rep.module.css';
@@ -113,6 +115,14 @@ function MarginScore({ margin }: { margin: number }) {
   return <>{money(shown)}</>;
 }
 
+/** When the carrier report last landed; amber once it's stale, since every figure above comes from it. */
+function ReportStamp({ reportAt }: { reportAt: string | null }) {
+  const now = useMinuteClock();
+  const stamp = carrierReportStamp(reportAt, now);
+  if (!stamp) return null;
+  return <span className={stamp.stale ? o.footGap : undefined}> {stamp.text}.</span>;
+}
+
 function MoneyBoard({ data }: { data: MoneySummary }) {
   const month = data.month;
   const week = data.week;
@@ -185,6 +195,7 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
 
       <p className={o.foot}>
         Estimates from installs × current comp-plan rates. &ldquo;vs&rdquo; is the same point last week or last month.
+        <ReportStamp reportAt={data.reportAt} />
         {gaps.length ? <span className={o.footGap}> {gaps.join(' · ')} (counted at $0).</span> : null}
       </p>
     </section>

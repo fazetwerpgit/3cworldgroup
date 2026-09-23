@@ -93,10 +93,17 @@ export function activationDate(user: ActivatedUser): Date | null {
 
 export type OpenQueue = 'payrollDisputes' | 'expediteOrders' | 'leadsRequests' | 'bugReports';
 
+/** Every sale since the portal started logging (no customer PII) and every carrier order. */
+export interface OwnerBook {
+  sales: Sale[];
+  orders: FiberOrder[];
+  /** When the carrier report behind the orders last arrived (ISO), or null if none has. */
+  reportAt: string | null;
+}
+
 /** Everything the summary reads. The Firestore adapter lives in firestoreSource.ts. */
 export interface OwnerSummarySource {
-  /** Every sale since the portal started logging, without customer PII, plus every carrier order. */
-  loadBook(): Promise<{ sales: Sale[]; orders: FiberOrder[] }>;
+  loadBook(): Promise<OwnerBook>;
   loadCompPlan(): Promise<CompPlanTables>;
   loadRepRoles(repIds: string[]): Promise<Map<string, RepRoles>>;
   /** Form submissions still marked 'new'. */
@@ -172,6 +179,8 @@ export interface MoneySummary {
   unpricedInstalls: number;
   /** Installs in either window whose rep resolves to no pay plan (counted at $0 commission). */
   unratedInstalls: number;
+  /** When the carrier report behind these installs last arrived (ISO), or null if none has. */
+  reportAt: string | null;
 }
 
 function sumProducts(sale: Sale, rateOf: (company: string, planId: string) => number): number {
@@ -230,7 +239,7 @@ export function moneyHorizon(periods: OwnerPeriods): Date {
   return new Date(Math.min(periods.lastWeek.start.getTime(), periods.lastMonth.start.getTime()));
 }
 
-export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): MoneySummary {
+export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): Omit<MoneySummary, 'reportAt'> {
   const { now, thisWeek, lastWeek, thisMonth, lastMonth } = periods;
   const weekNow = { start: thisWeek.start, end: now };
   const monthNow = { start: thisMonth.start, end: now };
@@ -375,13 +384,13 @@ export type OwnerSection = 'money' | 'problems' | 'recruiting';
 export const OWNER_SECTIONS: readonly OwnerSection[] = ['money', 'problems', 'recruiting'];
 
 export async function buildMoney(source: OwnerSummarySource, periods: OwnerPeriods): Promise<MoneySummary> {
-  const [{ sales, orders }, plan] = await Promise.all([source.loadBook(), source.loadCompPlan()]);
+  const [{ sales, orders, reportAt }, plan] = await Promise.all([source.loadBook(), source.loadCompPlan()]);
   const book = companyBook(sales, orders, periods.now);
   const horizon = moneyHorizon(periods);
   const recent = book.installs.filter((install) => install.installDate.getTime() >= horizon.getTime());
   const repIds = [...new Set(recent.map((install) => install.repId).filter(Boolean))];
   const roles = await source.loadRepRoles(repIds);
-  return summarizeMoney(priceInstalls(recent, plan, roles), periods);
+  return { ...summarizeMoney(priceInstalls(recent, plan, roles), periods), reportAt };
 }
 
 export async function buildProblems(source: OwnerSummarySource, periods: OwnerPeriods): Promise<ProblemRow[]> {
@@ -451,7 +460,7 @@ export async function buildOwnerSummary(
   now: Date = new Date()
 ): Promise<OwnerSummary> {
   const periods = ownerPeriods(now);
-  let book: ReturnType<OwnerSummarySource['loadBook']> | undefined;
+  let book: Promise<OwnerBook> | undefined;
   const shared: OwnerSummarySource = Object.create(source);
   shared.loadBook = () => (book ??= source.loadBook());
 

@@ -28,6 +28,7 @@ const MONEY = {
   month: { current: figures(112, 51300, 16900), prior: figures(98, 44750, 14060), priorEnd: '2026-08-22T17:00:00.000Z' },
   unpricedInstalls: 0,
   unratedInstalls: 0,
+  reportAt: null,
 };
 const RECRUITING = {
   applications: { thisWeek: 11, lastWeek: 14 },

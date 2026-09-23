@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { MoneySummary, OwnerSection, OwnerSummary, ProblemRow, RecruitingSummary } from '@/lib/owner/companySummary';
 import type { Section } from '@/hooks/useRepDashboard';
 
 // The owner's company view. The first load is ONE request for all three
 // sections, so the server reads the sales book once. A failed section reports
-// 'error' (never zeros) and its Retry asks for that section alone.
+// 'error' (never zeros) and its Retry asks for that section alone. Coming back
+// to the app reloads all three quietly: the numbers on screen stay until the
+// new ones land, and a failed quiet reload keeps them.
 
 export interface OwnerDashboardState {
   money: Section<MoneySummary>;
@@ -35,7 +38,7 @@ export function useOwnerDashboard(enabled = true) {
   const controllers = useRef(new Map<OwnerSection, AbortController>());
 
   const run = useCallback(
-    async (keys: OwnerSection[] = SECTIONS) => {
+    async (keys: OwnerSection[] = SECTIONS, { quiet = false } = {}) => {
       if (!enabled) return;
       const controller = new AbortController();
       for (const key of keys) controllers.current.set(key, controller);
@@ -52,7 +55,7 @@ export function useOwnerDashboard(enabled = true) {
             const value = data[key];
             if (value === undefined) {
               console.error(`Owner dashboard section "${key}" failed`);
-              next[key] = { status: 'error' };
+              if (!(quiet && prev[key].status === 'ready')) next[key] = { status: 'error' };
             } else {
               (next as Record<OwnerSection, unknown>)[key] = { status: 'ready', data: value };
             }
@@ -64,7 +67,9 @@ export function useOwnerDashboard(enabled = true) {
         console.error(`Owner dashboard (${keys.join(', ')}) failed:`, error);
         setState((prev) => {
           const next = { ...prev };
-          for (const key of keys) if (current(key)) next[key] = { status: 'error' };
+          for (const key of keys) {
+            if (current(key) && !(quiet && prev[key].status === 'ready')) next[key] = { status: 'error' };
+          }
           return next;
         });
       }
@@ -88,6 +93,9 @@ export function useOwnerDashboard(enabled = true) {
     },
     [run]
   );
+
+  const refresh = useCallback(() => void run(SECTIONS, { quiet: true }), [run]);
+  useRefreshOnResume(refresh, { enabled });
 
   return { ...state, retry };
 }

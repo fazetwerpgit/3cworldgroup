@@ -120,7 +120,7 @@ function fixture() {
 function fakeSource(over: Partial<OwnerSummarySource> = {}): OwnerSummarySource {
   const { sales, orders } = fixture();
   return {
-    loadBook: vi.fn(async () => ({ sales, orders })),
+    loadBook: vi.fn(async () => ({ sales, orders, reportAt: '2026-09-22T12:00:00.000Z' })),
     loadCompPlan: vi.fn(async () => ({ rates: RATES, margin: MARGIN })),
     loadRepRoles: vi.fn(async (ids: string[]) => new Map([...ROLES].filter(([id]) => ids.includes(id)))),
     countOpen: vi.fn(async (queue: OpenQueue) => ({ payrollDisputes: 2, expediteOrders: 0, leadsRequests: 1, bugReports: 0 })[queue]),
