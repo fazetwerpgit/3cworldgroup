@@ -992,7 +992,7 @@ span.thumbView {
 
 /* Money in Geist 600 tabular, with a muted top-aligned dollar sign. */
 .estNum {
-  font: 600 24px / 1 var(--f-ui);
+  font: 600 24px / 1 var(--f-num);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
 }
