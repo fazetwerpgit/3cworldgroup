@@ -12,7 +12,7 @@ import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
 import { groupPaySales, type PayGroup } from '@/lib/pay/payGroups';
 import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
-import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
+import { countedSales, isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
@@ -313,7 +313,10 @@ export function SalesTable({
           <span className={x.dot} aria-hidden="true" />
           {statusLine(status, sale.installDate)}
         </span>
-        {order && <FiberStatusPill status={order.status} />}
+        {/* A breakage the sale was rescheduled past is history, not a flag. */}
+        {order && !(order.status === 'breakage' && !isStandingBreakage(sale, order)) && (
+          <FiberStatusPill status={order.status} />
+        )}
         {(sale.status === 'pending' || sale.status === 'rejected') && (
           <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
         )}

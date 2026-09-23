@@ -5,6 +5,7 @@ import {
   countInstallBuckets,
   countedSales,
   installBucketForSale,
+  isStandingBreakage,
   rollupSalesByRep,
 } from './installBucket';
 
@@ -46,6 +47,20 @@ describe('installBucketForSale', () => {
   it('pulls a breakage back to attention even with a date on the calendar', () => {
     const scheduled = sale({ installDate: new Date('2026-09-20T12:00:00') });
     expect(installBucketForSale(scheduled, order('breakage'), NOW)).toBe('attention');
+  });
+
+  it('lets a later date on the sale stand over the breakage it replaced', () => {
+    const broke = { status: 'breakage', estInstallDate: '2026-09-09' } as FiberOrder;
+    const sameDay = sale({ installDate: new Date('2026-09-09T12:00:00') });
+    const rescheduled = sale({ installDate: new Date('2026-09-20T12:00:00') });
+    const rescheduledPast = sale({ installDate: new Date('2026-09-10T12:00:00') });
+    expect(isStandingBreakage(sameDay, broke)).toBe(true);
+    expect(installBucketForSale(sameDay, broke, NOW)).toBe('attention');
+    expect(isStandingBreakage(rescheduled, broke)).toBe(false);
+    expect(installBucketForSale(rescheduled, broke, NOW)).toBe('scheduled');
+    expect(installBucketForSale(rescheduledPast, broke, NOW)).toBe('installed');
+    // An earlier date than the one that broke is not a reschedule.
+    expect(installBucketForSale(sale({ installDate: new Date('2026-09-05T12:00:00') }), broke, NOW)).toBe('attention');
   });
 
   it('does not call a cancelled or churned order installed off the sale date', () => {
