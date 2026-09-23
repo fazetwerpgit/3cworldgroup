@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import { Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
+import type { FiberOrderStatus } from '@/types/fiberOrder';
 import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -86,6 +87,16 @@ function statusLine(status: RowStatus, installDate: Date | string | null | undef
       return 'Cancelled';
   }
 }
+
+/** Carrier statuses the status line already says; the pill only shows when it adds something. */
+const LINE_SAYS: Record<FiberOrderStatus, RowStatus[]> = {
+  active: ['installed'],
+  pending_install: ['scheduled', 'needs-date'],
+  pre_sale: ['scheduled', 'needs-date'],
+  cancelled: ['cancelled'],
+  churned: [],
+  breakage: ['missed'],
+};
 
 /** Every dollar here is an estimate, and says so. */
 function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan: boolean }) {
@@ -304,7 +315,7 @@ export function SalesTable({
     },
   });
 
-  const statusCell = (sale: Sale, extra?: ReactNode) => {
+  const statusCell = (sale: Sale) => {
     const order = fiberBySale.get(sale.id || '');
     const status = statusBySale[sale.id || ''] ?? 'needs-date';
     return (
@@ -314,13 +325,12 @@ export function SalesTable({
           {statusLine(status, sale.installDate)}
         </span>
         {/* A breakage the sale was rescheduled past is history, not a flag. */}
-        {order && !(order.status === 'breakage' && !isStandingBreakage(sale, order)) && (
-          <FiberStatusPill status={order.status} />
-        )}
+        {order &&
+          !LINE_SAYS[order.status].includes(status) &&
+          !(order.status === 'breakage' && !isStandingBreakage(sale, order)) && <FiberStatusPill status={order.status} />}
         {(sale.status === 'pending' || sale.status === 'rejected') && (
           <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
         )}
-        {extra}
       </span>
     );
   };
@@ -343,7 +353,7 @@ export function SalesTable({
               estimate it, and say so where the figure is. */}
           <h2 id="ledger-h" className={x.panelTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
           <p className={x.panelMeta}>{showPay
-            ? `${datedPayCount} by install date · tick one off once it lands`
+            ? `${datedPayCount} ${datedPayCount === 1 ? 'sale' : 'sales'}`
             : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
         </div>
 
@@ -411,9 +421,7 @@ export function SalesTable({
             ) : null}
             {/* Stated once, above the money, rather than as a footnote under it. */}
             <p className={x.note}>
-              An estimate, not a statement of pay. Chargebacks, claims and cancellations are
-              not included here, and the carrier&rsquo;s final report decides what actually pays.
-              Tick a sale off yourself once the money lands.
+              Estimates before chargebacks and claims; the carrier&rsquo;s final report decides what pays.
             </p>
             <div className={`${x.thead} ${x.payHead} ${hasPlan ? '' : x.noMoney}`} aria-hidden="true">
               <span>Customer</span>
@@ -431,7 +439,6 @@ export function SalesTable({
                     const expected = expectedBySale[sale.id || ''] ?? null;
                     const paid = !!paidBySale[sale.id || ''];
                     const window = payoutBySale[sale.id || ''];
-                    const scheduled = statusBySale[sale.id || ''] === 'scheduled';
                     const payout = window ? (
                       <span className={x.payout}>Est. payout <b>{window}</b></span>
                     ) : (
@@ -465,7 +472,7 @@ export function SalesTable({
                         </span>
                         <span className={x.cPayout}>{payout}</span>
                         <span className={x.cStatus}>
-                          {statusCell(sale, scheduled ? <span className={`${x.tag} ${x.tagScheduled}`}>Scheduled</span> : null)}
+                          {statusCell(sale)}
                         </span>
                         <span className={x.cMeta}>{window ? <>Est. payout {window}</> : `Sold ${formatDate(sale.saleDate)} · ${planLabel(sale)}`}</span>
                         <span
@@ -566,7 +573,6 @@ export function SalesTable({
 
       <SaleDetailSheet
         sale={selectedSale}
-        index={selectedIndex}
         total={listSales.length}
         open={!!selectedSale}
         onOpenChange={(open) => { if (!open) setSelectedId(null); }}
@@ -583,7 +589,7 @@ export function SalesTable({
       <SalesDialog
         open={!!deletingId}
         title="Delete sale"
-        description="Are you sure you want to delete this sale? This action cannot be undone."
+        description="Delete this sale? It can't be undone."
         onClose={() => setDeletingId(null)}
         footer={(
           <>

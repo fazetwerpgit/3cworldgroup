@@ -928,7 +928,6 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
       <SaleDetailSheet
         sale={selectedSale}
-        index={selectedIndex}
         total={sheetSales.length}
         open={!!selectedSale}
         onOpenChange={(open) => { if (!open) setSelectedId(null); }}
