@@ -445,10 +445,6 @@
   outline-offset: 2px;
 }
 
-.dropBusy {
-  cursor: progress;
-}
-
 .dropIcon {
   color: var(--c-lime);
 }
@@ -524,6 +520,19 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fileSub {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.fileFailed {
+  border-color: rgba(255, 138, 128, 0.5);
+}
+
+.fileFailed .fileIcon {
+  color: var(--c-red);
 }
 
 .fileOk {

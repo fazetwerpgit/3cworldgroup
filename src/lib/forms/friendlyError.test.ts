@@ -32,4 +32,8 @@ describe('friendlyError', () => {
   it('uses the given verb for the retry', () => {
     expect(friendlyError('Load failed', 'sign').message).toBe('No signal. Check your connection and sign again.');
   });
+
+  it('keeps the upload timeout short, for the tile\'s Retry', () => {
+    expect(friendlyError('Upload timed out', 'upload')).toEqual({ offline: true, message: 'Upload timed out' });
+  });
 });
