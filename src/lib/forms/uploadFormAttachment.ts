@@ -69,9 +69,11 @@ export async function snapshotFormFile(file: File): Promise<File> {
 }
 
 /** Friendly pre-check before any work. Returns an error message or null. */
-export function checkFormFile(file: File): string | null {
-  if (!FORM_ATTACHMENT_TYPES.includes(formFileMime(file))) {
-    return 'Use a photo, a screenshot or a PDF';
+export function checkFormFile(file: File, allowedTypes: string[] = FORM_ATTACHMENT_TYPES): string | null {
+  if (!allowedTypes.includes(formFileMime(file))) {
+    return allowedTypes.includes('application/pdf')
+      ? 'Use a photo, a screenshot or a PDF'
+      : 'Use a photo or a screenshot';
   }
   return null;
 }
@@ -85,19 +87,26 @@ export async function uploadFormAttachment({
   itemId,
   formType,
   slot,
+  fields,
+  allowedTypes,
   getHeaders,
   uploadUrl = '/api/portal/forms/upload',
   maxBytes = MAX_FORM_FILE_BYTES,
 }: {
   file: File;
   itemId: string;
-  formType: string;
+  /** Omitted for routes that do not take one (onboarding uploads). */
+  formType?: string;
   slot?: string;
+  /** Extra multipart fields: the per-submission `uploadId`, onboarding's `userId`. */
+  fields?: Record<string, string>;
+  /** Narrower MIME allowlist than the form default (license photos are images only). */
+  allowedTypes?: string[];
   getHeaders?: () => Promise<HeadersInit>;
   uploadUrl?: string;
   maxBytes?: number;
 }): Promise<string> {
-  const typeError = checkFormFile(file);
+  const typeError = checkFormFile(file, allowedTypes);
   if (typeError) throw new Error(typeError);
 
   const prepared = await maybeDownscale(await snapshotFormFile(file), maxBytes);
@@ -107,8 +116,9 @@ export async function uploadFormAttachment({
 
   const body = new FormData();
   body.set('itemId', itemId);
-  body.set('formType', formType);
+  if (formType) body.set('formType', formType);
   if (slot) body.set('slot', slot);
+  for (const [key, value] of Object.entries(fields ?? {})) body.set(key, value);
   body.set('file', prepared);
 
   const headers = getHeaders ? await getHeaders() : undefined;
