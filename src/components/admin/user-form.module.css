@@ -1,0 +1,171 @@
+/* Person record form (direction D). Fields, panels and buttons are admin-ui /
+   rep; this file only holds the manager picker, the action rows and the save bar. */
+
+.form {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .form {
+    gap: var(--s5);
+  }
+}
+
+/* ---------- manager picker ---------- */
+/* admin-ui .search is sized for a flex row; in a field column it must not grow. */
+.form .managerSearch {
+  flex: none;
+}
+
+.managerList {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  list-style: none;
+}
+
+.managerList > li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.managerOption {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s2) var(--s3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.managerOption[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+  box-shadow: inset 2px 0 0 var(--c-lime);
+}
+
+@media (hover: hover) {
+  .managerOption:hover:not([aria-pressed='true']) {
+    background: rgba(163, 184, 214, 0.05);
+  }
+}
+
+.managerOption:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.managerCheck {
+  flex: none;
+  margin-left: auto;
+  color: var(--c-lime);
+}
+
+.managerList .managerClear {
+  min-height: var(--tap);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+/* ---------- create (new user) ---------- */
+.createRow {
+  display: flex;
+  gap: var(--s2);
+}
+
+.createRow > * {
+  flex: 1 1 0;
+}
+
+@media (min-width: 1024px) {
+  .createRow {
+    justify-content: flex-end;
+  }
+
+  .createRow > * {
+    flex: none;
+  }
+}
+
+/* ---------- account actions ---------- */
+.actions {
+  border-color: rgba(255, 138, 128, 0.2);
+}
+
+.actionsBody {
+  display: grid;
+  gap: var(--s3);
+}
+
+/* ---------- save bar ----------
+   Sticky inside the form, never position:fixed (phones scroll <main>). Sticky
+   insets are measured inside the scroller's padding, and on a phone that
+   padding already clears the fixed tab bar, so bottom: 0 sits just above it. */
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3);
+  border: 1px solid rgba(141, 198, 63, 0.4);
+  border-radius: var(--r-panel);
+  background: var(--c-bar);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.03),
+    0 18px 40px -12px rgba(0, 0, 0, 0.9);
+  transform: translateZ(0);
+}
+
+.saveText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  padding-left: var(--s1);
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.savedIcon {
+  flex: none;
+  color: var(--c-lime);
+}
+
+.saveActions {
+  display: flex;
+  flex: 1 1 100%;
+  gap: var(--s2);
+}
+
+.saveActions > * {
+  flex: 1 1 0;
+}
+
+@media (min-width: 1024px) {
+  .saveBar {
+    bottom: var(--s4);
+    padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  }
+
+  .saveActions {
+    flex: none;
+  }
+
+  .saveActions > * {
+    flex: none;
+  }
+}

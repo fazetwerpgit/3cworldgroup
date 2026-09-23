@@ -1,0 +1,74 @@
+/* Member directory (direction D). Rows and cells come from admin-ui.module.css. */
+
+.cols {
+  --cols: minmax(0, 1.5fr) minmax(0, 1.25fr) 100px 116px 56px 124px 20px;
+}
+
+.row {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .row:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+/* The name is the row's keyboard / screen-reader target; the whole row is the tap target. */
+.nameBtn {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nameBtn:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.cols .action:empty {
+  display: none;
+}
+
+.action > button {
+  flex: 1 1 auto;
+}
+
+.cols .chev,
+.deskOnly {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .cols .statusCell {
+    justify-content: flex-start;
+  }
+
+  .role {
+    color: var(--c-text-2);
+  }
+
+  .cols .action,
+  .cols .action:empty {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .action > button {
+    flex: none;
+  }
+
+  .cols .chev,
+  .deskOnly {
+    display: block;
+  }
+}

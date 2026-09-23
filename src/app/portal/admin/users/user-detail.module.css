@@ -1,0 +1,82 @@
+/* A person's record (edit + new), direction D. */
+
+.headMeta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+}
+
+.headSkel {
+  display: grid;
+  gap: var(--s3);
+}
+
+.layout {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.main,
+.aside {
+  display: grid;
+  align-content: start;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.single {
+  max-width: 760px;
+}
+
+.salesBody {
+  display: grid;
+  gap: 4px;
+}
+
+.vaultBody {
+  display: grid;
+  gap: var(--s3);
+}
+
+.vault .vaultFacts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.revealRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+}
+
+.revealConfirm {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px solid rgba(255, 138, 128, 0.35);
+  border-radius: var(--r-control);
+  background: rgba(255, 138, 128, 0.07);
+}
+
+.revealConfirm p {
+  margin: 0;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: var(--s5);
+  }
+
+  .aside {
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--s6));
+    gap: var(--s5);
+  }
+}

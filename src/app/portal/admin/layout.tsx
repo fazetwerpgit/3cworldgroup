@@ -1,23 +1,15 @@
 'use client';
 
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { RepShell } from '@/components/portal/rep/RepShell';
+import { AdminFrame } from '@/components/portal/admin-d/AdminFrame';
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Direction D: every /portal/admin page sits on the rep shell (top bar + phone
+// tab bar). AdminFrame adds the admin section nav: a sticky rail on desktop, a
+// page switcher on phones. Each page keeps its own ProtectedRoute role gate.
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
-        </div>
-      </div>
-    </ProtectedRoute>
+    <RepShell>
+      <AdminFrame>{children}</AdminFrame>
+    </RepShell>
   );
 }

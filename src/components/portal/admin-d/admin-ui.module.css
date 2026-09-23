@@ -1,0 +1,1119 @@
+/* ==========================================================================
+   Admin UI (direction D): the shared page language for /portal/admin pages.
+   Buttons are rep.module.css .btnPrimary / .btnSecondary (+ .sm / .danger
+   here); panels are rep .panel / .panelHead / .kicker. Everything else a page
+   needs lives here so every admin page reads as one surface. Tokens come from
+   rep.module.css (.root, or .layer inside a portaled sheet).
+   ========================================================================== */
+
+/* ---------- page ---------- */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s3) var(--s5);
+}
+
+.headText {
+  display: grid;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  justify-self: start;
+  min-height: var(--tap);
+  margin: calc(var(--s2) * -1) 0 0 -6px;
+  padding: 0 var(--s2) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .back:hover {
+    color: var(--c-text);
+  }
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s1) var(--s3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  padding-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 500;
+}
+
+.meta b {
+  color: var(--c-text);
+  font-weight: 700;
+}
+
+.sub {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+@media (max-width: 1023px) {
+  .headActions {
+    width: 100%;
+  }
+
+  .headActions > * {
+    flex: 1 1 auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .title {
+    font-size: 52px;
+  }
+}
+
+/* ---------- buttons (modifiers on rep .btnPrimary / .btnSecondary) ----------
+   :is(a, button) lifts them over the base classes whatever the load order. */
+.sm:is(a, button) {
+  min-height: var(--tap);
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.primarySm:is(a, button) {
+  min-height: var(--tap);
+  padding: 0 18px;
+  font-size: 19px;
+}
+
+.danger:is(a, button) {
+  border-color: rgba(255, 138, 128, 0.42);
+  color: var(--c-red);
+}
+
+@media (hover: hover) {
+  .danger:is(a, button):hover {
+    border-color: var(--c-red);
+    background: rgba(255, 138, 128, 0.08);
+  }
+}
+
+.quiet:is(a, button) {
+  border-color: transparent;
+  color: var(--c-text-2);
+}
+
+.btnRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.page button:disabled,
+.sheet button:disabled,
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- stat strip ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  background: var(--c-line);
+  box-shadow: var(--c-lift);
+}
+
+.stat {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--s3) var(--s4) 14px;
+  background: var(--c-panel-fill);
+}
+
+.statValue {
+  font-family: var(--f-display);
+  font-size: 38px;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding-top: 4px;
+}
+
+.statHot {
+  color: var(--c-lime);
+  text-shadow: 0 0 24px var(--c-lime-glow);
+}
+
+.statWarn {
+  color: var(--c-amber);
+}
+
+.statNote {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.3;
+}
+
+@media (min-width: 1024px) {
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .stat {
+    gap: 6px;
+    padding: var(--s5);
+  }
+
+  .statValue {
+    font-size: 56px;
+  }
+}
+
+/* ---------- panels ---------- */
+.panelBody {
+  padding: var(--s4);
+}
+
+@media (min-width: 1024px) {
+  .panelBody {
+    padding: var(--s5);
+  }
+}
+
+.panelMeta {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s1) var(--s3);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.sectionTitle small {
+  margin-left: var(--s2);
+  color: var(--c-text-3);
+  font-size: var(--t-ui);
+  font-weight: 500;
+}
+
+.sectionSub {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* ---------- toolbar: search + chips ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.search {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.search svg {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--c-text-3);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.search .input {
+  height: 48px;
+  padding-left: 42px;
+}
+
+.search .input::-webkit-search-cancel-button {
+  filter: invert(0.7);
+}
+
+.chips {
+  display: flex;
+  gap: var(--s2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* Phones: the chip row scrolls sideways edge to edge instead of wrapping. */
+@media (max-width: 1023px) {
+  .chips {
+    flex: 1 1 100%;
+    margin: 0 calc(var(--gutter) * -1);
+    padding: 0 var(--gutter);
+  }
+}
+
+@media (min-width: 1024px) {
+  .chips {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 14px / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: rgba(141, 198, 63, 0.55);
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+@media (hover: hover) {
+  .chip:hover:not([aria-pressed='true']) {
+    border-color: var(--c-text-3);
+    color: var(--c-text);
+  }
+}
+
+.chipCount {
+  color: var(--c-text-3);
+  font-weight: 600;
+}
+
+.chip[aria-pressed='true'] .chipCount {
+  color: inherit;
+}
+
+/* One segmented control (status, carrier …), same as Log Sale's provider row. */
+.segmented {
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-line-strong);
+}
+
+.segmented > button {
+  flex: 1 1 auto;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 0;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmented > button[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+  box-shadow: inset 0 -2px 0 var(--c-lime);
+}
+
+.segmented > button:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+/* ---------- fields ---------- */
+.formGrid {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 720px) {
+  .formGrid2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.label svg {
+  color: var(--c-text-3);
+}
+
+.input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font: 400 var(--t-body) / 1.2 var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  appearance: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--c-text-3);
+}
+
+.input:focus {
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+.input:disabled,
+.input:read-only {
+  border-color: var(--c-line);
+  background: rgba(163, 184, 214, 0.04);
+  color: var(--c-text-2);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.textarea {
+  height: auto;
+  min-height: 104px;
+  padding: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.selectWrap {
+  position: relative;
+  display: block;
+}
+
+.selectWrap .input {
+  padding-right: 44px;
+  cursor: pointer;
+}
+
+.selectWrap svg {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--c-text-2);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.selectWrap option {
+  background: var(--c-panel);
+  color: var(--c-text);
+}
+
+.fileInput {
+  display: flex;
+  align-items: center;
+  height: auto;
+  min-height: 52px;
+  padding: 10px 14px;
+  font-size: var(--t-ui);
+  cursor: pointer;
+}
+
+.fileInput::file-selector-button {
+  margin-right: var(--s3);
+  padding: 8px 12px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.hintOk {
+  color: var(--c-lime);
+}
+
+.hintError {
+  color: var(--c-red);
+}
+
+/* Checkbox row: the whole row is the 44px target. */
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tap);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--c-lime);
+  cursor: pointer;
+}
+
+/* On/off switch: a 44px button with aria-pressed. */
+.switch {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch::before {
+  content: '';
+  width: 44px;
+  height: 26px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 13px;
+  background: var(--c-track);
+  transition: background-color 160ms ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c-text-2);
+  transform: translateY(-50%);
+  transition:
+    transform 180ms var(--ease),
+    background-color 160ms ease;
+}
+
+.switch[aria-pressed='true']::before {
+  border-color: transparent;
+  background: var(--c-lime);
+}
+
+.switch[aria-pressed='true']::after {
+  background: var(--c-on-lime);
+  transform: translate(18px, -50%);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 0;
+  border-radius: var(--r-control);
+}
+
+/* ---------- notices ---------- */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-panel);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.notice > svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.noticeBody {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.noticeError {
+  border-color: rgba(255, 138, 128, 0.4);
+  background: rgba(255, 138, 128, 0.07);
+}
+
+.noticeError > svg {
+  color: var(--c-red);
+}
+
+.noticeOk {
+  border-color: rgba(141, 198, 63, 0.4);
+  background: var(--c-lime-wash);
+}
+
+.noticeOk > svg {
+  color: var(--c-lime);
+}
+
+.noticeWarn {
+  border-color: rgba(245, 185, 69, 0.4);
+  background: var(--c-amber-wash);
+}
+
+.noticeWarn > svg {
+  color: var(--c-amber);
+}
+
+.noticeClose {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+}
+
+/* ---------- empty / loading ---------- */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--s2);
+  padding: var(--s6) var(--s4);
+  text-align: center;
+}
+
+.emptyIcon {
+  color: var(--c-text-3);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: 650;
+}
+
+.emptyText {
+  max-width: 44ch;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.empty > .btnRow {
+  margin-top: var(--s2);
+}
+
+.skelRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelRow + .skelRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.skelLines {
+  display: grid;
+  gap: var(--s2);
+}
+
+/* ---------- rows: phone stacked cards, desktop table ----------
+   A table is a .rows list. Each .row sets its columns with --cols (a page
+   class). On phones a row stacks: .cellMain and .cellEnd share the first line,
+   every other .cell becomes a "label … value" line using its data-label. */
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tHead {
+  display: none;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px var(--s3);
+  width: 100%;
+  padding: 14px var(--s4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.rows > li + li,
+.rows > .row + .row {
+  border-top: 1px solid var(--c-line);
+}
+
+:is(a, button).row {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  :is(a, button).row:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+:is(a, button).row:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.rowHot {
+  box-shadow: inset 3px 0 0 var(--c-lime);
+}
+
+.rowWarn {
+  box-shadow: inset 3px 0 0 var(--c-amber);
+}
+
+.cellMain {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.cellEnd {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+.cell {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-width: 0;
+  color: var(--c-text);
+  font-size: var(--t-sm);
+}
+
+.cell[data-label]::before {
+  content: attr(data-label);
+  flex: none;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.cellWide {
+  display: block;
+}
+
+.cellWide[data-label]::before {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.cellSub {
+  display: block;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.chev {
+  flex: none;
+  color: var(--c-text-3);
+}
+
+@media (min-width: 1024px) {
+  .tHead {
+    display: grid;
+    grid-template-columns: var(--cols);
+    align-items: center;
+    gap: var(--s4);
+    min-height: 40px;
+    padding: 0 var(--s5);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-3);
+    font-size: var(--t-min);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .row {
+    grid-template-columns: var(--cols);
+    gap: var(--s4);
+    min-height: 68px;
+    padding: 10px var(--s5);
+  }
+
+  .cellMain,
+  .cellEnd,
+  .cell {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .cell {
+    display: block;
+    font-size: var(--t-ui);
+  }
+
+  .cell[data-label]::before {
+    display: none;
+  }
+
+  .alignEnd {
+    justify-self: end;
+    text-align: right;
+  }
+}
+
+/* ---------- person ---------- */
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 50%;
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+}
+
+.personText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.personName {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.personName > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personSub {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.online {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-lime);
+  box-shadow: 0 0 8px var(--c-lime-glow);
+}
+
+/* ---------- status: one language (dot + word), same as the dashboard ---------- */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.toneLime {
+  color: var(--c-lime);
+}
+
+.toneBlue {
+  color: var(--c-blue);
+}
+
+.toneAmber {
+  color: var(--c-amber);
+}
+
+.toneRed {
+  color: var(--c-red);
+}
+
+.toneMuted {
+  color: var(--c-text-3);
+}
+
+/* Small outlined tag: IBO, Admin only, Sensitive, file counts. */
+.tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 4px;
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tagLime {
+  border-color: rgba(141, 198, 63, 0.45);
+  color: var(--c-lime);
+}
+
+.tagAmber {
+  border-color: rgba(245, 185, 69, 0.45);
+  color: var(--c-amber);
+}
+
+.tagRed {
+  border-color: rgba(255, 138, 128, 0.45);
+  color: var(--c-red);
+}
+
+/* ---------- facts (label / value grid) ---------- */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-line);
+}
+
+.facts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--s3);
+  background: var(--c-panel);
+}
+
+.facts dt {
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- confirm strip (inline destructive confirm) ---------- */
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid rgba(255, 138, 128, 0.3);
+  background: rgba(255, 138, 128, 0.07);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+/* ---------- sheet (AdminSheet) ---------- */
+.sheet {
+  color: var(--c-text);
+  font-family: var(--f-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheetHeadDanger {
+  box-shadow: inset 0 -2px 0 rgba(255, 138, 128, 0.55);
+}
+
+.sheetLead {
+  margin: 0;
+  padding: var(--s4) var(--s4) 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.sheetPad {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.sheetFoot {
+  display: flex;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4) var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.sheetFoot > * {
+  flex: 1 1 0;
+}

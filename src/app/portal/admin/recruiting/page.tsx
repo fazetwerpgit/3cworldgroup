@@ -3,21 +3,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CheckCircle2,
-  Clipboard,
+  ChevronDown,
+  Download,
   ExternalLink,
+  FileText,
   Link2,
   Loader2,
+  RotateCw,
   Send,
   UserPlus,
   XCircle,
 } from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-a.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { INVITABLE_FIELD_ROLES } from '@/types/auth';
+import {
+  AdminAvatar,
+  AdminEmpty,
+  AdminFailed,
+  AdminGate,
+  AdminNotice,
+  AdminPageHead,
+  AdminSkeletonRows,
+  StatusDot,
+  type Tone,
+} from '@/components/portal/admin-d/AdminUi';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import r from './recruiting.module.css';
 import {
   ApplicationRecord,
   ApplicationStatus,
@@ -76,22 +90,30 @@ const APPLICATION_COLUMNS = [
 
 /** Split from the previously-conflated single lookup (B-4) — ApplicationStatus and
  * OnboardingInviteStatus are distinct enums with only partial overlap. */
-const applicationStatusTone: Record<ApplicationStatus, string> = {
-  applied: 'tone-blue',
-  contacted: 'tone-amber',
-  invited: 'tone-blue',
-  not_selected: 'tone-muted',
-  converted: 'tone-lime',
+const applicationStatusTone: Record<ApplicationStatus, Tone> = {
+  applied: 'blue',
+  contacted: 'amber',
+  invited: 'blue',
+  not_selected: 'muted',
+  converted: 'lime',
 };
 
-const inviteStatusTone: Record<OnboardingInviteStatus, string> = {
-  invited: 'tone-blue',
-  in_progress: 'tone-amber',
-  submitted: 'tone-lime',
-  approved: 'tone-lime',
-  rejected: 'tone-red',
-  expired: 'tone-muted',
-  converted: 'tone-lime',
+const applicationStatusLabel: Record<ApplicationStatus, string> = {
+  applied: 'Applied',
+  contacted: 'Contacted',
+  invited: 'Invited',
+  not_selected: 'Not selected',
+  converted: 'Converted',
+};
+
+const inviteStatusTone: Record<OnboardingInviteStatus, Tone> = {
+  invited: 'blue',
+  in_progress: 'amber',
+  submitted: 'lime',
+  approved: 'lime',
+  rejected: 'red',
+  expired: 'muted',
+  converted: 'lime',
 };
 
 function formatMissingItems(missing: unknown): string {
@@ -108,6 +130,7 @@ export default function RecruitingCommandCenterPage() {
   const [invites, setInvites] = useState<InviteView[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
@@ -142,7 +165,9 @@ export default function RecruitingCommandCenterPage() {
       if (!response.ok) throw new Error(json.error || 'Failed to load recruiting data');
       setInvites(json.invites);
       setApplications(json.applications);
+      setLoadFailed(false);
     } catch (err) {
+      setLoadFailed(true);
       setError(err instanceof Error ? err.message : 'Failed to load recruiting data');
     } finally {
       setLoading(false);
@@ -253,9 +278,19 @@ export default function RecruitingCommandCenterPage() {
     ['invited', 'in_progress'].includes(invite.status)
   ).length;
   const waitingApplications = applications.length;
+  const showCounts = !loading && !loadFailed;
+
+  const stat = (value: number, hot = false) =>
+    loading ? (
+      <span className={s.skel} style={{ width: 56, height: 38 }} aria-hidden="true" />
+    ) : (
+      <strong className={`${u.statValue} ${!showCounts ? u.toneMuted : hot && value > 0 ? u.statHot : ''}`}>
+        {showCounts ? value : '—'}
+      </strong>
+    );
 
   return (
-    <ProtectedRoute
+    <AdminGate
       roles={[
         'admin',
         'operations',
@@ -269,121 +304,289 @@ export default function RecruitingCommandCenterPage() {
         'director',
       ]}
     >
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle
-            title="Recruiting"
-            meta={`${loading ? '—' : waitingApplications} applications`}
-            subtitle="Send invites, review applications, and activate submitted profiles."
-            actions={<button type="button" className="ops-line-primary" onClick={() => document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>New Invite</button>}
-          />
+      <div className={u.page}>
+        <AdminPageHead
+          title="Recruiting"
+          meta={showCounts ? <><b>{waitingApplications}</b> applications</> : null}
+          sub="Send invites, review applications, and activate submitted profiles."
+          actions={
+            <>
+              <button
+                type="button"
+                className={`${s.btnPrimary} ${u.primarySm}`}
+                onClick={() => {
+                  document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  document.getElementById('invite-name')?.focus({ preventScroll: true });
+                }}
+              >
+                <UserPlus size={18} aria-hidden="true" />
+                New Invite
+              </button>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm}`}
+                onClick={fetchRecruiting}
+                disabled={loading}
+              >
+                <RotateCw size={16} className={loading ? u.spin : undefined} aria-hidden="true" />
+                Refresh
+              </button>
+            </>
+          }
+        />
 
-          <div className="ops-line-recruiting-strip">
-            <div className="ops-line-strip-cell">
-              <span>Invited</span>
-              <b>{loading ? '—' : inProgressCount}</b>
-            </div>
-            <div className="ops-line-strip-cell accent">
-              <span>Submitted</span>
-              <b>{loading ? '—' : submittedCount}</b>
-            </div>
-            <div className="ops-line-strip-cell">
-              <span>Activated</span>
-              <b>{loading ? '—' : activeCount}</b>
-            </div>
-            <div className="ops-line-strip-cell">
-              <span>Applications</span>
-              <b>{loading ? '—' : waitingApplications}</b>
-            </div>
+        <div className={`${u.stats} ${r.stats}`} aria-busy={loading}>
+          <div className={u.stat}>
+            <span className={s.kicker}>Invited</span>
+            {stat(inProgressCount)}
+            <span className={u.statNote}>{showCounts ? 'in progress' : '\u00a0'}</span>
           </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Submitted</span>
+            {stat(submittedCount, true)}
+            <span className={u.statNote}>{showCounts ? 'ready to review' : '\u00a0'}</span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Activated</span>
+            {stat(activeCount)}
+            <span className={u.statNote}>{showCounts ? 'now reps' : '\u00a0'}</span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Applications</span>
+            {stat(waitingApplications)}
+            <span className={u.statNote}>{showCounts ? 'from the website' : '\u00a0'}</span>
+          </div>
+        </div>
 
-          {error && <div className="ops-line-error-banner">{error}</div>}
-          {success && (
-            <div className="ops-line-error-banner" style={{ borderColor: 'color-mix(in srgb, var(--ops-line-lime) 45%, transparent)', background: 'var(--ops-line-lime-soft)', color: 'var(--ops-line-lime)' }}>
-              {success}
-            </div>
+        {error && !loadFailed ? (
+          <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
+        ) : null}
+        {success ? (
+          <AdminNotice tone="ok" onDismiss={() => setSuccess('')}>{success}</AdminNotice>
+        ) : null}
+
+        <section className={s.panel} aria-labelledby="recruiting-invites-heading">
+          <div className={s.panelHead}>
+            <h2 id="recruiting-invites-heading" className={s.kicker}>Invites</h2>
+            {showCounts && submittedCount > 0 ? (
+              <span className={u.panelMeta}>{submittedCount} ready to review</span>
+            ) : null}
+          </div>
+          {loading ? (
+            <AdminSkeletonRows rows={4} label="Loading recruits" />
+          ) : loadFailed ? (
+            <AdminFailed what="recruits" onRetry={fetchRecruiting} />
+          ) : invites.length === 0 ? (
+            <AdminEmpty icon={<Link2 size={24} aria-hidden="true" />} title="No invites yet">
+              Create one below and send the link to your recruit.
+            </AdminEmpty>
+          ) : (
+            <ul className={`${u.rows} ${r.inviteCols}`}>
+              <li className={u.tHead} aria-hidden="true">
+                <span>Recruit</span>
+                <span>Role</span>
+                <span>Owner</span>
+                <span>Status</span>
+                <span className={u.alignEnd}>Action</span>
+              </li>
+              {invites.map((invite) => {
+                const confirmingReject = rejectConfirmId === invite.id;
+                const busy = processingId === invite.id;
+                const submitted = invite.status === 'submitted';
+                return (
+                  <li key={invite.id}>
+                    <div className={`${u.row} ${r.invite} ${submitted ? u.rowHot : ''}`}>
+                      <span className={`${u.cellMain} ${u.person}`}>
+                        <AdminAvatar name={invite.candidateName} />
+                        <span className={u.personText}>
+                          <span className={u.personName}>
+                            <span>{invite.candidateName}</span>
+                          </span>
+                          <span className={u.personSub}>{invite.candidateEmail}</span>
+                        </span>
+                      </span>
+                      <span className={`${u.cellEnd} ${r.phoneOnly}`}>
+                        <StatusDot tone={inviteStatusTone[invite.status] ?? 'blue'}>
+                          {RecruitingStatusLabels[invite.status] ?? invite.status}
+                        </StatusDot>
+                      </span>
+                      <span className={u.cell} data-label="Role">
+                        <span className={r.roleValue}>
+                          {RoleDisplayNames[invite.intendedFieldRole]}
+                          {invite.isIBO ? <span className={u.tag}>IBO</span> : null}
+                        </span>
+                      </span>
+                      <span className={u.cell} data-label="Owner">
+                        <span className={r.stackValue}>
+                          <span>{invite.ownerName}</span>
+                          <span className={u.cellSub}>
+                            {invite.submittedAt ? `Submitted ${formatDate(invite.submittedAt)}` : `Created ${formatDate(invite.createdAt)}`}
+                          </span>
+                        </span>
+                      </span>
+                      <span className={`${u.cell} ${r.deskOnly}`}>
+                        <StatusDot tone={inviteStatusTone[invite.status] ?? 'blue'}>
+                          {RecruitingStatusLabels[invite.status] ?? invite.status}
+                        </StatusDot>
+                      </span>
+                      {submitted ? (
+                        <span className={`${u.btnRow} ${r.actions}`}>
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm} ${r.activate}`}
+                            disabled={busy}
+                            onClick={() => convertInvite(invite, 'approved')}
+                          >
+                            {busy && !confirmingReject ? (
+                              <Loader2 size={16} className={u.spin} aria-hidden="true" />
+                            ) : (
+                              <CheckCircle2 size={16} aria-hidden="true" />
+                            )}
+                            Activate
+                          </button>
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                            disabled={busy}
+                            aria-expanded={confirmingReject}
+                            onClick={() => setRejectConfirmId(invite.id)}
+                          >
+                            <XCircle size={16} aria-hidden="true" />
+                            Reject
+                          </button>
+                        </span>
+                      ) : (
+                        <span className={`${u.cell} ${u.alignEnd} ${r.deskOnly} ${u.toneMuted}`}>No action</span>
+                      )}
+                    </div>
+                    {confirmingReject ? (
+                      <div className={u.confirm} role="alert">
+                        <span>Reject this recruit? This deactivates their account.</span>
+                        <span className={u.btnRow}>
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm}`}
+                            onClick={() => setRejectConfirmId(null)}
+                            disabled={busy}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                            onClick={() => convertInvite(invite, 'rejected')}
+                            disabled={busy}
+                          >
+                            {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
+                            {busy ? 'Rejecting…' : 'Yes, reject'}
+                          </button>
+                        </span>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           )}
+        </section>
 
-          <div className="ops-line-recruiting-grid">
-            <div className="ops-line-form-card" id="invite-form">
-              <div className="ops-line-form-head">
-                <UserPlus size={15} />
-                <h3>Start Recruit Onboarding</h3>
-              </div>
-              <form onSubmit={createInvite} className="ops-line-form">
+        <div className={r.grid}>
+          <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
+            <div className={s.panelHead}>
+              <h2 id="recruiting-form-heading" className={s.kicker}>Start recruit onboarding</h2>
+            </div>
+            <div className={u.panelBody}>
+              <form onSubmit={createInvite} className={u.formGrid}>
                 {applications.length > 0 && (
-                  <div className="ops-line-field">
-                    <label>Use website application</label>
-                    <select
-                      className="ops-line-select"
-                      value={form.applicationId}
-                      onChange={(event) => fillFromApplication(event.target.value)}
-                    >
-                      <option value="">Manual entry</option>
-                      {applications.map((application) => (
-                        <option key={application.id} value={application.id}>
-                          {application.name} - {application.city}
-                        </option>
-                      ))}
-                    </select>
+                  <div className={u.field}>
+                    <label htmlFor="invite-application" className={u.label}>Use website application</label>
+                    <span className={u.selectWrap}>
+                      <select
+                        id="invite-application"
+                        className={u.input}
+                        value={form.applicationId}
+                        onChange={(event) => fillFromApplication(event.target.value)}
+                      >
+                        <option value="">Manual entry</option>
+                        {applications.map((application) => (
+                          <option key={application.id} value={application.id}>
+                            {application.name} - {application.city}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={18} aria-hidden="true" />
+                    </span>
                   </div>
                 )}
 
-                <div className="ops-line-field">
-                  <label>Name</label>
+                <div className={u.field}>
+                  <label htmlFor="invite-name" className={u.label}>Name</label>
                   <input
-                    className="ops-line-input"
+                    id="invite-name"
+                    className={u.input}
+                    autoComplete="off"
                     value={form.candidateName}
                     onChange={(event) => setForm((prev) => ({ ...prev, candidateName: event.target.value }))}
                     required
                   />
                 </div>
-                <div className="ops-line-field">
-                  <label>Email</label>
+                <div className={u.field}>
+                  <label htmlFor="invite-email" className={u.label}>Email</label>
                   <input
-                    className="ops-line-input"
+                    id="invite-email"
+                    className={u.input}
                     type="email"
+                    autoComplete="off"
                     value={form.candidateEmail}
                     onChange={(event) => setForm((prev) => ({ ...prev, candidateEmail: event.target.value }))}
                     required
                   />
                 </div>
-                <div className="ops-line-form-row">
-                  <div className="ops-line-field">
-                    <label>Phone</label>
+                <div className={`${u.formGrid} ${u.formGrid2}`}>
+                  <div className={u.field}>
+                    <label htmlFor="invite-phone" className={u.label}>Phone</label>
                     <input
-                      className="ops-line-input"
+                      id="invite-phone"
+                      className={u.input}
+                      inputMode="tel"
+                      autoComplete="off"
                       value={form.candidatePhone}
                       onChange={(event) => setForm((prev) => ({ ...prev, candidatePhone: event.target.value }))}
                       required
                     />
                   </div>
-                  <div className="ops-line-field">
-                    <label>City</label>
+                  <div className={u.field}>
+                    <label htmlFor="invite-city" className={u.label}>City</label>
                     <input
-                      className="ops-line-input"
+                      id="invite-city"
+                      className={u.input}
+                      autoComplete="off"
                       value={form.candidateCity}
                       onChange={(event) => setForm((prev) => ({ ...prev, candidateCity: event.target.value }))}
                     />
                   </div>
                 </div>
-                <div className="ops-line-field">
-                  <label>Role</label>
-                  <select
-                    className="ops-line-select"
-                    value={form.intendedFieldRole}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
-                    }
-                  >
-                    {INVITABLE_FIELD_ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {RoleDisplayNames[role]}
-                      </option>
-                    ))}
-                  </select>
+                <div className={u.field}>
+                  <label htmlFor="invite-role" className={u.label}>Role</label>
+                  <span className={u.selectWrap}>
+                    <select
+                      id="invite-role"
+                      className={u.input}
+                      value={form.intendedFieldRole}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
+                      }
+                    >
+                      {INVITABLE_FIELD_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {RoleDisplayNames[role]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={18} aria-hidden="true" />
+                  </span>
                 </div>
-                <label className="ops-line-checkbox-row">
+                <label className={u.check}>
                   <input
                     type="checkbox"
                     checked={form.isIBO}
@@ -391,195 +594,105 @@ export default function RecruitingCommandCenterPage() {
                   />
                   Include IBO business items
                 </label>
-                <button type="submit" className="ops-line-primary" disabled={saving} style={{ width: '100%', justifyContent: 'center' }}>
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                <button type="submit" className={`${s.btnPrimary} ${r.submit}`} disabled={saving}>
+                  {saving ? <Loader2 size={20} className={u.spin} aria-hidden="true" /> : <Send size={20} aria-hidden="true" />}
                   Create invite
                 </button>
               </form>
 
               {latestInviteUrl && (
-                <div className="ops-line-invite-ready">
-                  <p className="ops-line-invite-ready-title">Invite link ready</p>
-                  <p className="ops-line-invite-ready-url">{latestInviteUrl}</p>
-                  <div className="ops-line-invite-ready-actions">
-                    <button type="button" className="ops-line-primary" onClick={copyLatestInvite}>
-                      <Link2 size={13} />
+                <div className={r.ready} role="status">
+                  <p className={r.readyTitle}>
+                    <CheckCircle2 size={18} aria-hidden="true" />
+                    Invite link ready
+                  </p>
+                  <p className={r.readyUrl}>{latestInviteUrl}</p>
+                  <div className={u.btnRow}>
+                    <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={copyLatestInvite}>
+                      <Link2 size={18} aria-hidden="true" />
                       {copied ? 'Copied' : 'Copy Link'}
                     </button>
                     <a
-                      className="ops-line-action"
+                      className={`${s.btnSecondary} ${u.sm}`}
                       href={latestInviteUrl}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                     >
-                      <ExternalLink size={13} />
+                      <ExternalLink size={16} aria-hidden="true" />
                       Open
                     </a>
                   </div>
                 </div>
               )}
             </div>
+          </section>
 
-            <div className="ops-line-applications-card">
-              <div className="ops-line-form-head" style={{ justifyContent: 'space-between' }}>
-                <h3>Website Applications</h3>
-                <button
-                  type="button"
-                  className="ops-line-export"
-                  disabled={applications.length === 0}
-                  onClick={() =>
-                    downloadCsv(
-                      'applications.csv',
-                      toCsv(APPLICATION_COLUMNS, applications as unknown as Record<string, unknown>[])
-                    )
-                  }
-                >
-                  Export CSV
-                </button>
-              </div>
-              {applications.length === 0 ? (
-                <div className="ops-line-state-card">No website applications yet.</div>
-              ) : (
-                <div className="ops-line-list">
-                  {applications.map((application) => (
-                    <div key={application.id} className="ops-line-row app">
-                      <div className="ops-line-app-row">
-                        <span className="ops-line-person ops-line-cell">
-                          <span className="ops-line-avatar">
-                            {application.name
-                              .split(' ')
-                              .map((p) => p[0])
-                              .join('')
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </span>
-                          <span>
-                            <strong>{application.name}</strong>
-                            <small>{application.city}</small>
-                          </span>
-                        </span>
-                        <span className="ops-line-cell">
-                          <strong>{application.phone}</strong>
-                          <small>{application.email}</small>
-                        </span>
-                        <span className="ops-line-cell">
-                          <strong>Submitted</strong>
-                          <small>{formatDate(application.createdAt ? application.createdAt.toString() : null)}</small>
-                        </span>
-                        <span className={`ops-line-status-chip ${applicationStatusTone[application.status] ?? 'tone-blue'}`}>
-                          {application.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <section className={s.panel} aria-labelledby="recruiting-apps-heading">
+            <div className={s.panelHead}>
+              <h2 id="recruiting-apps-heading" className={s.kicker}>Website applications</h2>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
+                disabled={applications.length === 0}
+                onClick={() =>
+                  downloadCsv(
+                    'applications.csv',
+                    toCsv(APPLICATION_COLUMNS, applications as unknown as Record<string, unknown>[])
+                  )
+                }
+              >
+                <Download size={16} aria-hidden="true" />
+                Export CSV
+              </button>
             </div>
-
-            <div className="ops-line-queue-card-wide">
-              <div className="ops-line-form-head">
-                <h3>Invites</h3>
-              </div>
-              {loading ? (
-                <div className="ops-line-state-card">Loading recruits…</div>
-              ) : invites.length === 0 ? (
-                <div className="ops-line-state-card">No invite links have been created yet.</div>
-              ) : (
-                <div className="ops-line-list">
-                  {invites.map((invite) => {
-                    const confirmingReject = rejectConfirmId === invite.id;
-                    const busy = processingId === invite.id;
-                    return (
-                      <article key={invite.id} className={`ops-line-row${invite.status === 'submitted' ? ' new' : ''}`}>
-                        <div className="ops-line-recruit-row">
-                          <span className="ops-line-person ops-line-cell">
-                            <span className="ops-line-avatar">
-                              {invite.candidateName
-                                .split(' ')
-                                .map((p) => p[0])
-                                .join('')
-                                .slice(0, 2)
-                                .toUpperCase()}
-                            </span>
-                            <span>
-                              <strong>{invite.candidateName}</strong>
-                              <small>{invite.candidateEmail}</small>
-                            </span>
-                          </span>
-                          <span className="ops-line-cell">
-                            <strong>{RoleDisplayNames[invite.intendedFieldRole]}</strong>
-                            {invite.isIBO && <small>IBO</small>}
-                          </span>
-                          <span className="ops-line-cell">
-                            <strong>{invite.ownerName}</strong>
-                            <small>
-                              {invite.submittedAt ? `Submitted ${formatDate(invite.submittedAt)}` : `Created ${formatDate(invite.createdAt)}`}
-                            </small>
-                          </span>
-                          <span className={`ops-line-status-chip ${inviteStatusTone[invite.status] ?? 'tone-blue'}`}>
-                            {RecruitingStatusLabels[invite.status] ?? invite.status}
-                          </span>
-                          {invite.status === 'submitted' ? (
-                            <span className="ops-line-detail-actions" style={{ margin: 0 }}>
-                              <button
-                                type="button"
-                                className="ops-line-action resolve"
-                                disabled={busy}
-                                onClick={() => convertInvite(invite, 'approved')}
-                              >
-                                <CheckCircle2 size={12} />
-                                Activate
-                              </button>
-                              <button
-                                type="button"
-                                className="ops-line-action reject"
-                                disabled={busy}
-                                onClick={() => setRejectConfirmId(invite.id)}
-                              >
-                                <XCircle size={12} />
-                                Reject
-                              </button>
-                            </span>
-                          ) : (
-                            <span className="ops-line-no-action">No action</span>
-                          )}
-                        </div>
-                        {confirmingReject && (
-                          <div className="ops-line-confirm-strip">
-                            <span>Reject this recruit? This deactivates their account.</span>
-                            <span style={{ display: 'flex', gap: 6 }}>
-                              <button type="button" onClick={() => setRejectConfirmId(null)} disabled={busy}>
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                className="yes"
-                                onClick={() => convertInvite(invite, 'rejected')}
-                                disabled={busy}
-                              >
-                                {busy ? 'Rejecting…' : 'Yes, reject'}
-                              </button>
-                            </span>
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="ops-line-quiet-rail">
-            <span>No new items means there is nothing to review.</span>
-            <button type="button" className="ops-line-export" onClick={fetchRecruiting} disabled={loading}>
-              {loading ? <Loader2 size={12} className="animate-spin" /> : <Clipboard size={12} />}
-              Refresh
-            </button>
-          </div>
+            {loading ? (
+              <AdminSkeletonRows rows={3} label="Loading applications" />
+            ) : loadFailed ? (
+              <AdminFailed what="applications" onRetry={fetchRecruiting} />
+            ) : applications.length === 0 ? (
+              <AdminEmpty icon={<FileText size={24} aria-hidden="true" />} title="No website applications yet" />
+            ) : (
+              <ul className={`${u.rows} ${r.appCols}`}>
+                {applications.map((application) => (
+                  <li key={application.id} className={`${u.row} ${r.app}`}>
+                    <span className={`${u.cellMain} ${u.person}`}>
+                      <AdminAvatar name={application.name} />
+                      <span className={u.personText}>
+                        <span className={u.personName}>
+                          <span>{application.name}</span>
+                        </span>
+                        <span className={u.personSub}>{application.city}</span>
+                      </span>
+                    </span>
+                    <span className={`${u.cellEnd} ${r.appStatus}`}>
+                      <StatusDot tone={applicationStatusTone[application.status] ?? 'blue'}>
+                        {applicationStatusLabel[application.status] ?? application.status}
+                      </StatusDot>
+                    </span>
+                    <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
+                      <span className={u.num}>{application.phone}</span>
+                    </span>
+                    <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
+                      <span className={r.ellipsis}>{application.email}</span>
+                    </span>
+                    <span className={`${u.cell} ${r.deskOnly}`}>
+                      <span className={r.stackValue}>
+                        <span className={u.num}>{application.phone}</span>
+                        <span className={`${u.cellSub} ${r.ellipsis}`}>{application.email}</span>
+                      </span>
+                    </span>
+                    <span className={u.cell} data-label="Submitted">
+                      <span className={u.num}>
+                        {formatDate(application.createdAt ? application.createdAt.toString() : null)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       </div>
-    </ProtectedRoute>
+    </AdminGate>
   );
 }

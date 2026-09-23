@@ -1,0 +1,155 @@
+/* Recruiting (direction D). Shared pieces are admin-ui.module.css. */
+
+@media (min-width: 1024px) {
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Phone-only / desktop-only cells. Two classes so they beat admin-ui's .cell. */
+:is(.invite, .app) > .deskOnly {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  :is(.invite, .app) > .phoneOnly {
+    display: none;
+  }
+
+  :is(.invite, .app) > .deskOnly {
+    display: block;
+  }
+}
+
+.ellipsis {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackValue {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: right;
+}
+
+.roleValue {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+/* ---------- invites ---------- */
+.inviteCols {
+  --cols: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 130px 240px;
+}
+
+.actions {
+  grid-column: 1 / -1;
+}
+
+.actions > button {
+  flex: 1 1 0;
+}
+
+.activate:is(button) {
+  border-color: rgba(141, 198, 63, 0.5);
+  color: var(--c-lime-hi);
+}
+
+@media (hover: hover) {
+  .activate:is(button):hover {
+    border-color: var(--c-lime);
+    background: var(--c-lime-wash);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stackValue {
+    text-align: left;
+  }
+
+  .roleValue {
+    justify-content: flex-start;
+  }
+
+  .actions {
+    grid-column: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .actions > button {
+    flex: none;
+  }
+}
+
+/* ---------- form + applications ---------- */
+.grid {
+  display: grid;
+  gap: var(--s5);
+  align-items: start;
+}
+
+@media (min-width: 1180px) {
+  .grid {
+    grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+  }
+}
+
+.formPanel {
+  scroll-margin-top: calc(var(--topbar-h, 64px) + var(--s4));
+}
+
+.submit:is(button) {
+  width: 100%;
+  min-height: 52px;
+}
+
+.ready {
+  display: grid;
+  gap: var(--s3);
+  margin-top: var(--s5);
+  padding: var(--s4);
+  border: 1px solid rgba(141, 198, 63, 0.45);
+  border-radius: var(--r-control);
+  background: var(--c-lime-wash);
+}
+
+.readyTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+  color: var(--c-lime-hi);
+  font-size: var(--t-ui);
+  font-weight: 650;
+}
+
+.readyUrl {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.export:is(button) {
+  margin-right: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+}
+
+.appCols {
+  --cols: minmax(0, 0.9fr) minmax(0, 1.3fr) 108px 104px;
+}
+
+@media (min-width: 1024px) {
+  .app > .appStatus {
+    order: 9;
+  }
+}

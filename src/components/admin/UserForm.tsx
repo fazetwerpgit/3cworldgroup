@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock } from 'lucide-react';
+import { Check, ChevronDown, Lock, Search, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import '@/styles/sweep-admin-a.css';
+import { AdminAvatar, AdminNotice } from '@/components/portal/admin-d/AdminUi';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import f from './user-form.module.css';
 import {
   User,
   UserRole,
@@ -306,253 +309,354 @@ export function UserForm({ user, isEdit = false }: UserFormProps) {
     }
   };
 
+  const selectableRoles = roleSegments.filter((seg) =>
+    seg.value === 'owner'
+      ? isOwner(currentUser?.role)
+      : isAdminLevel(currentUser?.role) || !isPlatformRole(seg.value)
+  );
+  const personName = formData.displayName || 'this person';
+  const showSaveBar = isEdit && (dirty || saved);
+
   return (
-    <>
-      {error && (
-        <div
-          className="admin-line-empty-state"
-          style={{ display: 'block', marginTop: 0, borderColor: 'var(--admin-line-red)', color: 'var(--admin-line-red)' }}
-        >
+    <div className={f.form}>
+      {error ? (
+        <AdminNotice tone="error" onDismiss={() => setError('')}>
           {error}
-        </div>
-      )}
+        </AdminNotice>
+      ) : null}
 
-      <div className="admin-line-panel-head" style={{ marginTop: error ? 14 : 0 }}>
-        <div>
-          <h2>Account details</h2>
-          <p className="admin-line-sub">
-            Identity fields are editable; the email stays locked to the account.
-          </p>
+      <section className={s.panel} aria-labelledby="person-details-heading">
+        <div className={s.panelHead}>
+          <h2 id="person-details-heading" className={s.kicker}>
+            Account details
+          </h2>
+          {isEdit ? <span className={u.panelMeta}>Email is locked</span> : null}
         </div>
-        {isEdit && <span className="admin-line-meta">last saved / today</span>}
-      </div>
-
-      <div className="admin-line-form-grid" style={{ marginTop: 14 }}>
-        <div className="admin-line-field">
-          <label htmlFor="person-name">Name</label>
-          <input
-            id="person-name"
-            value={formData.displayName}
-            onChange={(e) => handleChange('displayName', e.target.value)}
-            required
-            placeholder="John Smith"
-          />
-        </div>
-        <div className="admin-line-field">
-          <label htmlFor="person-phone">Phone</label>
-          <input
-            id="person-phone"
-            value={formData.phone}
-            onChange={(e) => handleChange('phone', e.target.value)}
-            placeholder="(555) 123-4567"
-          />
-        </div>
-        <div className="admin-line-field">
-          <label htmlFor="person-email">
-            Email <Lock className="admin-line-lock" />
-          </label>
-          <input
-            id="person-email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleChange('email', e.target.value, false)}
-            readOnly={isEdit}
-            disabled={isEdit}
-            required
-            placeholder="employee@3cworldgroup.com"
-          />
-        </div>
-        {isEdit && (
-          <div className="admin-line-field">
-            <label htmlFor="person-hire">Hire date</label>
+        <div className={`${u.panelBody} ${u.formGrid} ${u.formGrid2}`}>
+          <div className={u.field}>
+            <label className={u.label} htmlFor="person-name">
+              Name
+            </label>
             <input
-              id="person-hire"
-              readOnly
-              disabled
-              value={
-                user?.hireDate
-                  ? new Date(user.hireDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })
-                  : 'N/A'
-              }
-            />
-          </div>
-        )}
-        <div className="admin-line-field full">
-          <label htmlFor="person-address">Address</label>
-          <input
-            id="person-address"
-            value={formData.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-            placeholder="123 Main St"
-          />
-        </div>
-      </div>
-
-      {!isEdit && (
-        <div className="admin-line-new-note" style={{ marginTop: 15 }}>
-          Set a temporary password for this new user.
-          <div className="admin-line-field" style={{ marginTop: 10 }}>
-            <label htmlFor="new-password">Temporary password</label>
-            <input
-              id="new-password"
-              type="password"
-              minLength={6}
-              value={formData.password}
-              onChange={(e) => handleChange('password', e.target.value)}
+              id="person-name"
+              className={u.input}
+              value={formData.displayName}
+              onChange={(e) => handleChange('displayName', e.target.value)}
               required
-              placeholder="Minimum 6 characters"
+              autoComplete="off"
+              placeholder="John Smith"
+            />
+          </div>
+          <div className={u.field}>
+            <label className={u.label} htmlFor="person-phone">
+              Phone
+            </label>
+            <input
+              id="person-phone"
+              className={u.input}
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => handleChange('phone', e.target.value)}
+              placeholder="(555) 123-4567"
+            />
+          </div>
+          <div className={u.field}>
+            <label className={u.label} htmlFor="person-email">
+              Email {isEdit ? <Lock size={14} aria-label="Locked" /> : null}
+            </label>
+            <input
+              id="person-email"
+              className={u.input}
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleChange('email', e.target.value, false)}
+              readOnly={isEdit}
+              disabled={isEdit}
+              required
+              placeholder="employee@3cworldgroup.com"
+            />
+          </div>
+          {isEdit ? (
+            <div className={u.field}>
+              <label className={u.label} htmlFor="person-hire">
+                Hire date <Lock size={14} aria-label="Locked" />
+              </label>
+              <input
+                id="person-hire"
+                className={u.input}
+                readOnly
+                disabled
+                value={
+                  user?.hireDate
+                    ? new Date(user.hireDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : 'N/A'
+                }
+              />
+            </div>
+          ) : (
+            <div className={u.field}>
+              <label className={u.label} htmlFor="new-password">
+                Temporary password
+              </label>
+              <input
+                id="new-password"
+                className={u.input}
+                type="password"
+                minLength={6}
+                value={formData.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                required
+                autoComplete="new-password"
+                placeholder="Minimum 6 characters"
+              />
+              <p className={u.hint}>Set a temporary password for this new user.</p>
+            </div>
+          )}
+          <div className={`${u.field} ${u.wide}`}>
+            <label className={u.label} htmlFor="person-address">
+              Address
+            </label>
+            <input
+              id="person-address"
+              className={u.input}
+              value={formData.address}
+              onChange={(e) => handleChange('address', e.target.value)}
+              placeholder="123 Main St"
             />
           </div>
         </div>
-      )}
+      </section>
 
-      <div className="admin-line-form-section">
-        <h3>Role and status</h3>
-        <div className="admin-line-field" style={{ marginTop: 12 }}>
-          <label htmlFor="person-role">Role</label>
-          {/* Platform roles are admin-grantable only, and Owner is
-              owner-grantable only — the server enforces both; hiding them here
-              keeps the UI from offering choices that would 403. A retired role
-              the user still holds (IBO level, L1/L2 manager) is shown as a
-              disabled option so the dropdown reflects reality until they are
-              moved to a current role. */}
-          <select
-            id="person-role"
-            value={formData.role}
-            onChange={(e) => handleChange('role', e.target.value)}
-          >
-            {!formData.role && (
-              <option value="" disabled>
-                Select a role
-              </option>
-            )}
-            {formData.role && !ALL_ROLE_VALUES.includes(formData.role) && (
-              <option value={formData.role} disabled>
-                {roleLabel(formData.role)} (retired)
-              </option>
-            )}
-            {roleSegments
-              .filter((seg) =>
-                seg.value === 'owner'
-                  ? isOwner(currentUser?.role)
-                  : isAdminLevel(currentUser?.role) || !isPlatformRole(seg.value)
-              )
-              .map((seg) => (
-                <option key={seg.value} value={seg.value}>
-                  {seg.label}
-                </option>
-              ))}
-          </select>
+      <section className={s.panel} aria-labelledby="person-role-heading">
+        <div className={s.panelHead}>
+          <h2 id="person-role-heading" className={s.kicker}>
+            Role and status
+          </h2>
         </div>
-
-        {isEdit && (
-          <div className="admin-line-field" style={{ marginTop: 12 }}>
-            <label>Status</label>
-            <div className="admin-line-segmented" role="group" aria-label="Status">
-              {statusSegments.map((seg) => (
-                <button
-                  key={seg.value}
-                  type="button"
-                  aria-pressed={formData.status === seg.value}
-                  onClick={() => handleChange('status', seg.value)}
+        <div className={`${u.panelBody} ${u.formGrid}`}>
+          <div className={`${u.formGrid} ${u.formGrid2}`}>
+            <div className={u.field}>
+              <label className={u.label} htmlFor="person-role">
+                Role
+              </label>
+              {/* Platform roles are admin-grantable only, and Owner is
+                  owner-grantable only — the server enforces both; hiding them here
+                  keeps the UI from offering choices that would 403. A retired role
+                  the user still holds (IBO level, L1/L2 manager) is shown as a
+                  disabled option so the dropdown reflects reality until they are
+                  moved to a current role. */}
+              <span className={u.selectWrap}>
+                <select
+                  id="person-role"
+                  className={u.input}
+                  value={formData.role}
+                  onChange={(e) => handleChange('role', e.target.value)}
                 >
-                  {seg.label}
-                </button>
-              ))}
+                  {!formData.role && (
+                    <option value="" disabled>
+                      Select a role
+                    </option>
+                  )}
+                  {formData.role && !ALL_ROLE_VALUES.includes(formData.role) && (
+                    <option value={formData.role} disabled>
+                      {roleLabel(formData.role)} (retired)
+                    </option>
+                  )}
+                  {selectableRoles.map((seg) => (
+                    <option key={seg.value} value={seg.value}>
+                      {seg.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} aria-hidden="true" />
+              </span>
             </div>
-          </div>
-        )}
 
-        <div className="admin-line-field admin-line-manager-picker" style={{ marginTop: 12 }}>
-          <label htmlFor="manager-search">Manager</label>
-          <input
-            id="manager-search"
-            type="search"
-            placeholder="Search managers"
-            value={managerSearch || selectedManagerLabel}
-            onChange={(e) => {
-              setSelectedManagerLabel('');
-              setManagerSearch(e.target.value);
-            }}
-          />
-          <div className="admin-line-manager-results">
-            {managerResults.map((m) => (
-              <button
-                key={m.uid}
-                type="button"
-                onClick={() => {
-                  handleChange('managerId', m.uid);
-                  setSelectedManagerLabel(m.displayName || m.email || m.uid);
-                  setManagerSearch('');
+            {isEdit ? (
+              <div className={u.field}>
+                <span className={u.label} id="person-status-label">
+                  Status
+                </span>
+                <div className={u.segmented} role="group" aria-labelledby="person-status-label">
+                  {statusSegments.map((seg) => (
+                    <button
+                      key={seg.value}
+                      type="button"
+                      aria-pressed={formData.status === seg.value}
+                      onClick={() => handleChange('status', seg.value)}
+                    >
+                      {seg.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className={u.field}>
+            <label className={u.label} htmlFor="manager-search">
+              Manager
+            </label>
+            <label className={`${u.search} ${f.managerSearch}`}>
+              <Search size={18} aria-hidden="true" />
+              <input
+                id="manager-search"
+                className={u.input}
+                type="search"
+                placeholder="Search managers"
+                autoComplete="off"
+                value={managerSearch || selectedManagerLabel}
+                onChange={(e) => {
+                  setSelectedManagerLabel('');
+                  setManagerSearch(e.target.value);
                 }}
-              >
-                {m.displayName || m.email || 'Unnamed'} · {roleLabel(getEffectiveRole(m))}
-              </button>
-            ))}
-            {formData.managerId && (
-              <button type="button" onClick={() => { handleChange('managerId', ''); setSelectedManagerLabel(''); }}>
-                Clear manager
-              </button>
-            )}
+              />
+            </label>
+            {managerResults.length || formData.managerId ? (
+              <ul className={f.managerList} aria-label="Managers">
+                {managerResults.map((m) => {
+                  const selected = formData.managerId === m.uid;
+                  return (
+                    <li key={m.uid}>
+                      <button
+                        type="button"
+                        className={f.managerOption}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          handleChange('managerId', m.uid);
+                          setSelectedManagerLabel(m.displayName || m.email || m.uid);
+                          setManagerSearch('');
+                        }}
+                      >
+                        <AdminAvatar name={m.displayName || m.email} />
+                        <span className={u.personText}>
+                          <span className={u.personName}>
+                            <span>{m.displayName || m.email || 'Unnamed'}</span>
+                          </span>
+                          <span className={u.personSub}>{roleLabel(getEffectiveRole(m))}</span>
+                        </span>
+                        {selected ? <Check size={18} className={f.managerCheck} aria-hidden="true" /> : null}
+                      </button>
+                    </li>
+                  );
+                })}
+                {formData.managerId ? (
+                  <li>
+                    <button
+                      type="button"
+                      className={`${f.managerOption} ${f.managerClear}`}
+                      onClick={() => {
+                        handleChange('managerId', '');
+                        setSelectedManagerLabel('');
+                      }}
+                    >
+                      <X size={18} aria-hidden="true" />
+                      Clear manager
+                    </button>
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="admin-line-save-bar" style={{ display: dirty || saved ? 'flex' : 'none' }}>
-        <span>
-          {saved
-            ? `${formData.displayName || 'Record'} saved · Saved`
-            : `Unsaved changes in ${formData.displayName || 'this'}'s record.`}
-        </span>
-        <div className="admin-line-save-actions">
+      {!isEdit ? (
+        <div className={f.createRow}>
           <button
             type="button"
-            className="admin-line-clear-button"
+            className={`${s.btnSecondary} ${u.sm}`}
             onClick={() => router.back()}
             disabled={loading}
           >
             Cancel
           </button>
-          <button
-            type="button"
-            className="admin-line-primary"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Create user'}
-          </button>
-        </div>
-      </div>
-
-      {!isEdit && (
-        <div style={{ marginTop: 15 }}>
-          <button type="button" className="admin-line-primary" onClick={handleSubmit} disabled={loading}>
+          <button type="button" className={s.btnPrimary} onClick={handleSubmit} disabled={loading}>
             {loading ? 'Creating…' : 'Create user'}
           </button>
         </div>
-      )}
+      ) : null}
 
-      {isEdit && user && (
-        <div className="sweep-user-danger">
-          <div>
-            <strong>Account actions</strong>
-            <p>Deactivate an account temporarily, or delete it permanently.</p>
+      {isEdit && user ? (
+        <section className={`${s.panel} ${f.actions}`} aria-labelledby="person-actions-heading">
+          <div className={s.panelHead}>
+            <h2 id="person-actions-heading" className={s.kicker}>
+              Account actions
+            </h2>
           </div>
-          <div className="sweep-user-danger-actions">
-            {formData.status === 'pending' && user.fieldRole && <button type="button" className="admin-line-primary" onClick={() => void acceptPending()} disabled={actionBusy}>{actionBusy ? 'Working…' : 'Accept'}</button>}
-            <button type="button" className="admin-line-action" onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')} disabled={actionBusy}>
-              {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
+          <div className={`${u.panelBody} ${f.actionsBody}`}>
+            <p className={u.hint}>Deactivate an account temporarily, or delete it permanently.</p>
+            <div className={u.btnRow}>
+              {formData.status === 'pending' && user.fieldRole ? (
+                <button
+                  type="button"
+                  className={`${s.btnPrimary} ${u.primarySm}`}
+                  onClick={() => void acceptPending()}
+                  disabled={actionBusy}
+                >
+                  {actionBusy ? 'Working…' : 'Accept'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm}`}
+                onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')}
+                disabled={actionBusy}
+              >
+                {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
+              </button>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                onClick={() => void deleteUser()}
+                disabled={actionBusy}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* Sticky, not fixed: it rides the bottom of the scroller while the form is
+          in view and settles under it at the end, so nothing is ever covered and
+          no position:fixed lives inside the phone scroller. */}
+      {showSaveBar ? (
+        <div className={f.saveBar} role="status">
+          <span className={f.saveText}>
+            {saved ? (
+              <>
+                <Check size={18} className={f.savedIcon} aria-hidden="true" />
+                {personName} saved
+              </>
+            ) : (
+              <>Unsaved changes to {personName}</>
+            )}
+          </span>
+          <div className={f.saveActions}>
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm}`}
+              onClick={() => router.back()}
+              disabled={loading}
+            >
+              Cancel
             </button>
-            <button type="button" className="admin-line-action danger" onClick={() => void deleteUser()} disabled={actionBusy}>
-              Delete
+            <button
+              type="button"
+              className={`${s.btnPrimary} ${u.primarySm}`}
+              onClick={handleSubmit}
+              disabled={loading || saved}
+            >
+              {loading ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </div>
-      )}
-    </>
+      ) : null}
+    </div>
   );
 }
