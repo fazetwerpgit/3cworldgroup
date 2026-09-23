@@ -12,6 +12,31 @@
   padding-bottom: calc(var(--s7) + var(--s4));
 }
 
+/* Moving between Proof and Details: the new step slides in 12px from the side
+   the rep is heading, and fades up. Backwards fill only, so nothing is left
+   transformed once it lands (the submit bar is fixed, and portaled anyway). */
+.main[data-step-move='forward'] {
+  animation: stepForward 280ms ease-out backwards;
+}
+
+.main[data-step-move='back'] {
+  animation: stepBack 280ms ease-out backwards;
+}
+
+@keyframes stepForward {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0);
+  }
+}
+
+@keyframes stepBack {
+  from {
+    opacity: 0;
+    transform: translate3d(-12px, 0, 0);
+  }
+}
+
 /* ---------- step label ---------- */
 .steps {
   margin: 0 0 var(--s4);
@@ -830,6 +855,18 @@ span.thumbView {
   border-color: var(--c-amber);
 }
 
+/* Filled from the screenshot: the input's well lifts to a lighter neutral
+   panel tint and settles back over 600ms, so the rep sees what went in. */
+.fieldFilled .input {
+  animation: scanFill 600ms ease-out;
+}
+
+@keyframes scanFill {
+  from {
+    background-color: rgb(38, 53, 76);
+  }
+}
+
 .flagLow .flagTag {
   border-color: var(--c-amber);
   background: var(--c-amber);
@@ -1103,6 +1140,11 @@ span.thumbView {
 @media (prefers-reduced-motion: reduce) {
   .submitSwap > span {
     transition: none;
+  }
+
+  .main[data-step-move],
+  .fieldFilled .input {
+    animation: none;
   }
 }
 

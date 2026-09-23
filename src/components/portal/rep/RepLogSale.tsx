@@ -104,6 +104,7 @@ function Field({
   wide,
   flag,
   reading,
+  filled,
   children,
 }: {
   id: string;
@@ -116,11 +117,13 @@ function Field({
   flag?: 'low' | 'medium';
   /** The screenshot is being read and may fill this field. */
   reading?: boolean;
+  /** The screenshot filled this field: it takes a brief tint as the value lands. */
+  filled?: boolean;
   children: ReactNode;
 }) {
   const flagClass = flag === 'low' ? l.flagLow : flag === 'medium' ? l.flagMedium : '';
   return (
-    <div className={`${l.field} ${error ? l.fieldInvalid : flagClass} ${wide ? l.wide : ''}`}>
+    <div className={`${l.field} ${error ? l.fieldInvalid : flagClass} ${wide ? l.wide : ''} ${filled ? l.fieldFilled : ''}`}>
       <label htmlFor={id} className={l.label}>
         {label}
         {flag && !error ? (
@@ -186,6 +189,15 @@ export function RepLogSale() {
   const { formRef, errorRef, ...form } = useSaleFormState();
   const { rates, hasPlan, error: planError, retry: retryPlan } = useCompPlan();
   const [step, setStep] = useState<'entry' | 'details'>('entry');
+  // Which way the rep last moved between the steps; the page slides in from
+  // that side. Null until they move, so a first paint or a restored draft stays put.
+  const [stepMove, setStepMove] = useState<'forward' | 'back' | null>(null);
+  const goToStep = (next: 'entry' | 'details') => {
+    setStep(next);
+    setStepMove(next === 'details' ? 'forward' : 'back');
+  };
+  // Fields the screenshot filled, for the tint as each value lands.
+  const [scanFilled, setScanFilled] = useState<ReadonlySet<ScanTarget>>(() => new Set());
   const [providerChoice, setProviderChoice] = useState<string | null>(null);
 
   const hasInternetPlan = form.products.some((p) => !isExtraPlanId(p.productId));
@@ -196,6 +208,7 @@ export function RepLogSale() {
     isEmpty: (target) =>
       target === 'plan' ? !hasInternetPlan : !form.formData[target].trim(),
     apply: (fills: ScanFill[]) => {
+      setScanFilled((prev) => new Set([...prev, ...fills.map((fill) => fill.target)]));
       for (const fill of fills) {
         if (fill.target === 'plan') {
           setProviderChoice(fill.provider);
@@ -245,7 +258,7 @@ export function RepLogSale() {
 
   const pickFiles = (files: FileList | null) => {
     const taken = uploads.addFiles(Array.from(files ?? []));
-    if (taken > 0) setStep('details');
+    if (taken > 0) goToStep('details');
   };
 
   const chooseProvider = (company: string) => {
@@ -297,7 +310,8 @@ export function RepLogSale() {
     for (const tile of uploads.tiles) if (tile.kind !== 'done') uploads.discard(tile.key);
     form.startOver();
     scan.reset();
-    setStep('entry');
+    setScanFilled(new Set());
+    goToStep('entry');
     setProviderChoice(null);
     setMoreOpen(false);
     setConfirmClear(false);
@@ -334,7 +348,11 @@ export function RepLogSale() {
     };
   };
   /** Field props for a field the screenshot reader can fill. */
-  const scanned = (target: ScanTarget) => ({ flag: scan.flags[target], reading: scan.pending(target) });
+  const scanned = (target: ScanTarget) => ({
+    flag: scan.flags[target],
+    reading: scan.pending(target),
+    filled: scanFilled.has(target),
+  });
 
   const blockError = form.blockError;
   const offline = blockError === NO_SIGNAL_SALE_MESSAGE;
@@ -383,7 +401,7 @@ export function RepLogSale() {
 
   if (!onDetails) {
     return (
-      <div className={l.main}>
+      <div className={l.main} data-step-move={stepMove ?? undefined}>
         <Steps onDetails={false} />
         <div className={l.defaultGrid}>
           <section className={l.entry} aria-labelledby="entry-h">
@@ -432,7 +450,7 @@ export function RepLogSale() {
           </section>
 
           <div className={l.side}>
-            <button type="button" className={l.manual} onClick={() => setStep('details')}>
+            <button type="button" className={l.manual} onClick={() => goToStep('details')}>
               <Keyboard size={20} strokeWidth={1.75} aria-hidden="true" className={l.manualIcon} />
               <span className={l.manualText}>
                 <span className={l.manualTitle}>Enter manually</span>
@@ -447,7 +465,7 @@ export function RepLogSale() {
   }
 
   return (
-    <div className={`${l.main} ${l.mainDetails}`}>
+    <div className={`${l.main} ${l.mainDetails}`} data-step-move={stepMove ?? undefined}>
       <Steps onDetails />
       {form.fromDraft ? (
         confirmClear ? (
