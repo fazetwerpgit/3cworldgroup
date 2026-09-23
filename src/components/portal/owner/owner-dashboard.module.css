@@ -1,12 +1,24 @@
 /* ==========================================================================
    Owner dashboard (direction C, "split"). Money on a raised L2 card with the
    week | month breakdown tucked behind it; counts on flatter scoreboard strips
-   (a recessed header band, Bebas numerals, lime only for a win). Tokens,
-   surface ladder and shadows come from rep.module.css (DESIGN.md §2, §6).
-   No glows, washes or accent shadows.
+   (a recessed header band, Bebas numerals, lime only for a win). Base type,
+   spacing and colour come from rep.module.css; the surface ladder and shadows
+   are owner-local until the rep base carries them (docs/redesign/design-refresh
+   DESIGN.md §2, §6). No glows, washes or accent shadows.
    ========================================================================== */
 
 .grid {
+  --o-well: #08101d;
+  --o-l1: #111c2f;
+  --o-l2: #16233a;
+  --o-l3: #1d2c46;
+  --o-line: rgba(163, 184, 214, 0.13);
+  --o-edge: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --o-sh-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --o-sh-tuck: 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+  --o-sh-3: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -18px rgba(0, 0, 0, 0.8);
+  --o-sh-well: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+
   display: grid;
   gap: var(--s4);
 }
@@ -45,10 +57,10 @@
 .panel,
 .strip {
   overflow: hidden;
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-card);
-  background: var(--c-panel);
-  box-shadow: var(--c-lift);
+  border: 1px solid var(--o-line);
+  border-radius: 14px;
+  background: var(--o-l1);
+  box-shadow: var(--o-edge), var(--o-sh-1);
 }
 
 /* First load: blocks rise in like a sheet, staggered. Transform + opacity only. */
@@ -79,16 +91,16 @@
   position: relative;
   z-index: 2;
   padding: 18px 20px 20px;
-  border: 1px solid var(--c-line);
+  border: 1px solid var(--o-line);
   border-radius: 18px;
-  background: var(--c-raised);
-  box-shadow: var(--c-lift-3);
+  background: var(--o-l2);
+  box-shadow: var(--o-edge), var(--o-sh-3);
 }
 
 .moneyNum {
   margin: var(--s3) 0 0;
   color: var(--c-text);
-  font-family: var(--f-num);
+  font-family: var(--f-ui);
   font-size: clamp(52px, 16vw, 64px);
   font-weight: 600;
   letter-spacing: -0.055em;
@@ -145,11 +157,11 @@
   margin: -18px var(--s2) 0;
   padding-top: 18px;
   overflow: hidden;
-  border: 1px solid var(--c-line);
+  border: 1px solid var(--o-line);
   border-top: 0;
   border-radius: 0 0 16px 16px;
-  background: var(--c-panel);
-  box-shadow: var(--c-lift-2);
+  background: var(--o-l1);
+  box-shadow: var(--o-sh-tuck);
 }
 
 .table {
@@ -184,7 +196,7 @@
 }
 
 .table tbody tr {
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--o-line);
 }
 
 .table tbody th {
@@ -202,7 +214,6 @@
 .cellValue {
   display: block;
   color: var(--c-text);
-  font-family: var(--f-num);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -220,7 +231,7 @@
 
 /* The margin row is the one the card is about: lifted one step. */
 .rowMargin {
-  background: var(--c-panel-hi);
+  background: var(--o-l3);
 }
 
 .rowMargin th {
@@ -230,7 +241,7 @@
 .foot {
   margin: 0;
   padding: var(--s3) 14px 14px;
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--o-line);
   color: var(--c-text-3);
   font-size: var(--t-min);
   line-height: 1.45;
@@ -247,9 +258,9 @@
   justify-content: space-between;
   min-height: 40px;
   padding: 0 var(--s4);
-  border-bottom: 1px solid var(--c-line);
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
+  border-bottom: 1px solid var(--o-line);
+  background: var(--o-well);
+  box-shadow: var(--o-sh-well);
 }
 
 .bandTitle {
@@ -275,7 +286,7 @@
 }
 
 .half + .half {
-  border-left: 1px solid var(--c-line);
+  border-left: 1px solid var(--o-line);
 }
 
 .halfLab {
@@ -330,11 +341,11 @@
 
 /* 2 x 2 on the phone: rule between columns and between rows. */
 .stat:nth-child(even) {
-  border-left: 1px solid var(--c-line);
+  border-left: 1px solid var(--o-line);
 }
 
 .stat:nth-child(n + 3) {
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--o-line);
 }
 
 /* ---------- needs attention: a plain list ---------- */
@@ -345,7 +356,7 @@
 }
 
 .attnList > li + li {
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--o-line);
 }
 
 .attnRow {
@@ -363,7 +374,7 @@
 }
 
 .attnRow:active {
-  background: var(--c-panel-hi);
+  background: var(--o-l3);
   transform: scale(0.985);
 }
 
@@ -587,7 +598,7 @@
   }
 
   .stat + .stat {
-    border-left: 1px solid var(--c-line);
+    border-left: 1px solid var(--o-line);
   }
 
   .attnRow {
