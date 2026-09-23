@@ -133,36 +133,43 @@
 /* ---------- panels ---------- */
 .panelHead {
   flex-wrap: wrap;
-  row-gap: 0;
-  padding-block: var(--s2);
+  row-gap: 2px;
+  min-height: 0;
+  padding-block: 11px;
+  border-radius: calc(var(--r-panel) - 1px) calc(var(--r-panel) - 1px) 0 0;
+  background: var(--c-well);
 }
 
 .panelTitle {
   margin: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-min);
-  font-weight: 600;
+  color: var(--c-text-2);
+  font: 400 20px / 1 var(--f-display);
   letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
 }
 
 .panelMeta {
   margin: 0;
-  color: var(--c-text-2);
+  color: var(--c-text-3);
   font-size: var(--t-sm);
+}
+
+/* Board and install-status panels clip their row hovers to the corners. */
+.board > section,
+.mgmt > section,
+.ledgerCol > section {
+  overflow: hidden;
 }
 
 /* ---------- the one selection control: segmented tabs + filter chips ---------- */
 .seg {
   display: flex;
-  gap: 1px;
+  gap: 4px;
   margin: 0;
-  padding: 0;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
-  background: var(--c-line-strong);
-  overflow: hidden;
+  padding: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
 }
 
 .segBtn {
@@ -172,21 +179,27 @@
   justify-content: center;
   gap: 6px;
   min-width: 88px;
-  min-height: var(--tap);
+  min-height: 40px;
   padding: 0 var(--s4);
   border: 0;
-  background: var(--c-panel);
-  color: var(--c-text-2);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-3);
   font: 600 var(--t-ui) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
+  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+}
+
+.segBtn:active {
+  transform: scale(0.97);
 }
 
 .segBtn[aria-selected='true'],
 .segBtn[aria-pressed='true'] {
-  background: var(--c-lime-wash);
-  color: var(--c-lime-hi);
-  box-shadow: inset 0 -2px 0 var(--c-lime);
+  background: var(--c-panel-hi);
+  box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
+  color: var(--c-text);
 }
 
 .segBtn:focus-visible {
@@ -196,7 +209,7 @@
 
 @media (hover: hover) {
   .segBtn:not([aria-selected='true']):not([aria-pressed='true']):hover {
-    color: var(--c-text);
+    color: var(--c-text-2);
   }
 }
 
@@ -218,15 +231,25 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: var(--tap);
+  min-height: 36px;
   padding: 0 var(--s3);
   border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
+  border-radius: 999px;
   background: transparent;
   color: var(--c-text-2);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  font: 500 var(--t-sm) / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
+  transition: background 140ms, color 140ms, transform 140ms var(--ease);
+}
+
+.chip:active {
+  transform: scale(0.95);
+}
+
+.chip .dot {
+  width: 6px;
+  height: 6px;
 }
 
 .chip b {
@@ -236,13 +259,13 @@
 }
 
 .chip[aria-pressed='true'] {
-  border-color: var(--c-lime);
-  background: var(--c-lime-wash);
-  color: var(--c-lime-hi);
+  border-color: var(--c-text);
+  background: var(--c-text);
+  color: var(--c-ground);
 }
 
 .chip[aria-pressed='true'] b {
-  color: var(--c-lime-hi);
+  color: var(--c-ground);
 }
 
 .chip:focus-visible {
@@ -367,11 +390,10 @@
 }
 
 .money {
-  font-family: var(--f-display);
-  font-size: 28px;
-  font-weight: 400;
+  font-family: var(--f-num);
+  font-size: 17px;
+  font-weight: 600;
   line-height: 1;
-  padding-top: 3px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -917,31 +939,6 @@
   border-bottom: 0;
 }
 
-.ledger .chip {
-  min-height: 36px;
-  border-radius: 999px;
-  font-weight: 500;
-  transition: background 140ms, color 140ms, transform 140ms var(--ease);
-}
-
-.ledger .chip:active {
-  transform: scale(0.95);
-}
-
-.ledger .chip[aria-pressed='true'] {
-  border-color: var(--c-text);
-  background: var(--c-text);
-  color: var(--c-ground);
-}
-
-.ledger .chip[aria-pressed='true'] b {
-  color: var(--c-ground);
-}
-
-.ledger .chip .dot {
-  width: 6px;
-  height: 6px;
-}
 
 .srcNote {
   margin: 0;
@@ -1306,6 +1303,7 @@
 .figs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--c-line);
 }
 
 .fig {
@@ -1321,6 +1319,7 @@
 }
 
 .fig strong {
+  color: var(--c-text);
   font-family: var(--f-display);
   font-size: 40px;
   font-weight: 400;
@@ -1343,24 +1342,29 @@
   font-size: var(--t-sm);
 }
 
-.figPay strong {
-  color: var(--c-lime);
+/* My est. pay has one figure: give it the full row. */
+.figPay {
+  grid-column: 1 / -1;
 }
 
 .period {
   padding: var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
+/* The pipeline bar sits in a well. */
 .stack {
   display: flex;
   gap: 3px;
-  height: 12px;
+  height: 18px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
 }
 
 .stack > i {
   min-width: 6px;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .seg_installed {
@@ -1440,6 +1444,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 140ms;
 }
 
 .expander:first-child {
@@ -1453,12 +1458,16 @@
 
 @media (hover: hover) {
   .expander:hover {
-    background: rgba(163, 184, 214, 0.04);
+    background: var(--c-raised);
   }
 }
 
 .expander[aria-expanded='true'] {
-  background: rgba(163, 184, 214, 0.05);
+  background: var(--c-raised);
+}
+
+.expander:active {
+  background: var(--c-panel-hi);
 }
 
 .chev {
@@ -1495,7 +1504,7 @@
 }
 
 .exSide .money {
-  font-size: 24px;
+  font-size: 17px;
 }
 
 .exSub {
@@ -1532,11 +1541,12 @@
   min-width: 32px;
   height: 28px;
   padding: 0 var(--s2);
-  border-radius: 4px;
-  background: rgba(163, 184, 214, 0.1);
+  border-radius: 999px;
+  background: var(--c-panel-hi);
+  box-shadow: var(--c-edge);
   color: var(--c-text);
-  font-size: var(--t-sm);
-  font-weight: 700;
+  font: 600 var(--t-sm) / 1 var(--f-num);
+  font-variant-numeric: tabular-nums;
 }
 
 .exAlert .exBadge {
@@ -1544,9 +1554,11 @@
   color: var(--c-red);
 }
 
+/* An open group's rows sit one step down, in the ground. */
 .nested {
   border-top: 1px solid var(--c-line);
-  background: rgba(3, 7, 14, 0.35);
+  background: var(--c-ground);
+  box-shadow: var(--c-sink);
 }
 
 /* One customer on the company board. */
@@ -1561,6 +1573,7 @@
   gap: 4px var(--s3);
   min-height: 64px;
   padding: var(--s3) var(--s4) var(--s3) calc(var(--s4) + 20px + var(--s3));
+  transition: background 140ms;
 }
 
 /* The viewer's own pay list: top level, so no nested indent; Paid on the right. */
@@ -1596,8 +1609,12 @@
 
 @media (hover: hover) {
   .bRow[role='button']:hover {
-    background: rgba(163, 184, 214, 0.04);
+    background: var(--c-raised);
   }
+}
+
+.bRow[role='button']:active {
+  background: var(--c-panel-hi);
 }
 
 .bCust {
@@ -1619,7 +1636,9 @@
 
 .bVal b {
   color: var(--c-text);
+  font-family: var(--f-num);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .bProd {
