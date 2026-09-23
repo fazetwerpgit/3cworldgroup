@@ -1,0 +1,573 @@
+/* ==========================================================================
+   Owner dashboard (direction D). Same tokens, panel, score type and blooms as
+   the rep dashboard (rep.module.css / rep-dashboard.module.css); only the
+   content differs: company money as the score panel, then needs attention,
+   then recruiting.
+   ========================================================================== */
+
+.grid {
+  display: grid;
+  gap: var(--s3);
+}
+
+/* Phone: one column in answer order. Desktop: money + recruiting on the left,
+   needs attention on the right. */
+.colMain,
+.colSide {
+  display: contents;
+}
+
+@media (max-width: 1023px) {
+  .banners {
+    order: 0;
+  }
+  .board {
+    order: 1;
+  }
+  .attention {
+    order: 2;
+  }
+  .recruiting {
+    order: 3;
+  }
+}
+
+.banners:empty {
+  display: none;
+}
+
+/* ---------- money: the score panel ---------- */
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-areas:
+    'margin installs'
+    'table table'
+    'foot foot';
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(141, 198, 63, 0) 18%, rgba(141, 198, 63, 0.55) 74%, rgba(141, 198, 63, 0) 100%) top /
+      100% 1px no-repeat,
+    var(--c-panel-fill);
+}
+
+.board::before,
+.board::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Lime bloom behind the installs numeral, cool blue behind the money figure. */
+.board::before {
+  top: -22%;
+  right: -12%;
+  width: 72%;
+  height: 70%;
+  background: radial-gradient(
+    closest-side,
+    rgba(141, 198, 63, 0.2) 0%,
+    rgba(141, 198, 63, 0.124) 35%,
+    rgba(141, 198, 63, 0.052) 68%,
+    transparent 100%
+  );
+}
+
+.board::after {
+  top: -26%;
+  left: -18%;
+  width: 90%;
+  height: 72%;
+  background: radial-gradient(
+    closest-side,
+    rgba(80, 140, 240, 0.17) 0%,
+    rgba(80, 140, 240, 0.105) 35%,
+    rgba(80, 140, 240, 0.044) 68%,
+    transparent 100%
+  );
+}
+
+.boardFailed {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'margin';
+}
+
+.boardFailed .cellMargin {
+  border-right: 0;
+}
+
+.cellMargin,
+.cellInstalls {
+  position: relative;
+  z-index: 1;
+  padding: var(--s4);
+}
+
+.cellMargin {
+  grid-area: margin;
+  border-right: 1px solid var(--c-line);
+}
+
+.cellInstalls {
+  grid-area: installs;
+}
+
+/* Labels over the blooms sit one tone up so they hold 4.5:1. */
+.boardLabel {
+  color: var(--c-text-2);
+}
+
+.score {
+  margin: var(--s3) 0 var(--s2);
+  font-family: var(--f-display);
+  font-size: var(--t-score);
+  font-weight: 400;
+  line-height: 0.82;
+  letter-spacing: 0.005em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Five-figure money has to fit the phone's pay cell. */
+.cellMargin .score {
+  font-size: clamp(48px, 15vw, var(--t-score));
+}
+
+.scoreLime {
+  color: var(--c-lime);
+  text-shadow:
+    0 0 22px rgba(141, 198, 63, 0.45),
+    0 0 64px rgba(141, 198, 63, 0.22);
+}
+
+.heroSub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--s2);
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.35;
+}
+
+.heroSub strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.deltaFlat {
+  color: var(--c-text-2);
+}
+
+/* ---------- money: week | month table ---------- */
+.tableWrap {
+  position: relative;
+  z-index: 1;
+  grid-area: table;
+  border-top: 1px solid var(--c-line);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.table th,
+.table td {
+  padding: var(--s3) var(--s4);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  padding-top: var(--s3);
+  padding-bottom: var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.table thead th:first-child {
+  width: 30%;
+}
+
+.table tbody th {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  padding-top: 14px;
+}
+
+.table tbody tr {
+  border-top: 1px solid var(--c-line);
+}
+
+.table td,
+.table thead th + th {
+  padding-right: var(--s3);
+  padding-left: var(--s2);
+}
+
+.cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.cellValue {
+  display: block;
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: 30px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cellPrior {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--s2);
+  margin-top: 6px;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+}
+
+.rowMargin th {
+  color: var(--c-text);
+}
+
+.rowMargin .cellValue {
+  color: var(--c-lime);
+}
+
+.foot {
+  position: relative;
+  z-index: 1;
+  grid-area: foot;
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  line-height: 1.45;
+}
+
+.footGap {
+  color: var(--c-amber);
+}
+
+.cellFailed {
+  padding: 0;
+  margin-top: var(--s3);
+}
+
+/* ---------- needs attention ---------- */
+.attnList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attnList > li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.attnRow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 64px;
+  padding: 10px var(--s3) 10px var(--s4);
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.attnRow:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .attnRow:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+.attnCount {
+  font-family: var(--f-display);
+  font-size: var(--t-d2);
+  line-height: 1;
+  padding-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.attnRisk {
+  color: var(--c-amber);
+}
+
+.tText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tTitle {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tSub {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.chev {
+  color: var(--c-text-3);
+}
+
+.clear {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  min-height: 64px;
+  margin: 0;
+  padding: 10px var(--s4);
+}
+
+.clearTile {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-panel);
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+/* ---------- recruiting ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stat {
+  padding: var(--s4);
+}
+
+/* 2 x 2 on the phone: rule between columns and between rows. */
+.stat:nth-child(even) {
+  border-left: 1px solid var(--c-line);
+}
+
+.stat:nth-child(n + 3) {
+  border-top: 1px solid var(--c-line);
+}
+
+.statLabel {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.statValue {
+  margin: var(--s3) 0 var(--s2);
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.statPrior {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.statPrior strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* ---------- skeletons ---------- */
+.skelScore {
+  width: 62%;
+  height: 58px;
+  margin: var(--s3) 0 var(--s2);
+}
+
+.skelLine {
+  width: 48%;
+  height: 12px;
+}
+
+.skelBody,
+.skelTable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelRow {
+  height: 40px;
+}
+
+/* ---------- desktop ---------- */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--s4);
+  }
+
+  .banners {
+    grid-column: 1 / -1;
+  }
+
+  .colMain,
+  .colSide {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s4);
+    min-width: 0;
+  }
+
+  .colMain {
+    grid-column: 1 / span 8;
+  }
+
+  .colSide {
+    grid-column: 9 / span 4;
+  }
+
+  .cellMargin,
+  .cellInstalls {
+    padding: var(--s5) var(--s6) var(--s6);
+  }
+
+  .score,
+  .cellMargin .score {
+    margin: var(--s5) 0 var(--s3);
+    font-size: var(--t-score);
+  }
+
+  .heroSub,
+  .delta {
+    font-size: var(--t-ui);
+  }
+
+  .table th,
+  .table td {
+    padding: 14px var(--s6);
+  }
+
+  .table td,
+  .table thead th + th {
+    padding-right: var(--s6);
+    padding-left: var(--s4);
+  }
+
+  .table thead th:first-child {
+    width: 34%;
+  }
+
+  .table thead th {
+    padding-top: var(--s4);
+    padding-bottom: var(--s2);
+  }
+
+  .table tbody th,
+  .table tbody td {
+    vertical-align: middle;
+  }
+
+  .table tbody th {
+    font-size: var(--t-ui);
+  }
+
+  .cellValue {
+    font-size: 40px;
+  }
+
+  .foot {
+    padding: var(--s3) var(--s6);
+    font-size: var(--t-sm);
+  }
+
+  .skelScore {
+    height: 88px;
+    margin: var(--s5) 0 var(--s3);
+  }
+
+  .stat {
+    padding: var(--s4) var(--s5);
+  }
+
+  /* The two columns end level: whichever is shorter stretches its last panel. */
+  .colMain .board {
+    flex: 1;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .colMain .boardFailed {
+    grid-template-rows: auto;
+  }
+
+  .table {
+    height: 100%;
+  }
+
+  .attnRow {
+    min-height: 60px;
+  }
+
+  /* When the column stretches, a tile keeps its label on top and its figures
+     on the bottom edge, like the score cells, instead of floating mid-air. */
+  .stat {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--s3);
+  }
+
+  .stat .statValue {
+    margin-top: auto;
+  }
+
+  /* Recruiting closes the right column level with the money panel. */
+  .recruiting {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .recruiting .stats {
+    flex: 1;
+  }
+}

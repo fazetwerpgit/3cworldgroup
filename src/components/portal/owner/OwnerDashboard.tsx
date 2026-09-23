@@ -1,0 +1,373 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { CheckCircle2, ChevronRight, RotateCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
+import type {
+  MoneyComparison,
+  MoneyFigures,
+  MoneySummary,
+  ProblemKey,
+  ProblemRow,
+  RecruitingSummary,
+  WeekCount,
+} from '@/lib/owner/companySummary';
+import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
+import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
+import s from '../rep/rep.module.css';
+import o from './owner-dashboard.module.css';
+
+// The owner's home screen (direction D): the company, not a personal pay card.
+// Money first (estimated from installs × the comp plan), then what needs
+// attention, then recruiting. Each section loads and fails on its own.
+
+// ---------------------------------------------------------------- format
+
+function money(n: number) {
+  const whole = Math.round(Math.abs(n)).toLocaleString('en-US');
+  return n < 0 ? `−$${whole}` : `$${whole}`;
+}
+
+const count = (n: number) => n.toLocaleString('en-US');
+
+/** Whole-percent change, or null when there is nothing to compare against. */
+function deltaPct(current: number, prior: number): number | null {
+  if (prior <= 0) return null;
+  return Math.round(((current - prior) / prior) * 100);
+}
+
+const SHORT_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Chicago' });
+
+/** The prior cut's last day, e.g. "Aug 22" (the cut ends mid-day, so step back a moment). */
+const priorDay = (iso: string) => SHORT_DAY.format(new Date(new Date(iso).getTime() - 1));
+
+const MONTH_SHORT = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'America/Chicago' });
+
+// ---------------------------------------------------------------- shared bits
+
+function Failed({ what, onRetry, className = '' }: { what: string; onRetry: () => void; className?: string }) {
+  return (
+    <div className={`${s.failed} ${className}`} role="alert">
+      <span>Couldn&apos;t load {what}</span>
+      <button type="button" className={s.retry} onClick={onRetry}>
+        <RotateCw size={14} aria-hidden="true" />
+        Retry
+      </button>
+    </div>
+  );
+}
+
+function PanelHead({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
+  return (
+    <div className={s.panelHead}>
+      <h2 id={id} className={s.kicker}>
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+function Delta({ current, prior, label, neutral = false }: { current: number; prior: number; label: string; neutral?: boolean }) {
+  const pct = deltaPct(current, prior);
+  if (pct === null) return null;
+  const down = pct < 0;
+  return (
+    <span className={`${o.delta} ${down || neutral ? o.deltaFlat : ''}`} aria-label={`${pct > 0 ? '+' : ''}${pct}% ${label}`}>
+      {down ? (
+        <TrendingDown size={14} strokeWidth={2.25} aria-hidden="true" />
+      ) : (
+        <TrendingUp size={14} strokeWidth={2.25} aria-hidden="true" />
+      )}
+      {pct > 0 ? '+' : ''}
+      {pct}%
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------- money
+
+const MONEY_ROWS: Array<{ key: keyof MoneyFigures; label: string; format: (n: number) => string; neutral?: boolean }> = [
+  { key: 'installs', label: 'Installs', format: count },
+  { key: 'revenue', label: 'Est. revenue', format: money },
+  { key: 'commissions', label: 'Rep commissions', format: money, neutral: true },
+  { key: 'margin', label: 'Est. margin', format: money },
+];
+
+function MoneyCell({ comparison, row, priorLabel }: { comparison: MoneyComparison; row: (typeof MONEY_ROWS)[number]; priorLabel: string }) {
+  const current = comparison.current[row.key];
+  const prior = comparison.prior[row.key];
+  return (
+    <td className={o.cell}>
+      <span className={o.cellValue}>{row.format(current)}</span>
+      <span className={o.cellPrior}>
+        <Delta current={current} prior={prior} label={priorLabel} neutral={row.neutral} />
+        <span>
+          <span className={s.srOnly}>{priorLabel}: </span>
+          <span aria-hidden="true">vs </span>
+          {row.format(prior)}
+        </span>
+      </span>
+    </td>
+  );
+}
+
+function MoneyBoard({ data }: { data: MoneySummary }) {
+  const month = data.month;
+  const week = data.week;
+  const monthPrior = `through ${priorDay(month.priorEnd)}`;
+  const weekPrior = `through ${priorDay(week.priorEnd)}`;
+  const gaps = [
+    data.unpricedInstalls > 0
+      ? `${data.unpricedInstalls} ${data.unpricedInstalls === 1 ? 'install has' : 'installs have'} no 3C rate yet`
+      : null,
+    data.unratedInstalls > 0
+      ? `${data.unratedInstalls} ${data.unratedInstalls === 1 ? 'install has' : 'installs have'} no rep rate`
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <section className={`${s.panel} ${o.board}`} aria-labelledby="money-h">
+      <h2 id="money-h" className={s.srOnly}>
+        Company money
+      </h2>
+      <div className={o.cellMargin}>
+        <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+        <p className={o.score}>{money(month.current.margin)}</p>
+        <p className={o.heroSub}>
+          <Delta current={month.current.margin} prior={month.prior.margin} label={`vs ${monthPrior}`} />
+          <span>
+            vs {money(month.prior.margin)} through {priorDay(month.priorEnd)}
+          </span>
+        </p>
+      </div>
+
+      <div className={o.cellInstalls}>
+        <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
+        <p className={`${o.score} ${o.scoreLime}`}>{count(week.current.installs)}</p>
+        <p className={o.heroSub}>
+          <span>
+            <strong>installs</strong> · vs {count(week.prior.installs)} by {priorDay(week.priorEnd)}
+          </span>
+        </p>
+      </div>
+
+      <div className={o.tableWrap}>
+        <table className={o.table}>
+          <caption className={s.srOnly}>
+            Estimated installs, revenue, rep commissions and margin, this week and this month, each against the same
+            point in the prior period
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className={s.srOnly}>Figure</span>
+              </th>
+              <th scope="col">This week</th>
+              <th scope="col">This month</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MONEY_ROWS.map((row) => (
+              <tr key={row.key} className={row.key === 'margin' ? o.rowMargin : undefined}>
+                <th scope="row">{row.label}</th>
+                <MoneyCell comparison={week} row={row} priorLabel={weekPrior} />
+                <MoneyCell comparison={month} row={row} priorLabel={monthPrior} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className={o.foot}>
+        Estimates from installs × current comp-plan rates. &ldquo;vs&rdquo; is the same point last week or last month.
+        {gaps.length ? <span className={o.footGap}> {gaps.join(' · ')} (counted at $0).</span> : null}
+      </p>
+    </section>
+  );
+}
+
+function MoneySkeleton() {
+  return (
+    <section className={`${s.panel} ${o.board}`} aria-busy="true" aria-label="Loading company money">
+      <div className={o.cellMargin}>
+        <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+        <span className={`${s.skel} ${o.skelScore}`} />
+        <span className={`${s.skel} ${o.skelLine}`} />
+      </div>
+      <div className={o.cellInstalls}>
+        <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
+        <span className={`${s.skel} ${o.skelScore}`} />
+      </div>
+      <div className={`${o.tableWrap} ${o.skelTable}`}>
+        {MONEY_ROWS.map((row) => (
+          <span key={row.key} className={`${s.skel} ${o.skelRow}`} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- needs attention
+
+const PROBLEM_COPY: Record<ProblemKey, { one: string; many: string; page: string }> = {
+  carrierCancellations: { one: 'Carrier cancellation this week', many: 'Carrier cancellations this week', page: 'Sales · Cancelled' },
+  notLogged: { one: 'Carrier order not logged', many: 'Carrier orders not logged', page: 'Sales · Not logged' },
+  payrollDisputes: { one: 'Open pay dispute', many: 'Open pay disputes', page: 'Payroll disputes' },
+  stalledOnboarding: { one: 'Stuck in onboarding 3+ days', many: 'Stuck in onboarding 3+ days', page: 'Onboarding' },
+  pendingSignups: { one: 'Signup waiting for approval', many: 'Signups waiting for approval', page: 'Users' },
+  missingInstallDate: { one: 'Sale missing an install date', many: 'Sales missing an install date', page: 'Sales' },
+  expediteOrders: { one: 'Open expedite request', many: 'Open expedite requests', page: 'Expedite orders' },
+  leadsRequests: { one: 'Open leads request', many: 'Open leads requests', page: 'Leads requests' },
+  bugReports: { one: 'New bug report', many: 'New bug reports', page: 'Bug reports' },
+};
+
+/** Money at risk reads amber; queues read plain. */
+const MONEY_RISK: ReadonlySet<ProblemKey> = new Set(['carrierCancellations', 'notLogged', 'payrollDisputes', 'missingInstallDate']);
+
+function Attention({ rows }: { rows: ProblemRow[] }) {
+  const open = rows.filter((row) => row.count > 0);
+  return (
+    <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
+      <PanelHead id="attn-h" title="Needs attention" />
+      {open.length === 0 ? (
+        <p className={o.clear}>
+          <span className={o.clearTile} aria-hidden="true">
+            <CheckCircle2 size={18} strokeWidth={2} />
+          </span>
+          <span className={o.tText}>
+            <span className={o.tTitle}>All clear</span>
+            <span className={o.tSub}>Nothing is waiting in any queue.</span>
+          </span>
+        </p>
+      ) : (
+        <ul className={o.attnList}>
+          {open.map((row) => {
+            const copy = PROBLEM_COPY[row.key];
+            return (
+              <li key={row.key}>
+                <Link href={row.href} className={o.attnRow}>
+                  <span className={`${o.attnCount} ${MONEY_RISK.has(row.key) ? o.attnRisk : ''}`}>{count(row.count)}</span>
+                  <span className={o.tText}>
+                    <span className={o.tTitle}>{row.count === 1 ? copy.one : copy.many}</span>
+                    <span className={o.tSub}>{copy.page}</span>
+                  </span>
+                  <ChevronRight size={20} className={o.chev} aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- recruiting
+
+const RECRUITING_TILES: Array<{ key: keyof RecruitingSummary; label: string }> = [
+  { key: 'applications', label: 'Applications' },
+  { key: 'interviews', label: 'Interviews' },
+  { key: 'activations', label: 'Activated' },
+  { key: 'firstInstalls', label: 'First installs' },
+];
+
+function RecruitingTile({ label, value }: { label: string; value: WeekCount }) {
+  return (
+    <div className={o.stat}>
+      <p className={o.statLabel}>{label}</p>
+      <p className={o.statValue}>{count(value.thisWeek)}</p>
+      <p className={o.statPrior}>
+        <strong>{count(value.lastWeek)}</strong> all last week
+      </p>
+    </div>
+  );
+}
+
+function Recruiting({ data }: { data: RecruitingSummary }) {
+  return (
+    <section className={`${s.panel} ${o.recruiting}`} aria-labelledby="recruit-h">
+      <PanelHead id="recruit-h" title="Recruiting · this week" />
+      <div className={o.stats}>
+        {RECRUITING_TILES.map((tile) => (
+          <RecruitingTile key={tile.key} label={tile.label} value={data[tile.key]} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SkeletonPanel({ label, title, rows, className }: { label: string; title: string; rows: number; className: string }) {
+  return (
+    <section className={`${s.panel} ${className}`} aria-busy="true" aria-label={label}>
+      <PanelHead id={`${className}-skel`} title={title} />
+      <div className={o.skelBody}>
+        {Array.from({ length: rows }, (_, i) => (
+          <span key={i} className={`${s.skel} ${o.skelRow}`} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- page
+
+export function OwnerDashboard() {
+  const data = useOwnerDashboard();
+  const { retry } = data;
+  const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
+
+  return (
+    <>
+      <h1 className={s.srOnly}>Company dashboard</h1>
+
+      <div className={o.grid}>
+        <div className={o.banners}>
+          <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
+          {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
+        </div>
+
+        <div className={o.colMain}>
+          {data.money.status === 'loading' ? (
+            <MoneySkeleton />
+          ) : data.money.status === 'error' ? (
+            <section className={`${s.panel} ${o.board} ${o.boardFailed}`} aria-label="Company money">
+              <div className={o.cellMargin}>
+                <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+                <Failed what="company money" onRetry={() => retry('money')} className={o.cellFailed} />
+              </div>
+            </section>
+          ) : (
+            <MoneyBoard data={data.money.data} />
+          )}
+
+        </div>
+
+        <div className={o.colSide}>
+          {data.problems.status === 'loading' ? (
+            <SkeletonPanel label="Loading needs attention" title="Needs attention" rows={4} className={o.attention} />
+          ) : data.problems.status === 'error' ? (
+            <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
+              <PanelHead id="attn-h" title="Needs attention" />
+              <Failed what="what needs attention" onRetry={() => retry('problems')} />
+            </section>
+          ) : (
+            <Attention rows={data.problems.data} />
+          )}
+
+          {data.recruiting.status === 'loading' ? (
+            <SkeletonPanel label="Loading recruiting" title="Recruiting · this week" rows={2} className={o.recruiting} />
+          ) : data.recruiting.status === 'error' ? (
+            <section className={`${s.panel} ${o.recruiting}`} aria-labelledby="recruit-h">
+              <PanelHead id="recruit-h" title="Recruiting · this week" />
+              <Failed what="recruiting" onRetry={() => retry('recruiting')} />
+            </section>
+          ) : (
+            <Recruiting data={data.recruiting.data} />
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
