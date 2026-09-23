@@ -11,6 +11,14 @@
     {
       "path": "/api/cron/weekly-installs?slot=cst",
       "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/cron/announcements?slot=cdt",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/announcements?slot=cst",
+      "schedule": "0 14 * * *"
     }
   ]
 }

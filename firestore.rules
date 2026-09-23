@@ -173,6 +173,10 @@ service cloud.firestore {
     match /onboardingNudges/{uid} {
       allow read, write: if false;
     }
+    // Owner push announcements: server-only (Admin SDK via the owner API and cron).
+    match /announcements/{announcementId} {
+      allow read, write: if false;
+    }
 
     match /chatChannels/{channelId} {
       allow read: if (isApproved() || isOnboardingMember()) && request.auth.uid in resource.data.memberIds;
