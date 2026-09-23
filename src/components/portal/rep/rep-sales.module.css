@@ -1,0 +1,2012 @@
+/* ==========================================================================
+   Sales page — direction D. Page-scoped styles for /portal/sales: the KPI
+   strip, the rep's ledger + pay list, the company board (admin / owner),
+   Install status by rep and the sale detail sheet. Tokens and primitives
+   (.panel, .kicker, buttons, .sheet, .skel) live in rep.module.css; this file
+   only reads the custom properties it defines on .root / .layer.
+   ========================================================================== */
+
+/* ---------- page head ---------- */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3) var(--s4);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d2);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding-top: 3px;
+}
+
+/* ‹ September 2026 › — the month picker, one bordered control. */
+.month {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-panel);
+  overflow: hidden;
+}
+
+.monthBtn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  cursor: pointer;
+}
+
+.monthBtn:disabled {
+  color: var(--c-text-3);
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .monthBtn:not(:disabled):hover {
+    background: rgba(163, 184, 214, 0.06);
+  }
+}
+
+.monthLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  padding: 0 var(--s2);
+  border-inline: 1px solid var(--c-line);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- KPI strip ---------- */
+.kpis {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    'value count'
+    'pay pay';
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(141, 198, 63, 0) 30%, rgba(141, 198, 63, 0.5) 82%, rgba(141, 198, 63, 0) 100%) top / 100% 1px no-repeat,
+    radial-gradient(70% 120% at 100% 0%, rgba(141, 198, 63, 0.1) 0%, rgba(141, 198, 63, 0.05) 45%, transparent 100%),
+    var(--c-panel-fill);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s4);
+}
+
+.kpiValue {
+  grid-area: value;
+  border-right: 1px solid var(--c-line);
+}
+
+.kpiCount {
+  grid-area: count;
+}
+
+.kpiPay {
+  grid-area: pay;
+  border-top: 1px solid var(--c-line);
+}
+
+.kpiLabel {
+  color: var(--c-text-2);
+}
+
+.kpiNum {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  line-height: 0.9;
+  padding-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiPay .kpiNum {
+  color: var(--c-lime);
+  font-size: 64px;
+}
+
+.kpiUnit {
+  color: var(--c-text-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.kpiNote {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.kpiNote b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.kpiDash {
+  color: var(--c-text-3);
+}
+
+/* ---------- panels ---------- */
+.panelHead {
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding-block: var(--s2);
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.panelMeta {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* ---------- the one selection control: segmented tabs + filter chips ---------- */
+.seg {
+  display: flex;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-line-strong);
+  overflow: hidden;
+}
+
+.segBtn {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 88px;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segBtn[aria-selected='true'],
+.segBtn[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+  box-shadow: inset 0 -2px 0 var(--c-lime);
+}
+
+.segBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .segBtn:not([aria-selected='true']):not([aria-pressed='true']):hover {
+    color: var(--c-text);
+  }
+}
+
+.tabsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.tabsRow .seg {
+  flex: 1;
+}
+
+.chips {
+  display: flex;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip b {
+  color: var(--c-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--c-lime);
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+.chip[aria-pressed='true'] b {
+  color: var(--c-lime-hi);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .chip:not([aria-pressed='true']):hover {
+    border-color: var(--c-text-2);
+    color: var(--c-text);
+  }
+}
+
+/* ---------- status language (same as the dashboard) ---------- */
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.st_installed,
+.t_active {
+  color: var(--c-lime);
+}
+
+.st_scheduled,
+.t_pending {
+  color: var(--c-blue);
+}
+
+.st_needsdate,
+.t_attention {
+  color: var(--c-amber);
+}
+
+.st_missed,
+.t_never {
+  color: var(--c-red);
+}
+
+.st_cancelled,
+.t_cancelled,
+.t_quiet {
+  color: var(--c-text-3);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* The carrier's own word on an order ("live" status from the provider report). */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pill .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: rgba(163, 184, 214, 0.1);
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tagWarn {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+}
+
+.statusStack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--s2);
+  min-width: 0;
+}
+
+/* ---------- money ---------- */
+.est {
+  margin-right: 4px;
+  color: var(--c-text-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.money {
+  font-family: var(--f-display);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1;
+  padding-top: 3px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.moneyQuiet {
+  color: var(--c-text-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  padding-top: 0;
+}
+
+.muted {
+  color: var(--c-text-3);
+}
+
+/* ---------- ledger rows ---------- */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thead {
+  display: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name pay'
+    'status status'
+    'meta value';
+  align-items: center;
+  gap: 4px var(--s3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--s3) var(--s4) 14px;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.row + .row,
+.list > li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .row:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+.rowOff .cName,
+.rowOff .cPay .money {
+  color: var(--c-text-3);
+}
+
+.cName {
+  grid-area: name;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cName strong {
+  overflow: hidden;
+  font-size: var(--t-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cName span {
+  display: none;
+}
+
+.cPay {
+  grid-area: pay;
+  text-align: right;
+}
+
+.cStatus {
+  grid-area: status;
+  min-width: 0;
+}
+
+.cWhen {
+  grid-area: when;
+  /* On a phone the status line already carries the install date. */
+  display: none;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cWhen b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.cWhen span {
+  display: none;
+}
+
+.cMeta {
+  grid-area: meta;
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cValue {
+  grid-area: value;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cPayout {
+  display: none;
+}
+
+.cActions {
+  display: none;
+}
+
+/* Pay rows: the Paid tick takes the "value" slot on a phone. */
+.payRow {
+  grid-template-areas:
+    'name pay'
+    'status paid'
+    'meta paid';
+}
+
+.payRow .cWhen {
+  display: none;
+}
+
+.payRow .cPaid {
+  grid-area: paid;
+  justify-self: end;
+}
+
+.payout {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.payout b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* "Paid" — a real 44px tap target around a native checkbox. */
+.paid {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding: 0 var(--s2) 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.paid input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--c-lime);
+  cursor: pointer;
+}
+
+.paid:has(input:checked) {
+  border-color: var(--c-lime);
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+.paid:has(input:focus-visible) {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: var(--s1);
+}
+
+.quietBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.quietBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .quietBtn:not(:disabled):hover {
+    border-color: var(--c-line-strong);
+    color: var(--c-text);
+  }
+}
+
+.quietBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line-strong);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.totals b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.totalsPay {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.totalsPay .money {
+  color: var(--c-lime);
+}
+
+.note {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.noteWarn {
+  border-left: 2px solid var(--c-amber);
+  background: var(--c-amber-wash);
+  color: var(--c-text);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--s5) var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+/* ---------- carrier (fiber) rows ---------- */
+.fiberRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'who pill'
+    'meta meta';
+  gap: 4px var(--s3);
+  padding: var(--s3) var(--s4) 14px;
+}
+
+.fiberRow + .fiberRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.fiberWho {
+  grid-area: who;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fiberWho strong {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.fiberWho span {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.fiberMeta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s3);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.fiberPill {
+  grid-area: pill;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.fiberMeta > span + span::before {
+  content: '·';
+  margin-right: var(--s3);
+  color: var(--c-text-3);
+}
+
+/* ---------- loading / failed / zero ---------- */
+.skelBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelKpi {
+  height: 44px;
+  width: 60%;
+}
+
+.skelLine {
+  width: 40%;
+  height: 12px;
+}
+
+.skelRow {
+  height: 48px;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4);
+}
+
+.welcomeTitle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+
+.welcomeText {
+  margin: 0 0 var(--s2);
+  max-width: 34em;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+.alert {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid rgba(255, 138, 128, 0.35);
+  border-radius: var(--r-panel);
+  background: rgba(255, 138, 128, 0.08);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+/* ---------- company board (admin / owner) ---------- */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fig {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s4);
+}
+
+.fig + .fig {
+  border-left: 1px solid var(--c-line);
+}
+
+.fig strong {
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 0.9;
+  padding-top: 3px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fig strong small {
+  margin-left: 3px;
+  color: var(--c-text-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.fig > span {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.figPay strong {
+  color: var(--c-lime);
+}
+
+.period {
+  padding: var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.stack {
+  display: flex;
+  gap: 3px;
+  height: 12px;
+}
+
+.stack > i {
+  min-width: 6px;
+  border-radius: 2px;
+}
+
+.seg_installed {
+  background: var(--c-lime);
+  box-shadow: 0 0 10px rgba(141, 198, 63, 0.38);
+}
+
+.seg_scheduled {
+  background: var(--c-blue);
+  box-shadow: 0 0 10px rgba(124, 184, 255, 0.24);
+}
+
+.seg_needs {
+  background: var(--c-amber);
+  box-shadow: 0 0 10px rgba(245, 185, 69, 0.26);
+}
+
+.seg_empty {
+  background: var(--c-track);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+  margin: var(--s3) 0 0;
+  padding: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.scope {
+  margin: var(--s2) 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.scale {
+  display: block;
+  padding: var(--s3) var(--s4) 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.repHead {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* An expandable row (rep, drawer, install-status group). */
+.expander {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--s3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--s3) var(--s4);
+  border: 0;
+  border-top: 1px solid var(--c-line);
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.expander:first-child {
+  border-top: 0;
+}
+
+.expander:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .expander:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+.expander[aria-expanded='true'] {
+  background: rgba(163, 184, 214, 0.05);
+}
+
+.chev {
+  grid-row: 1 / span 2;
+  color: var(--c-text-3);
+  transition: transform 180ms var(--ease);
+}
+
+.expander[aria-expanded='true'] .chev {
+  transform: rotate(90deg);
+  color: var(--c-text);
+}
+
+.exName {
+  overflow: hidden;
+  font-size: var(--t-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A drawer's title and its explanatory note wrap rather than truncate. */
+.exLabel {
+  overflow: visible;
+  white-space: normal;
+}
+
+.exSide {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--s2);
+  white-space: nowrap;
+}
+
+.exSide .money {
+  font-size: 24px;
+}
+
+.exSub {
+  grid-column: 2;
+  min-width: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.exSub em {
+  color: var(--c-red);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.exCount {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: right;
+}
+
+.exNote {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.exBadge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 var(--s2);
+  border-radius: 4px;
+  background: rgba(163, 184, 214, 0.1);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  font-weight: 700;
+}
+
+.exAlert .exBadge {
+  background: rgba(255, 138, 128, 0.14);
+  color: var(--c-red);
+}
+
+.nested {
+  border-top: 1px solid var(--c-line);
+  background: rgba(3, 7, 14, 0.35);
+}
+
+/* One customer on the company board. */
+.bRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'cust val'
+    'prod chip'
+    'note act';
+  align-items: center;
+  gap: 4px var(--s3);
+  min-height: 64px;
+  padding: var(--s3) var(--s4) var(--s3) calc(var(--s4) + 20px + var(--s3));
+}
+
+/* The viewer's own pay list: top level, so no nested indent; Paid on the right. */
+.bPay {
+  grid-template-areas:
+    'cust val'
+    'prod chip'
+    'note chip';
+  padding-left: var(--s4);
+}
+
+/* A carrier order with no sale behind it: no value column, the status word
+   sits on the first line. */
+.bOrder {
+  grid-template-areas:
+    'cust chip'
+    'prod prod'
+    'note act';
+}
+
+.bRow + .bRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.bRow[role='button'] {
+  cursor: pointer;
+}
+
+.bRow[role='button']:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .bRow[role='button']:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+.bCust {
+  grid-area: cust;
+  overflow: hidden;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bVal {
+  grid-area: val;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.bVal b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.bProd {
+  grid-area: prod;
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bChip {
+  grid-area: chip;
+  justify-self: end;
+}
+
+.bNote {
+  grid-area: note;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.bNoteWarn {
+  color: var(--c-amber);
+}
+
+.bAct {
+  grid-area: act;
+  justify-self: end;
+}
+
+.bQuiet .bCust,
+.bQuiet .bProd {
+  color: var(--c-text-3);
+}
+
+.drawerSub {
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s2) calc(var(--s4) + 20px + var(--s3));
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drawerSub em {
+  font-style: normal;
+  color: var(--c-text-3);
+}
+
+.drawerSubAlert {
+  color: var(--c-red);
+}
+
+.quietGroup .bRow {
+  opacity: 0.8;
+}
+
+/* A real button, sized for a thumb; secondary weight. */
+.actBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.actBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.actBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .actBtn:not(:disabled):hover {
+    border-color: var(--c-text-2);
+    background: rgba(163, 184, 214, 0.06);
+  }
+}
+
+.actPrimary {
+  border-color: var(--c-lime);
+  background: var(--c-lime);
+  color: var(--c-on-lime);
+}
+
+@media (hover: hover) {
+  .actPrimary:not(:disabled):hover {
+    border-color: var(--c-lime-hi);
+    background: var(--c-lime-hi);
+  }
+}
+
+.actDanger {
+  border-color: rgba(255, 138, 128, 0.5);
+  color: var(--c-red);
+}
+
+/* ---------- install status by rep ---------- */
+.search {
+  display: block;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.input,
+.select {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font: 400 16px / 1 var(--f-ui);
+  appearance: none;
+}
+
+.input::placeholder {
+  color: var(--c-text-3);
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+.select {
+  padding-right: 36px;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--c-text-2) 50%) calc(100% - 18px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, var(--c-text-2) 50%, transparent 50%) calc(100% - 12px) 50% / 6px 6px no-repeat,
+    var(--c-ground);
+}
+
+.logged {
+  border-top: 1px solid var(--c-line);
+}
+
+.loggedHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.loggedHead b {
+  color: var(--c-text);
+}
+
+.subRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px var(--s3);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.subRow:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .subRow:hover {
+    background: rgba(163, 184, 214, 0.04);
+  }
+}
+
+.subAddr {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.subWho,
+.subWhen {
+  grid-column: 1 / -1;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.subWhen {
+  color: var(--c-text-2);
+}
+
+.divider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line-strong);
+  background: rgba(3, 7, 14, 0.35);
+}
+
+.assign {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.assignLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assignLabel strong {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.assignLabel span {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.assignControls {
+  display: flex;
+  gap: var(--s2);
+}
+
+.assignControls .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.inlineNote {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.inlineError {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+}
+
+/* ---------- sale detail sheet ---------- */
+.detail {
+  max-height: 92dvh;
+}
+
+.dHead {
+  min-height: 72px;
+}
+
+.sheetHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--s2) 0;
+}
+
+.sheetName {
+  overflow: hidden;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.dBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.dStatus {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.dAge {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.dAge_amber {
+  color: var(--c-amber);
+}
+
+.dAge_red {
+  color: var(--c-red);
+}
+
+.dCancelled {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  background: rgba(163, 184, 214, 0.06);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.dLine {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  text-decoration: none;
+}
+
+.dLine svg {
+  flex: none;
+  color: var(--c-text-3);
+}
+
+span.dLine {
+  min-height: 28px;
+}
+
+a.dLine {
+  color: var(--c-lime-hi);
+  font-weight: 600;
+}
+
+.dStrong {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.dDates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+}
+
+.dDate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dDate span {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.dDate b {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.dChange {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.dEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+.dEditorLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.dEditorActions {
+  display: flex;
+  gap: var(--s2);
+}
+
+.dPlan {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--s3);
+  padding: var(--s2) 0;
+}
+
+.dPlan + .dPlan {
+  border-top: 1px solid var(--c-line);
+}
+
+.dPlan strong {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.dPlan span {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.dPlan b {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-align: right;
+}
+
+.dPlan em {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-style: normal;
+  text-align: right;
+}
+
+.dSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--c-line);
+}
+
+.dSummary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--s4);
+}
+
+.dSummary > div + div {
+  border-left: 1px solid var(--c-line);
+}
+
+.dSummary small {
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dSummary strong {
+  font-family: var(--f-display);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dSummary .est {
+  font-size: var(--t-min);
+}
+
+.proofList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.proofBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.proofBtn > span {
+  flex: 1;
+}
+
+.proofBtn svg {
+  flex: none;
+  color: var(--c-text-2);
+}
+
+.proofBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.proofBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .proofBtn:not(:disabled):hover {
+    border-color: var(--c-text-2);
+  }
+}
+
+.dNotes {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.dActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding: var(--s4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.dActions:empty {
+  display: none;
+}
+
+.dNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.dFoot {
+  padding: var(--s4) var(--s4) var(--s5);
+}
+
+/* Confirm dialogs (delete, cancel, link). */
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s5);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.dialogBody p {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.dialogFoot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+/* ---------- desktop ---------- */
+@media (min-width: 1024px) {
+  .page {
+    gap: var(--s5);
+  }
+
+  .title {
+    font-size: var(--t-d1);
+  }
+
+  .kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas: 'value count pay';
+  }
+
+  .kpi {
+    padding: var(--s5) var(--s6);
+  }
+
+  .kpiCount {
+    border-right: 1px solid var(--c-line);
+  }
+
+  .kpiPay {
+    border-top: 0;
+  }
+
+  .kpiNum,
+  .kpiPay .kpiNum {
+    font-size: 64px;
+  }
+
+  .panelHead {
+    padding-inline: var(--s5);
+  }
+
+  .tabsRow {
+    padding: var(--s3) var(--s5);
+  }
+
+  .tabsRow .seg {
+    flex: none;
+  }
+
+  .chips,
+  .note,
+  .totals,
+  .search,
+  .divider,
+  .assign {
+    padding-inline: var(--s5);
+  }
+
+  .thead,
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.5fr) 96px 120px;
+    grid-template-areas: 'name when status value pay';
+    gap: var(--s4);
+    align-items: center;
+  }
+
+  /* Admins get an edit/delete column; reps do not. */
+  .hasAct {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.5fr) 96px 120px 48px;
+    grid-template-areas: 'name when status value pay act';
+  }
+
+  .thead {
+    min-height: 40px;
+    padding: 0 var(--s5);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-3);
+    font-size: var(--t-min);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .row {
+    min-height: 68px;
+    padding: var(--s2) var(--s5);
+  }
+
+  .num {
+    text-align: right;
+  }
+
+  .cName span {
+    display: block;
+    overflow: hidden;
+    color: var(--c-text-3);
+    font-size: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cName strong {
+    font-size: var(--t-ui);
+  }
+
+  .cMeta {
+    display: none;
+  }
+
+  .cWhen {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+  }
+
+  .cWhen span {
+    display: block;
+    color: var(--c-text-3);
+  }
+
+  .cValue {
+    color: var(--c-text);
+    font-size: var(--t-ui);
+  }
+
+  /* Only admins have the column; an unplaced area would add implicit rows. */
+  .hasAct .cActions {
+    grid-area: act;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .board > .seg {
+    align-self: flex-start;
+    min-width: 320px;
+  }
+
+  .mgmt .chips {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .payHead,
+  .payRow {
+    grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr) 96px;
+    grid-template-areas: 'name pay when payout status paid';
+  }
+
+  .payRow .cWhen {
+    display: flex;
+  }
+
+  .cPayout {
+    grid-area: payout;
+    display: block;
+  }
+
+  .payRow .cStatus .payout {
+    display: none;
+  }
+
+  .noMoney {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr) 96px;
+    grid-template-areas: 'name when payout status paid';
+  }
+
+  .fiberRow {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) auto;
+    grid-template-areas: 'who meta pill';
+    align-items: center;
+    padding: var(--s3) var(--s5);
+  }
+
+  .fig {
+    padding: var(--s5) var(--s5);
+  }
+
+  .fig strong {
+    font-size: 52px;
+  }
+
+  .period {
+    padding: var(--s4) var(--s5) var(--s5);
+  }
+
+  .expander {
+    padding-inline: var(--s5);
+  }
+
+  .bRow {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) auto 110px;
+    grid-template-areas:
+      'cust prod chip val'
+      'note note act act';
+    padding: var(--s2) var(--s5) var(--s2) calc(var(--s5) + 20px + var(--s3));
+  }
+
+  .bPay {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.7fr) 110px 96px;
+    grid-template-areas:
+      'cust prod val chip'
+      'note note val chip';
+    padding-left: var(--s5);
+  }
+
+  .drawerSub {
+    padding-left: calc(var(--s5) + 20px + var(--s3));
+  }
+
+  .subRow {
+    padding-inline: var(--s5);
+  }
+
+  .loggedHead {
+    padding-inline: var(--s5);
+  }
+
+  .assign {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .assignLabel {
+    flex: 1;
+  }
+
+  .assignControls {
+    flex: 1.4;
+  }
+
+  /* Owner / admin: the book on the left, the carrier's view on the right. */
+  .mgmt {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: start;
+    gap: var(--s4);
+  }
+
+  .mgmtSolo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Detail: a right-hand panel beside the list, not a centred dialog. */
+  .detail {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    width: min(480px, 100vw);
+    max-height: none;
+    border-radius: 0;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+    transform: translateZ(0);
+    animation: slideIn 240ms var(--ease) both;
+  }
+}
+
+@media (max-width: 1023px) {
+  .mgmt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s4);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail,
+  .chev {
+    animation: none;
+    transition: none;
+  }
+}

@@ -123,13 +123,13 @@ async function render(
 
 /** The "Not in the portal" figure — a fact on the board, never an alarm. */
 function notInPortal() {
-  return [...container.querySelectorAll('.sales-board-fig')]
+  return [...container.querySelectorAll('[data-part="fig"]')]
     .find((fig) => fig.querySelector('span')?.textContent === 'Not in the portal');
 }
 
 /** Opens the one rep row so its customers are on screen. */
 async function openRep() {
-  const rep = container.querySelector<HTMLButtonElement>('.sales-board-rep')!;
+  const rep = container.querySelector<HTMLButtonElement>('[data-part="rep"]')!;
   await act(async () => rep.click());
 }
 
@@ -152,7 +152,7 @@ describe('AdminSalesBoard merged rows', () => {
 
     // The sale's month is what the row files under, so on the current month the
     // pair is out of view entirely — reported, never silently dropped.
-    expect(container.querySelector('.sales-board-scope')?.textContent).toContain('+1 older');
+    expect(container.querySelector('[data-part="scope"]')?.textContent).toContain('+1 older');
     expect(container.textContent).not.toContain('not logged here');
     expect(notInPortal()?.querySelector('strong')?.textContent).toBe('0');
   });
@@ -162,16 +162,16 @@ describe('AdminSalesBoard merged rows', () => {
     sold.month -= 1;
     await render([backDatedSale], [carrierOrder], sold);
 
-    expect(container.querySelectorAll('.sales-board-rep')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-part="rep"]')).toHaveLength(1);
     await openRep();
 
-    const rows = container.querySelectorAll('.sales-board-sale');
+    const rows = container.querySelectorAll('[data-part="board-row"]');
     expect(rows).toHaveLength(1);
-    expect(rows[0].className).not.toContain('never-logged');
+    expect(rows[0].getAttribute('data-state')).not.toBe('never_logged');
     expect(rows[0].textContent).toContain('Dana Reyes');
-    expect(container.querySelector('.sales-board-sale.never-logged')).toBeNull();
+    expect(container.querySelector('[data-part="board-row"][data-state="never_logged"]')).toBeNull();
     // Same money on both sides, so no "Check" line.
-    expect(container.querySelector('.sales-board-sale-note.gap')).toBeNull();
+    expect(container.querySelector('[data-part="gap-note"]')).toBeNull();
   });
 
   // R2: the sale and its carrier order straddle a month boundary, which is the
@@ -189,7 +189,7 @@ describe('AdminSalesBoard merged rows', () => {
     await render([augustSale], [septemberOrder], thisMonth());
     await openRep();
 
-    const ask = container.querySelector<HTMLButtonElement>('.sales-board-rowact-btn')!;
+    const ask = container.querySelector<HTMLButtonElement>('[data-part="row-action"]')!;
     await act(async () => ask.click());
 
     expect(captured.link?.candidates.map((entry) => entry.sale.id)).toContain('s2');
@@ -208,7 +208,7 @@ describe('AdminSalesBoard merged rows', () => {
     await render([], [broken], thisMonth());
     await openRep();
 
-    const row = container.querySelector('.sales-board-sale.never-logged.link-broken')!;
+    const row = container.querySelector('[data-part="board-row"][data-state="never_logged"][data-link-broken]')!;
     expect(row.textContent).toContain('Link broken');
     expect(row.textContent).toContain("This link isn't active");
     expect(row.textContent).toContain('Re-link this order');
@@ -223,13 +223,13 @@ describe('AdminSalesBoard merged rows', () => {
     };
     await render([], [dismissed], thisMonth());
 
-    expect(container.querySelector('.sales-board-fig.alert')).toBeNull();
-    const head = container.querySelector('.sales-board-drawer-head')!;
+    expect(container.querySelector('[data-part="fig"][data-alert]')).toBeNull();
+    const head = container.querySelector('[data-part="drawer-head"]')!;
     await act(async () => (head as HTMLButtonElement).click());
 
-    const row = container.querySelector('.sales-board-sale.dismissed')!;
+    const row = container.querySelector('[data-part="board-row"][data-state="dismissed"]')!;
     expect(row.textContent).toContain('Not a sale');
-    expect(container.querySelector('.sales-board-sale.never-logged')).toBeNull();
+    expect(container.querySelector('[data-part="board-row"][data-state="never_logged"]')).toBeNull();
   });
 
   // Undo has to CLEAR the link. Writing saleId: null again would re-assert the
@@ -244,10 +244,10 @@ describe('AdminSalesBoard merged rows', () => {
       saleLink: { saleId: null, by: 'admin1', byName: 'Jacob', at: '2026-09-01' },
     };
     await render([], [dismissed], thisMonth());
-    const head = container.querySelector<HTMLButtonElement>('.sales-board-drawer-head')!;
+    const head = container.querySelector<HTMLButtonElement>('[data-part="drawer-head"]')!;
     await act(async () => head.click());
 
-    const undo = container.querySelector<HTMLButtonElement>('.sales-board-sale.dismissed .sales-board-rowact-btn')!;
+    const undo = container.querySelector<HTMLButtonElement>('[data-part="board-row"][data-state="dismissed"] [data-part="row-action"]')!;
     expect(undo.textContent).toContain('Undo');
     await act(async () => undo.click());
 
@@ -262,7 +262,7 @@ describe('AdminSalesBoard merged rows', () => {
   it('says the figures are incomplete when the book was cut short', async () => {
     await render([backDatedSale], [], thisMonth(), { truncated: true });
 
-    const warning = container.querySelector('.sales-board-warning')!;
+    const warning = container.querySelector('[data-part="warning"]')!;
     expect(warning.textContent).toContain('incomplete');
     expect(warning.textContent).toContain('not in the portal');
   });
@@ -272,14 +272,14 @@ describe('AdminSalesBoard merged rows', () => {
     await render([], [orphan], thisMonth());
     await openRep();
 
-    expect(container.querySelector('.sales-board-sale.never-logged')?.textContent)
+    expect(container.querySelector('[data-part="board-row"][data-state="never_logged"]')?.textContent)
       .toContain('Not in the portal');
-    expect(container.querySelector('.sales-board-rep-flag')?.textContent)
+    expect(container.querySelector('[data-part="rep-flag"]')?.textContent)
       .toContain('1 not in the portal');
     expect(notInPortal()?.querySelector('strong')?.textContent).toBe('1');
     // The figure states a fact: most of these were very likely paid outside the
     // portal and simply never entered, so nothing here may read as a debt.
-    expect(notInPortal()?.className).not.toContain('alert');
+    expect(notInPortal()?.hasAttribute('data-alert')).toBe(false);
     expect(container.textContent).not.toContain('owed');
   });
 });
@@ -300,23 +300,23 @@ describe('carrier orders from before the portal', () => {
     await render([], [before], { year: 2025, month: 10 });
 
     expect(notInPortal()?.querySelector('strong')?.textContent).toBe('0');
-    expect(container.querySelector('.sales-board-sale.never-logged')).toBeNull();
-    expect(container.querySelector('.sales-board-rep')).toBeNull();
+    expect(container.querySelector('[data-part="board-row"][data-state="never_logged"]')).toBeNull();
+    expect(container.querySelector('[data-part="rep"]')).toBeNull();
     expect(container.textContent).not.toContain('not logged here');
   });
 
   it('keeps them reachable in their own quiet drawer', async () => {
     await render([], [before], { year: 2025, month: 10 });
 
-    const head = [...container.querySelectorAll('.sales-board-drawer-head')]
+    const head = [...container.querySelectorAll('[data-part="drawer-head"]')]
       .find((node) => node.textContent?.includes('From before the portal')) as HTMLButtonElement;
     expect(head).toBeTruthy();
     // Muted, not an alert: this drawer is history, not work.
-    expect(head.className).not.toContain('alert');
+    expect(head.hasAttribute('data-alert')).toBe(false);
     expect(head.textContent).toContain('There is nothing to do with these');
 
     await act(async () => head.click());
-    const row = container.querySelector('.sales-board-sale.historic')!;
+    const row = container.querySelector('[data-part="board-row"][data-state="historic"]')!;
     expect(row.textContent).toContain('901 Old Mill Road');
     expect(row.textContent).toContain('Before the portal');
   });
@@ -345,7 +345,7 @@ describe('not-logged rows split at the month reps started logging', () => {
   } as unknown as FiberOrder;
 
   async function openNeverDrawer() {
-    const head = [...container.querySelectorAll('.sales-board-drawer-head')]
+    const head = [...container.querySelectorAll('[data-part="drawer-head"]')]
       .find((node) => node.textContent?.includes('Carrier installed it')) as HTMLButtonElement;
     expect(head).toBeTruthy();
     await act(async () => head.click());
@@ -358,9 +358,9 @@ describe('not-logged rows split at the month reps started logging', () => {
 
     // Nothing on the drawer may read as money owed.
     expect(head.textContent).toContain('May already have been paid outside the portal');
-    expect(head.className).not.toContain('alert');
+    expect(head.hasAttribute('data-alert')).toBe(false);
 
-    const groups = [...container.querySelectorAll('.sales-board-drawer-sub')]
+    const groups = [...container.querySelectorAll('[data-part="drawer-sub"]')]
       .map((node) => node.textContent ?? '');
     expect(groups[0]).toContain('Since reps started logging');
     expect(groups[0]).toContain('1');
@@ -368,7 +368,7 @@ describe('not-logged rows split at the month reps started logging', () => {
     expect(groups[1]).toContain('1');
 
     // The August row carries the emphasis; the May row is held back.
-    const quiet = container.querySelector('.sales-board-group-quiet')!;
+    const quiet = container.querySelector('[data-part="quiet-group"]')!;
     expect(quiet.textContent).toContain('204 Halsey Street');
     expect(quiet.textContent).not.toContain('18 Marbury Court');
   });
@@ -381,9 +381,9 @@ describe('not-logged rows split at the month reps started logging', () => {
     const head = await openNeverDrawer();
 
     expect(head.textContent).not.toContain('outside this month');
-    expect(head.querySelector('.sales-board-drawer-count')?.textContent).toBe('2');
+    expect(head.querySelector('[data-part="drawer-count"]')?.textContent).toBe('2');
 
-    const groups = [...container.querySelectorAll('.sales-board-drawer-sub')]
+    const groups = [...container.querySelectorAll('[data-part="drawer-sub"]')]
       .map((node) => node.textContent ?? '');
     expect(groups[0]).toContain('Since reps started logging');
     expect(groups[0]).toContain('1');
@@ -397,7 +397,7 @@ describe('not-logged rows split at the month reps started logging', () => {
 });
 
 function tabLabels() {
-  return [...container.querySelectorAll('.sales-line-tab')].map((tab) => tab.textContent);
+  return [...container.querySelectorAll('[data-part="board-tab"]')].map((tab) => tab.textContent);
 }
 
 describe('the raw submitted feed is no longer a tab', () => {
@@ -411,7 +411,7 @@ describe('the raw submitted feed is no longer a tab', () => {
       viewer.role = role;
       await render([inMonth], [], thisMonth());
       expect(tabLabels()).not.toContain('Submitted');
-      expect(container.querySelector('.sales-board-sub-row')).toBeNull();
+      expect(container.querySelector('[data-part="sub-row"]')).toBeNull();
     }
   });
 });

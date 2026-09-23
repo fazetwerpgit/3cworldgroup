@@ -6,15 +6,10 @@ import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusRespons
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { ChevronRight } from 'lucide-react';
+import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
+import s from '@/components/portal/rep/rep.module.css';
+import x from '@/components/portal/rep/rep-sales.module.css';
 import type { InstallBucket, InstallCounts } from '@/lib/sales/installBucket';
 import { bookForMonth, buildMergedBook, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
 import { normalizeAddress } from '@/lib/fiberReport/matchSales';
@@ -22,6 +17,7 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isInMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
+import { SalesDialog } from './SalesDialog';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
 // reps logged and the carrier's morning report merged into a single list, so the
@@ -149,6 +145,20 @@ function countsSummary(counts: InstallCounts): string {
     .filter((bucket) => counts[bucket] > 0)
     .map((bucket) => `${counts[bucket]} ${BUCKET_LABEL[bucket]}`)
     .join(' · ');
+}
+
+/** The dashboard's colour for each install bucket. */
+const BUCKET_TONE: Record<InstallBucket, string> = {
+  installed: x.st_installed,
+  scheduled: x.st_scheduled,
+  attention: x.st_needsdate,
+};
+
+/** Has this sale's install date arrived? Only then can it have a payout window. */
+function installedBy(sale: Sale, now: Date): boolean {
+  if (!sale.installDate) return false;
+  const time = new Date(sale.installDate as Date | string).getTime();
+  return !Number.isNaN(time) && time <= now.getTime();
 }
 
 function installChip(sale: Sale, bucket: InstallBucket) {
@@ -440,6 +450,22 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     }));
   }, [fullBook.reps, linkingRow]);
 
+  // The T-Fiber estimated payout window for the sale open in the sheet — a
+  // range, never a single date, and only once the install has happened.
+  const selectedPayout = useMemo(() => {
+    if (!selectedSale || selectedSale.status === 'cancelled') return null;
+    const window = payoutWindowForSale(selectedSale, installedBy(selectedSale, now));
+    return window ? formatPayoutWindow(window) : null;
+  }, [now, selectedSale]);
+
+  /** One status word, in the dashboard's colour language. */
+  const chip = (tone: string, label: string) => (
+    <span className={`${x.bChip} ${x.status} ${tone}`} data-part="chip">
+      <span className={x.dot} aria-hidden="true" />
+      {label}
+    </span>
+  );
+
   /** One customer. What it says depends entirely on which state it is in. */
   const renderRow = (row: MergedRow) => {
     // Settled: an admin looked at this order and said it is not one of ours. It
@@ -448,16 +474,17 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     if (row.state === 'dismissed') {
       const order = row.order!;
       return (
-        <div className="sales-board-sale dismissed" key={row.key}>
-          <span className="sales-board-sale-cust">{row.address || row.customerName || 'Address unavailable'}</span>
-          <span className="sales-board-chip dismissed">Not a sale</span>
-          <span className="sales-board-sale-prod">{orderLine(order)}</span>
+        <div className={`${x.bRow} ${x.bOrder} ${x.bQuiet}`} data-part="board-row" data-state={row.state} key={row.key}>
+          <span className={x.bCust}>{row.address || row.customerName || 'Address unavailable'}</span>
+          {chip(x.t_quiet, 'Not a sale')}
+          <span className={x.bProd}>{orderLine(order)}</span>
           {/* Undo CLEARS saleLink rather than writing null to it — null IS the
               dismissal, so writing it again would change nothing. */}
-          <span className="sales-board-rowact">
+          <span className={x.bAct}>
             <button
               type="button"
-              className="sales-board-rowact-btn"
+              className={x.actBtn}
+              data-part="row-action"
               disabled={undoingKey === row.key}
               onClick={() => void undismiss(row)}
             >
@@ -474,10 +501,10 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     if (row.state === 'historic') {
       const order = row.order!;
       return (
-        <div className="sales-board-sale historic" key={row.key}>
-          <span className="sales-board-sale-cust">{row.address || row.customerName || 'Address unavailable'}</span>
-          <span className="sales-board-chip historic">Before the portal</span>
-          <span className="sales-board-sale-prod">{orderLine(order)}</span>
+        <div className={`${x.bRow} ${x.bOrder} ${x.bQuiet}`} data-part="board-row" data-state={row.state} key={row.key}>
+          <span className={x.bCust}>{row.address || row.customerName || 'Address unavailable'}</span>
+          {chip(x.t_quiet, 'Before the portal')}
+          <span className={x.bProd}>{orderLine(order)}</span>
         </div>
       );
     }
@@ -490,19 +517,23 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
       // link is not in effect, which is true of both, and asks for the sale
       // again. Until it is answered the stale link keeps blocking the guess.
       return (
-        <div className={`sales-board-sale never-logged${row.linkBroken ? ' link-broken' : ''}`} key={row.key}>
-          <span className="sales-board-sale-cust">{row.address || row.customerName || 'Address unavailable'}</span>
-          <span className={`sales-board-chip ${row.linkBroken ? 'broken' : 'never'}`}>
-            {row.linkBroken ? 'Link broken' : 'Not in the portal'}
-          </span>
-          <span className="sales-board-sale-prod">{orderLine(order)}</span>
+        <div
+          className={`${x.bRow} ${x.bOrder}`}
+          data-part="board-row"
+          data-state={row.state}
+          data-link-broken={row.linkBroken ? '' : undefined}
+          key={row.key}
+        >
+          <span className={x.bCust}>{row.address || row.customerName || 'Address unavailable'}</span>
+          {chip(row.linkBroken ? x.st_needsdate : x.st_missed, row.linkBroken ? 'Link broken' : 'Not in the portal')}
+          <span className={x.bProd}>{orderLine(order)}</span>
           {row.linkBroken && (
-            <span className="sales-board-sale-note warn">
+            <span className={`${x.bNote} ${x.bNoteWarn}`}>
               This link isn&apos;t active. Pick the sale again — nothing will re-join it until you do.
             </span>
           )}
-          <span className="sales-board-rowact">
-            <button type="button" className="sales-board-rowact-btn" onClick={() => setLinkingRow(row)}>
+          <span className={x.bAct}>
+            <button type="button" className={x.actBtn} data-part="row-action" onClick={() => setLinkingRow(row)}>
               {row.linkBroken ? 'Re-link this order' : 'Which sale is this?'}
             </button>
           </span>
@@ -512,9 +543,12 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
     const sale = row.sale!;
     const gap = row.valueGap;
+    const cancelled = row.state === 'cancelled';
     return (
       <div
-        className={`sales-board-sale ${row.state === 'cancelled' ? 'cancelled' : row.bucket}`}
+        className={`${x.bRow} ${cancelled ? x.bQuiet : ''}`}
+        data-part="board-row"
+        data-state={row.state}
         key={row.key}
         role="button"
         tabIndex={0}
@@ -526,25 +560,25 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           }
         }}
       >
-        <span className="sales-board-sale-cust">
+        <span className={x.bCust}>
           {row.customerName || row.address || 'Customer pending'}
         </span>
-        <span className="sales-board-sale-val">
-          {formatMoney(row.value)}<small>/mo</small>
+        <span className={x.bVal}>
+          <b>{formatMoney(row.value)}</b>/mo
         </span>
-        <span className="sales-board-sale-prod">
-          {row.state === 'cancelled'
+        <span className={x.bProd}>
+          {cancelled
             ? `${row.repName}${sale.cancelReason ? ` · ${sale.cancelReason}` : ''}`
             : productSummary(sale) || row.order?.fiberPlan || '—'}
         </span>
-        <span className={`sales-board-chip ${row.state === 'cancelled' ? 'cancelled' : row.bucket}`}>
-          {row.state === 'cancelled' ? `Cancelled ${formatDate(sale.cancelledAt)}` : installChip(sale, row.bucket)}
-        </span>
+        {cancelled
+          ? chip(x.st_cancelled, `Cancelled ${formatDate(sale.cancelledAt)}`)
+          : chip(BUCKET_TONE[row.bucket], installChip(sale, row.bucket))}
         {row.state === 'waiting' && (
-          <span className="sales-board-sale-note">Not in the report yet</span>
+          <span className={x.bNote}>Not in the report yet</span>
         )}
         {row.state === 'agreed' && gap && (
-          <span className="sales-board-sale-note gap">
+          <span className={`${x.bNote} ${x.bNoteWarn}`} data-part="gap-note">
             Check · carrier has {formatMoney(gap.carrierMrc)}/mo
           </span>
         )}
@@ -567,33 +601,39 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     if (inView === 0 && !hidden.olderCount && !hidden.newerCount) return null;
     const open = openDrawer === key;
     const more = outOfViewLabel(hidden);
+    const alert = key === 'unassigned';
     return (
-      <div className="sales-board-drawer" key={key}>
+      <div key={key} data-part="drawer">
         <button
-          className={`sales-board-drawer-head${open ? ' open' : ''}${key === 'unassigned' ? ' alert' : ''}`}
+          className={`${x.expander} ${alert ? x.exAlert : ''}`}
+          data-part="drawer-head"
+          data-alert={alert ? '' : undefined}
           type="button"
           aria-expanded={open}
           onClick={() => setOpenDrawer(open ? null : key)}
         >
-          <span className="sales-board-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
-          <span className="sales-board-drawer-label">
+          <ChevronRight className={x.chev} size={18} aria-hidden="true" />
+          <span className={`${x.exName} ${x.exLabel}`}>
             {label}
-            {note && <em className="sales-board-drawer-more">{note}</em>}
-            {more && <em className="sales-board-drawer-more">{more} outside this month</em>}
+            {note && <em className={x.exNote}>{note}</em>}
+            {more && <em className={x.exNote}>{more} outside this month</em>}
           </span>
-          <span className="sales-board-drawer-count">{count}</span>
+          <span className={x.exSide}>
+            <span className={x.exBadge} data-part="drawer-count">{count}</span>
+          </span>
         </button>
-        {open && body}
+        {open && <div className={x.nested}>{body}</div>}
       </div>
     );
   };
 
   return (
-    <>
+    <div className={x.board}>
       {(hasPlan || ownerView) && (
-        <nav className="sales-line-tabs" aria-label="Sales views">
+        <div className={x.seg} role="tablist" aria-label="Sales views">
           <button
-            className="sales-line-tab"
+            className={x.segBtn}
+            data-part="board-tab"
             role="tab"
             type="button"
             aria-selected={activeTab === 'company'}
@@ -603,7 +643,8 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           </button>
           {hasPlan && (
             <button
-              className="sales-line-tab"
+              className={x.segBtn}
+              data-part="board-tab"
               role="tab"
               type="button"
               aria-selected={activeTab === 'pay'}
@@ -612,28 +653,32 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
               My pay
             </button>
           )}
-        </nav>
+        </div>
       )}
 
       {activeTab === 'company' ? (
-        <section className="sales-board" aria-label="Company sales by rep">
+        <>
           {truncated && (
-            <p className="sales-board-warning" role="alert">
+            <p className={x.alert} data-part="warning" role="alert">
               This book was cut short at the fetch limit. Sales are missing from every month,
               the figures below are incomplete, and some rows may show as not in the portal
               when the rep did log them.
             </p>
           )}
-          {undoError && <p className="sales-board-warning" role="alert">{undoError}</p>}
+          {undoError && <p className={x.alert} data-part="warning" role="alert">{undoError}</p>}
 
-          <div className="sales-board-summary">
-            <div className="sales-board-figs">
-              <div className="sales-board-fig">
-                <strong className="portal-metallic-num">{countedCount}</strong>
+          <section className={s.panel} aria-labelledby="board-h">
+            <div className={`${s.panelHead} ${x.panelHead}`}>
+              <h2 id="board-h" className={x.panelTitle}>Company sales</h2>
+              <p className={x.panelMeta}>{month ? monthLabel(month) : 'All time'}</p>
+            </div>
+            <div className={x.figs}>
+              <div className={x.fig} data-part="fig">
+                <strong>{countedCount}</strong>
                 <span>Sales</span>
               </div>
-              <div className="sales-board-fig">
-                <strong className="portal-metallic-num">{formatMoney(monthValue)}<small> / mo</small></strong>
+              <div className={x.fig} data-part="fig">
+                <strong>{formatMoney(monthValue)}<small>/ mo</small></strong>
                 <span>Value</span>
               </div>
               {/* Carrier installs with no sale in the portal. It is NOT a count
@@ -642,176 +687,187 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                   paid outside the portal and simply never entered. So it states
                   a fact and carries no alarm — the emphasis lives on the one
                   group inside drawer 1 that is actually surprising. */}
-              <div className="sales-board-fig">
-                <strong className="portal-metallic-num">{book.notLoggedCount}</strong>
+              <div className={x.fig} data-part="fig">
+                <strong>{book.notLoggedCount}</strong>
                 <span>Not in the portal</span>
               </div>
             </div>
 
-            {/* Weighted by count, so the bar IS the pipeline rather than a legend. */}
-            <div className="sales-board-strip" role="img" aria-label={countsSummary(counts) || 'No sales this month'}>
-              {counts.installed > 0 && <i className="installed" style={{ flexGrow: counts.installed }} />}
-              {counts.scheduled > 0 && <i className="scheduled" style={{ flexGrow: counts.scheduled }} />}
-              {counts.attention > 0 && <i className="attention" style={{ flexGrow: counts.attention }} />}
-              {countedCount === 0 && <i className="empty" style={{ flexGrow: 1 }} />}
-            </div>
+            <div className={x.period}>
+              {/* Weighted by count, so the bar IS the pipeline rather than a legend. */}
+              <div className={x.stack} role="img" aria-label={countsSummary(counts) || 'No sales this month'}>
+                {counts.installed > 0 && <i className={x.seg_installed} style={{ flexGrow: counts.installed }} />}
+                {counts.scheduled > 0 && <i className={x.seg_scheduled} style={{ flexGrow: counts.scheduled }} />}
+                {counts.attention > 0 && <i className={x.seg_needs} style={{ flexGrow: counts.attention }} />}
+                {countedCount === 0 && <i className={x.seg_empty} style={{ flexGrow: 1 }} />}
+              </div>
 
-            <p className="sales-board-key">
-              <span className="installed">{counts.installed} installed</span>
-              <span className="scheduled">{counts.scheduled} scheduled</span>
-              <span className="attention">{counts.attention} need a date</span>
-            </p>
-
-            {/* Nothing is hidden without saying so. */}
-            {(olderCount > 0 || newerCount > 0) && (
-              <p className="sales-board-scope">
-                {outOfViewLabel({ olderCount, newerCount })} outside this month
+              <p className={x.legend}>
+                <span><i className={`${x.swatch} ${x.seg_installed}`} aria-hidden="true" /><b>{counts.installed}</b> installed</span>
+                <span><i className={`${x.swatch} ${x.seg_scheduled}`} aria-hidden="true" /><b>{counts.scheduled}</b> scheduled</span>
+                <span><i className={`${x.swatch} ${x.seg_needs}`} aria-hidden="true" /><b>{counts.attention}</b> need a date</span>
               </p>
-            )}
-          </div>
 
-          <div className="sales-board-reps-head">
-            <span>Rep</span>
-            <span>Value / mo</span>
-          </div>
-
-          {book.reps.length === 0 && !loading && (
-            <p className="sales-line-ledger-empty">No sales logged this month.</p>
-          )}
-
-          {book.reps.map((rep) => {
-            const open = openRepId === rep.repId;
-            return (
-              <div key={rep.repId}>
-                <button
-                  className={`sales-board-rep${open ? ' open' : ''}`}
-                  type="button"
-                  aria-expanded={open}
-                  onClick={() => { setOpenRepId(open ? null : rep.repId); setSelectedId(null); }}
-                >
-                  <span className="sales-board-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
-                  <span className="sales-board-rep-name">{rep.repName}</span>
-                  <span className="sales-board-rep-value">{formatMoney(rep.value)}</span>
-                  {/* "5 installed · 2 scheduled · 1 not in the portal" — only the last
-                      part is red, because only the last part is a problem. */}
-                  <span className="sales-board-rep-sub">
-                    {countsSummary(rep.counts)}
-                    {rep.notLogged > 0 && (
-                      <em className="sales-board-rep-flag">
-                        {countsSummary(rep.counts) ? ' · ' : ''}{rep.notLogged} not in the portal
-                      </em>
-                    )}
-                  </span>
-                  <span className="sales-board-rep-count">{rep.count} sale{rep.count === 1 ? '' : 's'}</span>
-                </button>
-
-                {open && <div className="sales-board-sales">{rep.rows.map(renderRow)}</div>}
-              </div>
-            );
-          })}
-
-          {drawer(
-            'never',
-            'Carrier installed it — not logged here',
-            sinceView.rows.length + earlierView.rows.length,
-            neverView,
-            <div className="sales-board-sales">
-              {/* First, and the only group here carrying any emphasis: a rep was
-                  demonstrably using the site in these months and the install is
-                  still not in the book. */}
-              {(sinceView.rows.length > 0 || sinceView.olderCount > 0 || sinceView.newerCount > 0) && (
-                <>
-                  <p className="sales-board-drawer-sub attention">
-                    Since reps started logging · {sinceView.rows.length}
-                    {outOfViewLabel(sinceView) && <em> · {outOfViewLabel(sinceView)}</em>}
-                  </p>
-                  {sinceView.rows.map(renderRow)}
-                </>
+              {/* Nothing is hidden without saying so. */}
+              {(olderCount > 0 || newerCount > 0) && (
+                <p className={x.scope} data-part="scope">
+                  {outOfViewLabel({ olderCount, newerCount })} outside this month
+                </p>
               )}
-              {/* Second and quieter: before July nobody was logging here at all,
-                  so these say nothing about anybody. */}
-              {(earlierView.rows.length > 0 || earlierView.olderCount > 0 || earlierView.newerCount > 0) && (
-                <>
-                  <p className="sales-board-drawer-sub">
-                    Before that · {earlierView.rows.length}
-                    {outOfViewLabel(earlierView) && <em> · {outOfViewLabel(earlierView)}</em>}
-                  </p>
-                  <div className="sales-board-group-quiet">
-                    {earlierView.rows.map(renderRow)}
-                  </div>
-                </>
-              )}
-              {dismissedView.rows.length > 0 && (
-                <>
-                  <p className="sales-board-drawer-sub">
-                    Marked not a sale · {dismissedView.rows.length}
-                  </p>
-                  <div className="sales-board-group-quiet">
-                    {dismissedView.rows.map(renderRow)}
-                  </div>
-                </>
-              )}
-            </div>,
-            sinceView.rows.length + earlierView.rows.length + dismissedView.rows.length,
-            'May already have been paid outside the portal. Log them to bring them in.'
-          )}
-
-          {drawer(
-            'unassigned',
-            'Orders with no rep matched',
-            unassignedView.rows.length,
-            unassignedView,
-            <UnassignedOrders rows={unassignedView.rows} onAssigned={refetchFiber} />
-          )}
-
-          {drawer(
-            'cancelled',
-            'Cancelled this month',
-            cancelledView.rows.length,
-            cancelledView,
-            <div className="sales-board-sales">{cancelledView.rows.map(renderRow)}</div>
-          )}
-
-          {/* Last, quiet, and its own drawer rather than a section inside the
-              never-logged one: that drawer is a list of things somebody has to
-              answer for, and these are the opposite of that. */}
-          {drawer(
-            'historic',
-            'From before the portal',
-            historicView.rows.length,
-            historicView,
-            <div className="sales-board-sales">{historicView.rows.map(renderRow)}</div>,
-            historicView.rows.length,
-            'Carrier orders from before the portal existed. There is nothing to do with these.'
-          )}
-        </section>
-      ) : (
-        <section className="sales-board" aria-label="My expected pay">
-          <div className="sales-board-summary">
-            {payScaleLabel && <span className="sales-board-scale">Pay scale · {payScaleLabel}</span>}
-            <div className="sales-board-figs">
-              <div className="sales-board-fig">
-                <strong className="portal-metallic-num">{formatMoney(myExpected)}</strong>
-                <span>Estimated this month</span>
-              </div>
             </div>
-            <p className="sales-board-note">
-              An estimate off your installs — not a statement of pay. Chargebacks,
-              claims and cancellations are not in the portal, and the carrier&rsquo;s
-              final report decides what actually pays.
-            </p>
+          </section>
+
+          <section className={s.panel} aria-labelledby="board-reps-h">
+            <div className={`${s.panelHead} ${x.panelHead}`}>
+              <h2 id="board-reps-h" className={x.panelTitle}>By rep</h2>
+              <p className={x.panelMeta}>Value / mo</p>
+            </div>
+
+            {book.reps.length === 0 && !loading && (
+              <p className={x.empty}>No sales logged this month.</p>
+            )}
+
+            {book.reps.map((rep) => {
+              const open = openRepId === rep.repId;
+              const summary = countsSummary(rep.counts);
+              return (
+                <div key={rep.repId}>
+                  <button
+                    className={x.expander}
+                    data-part="rep"
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => { setOpenRepId(open ? null : rep.repId); setSelectedId(null); }}
+                  >
+                    <ChevronRight className={x.chev} size={18} aria-hidden="true" />
+                    <span className={x.exName}>{rep.repName}</span>
+                    <span className={x.exSide}>
+                      <span className={x.money}>{formatMoney(rep.value)}</span>
+                    </span>
+                    {/* "5 installed · 2 scheduled · 1 not in the portal" — only the last
+                        part is red, because only the last part is a problem. */}
+                    <span className={x.exSub}>
+                      {summary}
+                      {rep.notLogged > 0 && (
+                        <em data-part="rep-flag">
+                          {summary ? ' · ' : ''}{rep.notLogged} not in the portal
+                        </em>
+                      )}
+                    </span>
+                    <span className={x.exCount}>{rep.count} sale{rep.count === 1 ? '' : 's'}</span>
+                  </button>
+
+                  {open && <div className={x.nested}>{rep.rows.map(renderRow)}</div>}
+                </div>
+              );
+            })}
+
+            {drawer(
+              'never',
+              'Carrier installed it — not logged here',
+              sinceView.rows.length + earlierView.rows.length,
+              neverView,
+              <>
+                {/* First, and the only group here carrying any emphasis: a rep was
+                    demonstrably using the site in these months and the install is
+                    still not in the book. */}
+                {(sinceView.rows.length > 0 || sinceView.olderCount > 0 || sinceView.newerCount > 0) && (
+                  <>
+                    <p className={`${x.drawerSub} ${x.drawerSubAlert}`} data-part="drawer-sub">
+                      Since reps started logging · {sinceView.rows.length}
+                      {outOfViewLabel(sinceView) && <em> · {outOfViewLabel(sinceView)}</em>}
+                    </p>
+                    {sinceView.rows.map(renderRow)}
+                  </>
+                )}
+                {/* Second and quieter: before July nobody was logging here at all,
+                    so these say nothing about anybody. */}
+                {(earlierView.rows.length > 0 || earlierView.olderCount > 0 || earlierView.newerCount > 0) && (
+                  <>
+                    <p className={x.drawerSub} data-part="drawer-sub">
+                      Before that · {earlierView.rows.length}
+                      {outOfViewLabel(earlierView) && <em> · {outOfViewLabel(earlierView)}</em>}
+                    </p>
+                    <div className={x.quietGroup} data-part="quiet-group">
+                      {earlierView.rows.map(renderRow)}
+                    </div>
+                  </>
+                )}
+                {dismissedView.rows.length > 0 && (
+                  <>
+                    <p className={x.drawerSub} data-part="drawer-sub">
+                      Marked not a sale · {dismissedView.rows.length}
+                    </p>
+                    <div className={x.quietGroup} data-part="quiet-group">
+                      {dismissedView.rows.map(renderRow)}
+                    </div>
+                  </>
+                )}
+              </>,
+              sinceView.rows.length + earlierView.rows.length + dismissedView.rows.length,
+              'May already have been paid outside the portal. Log them to bring them in.'
+            )}
+
+            {drawer(
+              'unassigned',
+              'Orders with no rep matched',
+              unassignedView.rows.length,
+              unassignedView,
+              <UnassignedOrders rows={unassignedView.rows} onAssigned={refetchFiber} />
+            )}
+
+            {drawer(
+              'cancelled',
+              'Cancelled this month',
+              cancelledView.rows.length,
+              cancelledView,
+              <>{cancelledView.rows.map(renderRow)}</>
+            )}
+
+            {/* Last, quiet, and its own drawer rather than a section inside the
+                never-logged one: that drawer is a list of things somebody has to
+                answer for, and these are the opposite of that. */}
+            {drawer(
+              'historic',
+              'From before the portal',
+              historicView.rows.length,
+              historicView,
+              <>{historicView.rows.map(renderRow)}</>,
+              historicView.rows.length,
+              'Carrier orders from before the portal existed. There is nothing to do with these.'
+            )}
+          </section>
+        </>
+      ) : (
+        <section className={s.panel} aria-labelledby="board-pay-h">
+          <div className={`${s.panelHead} ${x.panelHead}`}>
+            <h2 id="board-pay-h" className={x.panelTitle}>My est. pay</h2>
+            {payScaleLabel && <p className={x.panelMeta}>Pay scale · {payScaleLabel}</p>}
           </div>
+          <div className={x.figs}>
+            <div className={`${x.fig} ${x.figPay}`} data-part="fig">
+              <strong><small className={x.est}>est.</small>{formatMoney(myExpected)}</strong>
+              <span>Estimated this month</span>
+            </div>
+          </div>
+          <p className={x.note}>
+            An estimate off your installs — not a statement of pay. Chargebacks,
+            claims and cancellations are not in the portal, and the carrier&rsquo;s
+            final report decides what actually pays.
+          </p>
 
           {mySales.length === 0 ? (
-            <p className="sales-line-ledger-empty">
+            <p className={x.empty}>
               Nothing installed yet. Pay shows up here once one of your sales has an install date.
             </p>
           ) : (
             mySales.map((sale) => {
               const expected = expectedPayForSale(sale, payPlan?.rates ?? null);
+              const window = payoutWindowForSale(sale, installedBy(sale, now));
               return (
                 <div
-                  className="sales-board-payrow"
+                  className={`${x.bRow} ${x.bPay}`}
+                  data-part="pay-row"
                   key={sale.id}
                   role="button"
                   tabIndex={0}
@@ -823,35 +879,39 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                     }
                   }}
                 >
-                  <span className="sales-board-sale-cust">
+                  <span className={x.bCust}>
                     {sale.customerName || sale.customerAddress || 'Customer pending'}
                   </span>
                   {/* A rate of 0 means the comp plan has no contracted rate for
                       that product yet — say so rather than promising $0. */}
-                  <span className={`sales-board-amt${expected ? '' : ' pending'}`}>
-                    {expected ? formatMoney(expected) : 'Rate pending'}
+                  <span className={x.bVal}>
+                    {expected ? <><small className={x.est}>est.</small><b>{formatMoney(expected)}</b></> : 'Rate pending'}
                   </span>
-                  <span className="sales-board-sale-prod">
-                    {productSummary(sale) || '—'} · installed {formatDate(sale.installDate)}
+                  <span className={x.bProd}>
+                    {productSummary(sale) || '—'} · installed {formatDate(sale.installDate)} · sold {formatDate(sale.saleDate)}
                   </span>
-                  <span className="sales-board-when">Sold {formatDate(sale.saleDate)}</span>
                   {/* Stops the row's own click so ticking Paid doesn't also
                       open the detail sheet over the top of it. */}
                   <span
-                    className="sales-board-paid sales-line-paid-cell"
+                    className={x.bChip}
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
                   >
-                    <label className="sales-line-paid-toggle">
+                    <label className={x.paid}>
                       <input
                         type="checkbox"
                         checked={!!paidBySale[sale.id || '']}
                         onChange={() => void togglePaid(sale.id || '')}
                         aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
                       />
-                      <span className="sales-line-paid-label">Paid</span>
+                      <span>Paid</span>
                     </label>
                   </span>
+                  {window && (
+                    <span className={x.bNote}>
+                      <span className={x.payout}>Est. payout <b>{formatPayoutWindow(window)}</b></span>
+                    </span>
+                  )}
                 </div>
               );
             })
@@ -873,6 +933,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onRequestCancel={onSetCancelled ? (id) => { setCancelReason(''); setCancellingId(id); } : undefined}
         onRestore={onSetCancelled ? (id) => { void onSetCancelled(id, false); } : undefined}
         onSaleUpdated={onSaleUpdated}
+        payout={selectedPayout}
       />
 
       <LinkOrderDialog
@@ -882,33 +943,22 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onLinked={refetchFiber}
       />
 
-      <Dialog
+      <SalesDialog
         open={!!cancellingId}
-        onOpenChange={(open) => { if (!open) setCancellingId(null); }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cancel sale</DialogTitle>
-            <DialogDescription>
-              The customer backed out. The sale stays on the books as a record but drops out of
-              this month&apos;s totals, the install pipeline and everyone&apos;s pay. You can undo it later.
-            </DialogDescription>
-          </DialogHeader>
-          <label className="sales-board-reason">
-            <span>Reason (optional)</span>
-            <input
-              type="text"
-              value={cancelReason}
-              maxLength={300}
-              placeholder="Customer changed their mind"
-              onChange={(event) => setCancelReason(event.target.value)}
-            />
-          </label>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setCancellingId(null)}>Keep sale</Button>
-            <Button
+        title="Cancel sale"
+        description={
+          <>
+            The customer backed out. The sale stays on the books as a record but drops out of
+            this month&apos;s totals, the install pipeline and everyone&apos;s pay. You can undo it later.
+          </>
+        }
+        onClose={() => setCancellingId(null)}
+        footer={
+          <>
+            <button type="button" className={s.btnSecondary} onClick={() => setCancellingId(null)}>Keep sale</button>
+            <button
               type="button"
-              variant="destructive"
+              className={`${x.actBtn} ${x.actDanger}`}
               disabled={loading}
               onClick={() => {
                 const id = cancellingId;
@@ -919,22 +969,34 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
               }}
             >
               Cancel sale
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </button>
+          </>
+        }
+      >
+        <label className={x.field}>
+          <span>Reason (optional)</span>
+          <input
+            className={x.input}
+            type="text"
+            value={cancelReason}
+            maxLength={300}
+            placeholder="Customer changed their mind"
+            onChange={(event) => setCancelReason(event.target.value)}
+          />
+        </label>
+      </SalesDialog>
 
-      <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete sale</DialogTitle>
-            <DialogDescription>Are you sure you want to delete this sale? This action cannot be undone.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
-            <Button
+      <SalesDialog
+        open={!!deletingId}
+        title="Delete sale"
+        description="Are you sure you want to delete this sale? This action cannot be undone."
+        onClose={() => setDeletingId(null)}
+        footer={
+          <>
+            <button type="button" className={s.btnSecondary} onClick={() => setDeletingId(null)}>Cancel</button>
+            <button
               type="button"
-              variant="destructive"
+              className={`${x.actBtn} ${x.actDanger}`}
               disabled={loading}
               onClick={() => {
                 const id = deletingId;
@@ -944,10 +1006,10 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
               }}
             >
               Delete Sale
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            </button>
+          </>
+        }
+      />
+    </div>
   );
 }

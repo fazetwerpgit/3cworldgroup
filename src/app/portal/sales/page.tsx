@@ -2,11 +2,10 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalSidebar } from '@/components/portal/PortalSidebar';
+import { useSearchParams } from 'next/navigation';
+import { ChevronLeft, ChevronRight, Plus, RotateCw } from 'lucide-react';
+import { RepShell } from '@/components/portal/rep/RepShell';
+import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
 import { AdminSalesBoard } from '@/components/sales/AdminSalesBoard';
 import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { SalesTable } from '@/components/sales/SalesTable';
@@ -27,64 +26,85 @@ import {
   shiftMonth,
   type MonthKey,
 } from '@/lib/sales/monthWindow';
-import '@/styles/sweep-rep-a.css';
+import s from '@/components/portal/rep/rep.module.css';
+import x from '@/components/portal/rep/rep-sales.module.css';
 
-function AnimatedNumber({ value }: { value: number }) {
-  const [display, setDisplay] = useState(0);
+const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
-  useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) {
-      const frame = requestAnimationFrame(() => setDisplay(value));
-      return () => cancelAnimationFrame(frame);
-    }
-
-    const started = performance.now();
-    const tick = (now: number) => {
-      const progress = Math.min((now - started) / 650, 1);
-      setDisplay(Math.round(value * (1 - Math.pow(1 - progress, 3))));
-      if (progress < 1) requestAnimationFrame(tick);
-    };
-
-    const frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-
-  return <>{display.toLocaleString('en-US')}</>;
+function MonthPicker({ month, onChange }: { month: MonthKey; onChange: (next: MonthKey) => void }) {
+  return (
+    <div className={x.month} role="group" aria-label="Month">
+      <button
+        type="button"
+        className={x.monthBtn}
+        onClick={() => onChange(shiftMonth(month, -1))}
+        aria-label="Previous month"
+      >
+        <ChevronLeft size={20} aria-hidden="true" />
+      </button>
+      <span className={x.monthLabel} aria-live="polite">
+        {monthLabel(month)}
+      </span>
+      <button
+        type="button"
+        className={x.monthBtn}
+        onClick={() => onChange(shiftMonth(month, 1))}
+        disabled={isCurrentMonth(month)}
+        aria-label="Next month"
+      >
+        <ChevronRight size={20} aria-hidden="true" />
+      </button>
+    </div>
+  );
 }
 
-function SalesLineSkeleton() {
+function PageHead({ month, onMonth }: { month?: MonthKey; onMonth?: (next: MonthKey) => void }) {
   return (
-    <div className="sales-line sales-line-loading" aria-label="Loading sales">
-      <PageTitle title="Sales" meta="Loading" />
-      <div className="sales-line-command">
-        <div className="sales-line-command-top">
-          <div className="sales-skeleton-stack">
-            <span className="sales-skeleton sales-skeleton-kicker" />
-            <span className="sales-skeleton sales-skeleton-title" />
-            <span className="sales-skeleton sales-skeleton-copy" />
-            <span className="sales-skeleton sales-skeleton-button" />
-          </div>
-          <span className="sales-skeleton sales-skeleton-hero" />
+    <header className={x.head}>
+      <h1 className={x.title}>Sales</h1>
+      {month && onMonth ? <MonthPicker month={month} onChange={onMonth} /> : null}
+    </header>
+  );
+}
+
+function SalesSkeleton({ label = 'Loading sales' }: { label?: string }) {
+  return (
+    <div className={x.page} aria-busy="true" aria-label={label}>
+      <section className={s.panel}>
+        <div className={x.skelBody}>
+          <span className={`${s.skel} ${x.skelLine}`} />
+          <span className={`${s.skel} ${x.skelKpi}`} />
         </div>
-        <div className="sales-line-broadcast">
-          {[1, 2, 3].map((item) => <span key={item} className="sales-skeleton sales-skeleton-metric" />)}
+      </section>
+      <section className={s.panel}>
+        <div className={x.skelBody}>
+          <span className={`${s.skel} ${x.skelLine}`} />
+          {[1, 2, 3, 4].map((item) => (
+            <span key={item} className={`${s.skel} ${x.skelRow}`} />
+          ))}
         </div>
-      </div>
-      <div className="sales-skeleton-section">
-        <span className="sales-skeleton sales-skeleton-section-head" />
-        {[1, 2, 3].map((item) => <span key={item} className="sales-skeleton sales-skeleton-row" />)}
-      </div>
-      <div className="sales-skeleton-section">
-        <span className="sales-skeleton sales-skeleton-section-head" />
-        {[1, 2, 3, 4].map((item) => <span key={item} className="sales-skeleton sales-skeleton-row" />)}
-      </div>
+      </section>
     </div>
+  );
+}
+
+function LoadFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section className={s.panel} aria-label="Sales">
+      <div className={s.failed} role="alert">
+        <span>Couldn&apos;t load your sales</span>
+        <button type="button" className={s.retry} onClick={onRetry}>
+          <RotateCw size={14} aria-hidden="true" />
+          Retry
+        </button>
+      </div>
+    </section>
   );
 }
 
 function SalesContent() {
   const { user, hasPermission } = useAuth();
+  const params = useSearchParams();
   const { sales: loggedSales, truncated, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
   const fiber = useFiberStatus();
 
@@ -92,16 +112,19 @@ function SalesContent() {
   // This replaced sales:approve, which used to carry the visibility switch as a
   // side effect of the approval permission.
   const canViewAll = hasPermission('sales:read:all');
+  const canLog = hasPermission('sales:write');
 
-  const [payView, setPayView] = useState(false);
+  // `?view=pay` opens the rep's pay list directly.
+  const [payView, setPayView] = useState(() => params.get('view') === 'pay');
   const [month, setMonth] = useState<MonthKey>(() => currentMonth());
-  const { rates, payDelayDays, hasPlan, compRole } = useCompPlan();
+  // useSales starts idle (loading false, no sales). Until the first fetch
+  // settles the page shows skeletons, never a zero it has not measured.
+  const [fetched, setFetched] = useState(false);
+  const { rates, payDelayDays, hasPlan, compRole, loading: planLoading } = useCompPlan();
   const payPlan = useMemo(
     () => ({ rates, payDelayDays, hasPlan, compRole }),
     [compRole, hasPlan, payDelayDays, rates]
   );
-
-  const atCurrentMonth = useMemo(() => isCurrentMonth(month), [month]);
 
   const refreshSales = useCallback(() => {
     if (!user) return;
@@ -119,7 +142,7 @@ function SalesContent() {
     // is applied to the merged book instead, where both sides see it.
     const filters: { salesRepId?: string; limit?: number } =
       canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
-    fetchSales(filters);
+    void fetchSales(filters).finally(() => setFetched(true));
   }, [canViewAll, fetchSales, user]);
 
   useEffect(() => {
@@ -152,151 +175,159 @@ function SalesContent() {
     : null;
   const boardValue = payableMtd.reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
 
-  return (
-    <ProtectedRoute permissions={['sales:read']}>
-      <div className="min-h-screen portal-canvas">
-        <PortalHeader />
-        <div className="flex">
-          <PortalSidebar />
-          <main className="sales-line-main flex-1 overflow-auto">
-            <div className="sales-line">
-              <PageTitle
-                title="Sales"
-                meta={monthLabel(month)}
-                actions={(
-                  <Link className="sales-line-primary" href="/portal/sales/new">
-                    <Plus className="sales-line-icon" aria-hidden="true" />
-                    Log Sale
-                  </Link>
-                )}
+  const booting = !fetched || (loading && sales.length === 0);
+  const failed = !!error && sales.length === 0;
+  const staleNote = error ? (
+    <p className={x.alert} role="alert">
+      Couldn&apos;t refresh just now. What you see may be out of date.
+    </p>
+  ) : null;
+
+  if (canViewAll) {
+    return (
+      <div className={x.page}>
+        <PageHead month={month} onMonth={setMonth} />
+        {booting ? (
+          <SalesSkeleton label="Loading the company book" />
+        ) : failed ? (
+          <LoadFailed onRetry={refreshSales} />
+        ) : (
+          <>
+            {staleNote}
+            <div className={`${x.mgmt} ${fiber.data?.scope === 'all' ? '' : x.mgmtSolo}`}>
+              <AdminSalesBoard
+                sales={sales}
+                month={month}
+                truncated={truncated}
+                loading={loading}
+                onDelete={deleteSale}
+                onSetCancelled={setSaleCancelled}
+                fiber={fiber}
+                payPlan={payPlan}
+                onSaleUpdated={refreshSales}
               />
 
-              {error && <div className="sales-line-error" role="alert">{error}</div>}
+              {/* The carrier report from the morning email — Pending
+                  install / Active / Cancelled-Churned / Attention. It is a
+                  DIFFERENT feed from the board: the board is what reps
+                  logged, this is what the carrier says actually happened, so
+                  management needs both. It is not month-scoped; the picker
+                  only moves the board. */}
+              {fiber.data?.scope === 'all' && (
+                <InstallStatusSection
+                  fiber={fiber}
+                  sales={sales}
+                  ownerView={isOwner(user?.role)}
+                  viewerId={user?.uid ?? null}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
-              {/* One picker for both views. A rep's ledger is month-sliced in
-                  the browser rather than in the fetch — see the fetch comment
-                  above — but the control and the label are the same one. */}
-              <div className="sales-board-month" role="group" aria-label="Month">
-                <button
-                  type="button"
-                  onClick={() => setMonth((current) => shiftMonth(current, -1))}
-                  aria-label="Previous month"
-                >
-                  ‹
-                </button>
-                <span>{monthLabel(month)}</span>
-                <button
-                  type="button"
-                  onClick={() => setMonth((current) => shiftMonth(current, 1))}
-                  disabled={atCurrentMonth}
-                  aria-label="Next month"
-                >
-                  ›
-                </button>
-              </div>
+  const monthName = monthLabel(month);
 
-              {canViewAll ? (
+  return (
+    <div className={x.page}>
+      <PageHead month={month} onMonth={booting || failed || sales.length === 0 ? undefined : setMonth} />
+
+      {booting ? (
+        <SalesSkeleton />
+      ) : failed ? (
+        <LoadFailed onRetry={refreshSales} />
+      ) : sales.length === 0 ? (
+        <section className={`${s.panel} ${x.welcome}`} aria-labelledby="sales-empty-h">
+          <p className={s.kicker}>Your sales</p>
+          <h2 id="sales-empty-h" className={x.welcomeTitle}>
+            No sales yet
+          </h2>
+          <p className={x.welcomeText}>
+            Log your first sale and it shows up here with its install status and estimated pay.
+          </p>
+          {canLog ? (
+            <Link href={LOG_SALE_HREF} className={s.btnPrimary}>
+              <Plus size={20} strokeWidth={2.5} aria-hidden="true" />
+              Log your first sale
+            </Link>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          {staleNote}
+
+          <section className={`${s.panel} ${x.kpis}`} aria-label="Sales summary">
+            <div className={`${x.kpi} ${x.kpiValue}`}>
+              <p className={`${s.kicker} ${x.kpiLabel}`}>Value</p>
+              <p className={x.kpiNum}>
+                {money(boardValue)}
+                <span className={x.kpiUnit}>/ mo</span>
+              </p>
+              <p className={x.kpiNote}>
+                <b>{payableMtd.length}</b> {payableMtd.length === 1 ? 'record' : 'records'} in {monthName}
+              </p>
+            </div>
+            <div className={`${x.kpi} ${x.kpiCount}`}>
+              <p className={`${s.kicker} ${x.kpiLabel}`}>Sales</p>
+              <p className={x.kpiNum}>
+                {payableMtd.length}
+                <span className={x.kpiUnit}>{payableMtd.length === 1 ? 'sale' : 'sales'}</span>
+              </p>
+              <p className={x.kpiNote}>
+                <b>{sales.length}</b> on your board all time
+              </p>
+            </div>
+            <div className={`${x.kpi} ${x.kpiPay}`}>
+              <p className={`${s.kicker} ${x.kpiLabel}`}>Est. pay</p>
+              {planLoading ? (
+                <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
+              ) : expectedPayMtd === null ? (
                 <>
-                  <AdminSalesBoard
-                    sales={sales}
-                    month={month}
-                    truncated={truncated}
-                    loading={loading}
-                    onDelete={deleteSale}
-                    onSetCancelled={setSaleCancelled}
-                    fiber={fiber}
-                    payPlan={payPlan}
-                    onSaleUpdated={refreshSales}
-                  />
-
-                  {/* The carrier report from the morning email — Pending
-                      install / Active / Cancelled-Churned / Attention. It is a
-                      DIFFERENT feed from the board above: the board is what
-                      reps logged, this is what the carrier says actually
-                      happened, so management needs both. It is not month-
-                      scoped; the picker above only moves the board. */}
-                  {fiber.data?.scope === 'all' && (
-                    <InstallStatusSection
-                      fiber={fiber}
-                      sales={sales}
-                      ownerView={isOwner(user?.role)}
-                      viewerId={user?.uid ?? null}
-                    />
-                  )}
+                  <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>
+                  <p className={x.kpiNote}>No pay plan assigned yet</p>
                 </>
               ) : (
                 <>
-                  {!loading && sales.length === 0 && (
-                    <p className="sales-line-empty-state">No sales yet. Log your first one.</p>
-                  )}
-
-                  <section className="sales-line-command" aria-label="Sales summary">
-                    <section className="sales-line-broadcast" aria-label="Sales KPIs">
-                      <div className="sales-line-metric">
-                        <span className="sales-line-metric-label">Value MTD</span>
-                        <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={boardValue} /><small>$ / mo</small></strong>
-                        <span className="sales-line-metric-note"><span className="sales-line-lime">{payableMtd.length}</span> records in {monthLabel(month)}</span>
-                      </div>
-                      <div className="sales-line-metric">
-                        <span className="sales-line-metric-label">Sales this month</span>
-                        <strong className="sales-line-metric-value portal-metallic-num"><AnimatedNumber value={payableMtd.length} /><small>sales</small></strong>
-                        <span className="sales-line-metric-note">{sales.length} on your board all time</span>
-                      </div>
-                      <div className="sales-line-metric">
-                        <span className="sales-line-metric-label">Estimated pay MTD</span>
-                        <strong className="sales-line-metric-value portal-metallic-num">
-                          {expectedPayMtd === null ? '—' : <><AnimatedNumber value={expectedPayMtd} /><small>$ expected</small></>}
-                        </strong>
-                        <span className="sales-line-metric-note">{expectedPayMtd === null
-                          ? 'No pay plan assigned yet'
-                          : `Across ${payableMtd.length} sale${payableMtd.length === 1 ? '' : 's'} in ${monthLabel(month)} · before chargebacks`}</span>
-                      </div>
-                    </section>
-                  </section>
-
-                  {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
-
-                  {(loading || sales.length > 0) && (
-                    <SalesTable
-                      sales={sales}
-                      month={month}
-                      onDelete={deleteSale}
-                      loading={loading}
-                      payView={payView}
-                      onPayViewChange={setPayView}
-                      payPlan={payPlan}
-                      fiber={fiber}
-                      onSaleUpdated={refreshSales}
-                    />
-                  )}
+                  <p className={x.kpiNum}>
+                    <span className={x.est}>est.</span>
+                    {money(expectedPayMtd)}
+                  </p>
+                  <p className={x.kpiNote}>
+                    Across <b>{payableMtd.length}</b> {payableMtd.length === 1 ? 'sale' : 'sales'} in {monthName} ·
+                    before chargebacks
+                  </p>
                 </>
               )}
             </div>
-          </main>
-        </div>
-      </div>
-    </ProtectedRoute>
-  );
-}
+          </section>
 
-function SalesLoadingFallback() {
-  return (
-    <div className="min-h-screen portal-canvas">
-      <PortalHeader />
-      <div className="flex">
-        <PortalSidebar />
-        <main className="sales-line-main flex-1 overflow-auto">
-          <SalesLineSkeleton />
-        </main>
-      </div>
+          {fiber.data?.scope === 'all' && <InstallStatusSection fiber={fiber} />}
+
+          <SalesTable
+            sales={sales}
+            month={month}
+            onDelete={deleteSale}
+            loading={loading}
+            payView={payView}
+            onPayViewChange={setPayView}
+            payPlan={payPlan}
+            fiber={fiber}
+            onSaleUpdated={refreshSales}
+          />
+        </>
+      )}
     </div>
   );
 }
 
 export default function SalesPage() {
   return (
-    <Suspense fallback={<SalesLoadingFallback />}>
-      <SalesContent />
-    </Suspense>
+    <RepShell permissions={['sales:read']}>
+      <Suspense fallback={<SalesSkeleton />}>
+        <SalesContent />
+      </Suspense>
+    </RepShell>
   );
 }
