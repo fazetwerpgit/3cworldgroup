@@ -251,7 +251,7 @@ export default function SettingsPage() {
         </div>
 
         <div className={st.col}>
-          <section className={s.panel} aria-labelledby="app-title">
+          <section id="app-settings" className={s.panel} aria-labelledby="app-title">
             <div className={s.panelHead}>
               <h2 id="app-title" className={s.kicker}>Notifications and app</h2>
             </div>

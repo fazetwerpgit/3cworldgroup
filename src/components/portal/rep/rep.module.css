@@ -480,6 +480,19 @@
   box-sizing: content-box;
 }
 
+/* Push alerts never turned on: amber, top-left, clear of the unread badge. */
+.pushDot {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--c-ground);
+  border-radius: 50%;
+  background: var(--c-amber);
+  box-sizing: content-box;
+}
+
 .deskNav {
   display: none;
 }
@@ -768,7 +781,8 @@
   right: max(var(--gutter), calc((100vw - 1360px) / 2 + var(--gutter)));
   z-index: 61;
   width: 320px;
-  max-height: calc(100dvh - var(--topbar-h) - 24px);
+  /* Under the top bar and above the home indicator, so the last row is reachable. */
+  max-height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
   overflow-y: auto;
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-panel);
@@ -974,6 +988,35 @@
 .noteUnread {
   background: rgba(141, 198, 63, 0.06);
   box-shadow: inset 3px 0 0 var(--c-lime);
+}
+
+.notePush {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tap);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+  font-size: var(--t-sm);
+  text-decoration: none;
+}
+
+.notePush span {
+  color: var(--c-text);
+}
+
+.notePush b {
+  margin-left: var(--s2);
+  color: var(--c-amber);
+  font-weight: 600;
+}
+
+.noteFoot {
+  display: flex;
+  justify-content: center;
+  padding: var(--s1) var(--s4);
 }
 
 .noteEmpty {

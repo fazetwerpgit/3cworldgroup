@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Bug, ChevronDown, ChevronLeft, LogOut, Menu, Plus, Settings, X } from 'lucide-react';
+import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, Plus, Settings, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
@@ -52,6 +52,11 @@ function initials(name?: string | null, email?: string | null) {
     : value.slice(0, 2).toUpperCase();
 }
 
+/** Push alerts were never turned on (or off) on this device. Denied is final, so it gets no nudge. */
+function pushNotAskedYet() {
+  return typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'default';
+}
+
 function timeAgo(date: Date | string) {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (seconds < 60) return 'Just now';
@@ -84,8 +89,11 @@ export function RepTopBar({
   const router = useRouter();
   const { user, signOut } = useAuth();
   const { canAccess, sheetGroups } = useNavAccess();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
   const [panel, setPanel] = useState<Panel>(null);
+  // Read after mount (the server render has no Notification) and again on focus,
+  // since the rep turns alerts on in Settings or in iOS Settings and comes back.
+  const [pushOff, setPushOff] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
@@ -105,6 +113,13 @@ export function RepTopBar({
     setOpenedOn(pathname);
     if (panel) setPanel(null);
   }
+
+  useEffect(() => {
+    const update = () => setPushOff(pushNotAskedYet());
+    update();
+    window.addEventListener('focus', update);
+    return () => window.removeEventListener('focus', update);
+  }, []);
 
   useEffect(() => {
     if (!panel) return;
@@ -224,10 +239,14 @@ export function RepTopBar({
             className={s.iconBtn}
             aria-expanded={panel === 'notes'}
             aria-haspopup="true"
-            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            aria-label={
+              (unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications') +
+              (pushOff ? '. Alerts are off.' : '')
+            }
             onClick={toggle('notes')}
           >
             <Bell size={22} strokeWidth={1.75} aria-hidden="true" />
+            {pushOff ? <i className={s.pushDot} aria-hidden="true" /> : null}
             {unreadCount > 0 ? <span className={s.badge}>{unreadCount > 9 ? '9+' : unreadCount}</span> : null}
           </button>
 
@@ -348,6 +367,15 @@ export function RepTopBar({
                 </button>
               )}
             </div>
+            {pushOff ? (
+              <Link href="/portal/settings#app-settings" className={s.notePush} onClick={() => setPanel(null)}>
+                <BellOff size={18} aria-hidden="true" />
+                <span>
+                  Alerts are off on this device.
+                  <b>Turn on</b>
+                </span>
+              </Link>
+            ) : null}
             {notifications.length === 0 ? (
               <p className={s.noteEmpty}>You&apos;re all caught up.</p>
             ) : (
@@ -370,6 +398,13 @@ export function RepTopBar({
                 </button>
               ))
             )}
+            {notifications.length > 0 ? (
+              <div className={s.noteFoot}>
+                <button type="button" className={s.textBtn} onClick={() => void clearAll()}>
+                  Clear all
+                </button>
+              </div>
+            ) : null}
           </div>
         </BodyLayer>
       ) : null}
