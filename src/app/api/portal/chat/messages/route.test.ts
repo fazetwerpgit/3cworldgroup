@@ -62,8 +62,18 @@ const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
   'deleted-msg': { authorId: 'real-uid', authorName: 'Real User', text: 'was here', deletedAt: { seconds: 1 } },
 };
 
+// create() on a messages.doc(id): the ids already "stored" reject like the
+// Admin SDK does (gRPC ALREADY_EXISTS), everything else records the write.
+const createdIds = new Set<string>();
+const createMock = vi.fn(async (messageId: string, _doc: Record<string, unknown>) => {
+  if (createdIds.has(messageId)) throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
+  createdIds.add(messageId);
+});
+
 function messagesDoc(messageId: string) {
   return {
+    id: messageId,
+    create: (doc: Record<string, unknown>) => createMock(messageId, doc),
     get: vi.fn(async () => ({
       id: messageId,
       exists: messageId in MESSAGE_DOCS,
@@ -172,6 +182,8 @@ beforeEach(() => {
   addMock.mockClear();
   setMock.mockClear();
   msgSetMock.mockClear();
+  createMock.mockClear();
+  createdIds.clear();
   sendPushMock.mockClear();
   afterTasks.length = 0;
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
@@ -402,7 +414,7 @@ describe('POST /api/portal/chat/messages (push fan-out)', () => {
     expect(sendPushMock).toHaveBeenCalledWith('mgr-1', {
       title: 'Managers',
       body: 'Real User: standup in five',
-      url: '/portal/chat',
+      url: '/portal/chat?channel=managers-extra',
     });
   });
 
@@ -425,6 +437,47 @@ describe('POST /api/portal/chat/messages (push fan-out)', () => {
     expect(res.status).toBe(200);
     await flushAfter();
     expect(sendPushMock.mock.calls[0][1]).toMatchObject({ body: 'Real User sent a photo' });
+  });
+});
+
+describe('POST /api/portal/chat/messages (idempotent retry)', () => {
+  const CLIENT_ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
+
+  it('stores a keyed send under the author-scoped id', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, messageId: `real-uid_${CLIENT_ID}` });
+    expect(addMock).not.toHaveBeenCalled();
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock.mock.calls[0][1]).toMatchObject({ authorId: 'real-uid', text: 'hi' });
+  });
+
+  it('answers a repeat of the same key as a success without a second message or push', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
+    await flushAfter();
+    sendPushMock.mockClear();
+    setMock.mockClear();
+    afterTasks.length = 0;
+
+    const again = await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ success: true, messageId: `real-uid_${CLIENT_ID}`, duplicate: true });
+    await flushAfter();
+    expect(sendPushMock).not.toHaveBeenCalled();
+    expect(setMock).not.toHaveBeenCalledWith(expect.objectContaining({ lastMessageAt: expect.anything() }), {
+      merge: true,
+    });
+    expect(createdIds.size).toBe(1);
+  });
+
+  it('falls back to a random id when the key is malformed', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'hi', clientMessageId: '../../evil' }));
+    expect(res.status).toBe(200);
+    expect(createMock).not.toHaveBeenCalled();
+    expect(addMock).toHaveBeenCalledTimes(1);
   });
 });
 
