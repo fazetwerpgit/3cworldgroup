@@ -116,8 +116,6 @@ export interface CompanyBook {
   installs: InstallRecord[];
   /** Counted sales with no install date at all. */
   missingInstallDate: number;
-  /** Carrier orders with no portal sale ("Not logged" on the Sales board). */
-  notLogged: number;
   orders: FiberOrder[];
 }
 
@@ -140,7 +138,7 @@ export function companyBook(sales: Sale[], orders: FiberOrder[], now: Date): Com
     installs.push({ saleId: row.key, repId: sale.salesRepId, installDate, sale });
   }
 
-  return { installs, missingInstallDate, notLogged: book.notLoggedCount, orders };
+  return { installs, missingInstallDate, orders };
 }
 
 // ---------------------------------------------------------------- money
@@ -257,7 +255,6 @@ export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): 
 
 export type ProblemKey =
   | 'carrierCancellations'
-  | 'notLogged'
   | 'payrollDisputes'
   | 'stalledOnboarding'
   | 'pendingSignups'
@@ -276,7 +273,6 @@ export interface ProblemRow {
 /** Display order: money at risk first, then people, then requests. */
 export const PROBLEM_HREFS: Record<ProblemKey, string> = {
   carrierCancellations: '/portal/sales',
-  notLogged: '/portal/sales',
   payrollDisputes: '/portal/admin/payroll-disputes',
   stalledOnboarding: '/portal/admin/onboarding',
   pendingSignups: '/portal/admin/users',
@@ -394,7 +390,6 @@ export async function buildProblems(source: OwnerSummarySource, periods: OwnerPe
   const book = companyBook(bookData.sales, bookData.orders, periods.now);
   return problemRows({
     carrierCancellations: carrierCancellationsIn(book.orders, { start: periods.thisWeek.start, end: periods.now }),
-    notLogged: book.notLogged,
     payrollDisputes,
     stalledOnboarding,
     pendingSignups,

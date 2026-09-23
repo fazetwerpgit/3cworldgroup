@@ -213,7 +213,6 @@ function MoneySkeleton() {
 
 const PROBLEM_COPY: Record<ProblemKey, { one: string; many: string; page: string }> = {
   carrierCancellations: { one: 'Carrier cancellation this week', many: 'Carrier cancellations this week', page: 'Sales · Cancelled' },
-  notLogged: { one: 'Carrier order not logged', many: 'Carrier orders not logged', page: 'Sales · Not logged' },
   payrollDisputes: { one: 'Open pay dispute', many: 'Open pay disputes', page: 'Payroll disputes' },
   stalledOnboarding: { one: 'Stuck in onboarding 3+ days', many: 'Stuck in onboarding 3+ days', page: 'Onboarding' },
   pendingSignups: { one: 'Signup waiting for approval', many: 'Signups waiting for approval', page: 'Users' },
@@ -224,7 +223,7 @@ const PROBLEM_COPY: Record<ProblemKey, { one: string; many: string; page: string
 };
 
 /** Money at risk reads amber; queues read plain. */
-const MONEY_RISK: ReadonlySet<ProblemKey> = new Set(['carrierCancellations', 'notLogged', 'payrollDisputes', 'missingInstallDate']);
+const MONEY_RISK: ReadonlySet<ProblemKey> = new Set(['carrierCancellations', 'payrollDisputes', 'missingInstallDate']);
 
 function Attention({ rows }: { rows: ProblemRow[] }) {
   const open = rows.filter((row) => row.count > 0);

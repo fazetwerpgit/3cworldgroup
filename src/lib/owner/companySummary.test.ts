@@ -177,7 +177,6 @@ describe('companyBook', () => {
     const moved = book.installs.find((install) => install.saleId === 's10')!;
     expect(moved.installDate.getDate()).toBe(21); // the carrier's activation, not Aug 30
     expect(book.missingInstallDate).toBe(1);
-    expect(book.notLogged).toBe(1);
   });
 });
 
@@ -205,7 +204,6 @@ describe('buildOwnerSummary', () => {
     const counts = Object.fromEntries(summary.problems!.map((row) => [row.key, row.count]));
     expect(counts).toEqual({
       carrierCancellations: 1,
-      notLogged: 1,
       payrollDisputes: 2,
       stalledOnboarding: 0,
       pendingSignups: 3,
