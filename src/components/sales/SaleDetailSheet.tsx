@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
 import { dateToSaleDateInput, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
+import { saveInstallDate as saveOwnInstallDate } from '@/lib/sales/saveInstallDate';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
@@ -191,9 +192,10 @@ export function SaleDetailSheet({
   const shownInstallDate = installSaved && installSaved.saleId === saleId
     ? installSaved.date
     : storedInstallDate;
-  // The owning rep, or an admin. A cancelled sale has no install to move.
+  // The owning rep, or an admin. A cancelled or rejected sale has no install to move.
+  const ownSale = !!user?.uid && sale.salesRepId === user.uid;
   const canEditInstallDate =
-    sale.status !== 'cancelled' && (isAdmin || (!!user?.uid && sale.salesRepId === user.uid));
+    sale.status !== 'cancelled' && sale.status !== 'rejected' && (isAdmin || ownSale);
 
   const startEditingInstall = () => {
     setInstallError(null);
@@ -214,10 +216,18 @@ export function SaleDetailSheet({
     }
     setSavingInstall(true);
     setInstallError(null);
-    const ok = await updateSale(saleId, { installDate: installDraft });
+    // Their own sale goes through the install-date-only route (a rep's one
+    // edit); an admin fixing someone else's sale keeps the full edit.
+    let failure: string | null = null;
+    if (ownSale) {
+      const result = await saveOwnInstallDate(saleId, installDraft);
+      if (!result.ok) failure = result.error;
+    } else if (!(await updateSale(saleId, { installDate: installDraft }))) {
+      failure = INSTALL_DATE_ERROR;
+    }
     setSavingInstall(false);
-    if (!ok) {
-      setInstallError(INSTALL_DATE_ERROR);
+    if (failure) {
+      setInstallError(failure);
       return;
     }
     setInstallSaved({ saleId, date: parsed.date });
@@ -323,7 +333,12 @@ export function SaleDetailSheet({
                 <span>Install</span>
                 <b>{formatDate(shownInstallDate)}</b>
                 {canEditInstallDate && installDraft === null && (
-                  <button className={`${x.actBtn} ${x.dChange}`} type="button" onClick={startEditingInstall}>
+                  <button
+                    className={`${x.actBtn} ${x.dChange}`}
+                    type="button"
+                    aria-label="Change install date"
+                    onClick={startEditingInstall}
+                  >
                     Change
                   </button>
                 )}

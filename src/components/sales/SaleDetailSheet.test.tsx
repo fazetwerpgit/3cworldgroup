@@ -3,7 +3,9 @@
 // Covers the rep-facing install-date edit in the detail sheet. A customer
 // reschedules and the rep has to move the date from their phone; the API has
 // always allowed a rep to edit their own sale, so the only thing under test is
-// who the sheet offers the control to and what it sends.
+// who the sheet offers the control to and what it sends: the owning rep goes
+// through the install-date-only route, an admin on someone else's sale through
+// the full edit.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +13,13 @@ import type { Sale } from '@/types';
 
 const viewer = vi.hoisted(() => ({ uid: 'rep1' }));
 const api = vi.hoisted(() => ({ updateSale: vi.fn(async () => true) }));
+type SaveResult = { ok: true; installDate: string } | { ok: false; error: string };
+const own = vi.hoisted(() => ({
+  save: vi.fn<(saleId: string, day: string) => Promise<SaveResult>>(async () => ({
+    ok: true,
+    installDate: '2026-10-02T17:00:00.000Z',
+  })),
+}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { uid: viewer.uid, displayName: 'Wil Teasdale' }, isRole: () => false }),
@@ -19,6 +28,9 @@ vi.mock('@/hooks/useSales', () => ({
   useSales: () => ({ updateSale: api.updateSale, loading: false, error: null }),
 }));
 vi.mock('@/lib/firebase/config', () => ({ auth: null }));
+vi.mock('@/lib/sales/saveInstallDate', () => ({
+  saveInstallDate: (...args: [string, string]) => own.save(...args),
+}));
 vi.mock('@/components/chat/ChatLightbox', () => ({ ChatLightbox: () => null }));
 vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
@@ -87,6 +99,7 @@ function click(element: Element | undefined) {
 beforeEach(() => {
   viewer.uid = 'rep1';
   api.updateSale = vi.fn(async () => true);
+  own.save.mockClear();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -121,7 +134,8 @@ describe('SaleDetailSheet install date', () => {
       buttonByText('Save')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(api.updateSale).toHaveBeenCalledWith('sale1', { installDate: '2026-10-02' });
+    expect(own.save).toHaveBeenCalledWith('sale1', '2026-10-02');
+    expect(api.updateSale).not.toHaveBeenCalled();
     // The sheet shows the saved date without waiting for the list to refetch.
     expect(document.body.textContent).toContain('Oct 2');
     expect(installInput()).toBeNull();
@@ -133,13 +147,15 @@ describe('SaleDetailSheet install date', () => {
     expect(buttonByText('Change')).toBeUndefined();
   });
 
-  it('offers no control on a cancelled sale', () => {
+  it('offers no control on a cancelled or rejected sale', () => {
     render({ ...SALE, status: 'cancelled' });
+    expect(buttonByText('Change')).toBeUndefined();
+    render({ ...SALE, status: 'rejected' });
     expect(buttonByText('Change')).toBeUndefined();
   });
 
-  it('shows the error copy when the save fails', async () => {
-    api.updateSale = vi.fn(async () => false);
+  it("shows the route's reason when the rep's save fails, and keeps the editor open", async () => {
+    own.save.mockResolvedValueOnce({ ok: false, error: 'No signal. Tap Save to try again.' });
     render(SALE);
     click(buttonByText('Change'));
 
@@ -147,9 +163,24 @@ describe('SaleDetailSheet install date', () => {
       buttonByText('Save')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(document.body.textContent).toContain('Could not save the install date. Try again.');
+    expect(document.body.textContent).toContain('No signal. Tap Save to try again.');
     // The editor stays open so the rep can retry.
     expect(installInput()).toBeTruthy();
+  });
+
+  it("keeps an admin on someone else's sale on the full edit", async () => {
+    viewer.uid = 'admin1';
+    api.updateSale = vi.fn(async () => false);
+    render(SALE, true);
+    click(buttonByText('Change'));
+
+    await act(async () => {
+      buttonByText('Save')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(api.updateSale).toHaveBeenCalledWith('sale1', { installDate: '2026-09-20' });
+    expect(own.save).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('Could not save the install date. Try again.');
   });
 });
 
