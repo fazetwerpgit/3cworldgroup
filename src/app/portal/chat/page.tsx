@@ -200,7 +200,7 @@ export default function TeamChatPage() {
   const [desktopPrevChannel, setDesktopPrevChannel] = useState('');
   const desktopSignalRef = useRef(0);
 
-  const { channels, loading: loadingChannels, error: channelsError } = useChatChannels();
+  const { channels, loading: loadingChannels, error: channelsError, retry: retryChannels } = useChatChannels();
   const {
     messages,
     loading: loadingMessages,
@@ -1269,6 +1269,7 @@ export default function TeamChatPage() {
               channels={channels}
               loading={loadingChannels}
               error={channelsError}
+              onRetry={retryChannels}
               unreadByChannel={unreadByChannel}
               activeChannelId={activeChannelId}
               onSelect={setActiveChannelId}
@@ -1620,6 +1621,7 @@ export default function TeamChatPage() {
               channels={channels}
               loading={loadingChannels}
               error={channelsError}
+              onRetry={retryChannels}
               unreadByChannel={unreadByChannel}
               onOpenChannel={openChannelOnPhone}
             />
