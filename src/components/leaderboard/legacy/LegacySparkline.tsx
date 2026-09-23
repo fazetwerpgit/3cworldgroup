@@ -7,7 +7,7 @@ export function LegacySparkline({ spark, mine }: { spark: (number | null)[]; min
   const values = spark.filter((value): value is number => value !== null);
   const mutedLine = !mine && (polylines.length > 1 || (values.length > 1 && new Set(values).size === 1));
   if (polylines.length === 0 && dots.length === 0) {
-    return <span aria-hidden="true" className="text-[10px] font-semibold text-slate-300 dark:text-muted-foreground">--</span>;
+    return <span aria-hidden="true" className="text-[12px] font-semibold text-slate-300 dark:text-muted-foreground">--</span>;
   }
   return (
     <svg

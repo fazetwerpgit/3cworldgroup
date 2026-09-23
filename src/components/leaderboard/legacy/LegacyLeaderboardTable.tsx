@@ -69,14 +69,14 @@ function CountUpValue({ value }: { value: number }) {
 
 function MovementIndicator({ movement, noHistory }: { movement: number | null | undefined; noHistory: boolean }) {
   if (noHistory || movement === 0) {
-    return <span className="portal-display text-[10px] font-black text-[#687384]" aria-hidden="true">-</span>;
+    return <span className="portal-display text-[12px] font-black text-[#687384]" aria-hidden="true">-</span>;
   }
   if (movement === null || movement === undefined) {
-    return <span className="border border-current px-1.5 py-[3px] text-[8px] font-black uppercase tracking-[0.12em] text-[#687384]">NEW</span>;
+    return <span className="border border-current px-1.5 py-[3px] text-[12px] font-black uppercase tracking-[0.12em] text-[#687384]">NEW</span>;
   }
   const up = movement > 0;
   return (
-    <span className={`portal-display inline-flex items-center gap-1 text-[10px] font-black ${up ? 'text-[#8dc63f]' : 'text-[#ad7116]'}`}>
+    <span className={`portal-display inline-flex items-center gap-1 text-[12px] font-black ${up ? 'text-[#8dc63f]' : 'text-[#ad7116]'}`}>
       {up ? <ArrowUp className="size-3" aria-hidden="true" /> : <ArrowDown className="size-3" aria-hidden="true" />}
       {Math.abs(movement)}
       <span className="sr-only">{up ? 'up' : 'down'} {Math.abs(movement)} since yesterday</span>
@@ -87,7 +87,7 @@ function MovementIndicator({ movement, noHistory }: { movement: number | null | 
 function StreakChip({ streakDays, mine = false }: { streakDays: number | undefined; mine?: boolean }) {
   if (!streakDays || streakDays < 2) return null;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-[99px] px-1.5 py-[3px] text-[9px] font-black ${mine ? 'border border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44] dark:text-white' : 'bg-[#0A1F44] text-[#d9a520]'}`}>
+    <span className={`inline-flex items-center gap-1 rounded-[99px] px-1.5 py-[3px] text-[12px] font-black ${mine ? 'border border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44] dark:text-white' : 'bg-[#0A1F44] text-[#d9a520]'}`}>
       <Flame className="size-3 fill-current" aria-hidden="true" />
       {streakDays}-day streak
     </span>
@@ -152,24 +152,24 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
   return (
     <section className="mb-[45px] grid grid-cols-2 border-y border-[#0A1F44] dark:border-[#e7edf4] sm:grid-cols-4" aria-label="Team pulse">
       <div className="min-h-[109px] border-r border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4]">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Top closer</span>
+        <span className="text-[12px] font-black uppercase tracking-[0.16em] text-[#687384]">Top closer</span>
         <strong className="mt-[18px] block truncate portal-display text-[20px] font-black tracking-[-0.02em]">{topCloser?.salesRepName ?? '--'}</strong>
-        <span className="portal-display mt-1 block text-[10px] text-[#687384]">{topCloser ? `${formatNumber(topCloser.totalSales)} approved sales` : 'No approved sales yet'}</span>
+        <span className="portal-display mt-1 block text-[12px] text-[#687384]">{topCloser ? `${formatNumber(topCloser.totalSales)} approved sales` : 'No approved sales yet'}</span>
       </div>
       <div className="min-h-[109px] border-r border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4]">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Closest race</span>
+        <span className="text-[12px] font-black uppercase tracking-[0.16em] text-[#687384]">Closest race</span>
         <strong className="mt-[18px] block portal-display text-[20px] font-black tracking-[-0.02em]">{race ? `#${race.above.rank} vs #${race.below.rank}` : '--'}</strong>
-        <span className="portal-display mt-1 block text-[10px] text-[#687384]">{race ? `${formatNumber(race.gap)} ${unit} apart` : 'Needs two active reps'}</span>
+        <span className="portal-display mt-1 block text-[12px] text-[#687384]">{race ? `${formatNumber(race.gap)} ${unit} apart` : 'Needs two active reps'}</span>
       </div>
       <div className="min-h-[109px] border-r border-t border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4] sm:border-t-0">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Your climb</span>
+        <span className="text-[12px] font-black uppercase tracking-[0.16em] text-[#687384]">Your climb</span>
         <strong className="mt-[18px] block truncate portal-display text-[20px] font-black tracking-[-0.02em]">{!currentUser ? 'First sale' : soleLeader ? 'Top of the board' : currentUser.rank === 1 ? `Leading by ${formatNumber(lead ?? 0)}` : nextGap !== null ? `${formatNumber(nextGap)} ${unit}` : 'Keep climbing'}</strong>
-        <span className="portal-display mt-1 block text-[10px] text-[#687384]">{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? 'over #2 in pts' : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</span>
+        <span className="portal-display mt-1 block text-[12px] text-[#687384]">{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? 'over #2 in pts' : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</span>
       </div>
       <div className="min-h-[109px] border-t border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4] sm:border-t-0">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#687384]">Team pulse</span>
+        <span className="text-[12px] font-black uppercase tracking-[0.16em] text-[#687384]">Team pulse</span>
         <strong className="mt-[18px] block portal-display text-[20px] font-black tracking-[-0.02em]">{formatNumber(totalPoints)} pts</strong>
-        <span className="portal-display mt-1 block text-[10px] text-[#687384]">{entries.length} reps, {daysLeft ? `${daysLeft} days left` : 'all time'}</span>
+        <span className="portal-display mt-1 block text-[12px] text-[#687384]">{entries.length} reps, {daysLeft ? `${daysLeft} days left` : 'all time'}</span>
       </div>
     </section>
   );
@@ -185,7 +185,7 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
     <section className="mb-[46px]" aria-labelledby="podium-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
         <h2 id="podium-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">Top performers</h2>
-        <p className="text-right text-[10px] uppercase tracking-[0.15em] text-[#687384]">Approved {metric === 'totalPoints' ? 'points' : 'sales'} · {periodLabel(period)}</p>
+        <p className="text-right text-[12px] uppercase tracking-[0.15em] text-[#687384]">Approved {metric === 'totalPoints' ? 'points' : 'sales'} · {periodLabel(period)}</p>
       </div>
       <div className={`grid gap-0 bg-[#0A1F44] text-white dark:bg-[radial-gradient(circle_at_50%_31%,rgba(245,215,128,0.18),transparent_26%),linear-gradient(180deg,#0d2449,#06142b)] dark:text-[#f6f7f8] dark:shadow-[0_25px_70px_rgba(0,0,0,0.24)] ${gridColumns}`}>
         {podiumEntries.map((entry) => {
@@ -201,14 +201,14 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
               {winner && <Crown className="absolute right-[22px] top-[21px] size-7 fill-[#0A1F44] text-[#0A1F44] dark:fill-[#d9a520] dark:text-[#d9a520] dark:drop-shadow-[0_0_11px_rgba(245,215,128,0.75)]" aria-label="Gold crown" />}
               <div className={`portal-display text-[clamp(86px,11vw,160px)] font-black leading-[0.67] tracking-[-0.02em] pt-[0.14em] ${rankStyle}`}>{String(entry.rank).padStart(2, '0')}</div>
               <div className="mt-6 flex items-center gap-[11px]">
-                <span className={`grid size-[43px] shrink-0 place-items-center rounded-full bg-[#31537b] text-[11px] font-black ${winner ? 'bg-[#0A1F44] text-white dark:shadow-[0_0_20px_rgba(245,215,128,0.3)]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
+                <span className={`grid size-[43px] shrink-0 place-items-center rounded-full bg-[#31537b] text-[12px] font-black ${winner ? 'bg-[#0A1F44] text-white dark:shadow-[0_0_20px_rgba(245,215,128,0.3)]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
                   <strong className="block truncate text-[16px] font-black">{entry.salesRepName}</strong>
-                  <span className="portal-display mt-[3px] block text-[10px]">{formatNumber(entry.totalSales)} approved sales{winner ? ', current leader' : ''}</span>
-                  {mine && <span className="mt-1 inline-block bg-[#8dc63f] px-1.5 py-[3px] text-[8px] font-black uppercase tracking-[0.1em] text-[#0A1F44]">YOU</span>}
+                  <span className="portal-display mt-[3px] block text-[12px]">{formatNumber(entry.totalSales)} approved sales{winner ? ', current leader' : ''}</span>
+                  {mine && <span className="mt-1 inline-block bg-[#8dc63f] px-1.5 py-[3px] text-[12px] font-black uppercase tracking-[0.1em] text-[#0A1F44]">YOU</span>}
                 </div>
               </div>
-              <div className={`portal-display absolute bottom-[18px] right-[22px] text-[25px] font-black ${winner ? 'text-[37px] dark:text-[#f5d780] dark:[text-shadow:0_0_15px_rgba(245,215,128,0.6)]' : ''}`}><CountUpValue value={metricValue(entry, metric)} /> <small className="text-[9px] tracking-[0.15em]">{unit}</small></div>
+              <div className={`portal-display absolute bottom-[18px] right-[22px] text-[25px] font-black ${winner ? 'text-[37px] dark:text-[#f5d780] dark:[text-shadow:0_0_15px_rgba(245,215,128,0.6)]' : ''}`}><CountUpValue value={metricValue(entry, metric)} /> <small className="text-[12px] tracking-[0.15em]">{unit}</small></div>
             </article>
           );
         })}
@@ -227,10 +227,10 @@ function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntr
     <section className="mb-[25px]" aria-labelledby="chase-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
         <h2 id="chase-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">Ranks 4-{entries.length}</h2>
-        <p className="text-right text-[10px] uppercase tracking-[0.14em] text-[#687384]">Movement since yesterday</p>
+        <p className="text-right text-[12px] uppercase tracking-[0.14em] text-[#687384]">Movement since yesterday</p>
       </div>
       <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">
-        <div className="hidden min-h-[38px] grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] items-center gap-[15px] px-3 text-[9px] font-black uppercase tracking-[0.16em] text-[#687384] sm:grid"><span>Rank / move</span><span>Rep</span><span>7-day trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span></div>
+        <div className="hidden min-h-[38px] grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] items-center gap-[15px] whitespace-nowrap px-3 text-[12px] font-black uppercase tracking-[0.16em] text-[#687384] sm:grid"><span>Rank / move</span><span>Rep</span><span>7-day trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span></div>
         {rest.map((entry, index) => {
           const mine = entry.salesRepId === currentUser?.salesRepId;
           const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
@@ -243,15 +243,15 @@ function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntr
             <div key={entry.salesRepId} className={`relative grid min-h-[77px] grid-cols-[43px_minmax(0,1fr)_auto] items-center gap-[9px] border-b border-[rgba(10,31,68,0.22)] px-1 py-2.5 transition-colors duration-150 last:border-0 hover:bg-[rgba(141,198,63,0.12)] dark:border-white/15 dark:hover:bg-[rgba(245,215,128,0.08)] sm:grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] sm:gap-[15px] sm:px-3 ${mine ? 'bg-[#0A1F44] text-white shadow-[inset_7px_0_#8dc63f] dark:bg-[#8dc63f] dark:text-[#0A1F44] dark:border-[#8dc63f] dark:shadow-[inset_7px_0_#d7edaf,0_0_30px_rgba(141,198,63,0.12)]' : ''}`} style={{ animationDelay: `${Math.min(index * 42, 420)}ms` }}>
               <div className="portal-display flex items-center gap-[9px]"><b className="text-[21px]">{String(entry.rank).padStart(2, '0')}</b><MovementIndicator movement={entry.movement} noHistory={noHistory} /></div>
               <div className="flex min-w-0 items-center gap-[11px]">
-                <span className={`grid size-[35px] shrink-0 place-items-center rounded-full bg-[#0A1F44] text-[10px] font-black text-white ${mine ? 'dark:bg-[#0A1F44]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
+                <span className={`grid size-[35px] shrink-0 place-items-center rounded-full bg-[#0A1F44] text-[12px] font-black text-white ${mine ? 'dark:bg-[#0A1F44]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
-                  <span className={`block truncate text-[14px] font-black ${mine ? 'text-white dark:text-[#0A1F44]' : ''}`}>{entry.salesRepName}{mine && <em className="ml-[7px] bg-[#8dc63f] px-1.5 py-[3px] text-[8px] font-black uppercase not-italic tracking-[0.1em] text-[#0A1F44] dark:bg-white">YOU</em>}</span>
-                  <span className={`mt-1 flex flex-wrap items-center gap-1 text-[9px] text-[#687384] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : ''}`}>{formatNumber(entry.totalSales)} sales <StreakChip streakDays={entry.streakDays} mine={mine} /></span>
+                  <span className={`block truncate text-[14px] font-black ${mine ? 'text-white dark:text-[#0A1F44]' : ''}`}>{entry.salesRepName}{mine && <em className="ml-[7px] bg-[#8dc63f] px-1.5 py-[3px] text-[12px] font-black uppercase not-italic tracking-[0.1em] text-[#0A1F44] dark:bg-white">YOU</em>}</span>
+                  <span className={`mt-1 flex flex-wrap items-center gap-1 text-[12px] text-[#687384] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : ''}`}>{formatNumber(entry.totalSales)} sales <StreakChip streakDays={entry.streakDays} mine={mine} /></span>
                 </div>
               </div>
               <span className="hidden justify-center sm:flex"><LegacySparkline spark={entry.spark ?? []} mine={mine} /></span>
-              <div className="num portal-display text-right text-[17px] font-black">{formatNumber(currentValue)} <small className={`text-[9px] tracking-[0.12em] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : 'text-[#687384]'}`}>{unit}</small></div>
-              <div className={`${gap === null || !below ? 'grid size-7 place-items-center rounded-full p-0 text-[13px]' : 'rounded-[99px] px-2 py-1'} portal-display col-span-2 justify-self-start border border-[#0A1F44] text-[10px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
+              <div className="num portal-display text-right text-[17px] font-black">{formatNumber(currentValue)} <small className={`text-[12px] tracking-[0.12em] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : 'text-[#687384]'}`}>{unit}</small></div>
+              <div className={`${gap === null || !below ? 'grid size-7 place-items-center rounded-full p-0 text-[13px]' : 'rounded-[99px] px-2 py-1'} portal-display col-span-2 justify-self-start border border-[#0A1F44] text-[12px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
               {mine && <ChaseProgress current={currentValue} target={aboveValue} highlighted />}
             </div>
           );
@@ -270,7 +270,7 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period }:
       <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
       <ChaseTable entries={ordered} currentUser={currentUser} metric={metric} />
-      <footer className="flex justify-between gap-3 border-t border-[#0A1F44] pt-3 text-[10px] text-[#687384] dark:border-[#e7edf4] max-sm:block">
+      <footer className="flex justify-between gap-3 border-t border-[#0A1F44] pt-3 text-[12px] text-[#687384] dark:border-[#e7edf4] max-sm:block">
         <span>Rankings use approved sales for the selected period.</span>
         <span className="max-sm:mt-2 max-sm:block">Point values vary by product and plan · refreshed moments ago.</span>
       </footer>
