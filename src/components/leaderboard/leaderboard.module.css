@@ -6,37 +6,40 @@
    100px tall at most) carrying the page, a centred header stack, and a lit
    ground that fades from the accent down to the page colour by the podium.
    Shape rule: cards and rows are 14px, the filter rail and countdown are pills,
-   and the podium blocks are the one square-footed object. */
+   and the podium blocks are the one square-footed object.
+   The page sits on the direction D shell (RepShell), so the surfaces around the
+   podium read D's tokens (--c-*, set on the shell root); the podium, crown,
+   laurels and numerals keep their own colours. */
 
 .shell {
-  --leaderboard-surface-2: var(--secondary);
-  --leaderboard-ink: var(--foreground);
-  --leaderboard-muted: var(--muted-foreground);
-  --leaderboard-line: var(--border);
-  --leaderboard-accent: var(--primary);
+  --leaderboard-surface-2: var(--c-panel-hi);
+  --leaderboard-ink: var(--c-text);
+  --leaderboard-muted: var(--c-text-2);
+  --leaderboard-line: var(--c-line);
+  --leaderboard-accent: var(--c-lime);
   --gold: #d6a94c;
   --gold-deep: #a8802f;
   --silver: #9ba4af;
   --bronze: #b1723e;
-  /* The brand lime is only 1.85:1 on a white row, so small accent marks take a
-     deeper green in light theme (5.1:1) and the bright rail lime in dark. */
-  --accent-ink: #4a7a18;
-  --glow: rgba(141, 198, 63, 0.03);
-  --glow-hot: rgba(141, 198, 63, 0.05);
-  --row-surface: var(--card);
-  --row-line: var(--border);
-  --standing-surface: var(--card);
-  --avatar-ring: rgba(10, 31, 68, 0.14);
-  --rail-fill: rgba(10, 31, 68, 0.05);
-  --rail-line: rgba(10, 31, 68, 0.11);
-  --rail-ink: var(--leaderboard-muted);
-  --pill-fill: color-mix(in srgb, var(--primary) 12%, transparent);
-  --pill-line: color-mix(in srgb, var(--primary) 42%, transparent);
+  --accent-ink: var(--c-lime);
+  --glow: rgba(163, 230, 53, 0.12);
+  --glow-hot: rgba(110, 231, 170, 0.28);
+  --row-surface: var(--c-panel);
+  --row-line: var(--c-line);
+  --standing-surface: var(--c-panel-hi);
+  --avatar-ring: rgba(255, 255, 255, 0.5);
+  --rail-fill: var(--c-panel);
+  --rail-line: var(--c-line-strong);
+  --rail-ink: var(--c-text-2);
+  --pill-fill: var(--c-lime-wash);
+  --pill-line: color-mix(in srgb, var(--c-lime) 38%, transparent);
   position: relative;
   isolation: isolate;
   max-width: 640px;
-  margin: 0 auto;
-  padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+  /* The shell's .main already carries the 16px gutter and a 16px top pad; the
+     column keeps its old 18px header offset and full phone width inside it. */
+  margin: calc(-1 * var(--s4, 16px)) auto 0;
+  padding: 18px 0 calc(20px + env(safe-area-inset-bottom));
 }
 
 /* A faint accent glow behind the header that has faded back to the page colour
@@ -49,8 +52,9 @@
      naturally without carrying a z-index of its own. */
   z-index: -1;
   top: 0;
-  right: 0;
-  left: 0;
+  /* Out through the shell's gutter, so the glow still runs edge to edge. */
+  right: calc(-1 * var(--gutter, 16px));
+  left: calc(-1 * var(--gutter, 16px));
   height: 320px;
   background:
     radial-gradient(ellipse 98% 86% at 50% -20%, var(--glow-hot), transparent 72%),
@@ -68,23 +72,6 @@
 }
 
 
-
-:global(.dark) .shell {
-  --glow: rgba(163, 230, 53, 0.12);
-  --glow-hot: rgba(110, 231, 170, 0.28);
-  --accent-ink: var(--rail-lime);
-  --row-surface: rgba(255, 255, 255, 0.06);
-  --row-line: rgba(255, 255, 255, 0.1);
-  --standing-surface: #161b28;
-  --avatar-ring: rgba(255, 255, 255, 0.5);
-  /* A dark translucent rail, a step under the navy ground, found by its
-     hairline rather than by a fill lighter than the page. */
-  --rail-fill: rgba(2, 16, 8, 0.38);
-  --rail-line: rgba(255, 255, 255, 0.18);
-  --rail-ink: rgba(255, 255, 255, 0.85);
-  --pill-fill: color-mix(in srgb, var(--rail-lime) 15%, transparent);
-  --pill-line: color-mix(in srgb, var(--rail-lime) 38%, transparent);
-}
 
 /* ---------- header ---------- */
 
@@ -175,14 +162,9 @@
 }
 
 .filters button[aria-pressed='true'] {
-  background: var(--secondary-foreground);
-  color: var(--card);
+  background: var(--c-lime);
+  color: var(--c-on-lime);
   font-weight: 700;
-}
-
-:global(.dark) .filters button[aria-pressed='true'] {
-  background: var(--rail-lime);
-  color: var(--primary-foreground);
 }
 
 /* The stack under the header: podium, rows, standing bar. */
@@ -442,7 +424,7 @@
   border: 0 solid transparent;
   border-radius: 50%;
   background: var(--leaderboard-surface-2);
-  color: var(--secondary-foreground);
+  color: var(--c-text);
   font-family: var(--font-archivo, sans-serif);
   font-weight: 700;
 }
@@ -472,7 +454,7 @@
   width: 32px;
   height: 32px;
   box-shadow: 0 0 0 1.5px var(--avatar-ring);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .avatarGold { border-color: var(--gold); }
@@ -609,7 +591,7 @@
 .rowName em {
   margin-left: 7px;
   color: var(--accent-ink);
-  font-size: 9px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -621,10 +603,11 @@
 .standing {
   position: sticky;
   z-index: 30;
-  /* 12px, not 12px + nav height: <main> is the scrollport and already carries
-     4.5rem + safe-area of bottom padding for the tab bar, and a sticky offset
-     resolves inside that padding. */
-  bottom: 12px;
+  /* Not nav height: <main> is the scrollport and already carries the tab bar's
+     height + safe-area + 24px of bottom padding (RepShell), and a sticky offset
+     resolves inside that padding. -8px spends 8px of the 24 so the bar floats
+     the same ~16px over the tab bar it did over the old bottom nav. */
+  bottom: -8px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -675,9 +658,9 @@
   gap: 8px;
   margin-top: 14px;
   padding: 11px 13px;
-  border: 1px solid var(--destructive);
+  border: 1px solid var(--c-red);
   border-radius: 14px;
-  color: color-mix(in srgb, var(--destructive) 45%, var(--foreground));
+  color: var(--c-red);
   font-size: 13px;
 }
 
@@ -732,14 +715,8 @@
 /* ---------- responsive ---------- */
 
 @media (max-width: 359px) {
-  .shell {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
   .filters button {
     padding: 0 8px;
-    font-size: 11px;
   }
 
   .row {

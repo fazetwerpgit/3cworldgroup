@@ -134,7 +134,7 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
       </div>
       <div className="mt-[17px] flex items-end justify-between gap-2.5 border-t border-white/35 pt-2.5">
         <strong className="truncate text-[14px]">{userName}</strong>
-        <span className="portal-display shrink-0 text-[10px] whitespace-nowrap sm:text-[11px]">{formatNumber(userRank?.totalPoints ?? 0)} pts, {userRank?.totalSales ?? 0} sales</span>
+        <span className="portal-display shrink-0 text-[12px] whitespace-nowrap">{formatNumber(userRank?.totalPoints ?? 0)} pts, {userRank?.totalSales ?? 0} sales</span>
       </div>
       <span className="sr-only">Metric: {unit}</span>
     </aside>
@@ -241,9 +241,11 @@ export function LegacyLeaderboardPage({
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%)] dark:bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%),#030916]" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_42%,transparent_35%,rgba(0,0,0,0.46)_100%)] opacity-70 mix-blend-multiply dark:block" aria-hidden="true" />
-      <div className="relative z-10 mx-auto w-full max-w-[1500px] px-[clamp(14px,3.6vw,56px)] pb-8 pt-[19px]">
+      {/* The gold glow behind the top three stays; the flat ground and the
+          vignette that used to sit under it now come from the D shell. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_21%,rgba(217,165,32,0.13),transparent_24%)]" aria-hidden="true" />
+      {/* No side padding: the D shell's gutter already lines the board up with its top bar. */}
+      <div className="relative z-10 mx-auto w-full max-w-[1500px] pb-8">
         <PageTitle title="Leaderboard" meta={`${entries.length} ranked`} />
         <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} />
         <div className="portal-leaderboard-summary-grid">
