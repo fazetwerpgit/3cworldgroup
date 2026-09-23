@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Plus, RotateCw } from 'lucide-react';
+import { CarrierNotice } from '@/components/portal/rep/CarrierNotice';
 import { RepShell } from '@/components/portal/rep/RepShell';
 import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
 import { AdminSalesBoard } from '@/components/sales/AdminSalesBoard';
@@ -263,6 +264,14 @@ function SalesContent() {
       ) : (
         <>
           {staleNote}
+          {/* Without the carrier report, carrier cancellations and missed
+              installs still count as money: say so, keep the numbers. */}
+          {fiber.error ? (
+            <CarrierNotice
+              onRetry={() => void fiber.refetch().catch(() => undefined)}
+              retrying={fiber.refreshing}
+            />
+          ) : null}
 
           <section className={`${s.panel} ${x.kpis}`} aria-label="Sales summary">
             <div className={`${x.kpi} ${x.kpiValue}`}>

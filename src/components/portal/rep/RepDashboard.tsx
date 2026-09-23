@@ -40,6 +40,7 @@ import {
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
 import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
+import { CarrierNotice } from './CarrierNotice';
 import { PAY_DISPUTE_HREF, PayHelpSheet } from './PayHelpSheet';
 import { LOG_SALE_HREF } from './repNav';
 import s from './rep.module.css';
@@ -843,13 +844,18 @@ export function RepDashboard() {
               ) : null}
             </section>
           ) : pay ? (
-            <Board
-              pay={pay}
-              hasPlan={rates !== null}
-              standing={standing}
-              onHelp={() => setHelpOpen(true)}
-              onRetryStanding={() => retry('standing')}
-            />
+            <>
+              {book?.carrierFailed ? (
+                <CarrierNotice onRetry={() => retry('book')} className={d.carrierNote} />
+              ) : null}
+              <Board
+                pay={pay}
+                hasPlan={rates !== null}
+                standing={standing}
+                onHelp={() => setHelpOpen(true)}
+                onRetryStanding={() => retry('standing')}
+              />
+            </>
           ) : null}
 
           {!payLoading && !payFailed && rows.length > 0 ? <RecentSales rows={rows} /> : null}

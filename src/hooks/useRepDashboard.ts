@@ -27,6 +27,12 @@ export interface RepBook {
   /** Own sales, newest logged first, with the carrier's install dates applied. */
   sales: Sale[];
   fiberBySale: Map<string, FiberOrder>;
+  /**
+   * The carrier report failed to load. The book still stands, but carrier
+   * cancellations and missed installs are unknown, so the estimates may be off
+   * and the dashboard says so instead of passing them off as complete.
+   */
+  carrierFailed: boolean;
 }
 
 export interface RepStanding {
@@ -66,6 +72,26 @@ async function getJson<T>(url: string, token: string | null, signal: AbortSignal
   return data;
 }
 
+/**
+ * The rep's own sales plus the carrier report. Only the sales are required:
+ * without the report the book still stands (as the Sales page does), flagged
+ * `carrierFailed` so the page can say the estimates may be off.
+ */
+export async function fetchRepBook(uid: string, token: string | null, signal: AbortSignal): Promise<RepBook> {
+  const own = encodeURIComponent(uid);
+  const [salesResult, fiberResult] = await Promise.allSettled([
+    getJson<{ sales: Sale[] }>(`/api/portal/sales?salesRepId=${own}&limit=500`, token, signal),
+    getJson<{ orders?: FiberOrder[] }>('/api/portal/sales/status', token, signal),
+  ]);
+  if (salesResult.status === 'rejected') throw salesResult.reason;
+  const logged = salesResult.value.sales ?? [];
+  const carrierFailed = fiberResult.status === 'rejected';
+  if (carrierFailed && !signal.aborted) console.error('Carrier report failed:', fiberResult.reason);
+  const orders = fiberResult.status === 'fulfilled' ? fiberResult.value.orders ?? [] : [];
+  const fiberBySale = matchFiberOrdersToSales(logged, orders);
+  return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale, carrierFailed };
+}
+
 type Loaders = { [K in RepSectionKey]: (token: string | null, signal: AbortSignal) => Promise<unknown> };
 
 export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } = {}) {
@@ -85,22 +111,10 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
 
   const loaders = useCallback((): Partial<Loaders> => {
     if (!uid) return {};
-    const own = encodeURIComponent(uid);
     const loaders: Partial<Loaders> = {
-      book: async (token, signal) => {
-        const [salesResult, fiberResult] = await Promise.allSettled([
-          getJson<{ sales: Sale[] }>(`/api/portal/sales?salesRepId=${own}&limit=500`, token, signal),
-          getJson<{ orders?: FiberOrder[] }>('/api/portal/sales/status', token, signal),
-        ]);
-        if (salesResult.status === 'rejected') throw salesResult.reason;
-        const logged = salesResult.value.sales ?? [];
-        // The carrier report sharpens install dates and drops carrier
-        // cancellations; without it the book still stands on its own (as the
-        // Sales page does when the report is unavailable).
-        const orders = fiberResult.status === 'fulfilled' ? fiberResult.value.orders ?? [] : [];
-        const fiberBySale = matchFiberOrdersToSales(logged, orders);
-        return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale } satisfies RepBook;
-      },
+      // The carrier report sharpens install dates and drops carrier
+      // cancellations; see fetchRepBook for what happens without it.
+      book: (token, signal) => fetchRepBook(uid, token, signal),
       plan: async (token, signal) => {
         // Pending accounts are refused by the route; they have no plan yet.
         if (!active) return { rates: null };
