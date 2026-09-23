@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useReducer,
   useRef,
   useState,
@@ -15,7 +16,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Check,
-  CircleCheck,
   FileText,
   ImageUp,
   Loader2,
@@ -99,7 +99,6 @@ export function useFormCheck<T extends object>(form: T, rules: FieldRule<T>[]) {
   const [errors, setErrors] = useState<Partial<Record<keyof T & string, string>>>({});
   const active = rules.filter((rule) => rule.when !== false);
   const values = form as Record<string, unknown>;
-  const done = active.filter((rule) => isFilled(values[rule.key])).length;
 
   const validate = (): boolean => {
     const next: Partial<Record<keyof T & string, string>> = {};
@@ -128,7 +127,7 @@ export function useFormCheck<T extends object>(form: T, rules: FieldRule<T>[]) {
     });
   }, []);
 
-  return { errors, done, total: active.length, validate, clear, reset: () => setErrors({}) };
+  return { errors, validate, clear, reset: () => setErrors({}) };
 }
 
 // ---------- layout ----------
@@ -151,12 +150,11 @@ export function FormHeader({ title, lede, back = true }: { title: string; lede: 
   );
 }
 
-export function FormSection({ n, title, children }: { n: number; title: string; children: ReactNode }) {
-  const id = `form-section-${n}`;
+export function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
   return (
     <section className={f.section} aria-labelledby={id}>
       <h2 id={id} className={f.sectionHead}>
-        <b aria-hidden="true">{n}</b>
         {title}
       </h2>
       <div className={f.grid}>{children}</div>
@@ -376,14 +374,12 @@ export function FormSent({
   }, []);
   return (
     <section className={`${s.panel} ${f.sent}`} role="status" aria-labelledby="form-sent-h">
-      <CircleCheck size={40} strokeWidth={1.75} className={f.sentIcon} aria-hidden="true" />
       <h1 id="form-sent-h" ref={headRef} tabIndex={-1} className={f.sentTitle}>
         {title}
       </h1>
       <p className={f.sentMsg}>{message}</p>
       <p className={f.sentRef}>
-        <span className={s.kicker}>Reference</span>
-        <span className={f.sentRefId}>{referenceId}</span>
+        Reference <span className={f.sentRefId}>{referenceId}</span>
       </p>
       <div className={f.sentActions}>
         <Link href="/portal/dashboard" className={`${s.btnPrimary} ${f.sentBtn}`}>
@@ -398,9 +394,8 @@ export function FormSent({
 }
 
 /**
- * The form column plus its submit panel. Desktop: a sticky side panel with the
- * required-field meter, the reviewer note and the submit button. Phones: the
- * note sits under the header and the submit bar replaces the tab bar (in the
+ * The form column plus its submit button. Desktop: the button sits under the
+ * form with who is sending. Phones: the submit bar replaces the tab bar (in the
  * page flow while the soft keyboard is up), as on Log Sale.
  */
 export function FormFrame({
@@ -413,11 +408,7 @@ export function FormFrame({
   saving,
   uploading,
   disabled,
-  done,
-  total,
   submitter,
-  routeTo,
-  note,
 }: {
   formId: string;
   onSubmit: (event: React.FormEvent) => void;
@@ -429,16 +420,10 @@ export function FormFrame({
   /** A file is still uploading: the button says so and the page's submit waits. */
   uploading?: boolean;
   disabled?: boolean;
-  done: number;
-  total: number;
   submitter: string;
-  /** Who reviews it, e.g. "Payroll review". */
-  routeTo: string;
-  note: string;
 }) {
   useHideRepTabBar(true);
   const keyboardOpen = useSoftKeyboardOpen();
-  const meter = <Meter done={done} total={total} />;
   const button = (
     <button
       type="submit"
@@ -456,66 +441,27 @@ export function FormFrame({
       <div className={f.frame}>
         <div className={f.body}>
           {header}
-          <p className={`${f.who} ${s.phoneOnly}`}>
-            Sending as <strong>{submitter}</strong>. Goes to {routeTo.toLowerCase()}.
-          </p>
           {alert}
           <form id={formId} className={f.form} onSubmit={onSubmit} noValidate>
             {children}
           </form>
-          {/* Phones with the keyboard up: in the page flow. */}
+          {/* Desktop, and phones with the keyboard up: in the page flow. */}
           <div className={f.submitInline} data-keyboard={keyboardOpen ? 'open' : undefined}>
-            {meter}
             {button}
+            <p className={`${f.who} ${s.deskOnly}`}>
+              Sending as <strong>{submitter}</strong>
+            </p>
           </div>
         </div>
-
-        <aside className={`${s.panel} ${f.aside} ${s.deskOnly}`} aria-label="Send">
-          <p className={s.kicker}>Goes to</p>
-          <p className={f.asideRoute}>{routeTo}</p>
-          <p className={f.asideNote}>{note}</p>
-          {meter}
-          {button}
-          <p className={f.asideWho}>
-            Sending as <strong>{submitter}</strong>
-          </p>
-        </aside>
       </div>
 
       {/* Phones with the keyboard down: fixed in the tab bar's place. */}
       {keyboardOpen ? null : (
         <BodyLayer>
-          <div className={f.submitBar}>
-            {meter}
-            {button}
-          </div>
+          <div className={f.submitBar}>{button}</div>
         </BodyLayer>
       )}
     </div>
-  );
-}
-
-function Meter({ done, total }: { done: number; total: number }) {
-  if (total === 0) {
-    return (
-      <p className={f.meter}>
-        <span className={f.meterLabel}>Every field is optional</span>
-      </p>
-    );
-  }
-  const pct = Math.round((done / total) * 100);
-  return (
-    <p className={f.meter}>
-      <span className={f.meterLabel}>
-        <span className={f.meterNum}>
-          {done}/{total}
-        </span>{' '}
-        required
-      </span>
-      <span className={`${s.track} ${f.meterTrack}`} aria-hidden="true">
-        <span className={s.fill} style={{ width: `${pct}%` }} />
-      </span>
-    </p>
   );
 }
 

@@ -66,47 +66,25 @@ function FormsHub() {
         <h1 className={f.hubTitle}>Forms</h1>
         <span className={f.hubCount}>{visible.length} forms</span>
       </header>
-      <p className={f.hubLede}>Send a request to the office. Each one goes to a review queue.</p>
+      <p className={f.hubLede}>Send a request to the office.</p>
 
-      <div className={f.hubWrap}>
-        <ul className={`${s.panel} ${f.hubList}`} aria-label="Forms">
-          {visible.map(({ href, title, description, tag, icon: Icon }) => (
-            <li key={href}>
-              <Link href={href} className={f.hubRow}>
-                <span className={f.hubIcon} aria-hidden="true">
-                  <Icon size={20} strokeWidth={2} />
-                </span>
-                <span className={f.hubText}>
-                  <span className={f.hubName}>{title}</span>
-                  <span className={f.hubDesc}>{description}</span>
-                  {tag ? <span className={f.hubTag}>{tag}</span> : null}
-                </span>
-                <ChevronRight size={20} className={f.hubChev} aria-hidden="true" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        <aside className={`${s.panel} ${f.aside} ${f.hubAside}`} aria-labelledby="forms-after-h">
-          <h2 id="forms-after-h" className={s.kicker}>
-            After you send
-          </h2>
-          <ol className={f.hubSteps}>
-            <li>
-              <b>1</b>
-              <span>It lands in the office&apos;s review queue.</span>
-            </li>
-            <li>
-              <b>2</b>
-              <span>You get a reference number on screen. Keep it if you follow up.</span>
-            </li>
-            <li>
-              <b>3</b>
-              <span>The team follows up through the portal record.</span>
-            </li>
-          </ol>
-        </aside>
-      </div>
+      <ul className={`${s.panel} ${f.hubList}`} aria-label="Forms">
+        {visible.map(({ href, title, description, tag, icon: Icon }) => (
+          <li key={href}>
+            <Link href={href} className={f.hubRow}>
+              <span className={f.hubIcon} aria-hidden="true">
+                <Icon size={20} strokeWidth={2} />
+              </span>
+              <span className={f.hubText}>
+                <span className={f.hubName}>{title}</span>
+                <span className={f.hubDesc}>{description}</span>
+                {tag ? <span className={f.hubTag}>{tag}</span> : null}
+              </span>
+              <ChevronRight size={20} className={f.hubChev} aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
