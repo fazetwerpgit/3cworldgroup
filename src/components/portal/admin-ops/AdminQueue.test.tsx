@@ -83,11 +83,11 @@ describe('AdminQueue', () => {
     expect(pressed('Handled')).toBe('false');
   });
 
-  it('says All caught up, with Show all, when every row is handled', () => {
+  it('says Nothing waiting, with Show handled, when every row is handled', () => {
     const html = render({ rows: [row({ status: 'handled', person: 'Priya Nair' })] });
-    expect(html).toContain('All caught up');
+    expect(html).toContain('Nothing waiting');
     expect(html).toContain('Every bug report here is handled.');
-    expect(html).toContain('Show all');
+    expect(html).toContain('Show handled');
     expect(html).not.toContain('Nothing matches');
     expect(html).not.toContain('Priya Nair');
   });

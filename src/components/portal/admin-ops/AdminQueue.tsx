@@ -172,11 +172,11 @@ export function AdminQueue({
   else if (statusFilter === 'new' && openCount === 0 && !search.trim() && filter === 'all')
     body = (
       <EmptyState
-        title="All caught up"
+        title="Nothing waiting"
         body={`Every ${itemNoun.toLowerCase()} here is handled.`}
         action={
-          <button type="button" className={s.btn} onClick={() => setStatusFilter('all')}>
-            Show all
+          <button type="button" className={s.btn} onClick={() => setStatusFilter('handled')}>
+            Show handled
           </button>
         }
       />
