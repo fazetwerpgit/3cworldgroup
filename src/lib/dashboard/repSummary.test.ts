@@ -234,7 +234,7 @@ describe('needsDateRows', () => {
       [bySaleDay.id!, { status: 'breakage', estInstallDate: null, breakageReason: ' — Tech No Show' } as FiberOrder],
     ]);
     const rows = needsDateRows([byCarrierDay, bySaleDay], fiber, NOW);
-    expect(rows.map((r) => r.missedNote)).toEqual(['Missed Sep 19 · Customer not home', 'Missed Sep 12 · Tech no show']);
+    expect(rows.map((r) => r.missedNote)).toEqual(['Sep 19 · Customer not home', 'Sep 12 · Tech no show']);
   });
 
   it('adds no note without a reason, or when the sale never had a date', () => {

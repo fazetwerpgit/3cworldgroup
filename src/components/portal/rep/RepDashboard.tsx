@@ -473,7 +473,7 @@ function TodayPanel({
             >
               <span className={`${d.stamp} ${d.stampNow}`}>Now</span>
               <span className={d.tText}>
-                <span className={d.tTitle}>{item.row.missed ? 'Reschedule the install' : 'Add an install date'}</span>
+                <span className={d.tTitle}>{item.row.missed ? 'Missed install' : 'Add an install date'}</span>
                 <span className={d.tSub}>
                   {item.row.customer}
                   {item.row.plan ? `, ${item.row.plan}` : ''}

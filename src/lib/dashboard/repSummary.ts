@@ -178,21 +178,21 @@ export interface NeedsDateRow {
   missed: boolean;
   /** The carrier's missed install day (its breakage row), when it gave one. */
   missedDay: string | null;
-  /** "Missed Sep 19 · Customer not home": a missed install the carrier gave a reason for, else null. */
+  /** "Sep 19 · Customer not home": the missed day and the carrier's reason, else null. */
   missedNote: string | null;
 }
 
 const NOTE_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
-/** "Missed Sep 19 · Customer not home", or null when the carrier gave no reason. */
+/** "Sep 19 · Customer not home" (the row is titled Missed install), or null when the carrier gave no reason. */
 function missedNote(sale: Sale, order: FiberOrder | undefined): string | null {
   if (order?.status !== 'breakage') return null;
   const reason = carrierReasonLabel(order.breakageReason);
   if (!reason) return null;
   const day = missedInstallDay(order.estInstallDate, sale.installDate);
-  if (!day) return `Missed · ${reason}`;
+  if (!day) return reason;
   const [year, month, date] = day.split('-').map(Number);
-  return `Missed ${NOTE_DAY.format(new Date(Date.UTC(year, month - 1, date)))} · ${reason}`;
+  return `${NOTE_DAY.format(new Date(Date.UTC(year, month - 1, date)))} · ${reason}`;
 }
 
 /** Counted sales that still need an install date on the calendar, newest first. */
