@@ -1,25 +1,42 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const state: { docs: Array<Record<string, unknown>> } = { docs: [] };
+const state: {
+  docs: Array<Record<string, unknown>>;
+  users: Array<{ id: string; data: Record<string, unknown> }>;
+  recent: Array<Record<string, unknown>>;
+} = { docs: [], users: [], recent: [] };
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedRequester: vi.fn(async () => ({ ok: true, uid: 'u1', isManagement: true })),
 }));
 
+function snapshot(rows: Array<{ id: string; data: Record<string, unknown> }>) {
+  return {
+    forEach: (fn: (doc: { id: string; data: () => Record<string, unknown> }) => void) => {
+      rows.forEach((row) => fn({ id: row.id, data: () => row.data }));
+    },
+  };
+}
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
-    collection: vi.fn(() => ({
-      where: vi.fn(() => ({
-        limit: vi.fn(() => ({
-          get: vi.fn(async () => ({
-            forEach: (fn: (doc: { data: () => Record<string, unknown> }) => void) => {
-              state.docs.forEach((data) => fn({ data: () => data }));
-            },
-          })),
-        })),
-      })),
-    })),
+    collection: vi.fn((name: string) =>
+      name === 'users'
+        ? { where: vi.fn(() => ({ get: vi.fn(async () => snapshot(state.users)) })) }
+        : {
+            where: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                get: vi.fn(async () => snapshot(state.docs.map((data, i) => ({ id: `s${i}`, data })))),
+              })),
+            })),
+            orderBy: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                get: vi.fn(async () => snapshot(state.recent.map((data, i) => ({ id: `r${i}`, data })))),
+              })),
+            })),
+          }
+    ),
   },
 }));
 
@@ -40,6 +57,8 @@ async function response(period: string) {
 beforeEach(() => {
   vi.useFakeTimers();
   state.docs = [];
+  state.users = [];
+  state.recent = [];
 });
 
 afterEach(() => vi.useRealTimers());
@@ -102,5 +121,55 @@ describe('GET /api/portal/leaderboard Chicago periods', () => {
 
     expect((await response('all')).startDate).toBe('1970-01-01T00:00:00.000Z');
     expect((await response('unexpected')).startDate).toBe('2026-09-01T05:00:00.000Z');
+  });
+});
+
+describe('GET /api/portal/leaderboard ?include=team', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z')));
+
+  it('leaves the extras off unless asked for', async () => {
+    const json = await response('week');
+    expect(json).not.toHaveProperty('unranked');
+    expect(json).not.toHaveProperty('recent');
+  });
+
+  it('lists active field reps at 0 by name, without the ranked, pending or back-office', async () => {
+    state.docs = [{ ...sale('2026-09-15T17:00:00.000Z', 'u1'), status: 'approved' }];
+    state.users = [
+      { id: 'u1', data: { status: 'active', role: 'rep', fieldRole: 'entry_rep', displayName: 'Ranked Rep' } },
+      { id: 'u2', data: { status: 'active', role: 'rep', fieldRole: 'entry_rep', displayName: 'Zed Zero' } },
+      { id: 'u3', data: { status: 'active', role: 'rep', fieldRole: 'entry_rep', displayName: 'Amy Zero' } },
+      { id: 'u4', data: { status: 'pending', role: 'rep', fieldRole: 'entry_rep', displayName: 'Pending Hire' } },
+      { id: 'u5', data: { status: 'active', role: 'operations', displayName: 'Back Office' } },
+      { id: 'u6', data: { status: 'active', role: 'rep', fieldRole: 'entry_rep', email: 'noname@x.com' } },
+    ];
+    const json = await (await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&limit=100&include=team'))).json();
+
+    expect(json.unranked).toEqual([
+      { salesRepId: 'u3', salesRepName: 'Amy Zero' },
+      { salesRepId: 'u2', salesRepName: 'Zed Zero' },
+    ]);
+  });
+
+  it('returns the 5 newest standing sales as name, plan and time only', async () => {
+    const at = (min: number) => new Date(Date.UTC(2026, 8, 16, 16, 59 - min));
+    const base = {
+      salesRepName: 'Rep Name',
+      customerName: 'Private Person',
+      customerAddress: '1 Hidden St',
+      estimatedCommission: 500,
+      products: [{ productName: 'TFiber 1 Gig', company: 'tfiber' }],
+    };
+    state.recent = [
+      { ...base, status: 'cancelled', createdAt: at(0), saleDate: at(0) },
+      ...[1, 2, 3, 4, 5, 6].map((m) => ({ ...base, status: m === 2 ? 'rejected' : 'approved', createdAt: at(m), saleDate: at(m) })),
+      { ...base, status: 'pending', createdAt: at(7), saleDate: at(7) },
+    ];
+    const json = await (await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&include=team'))).json();
+
+    expect(json.recent).toHaveLength(5);
+    expect(json.recent[0]).toEqual({ repName: 'Rep Name', plan: expect.any(String), at: at(1).toISOString() });
+    for (const row of json.recent) expect(Object.keys(row).sort()).toEqual(['at', 'plan', 'repName']);
+    expect(JSON.stringify(json.recent)).not.toMatch(/Private|Hidden|500/);
   });
 });

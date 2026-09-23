@@ -4,6 +4,9 @@ import { LeaderboardRows } from './LeaderboardRows';
 import { Podium } from './Podium';
 import { Avatar } from './Avatar';
 import { LeaderboardStage } from './LeaderboardStage';
+import { RecentSales } from './RecentSales';
+import { spotLine, zeroEntries } from './belowPodium';
+import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import styles from './leaderboard.module.css';
 
 export interface LeaderboardEntry {
@@ -27,6 +30,10 @@ export interface LeaderboardProps {
   viewer?: LeaderboardViewer | null;
   metric: LeaderboardMetric;
   period: LeaderboardPeriod;
+  /** Active reps with nothing on the board this period, listed after the ranks. */
+  unranked?: UnrankedRep[];
+  /** The newest standing sales, team-wide: name, plan, time. */
+  recent?: RecentSale[];
 }
 
 export interface LeaderboardViewer {
@@ -63,16 +70,28 @@ function periodSuffix(period: LeaderboardPeriod) {
   return 'this week';
 }
 
-export function LeaderboardTable({ entries, currentUser, viewer, metric, period }: LeaderboardProps) {
+export function LeaderboardTable({
+  entries,
+  currentUser,
+  viewer,
+  metric,
+  period,
+  unranked = [],
+  recent = [],
+}: LeaderboardProps) {
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
   const podiumEntries = ordered.filter((entry) => entry.rank <= 3);
   const viewerEntry = viewer
     ? ordered.find((entry) => entry.salesRepId === viewer.uid)
     : undefined;
-  const effectiveCurrentUser = currentUser ?? viewerEntry;
+  const zeros = zeroEntries(ordered, unranked);
+  const viewerZero = viewer ? zeros.find((entry) => entry.salesRepId === viewer.uid) : undefined;
+  const effectiveCurrentUser = currentUser ?? viewerEntry ?? viewerZero;
   const currentUserIsVisible = Boolean(
-    effectiveCurrentUser && ordered.some((entry) => entry.salesRepId === effectiveCurrentUser.salesRepId)
+    effectiveCurrentUser &&
+      [...ordered, ...zeros].some((entry) => entry.salesRepId === effectiveCurrentUser.salesRepId)
   );
+  const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId: viewer?.uid, metric });
   const viewerFallback: LeaderboardEntry | undefined = viewer && !currentUser
     ? {
       rank: 0,
@@ -102,11 +121,10 @@ export function LeaderboardTable({ entries, currentUser, viewer, metric, period 
       <LeaderboardStage period={period}>
         <Podium entries={podiumEntries} currentUser={effectiveCurrentUser} metric={metric} />
       </LeaderboardStage>
-      {entries.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <LeaderboardRows entries={rowEntries} currentUser={effectiveCurrentUser} metric={metric} />
-      )}
+      {spot ? <p className={styles.spot} data-testid="spot-line">{spot}</p> : null}
+      {entries.length === 0 ? <EmptyState /> : null}
+      <LeaderboardRows entries={rowEntries} zeros={zeros} currentUser={effectiveCurrentUser} metric={metric} />
+      <RecentSales sales={recent} />
       {showsStandingBar ? (
         <div className={styles.standing} aria-label="Your standing">
           <Avatar entry={standingEntry} size="row" decorative={false} />

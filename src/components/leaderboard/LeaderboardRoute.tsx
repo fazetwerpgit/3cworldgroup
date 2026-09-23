@@ -17,13 +17,13 @@ import split from './routeSplit.module.css';
  *  The filter controls in each page write back through the callbacks. */
 export function LeaderboardRoute() {
   const { user } = useAuth();
-  const { leaderboard, currentUser, loading, error, fetchLeaderboard } = useLeaderboard();
+  const { leaderboard, currentUser, unranked, recent, loading, error, fetchLeaderboard } = useLeaderboard();
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
   const [metric, setMetric] = useState<LeaderboardMetric>('totalPoints');
   const wide = useWideViewport();
 
   useEffect(() => {
-    if (user) fetchLeaderboard(period, metric, 100);
+    if (user) fetchLeaderboard(period, metric, 100, 'approved', { team: true });
   }, [user, period, metric, fetchLeaderboard]);
 
   const busy = loading || !user;
@@ -35,6 +35,8 @@ export function LeaderboardRoute() {
           entries={leaderboard}
           currentUser={currentUser}
           viewer={user ? { uid: user.uid, displayName: user.displayName, avatarUrl: user.avatarUrl } : null}
+          unranked={unranked}
+          recent={recent}
           loading={busy}
           error={error}
           period={period}
@@ -60,6 +62,9 @@ export function LeaderboardRoute() {
             onPeriodChange={setPeriod}
             onMetricChange={setMetric}
             viewerName={user?.displayName ?? user?.email ?? null}
+            viewerId={user?.uid ?? null}
+            unranked={unranked}
+            recent={recent}
           />
         </div>
       </div>

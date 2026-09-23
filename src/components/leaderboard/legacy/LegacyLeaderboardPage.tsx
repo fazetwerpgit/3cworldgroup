@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { LegacyLeaderboardTable } from './LegacyLeaderboardTable';
+import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { auth } from '@/lib/firebase/config';
@@ -206,6 +207,9 @@ interface LegacyLeaderboardPageProps {
   onPeriodChange: (period: Period) => void;
   onMetricChange: (metric: Metric) => void;
   viewerName?: string | null;
+  viewerId?: string | null;
+  unranked?: UnrankedRep[];
+  recent?: RecentSale[];
 }
 
 export function LegacyLeaderboardPage({
@@ -219,6 +223,9 @@ export function LegacyLeaderboardPage({
   onPeriodChange,
   onMetricChange,
   viewerName,
+  viewerId,
+  unranked,
+  recent,
 }: LegacyLeaderboardPageProps) {
   const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard } = useLeaderboard();
   const [challengeTarget, setChallengeTarget] = useState<number | null>(null);
@@ -292,7 +299,7 @@ export function LegacyLeaderboardPage({
         {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
         <div className="pt-4">
-          {loading ? <BoardSkeleton /> : <LegacyLeaderboardTable entries={entries} currentUser={currentUser} metric={metric} period={period} />}
+          {loading ? <BoardSkeleton /> : <LegacyLeaderboardTable entries={entries} currentUser={currentUser} metric={metric} period={period} unranked={unranked} recent={recent} viewerId={viewerId} />}
         </div>
       </div>
     </>

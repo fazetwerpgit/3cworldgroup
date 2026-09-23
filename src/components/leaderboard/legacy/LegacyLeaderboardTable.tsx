@@ -5,12 +5,16 @@
    redesign lives beside it in src/components/leaderboard; this tree is what
    >=1024px renders, and its layout and content stay as on master: edit it
    only to keep it compiling. Its panel surfaces read the portal's C tokens
-   (--c-panel / --c-raised) instead of the old navy gradients. */
+   (--c-panel / --c-raised) instead of the old navy gradients. Below the
+   podium it also carries the spot line, the team at 0 after the ranks and the
+   recent sales feed, shared with the phone board (../belowPodium). */
 
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Crown, Flame } from 'lucide-react';
 import { LegacySparkline } from './LegacySparkline';
 import type { LeaderboardEntry } from '../LeaderboardTable';
+import { recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
+import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 
 type Metric = 'totalPoints' | 'totalSales';
 type Period = 'week' | 'month' | 'year' | 'all';
@@ -20,6 +24,11 @@ interface LegacyLeaderboardTableProps {
   currentUser?: LeaderboardEntry | null;
   metric: Metric;
   period: Period;
+  /** Active reps with nothing on the board this period, listed after the ranks. */
+  unranked?: UnrankedRep[];
+  /** The newest standing sales, team-wide: name, plan, time. */
+  recent?: RecentSale[];
+  viewerId?: string | null;
 }
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -218,16 +227,17 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
   );
 }
 
-function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric }) {
+function ChaseTable({ entries, zeros, currentUser, metric }: { entries: LeaderboardEntry[]; zeros: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric }) {
   const rest = entries.filter((entry) => entry.rank >= 4).sort((a, b) => a.rank - b.rank);
-  if (rest.length === 0) return null;
+  if (rest.length === 0 && zeros.length === 0) return null;
+  const lastRank = (zeros.length > 0 ? zeros[zeros.length - 1] : rest[rest.length - 1]).rank;
   const unit = metricUnit(metric);
   const noHistory = entries.every((entry) => (entry.movement ?? null) === null);
 
   return (
     <section className="mb-[25px]" aria-labelledby="chase-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
-        <h2 id="chase-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">Ranks 4-{entries.length}</h2>
+        <h2 id="chase-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">Ranks 4-{lastRank}</h2>
         <p className="text-right text-[12px] uppercase tracking-[0.14em] text-[#687384]">Movement since yesterday</p>
       </div>
       <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">
@@ -257,20 +267,80 @@ function ChaseTable({ entries, currentUser, metric }: { entries: LeaderboardEntr
             </div>
           );
         })}
+        {/* The team at 0: the same grid, one step quieter, no trend or gap. */}
+        {zeros.map((entry, index) => {
+          const mine = entry.salesRepId === currentUser?.salesRepId;
+          return (
+            <div key={entry.salesRepId} data-zero className={`relative grid min-h-[60px] grid-cols-[43px_minmax(0,1fr)_auto] items-center gap-[9px] border-b border-[rgba(10,31,68,0.22)] px-1 py-2 text-[#687384] last:border-0 dark:border-white/15 sm:grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] sm:gap-[15px] sm:px-3 ${index === 0 && rest.length > 0 ? 'border-t border-t-[#0A1F44] dark:border-t-white/40' : ''} ${mine ? 'bg-[#0A1F44] text-white shadow-[inset_7px_0_#8dc63f] dark:bg-[var(--c-panel-hi)] dark:text-[#f6f7f8]' : ''}`}>
+              <div className="portal-display"><b className="text-[21px]">{String(entry.rank).padStart(2, '0')}</b></div>
+              <div className="flex min-w-0 items-center gap-[11px]">
+                <span className="grid size-[35px] shrink-0 place-items-center rounded-full bg-[#0A1F44]/60 text-[12px] font-black text-white/80">{initialsOf(entry.salesRepName)}</span>
+                <span className={`block truncate text-[14px] font-semibold ${mine ? '' : 'text-[#0A1F44]/70 dark:text-[#f6f7f8]/70'}`}>{entry.salesRepName}{mine && <em className="ml-[7px] bg-[#8dc63f] px-1.5 py-[3px] text-[12px] font-black uppercase not-italic tracking-[0.1em] text-[#0A1F44]">YOU</em>}</span>
+              </div>
+              <span className="hidden sm:block" aria-hidden="true" />
+              <div className="num portal-display text-right text-[17px] font-black">0 <small className="text-[12px] tracking-[0.12em]">{unit}</small></div>
+              <span className="hidden sm:block" aria-hidden="true" />
+            </div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-export function LegacyLeaderboardTable({ entries, currentUser, metric, period }: LegacyLeaderboardTableProps) {
-  if (entries.length === 0) return <EmptyState />;
+function SpotLine({ text }: { text: string | null }) {
+  if (!text) return null;
+  return <p data-testid="spot-line" className="-mt-5 mb-[40px] text-[15px] font-bold">{text}</p>;
+}
+
+function RecentSales({ sales }: { sales: RecentSale[] }) {
+  const now = useMinuteClock();
+  if (sales.length === 0) return null;
+
+  return (
+    <section className="mb-[25px]" aria-labelledby="recent-heading">
+      <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
+        <h2 id="recent-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">Recent sales</h2>
+        <p className="text-right text-[12px] uppercase tracking-[0.14em] text-[#687384]">Team-wide, newest first</p>
+      </div>
+      <ol className="border-b border-[#0A1F44] dark:border-[#e7edf4]">
+        {sales.map((sale, index) => (
+          <li key={`${sale.at}-${index}`} className="flex min-h-[50px] items-center justify-between gap-4 border-b border-[rgba(10,31,68,0.22)] px-3 text-[14px] last:border-0 dark:border-white/15">
+            <span className="min-w-0 truncate font-semibold">{recentSaleLabel(sale)}</span>
+            <time dateTime={sale.at} className="num shrink-0 text-[13px] text-[#687384]">{recentSaleWhen(sale, now)}</time>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+export function LegacyLeaderboardTable({ entries, currentUser, metric, period, unranked = [], recent = [], viewerId }: LegacyLeaderboardTableProps) {
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
+  const zeros = zeroEntries(ordered, unranked);
+  const mine = currentUser ?? (viewerId ? zeros.find((entry) => entry.salesRepId === viewerId) : undefined);
+  const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId, metric });
+
+  if (entries.length === 0) {
+    return (
+      <div>
+        <EmptyState />
+        {spot && <p data-testid="spot-line" className="mt-5 text-[15px] font-bold">{spot}</p>}
+        <div className="mt-[34px]">
+          <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} />
+          <RecentSales sales={recent} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} />
+      <SpotLine text={spot} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <ChaseTable entries={ordered} currentUser={currentUser} metric={metric} />
+      <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} />
+      <RecentSales sales={recent} />
       <footer className="flex justify-between gap-3 border-t border-[#0A1F44] pt-3 text-[12px] text-[#687384] dark:border-[#e7edf4] max-sm:block">
         <span>Rankings use approved sales for the selected period.</span>
         <span className="max-sm:mt-2 max-sm:block">Point values vary by product and plan · refreshed moments ago.</span>

@@ -10,6 +10,7 @@ import {
   type LeaderboardPeriod,
   type LeaderboardViewer,
 } from './LeaderboardTable';
+import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { periodLabel } from './PeriodCountdown';
 import styles from './leaderboard.module.css';
 
@@ -17,6 +18,9 @@ interface LeaderboardPageContentProps {
   entries: LeaderboardEntry[];
   currentUser?: LeaderboardEntry | null;
   viewer?: LeaderboardViewer | null;
+  /** The team at 0 and the newest sales (?include=team). */
+  unranked?: UnrankedRep[];
+  recent?: RecentSale[];
   loading: boolean;
   error: string | null;
   period: LeaderboardPeriod;
@@ -37,6 +41,8 @@ export function LeaderboardPageContent({
   entries,
   currentUser,
   viewer,
+  unranked,
+  recent,
   loading,
   error,
   period,
@@ -72,6 +78,8 @@ export function LeaderboardPageContent({
           entries={entries}
           currentUser={currentUser}
           viewer={viewer}
+          unranked={unranked}
+          recent={recent}
           metric={metric}
           period={period}
         />

@@ -20,6 +20,8 @@ const testState = vi.hoisted(() => ({
     totalSales: number;
     totalPoints: number;
   } | null,
+  unranked: [] as Array<{ salesRepId: string; salesRepName: string }>,
+  recent: [] as Array<{ repName: string; plan: string; at: string; dayOnly?: boolean }>,
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -35,6 +37,12 @@ vi.mock('@/hooks/useLeaderboard', () => ({
     },
     get currentUser() {
       return testState.currentUser;
+    },
+    get unranked() {
+      return testState.unranked;
+    },
+    get recent() {
+      return testState.recent;
     },
     loading: false,
     error: null,
@@ -79,6 +87,8 @@ beforeEach(() => {
   testState.fetchLeaderboard.mockClear();
   testState.leaderboard = [];
   testState.currentUser = null;
+  testState.unranked = [];
+  testState.recent = [];
   setViewport(false);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -98,7 +108,7 @@ describe('leaderboard page filters', () => {
 
     await act(async () => root.render(<LeaderboardRoute />));
 
-    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'totalPoints', 100);
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'totalPoints', 100, 'approved', { team: true });
     expect(container.textContent).toContain('Weekly points · resets Sunday');
     expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 pts this week');
     expect(container.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Ada Lovelace avatar');
@@ -109,11 +119,11 @@ describe('leaderboard page filters', () => {
     const sales = buttons.find((button) => button.textContent === 'Sales');
 
     await act(async () => month?.click());
-    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalPoints', 100);
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalPoints', 100, 'approved', { team: true });
     expect(container.textContent).toContain('Monthly points · resets on the 1st');
 
     await act(async () => sales?.click());
-    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalSales', 100);
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalSales', 100, 'approved', { team: true });
     expect(container.textContent).toContain('Monthly sales · resets on the 1st');
     expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 sales this month');
 
@@ -121,12 +131,12 @@ describe('leaderboard page filters', () => {
     const allTime = buttons.find((button) => button.textContent === 'All time');
 
     await act(async () => year?.click());
-    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('year', 'totalSales', 100);
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('year', 'totalSales', 100, 'approved', { team: true });
     expect(container.textContent).toContain('Yearly sales · resets Jan 1');
     expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 sales this year');
 
     await act(async () => allTime?.click());
-    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('all', 'totalSales', 100);
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('all', 'totalSales', 100, 'approved', { team: true });
     expect(container.textContent).toContain('All-time sales');
     expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 sales all time');
   });
@@ -170,7 +180,7 @@ describe('breakpoint switch', () => {
     expect(container.textContent).toContain('Your standing');
     // The phone podium is the redesign's alone.
     expect(container.querySelectorAll('[data-rank]')).toHaveLength(0);
-    expect(testState.fetchLeaderboard).toHaveBeenCalledWith('week', 'totalPoints', 100);
+    expect(testState.fetchLeaderboard).toHaveBeenCalledWith('week', 'totalPoints', 100, 'approved', { team: true });
     expect(testState.fetchLeaderboard).toHaveBeenCalledWith('week', 'totalSales', 1, 'submitted');
   });
 
@@ -181,5 +191,41 @@ describe('breakpoint switch', () => {
 
     const boardCalls = testState.fetchLeaderboard.mock.calls.filter((call) => call[2] === 100);
     expect(boardCalls).toHaveLength(1);
+  });
+});
+
+describe('below the podium', () => {
+  function seed() {
+    testState.leaderboard = board().slice(0, 2);
+    testState.unranked = [
+      { salesRepId: 'current', salesRepName: 'Ada Lovelace' },
+      { salesRepId: 'z2', salesRepName: 'Ben Carter' },
+    ];
+    testState.recent = [{ repName: 'Rep 2', plan: '2 Gig', at: new Date(Date.now() - 12 * 60_000).toISOString() }];
+  }
+
+  it('lists the team at 0 after the ranks, with the viewer spot and the recent sales', async () => {
+    seed();
+    await act(async () => root.render(<LeaderboardRoute />));
+
+    const rows = [...container.querySelectorAll('[aria-label="Ranking"] > div')];
+    expect(rows.map((row) => row.textContent)).toEqual(['04ALAda LovelaceYou0pts', '05BCBen Carter0pts']);
+    expect(rows[0].getAttribute('data-current-user')).toBe('true');
+    expect(container.querySelector('[data-testid="spot-line"]')?.textContent).toBe('1 sale gets you on the board.');
+    expect(container.querySelector('[data-testid="standing-copy"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Recent sales"]')?.textContent).toContain('Rep 2 · 2 Gig12m ago');
+  });
+
+  it('shows the same on the desktop board', async () => {
+    seed();
+    setViewport(true);
+    await act(async () => root.render(<LeaderboardRoute />));
+
+    expect([...container.querySelectorAll('[data-zero]')].map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Ada Lovelace'),
+      expect.stringContaining('Ben Carter'),
+    ]);
+    expect(container.querySelector('[data-testid="spot-line"]')?.textContent).toBe('1 sale gets you on the board.');
+    expect(container.textContent).toContain('Rep 2 · 2 Gig');
   });
 });

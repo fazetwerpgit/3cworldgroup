@@ -8,10 +8,17 @@ import {
   type SaleRecord,
 } from '@/lib/leaderboard/history';
 import { periodBounds } from '@/lib/leaderboard/periods';
+import { recentSales, unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
 
 // How many ranked rows a non-management caller may pull in one request. The
 // most any rep-facing view asks for is 100 (dashboard); the mini widget asks 5.
 const NON_MANAGEMENT_LIMIT_CAP = 100;
+// ?include=team: the team at 0 is bounded like the All Company member list
+// (chat members route, MAX_MEMBERS) — the same names every rep already sees
+// there. The feed scans a small window of the newest sales for 5 that stand.
+const UNRANKED_CAP = 200;
+const RECENT_SCAN = 25;
+const RECENT_COUNT = 5;
 
 // GET /api/portal/leaderboard - Get leaderboard data (points-based)
 export async function GET(request: NextRequest) {
@@ -153,6 +160,37 @@ export async function GET(request: NextRequest) {
     // The caller's own standing (null if they have no approved sales this period).
     const rawCurrentUser = fullyRanked.find((e) => e.salesRepId === gate.uid) ?? null;
 
+    // Opt-in extras for the leaderboard page (fail-soft, like history):
+    // `unranked` — active field reps with nothing on the board this period,
+    // only when the whole ranked list fits in `limit` (so rows can follow it);
+    // `recent` — the newest standing sales, rep name + plan + time only.
+    let team: { unranked: UnrankedRep[]; recent: RecentSale[] } | null = null;
+    if (searchParams.get('include') === 'team') {
+      team = { unranked: [], recent: [] };
+      try {
+        if (fullyRanked.length <= limit) {
+          const usersSnapshot = await adminDb.collection('users').where('status', '==', 'active').get();
+          const users: Array<{ id: string; data: Record<string, unknown> }> = [];
+          usersSnapshot.forEach((doc) => users.push({ id: doc.id, data: doc.data() }));
+          team.unranked = unrankedReps(users, new Set(fullyRanked.map((e) => e.salesRepId))).slice(0, UNRANKED_CAP);
+        }
+      } catch (teamError) {
+        console.error('Leaderboard team list failed:', teamError);
+      }
+      try {
+        const recentSnapshot = await adminDb
+          .collection('sales')
+          .orderBy('createdAt', 'desc')
+          .limit(RECENT_SCAN)
+          .get();
+        const docs: Array<Record<string, unknown>> = [];
+        recentSnapshot.forEach((doc) => docs.push(doc.data()));
+        team.recent = recentSales(docs, RECENT_COUNT);
+      } catch (recentError) {
+        console.error('Leaderboard recent sales failed:', recentError);
+      }
+    }
+
     return NextResponse.json({
       period,
       metric,
@@ -160,6 +198,7 @@ export async function GET(request: NextRequest) {
       leaderboard: rankedLeaderboard,
       totalRanked: fullyRanked.length,
       currentUser: rawCurrentUser ? withHistory(rawCurrentUser) : null,
+      ...(team ?? {}),
     });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
