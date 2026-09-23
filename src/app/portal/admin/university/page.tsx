@@ -144,24 +144,46 @@ function AdminUniversity() {
     }
   };
 
+  // Returns true when the change saved; otherwise shows why and leaves the view as is.
+  const mutate = async (url: string, init: RequestInit, failMsg: string): Promise<boolean> => {
+    setErr('');
+    setMsg('');
+    try {
+      const res = await fetch(url, init);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data.error === 'string' ? data.error : failMsg);
+      }
+      return true;
+    } catch (error) {
+      setErr(error instanceof Error && error.message ? error.message : failMsg);
+      return false;
+    }
+  };
+
   const togglePublish = async (item: TrainingResource) => {
     if (!user) return;
-    await fetch(`/api/portal/training/${item.id}`, {
-      method: 'PUT',
-      headers: await authHeaders(true),
-      body: JSON.stringify({ isPublished: !item.isPublished }),
-    });
-    await load();
+    const ok = await mutate(
+      `/api/portal/training/${item.id}`,
+      {
+        method: 'PUT',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ isPublished: !item.isPublished }),
+      },
+      item.isPublished ? "Couldn't unpublish. Try again." : "Couldn't publish. Try again."
+    );
+    if (ok) await load();
   };
 
   const remove = async (item: TrainingResource) => {
     if (!user) return;
-    await fetch(`/api/portal/training/${item.id}`, {
-      method: 'DELETE',
-      headers: await authHeaders(),
-    });
+    const ok = await mutate(
+      `/api/portal/training/${item.id}`,
+      { method: 'DELETE', headers: await authHeaders() },
+      "Couldn't delete. Try again."
+    );
     setConfirmDeleteId(null);
-    await load();
+    if (ok) await load();
   };
 
   const startEdit = (item: TrainingResource) => {
@@ -172,11 +194,16 @@ function AdminUniversity() {
 
   const saveEdit = async (item: TrainingResource) => {
     if (!user || !editTitle.trim()) return;
-    await fetch(`/api/portal/training/${item.id}`, {
-      method: 'PUT',
-      headers: await authHeaders(true),
-      body: JSON.stringify({ title: editTitle.trim(), description: editDesc.trim() }),
-    });
+    const ok = await mutate(
+      `/api/portal/training/${item.id}`,
+      {
+        method: 'PUT',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ title: editTitle.trim(), description: editDesc.trim() }),
+      },
+      "Couldn't save changes. Try again."
+    );
+    if (!ok) return;
     setEditingId(null);
     await load();
   };

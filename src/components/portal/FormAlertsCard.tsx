@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase/config';
 import rep from '@/components/portal/rep/rep.module.css';
-import { LoadFailed, SkeletonRows, cx } from '@/components/portal/admin-ops/AdminKit';
+import { Banner, LoadFailed, SkeletonRows, cx } from '@/components/portal/admin-ops/AdminKit';
 import s from '@/components/portal/admin-ops/admin-ops.module.css';
 
 interface FormAlert {
@@ -18,6 +18,7 @@ export default function FormAlertsCard() {
   const [forms, setForms] = useState<FormAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
     const token = await auth?.currentUser?.getIdToken();
@@ -48,15 +49,23 @@ export default function FormAlertsCard() {
   };
 
   const toggle = async (key: string, enabled: boolean) => {
-    // Optimistic update; revert on failure.
+    // Optimistic update; revert on any failure, including a network error.
+    setSaveError('');
     setForms((prev) => prev.map((f) => (f.key === key ? { ...f, enabled } : f)));
-    const res = await authedFetch('/api/portal/forms/alerts', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, enabled }),
-    });
-    if (!res.ok) {
+    let ok = false;
+    try {
+      const res = await authedFetch('/api/portal/forms/alerts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, enabled }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
       setForms((prev) => prev.map((f) => (f.key === key ? { ...f, enabled: !enabled } : f)));
+      setSaveError("Couldn't save that change. Try again.");
     }
   };
 
@@ -75,23 +84,26 @@ export default function FormAlertsCard() {
       ) : error ? (
         <LoadFailed what="alerts" onRetry={retry} />
       ) : (
-        <ul className={s.switchList}>
-          {forms.map((f) => (
-            <li key={f.key} className={s.switchRow}>
-              <span className={s.switchLabel} id={`alert-${f.key}`}>
-                {f.label}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={f.enabled}
-                aria-labelledby={`alert-${f.key}`}
-                className={s.switch}
-                onClick={() => toggle(f.key, !f.enabled)}
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          {saveError ? <Banner tone="error">{saveError}</Banner> : null}
+          <ul className={s.switchList}>
+            {forms.map((f) => (
+              <li key={f.key} className={s.switchRow}>
+                <span className={s.switchLabel} id={`alert-${f.key}`}>
+                  {f.label}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={f.enabled}
+                  aria-labelledby={`alert-${f.key}`}
+                  className={s.switch}
+                  onClick={() => toggle(f.key, !f.enabled)}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
