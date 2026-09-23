@@ -338,7 +338,7 @@ function BoardSkeleton() {
 
 // ---------------------------------------------------------------- standing
 
-function standLine(standing: Standing): ReactNode {
+export function standLine(standing: Standing): ReactNode {
   if (standing.ahead) {
     return (
       <>
@@ -363,7 +363,8 @@ function standLine(standing: Standing): ReactNode {
       <>Tied for 1st. One more sale breaks it.</>
     );
   }
-  return <>Top of the board this week</>;
+  // The rep above wasn't in the fetched board: only #1 is top of it.
+  return standing.rank === 1 ? <>Top of the board this week</> : <>Keep climbing</>;
 }
 
 function StandingPanels({ standing }: { standing: Standing }) {
