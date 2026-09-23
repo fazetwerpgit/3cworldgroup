@@ -1,11 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AlertTriangle, ChevronDown, ClipboardCheck, FileText, Lock, RotateCw } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-admin-a.css';
+import {
+  AdminAvatar,
+  AdminEmpty,
+  AdminFailed,
+  AdminGate,
+  AdminNotice,
+  AdminPageHead,
+  AdminSkeletonRows,
+  StatusDot,
+} from '@/components/portal/admin-d/AdminUi';
+import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import o from './admin-onboarding.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isEsignItem } from '@/lib/onboarding/esign';
@@ -97,6 +108,78 @@ function waitLabel(submittedAt: string | null): string {
   return `${days} day${days === 1 ? '' : 's'}`;
 }
 
+function groupSize(count: number) {
+  return `${count} item${count === 1 ? '' : 's'}`;
+}
+
+/** One rep's block inside a section: who, at-risk flag, item count, then their rows. */
+function RepGroup({ group, children }: { group: SubmissionGroup; children: ReactNode }) {
+  const name = repLabel(group.userName, group.userId);
+  return (
+    <li className={o.group}>
+      <div className={o.groupHead}>
+        <span className={u.person}>
+          <AdminAvatar name={name} />
+          <span className={u.personText}>
+            <span className={u.personName}>
+              <span>{name}</span>
+              {group.atRisk ? (
+                <span className={`${u.tag} ${u.tagAmber}`}>
+                  <AlertTriangle size={12} aria-hidden="true" />
+                  At risk
+                </span>
+              ) : null}
+            </span>
+            <span className={u.personSub}>{groupSize(group.items.length)}</span>
+          </span>
+        </span>
+      </div>
+      <ul className={`${u.rows} ${o.cols}`}>{children}</ul>
+    </li>
+  );
+}
+
+/** Section panel: kicker title, live count, one-line explanation. */
+function Section({
+  id,
+  title,
+  count,
+  sub,
+  action,
+  children,
+}: {
+  id: string;
+  title: string;
+  count?: ReactNode;
+  sub?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className={s.panel} aria-labelledby={id}>
+      <div className={s.panelHead}>
+        <h2 id={id} className={s.kicker}>
+          {title}
+        </h2>
+        <span className={o.headRight}>
+          {count !== undefined ? <span className={u.panelMeta}>{count}</span> : null}
+          {action}
+        </span>
+      </div>
+      {sub ? <p className={o.sectionSub}>{sub}</p> : null}
+      {children}
+    </section>
+  );
+}
+
+function evidenceLabel(submission: Submission) {
+  if (submission.adminOnly) return 'Admin only';
+  if (submission.referenceKind === 'storage') {
+    return `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`;
+  }
+  return 'Reference';
+}
+
 export default function OnboardingReviewPage() {
   const { user } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -104,6 +187,7 @@ export default function OnboardingReviewPage() {
   const [completed, setCompleted] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectModal, setRejectModal] = useState<Submission | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -123,14 +207,21 @@ export default function OnboardingReviewPage() {
       setSubmissions(Array.isArray(json.submissions) ? json.submissions : []);
       setEsignPending(Array.isArray(json.esignPending) ? json.esignPending : []);
       setCompleted(Array.isArray(json.completed) ? json.completed : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load review queue');
+      setLoadFailed(false);
+    } catch {
+      // A failed load says so (with a retry) instead of showing an empty queue.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   useEffect(() => { fetchQueue(); }, [fetchQueue]);
+
+  const retryLoad = () => {
+    setLoading(true);
+    void fetchQueue();
+  };
 
   // The signed-pdf route verifies a Bearer token, which a plain link cannot
   // send, so fetch the PDF with the token and open it as a blob URL. The tab is
@@ -254,424 +345,523 @@ export default function OnboardingReviewPage() {
     [completed, personFilter, atRiskOnly]
   );
 
-  return (
-    <ProtectedRoute roles={['admin', 'operations']}>
-      <div className="ops-line-main -m-4 sm:-m-6 p-4 sm:p-6">
-        <div className="ops-line">
-          <PageTitle title="Onboarding Review" meta={`${submissions.length} waiting`} subtitle="Review submitted documents and send clear next steps." />
+  const waitingPeople = new Set(submissions.map((item) => item.userId)).size;
+  const atRiskPeople = new Set(
+    [...submissions, ...esignPending].filter((item) => item.atRisk).map((item) => item.userId),
+  ).size;
+  const showStats = !loading && !loadFailed;
+  const catLabel = (submission: Submission) => OnboardingCategoryLabels[submission.category] ?? submission.category;
 
-          <div className="ops-line-onboarding-filters">
-            <span className="ops-line-kicker">Person</span>
-            <div className="ops-line-pill-row" role="group" aria-label="Person filter">
-              <button type="button" aria-pressed={personFilter === 'all'} onClick={() => setPersonFilter('all')}>
-                All People
-              </button>
-              {people.map((p) => (
-                <button key={p.key} type="button" aria-pressed={personFilter === p.key} onClick={() => setPersonFilter(p.key)}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
+  return (
+    <AdminGate roles={['admin', 'operations']}>
+      <div className={u.page}>
+        <AdminPageHead
+          title="Onboarding Review"
+          meta={
+            showStats ? (
+              <>
+                <b>{submissions.length}</b> waiting
+              </>
+            ) : null
+          }
+          sub="Review submitted documents and send clear next steps."
+        />
+
+        <div className={u.stats} aria-busy={loading}>
+          <div className={u.stat}>
+            <span className={s.kicker}>Waiting</span>
+            {showStats ? (
+              <strong className={`${u.statValue} ${submissions.length ? u.statHot : ''}`}>{submissions.length}</strong>
+            ) : (
+              <StatPlaceholder failed={loadFailed} />
+            )}
+            <span className={u.statNote}>
+              {showStats ? `from ${waitingPeople} ${waitingPeople === 1 ? 'person' : 'people'}` : '\u00a0'}
+            </span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>At risk</span>
+            {showStats ? (
+              <strong className={`${u.statValue} ${atRiskPeople ? u.statWarn : ''}`}>{atRiskPeople}</strong>
+            ) : (
+              <StatPlaceholder failed={loadFailed} />
+            )}
+            <span className={u.statNote}>
+              {showStats ? (atRiskPeople ? 'people behind' : 'Nobody behind') : '\u00a0'}
+            </span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Out for signature</span>
+            {showStats ? (
+              <strong className={u.statValue}>{esignPending.length}</strong>
+            ) : (
+              <StatPlaceholder failed={loadFailed} />
+            )}
+            <span className={u.statNote}>{showStats ? 'with the rep' : '\u00a0'}</span>
+          </div>
+          <div className={u.stat}>
+            <span className={s.kicker}>Completed</span>
+            {showStats ? (
+              <strong className={u.statValue}>{completed.length}</strong>
+            ) : (
+              <StatPlaceholder failed={loadFailed} />
+            )}
+            <span className={u.statNote}>{showStats ? 'approved or rejected' : '\u00a0'}</span>
+          </div>
+        </div>
+
+        <ActionQueue />
+
+        <div className={u.toolbar}>
+          <div className={u.chips} role="group" aria-label="Person filter">
             <button
               type="button"
-              className="ops-line-at-risk"
-              aria-pressed={atRiskOnly}
-              onClick={() => setAtRiskOnly((v) => !v)}
+              className={u.chip}
+              aria-pressed={personFilter === 'all'}
+              onClick={() => setPersonFilter('all')}
             >
-              At-risk Only
+              All People
             </button>
+            {people.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                className={u.chip}
+                aria-pressed={personFilter === p.key}
+                onClick={() => setPersonFilter(p.key)}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
+          <button
+            type="button"
+            className={`${u.chip} ${o.riskChip}`}
+            aria-pressed={atRiskOnly}
+            onClick={() => setAtRiskOnly((v) => !v)}
+          >
+            <AlertTriangle size={16} aria-hidden="true" />
+            At-risk Only
+          </button>
+        </div>
 
-          {error && <div className="ops-line-error-banner">{error}</div>}
+        {error ? (
+          <AdminNotice tone="error" onDismiss={() => setError('')}>
+            {error}
+          </AdminNotice>
+        ) : null}
 
+        <Section
+          id="onb-waiting"
+          title="Waiting for review"
+          action={
+            <button
+              type="button"
+              className={s.iconBtn}
+              onClick={retryLoad}
+              disabled={loading}
+              aria-label="Refresh review queue"
+            >
+              <RotateCw size={18} className={loading ? u.spin : undefined} aria-hidden="true" />
+            </button>
+          }
+          count={showStats ? `${filtered.length} of ${submissions.length}` : undefined}
+        >
           {loading ? (
-            <div className="ops-line-state-card">Loading submissions…</div>
+            <AdminSkeletonRows rows={3} label="Loading submissions" />
+          ) : loadFailed ? (
+            <AdminFailed what="the review queue" onRetry={retryLoad} />
           ) : filtered.length === 0 ? (
-            <div className="ops-line-state-card">
-              <p style={{ fontWeight: 900, marginBottom: 4 }}>
-                {submissions.length === 0 ? 'Review queue is clear' : 'No submissions match this view.'}
-              </p>
-              <p>
-                {submissions.length === 0
-                  ? 'No onboarding submissions need review right now.'
-                  : 'Clear filters to see all submissions.'}
-              </p>
-            </div>
+            submissions.length === 0 ? (
+              <AdminEmpty icon={<ClipboardCheck size={28} aria-hidden="true" />} title="Review queue is clear">
+                No onboarding submissions need review right now.
+              </AdminEmpty>
+            ) : (
+              <AdminEmpty title="No submissions match this view">Clear filters to see all submissions.</AdminEmpty>
+            )
           ) : (
-            <div className="ops-line-list">
-              {groupSubmissions(filtered).map((group) => (
-                <div key={group.userId} className="ops-line-rep-group">
-                  <div className="ops-line-rep-header">
-                    <span className="ops-line-person ops-line-cell">
-                      <span className="ops-line-avatar">
-                        {repLabel(group.userName, group.userId).charAt(0).toUpperCase()}
-                      </span>
-                      <span>
-                        <strong>
-                          {repLabel(group.userName, group.userId)}
-                          {group.atRisk && ' · AT RISK'}
-                        </strong>
-                        <small>{group.items.length} item{group.items.length === 1 ? '' : 's'}</small>
-                      </span>
-                    </span>
-                  </div>
+            <>
+              <div className={`${u.tHead} ${o.cols}`} aria-hidden="true">
+                <span>Item</span>
+                <span>Waiting</span>
+                <span>Access</span>
+                <span>Evidence</span>
+                <span />
+              </div>
+              <ul className={o.groups}>
+                {groupSubmissions(filtered).map((group) => (
+                  <RepGroup key={group.userId} group={group}>
+                    {group.items.map((submission) => {
+                      const expanded = expandedId === submission.id;
+                      const working = processingId === submission.id;
+                      return (
+                        <li key={submission.id} className={submission.atRisk ? u.rowWarn : undefined}>
+                          <button
+                            type="button"
+                            className={`${u.row} ${o.itemRow}`}
+                            onClick={() => setExpandedId(expanded ? null : submission.id)}
+                            aria-expanded={expanded}
+                          >
+                            <span className={u.cellMain}>
+                              <strong className={o.itemName}>{submission.itemLabel}</strong>
+                              <span className={u.cellSub}>{catLabel(submission)}</span>
+                            </span>
+                            <span className={`${u.cell} ${u.num}`} data-label="Waiting">
+                              {waitLabel(submission.submittedAt)}
+                            </span>
+                            <span className={u.cell} data-label="Access">
+                              <span className={o.access}>
+                                {submission.sensitive ? <Lock size={14} aria-hidden="true" /> : null}
+                                {submission.sensitive ? 'Sensitive' : 'Standard'}
+                              </span>
+                            </span>
+                            <span className={u.cell} data-label="Evidence">
+                              <span className={`${u.tag} ${submission.adminOnly ? u.tagAmber : ''}`}>
+                                {submission.adminOnly ? <Lock size={12} aria-hidden="true" /> : null}
+                                {evidenceLabel(submission)}
+                              </span>
+                            </span>
+                            <span className={u.cellEnd}>
+                              <ChevronDown
+                                size={20}
+                                className={`${u.chev} ${expanded ? o.chevOpen : ''}`}
+                                aria-hidden="true"
+                              />
+                            </span>
+                          </button>
+
+                          {expanded ? (
+                            <div className={o.detail}>
+                              <div className={o.reference}>
+                                <p className={s.kicker}>Reference</p>
+                                {submission.referenceKind === 'storage' && submission.adminOnly ? (
+                                  <p className={o.locked}>
+                                    <Lock size={16} aria-hidden="true" />
+                                    Admin only. Sensitive files are visible to admins.
+                                  </p>
+                                ) : submission.referenceKind === 'storage' ? (
+                                  submission.files.length > 0 ? (
+                                    <>
+                                      <div className={o.files}>
+                                        {submission.files.map((file) => (
+                                          <a
+                                            key={`${submission.id}-${file.name}`}
+                                            href={file.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={o.file}
+                                          >
+                                            <FileText size={16} aria-hidden="true" />
+                                            <span>{file.name}</span>
+                                          </a>
+                                        ))}
+                                      </div>
+                                      <p className={u.hint}>Links expire in 15 minutes.</p>
+                                    </>
+                                  ) : (
+                                    <p className={o.quote}>
+                                      No files found at {submission.reference ?? 'this reference'}.
+                                    </p>
+                                  )
+                                ) : (
+                                  <p className={o.quote}>{submission.reference ?? 'No reference on file.'}</p>
+                                )}
+                              </div>
+                              <div className={o.detailMain}>
+                                <dl className={u.facts}>
+                                  <div>
+                                    <dt>Person</dt>
+                                    <dd>{repLabel(submission.userName, submission.userId)}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Category</dt>
+                                    <dd>{catLabel(submission)}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Waiting</dt>
+                                    <dd>{waitLabel(submission.submittedAt)}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Access</dt>
+                                    <dd>{submission.sensitive ? 'Sensitive / locked' : 'Standard'}</dd>
+                                  </div>
+                                </dl>
+                                <p className={u.hint}>
+                                  Submitted {formatDate(submission.submittedAt)} · {submission.userEmail}
+                                </p>
+                                <div className={u.btnRow}>
+                                  <button
+                                    type="button"
+                                    className={`${s.btnPrimary} ${u.primarySm}`}
+                                    disabled={working}
+                                    onClick={() => review(submission, 'approved')}
+                                  >
+                                    {working ? 'Working…' : 'Approve'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                                    disabled={working}
+                                    onClick={() => setRejectModal(submission)}
+                                  >
+                                    Reject
+                                  </button>
+                                  {isEsignItem(submission.itemId) && !submission.esignEnvelopeId && (
+                                    <button
+                                      type="button"
+                                      className={`${s.btnSecondary} ${u.sm}`}
+                                      disabled={working}
+                                      onClick={() => void sendForSignature(submission)}
+                                    >
+                                      {working ? 'Sending…' : 'Send for signature'}
+                                    </button>
+                                  )}
+                                </div>
+                                {sendState[submission.id]?.message ? (
+                                  <AdminNotice tone={sendState[submission.id].error ? 'error' : 'ok'}>
+                                    {sendState[submission.id].message}
+                                  </AdminNotice>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </RepGroup>
+                ))}
+              </ul>
+            </>
+          )}
+        </Section>
+
+        {!loading && !loadFailed && filteredEsignPending.length > 0 && (
+          <Section
+            id="esign-pending-heading"
+            title="Out for signature"
+            count={`${filteredEsignPending.length} out`}
+            sub="These documents are with the rep. Reject one only when a fresh signature is needed."
+          >
+            <div className={`${u.tHead} ${o.cols}`} aria-hidden="true">
+              <span>Item</span>
+              <span>Out for</span>
+              <span>Access</span>
+              <span>Status</span>
+              <span />
+            </div>
+            <ul className={o.groups}>
+              {groupSubmissions(filteredEsignPending).map((group) => (
+                <RepGroup key={group.userId} group={group}>
                   {group.items.map((submission) => {
                     const expanded = expandedId === submission.id;
                     return (
-                      <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
-                    <button
-                      type="button"
-                      className="ops-line-row-main onboard"
-                      onClick={() => setExpandedId(expanded ? null : submission.id)}
-                      aria-expanded={expanded}
-                    >
-                      <span className="ops-line-cell">
-                        <strong>{submission.itemLabel}</strong>
-                        <small>{OnboardingCategoryLabels[submission.category] ?? submission.category}</small>
-                      </span>
-                      <span className="ops-line-cell">
-                        <strong>{waitLabel(submission.submittedAt)} waiting</strong>
-                        <small>Waiting time</small>
-                      </span>
-                      <span className="ops-line-cell">
-                        <strong className="ops-line-sensitive">
-                          {submission.sensitive && <Lock className="h-3 w-3" aria-hidden="true" />}
-                          {submission.sensitive ? 'Sensitive item' : 'Standard review'}
-                        </strong>
-                        <small>Waiting time</small>
-                      </span>
-                      <span className="ops-line-evidence-group">
-                        <span className="ops-line-file-chip">
-                          {submission.adminOnly
-                            ? 'Admin only'
-                            : submission.referenceKind === 'storage'
-                              ? `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`
-                              : 'reference'}
-                        </span>
-                      </span>
-                      <span className="ops-line-status-chip">waiting</span>
-                      <span className="ops-line-chevron">{expanded ? '−' : '+'}</span>
-                    </button>
+                      <li key={submission.id} className={submission.atRisk ? u.rowWarn : undefined}>
+                        <button
+                          type="button"
+                          className={`${u.row} ${o.itemRow}`}
+                          onClick={() => setExpandedId(expanded ? null : submission.id)}
+                          aria-expanded={expanded}
+                        >
+                          <span className={u.cellMain}>
+                            <strong className={o.itemName}>{submission.itemLabel}</strong>
+                            <span className={u.cellSub}>{catLabel(submission)}</span>
+                          </span>
+                          <span className={`${u.cell} ${u.num}`} data-label="Out for">
+                            {waitLabel(submission.submittedAt)}
+                          </span>
+                          <span className={u.cell} data-label="Access">
+                            <span className={o.access}>
+                              {submission.sensitive ? <Lock size={14} aria-hidden="true" /> : null}
+                              {submission.sensitive ? 'Sensitive' : 'E-signature'}
+                            </span>
+                          </span>
+                          <span className={u.cell} data-label="Status">
+                            <StatusDot tone="blue">Out for signature</StatusDot>
+                          </span>
+                          <span className={u.cellEnd}>
+                            <ChevronDown
+                              size={20}
+                              className={`${u.chev} ${expanded ? o.chevOpen : ''}`}
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </button>
 
-                    {expanded && (
-                      <div className="ops-line-detail-panel onboard">
-                        <div className="ops-line-reference-card">
-                          <p className="ops-line-kicker">Reference / preview</p>
-                          {submission.referenceKind === 'storage' && submission.adminOnly ? (
-                            <p className="quote">
-                              <Lock className="h-3 w-3" aria-hidden="true" /> Admin only. Sensitive files are visible to admins.
-                            </p>
-                          ) : submission.referenceKind === 'storage' ? (
-                            submission.files.length > 0 ? (
-                              <>
-                                <div className="ops-line-evidence-group" style={{ marginTop: 12 }}>
-                                  {submission.files.map((file) => (
-                                    <a
-                                      key={`${submission.id}-${file.name}`}
-                                      href={file.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="ops-line-file-chip"
-                                    >
-                                      {file.name}
-                                    </a>
-                                  ))}
+                        {expanded ? (
+                          <div className={o.detail}>
+                            <div className={o.reference}>
+                              <p className={s.kicker}>Reference</p>
+                              <p className={o.quote}>
+                                {submission.reference
+                                  ? `E-signature reference: ${submission.reference}`
+                                  : 'No envelope reference on file.'}
+                              </p>
+                            </div>
+                            <div className={o.detailMain}>
+                              <dl className={u.facts}>
+                                <div>
+                                  <dt>Person</dt>
+                                  <dd>{repLabel(submission.userName, submission.userId)}</dd>
                                 </div>
-                                <p style={{ marginTop: 10, fontSize: 10, color: 'var(--ops-line-muted)' }}>
-                                  Links expire in 15 minutes.
-                                </p>
-                              </>
-                            ) : (
-                              <p className="quote">No files found at {submission.reference ?? 'this reference'}.</p>
-                            )
-                          ) : (
-                            <p className="quote">{submission.reference ?? 'No reference on file.'}</p>
-                          )}
-                        </div>
-                        <div className="ops-line-detail-copy">
-                          <h3>{submission.itemLabel}</h3>
-                          <div className="ops-line-detail-fields">
-                            <div><span>Person</span><b>{repLabel(submission.userName, submission.userId)}</b></div>
-                            <div><span>Category</span><b>{OnboardingCategoryLabels[submission.category] ?? submission.category}</b></div>
-                            <div><span>Waiting</span><b>{waitLabel(submission.submittedAt)}</b></div>
-                            <div><span>Access</span><b>{submission.sensitive ? 'Sensitive / locked' : 'Standard'}</b></div>
-                          </div>
-                          <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>
-                            Submitted {formatDate(submission.submittedAt)} · {submission.userEmail}
-                          </p>
-                          <div className="ops-line-detail-actions">
-                            <button
-                              type="button"
-                              className="ops-line-action resolve"
-                              disabled={processingId === submission.id}
-                              onClick={() => review(submission, 'approved')}
-                            >
-                              {processingId === submission.id ? 'Working…' : 'Approve'}
-                            </button>
-                            <button
-                              type="button"
-                              className="ops-line-action reject"
-                              disabled={processingId === submission.id}
-                              onClick={() => setRejectModal(submission)}
-                            >
-                              Reject
-                            </button>
-                            {isEsignItem(submission.itemId) && !submission.esignEnvelopeId && (
-                              <button
-                                type="button"
-                                className="ops-line-action"
-                                disabled={processingId === submission.id}
-                                onClick={() => void sendForSignature(submission)}
-                              >
-                                {processingId === submission.id ? 'Sending…' : 'Send for signature'}
-                              </button>
-                            )}
-                          </div>
-                          {sendState[submission.id]?.message && (
-                            <p className="ops-line-intro" style={{ marginTop: 8 }} role="status">
-                              {sendState[submission.id].message}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                      </article>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!loading && filteredEsignPending.length > 0 && (
-            <section style={{ marginTop: 28 }} aria-labelledby="esign-pending-heading">
-              <div className="sweep-subsection-head" style={{ marginBottom: 12 }}>
-                <div>
-                  <h2 id="esign-pending-heading" style={{ fontSize: 24, fontWeight: 900 }}>
-                    Out for signature
-                  </h2>
-                  <p className="ops-line-intro">
-                    These documents are with the rep. Reject one only when a fresh signature is needed.
-                  </p>
-                </div>
-                <span className="sweep-subsection-count">{filteredEsignPending.length} out for signature</span>
-              </div>
-              <div className="ops-line-list">
-                {groupSubmissions(filteredEsignPending).map((group) => (
-                  <div key={group.userId} className="ops-line-rep-group">
-                    <div className="ops-line-rep-header">
-                      <span className="ops-line-person ops-line-cell">
-                        <span className="ops-line-avatar">
-                          {repLabel(group.userName, group.userId).charAt(0).toUpperCase()}
-                        </span>
-                        <span>
-                          <strong>
-                            {repLabel(group.userName, group.userId)}
-                            {group.atRisk && ' · AT RISK'}
-                          </strong>
-                          <small>{group.items.length} item{group.items.length === 1 ? '' : 's'}</small>
-                        </span>
-                      </span>
-                    </div>
-                    {group.items.map((submission) => {
-                      const expanded = expandedId === submission.id;
-                      return (
-                        <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
-                      <button
-                        type="button"
-                        className="ops-line-row-main onboard"
-                        onClick={() => setExpandedId(expanded ? null : submission.id)}
-                        aria-expanded={expanded}
-                      >
-                        <span className="ops-line-cell">
-                          <strong>{submission.itemLabel}</strong>
-                          <small>{OnboardingCategoryLabels[submission.category] ?? submission.category}</small>
-                        </span>
-                        <span className="ops-line-cell">
-                          <strong>{waitLabel(submission.submittedAt)} out</strong>
-                          <small>waiting time</small>
-                        </span>
-                        <span className="ops-line-cell">
-                          <strong className="ops-line-sensitive">
-                            {submission.sensitive && <Lock className="h-3 w-3" aria-hidden="true" />}
-                            {submission.sensitive ? 'Sensitive item' : 'E-signature'}
-                          </strong>
-                          <small>provider-managed</small>
-                        </span>
-                        <span className="ops-line-evidence-group">
-                          <span className="ops-line-file-chip">e-signature</span>
-                        </span>
-                        <span className="ops-line-status-chip">out for signature</span>
-                        <span className="ops-line-chevron">{expanded ? '−' : '+'}</span>
-                      </button>
-
-                      {expanded && (
-                        <div className="ops-line-detail-panel onboard">
-                          <div className="ops-line-reference-card">
-                            <p className="ops-line-kicker">Reference / preview</p>
-                            <p className="quote">
-                              {submission.reference
-                                ? `E-signature reference: ${submission.reference}`
-                                : 'No envelope reference on file.'}
-                            </p>
-                          </div>
-                          <div className="ops-line-detail-copy">
-                            <h3>{submission.itemLabel}</h3>
-                            <div className="ops-line-detail-fields">
-                              <div><span>Person</span><b>{repLabel(submission.userName, submission.userId)}</b></div>
-                              <div><span>Category</span><b>{OnboardingCategoryLabels[submission.category] ?? submission.category}</b></div>
-                              <div><span>Out for</span><b>{waitLabel(submission.submittedAt)}</b></div>
-                              <div><span>Access</span><b>Provider-managed</b></div>
-                            </div>
-                            <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>
-                              Dispatched {formatDate(submission.submittedAt)} · {submission.userEmail}
-                            </p>
-                            {submission.status === 'submitted' && submission.esignEnvelopeId && (
-                              <p style={{ fontSize: 11, color: 'var(--ops-line-muted)' }}>Awaiting rep signature</p>
-                            )}
-                            <div className="ops-line-detail-actions">
-                              <button
-                                type="button"
-                                className="ops-line-action reject"
-                                disabled={processingId === submission.id}
-                                onClick={() => setRejectModal(submission)}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {!loading && (
-            <section style={{ marginTop: 28 }} aria-labelledby="completed-heading">
-              <div className="sweep-subsection-head" style={{ marginBottom: 12 }}>
-                <div>
-                  <h2 id="completed-heading" style={{ fontSize: 24, fontWeight: 900 }}>
-                    Completed
-                  </h2>
-                  <p className="ops-line-intro">
-                    Approved and rejected items, newest review first.
-                  </p>
-                </div>
-                <span className="sweep-subsection-count">{filteredCompleted.length} completed</span>
-              </div>
-              {filteredCompleted.length === 0 ? (
-                <p className="ops-line-intro">Nothing completed yet.</p>
-              ) : (
-                <div className="ops-line-list">
-                  {groupSubmissions(filteredCompleted).map((group) => (
-                    <div key={group.userId} className="ops-line-rep-group">
-                      <div className="ops-line-rep-header">
-                        <span className="ops-line-person ops-line-cell">
-                          <span className="ops-line-avatar">
-                            {repLabel(group.userName, group.userId).charAt(0).toUpperCase()}
-                          </span>
-                          <span>
-                            <strong>
-                              {repLabel(group.userName, group.userId)}
-                              {group.atRisk && ' · AT RISK'}
-                            </strong>
-                            <small>{group.items.length} item{group.items.length === 1 ? '' : 's'}</small>
-                          </span>
-                        </span>
-                      </div>
-                      {group.items.map((submission) => (
-                        <article key={submission.id} className={`ops-line-row${submission.atRisk ? ' risk' : ''}`}>
-                          <div className="ops-line-row-main onboard">
-                            <span className="ops-line-cell">
-                              <strong>{submission.itemLabel}</strong>
-                              <small>{OnboardingCategoryLabels[submission.category] ?? submission.category}</small>
-                            </span>
-                            <span className="ops-line-cell">
-                              <strong>Reviewed {formatDate(submission.reviewedAt)}</strong>
-                              <small>review history</small>
-                            </span>
-                            <span className="ops-line-cell">
-                              <strong>{submission.reviewerName || '—'}</strong>
-                              <small>reviewer</small>
-                            </span>
-                            <span className="ops-line-evidence-group">
-                              {submission.hasSignedPdf && submission.adminOnly ? (
-                                <span className="ops-line-file-chip">
-                                  <Lock className="h-3 w-3" aria-hidden="true" /> Admin only
-                                </span>
-                              ) : submission.hasSignedPdf ? (
+                                <div>
+                                  <dt>Category</dt>
+                                  <dd>{catLabel(submission)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Out for</dt>
+                                  <dd>{waitLabel(submission.submittedAt)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Access</dt>
+                                  <dd>Provider-managed</dd>
+                                </div>
+                              </dl>
+                              <p className={u.hint}>
+                                Dispatched {formatDate(submission.submittedAt)} · {submission.userEmail}
+                                {submission.status === 'submitted' && submission.esignEnvelopeId
+                                  ? ' · Awaiting rep signature'
+                                  : ''}
+                              </p>
+                              <div className={u.btnRow}>
                                 <button
                                   type="button"
-                                  className="ops-line-file-chip"
-                                  style={{ background: 'transparent', cursor: 'pointer' }}
-                                  onClick={() => openSignedPdf(submission)}
+                                  className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                                  disabled={processingId === submission.id}
+                                  onClick={() => setRejectModal(submission)}
                                 >
-                                  Signed PDF
+                                  Reject
                                 </button>
-                              ) : (
-                                <span className="ops-line-file-chip">no PDF</span>
-                              )}
-                            </span>
-                            <span className={`ops-line-status-chip ${submission.status === 'approved' ? 'tone-lime' : 'tone-red'}`}>
-                              {submission.status === 'approved' ? 'Approved' : 'Rejected'}
-                            </span>
+                              </div>
+                            </div>
                           </div>
-                        </article>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </RepGroup>
+              ))}
+            </ul>
+          </Section>
+        )}
 
-          <ActionQueue />
-        </div>
+        {!loading && !loadFailed && (
+          <Section
+            id="completed-heading"
+            title="Completed"
+            count={`${filteredCompleted.length} completed`}
+            sub="Approved and rejected items, newest review first."
+          >
+            {filteredCompleted.length === 0 ? (
+              <p className={o.none}>Nothing completed yet.</p>
+            ) : (
+              <>
+                <div className={`${u.tHead} ${o.cols}`} aria-hidden="true">
+                  <span>Item</span>
+                  <span>Reviewed</span>
+                  <span>Reviewer</span>
+                  <span>Signed PDF</span>
+                  <span className={u.alignEnd}>Result</span>
+                </div>
+                <ul className={o.groups}>
+                  {groupSubmissions(filteredCompleted).map((group) => (
+                    <RepGroup key={group.userId} group={group}>
+                      {group.items.map((submission) => (
+                        <li key={submission.id} className={`${u.row} ${o.itemRow} ${o.doneRow}`}>
+                          <span className={u.cellMain}>
+                            <strong className={o.itemName}>{submission.itemLabel}</strong>
+                            <span className={u.cellSub}>{catLabel(submission)}</span>
+                          </span>
+                          <span className={`${u.cell} ${u.num}`} data-label="Reviewed">
+                            {formatDate(submission.reviewedAt)}
+                          </span>
+                          <span className={u.cell} data-label="Reviewer">
+                            {submission.reviewerName || '—'}
+                          </span>
+                          <span className={u.cell} data-label="Signed PDF">
+                            {submission.hasSignedPdf && submission.adminOnly ? (
+                              <span className={`${u.tag} ${u.tagAmber}`}>
+                                <Lock size={12} aria-hidden="true" />
+                                Admin only
+                              </span>
+                            ) : submission.hasSignedPdf ? (
+                              <button type="button" className={o.pdfBtn} onClick={() => openSignedPdf(submission)}>
+                                <FileText size={16} aria-hidden="true" />
+                                Signed PDF
+                              </button>
+                            ) : (
+                              <span className={u.toneMuted}>No PDF</span>
+                            )}
+                          </span>
+                          <span className={`${u.cellEnd} ${u.alignEnd}`}>
+                            <StatusDot tone={submission.status === 'approved' ? 'lime' : 'red'}>
+                              {submission.status === 'approved' ? 'Approved' : 'Rejected'}
+                            </StatusDot>
+                          </span>
+                        </li>
+                      ))}
+                    </RepGroup>
+                  ))}
+                </ul>
+              </>
+            )}
+          </Section>
+        )}
       </div>
 
-      {rejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="ops-line w-full max-w-md" style={{ margin: 0, padding: 0 }}>
-            <div className="ops-line-reference-card" style={{ background: 'var(--ops-line-panel)' }}>
-              <h3 style={{ fontWeight: 900, fontSize: 16, color: 'var(--ops-line-ink)', marginBottom: 6 }}>
-                Reject {rejectModal.itemLabel}
-              </h3>
-              <p style={{ fontSize: 12, color: 'var(--ops-line-muted)', marginBottom: 10 }}>
-                Provide a reason for rejection. This will be shared with {rejectModal.userName}.
-              </p>
+      {rejectModal ? (
+        <AdminSheet
+          title={`Reject ${rejectModal.itemLabel}`}
+          tone="danger"
+          description={`Give a reason. It is shared with ${repLabel(rejectModal.userName, rejectModal.userId)}.`}
+          onClose={() => {
+            setRejectModal(null);
+            setRejectionReason('');
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm}`}
+                onClick={() => {
+                  setRejectModal(null);
+                  setRejectionReason('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                disabled={processingId === rejectModal.id || !rejectionReason.trim()}
+                onClick={() => review(rejectModal, 'rejected', rejectionReason)}
+              >
+                {processingId === rejectModal.id ? 'Rejecting…' : 'Confirm reject'}
+              </button>
+            </>
+          }
+        >
+          <div className={u.sheetPad}>
+            <div className={u.field}>
+              <label className={u.label} htmlFor="onb-reject-reason">
+                Reason
+              </label>
               <textarea
-                className="ops-line-notes"
+                id="onb-reject-reason"
+                className={`${u.input} ${u.textarea}`}
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Enter rejection reason..."
+                placeholder="What needs to change?"
                 rows={3}
               />
-              <div className="ops-line-detail-actions" style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="ops-line-action"
-                  onClick={() => { setRejectModal(null); setRejectionReason(''); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="ops-line-action reject"
-                  disabled={processingId === rejectModal.id || !rejectionReason.trim()}
-                  onClick={() => review(rejectModal, 'rejected', rejectionReason)}
-                >
-                  {processingId === rejectModal.id ? 'Rejecting…' : 'Confirm reject'}
-                </button>
-              </div>
             </div>
           </div>
-        </div>
-      )}
-    </ProtectedRoute>
+        </AdminSheet>
+      ) : null}
+    </AdminGate>
   );
+}
+
+function StatPlaceholder({ failed }: { failed: boolean }) {
+  if (failed) return <strong className={`${u.statValue} ${u.toneMuted}`}>—</strong>;
+  return <span className={s.skel} style={{ width: 56, height: 40 }} aria-hidden="true" />;
 }

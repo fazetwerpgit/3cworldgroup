@@ -5,7 +5,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import '@/styles/sweep-admin-a.css';
+import { AdminAvatar, AdminFailed, AdminNotice, AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
+import s from '@/components/portal/rep/rep.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
+import q from './action-queue.module.css';
 import type { AlertTaskKind, AlertTaskStatus } from '@/types/alerts';
 
 interface AlertTaskRow {
@@ -61,6 +64,7 @@ export default function ActionQueue() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -75,8 +79,10 @@ export default function ActionQueue() {
         );
       }
       setTasks(Array.isArray(json.tasks) ? (json.tasks as AlertTaskRow[]) : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load action queue');
+      setLoadFailed(false);
+    } catch {
+      // A failed load says so (with a retry) rather than showing an empty queue.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -176,72 +182,101 @@ export default function ActionQueue() {
     }
   }
 
-  if (!loading && tasks.length === 0 && !error) return null;
+  if (!loading && tasks.length === 0 && !error && !loadFailed) return null;
 
   return (
-    <aside className="ops-line-activation-rail">
-      <div className="ops-line-activation-head">
-        <div>
-          <span className="sweep-admin-label">Activation tasks</span>
-          <h3>{tasks.length === 0 ? 'All items approved' : 'Needs attention'}</h3>
-        </div>
-        <span className="sweep-admin-label">
-          {tasks.length} task{tasks.length === 1 ? '' : 's'} ready
-        </span>
+    <section className={s.panel} aria-labelledby="activation-tasks-heading">
+      <div className={s.panelHead}>
+        <h2 id="activation-tasks-heading" className={s.kicker}>
+          Activation tasks
+        </h2>
+        {(!loading || tasks.length > 0) && !(loadFailed && tasks.length === 0) ? (
+          <span className={u.panelMeta}>
+            {tasks.length} task{tasks.length === 1 ? '' : 's'} ready
+          </span>
+        ) : null}
       </div>
 
-      {error && <div className="ops-line-error-banner">{error}</div>}
+      {loadFailed && tasks.length > 0 ? (
+        <div className={q.noticeWrap}>
+          <AdminNotice tone="warn">Couldn&apos;t refresh activation tasks. Showing the last list.</AdminNotice>
+        </div>
+      ) : null}
 
-      {loading && tasks.length === 0 ? (
-        <div className="ops-line-activation-person">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Loading activation tasks…</span>
+      {error ? (
+        <div className={q.noticeWrap}>
+          <AdminNotice tone="error" onDismiss={() => setError('')}>
+            {error}
+          </AdminNotice>
         </div>
+      ) : null}
+
+      {loadFailed && tasks.length === 0 ? (
+        <AdminFailed what="activation tasks" onRetry={() => void load()} />
+      ) : loading && tasks.length === 0 ? (
+        <AdminSkeletonRows rows={1} label="Loading activation tasks" />
       ) : tasks.length === 0 ? (
-        <div className="ops-line-activation-person">
-          <span>No manager tasks are waiting right now.</span>
-        </div>
+        error ? null : (
+          <p className={q.none}>No manager tasks are waiting right now.</p>
+        )
       ) : (
-        tasks.map((task) => (
-          <div key={task.id} className="ops-line-activation-person">
-            <div className="ops-line-person">
-              <span className="ops-line-avatar">{task.subjectName?.charAt(0)?.toUpperCase() || '?'}</span>
-              <div>
-                <strong>{task.subjectName}</strong>
-                <small>
-                  {task.message}
-                  {task.status === 'claimed' &&
-                    ` · claimed by ${task.claimedByName || task.claimedBy || 'another manager'}`}
-                  {formatRelativeAge(task.createdAt)}
-                </small>
-              </div>
-            </div>
-            <div className="ops-line-claim">
-              <Link href={task.link} className="ops-line-action">
-                View
-              </Link>
-              {task.status === 'open' && (
-                <button type="button" disabled={busy === task.id} onClick={() => void claim(task.id)}>
-                  {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "I've got it"}
-                </button>
-              )}
-              {task.kind === 'activation_ready' && (
-                <button
-                  type="button"
-                  className="ops-line-primary"
-                  disabled={busy === task.id}
-                  onClick={() => void activate(task)}
-                >
-                  {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
-                </button>
-              )}
-              <button type="button" disabled={busy === task.id} onClick={() => void dismiss(task.id)}>
-                {busy === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Dismiss'}
-              </button>
-            </div>
-          </div>
-        ))
+        <ul className={`${u.rows} ${q.list}`}>
+          {tasks.map((task) => {
+            const working = busy === task.id;
+            return (
+              <li key={task.id} className={`${u.row} ${q.task} ${task.kind === 'activation_ready' ? u.rowHot : ''}`}>
+                <span className={u.person}>
+                  <AdminAvatar name={task.subjectName || '?'} />
+                  <span className={u.personText}>
+                    <span className={u.personName}>
+                      <span>{task.subjectName}</span>
+                    </span>
+                    <span className={q.taskMsg}>
+                      {task.message}
+                      {task.status === 'claimed' &&
+                        ` · claimed by ${task.claimedByName || task.claimedBy || 'another manager'}`}
+                      {formatRelativeAge(task.createdAt)}
+                    </span>
+                  </span>
+                </span>
+                <span className={`${u.btnRow} ${q.taskActions}`}>
+                  <Link href={task.link} className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}>
+                    View
+                  </Link>
+                  {task.status === 'open' && (
+                    <button
+                      type="button"
+                      className={`${s.btnSecondary} ${u.sm} ${q.claimAct}`}
+                      disabled={working}
+                      onClick={() => void claim(task.id)}
+                    >
+                      {working ? <Loader2 size={16} className={u.spin} aria-label="Working" /> : "I've got it"}
+                    </button>
+                  )}
+                  {task.kind === 'activation_ready' && (
+                    <button
+                      type="button"
+                      className={`${s.btnPrimary} ${u.primarySm} ${q.activateAct}`}
+                      disabled={working}
+                      onClick={() => void activate(task)}
+                    >
+                      {working ? <Loader2 size={16} className={u.spin} aria-label="Working" /> : 'Activate'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
+                    disabled={working}
+                    onClick={() => void dismiss(task.id)}
+                  >
+                    {working ? <Loader2 size={16} className={u.spin} aria-label="Working" /> : 'Dismiss'}
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </aside>
+    </section>
   );
 }

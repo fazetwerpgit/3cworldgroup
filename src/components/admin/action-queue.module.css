@@ -1,0 +1,53 @@
+/* Activation tasks (direction D), shown on Onboarding Review. Shared pieces are admin-ui.module.css. */
+
+.noticeWrap {
+  padding: var(--s3) var(--s4) 0;
+}
+
+.none {
+  margin: 0;
+  padding: var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+/* Phone: person on top, actions below. Desktop: one line. */
+.list .task {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.taskMsg {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.35;
+}
+
+.taskActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Phones: the action that moves the rep forward comes first. */
+.activateAct {
+  order: -2;
+}
+
+.claimAct {
+  order: -1;
+}
+
+@media (min-width: 1024px) {
+  .list .task {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .taskActions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .activateAct,
+  .claimAct {
+    order: 0;
+  }
+}
