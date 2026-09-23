@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, RefObject } from 'react';
+import type { CSSProperties, RefObject, TouchEvent } from 'react';
 import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
@@ -14,6 +14,7 @@ import { validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
+import { gifPickerMaxHeight, keyboardInset } from '@/lib/chat/keyboard';
 import type { ConnectionNotice as ConnectionNoticeState } from '@/lib/chat/reconnect';
 import { useHideRepTabBar } from '@/components/portal/rep/RepShell';
 import s from '@/components/portal/rep/rep.module.css';
@@ -235,6 +236,15 @@ function dayLabel(date: Date) {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+// Caps the GIF picker (opening upward from the composer) to the room left in
+// the thread, via --gif-max on the thread element.
+function fitGifPicker(thread: HTMLElement) {
+  const anchor = thread.querySelector<HTMLElement>('[data-gif-anchor]');
+  if (!anchor) return;
+  const max = gifPickerMaxHeight(anchor.getBoundingClientRect().top, thread.getBoundingClientRect().top);
+  thread.style.setProperty('--gif-max', `${max}px`);
+}
+
 /**
  * Phone conversation screen: a back/title row under the D top bar, bubbles that
  * fill the height, and the composer on the bottom edge. The composer replaces
@@ -299,6 +309,10 @@ export function MobileThread({
   const [actionSheet, setActionSheet] = useState<ThreadMessage | null>(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
   const longPressTimer = useRef<number | undefined>(undefined);
+  // The sheet opens while the finger is still down; the tap the browser makes
+  // from that touch's release must not land on a sheet row (Delete sits last,
+  // right under the thumb).
+  const longPressFired = useRef(false);
   const clearLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -307,7 +321,18 @@ export function MobileThread({
   };
   const startLongPress = (message: ThreadMessage) => {
     clearLongPress();
-    longPressTimer.current = window.setTimeout(() => setActionSheet(message), 500);
+    longPressFired.current = false;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = undefined;
+      longPressFired.current = true;
+      setActionSheet(message);
+    }, 500);
+  };
+  const endLongPress = (event: TouchEvent) => {
+    clearLongPress();
+    if (!longPressFired.current) return;
+    longPressFired.current = false;
+    if (event.cancelable) event.preventDefault();
   };
   // Composer media state (mobile owns its own, mirroring the desktop composer).
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -594,27 +619,50 @@ export function MobileThread({
     if (!el) return;
     const vv = window.visualViewport;
     const update = () => {
-      const covered = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-      const inset = covered > 80 ? Math.round(covered) : 0;
+      const inset = vv
+        ? keyboardInset({ innerHeight: window.innerHeight, height: vv.height, offsetTop: vv.offsetTop, scale: vv.scale })
+        : 0;
+      // Pinch-zoomed: the shrunken viewport isn't a keyboard; leave it be.
+      if (inset === null) return;
       el.style.setProperty('--kb', `${inset}px`);
       if (inset && vv && vv.offsetTop > 0) window.scrollTo(0, 0);
+      fitGifPicker(el);
       const active = document.activeElement;
       const typing = active instanceof HTMLTextAreaElement && el.contains(active);
       setKeyboardOpen(inset > 0 || (typing && window.matchMedia('(pointer: coarse)').matches));
+    };
+    // Coming back to the app (keyboard dismissed while away, rotation) doesn't
+    // always fire a viewport resize, so measure again on resume.
+    let resumeFrame = 0;
+    const onResume = () => {
+      if (document.visibilityState !== 'visible') return;
+      window.cancelAnimationFrame(resumeFrame);
+      resumeFrame = window.requestAnimationFrame(update);
     };
     const frame = window.requestAnimationFrame(update);
     vv?.addEventListener('resize', update);
     vv?.addEventListener('scroll', update);
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('pageshow', onResume);
     return () => {
       window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(resumeFrame);
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('pageshow', onResume);
     };
   }, []);
+
+  // Size the GIF picker to the room above the composer as soon as it opens
+  // (the keyboard its search box raises re-fits it through update above).
+  useLayoutEffect(() => {
+    if (gifOpen && threadRef.current) fitGifPicker(threadRef.current);
+  }, [gifOpen]);
 
   const memberTotal = channel ? memberCount ?? channel.memberIds?.length ?? 0 : 0;
   const ChannelMark = channel?.audience === 'managers' ? Lock : Hash;
@@ -760,7 +808,7 @@ export function MobileThread({
                         className={c.bubbleCol}
                         onTouchStart={() => !isPending && startLongPress(message)}
                         onTouchMove={clearLongPress}
-                        onTouchEnd={clearLongPress}
+                        onTouchEnd={endLongPress}
                         onTouchCancel={clearLongPress}
                         onContextMenu={(event) => {
                           // Long-press on mobile also fires the browser context menu —
@@ -932,7 +980,7 @@ export function MobileThread({
             <ImagePlus size={22} aria-hidden="true" />
           </button>
           {gifEnabled && (
-            <div className={c.gifWrap}>
+            <div className={c.gifWrap} data-gif-anchor="">
               <button
                 type="button"
                 onClick={() => setGifOpen((open) => !open)}

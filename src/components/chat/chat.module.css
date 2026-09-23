@@ -1244,6 +1244,24 @@
   padding: var(--s2);
 }
 
+/* Phone thread: cap the picker to the room above the composer (--gif-max, set
+   by MobileThread) so the search box stays on screen with the keyboard up. */
+.thread .gif {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--gif-max, none);
+}
+
+.thread .gifSearch,
+.thread .gifFoot {
+  flex: none;
+}
+
+.thread .gifBody {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .gifGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1836,6 +1854,15 @@ button.person {
   font-size: var(--t-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sheetConfirm {
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s1);
+  color: var(--c-text);
+  font-size: var(--t-body);
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .sheetList {
