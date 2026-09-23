@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { auth } from '@/lib/firebase/config';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 
@@ -29,17 +29,26 @@ export function useLeaderboard() {
   const [recent, setRecent] = useState<RecentSale[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only the newest request may land: a slow answer for the old period (or a
+  // resume refresh overtaken by a filter tap) must not replace the new board.
+  const latest = useRef(0);
 
+  /**
+   * `quiet` reloads the board in place (the app was reopened): no loading
+   * flag, so no skeleton, and a failure keeps the board on screen.
+   */
   const fetchLeaderboard = useCallback(async (
     period: Period = 'month',
     metric: Metric = 'totalPoints',
     limit: number = 10,
     scope: 'approved' | 'submitted' = 'approved',
-    options: { team?: boolean } = {}
+    options: { team?: boolean; quiet?: boolean } = {}
   ) => {
-    setLoading(true);
-    setError(null);
-
+    const request = ++latest.current;
+    if (!options.quiet) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const params = new URLSearchParams();
       params.append('period', period);
@@ -57,16 +66,20 @@ export function useLeaderboard() {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch leaderboard');
       }
+      if (request !== latest.current) return;
 
       setLeaderboard(data.leaderboard);
       setCurrentUser(data.currentUser ?? null);
       setUnranked(Array.isArray(data.unranked) ? data.unranked : []);
       setRecent(Array.isArray(data.recent) ? data.recent : []);
+      setError(null);
     } catch (err) {
+      if (request !== latest.current) return;
       const message = err instanceof Error ? err.message : 'Failed to fetch leaderboard';
-      setError(message);
+      if (options.quiet) console.error('Quiet leaderboard refresh failed:', message);
+      else setError(message);
     } finally {
-      setLoading(false);
+      if (request === latest.current) setLoading(false);
     }
   }, []);
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import type { DashboardCall, LeaderboardRow } from '@/lib/dashboard/repSummary';
@@ -11,7 +12,9 @@ import type { CompPlanCompanyRates, CompPlanResponse, FiberOrder, Sale } from '@
 // The D dashboard's data, one independent section per source. Every section
 // loads in parallel (Promise.allSettled) and renders as it lands, so a slow or
 // failed source never holds up — or zeroes out — the others. A failed section
-// reports 'error' and can be retried on its own.
+// reports 'error' and can be retried on its own. Reopening the app reloads
+// every section quietly (useRefreshOnResume): the numbers on screen stay put
+// until the new ones land.
 //
 // Always the caller's OWN numbers: sales are fetched with salesRepId = uid for
 // every role (admins and owners included), the comp plan is read for the
@@ -202,9 +205,11 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
             // network failure must surface as "Couldn't load", never spin forever.
             if (controller.signal.aborted) return;
             console.error(`Dashboard section "${key}" failed:`, error);
-            // A quiet refresh keeps what is on screen rather than trading it for an error.
-            if (quiet) return;
-            setState((current) => ({ ...current, [key]: { status: 'error' } }));
+            // A quiet refresh keeps what is on screen rather than trading it for
+            // an error; a section with nothing loaded yet still gets its error.
+            setState((current) =>
+              quiet && current[key]?.status === 'ready' ? current : { ...current, [key]: { status: 'error' } }
+            );
           }
         })
       );
@@ -241,6 +246,10 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
     },
     [run]
   );
+
+  /** Reopened after a while: reload every section without leaving the screen. */
+  const refresh = useCallback(() => void run(undefined, { quiet: true }), [run]);
+  useRefreshOnResume(refresh, { enabled: !!uid });
 
   return { ...state, retry, installDateSaved };
 }
