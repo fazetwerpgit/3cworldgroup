@@ -156,6 +156,8 @@ export interface MoneyComparison {
   current: MoneyFigures;
   /** The prior period to the same elapsed point. */
   prior: MoneyFigures;
+  /** Where that prior cut ends (ISO), e.g. Aug 22 noon when today is Sep 22 noon. */
+  priorEnd: string;
 }
 
 export interface MoneySummary {
@@ -233,14 +235,18 @@ export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): 
     (install) => inWindow(install.installDate, weekNow) || inWindow(install.installDate, monthNow)
   );
 
+  const weekPrior = sameElapsed(thisWeek, lastWeek, now);
+  const monthPrior = sameElapsed(thisMonth, lastMonth, now);
   return {
     week: {
       current: figuresIn(inScope, weekNow),
-      prior: figuresIn(inScope, sameElapsed(thisWeek, lastWeek, now)),
+      prior: figuresIn(inScope, weekPrior),
+      priorEnd: weekPrior.end.toISOString(),
     },
     month: {
       current: figuresIn(inScope, monthNow),
-      prior: figuresIn(inScope, sameElapsed(thisMonth, lastMonth, now)),
+      prior: figuresIn(inScope, monthPrior),
+      priorEnd: monthPrior.end.toISOString(),
     },
     unpricedInstalls: current.filter((install) => install.revenue === 0).length,
     unratedInstalls: current.filter((install) => !install.hasRepPlan || install.commission === 0).length,
