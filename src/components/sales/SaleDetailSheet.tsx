@@ -22,7 +22,8 @@ import { useSales } from '@/hooks/useSales';
 import { useSheetExit } from '@/hooks/useSheetExit';
 import { isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
 import { isPayableSale } from '@/lib/pay/expectedPay';
-import { missedReasonLabel, rowStatus } from '@/lib/dashboard/repSummary';
+import { rowStatus } from '@/lib/dashboard/repSummary';
+import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import { firstRescheduleDay, missedInstallDay, rescheduleDayError } from '@/lib/sales/rescheduleDay';
 import { dateToSaleDateInput, installDayKey, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
@@ -220,7 +221,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
   const lineSale = { ...sale, installDate: shownInstallDate ?? undefined };
   const lineStatus = rowStatus(lineSale, fiberOrder ?? undefined, new Date());
   // The carrier's reason for the miss, beside the status line that says it.
-  const missedReason = fiberOrder?.status === 'breakage' ? missedReasonLabel(fiberOrder.breakageReason) : null;
+  const missedReason = fiberOrder?.status === 'breakage' ? carrierReasonLabel(fiberOrder.breakageReason) : null;
   const shownPay = estPay !== undefined
     ? estPay
     : !isPayableSale(sale) || isCarrierCancelled(fiberOrder) || typeof sale.commission !== 'number'

@@ -1,4 +1,5 @@
 import type { CallDay, CompPlanCompanyRates, FiberOrder, Sale } from '@/types';
+import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
 import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import {
@@ -181,39 +182,12 @@ export interface NeedsDateRow {
   missedNote: string | null;
 }
 
-/**
- * The carrier's breakage reason in plain words. The report stores it as
- * 'TMO_REASON — REASON_CODE' ('CX Missed — Customer Not Home'), either half
- * possibly blank; the code is the specific one, so it wins. Sentence case,
- * keeping acronyms: 'Customer not home', 'CX missed'. A reason in all caps has
- * no acronyms to keep ('CUSTOMER NOT HOME' → 'Customer not home'). Null when
- * there is none. Same rule as the carrier push's carrierReasonLabel.
- */
-export function missedReasonLabel(reason: string | null | undefined): string | null {
-  const halves = (reason ?? '')
-    .split('—')
-    .map((half) => half.trim())
-    .filter(Boolean);
-  const picked = halves.at(-1);
-  if (!picked) return null;
-  const shouting = picked === picked.toUpperCase();
-  return picked
-    .split(/\s+/)
-    .map((word, i) => {
-      const acronym = !shouting && word.length > 1 && word === word.toUpperCase() && word !== word.toLowerCase();
-      if (acronym) return word;
-      const lower = word.toLowerCase();
-      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
-    })
-    .join(' ');
-}
-
 const NOTE_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 /** "Missed Sep 19 · Customer not home", or null when the carrier gave no reason. */
 function missedNote(sale: Sale, order: FiberOrder | undefined): string | null {
   if (order?.status !== 'breakage') return null;
-  const reason = missedReasonLabel(order.breakageReason);
+  const reason = carrierReasonLabel(order.breakageReason);
   if (!reason) return null;
   const day = missedInstallDay(order.estInstallDate, sale.installDate);
   if (!day) return `Missed · ${reason}`;

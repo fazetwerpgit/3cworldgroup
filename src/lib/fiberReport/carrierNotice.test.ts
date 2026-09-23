@@ -238,6 +238,7 @@ describe('carrierReasonLabel', () => {
     [' — Tech No Show', 'Tech no show'],
     ['CX Missed — Not A Customer', 'Not a customer'],
     ['CX — CUSTOMER NOT HOME', 'Customer not home'],
+    ['CX MISSED — CUSTOMER NOT HOME', 'Customer not home'],
     [' — ', null],
     [null, null],
   ])('%s → %s', (raw, label) => {

@@ -3,7 +3,6 @@ import type { FiberOrder, Sale, SaleProduct } from '@/types';
 import {
   callsToday,
   formatCallTime,
-  missedReasonLabel,
   needsDateRows,
   recentSaleRows,
   shortName,
@@ -250,23 +249,6 @@ describe('needsDateRows', () => {
       [true, null],
       [false, null],
     ]);
-  });
-});
-
-describe('missedReasonLabel', () => {
-  it("prefers the specific code, falls back to the carrier's category, keeps acronyms", () => {
-    expect(missedReasonLabel('CX Missed — Customer Not Home')).toBe('Customer not home');
-    expect(missedReasonLabel('CX Missed — ')).toBe('CX missed');
-    expect(missedReasonLabel(' — Tech No Show')).toBe('Tech no show');
-  });
-
-  it('lowercases a shouted reason instead of treating every word as an acronym', () => {
-    expect(missedReasonLabel('CX MISSED — CUSTOMER NOT HOME')).toBe('Customer not home');
-  });
-
-  it('is null when both halves are blank', () => {
-    expect(missedReasonLabel(' — ')).toBeNull();
-    expect(missedReasonLabel(null)).toBeNull();
   });
 });
 
