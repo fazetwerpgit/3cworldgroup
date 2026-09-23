@@ -225,8 +225,8 @@
 
 .input:focus {
   border-color: var(--c-lime);
-  outline: 1px solid var(--c-lime);
-  outline-offset: -2px;
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
 }
 
 /* iOS draws date inputs centred and short; keep them in line with the rest. */
@@ -374,8 +374,24 @@
 }
 
 .chip:has(input:focus-visible) {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
+  z-index: 1;
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
+}
+
+/* Every button on the page: the same crisp 2px ring, never a glow. */
+.submit:focus-visible,
+.scanSkip:focus-visible,
+.draftStartOver:focus-visible,
+.dupeNew:focus-visible,
+.dupe :global(a):focus-visible,
+.dupe button:focus-visible,
+.estRetry:focus-visible,
+.thumbView:focus-visible,
+.thumbRetry:focus-visible,
+.thumbRemove:focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
 }
 
 /* ---------- Xfinity extras ---------- */
