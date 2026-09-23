@@ -161,6 +161,16 @@
   outline: none;
 }
 
+/* Focus: a crisp 2px lime outline off the edge (never a blurred shadow). */
+.input:focus-visible,
+.search input:focus-visible,
+.select:focus-visible,
+.segBtn:focus-visible,
+:is(.btn, .btnLime, .btnGhost, .btnDanger):focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
+}
+
 .selectWrap {
   position: relative;
   display: block;

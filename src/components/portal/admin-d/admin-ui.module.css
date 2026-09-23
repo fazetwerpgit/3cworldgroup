@@ -411,8 +411,8 @@
 }
 
 .segmented > button:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
 }
 
 /* ---------- fields ---------- */
@@ -472,9 +472,17 @@
   color: var(--c-text-3);
 }
 
+/* Focus: a crisp 2px lime outline off the edge (never a blurred shadow). */
 .input:focus {
   border-color: var(--c-lime);
   outline: none;
+}
+
+.input:focus-visible,
+.chip:focus-visible,
+:is(.sm, .primarySm, .danger, .quiet, .noticeClose, .back):focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
 }
 
 /* A <select> always matches :read-only; only real read-only fields step back. */
