@@ -49,6 +49,14 @@
    hidden while a thread is open). Scoped to phones: the phone view is hidden on
    desktop but can stay mounted there after a resize. */
 @media (max-width: 1023px) {
+  /* An iOS 26 install leaves a strip under the viewport (--pwa-bottom-gap,
+     see PwaBottomGap; 0 everywhere else and with the keyboard up): the shell
+     reaches down over it so the composer sits on the screen edge. The body's
+     overflow: hidden goes to the viewport, so nothing clips the extra strip. */
+  :global([data-shell='rep']):has(.thread) {
+    height: calc(100dvh + var(--pwa-bottom-gap, 0px));
+  }
+
   :global(#rep-main):has(.thread) {
     display: flex;
     flex-direction: column;

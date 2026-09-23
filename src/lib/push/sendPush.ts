@@ -8,6 +8,13 @@ export interface PushPayload {
   url?: string; // deep link opened on notification click
 }
 
+export interface PushResult {
+  /** Devices FCM accepted the message for. */
+  delivered: number;
+  /** Devices it did not (dead tokens included). */
+  failed: number;
+}
+
 // Sends a web push to every device token registered on a user. Best-effort: never
 // throws into the caller's request flow (mirrors notifySubmission). Prunes tokens
 // FCM reports as invalid so the user's token list stays clean.
@@ -19,8 +26,18 @@ export async function sendPushToUser(uid: string, payload: PushPayload): Promise
   try {
     const snap = await adminDb.collection('users').doc(uid).get();
     const tokens: string[] = (snap.data()?.pushTokens as string[] | undefined) ?? [];
-    if (tokens.length === 0) return;
+    await sendPushToTokens(uid, tokens, payload);
+  } catch (err) {
+    console.error('Failed to send push to user', uid, err);
+  }
+}
 
+// The send itself, for callers that already hold the user's tokens (the
+// announcement fan-out reads every user in one query). Same data-only message
+// and dead-token cleanup as sendPushToUser; never throws, reports counts.
+export async function sendPushToTokens(uid: string, tokens: string[], payload: PushPayload): Promise<PushResult> {
+  if (!app || !adminDb || tokens.length === 0) return { delivered: 0, failed: tokens.length };
+  try {
     const messaging = getMessaging(app);
     const res = await messaging.sendEachForMulticast({
       tokens,
@@ -47,7 +64,10 @@ export async function sendPushToUser(uid: string, payload: PushPayload): Promise
         { merge: true }
       );
     }
+    const delivered = res.responses.filter((r) => r.success).length;
+    return { delivered, failed: tokens.length - delivered };
   } catch (err) {
     console.error('Failed to send push to user', uid, err);
+    return { delivered: 0, failed: tokens.length };
   }
 }

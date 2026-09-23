@@ -8,7 +8,7 @@
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    transform 140ms var(--ease);
+    transform 120ms ease-out;
 }
 
 @media (hover: hover) {
@@ -17,13 +17,10 @@
   }
 }
 
-.row:active {
-  background: var(--c-panel-hi);
-}
-
+/* Press: scale only, no colour flash (the phone table is a list of rows). */
 @media (max-width: 1023px) {
   .row:active {
-    transform: scale(0.985);
+    transform: scale(0.97);
   }
 }
 
