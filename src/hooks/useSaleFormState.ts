@@ -353,7 +353,7 @@ export function useSaleFormState() {
       return null;
     }
     if (options.pendingUploads) {
-      setFormError('A screenshot is still uploading. Submit again once it is done.');
+      setFormError('A screenshot is still uploading. Submit once it is done, or cancel it.');
       return null;
     }
     if (!user) {

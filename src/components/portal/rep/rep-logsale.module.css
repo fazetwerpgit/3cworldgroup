@@ -614,8 +614,8 @@ span.thumbView {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 32px;
-  padding: 0 var(--s2);
+  min-height: var(--tap);
+  padding: 0 var(--s3);
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   background: var(--c-panel);
