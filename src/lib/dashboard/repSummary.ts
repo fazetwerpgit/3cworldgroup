@@ -23,6 +23,7 @@ import {
 } from '@/lib/sales/monthWindow';
 import { datedSales, missedInstallSales, sumExpectedPay, undatedSales } from '@/lib/pay/payGroups';
 import { periodBounds } from '@/lib/leaderboard/periods';
+import { missedInstallDay } from '@/lib/sales/rescheduleDay';
 
 // Everything the rep dashboard shows, derived from the rep's OWN book. Pure, so
 // the dashboard, its tests and any later endpoint agree on one set of numbers.
@@ -176,6 +177,48 @@ export interface NeedsDateRow {
   missed: boolean;
   /** The carrier's missed install day (its breakage row), when it gave one. */
   missedDay: string | null;
+  /** "Missed Sep 19 · Customer not home": a missed install the carrier gave a reason for, else null. */
+  missedNote: string | null;
+}
+
+/**
+ * The carrier's breakage reason in plain words. The report stores it as
+ * 'TMO_REASON — REASON_CODE' ('CX Missed — Customer Not Home'), either half
+ * possibly blank; the code is the specific one, so it wins. Sentence case,
+ * keeping acronyms: 'Customer not home', 'CX missed'. A reason in all caps has
+ * no acronyms to keep ('CUSTOMER NOT HOME' → 'Customer not home'). Null when
+ * there is none. Same rule as the carrier push's carrierReasonLabel.
+ */
+export function missedReasonLabel(reason: string | null | undefined): string | null {
+  const halves = (reason ?? '')
+    .split('—')
+    .map((half) => half.trim())
+    .filter(Boolean);
+  const picked = halves.at(-1);
+  if (!picked) return null;
+  const shouting = picked === picked.toUpperCase();
+  return picked
+    .split(/\s+/)
+    .map((word, i) => {
+      const acronym = !shouting && word.length > 1 && word === word.toUpperCase() && word !== word.toLowerCase();
+      if (acronym) return word;
+      const lower = word.toLowerCase();
+      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+    })
+    .join(' ');
+}
+
+const NOTE_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+/** "Missed Sep 19 · Customer not home", or null when the carrier gave no reason. */
+function missedNote(sale: Sale, order: FiberOrder | undefined): string | null {
+  if (order?.status !== 'breakage') return null;
+  const reason = missedReasonLabel(order.breakageReason);
+  if (!reason) return null;
+  const day = missedInstallDay(order.estInstallDate, sale.installDate);
+  if (!day) return `Missed · ${reason}`;
+  const [year, month, date] = day.split('-').map(Number);
+  return `Missed ${NOTE_DAY.format(new Date(Date.UTC(year, month - 1, date)))} · ${reason}`;
 }
 
 /** Counted sales that still need an install date on the calendar, newest first. */
@@ -184,12 +227,14 @@ export function needsDateRows(sales: Sale[], fiberBySale: FiberMap, now: Date = 
     .filter((sale) => installBucketForSale(sale, orderFor(sale, fiberBySale), now) === 'attention')
     .map((sale) => {
       const order = orderFor(sale, fiberBySale);
+      const missed = !!sale.installDate;
       return {
         id: sale.id || '',
         customer: sale.customerName || 'Customer',
         plan: planLabel(sale),
-        missed: !!sale.installDate,
+        missed,
         missedDay: order?.status === 'breakage' ? order.estInstallDate ?? null : null,
+        missedNote: missed ? missedNote(sale, order) : null,
       };
     });
 }

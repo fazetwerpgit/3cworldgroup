@@ -3,6 +3,7 @@ import type { FiberOrder, Sale, SaleProduct } from '@/types';
 import {
   callsToday,
   formatCallTime,
+  missedReasonLabel,
   needsDateRows,
   recentSaleRows,
   shortName,
@@ -224,6 +225,48 @@ describe('needsDateRows', () => {
     ]);
     const rows = needsDateRows([sale(), missed], fiber, NOW);
     expect(rows.map((r) => r.missedDay)).toEqual([null, '2026-09-14']);
+  });
+
+  it("puts the carrier's reason on a missed install's row, dated by the carrier's day", () => {
+    const byCarrierDay = sale({ installDate: d(2026, 9, 12) });
+    const bySaleDay = sale({ installDate: d(2026, 9, 12) });
+    const fiber = new Map<string, FiberOrder>([
+      [byCarrierDay.id!, { status: 'breakage', estInstallDate: '2026-09-19', breakageReason: 'CX Missed — Customer Not Home' } as FiberOrder],
+      [bySaleDay.id!, { status: 'breakage', estInstallDate: null, breakageReason: ' — Tech No Show' } as FiberOrder],
+    ]);
+    const rows = needsDateRows([byCarrierDay, bySaleDay], fiber, NOW);
+    expect(rows.map((r) => r.missedNote)).toEqual(['Missed Sep 19 · Customer not home', 'Missed Sep 12 · Tech no show']);
+  });
+
+  it('adds no note without a reason, or when the sale never had a date', () => {
+    const noReason = sale({ installDate: d(2026, 9, 12) });
+    const undated = sale();
+    const fiber = new Map<string, FiberOrder>([
+      [noReason.id!, { status: 'breakage', estInstallDate: '2026-09-12', breakageReason: null } as FiberOrder],
+      [undated.id!, { status: 'breakage', estInstallDate: '2026-09-12', breakageReason: 'CX Missed — Customer Not Home' } as FiberOrder],
+    ]);
+    const rows = needsDateRows([noReason, undated], fiber, NOW);
+    expect(rows.map((r) => [r.missed, r.missedNote])).toEqual([
+      [true, null],
+      [false, null],
+    ]);
+  });
+});
+
+describe('missedReasonLabel', () => {
+  it("prefers the specific code, falls back to the carrier's category, keeps acronyms", () => {
+    expect(missedReasonLabel('CX Missed — Customer Not Home')).toBe('Customer not home');
+    expect(missedReasonLabel('CX Missed — ')).toBe('CX missed');
+    expect(missedReasonLabel(' — Tech No Show')).toBe('Tech no show');
+  });
+
+  it('lowercases a shouted reason instead of treating every word as an acronym', () => {
+    expect(missedReasonLabel('CX MISSED — CUSTOMER NOT HOME')).toBe('Customer not home');
+  });
+
+  it('is null when both halves are blank', () => {
+    expect(missedReasonLabel(' — ')).toBeNull();
+    expect(missedReasonLabel(null)).toBeNull();
   });
 });
 
