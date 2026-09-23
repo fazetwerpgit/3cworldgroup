@@ -342,6 +342,13 @@
         "xfinity-wireless-standard": 0
       }
     },
+    "operations": {
+      "tfiber": {
+        "tfiber-1gig": 280,
+        "tfiber-2gig": 302,
+        "tfiber-300": 100
+      }
+    },
     "regional_manager": {
       "att": {
         "att-1gig": 350,

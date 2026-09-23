@@ -51,8 +51,15 @@ describe('resolveCompRole', () => {
     expect(resolveCompRole(undefined, 'owner')).toBe('internal_rep');
   });
 
-  it('gives operations no comp role of its own', () => {
-    expect(resolveCompRole(undefined, 'operations')).toBeNull();
+  // TEMPORARY (Jacob 2026-09-23): operations sells T-Fiber only for now (Braeden).
+  it('pays operations on its own table', () => {
+    // Braeden: role operations, no field role.
+    expect(resolveCompRole(undefined, 'operations')).toBe('operations');
+  });
+
+  it('never hands the operations table to a field role', () => {
+    expect(resolveCompRole('operations')).toBeNull();
+    expect(resolveCompRole('operations', 'admin')).toBe('internal_rep');
   });
 
   it('prefers a field role over the platform fallback', () => {
@@ -65,6 +72,15 @@ describe('rateFor', () => {
   it('reads a real rate out of the generated plan', () => {
     expect(rateFor(COMP_PLAN_RATES, 'ae_tier_1', 'att', 'att-1gig')).toBe(150);
     expect(rateFor(COMP_PLAN_RATES, 'ae_tier_2', 'att', 'att-1gig')).toBe(200);
+  });
+
+  it('pays operations 280 / 302 / 100 on T-Fiber and nothing else', () => {
+    expect(rateFor(COMP_PLAN_RATES, 'operations', 'tfiber', 'tfiber-1gig')).toBe(280);
+    expect(rateFor(COMP_PLAN_RATES, 'operations', 'tfiber', 'tfiber-2gig')).toBe(302);
+    expect(rateFor(COMP_PLAN_RATES, 'operations', 'tfiber', 'tfiber-300')).toBe(100);
+    expect(rateFor(COMP_PLAN_RATES, 'operations', 'tfiber', 'tfiber-500')).toBe(0);
+    expect(rateFor(COMP_PLAN_RATES, 'operations', 'att', 'att-1gig')).toBe(0);
+    expect(rateFor(COMP_PLAN_RATES, 'operations', 'xfinity', 'xfinity-1gig')).toBe(0);
   });
 
   it('returns 0 for an unknown role, company or plan', () => {
