@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactK
 import Link from 'next/link';
 import { Check, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
-import type { FiberOrderStatus } from '@/types/fiberOrder';
 import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,13 +13,14 @@ import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow'
 import { groupPaySales, type PayGroup } from '@/lib/pay/payGroups';
 import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
-import { countedSales, isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
+import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
-import { FiberRows, FiberStatusPill, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
+import { InstallStatusLine } from './InstallStatusLine';
+import { FiberRows, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 
 // A rep's own ledger. Management no longer renders this at all — they get
@@ -93,40 +93,6 @@ function DateStamp({ value, label }: { value: Date | string | null | undefined; 
     </span>
   );
 }
-
-const STATUS_CLASS: Record<RowStatus, string> = {
-  installed: x.st_installed,
-  scheduled: x.st_scheduled,
-  'needs-date': x.st_needsdate,
-  missed: x.st_missed,
-  cancelled: x.st_cancelled,
-};
-
-/** The dashboard's status line, so a sale reads the same on both pages. */
-function statusLine(status: RowStatus, installDate: Date | string | null | undefined) {
-  switch (status) {
-    case 'installed':
-      return installDate ? `Installed ${formatDate(installDate)}` : 'Installed';
-    case 'scheduled':
-      return installDate ? `Installs ${formatDate(installDate)}` : 'Scheduled';
-    case 'needs-date':
-      return 'Needs install date';
-    case 'missed':
-      return 'Missed install · reschedule';
-    case 'cancelled':
-      return 'Cancelled';
-  }
-}
-
-/** Carrier statuses the status line already says; the pill only shows when it adds something. */
-const LINE_SAYS: Record<FiberOrderStatus, RowStatus[]> = {
-  active: ['installed'],
-  pending_install: ['scheduled', 'needs-date'],
-  pre_sale: ['scheduled', 'needs-date'],
-  cancelled: ['cancelled'],
-  churned: [],
-  breakage: ['missed'],
-};
 
 /** Every dollar here is an estimate, and says so. */
 function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan: boolean }) {
@@ -350,18 +316,7 @@ export function SalesTable({
     const status = statusBySale[sale.id || ''] ?? 'needs-date';
     return (
       <span className={x.statusStack}>
-        <span className={`${x.status} ${STATUS_CLASS[status]}`}>
-          <span className={x.dot} aria-hidden="true" />
-          {statusLine(status, sale.installDate)}
-        </span>
-        {/* A breakage the sale was rescheduled past is history, not a flag. */}
-        {order &&
-          !LINE_SAYS[order.status].includes(status) &&
-          !(order.status === 'breakage' && !isStandingBreakage(sale, order)) && (
-            <span className={x.carrierSays}>
-              <FiberStatusPill status={order.status} />
-            </span>
-          )}
+        <InstallStatusLine sale={sale} order={order} status={status} />
         {(sale.status === 'pending' || sale.status === 'rejected') && (
           <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
         )}
@@ -617,6 +572,7 @@ export function SalesTable({
         onSaleUpdated={onSaleUpdated}
         payout={selectedSale ? payoutBySale[selectedSale.id || ''] ?? null : null}
         fiberOrder={selectedSale ? fiberBySale.get(selectedSale.id || '') ?? null : null}
+        estPay={selectedSale && hasPlan ? expectedBySale[selectedSale.id || ''] ?? null : null}
       />
 
       <SalesDialog

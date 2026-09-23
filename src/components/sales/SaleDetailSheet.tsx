@@ -15,11 +15,13 @@ import {
   Ban,
   X,
 } from 'lucide-react';
-import { Sale, SaleStatusConfig, type FiberOrder } from '@/types';
+import { Sale, FIBER_COMPANIES, SaleStatusConfig, type FiberOrder } from '@/types';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
-import { isStandingBreakage } from '@/lib/sales/installBucket';
+import { isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
+import { isPayableSale } from '@/lib/pay/expectedPay';
+import { rowStatus } from '@/lib/dashboard/repSummary';
 import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import { firstRescheduleDay, missedInstallDay, rescheduleDayError } from '@/lib/sales/rescheduleDay';
 import { dateToSaleDateInput, installDayKey, parseInstallDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
@@ -28,7 +30,7 @@ import { saveInstallDate as saveOwnInstallDate } from '@/lib/sales/saveInstallDa
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
-import { FiberStatusPill } from './InstallStatusSection';
+import { InstallStatusLine } from './InstallStatusLine';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 
@@ -60,6 +62,16 @@ interface SaleDetailSheetProps {
    * as on Home's reschedule sheet; anything earlier would still count as missed.
    */
   fiberOrder?: FiberOrder | null;
+  /**
+   * The row's est. pay for this sale (null: none, 0: rate pending). When left
+   * out, the sale's stored commission shows, unless the sale is cancelled.
+   */
+  estPay?: number | null;
+}
+
+/** A legacy free-text carrier has no mark; show its name rather than nothing. */
+function carrierName(company: string) {
+  return carrierMark(company) || FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
 }
 
 const INSTALL_DATE_ERROR = 'Could not save the install date. Try again.';
@@ -107,6 +119,7 @@ export function SaleDetailSheet({
   onSaleUpdated,
   payout = null,
   fiberOrder = null,
+  estPay,
 }: SaleDetailSheetProps) {
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
@@ -196,6 +209,14 @@ export function SaleDetailSheet({
   const missed = isStandingBreakage({ installDate: shownInstallDate ?? undefined }, fiberOrder);
   const brokeDay = missed ? missedInstallDay(fiberOrder?.estInstallDate, shownInstallDate) : '';
   const firstDay = missed ? firstRescheduleDay(brokeDay, installDayKey(sale.saleDate) ?? '') : '';
+  // The same status line and est. pay the row behind the sheet shows.
+  const lineSale = { ...sale, installDate: shownInstallDate ?? undefined };
+  const lineStatus = rowStatus(lineSale, fiberOrder ?? undefined, new Date());
+  const shownPay = estPay !== undefined
+    ? estPay
+    : !isPayableSale(sale) || isCarrierCancelled(fiberOrder) || typeof sale.commission !== 'number'
+      ? null
+      : sale.commission;
 
   const startEditingInstall = () => {
     setInstallError(null);
@@ -313,7 +334,7 @@ export function SaleDetailSheet({
             <div>
               <span className={s.kicker}>Est. pay</span>
               <span className={x.dMoneyNum}>
-                {typeof sale.commission === 'number' ? <><span className={x.amtEst}>est.</span>{formatMoney(sale.commission)}</> : '—'}
+                {shownPay === null ? '—' : shownPay === 0 ? <span className={x.amtQuiet}>Rate pending</span> : <><span className={x.amtEst}>est.</span>{formatMoney(shownPay)}</>}
               </span>
             </div>
             <dl className={x.dSummary}>
@@ -380,19 +401,18 @@ export function SaleDetailSheet({
             <div>
               {sale.products?.map((product, productIndex) => (
                 <div className={x.dPlan} key={`${product.productId}-${productIndex}`}>
-                  {carrierMark(product.company) ? <span className={x.carrierMark}>{carrierMark(product.company)}</span> : null}
+                  {carrierName(product.company) ? <span className={x.carrierMark}>{carrierName(product.company)}</span> : null}
                   <strong>{planWithoutCarrier(product.productName, product.company)}</strong>
                   <b>{formatMoney(product.totalPrice || product.unitPrice)}/mo</b>
                   <em>{product.points} pts</em>
                 </div>
               ))}
             </div>
-            {fiberOrder ? (
+            {sale.status !== 'cancelled' && (
               <p className={x.dCarrier}>
-                <span>Carrier report</span>
-                <FiberStatusPill status={fiberOrder.status} />
+                <InstallStatusLine sale={lineSale} order={fiberOrder} status={lineStatus} />
               </p>
-            ) : null}
+            )}
           </section>
 
           <section className={x.dBlock} aria-label="Customer">
