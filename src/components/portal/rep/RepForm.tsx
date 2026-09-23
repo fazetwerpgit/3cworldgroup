@@ -23,9 +23,10 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
+import { PdfPages } from '@/components/esign/PdfPages';
 import { friendlyError } from '@/lib/forms/friendlyError';
 import { isEmailShaped } from '@/lib/forms/managerInterview';
-import { attachReducer, uploadFailure } from './attachmentState';
+import { attachReducer, fileView, uploadFailure, type FileView } from './attachmentState';
 import { BodyLayer } from './BodyLayer';
 import { useHideRepTabBar } from './RepShell';
 import s from './rep.module.css';
@@ -524,8 +525,8 @@ function Meter({ done, total }: { done: number; total: number }) {
  * shrink, POST) and resolves to the storage folder path; it gets a signal that
  * Cancel (or leaving the page) aborts. While a file uploads the tile shows
  * Cancel; a timeout or lost signal leaves Retry for the same file. "View" shows
- * an attached photo in an in-page viewer (a new tab opens blank in the iPhone
- * home-screen app). `preview={false}` shows neither a thumbnail nor View, for
+ * an attached photo or PDF in an in-page viewer (a new tab opens blank in the
+ * iPhone home-screen app, so a PDF is drawn page by page like the e-sign one). `preview={false}` shows neither a thumbnail nor View, for
  * sensitive documents (license, W-9).
  */
 export function Attachment({
@@ -557,7 +558,7 @@ export function Attachment({
 }) {
   const [state, dispatch] = useReducer(
     attachReducer,
-    initialDone ? { kind: 'done', name: 'File on record', localUrl: null, isImage: false } : { kind: 'idle' }
+    initialDone ? { kind: 'done', name: 'File on record', localUrl: null, view: null } : { kind: 'idle' }
   );
   const urlRef = useRef<string | null>(null);
   const [viewing, setViewing] = useState(false);
@@ -604,7 +605,7 @@ export function Attachment({
       // Sensitive slots never get a local copy, so there is nothing to view.
       const localUrl = preview ? URL.createObjectURL(file) : null;
       urlRef.current = localUrl;
-      dispatch({ type: 'done', run, name: file.name, localUrl, isImage: file.type.startsWith('image/') });
+      dispatch({ type: 'done', run, name: file.name, localUrl, view: fileView(file) });
       onUploaded(path);
     } catch (err) {
       const failure = uploadFailure(err);
@@ -650,7 +651,7 @@ export function Attachment({
       </label>
       {state.kind === 'done' ? (
         <div className={f.fileRow}>
-          {preview && state.isImage && state.localUrl ? (
+          {preview && state.view === 'image' && state.localUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={state.localUrl} alt="" className={f.fileThumb} />
           ) : (
@@ -666,7 +667,7 @@ export function Attachment({
             </span>
           </span>
           <span className={f.fileActions}>
-            {state.localUrl && state.isImage ? (
+            {state.localUrl && state.view ? (
               <button ref={viewRef} type="button" className={f.fileBtn} onClick={() => setViewing(true)}>
                 View
               </button>
@@ -726,9 +727,10 @@ export function Attachment({
         </label>
       )}
       <FieldNote id={id} error={shownError} hint={hint} />
-      {viewing && state.kind === 'done' && state.localUrl ? (
-        <PhotoViewer
+      {viewing && state.kind === 'done' && state.localUrl && state.view ? (
+        <FileViewer
           src={state.localUrl}
+          view={state.view}
           name={state.name}
           onClose={() => {
             setViewing(false);
@@ -740,8 +742,18 @@ export function Attachment({
   );
 }
 
-/** A full-screen look at an attached photo, portaled to <body>. */
-function PhotoViewer({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+/** A full-screen look at an attached photo or PDF, portaled to <body>. */
+function FileViewer({
+  src,
+  view,
+  name,
+  onClose,
+}: {
+  src: string;
+  view: Exclude<FileView, null>;
+  name: string;
+  onClose: () => void;
+}) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -774,8 +786,14 @@ function PhotoViewer({ src, name, onClose }: { src: string; name: string; onClos
         >
           <X size={22} aria-hidden="true" />
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={name} className={f.viewerImg} />
+        {view === 'pdf' ? (
+          <div className={f.viewerDoc}>
+            <PdfPages src={src} />
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={name} className={f.viewerImg} />
+        )}
       </div>
     </BodyLayer>
   );

@@ -6,6 +6,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./RepShell', () => ({ useHideRepTabBar: () => {} }));
+vi.mock('@/components/esign/PdfPages', () => ({
+  PdfPages: ({ src }: { src: string }) => <div data-pdf-pages={src} />,
+}));
 
 import { Attachment } from './RepForm';
 import { FormUploadError } from '@/lib/forms/uploadFormAttachment';
@@ -98,5 +101,16 @@ describe('Attachment upload cancel and retry', () => {
     act(() => root.render(<p />));
     expect(seen!.aborted).toBe(true);
     expect(busy).toHaveBeenLastCalledWith(false);
+  });
+
+  it('a PDF gets View too, drawn in the page rather than a blob tab', async () => {
+    await render(async () => 'forms/proof');
+    await choose(new File(['%PDF'], 'stub.pdf', { type: 'application/pdf' }));
+    expect(container.textContent).toContain('Attached');
+
+    await act(async () => button('View')!.click());
+
+    expect(document.body.querySelector('[role=dialog] [data-pdf-pages="blob:x"]')).not.toBeNull();
+    expect(document.body.querySelector('[role=dialog] img')).toBeNull();
   });
 });

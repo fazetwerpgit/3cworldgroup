@@ -116,8 +116,9 @@ export function useNotifications() {
     }
   }, [user]);
 
-  const clearAll = useCallback(async () => {
-    if (!user) return;
+  /** Resolves false when nothing was cleared, so the caller can say so. */
+  const clearAll = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
 
     try {
       const response = await fetch('/api/portal/notifications', {
@@ -129,10 +130,12 @@ export function useNotifications() {
       if (response.ok) {
         setNotifications([]);
         setUnreadCount(0);
+        return true;
       }
     } catch (error) {
       console.error('Error clearing notifications:', error);
     }
+    return false;
   }, [user]);
 
   // Fetch notifications on mount and periodically

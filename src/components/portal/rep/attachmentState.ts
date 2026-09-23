@@ -5,7 +5,10 @@ import { FormUploadError, isUploadCancelled } from '@/lib/forms/uploadFormAttach
 // run that was cancelled or replaced is ignored, so a late answer from a
 // stalled request can never overwrite what the rep did since.
 
-export type AttachDone = { kind: 'done'; name: string; localUrl: string | null; isImage: boolean };
+/** How an attached file can be shown in the page: a photo, a PDF, or not at all. */
+export type FileView = 'image' | 'pdf' | null;
+
+export type AttachDone = { kind: 'done'; name: string; localUrl: string | null; view: FileView };
 
 export type AttachState =
   | { kind: 'idle' }
@@ -17,9 +20,15 @@ export type AttachState =
 
 export type AttachAction =
   | { type: 'start'; run: number; name: string }
-  | { type: 'done'; run: number; name: string; localUrl: string | null; isImage: boolean }
+  | { type: 'done'; run: number; name: string; localUrl: string | null; view: FileView }
   | { type: 'fail'; run: number; message: string; retry: boolean }
   | { type: 'cancel' };
+
+export function fileView(file: Pick<File, 'type' | 'name'>): FileView {
+  if (file.type.startsWith('image/')) return 'image';
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) return 'pdf';
+  return null;
+}
 
 export function attachReducer(state: AttachState, action: AttachAction): AttachState {
   switch (action.type) {
@@ -29,7 +38,7 @@ export function attachReducer(state: AttachState, action: AttachAction): AttachS
     }
     case 'done':
       if (state.kind !== 'uploading' || state.run !== action.run) return state;
-      return { kind: 'done', name: action.name, localUrl: action.localUrl, isImage: action.isImage };
+      return { kind: 'done', name: action.name, localUrl: action.localUrl, view: action.view };
     case 'fail':
       if (state.kind !== 'uploading' || state.run !== action.run) return state;
       return { kind: 'error', message: action.message, retry: action.retry, name: state.name };

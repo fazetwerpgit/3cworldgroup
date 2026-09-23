@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Loader2, Search, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { latestRequest } from '@/lib/fetch/latestRequest';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   AdminAvatar,
@@ -107,21 +108,28 @@ export default function PipelinePage() {
     void fetchPipeline();
   };
 
+  // Answers for a sheet that was closed or reopened for another rep are dropped.
+  const [channelsReq] = useState(latestRequest);
+  const openRepRef = useRef<string | null>(null);
+  useEffect(() => () => channelsReq.cancel(), [channelsReq]);
   const loadChannels = async (rep: PipelineRep) => {
+    const { signal, isCurrent } = channelsReq.start();
     setChannelsLoading(true);
     setChannelsFailed(false);
     try {
       if (!user) return;
       const response = await fetch(`/api/portal/pipeline/channels?userId=${rep.uid}`, {
         headers: await authHeaders(),
+        signal,
       });
       const json = await response.json();
+      if (!isCurrent()) return;
       if (!response.ok) throw new Error(json.error || 'Failed to load channels');
       setChannelRows(json.channels);
     } catch {
-      setChannelsFailed(true);
+      if (isCurrent()) setChannelsFailed(true);
     } finally {
-      setChannelsLoading(false);
+      if (isCurrent()) setChannelsLoading(false);
     }
   };
 
@@ -129,12 +137,16 @@ export default function PipelinePage() {
     setSelectedRep(null);
     setSheetError('');
     setChannelRows([]);
+    openRepRef.current = rep.uid;
     setChannelsModal(rep);
     void loadChannels(rep);
   };
 
   const closeChannels = () => {
+    channelsReq.cancel();
+    openRepRef.current = null;
     setChannelsModal(null);
+    setChannelsLoading(false);
     setChannelRows([]);
     setChannelsFailed(false);
     setSheetError('');
@@ -142,20 +154,23 @@ export default function PipelinePage() {
 
   const setChannelStatus = async (channelId: string, status: ChannelOnboardingStatus) => {
     if (!channelsModal || !user) return;
+    const repUid = channelsModal.uid;
+    // Every rep has the same channel ids: never mark one on another rep's sheet.
+    const stillOpen = () => openRepRef.current === repUid;
     setBusy(true);
     setSheetError('');
     try {
       const response = await fetch('/api/portal/pipeline/channels', {
         method: 'POST',
         headers: await authHeaders(true),
-        body: JSON.stringify({ userId: channelsModal.uid, channelId, status }),
+        body: JSON.stringify({ userId: repUid, channelId, status }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to update channel');
-      setChannelRows((prev) => prev.map((c) => (c.id === channelId ? { ...c, status } : c)));
+      if (stillOpen()) setChannelRows((prev) => prev.map((c) => (c.id === channelId ? { ...c, status } : c)));
       await fetchPipeline();
     } catch (err) {
-      setSheetError(err instanceof Error ? err.message : 'Failed to update channel');
+      if (stillOpen()) setSheetError(err instanceof Error ? err.message : 'Failed to update channel');
     } finally {
       setBusy(false);
     }
