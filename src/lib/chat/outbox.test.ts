@@ -3,7 +3,9 @@ import {
   AUTO_RETRY_MAX_AGE_MS,
   OUTBOX_MAX_AGE_MS,
   RETRY_DELAYS_MS,
+  SendRequestError,
   chatMessageDocId,
+  classifySendError,
   decideAfterFailure,
   isRetryableFailure,
   isValidClientMessageId,
@@ -172,5 +174,24 @@ describe('outbox persistence', () => {
   it('restores rows past the auto-retry age as failed', () => {
     const old = { ...toOutboxEntries([base])[0], createdAt: NOW - AUTO_RETRY_MAX_AGE_MS };
     expect(parseOutbox(JSON.stringify([old]), UID, NOW)[0].failed).toBe(true);
+  });
+});
+
+describe('classifySendError', () => {
+  it('treats fetch rejections, aborts and offline token refreshes as network failures', () => {
+    expect(classifySendError(new TypeError('Failed to fetch'))).toEqual({ kind: 'network' });
+    expect(classifySendError(Object.assign(new Error('aborted'), { name: 'AbortError' }))).toEqual({ kind: 'network' });
+    expect(classifySendError({ code: 'auth/network-request-failed' })).toEqual({ kind: 'network' });
+  });
+
+  it('passes through a classified request error', () => {
+    expect(classifySendError(new SendRequestError('nope', { kind: 'http', status: 403 }))).toEqual({
+      kind: 'http',
+      status: 403,
+    });
+  });
+
+  it('leaves anything else unclassified (permanent)', () => {
+    expect(classifySendError(new Error('That photo could not be read from your phone.'))).toBeNull();
   });
 });

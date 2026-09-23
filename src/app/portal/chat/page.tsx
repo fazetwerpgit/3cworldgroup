@@ -8,11 +8,12 @@ import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
-import { prepareImageForUpload, uploadChatImage, validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { prepareImageForUpload, uploadChatImageWithProgress, validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
+import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { MessageActions } from '@/components/chat/MessageActions';
 import { ChannelRows, MobileChannelList } from '@/components/chat/MobileChannelList';
-import { clockTime, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import c from '@/components/chat/chat.module.css';
 import s from '@/components/portal/rep/rep.module.css';
 import { MobileThread } from '@/components/chat/MobileThread';
@@ -22,8 +23,20 @@ import { ReactionBar } from '@/components/chat/ReactionBar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
+import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
+import {
+  SendRequestError,
+  chatMessageDocId,
+  classifySendError,
+  decideAfterFailure,
+  newClientMessageId,
+  outboxKey,
+  parseOutbox,
+  reconcileEchoes,
+  toOutboxEntries,
+} from '@/lib/chat/outbox';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
@@ -52,6 +65,11 @@ function formatChatLineDayDivider(createdAt: Date | null) {
   if (isSameLocalDay(date, yesterday)) return `Yesterday · ${dateLabel}`;
   return dateLabel;
 }
+
+// A message POST on bad signal can hang for a minute before the browser gives
+// up; abort sooner and let the retry policy take over (the send is idempotent,
+// so an abort after the server stored it can't duplicate it).
+const SEND_TIMEOUT_MS = 20_000;
 
 // Probe the GIF feature at most once per browser session (shared across mounts):
 // the proxy answers { enabled } based on whether a Tenor key is configured. The
@@ -106,6 +124,11 @@ function DesktopAttachment({
         style={aspectStyle}
       />
       {isUploading && <span className={c.uploading} />}
+      {isUploading && typeof message.uploadProgress === 'number' && (
+        <span className={c.progress} aria-hidden="true">
+          <span style={{ transform: `scaleX(${message.uploadProgress})` }} />
+        </span>
+      )}
     </button>
   );
 }
@@ -177,6 +200,7 @@ export default function TeamChatPage() {
     snapshotVersion,
     lastSnapshotWindow,
     renderedChannel,
+    fromCache: messagesFromCache,
   } = useMessages(activeChannelId || null);
 
   // Desktop "load older" trigger: scrolling near the top of the scroller grows
@@ -370,53 +394,28 @@ export default function TeamChatPage() {
   // echoes (in send order). Reconciliation happens HERE, synchronously, so the
   // rendered list can never contain both an echo and its delivered real message
   // in the same frame (an effect would reconcile only after paint → one-frame
-  // duplicate). An echo is reconciled when a real message with the same
-  // (authorId, text) exists — matched one-to-one via a consumed Set so two
-  // identical sends map to two distinct real messages. No time window: a stale
-  // still-"sending" echo must reconcile whenever its message finally shows,
-  // however long that takes. Failed echoes are never matched — they have no
-  // delivered counterpart, so matching them would let a failed send silently
-  // vanish onto an unrelated older message.
+  // duplicate). Matching is by doc id: an echo's id is the id the server derives
+  // from its clientMessageId, so the delivered message takes over the same React
+  // key, identical texts never cross-match, and a "failed" echo whose POST did
+  // land (response lost) still resolves when its message shows up.
+  const deliveredIds = useMemo(() => new Set(messages.map((message) => message.id)), [messages]);
   const threadMessages = useMemo<ThreadMessage[]>(() => {
-    const consumed = new Set<string>();
-    const unreconciled = pendingMessages.filter((echo) => {
-      if (echo.channelId !== activeChannelId) return false;
-      if (echo.pendingState === 'failed') return true;
-      const match = messages.find(
-        (real) => !consumed.has(real.id) && real.authorId === echo.authorId && real.text === echo.text
-      );
-      if (match) {
-        consumed.add(match.id);
-        return false;
-      }
-      return true;
-    });
+    const { unreconciled } = reconcileEchoes(deliveredIds, pendingMessages, activeChannelId);
     return [...messages, ...unreconciled];
-  }, [messages, pendingMessages, activeChannelId]);
+  }, [messages, deliveredIds, pendingMessages, activeChannelId]);
 
   // State hygiene only: drop reconciled echoes from state so pendingMessages
-  // doesn't grow without bound. Render correctness is already guaranteed by the
-  // synchronous filter above; this mirrors it (same no-window, consumed-Set,
-  // failed-excluded rules) for the active channel's echoes.
+  // doesn't grow without bound (and the outbox forgets them). Render
+  // correctness is already guaranteed by the synchronous filter above.
   useEffect(() => {
     setPendingMessages((prev) => {
       if (prev.length === 0) return prev;
-      const consumed = new Set<string>();
-      const next = prev.filter((echo) => {
-        if (echo.channelId !== activeChannelId) return true;
-        if (echo.pendingState === 'failed') return true;
-        const match = messages.find(
-          (real) => !consumed.has(real.id) && real.authorId === echo.authorId && real.text === echo.text
-        );
-        if (match) {
-          consumed.add(match.id);
-          return false;
-        }
-        return true;
-      });
-      return next.length === prev.length ? prev : next;
+      const { reconciledIds } = reconcileEchoes(deliveredIds, prev, activeChannelId);
+      if (reconciledIds.length === 0) return prev;
+      const done = new Set(reconciledIds);
+      return prev.filter((echo) => !done.has(echo.id));
     });
-  }, [messages, activeChannelId]);
+  }, [deliveredIds, activeChannelId]);
 
   // Render list with optimistic edits layered on top of the reconciled thread. The
   // reconcile memo above is left untouched (edits never change the message count, so
@@ -608,6 +607,25 @@ export default function TeamChatPage() {
     return () => URL.revokeObjectURL(attachPreview);
   }, [attachPreview]);
 
+  // A chat push opens /portal/chat?channel=<id>: land in that channel (the
+  // thread screen on phones), then drop the param so a reload or a later
+  // channel switch isn't overridden by it. An id the user can't see falls back
+  // to the first channel via the effect below.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkedChannel = params.get('channel');
+    if (!linkedChannel) return;
+    setActiveChannelId(linkedChannel);
+    setMobileView('thread');
+    params.delete('channel');
+    const rest = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`
+    );
+  }, []);
+
   useEffect(() => {
     if (!activeChannelId && channels.length > 0) {
       setActiveChannelId(channels[0].id);
@@ -687,6 +705,10 @@ export default function TeamChatPage() {
   // <=200px zone and arms a bogus load-older mid-flight.
   const renderedChannelMatches = !loadingMessages && renderedChannel === activeChannelId;
 
+  // "Reconnecting…" / offline chip for both layouts (delayed so a quick resume
+  // never flashes it).
+  const { notice: connectionNotice } = useConnectionNotice(messagesFromCache, renderedChannelMatches);
+
   // Desktop smart auto-scroll (mobile owns its own inside MobileThread). Pure
   // DOM sync (no setState): opening/switching a channel jumps instantly to the
   // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
@@ -716,68 +738,221 @@ export default function TeamChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
-  // POSTs an echo; on failure marks it 'failed' (retry flips it back). On success
-  // the echo stays put until the realtime feed delivers the real message and
-  // reconciliation drops it — no flicker. Attachment echoes take the SAME path as
-  // text: an image echo first uploads its file (result cached on the echo so a
-  // later message-POST retry won't re-upload), a GIF echo already carries its
-  // Tenor attachment, and reconciliation matches on (authorId, text) exactly as
-  // for text messages.
+  // Live mirror of pendingMessages for retry timers and lifecycle listeners,
+  // which must act on the latest echo (cached upload, attempt count) rather than
+  // the copy captured when they were scheduled.
+  const pendingRef = useRef<ThreadMessage[]>([]);
+  useEffect(() => {
+    pendingRef.current = pendingMessages;
+  }, [pendingMessages]);
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const retryTimersRef = useRef<Map<string, number>>(new Map());
+  const clearRetryTimer = useCallback((echoId: string) => {
+    const timer = retryTimersRef.current.get(echoId);
+    if (timer !== undefined) window.clearTimeout(timer);
+    retryTimersRef.current.delete(echoId);
+  }, []);
+  useEffect(() => {
+    const timers = retryTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+  const updateEcho = useCallback((echoId: string, patch: Partial<ThreadMessage>) => {
+    setPendingMessages((prev) => prev.map((p) => (p.id === echoId ? { ...p, ...patch } : p)));
+  }, []);
+  const postMessageRef = useRef<(echo: ThreadMessage) => Promise<void>>(async () => undefined);
+
+  // POSTs an echo. The echo stays "Sending…" through transient failures: it is
+  // retried with backoff while online, or as soon as the connection returns
+  // (see flushOutbox), and only a permanent error or an exhausted/stale retry
+  // run marks it 'failed' ("Not sent · Tap to retry"). The POST carries the
+  // echo's clientMessageId, so no retry can post twice. On success the echo
+  // stays put until the realtime feed delivers the real message and
+  // reconciliation drops it — no flicker. Attachment echoes take the SAME path
+  // as text: an image echo first prepares its photo once (cached so a retry
+  // never re-reads the picked file) and uploads it with progress (the result is
+  // cached so a message-POST retry won't re-upload); a GIF echo already carries
+  // its Tenor attachment.
   const postMessage = useCallback(
     async (echo: ThreadMessage) => {
+      if (inFlightRef.current.has(echo.id)) return;
+      inFlightRef.current.add(echo.id);
+      clearRetryTimer(echo.id);
+      const attempts = (echo.sendAttempts ?? 0) + 1;
       setSending(true);
       setError('');
       try {
         let attachment: ChatAttachment | undefined =
           echo.uploadedAttachment ?? (echo.attachment?.type === 'gif' ? echo.attachment : undefined);
         if (echo.pendingFile && !attachment) {
-          const prepared = await prepareImageForUpload(echo.pendingFile);
-          // Publish prepared dimensions before the (slower) upload so the pending
-          // tile reserves its box immediately and its decode causes no shift.
-          if (prepared.width && prepared.height) {
-            const { width: pw, height: ph } = prepared;
-            setPendingMessages((prev) =>
-              prev.map((p) =>
-                p.id === echo.id ? { ...p, localPreviewWidth: pw, localPreviewHeight: ph } : p
-              )
-            );
+          let prepared = echo.preparedUpload;
+          if (!prepared) {
+            prepared = await prepareImageForUpload(echo.pendingFile);
+            const ready = prepared;
+            // Publish prepared dimensions before the (slower) upload so the pending
+            // tile reserves its box immediately and its decode causes no shift.
+            updateEcho(echo.id, {
+              preparedUpload: ready,
+              ...(ready.width && ready.height ? { localPreviewWidth: ready.width, localPreviewHeight: ready.height } : {}),
+            });
           }
-          attachment = await uploadChatImage(
-            authedFetch,
+          const idToken = (await auth?.currentUser?.getIdToken()) ?? '';
+          let shownStep = -1;
+          attachment = await uploadChatImageWithProgress(
+            idToken,
             echo.channelId,
             prepared.file,
             prepared.width,
-            prepared.height
+            prepared.height,
+            (fraction) => {
+              // Every progress update re-renders the page: step in 5% increments.
+              const step = Math.floor(fraction * 20);
+              if (step === shownStep) return;
+              shownStep = step;
+              updateEcho(echo.id, { uploadProgress: fraction });
+            }
           );
-          const uploaded = attachment;
-          setPendingMessages((prev) =>
-            prev.map((p) => (p.id === echo.id ? { ...p, uploadedAttachment: uploaded } : p))
-          );
+          updateEcho(echo.id, { uploadedAttachment: attachment, uploadProgress: 1 });
         }
-        const response = await authedFetch('/api/portal/chat/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            channelId: echo.channelId,
-            text: echo.text,
-            ...(attachment ? { attachment } : {}),
-            // Reply rides the same send path; the server re-stamps the snippet.
-            ...(echo.replyToMessageId ? { replyToMessageId: echo.replyToMessageId } : {}),
-          }),
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+        let response: Response;
+        try {
+          response = await authedFetch('/api/portal/chat/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              channelId: echo.channelId,
+              text: echo.text,
+              ...(echo.clientMessageId ? { clientMessageId: echo.clientMessageId } : {}),
+              ...(attachment ? { attachment } : {}),
+              // Reply rides the same send path; the server re-stamps the snippet.
+              ...(echo.replyToMessageId ? { replyToMessageId: echo.replyToMessageId } : {}),
+            }),
+          });
+        } finally {
+          window.clearTimeout(timeout);
+        }
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new SendRequestError(json.error || 'Failed to send message', { kind: 'http', status: response.status });
+        }
+        updateEcho(echo.id, {
+          deliveredId: typeof json.messageId === 'string' ? json.messageId : echo.id,
+          sendAttempts: 0,
         });
-        const json = await response.json();
-        if (!response.ok) throw new Error(json.error || 'Failed to send message');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to send message');
-        setPendingMessages((prev) =>
-          prev.map((p) => (p.id === echo.id ? { ...p, pendingState: 'failed' as const } : p))
-        );
+        const failure = classifySendError(err);
+        const windowStart = echo.retryWindowStart ?? echo.createdAt?.getTime() ?? Date.now();
+        const decision = failure
+          ? decideAfterFailure({
+              failure,
+              attempts,
+              ageMs: Date.now() - windowStart,
+              online: navigator.onLine !== false,
+            })
+          : ({ action: 'fail' } as const);
+        if (decision.action === 'fail') {
+          setError(err instanceof Error && err.name !== 'AbortError' ? err.message : 'Failed to send message');
+          updateEcho(echo.id, { pendingState: 'failed', sendAttempts: 0, uploadProgress: undefined });
+        } else {
+          // Still "Sending…": retried on a timer, or by flushOutbox when the
+          // connection comes back.
+          updateEcho(echo.id, { sendAttempts: attempts, uploadProgress: undefined });
+          if (decision.action === 'retry') {
+            const timer = window.setTimeout(() => {
+              retryTimersRef.current.delete(echo.id);
+              const latest = pendingRef.current.find((p) => p.id === echo.id);
+              if (latest?.pendingState === 'sending' && !latest.deliveredId) void postMessageRef.current(latest);
+            }, decision.delayMs);
+            retryTimersRef.current.set(echo.id, timer);
+          }
+        }
       } finally {
+        inFlightRef.current.delete(echo.id);
         setSending(false);
       }
     },
-    [authedFetch]
+    [authedFetch, clearRetryTimer, updateEcho]
   );
+  useEffect(() => {
+    postMessageRef.current = postMessage;
+  }, [postMessage]);
+
+  // Sends every queued echo now (skipping ones in flight or already delivered)
+  // instead of waiting out a backoff timer: on 'online', when the app returns
+  // to the foreground, and after the outbox is restored on load.
+  const flushOutbox = useCallback(() => {
+    if (navigator.onLine === false) return;
+    for (const echo of pendingRef.current) {
+      if (echo.pendingState !== 'sending' || echo.deliveredId || inFlightRef.current.has(echo.id)) continue;
+      void postMessageRef.current(echo);
+    }
+  }, []);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') flushOutbox();
+    };
+    window.addEventListener('online', flushOutbox);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', flushOutbox);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [flushOutbox]);
+
+  // Outbox persistence: unsent echoes survive a reload or the app being killed.
+  // Restored once per signed-in user (during render, so the restored echoes are
+  // in the very first thread paint); rows past the auto-retry age come back as
+  // "Not sent", the rest resume sending. Photos still waiting on their upload
+  // aren't persisted (the picked file can't go in localStorage).
+  const [outboxUid, setOutboxUid] = useState<string | null>(null);
+  if (user?.uid && outboxUid !== user.uid) {
+    setOutboxUid(user.uid);
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(outboxKey(user.uid));
+    } catch {
+      // Storage blocked (private mode): nothing to restore.
+    }
+    const restored: ThreadMessage[] = parseOutbox(raw, user.uid, Date.now()).map((entry) => ({
+      id: entry.id,
+      clientMessageId: entry.clientMessageId,
+      channelId: entry.channelId,
+      text: entry.text,
+      authorId: entry.authorId,
+      authorName: entry.authorName,
+      authorRole: entry.authorRole,
+      createdAt: new Date(entry.createdAt),
+      reactionCounts: {},
+      myReactions: [],
+      attachment: entry.attachment,
+      uploadedAttachment: entry.attachment?.type === 'image' ? entry.attachment : undefined,
+      replyTo: entry.replyTo,
+      replyToMessageId: entry.replyToMessageId,
+      pendingState: entry.failed ? 'failed' : 'sending',
+    }));
+    if (restored.length > 0) {
+      const restoredIds = new Set(restored.map((echo) => echo.id));
+      setPendingMessages((prev) => [...prev.filter((echo) => !restoredIds.has(echo.id)), ...restored]);
+    }
+  }
+  useEffect(() => {
+    if (outboxUid) flushOutbox();
+  }, [outboxUid, flushOutbox]);
+  useEffect(() => {
+    if (!outboxUid || outboxUid !== user?.uid) return;
+    const entries = toOutboxEntries(pendingMessages);
+    try {
+      if (entries.length > 0) window.localStorage.setItem(outboxKey(outboxUid), JSON.stringify(entries));
+      else window.localStorage.removeItem(outboxKey(outboxUid));
+    } catch {
+      // Storage full or blocked: the queue still works for this session.
+    }
+  }, [pendingMessages, outboxUid, user?.uid]);
 
   // A locally-built reply quote for an optimistic echo (author + snippet), mirroring
   // the server's rule: text sliced to 140, or Photo/GIF for an attachment-only source.
@@ -801,16 +976,8 @@ export default function TeamChatPage() {
     // Local echo appears instantly; the composer clears so typing never waits
     // on the network.
     const echo: ThreadMessage = {
-      id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      channelId: activeChannelId,
+      ...makeEchoBase(),
       text: draft.trim(),
-      authorId: user.uid,
-      authorName: user.displayName,
-      authorRole: getEffectiveRole(user) ?? undefined,
-      createdAt: new Date(),
-      reactionCounts: {},
-      myReactions: [],
-      pendingState: 'sending',
       ...stagedReplyFields(),
     };
     setPendingMessages((prev) => [...prev, echo]);
@@ -820,18 +987,24 @@ export default function TeamChatPage() {
     void postMessage(echo);
   };
 
-  // Base fields shared by every optimistic echo this user creates.
-  const makeEchoBase = () => ({
-    id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    channelId: activeChannelId,
-    authorId: user!.uid,
-    authorName: user!.displayName,
-    authorRole: getEffectiveRole(user!) ?? undefined,
-    createdAt: new Date(),
-    reactionCounts: {},
-    myReactions: [],
-    pendingState: 'sending' as const,
-  });
+  // Base fields shared by every optimistic echo this user creates. The echo's id
+  // is the doc id the server will store it under (derived from the fresh
+  // clientMessageId), which is what reconciliation matches on.
+  function makeEchoBase() {
+    const clientMessageId = newClientMessageId();
+    return {
+      id: chatMessageDocId(user!.uid, clientMessageId),
+      clientMessageId,
+      channelId: activeChannelId,
+      authorId: user!.uid,
+      authorName: user!.displayName,
+      authorRole: getEffectiveRole(user!) ?? undefined,
+      createdAt: new Date(),
+      reactionCounts: {},
+      myReactions: [],
+      pendingState: 'sending' as const,
+    };
+  }
 
   // Optimistic image send: shows a local preview immediately, then uploads +
   // posts through postMessage (the same reconcile path as text). `caption` is the
@@ -914,15 +1087,16 @@ export default function TeamChatPage() {
   // every realtime message while the viewer is open.
   const closeLightbox = useCallback(() => setLightbox(null), []);
 
+  // A tap on "Not sent" starts a fresh auto-retry run from now.
   const retryPending = (echo: ThreadMessage) => {
-    setPendingMessages((prev) =>
-      prev.map((p) => (p.id === echo.id ? { ...p, pendingState: 'sending' as const } : p))
-    );
+    const restart = { pendingState: 'sending' as const, sendAttempts: 0, retryWindowStart: Date.now() };
+    updateEcho(echo.id, restart);
     setScrollToBottomSignal((tick) => tick + 1);
-    void postMessage({ ...echo, pendingState: 'sending' });
+    void postMessage({ ...echo, ...restart });
   };
 
   const discardPending = (echoId: string) => {
+    clearRetryTimer(echoId);
     setPendingMessages((prev) => prev.filter((p) => p.id !== echoId));
   };
 
@@ -1115,6 +1289,7 @@ export default function TeamChatPage() {
             </div>
           )}
           <div className={c.stage}>
+            <ConnectionNotice notice={connectionNotice} />
             <div ref={desktopScrollRef} onScroll={handleDesktopScroll} className={c.scroller}>
               {!loadingMessages && threadMessages.length > 0 && hasMoreMessages && (
                 <p className={c.pager}>Earlier messages load as you scroll</p>
@@ -1219,7 +1394,7 @@ export default function TeamChatPage() {
                               </div>
                             ) : (
                               <span className={c.status}>
-                                <Clock size={12} aria-hidden="true" /> Sending…
+                                <Clock size={12} aria-hidden="true" /> {pendingStatusLabel(message)}
                               </span>
                             )
                           ) : (
@@ -1403,6 +1578,7 @@ export default function TeamChatPage() {
             onDelete={deleteMessage}
             onReactionError={setError}
             onRetryPending={retryPending}
+            connectionNotice={connectionNotice}
             onDiscardPending={discardPending}
             onReply={startReply}
             onEdit={startEdit}

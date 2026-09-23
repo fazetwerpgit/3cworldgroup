@@ -31,8 +31,9 @@ export function chatMessageDocId(uid: string, clientMessageId: string): string {
 
 // ── Retry policy ────────────────────────────────────────────────────────────
 
-// Backoff between automatic attempts while the device reports it is online.
-export const RETRY_DELAYS_MS = [1_500, 4_000, 10_000, 25_000, 60_000];
+// Backoff between automatic attempts while the device reports it is online
+// (iOS often reports online on a dead cell connection): ~4 minutes in all.
+export const RETRY_DELAYS_MS = [1_500, 4_000, 10_000, 25_000, 60_000, 120_000];
 // A message stops retrying on its own once it is this old; after that it shows
 // "Not sent · Tap to retry" so nothing stale goes out without the author's say.
 export const AUTO_RETRY_MAX_AGE_MS = 30 * 60 * 1000;
@@ -40,6 +41,31 @@ export const AUTO_RETRY_MAX_AGE_MS = 30 * 60 * 1000;
 export const OUTBOX_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type SendFailure = { kind: 'network' } | { kind: 'http'; status: number };
+
+// A send/upload request that failed in a classifiable way. Anything else thrown
+// on the send path (a photo the phone can't read, a HEIC it can't convert) is
+// permanent and goes straight to "Not sent".
+export class SendRequestError extends Error {
+  constructor(
+    message: string,
+    readonly failure: SendFailure
+  ) {
+    super(message);
+    this.name = 'SendRequestError';
+  }
+}
+
+export function classifySendError(error: unknown): SendFailure | null {
+  if (error instanceof SendRequestError) return error.failure;
+  // fetch() rejects with a TypeError when the request never completes; an
+  // aborted (timed-out) request and Firebase Auth's token refresh failing
+  // offline are the same situation.
+  if (error instanceof TypeError) return { kind: 'network' };
+  const name = (error as { name?: unknown } | null)?.name;
+  if (name === 'AbortError' || name === 'TimeoutError') return { kind: 'network' };
+  if ((error as { code?: unknown } | null)?.code === 'auth/network-request-failed') return { kind: 'network' };
+  return null;
+}
 
 // Retryable: the request never reached us, timed out, or the server/edge was
 // briefly unhappy. Anything else (400 bad reply target, 403, 404…) will fail

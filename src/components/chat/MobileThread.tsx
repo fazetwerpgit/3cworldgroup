@@ -11,7 +11,9 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { clockTime, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
+import type { ConnectionNotice as ConnectionNoticeState } from '@/lib/chat/reconnect';
 import { useHideRepTabBar } from '@/components/portal/rep/RepShell';
 import s from '@/components/portal/rep/rep.module.css';
 import { GROW_STEP, MAX_WINDOW } from '@/hooks/chat/useMessages';
@@ -43,6 +45,17 @@ export type ThreadMessage = ChatMessageView & {
   // Set on optimistic reply echoes so the page's postMessage includes it and the
   // pending bubble can show its quote before the server echo reconciles.
   replyToMessageId?: string;
+  // Send reliability (echoes only): the idempotency key the POST sends (the
+  // echo's id is the doc id the server derives from it), the id the POST
+  // reported once it landed, attempts made in the current auto-retry run and
+  // when that run started, the photo prepared once (so a retry never re-reads
+  // the picked file), and upload progress 0..1 while a photo is uploading.
+  clientMessageId?: string;
+  deliveredId?: string;
+  sendAttempts?: number;
+  retryWindowStart?: number;
+  preparedUpload?: { file: File; width?: number; height?: number };
+  uploadProgress?: number;
 };
 
 interface MobileThreadProps {
@@ -117,6 +130,8 @@ interface MobileThreadProps {
   onReactionError: (message: string) => void;
   onRetryPending: (message: ThreadMessage) => void;
   onDiscardPending: (messageId: string) => void;
+  // Offline / reconnecting chip (already delayed by the page's hook).
+  connectionNotice: ConnectionNoticeState;
   // Message-action callbacks (Reply/Copy/Edit) + composer mode cancels/save.
   onReply: (message: ThreadMessage) => void;
   onEdit: (message: ThreadMessage) => void;
@@ -180,6 +195,11 @@ function BubbleImage({
         style={aspectStyle}
       />
       {isUploading && <span className={c.uploading} />}
+      {isUploading && typeof message.uploadProgress === 'number' && (
+        <span className={c.progress} aria-hidden="true">
+          <span style={{ transform: `scaleX(${message.uploadProgress})` }} />
+        </span>
+      )}
     </button>
   );
 }
@@ -262,6 +282,7 @@ export function MobileThread({
   onDelete,
   onReactionError,
   onRetryPending,
+  connectionNotice,
   onDiscardPending,
   onReply,
   onEdit,
@@ -682,6 +703,7 @@ export function MobileThread({
           is per-message so grouped bubbles can tighten up. The relative stage
           hosts the floating jump-to-latest pill. */}
       <div className={c.stage}>
+        <ConnectionNotice notice={connectionNotice} />
         <div ref={scrollRef} onScroll={handleScroll} className={c.threadScroller}>
           {!loading && messages.length > 0 && hasMore && (
             <p className={c.pager}>Earlier messages load as you scroll</p>
@@ -842,7 +864,7 @@ export function MobileThread({
                       ) : (
                         <span className={c.status}>
                           <Clock size={12} aria-hidden="true" />
-                          Sending…
+                          {pendingStatusLabel(message)}
                         </span>
                       )
                     ) : (

@@ -18,3 +18,10 @@ export interface CompanyStats {
   mtdMonthlyValue: number;
   lastSale: { repName: string } | null;
 }
+
+/** Status caption under a pending echo: upload progress for a photo, else "Sending…". */
+export function pendingStatusLabel(message: { uploadProgress?: number }): string {
+  const progress = message.uploadProgress;
+  if (typeof progress === 'number' && progress < 1) return `Uploading photo · ${Math.round(progress * 100)}%`;
+  return 'Sending…';
+}

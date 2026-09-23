@@ -1858,3 +1858,80 @@ button.person {
 .sheetDanger svg {
   color: var(--c-red);
 }
+
+/* ---------- Connection + upload progress (send reliability) ---------- */
+.connection {
+  position: absolute;
+  top: var(--s2);
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - var(--s4) * 2);
+  min-height: 32px;
+  margin: 0;
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: 16px;
+  background: var(--c-panel-hi);
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.8);
+  color: var(--c-text-2);
+  font: 500 var(--t-sm) / 1.2 var(--f-ui);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: connectionIn 0.2s ease-out both;
+}
+
+.connection[hidden] {
+  display: none;
+}
+
+.connection[data-state='offline'] {
+  color: var(--c-amber);
+}
+
+.connectionSpin {
+  animation: connectionSpin 1.2s linear infinite;
+}
+
+@keyframes connectionIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+@keyframes connectionSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progress {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(3, 7, 14, 0.6);
+  pointer-events: none;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--c-lime);
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection,
+  .connectionSpin {
+    animation: none;
+  }
+}

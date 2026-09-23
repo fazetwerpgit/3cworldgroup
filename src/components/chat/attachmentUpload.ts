@@ -1,3 +1,4 @@
+import { SendRequestError } from '@/lib/chat/outbox';
 import type { ChatAttachment } from '@/types';
 
 // Formats the picker may hand us. HEIC/HEIF are accepted at selection time and
@@ -208,15 +209,29 @@ export async function uploadChatImage(
   body.set('file', file);
   // Note: no explicit Content-Type — the browser sets the multipart boundary.
   const response = await authedFetch('/api/portal/chat/media', { method: 'POST', body });
-  const responseText = await response.text();
+  return toUploadedAttachment(response.status, await response.text(), width, height);
+}
+
+// Shared by both uploaders: turn the media route's response into an attachment,
+// or throw a SendRequestError carrying the status so the send path can tell a
+// transient failure (retry) from a permanent one.
+function toUploadedAttachment(
+  status: number,
+  responseText: string,
+  width?: number,
+  height?: number
+): ChatAttachment {
   let json: Record<string, unknown> = {};
   try {
     json = responseText ? (JSON.parse(responseText) as Record<string, unknown>) : {};
   } catch {
     // Proxies may return an HTML/plain-text body for request-size/network errors.
   }
-  if (!response.ok) {
-    throw new Error(typeof json.error === 'string' ? json.error : 'Photo upload failed. Please try again.');
+  if (status < 200 || status >= 300) {
+    throw new SendRequestError(
+      typeof json.error === 'string' ? json.error : 'Photo upload failed. Please try again.',
+      { kind: 'http', status }
+    );
   }
   if (typeof json.url !== 'string' || !json.url) throw new Error('Photo upload returned no image.');
   const attachment: ChatAttachment = { type: 'image', url: json.url as string };
@@ -224,4 +239,48 @@ export async function uploadChatImage(
   if (typeof width === 'number') attachment.width = width;
   if (typeof height === 'number') attachment.height = height;
   return attachment;
+}
+
+// A photo upload on bad signal can stall for minutes; give up and let the retry
+// policy take over instead.
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/**
+ * Same upload as uploadChatImage, over XMLHttpRequest so the pending photo can
+ * show real progress (fetch has no upload progress). `onProgress` receives 0..1.
+ * Network errors and timeouts reject with a retryable SendRequestError.
+ */
+export function uploadChatImageWithProgress(
+  idToken: string,
+  channelId: string,
+  file: File,
+  width: number | undefined,
+  height: number | undefined,
+  onProgress: (fraction: number) => void
+): Promise<ChatAttachment> {
+  return new Promise((resolve, reject) => {
+    const body = new FormData();
+    body.set('channelId', channelId);
+    body.set('file', file);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/portal/chat/media');
+    xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(Math.min(1, event.loaded / event.total));
+    };
+    const networkFailure = () =>
+      reject(new SendRequestError('Photo upload failed. Check your connection.', { kind: 'network' }));
+    xhr.onerror = networkFailure;
+    xhr.ontimeout = networkFailure;
+    xhr.onabort = networkFailure;
+    xhr.onload = () => {
+      try {
+        resolve(toUploadedAttachment(xhr.status, xhr.responseText, width, height));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    xhr.send(body);
+  });
 }
