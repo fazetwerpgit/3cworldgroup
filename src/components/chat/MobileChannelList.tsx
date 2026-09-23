@@ -1,6 +1,8 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { Lock, RotateCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { useFirstReveal } from '@/hooks/useFirstReveal';
 import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
 import s from '@/components/portal/rep/rep.module.css';
 import c from './chat.module.css';
@@ -41,6 +43,7 @@ export function ChannelRows({
   onSelect,
   onRetry = () => window.location.reload(),
 }: ChannelRowsProps) {
+  const reveal = useFirstReveal('3c:reveal:chat-channels', !loading && channels.length > 0);
   if (loading) {
     return (
       <div aria-hidden="true">
@@ -82,11 +85,11 @@ export function ChannelRows({
           </button>
         </p>
       ) : null}
-      <ul className={c.channels}>
-        {channels.map((channel) => {
+      <ul className={c.channels} data-reveal={reveal || undefined}>
+        {channels.map((channel, index) => {
           const unread = !!unreadByChannel?.[channel.id];
           return (
-            <li key={channel.id}>
+            <li key={channel.id} style={{ '--i': index } as CSSProperties}>
               <button
                 type="button"
                 onClick={() => onSelect(channel.id)}

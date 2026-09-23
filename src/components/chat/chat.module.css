@@ -163,6 +163,19 @@
   transition: background-color 160ms ease;
 }
 
+/* First time the channel list shows this session, rows rise in a short stagger. */
+.channels[data-reveal] > li {
+  animation: listRise 280ms ease-out backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 30ms);
+}
+
+@keyframes listRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 .channels li:last-child .channel {
   border-bottom: 0;
 }
@@ -1957,9 +1970,35 @@ button.person {
   transition: transform 0.2s linear;
 }
 
+/* A message that arrives while the thread is open (useLiveAppended): your own
+   rises the last 8px into place as it sends; someone else's fades in. */
+.liveOwn {
+  animation: chatSent 260ms ease-out backwards;
+}
+
+.liveIn {
+  animation: chatIn 300ms ease-out backwards;
+}
+
+@keyframes chatSent {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+@keyframes chatIn {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .connection,
-  .connectionSpin {
+  .connectionSpin,
+  .liveOwn,
+  .liveIn,
+  .channels[data-reveal] > li {
     animation: none;
   }
 }

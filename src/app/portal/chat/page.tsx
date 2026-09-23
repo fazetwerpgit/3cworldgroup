@@ -40,6 +40,7 @@ import {
   toOutboxEntries,
 } from '@/lib/chat/outbox';
 import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
+import { useLiveAppended } from '@/hooks/chat/useLiveAppended';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
@@ -715,6 +716,11 @@ export default function TeamChatPage() {
   // <=200px zone and arms a bogus load-older mid-flight.
   const renderedChannelMatches = !loadingMessages && renderedChannel === activeChannelId;
 
+  // Messages sent or received while the thread is open animate in; opening a
+  // thread, a cached first paint, and paged-in history never do.
+  const threadMessageIds = useMemo(() => threadMessages.map((message) => message.id), [threadMessages]);
+  const liveIds = useLiveAppended(threadMessageIds, renderedChannelMatches && !messagesFromCache, activeChannelId || null);
+
   // "Reconnecting…" / offline chip for both layouts (delayed so a quick resume
   // never flashes it).
   const { notice: connectionNotice } = useConnectionNotice(messagesFromCache, renderedChannelMatches);
@@ -1362,7 +1368,7 @@ export default function TeamChatPage() {
                       {showDayDivider && <div className={c.day}>{formatChatLineDayDivider(message.createdAt)}</div>}
                       <article
                         data-mid={message.id}
-                        className={`${c.row} ${grouped ? c.rowGrouped : ''} ${message.pendingState === 'sending' ? c.rowSending : ''}`}
+                        className={`${c.row} ${grouped ? c.rowGrouped : ''} ${message.pendingState === 'sending' ? c.rowSending : ''} ${liveIds.has(message.id) ? (isOwn ? c.liveOwn : c.liveIn) : ''}`}
                       >
                         <div className={c.rowAvatar}>
                           {grouped ? null : (
@@ -1581,6 +1587,7 @@ export default function TeamChatPage() {
             companyStats={activeChannelId === 'all-company' ? companyStats : null}
             authorAvatars={authorAvatars}
             loading={loadingMessages}
+            liveIds={liveIds}
             renderedChannel={renderedChannel}
             error={shownError}
             currentUserId={user?.uid}

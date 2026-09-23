@@ -92,6 +92,8 @@ interface MobileThreadProps {
   // (already-visible data — the same population whose names are shown per message).
   authorAvatars: Record<string, string>;
   loading: boolean;
+  /** Messages that arrived while the thread was open (useLiveAppended): they animate in. */
+  liveIds?: ReadonlySet<string>;
   // Which channel's messages are actually committed in state (from useMessages;
   // null until the first commit). An EMPTY committed channel still counts —
   // inspecting messages[0] would not cover it.
@@ -265,6 +267,7 @@ export function MobileThread({
   companyStats,
   authorAvatars,
   loading,
+  liveIds,
   renderedChannel,
   error,
   currentUserId,
@@ -758,7 +761,7 @@ export function MobileThread({
               const spacing = showDaySeparator || index === 0 ? '' : isFirstOfGroup ? c.gapGroup : c.gapTight;
 
               return (
-                <div key={message.id}>
+                <div key={message.id} className={liveIds?.has(message.id) ? (isOwn ? c.liveOwn : c.liveIn) : undefined}>
                   {showDaySeparator && message.createdAt && <div className={c.threadDay}>{dayLabel(message.createdAt)}</div>}
                   {/* data-mid anchors the scroll compensation. It lives HERE, not
                       on the outer keyed wrapper: the wrapper also contains the
