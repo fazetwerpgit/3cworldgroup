@@ -354,20 +354,17 @@ function WeekStrip({
 
   return (
     <section className={`${s.panel} ${d.card} ${d.week}`} style={rise(2)} aria-labelledby="week-h">
-      <div className={d.weekHead}>
-        <h2 id="week-h" className={d.weekTitle}>
-          This week
-        </h2>
+      <PanelHead id="week-h" title="This week">
         <span className={d.clock}>
           <Timer size={16} aria-hidden="true" />
           {timeLeft}
         </span>
-      </div>
+      </PanelHead>
 
       <div className={`${d.halves} ${showRank && showChallenge ? '' : d.halvesSolo}`}>
         {showRank ? (
           <div className={d.half}>
-            <p className={d.halfLab}>Rank</p>
+            <p className={s.kicker}>Rank</p>
             {standing.status === 'loading' ? (
               <span className={`${s.skel} ${d.skelBig}`} aria-label="Loading rank" />
             ) : standing.status === 'error' ? (
@@ -403,7 +400,7 @@ function WeekStrip({
 
         {showChallenge ? (
           <div className={d.half}>
-            <p className={d.halfLab}>Challenge</p>
+            <p className={s.kicker}>Challenge</p>
             {challenge.status === 'loading' ? (
               <span className={`${s.skel} ${d.skelBig}`} aria-label="Loading weekly challenge" />
             ) : challenge.status === 'error' ? (
