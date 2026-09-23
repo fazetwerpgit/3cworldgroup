@@ -225,7 +225,8 @@ describe('below the podium', () => {
       expect.stringContaining('Ada Lovelace'),
       expect.stringContaining('Ben Carter'),
     ]);
-    expect(container.querySelector('[data-testid="spot-line"]')?.textContent).toBe('1 sale gets you on the board.');
+    // Team pulse's "Your climb" covers the spot on the desktop board.
+    expect(container.querySelector('[data-testid="spot-line"]')).toBeNull();
     expect(container.textContent).toContain('Rep 2 · 2 Gig');
   });
 });

@@ -6,8 +6,8 @@
    >=1024px renders, and its layout and content stay as on master: edit it
    only to keep it compiling. Its panel surfaces read the portal's C tokens
    (--c-panel / --c-raised) instead of the old navy gradients. Below the
-   podium it also carries the spot line, the team at 0 after the ranks and the
-   recent sales feed, shared with the phone board (../belowPodium). */
+   podium it also carries the team at 0 after the ranks and the recent sales
+   feed, shared with the phone board (../belowPodium). */
 
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Crown, Flame } from 'lucide-react';
@@ -288,11 +288,6 @@ function ChaseTable({ entries, zeros, currentUser, metric }: { entries: Leaderbo
   );
 }
 
-function SpotLine({ text }: { text: string | null }) {
-  if (!text) return null;
-  return <p data-testid="spot-line" className="-mt-5 mb-[40px] text-[15px] font-bold">{text}</p>;
-}
-
 function RecentSales({ sales }: { sales: RecentSale[] }) {
   const now = useMinuteClock();
   if (sales.length === 0) return null;
@@ -319,9 +314,11 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
   const zeros = zeroEntries(ordered, unranked);
   const mine = currentUser ?? (viewerId ? zeros.find((entry) => entry.salesRepId === viewerId) : undefined);
-  const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId, metric });
 
+  // With nobody ranked there's no Team pulse, so the spot line stands in for
+  // its "Your climb"; on a ranked board that card already says it.
   if (entries.length === 0) {
+    const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId, metric });
     return (
       <div>
         <EmptyState />
@@ -337,7 +334,6 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
   return (
     <div>
       <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <SpotLine text={spot} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
       <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} />
       <RecentSales sales={recent} />
