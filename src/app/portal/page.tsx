@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { PendingApproval } from '@/components/auth/PendingApproval';
+import { RepBoot } from '@/components/portal/rep/RepShell';
 
 export default function PortalLoginPage() {
   const { user, loading, pendingApproval } = useAuth();
@@ -17,18 +18,9 @@ export default function PortalLoginPage() {
     }
   }, [user, loading, router]);
 
-  // Show loading while checking auth state — same navy deck as the login so
-  // there is no background flash between the two states.
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A1F44]">
-        <div className="flex items-center gap-3 text-white/70">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[#8dc63f]" />
-          <p className="text-sm">Signing you in…</p>
-        </div>
-      </div>
-    );
-  }
+  // Checking auth state: the same D boot mark the signed-in shell shows, so
+  // there is no flash between this and the login or the dashboard.
+  if (loading) return <RepBoot />;
 
   // If user is logged in, show nothing (will redirect)
   if (user) {
