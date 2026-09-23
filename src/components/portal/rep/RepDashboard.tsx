@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, TrendingDown, TrendingUp, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
+import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
 import {
   callsToday,
@@ -158,6 +159,17 @@ function MonthStack({ counts, total }: { counts: PaySummary['counts']; total: nu
   );
 }
 
+/** The big est. pay numeral: counts up from $0 on the first Home of a session. */
+function PayAmount({ amount }: { amount: number }) {
+  const shown = useCountUp(Math.round(amount), { sessionKey: '3c:countup:home-pay' });
+  return (
+    <>
+      <span className={d.cur}>$</span>
+      {shown.toLocaleString('en-US')}
+    </>
+  );
+}
+
 function MoneyCard({ pay, hasPlan, tucked }: { pay: PaySummary; hasPlan: boolean; tucked: boolean }) {
   const delta = pay.deltaPct;
   const amount = hasPlan && pay.estThisMonth !== null ? pay.estThisMonth : null;
@@ -168,16 +180,7 @@ function MoneyCard({ pay, hasPlan, tucked }: { pay: PaySummary; hasPlan: boolean
         <h2 id="money-h" className={s.kicker}>
           Est. pay this month
         </h2>
-        <p className={d.payNum}>
-          {amount !== null ? (
-            <>
-              <span className={d.cur}>$</span>
-              {Math.round(amount).toLocaleString('en-US')}
-            </>
-          ) : (
-            '—'
-          )}
-        </p>
+        <p className={d.payNum}>{amount !== null ? <PayAmount amount={amount} /> : '—'}</p>
         {!hasPlan ? (
           <p className={d.moneyNote}>No pay plan assigned yet</p>
         ) : delta !== null ? (

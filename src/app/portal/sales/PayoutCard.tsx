@@ -7,7 +7,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 
 function PayNumeral({ amount }: { amount: number }) {
-  const shown = useCountUp(Math.round(amount), 1100);
+  const shown = useCountUp(Math.round(amount), { sessionKey: '3c:countup:sales-pay' });
   return (
     <p className={x.payNum}>
       <span className={x.payEst}>est.</span>
