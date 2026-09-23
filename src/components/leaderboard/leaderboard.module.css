@@ -1,17 +1,15 @@
-/* Leaderboard, phone only.
-   The route renders this page below 1024px and the legacy desktop board above
-   it (src/components/leaderboard/legacy), so nothing here has a desktop layout:
-   the column simply stops growing at 640px for a tablet.
-   Built to measurements taken off the reference: a compact podium (330px wide,
-   100px tall at most) carrying the page, a centred header stack, and a lit
-   ground that fades from the accent down to the page colour by the podium.
-   Shape rule: cards and rows are 14px, the filter rail and countdown are pills,
-   and the podium blocks are the one square-footed object.
-   The page sits on the direction D shell (RepShell), so the surfaces around the
-   podium read D's tokens (--c-*, set on the shell root); the podium, crown,
-   laurels and numerals keep their own colours. */
+/* Leaderboard, phone and the pieces the desktop board shares with it.
+   Direction C: the podium stands on an L1 stage panel with a well band for the
+   period and clock, and the ranks below it are one scoreboard panel split by
+   hairlines. Lime is kept to wins and "yours": your row's rule, rank and tag,
+   the winner's seam and the podium's metric glyph. The desktop layout
+   (leaderboard-desk.module.css) arranges these same pieces across the width.
+   The podium itself (blocks, lid, crown, laurels, metal numerals, medal rings)
+   is owner-accepted and keeps its own colours and measurements. */
 
-.shell {
+/* The podium's and avatars' own colours. Both pages carry it: the phone on
+   .shell, the desktop on its page root. */
+.scope {
   --leaderboard-surface-2: var(--c-panel-hi);
   --leaderboard-ink: var(--c-text);
   --leaderboard-muted: var(--c-text-2);
@@ -22,15 +20,10 @@
   --silver: #9ba4af;
   --bronze: #b1723e;
   --accent-ink: var(--c-lime);
-  --row-surface: var(--c-panel);
-  --row-line: var(--c-line);
-  --standing-surface: var(--c-panel-hi);
   --avatar-ring: rgba(255, 255, 255, 0.5);
-  --rail-fill: var(--c-panel);
-  --rail-line: var(--c-line-strong);
-  --rail-ink: var(--c-text-2);
-  --pill-fill: var(--c-lime-wash);
-  --pill-line: color-mix(in srgb, var(--c-lime) 38%, transparent);
+}
+
+.shell {
   position: relative;
   isolation: isolate;
   max-width: 640px;
@@ -40,41 +33,169 @@
   padding: 18px 0 calc(20px + env(safe-area-inset-bottom));
 }
 
-/* ---------- header ---------- */
+/* ---------- page head ----------
+   C's page head, the same as Sales: a plain Geist title on the left and one
+   quiet meta line. The countdown moved into the stage's band. */
 
-.header {
-  text-align: center;
+.head {
+  margin-bottom: 14px;
 }
 
-.header h1 {
+.head h1 {
   margin: 0;
   color: var(--leaderboard-ink);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
-.header p {
-  margin: 5px 0 0;
-  color: var(--leaderboard-muted);
+.head p {
+  margin: 2px 0 0;
+  color: var(--c-text-3);
   font-size: 13px;
-  line-height: 1.3;
+  line-height: 1.35;
+}
+
+/* ---------- filters ----------
+   Two segmented controls, each set in a well: the period takes the room it
+   needs to fit All time, the metric sits beside it. The pressed segment lifts
+   to the top step of the ladder; lime stays off the controls. */
+
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filters div {
+  display: flex;
+  min-width: 0;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--c-well, #08101d);
+  box-shadow: var(--c-sink, inset 0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+.filters div:first-child {
+  flex: 1 1 auto;
+}
+
+.filters button {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 34px;
+  padding: 0 8px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--c-text-3);
+  font: 600 13px var(--f-ui, var(--font-sans, system-ui));
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms var(--ease, ease);
+}
+
+/* The segment reads at 34px but still takes a 44px press. */
+.filters button::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+.filters button:active {
+  transform: scale(0.97);
+}
+
+.filters button[aria-pressed='true'] {
+  background: var(--c-panel-hi, #1d2c46);
+  color: var(--c-text);
+  box-shadow:
+    var(--c-edge, inset 0 1px 0 rgba(255, 255, 255, 0.06)),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+@media (hover: hover) {
+  .filters button[aria-pressed='false']:hover {
+    color: var(--c-text-2);
+  }
+}
+
+/* The stack under the head: stage, rows, standing bar. */
+.board {
+  min-width: 0;
+}
+
+/* ---------- stage ----------
+   The podium stands on an L1 panel instead of the bare ground: a well band on
+   top carries the period and the clock (C's scoreboard head), and the blocks
+   stand on the panel's own floor. The panel takes the page's heaviest shadow,
+   because the top three are what this page is about. */
+
+.stage {
+  position: relative;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift-2, inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -12px rgba(0, 0, 0, 0.6));
+  animation: sheetRise 720ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-well, #08101d);
+}
+
+.bandTitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--c-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 20px/1 var(--f-display, 'Bebas Neue', sans-serif);
+  letter-spacing: 0.08em;
+  /* Bebas sits high in its box; this lands the caps on the band's centre. */
+  padding-top: 2px;
+}
+
+.bandMeta {
+  color: var(--c-text-3);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .countdown {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 6px;
-  height: 32px;
-  margin-top: 12px;
-  padding: 0 13px;
-  border: 1px solid var(--pill-line);
-  border-radius: 999px;
-  background: var(--pill-fill);
-  color: var(--accent-ink);
-  font: 600 14px var(--font-archivo, sans-serif);
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
+}
+
+.countdown svg {
+  color: var(--c-text-3);
+}
+
+.countdownValue {
+  color: var(--c-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .countdownValue,
@@ -82,61 +203,9 @@
   white-space: nowrap;
 }
 
-/* ---------- filters ---------- */
-
-.filters {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  margin: 12px auto 0;
-  padding: 3px;
-  border: 1px solid var(--rail-line);
-  border-radius: 999px;
-  background: var(--rail-fill);
-}
-
-.filters div {
-  display: flex;
-  min-width: 0;
-  gap: 2px;
-}
-
-.filters div + div {
-  margin-left: 4px;
-  padding-left: 5px;
-  border-left: 1px solid var(--rail-line);
-}
-
-.filters button {
-  position: relative;
-  min-height: 30px;
-  padding: 0 8px;
-  white-space: nowrap;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--rail-ink);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 140ms ease, color 140ms ease;
-}
-
-/* The rail reads at 38px but still takes a 44px press. */
-.filters button::after {
-  content: '';
-  position: absolute;
-  inset: -7px 0;
-}
-
-.filters button[aria-pressed='true'] {
-  background: var(--c-lime);
-  color: var(--c-on-lime);
-  font-weight: 700;
-}
-
-/* The stack under the header: podium, rows, standing bar. */
-.board {
-  min-width: 0;
+/* The floor the blocks stand on: the podium's own ground shadow falls here. */
+.stageFloor {
+  padding: 6px 14px 14px;
 }
 
 /* ---------- podium ----------
@@ -155,6 +224,11 @@
   width: 100%;
   max-width: 330px;
   margin: 22px auto 0;
+}
+
+/* On the stage the band above already separates it from the filters. */
+.stageFloor .podium {
+  margin-top: 18px;
 }
 
 /* The shadow the whole podium casts on the ground, behind the blocks (which
@@ -515,59 +589,104 @@
   white-space: nowrap;
 }
 
-/* ---------- rows ---------- */
+/* ---------- rows ----------
+   The ranked list is one L1 scoreboard panel: a well band naming the ranks,
+   then rows split by hairlines rather than a stack of separate cards. Rank is
+   a Bebas numeral; the score is Geist 600 with tabular figures. */
 
 .rows {
-  display: grid;
-  gap: 8px;
-  margin-top: 20px;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift, inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35));
+  animation: sheetRise 720ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) 70ms both;
 }
 
 .row {
+  position: relative;
   display: grid;
-  grid-template-columns: 24px 32px minmax(0, 1fr) auto;
+  grid-template-columns: 30px 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 54px;
   padding: 0 16px;
-  border: 1px solid var(--row-line);
-  border-radius: 16px;
-  background: var(--row-surface);
+  border-top: 1px solid var(--c-line);
 }
 
+.band + .row {
+  border-top: 0;
+}
+
+/* Yours: lifted one step with the top-edge highlight and a 3px lime rule down
+   the left. The rule, the rank and the tag are the only lime in the list. */
 .rowMine {
-  border-color: var(--leaderboard-accent);
-  background: color-mix(in srgb, var(--row-surface) 88%, var(--leaderboard-accent));
+  background: var(--c-panel-hi, #1d2c46);
+  box-shadow: var(--c-edge, inset 0 1px 0 rgba(255, 255, 255, 0.06));
+}
+
+.rowMine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--c-lime);
 }
 
 .rank {
-  color: var(--leaderboard-muted);
-  font: 500 14px var(--font-archivo, sans-serif);
+  color: var(--c-text-2);
+  font: 400 24px/1 var(--f-display, 'Bebas Neue', sans-serif);
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  padding-top: 2px;
 }
 
 .rowMine .rank {
-  color: var(--accent-ink);
-  font-weight: 700;
+  color: var(--c-lime-hi, #a6e052);
 }
 
+/* The name ellipsises; the You tag after it never does. */
 .rowName {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  color: var(--c-text);
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.rowName span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px;
-  font-weight: 400;
 }
 
 .rowName em {
-  margin-left: 7px;
-  color: var(--accent-ink);
-  font-size: 12px;
+  flex: none;
+  margin-left: 8px;
+  color: var(--c-lime-hi, #a6e052);
+  font-size: 11px;
   font-style: normal;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.rows .rowPoints {
+  font-family: var(--f-num, var(--font-sans, system-ui));
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* In the list the unit glyph is a quiet label, not a win: lime there would
+   repeat down every row. The podium keeps its lime glyph. */
+.rows .metricGlyph {
+  color: var(--c-text-3);
 }
 
 /* ---------- your standing ---------- */
@@ -584,17 +703,31 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 52px;
+  min-height: 54px;
   margin-top: 12px;
-  padding: 0 16px;
-  border: 1px solid var(--leaderboard-accent);
-  border-radius: 16px;
-  /* The lime hairline is enough to find it; a filled bar shouted over the
-     rows it floats above. Opaque, because it sits over scrolling content. */
-  background: var(--standing-surface);
-  color: var(--leaderboard-ink);
-  box-shadow: 0 10px 30px rgba(3, 9, 22, 0.35);
+  padding: 0 16px 0 19px;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 12px;
+  /* The top step of the ladder with a lime rule, like your row in the list.
+     Opaque, because it sits over scrolling content; the shadow is neutral. */
+  background: var(--c-panel-hi, #1d2c46);
+  color: var(--c-text);
+  box-shadow:
+    var(--c-edge, inset 0 1px 0 rgba(255, 255, 255, 0.06)),
+    0 12px 28px -10px rgba(0, 0, 0, 0.7);
   font-size: 14px;
+  font-weight: 600;
+}
+
+.standing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--c-lime);
 }
 
 .standingCopy {
@@ -602,26 +735,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- empty and error ---------- */
 
 .empty {
-  max-height: 40vh;
-  overflow: auto;
-  margin-top: 20px;
-  padding: 28px 20px;
-  border: 1px dashed var(--leaderboard-line);
+  margin-top: 16px;
+  padding: 26px 20px 28px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
   border-radius: 14px;
-  color: var(--leaderboard-muted);
+  background: var(--c-panel);
+  box-shadow: var(--c-lift, inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35));
+  color: var(--c-text-2);
+  font-size: 14px;
   text-align: center;
 }
 
 .empty p {
   margin: 0 0 6px;
-  color: var(--leaderboard-ink);
-  font-size: 18px;
-  font-weight: 700;
+  color: var(--c-text);
+  font: 400 24px/1 var(--f-display, 'Bebas Neue', sans-serif);
+  letter-spacing: 0.06em;
 }
 
 .error {
@@ -630,16 +766,27 @@
   gap: 8px;
   margin-top: 14px;
   padding: 11px 13px;
-  border: 1px solid var(--c-red);
-  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--c-red) 45%, transparent);
+  border-radius: 12px;
+  background: var(--c-panel);
   color: var(--c-red);
   font-size: 13px;
 }
 
-/* ---------- loading ---------- */
+/* ---------- loading ----------
+   The same stage and panel, drawn empty: the band, three block silhouettes on
+   the floor, and hairline-split row slots. Nothing shimmers. */
 
 .skeleton {
   min-width: 0;
+}
+
+.skeletonBar {
+  display: block;
+  width: 96px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--c-track, rgba(163, 184, 214, 0.14));
 }
 
 .skeletonPodium {
@@ -649,46 +796,73 @@
   gap: 0;
   width: 100%;
   max-width: 330px;
-  margin: 22px auto 0;
-}
-
-.skeletonPodium span,
-.skeletonRows span {
-  display: block;
-  background: var(--leaderboard-line);
+  margin: 118px auto 0;
 }
 
 .skeletonPodium span {
+  display: block;
   height: 72px;
-  border-radius: 10px 0 0 0;
+  border-radius: 6px 0 0 0;
+  background: var(--c-well, #08101d);
 }
 
 .skeletonPodium span:nth-child(2) {
   height: 100px;
-  border-radius: 10px 10px 0 0;
+  border-radius: 6px 6px 0 0;
 }
 
 .skeletonPodium span:nth-child(3) {
   height: 60px;
-  border-radius: 0 10px 0 0;
+  border-radius: 0 6px 0 0;
 }
 
-.skeletonRows {
-  display: grid;
-  gap: 8px;
-  margin-top: 20px;
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 16px;
+  border-top: 1px solid var(--c-line);
 }
 
-.skeletonRows span {
-  height: 52px;
-  border-radius: 14px;
+.band + .skeletonRow {
+  border-top: 0;
+}
+
+.skeletonRow::before {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-track, rgba(163, 184, 214, 0.14));
+}
+
+.skeletonRow::after {
+  content: '';
+  width: 40%;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--c-track, rgba(163, 184, 214, 0.14));
+}
+
+@keyframes sheetRise {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- responsive ---------- */
 
 @media (max-width: 359px) {
   .filters button {
-    padding: 0 8px;
+    padding: 0 6px;
+    font-size: 12px;
   }
 
   .row {
@@ -698,7 +872,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .block {
+  .block,
+  .stage,
+  .rows {
     animation: none;
   }
 

@@ -17,6 +17,14 @@ export function periodLabel(period: LeaderboardPeriod, metric: LeaderboardMetric
   return `All-time ${subject}`;
 }
 
+/** The stage band's short sport head: set in Bebas, so a few words only. */
+export function periodTitle(period: LeaderboardPeriod) {
+  if (period === 'week') return 'This week';
+  if (period === 'month') return 'This month';
+  if (period === 'year') return 'This year';
+  return 'All time';
+}
+
 export function periodBounds(period: LeaderboardPeriod, now = new Date()) {
   return sharedPeriodBounds(period, now);
 }
@@ -51,7 +59,7 @@ export function PeriodCountdown({ period }: { period: LeaderboardPeriod }) {
 
   return (
     <span className={styles.countdown} aria-label={`Period ends in ${label.replace(' left', '')}`}>
-      <Clock3 size={15} aria-hidden="true" />
+      <Clock3 size={14} aria-hidden="true" />
       <span className={styles.countdownText}>
         {isUnderOneHour ? 'Under ' : null}
         <span className={styles.countdownValue}>{accentedDuration}</span>

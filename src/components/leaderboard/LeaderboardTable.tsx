@@ -3,6 +3,7 @@
 import { LeaderboardRows } from './LeaderboardRows';
 import { Podium } from './Podium';
 import { Avatar } from './Avatar';
+import { LeaderboardStage } from './LeaderboardStage';
 import styles from './leaderboard.module.css';
 
 export interface LeaderboardEntry {
@@ -46,7 +47,7 @@ export function formatLeaderboardValue(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-function EmptyState() {
+export function EmptyState() {
   return (
     <div className={styles.empty}>
       <p className="portal-display">The board is open</p>
@@ -98,7 +99,9 @@ export function LeaderboardTable({ entries, currentUser, viewer, metric, period 
 
   return (
     <div className={styles.board}>
-      <Podium entries={podiumEntries} currentUser={effectiveCurrentUser} metric={metric} />
+      <LeaderboardStage period={period}>
+        <Podium entries={podiumEntries} currentUser={effectiveCurrentUser} metric={metric} />
+      </LeaderboardStage>
       {entries.length === 0 ? (
         <EmptyState />
       ) : (

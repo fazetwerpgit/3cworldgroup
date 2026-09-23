@@ -1,0 +1,516 @@
+/* Leaderboard, desktop (1024px and up). Direction C across the width.
+   Top row: the podium's stage (the page's heaviest shadow) beside a side column
+   holding your standing and the weekly challenge, both flat L1 scoreboard
+   panels with well bands. Under it the ranks run full width as one scoreboard
+   with desk-only columns. The pieces and their colours come from
+   leaderboard.module.css; this file only lays them out and adds the columns. */
+
+.page {
+  position: relative;
+  isolation: isolate;
+  padding-bottom: 8px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.head > div:first-child {
+  margin-bottom: 0;
+}
+
+.head > div h1 {
+  font-size: 28px;
+}
+
+.head > div p {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+/* On a desk the controls keep their natural width at the head's right. */
+.head [role='group']:first-child {
+  flex: none;
+}
+
+.head [role='group'] button {
+  padding: 0 14px;
+}
+
+.page .error {
+  margin: 0 0 16px;
+}
+
+/* ---------- top row ---------- */
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.top > .stage {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+}
+
+/* The floor fills the stage's height, so the blocks always stand on its
+   bottom edge however tall the side column runs. */
+.stage > :last-child {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 18px;
+}
+
+.stage > :last-child > * {
+  width: 100%;
+  zoom: 1.2;
+}
+
+/* A desk's stage carries the same podium a size up. zoom scales it whole, so
+   every proportion, colour and edge of the accepted design is unchanged. */
+@media (min-width: 1280px) {
+  .top {
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+
+  .stage > :last-child > * {
+    zoom: 1.4;
+  }
+}
+
+.side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift, inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35));
+  animation: deskRise 720ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.side .card:nth-child(1) { animation-delay: 70ms; }
+.side .card:nth-child(2) { animation-delay: 140ms; }
+
+/* ---------- your standing ---------- */
+
+.standing {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.standingBody {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 18px 18px 16px;
+}
+
+.bigRank {
+  display: flex;
+  flex: none;
+  margin: 0;
+  color: var(--c-text);
+  font: 400 96px/0.8 var(--f-display, 'Bebas Neue', sans-serif);
+  letter-spacing: 0.01em;
+}
+
+.bigRank sup {
+  margin-left: 3px;
+  color: var(--c-text-2);
+  font-size: 30px;
+  line-height: 1;
+  vertical-align: top;
+}
+
+/* Bebas draws a dash as a flat slab, so the unranked mark is set in the UI face. */
+.bigDash {
+  color: var(--c-text-3);
+  font: 300 64px/0.9 var(--f-ui, var(--font-sans, system-ui));
+}
+
+.standingWho {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 4px;
+}
+
+.standingWho strong {
+  overflow: hidden;
+  color: var(--c-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.standingWho span {
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* C's chase row: a short track, then the gap in words. */
+.chase {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 18px;
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chase b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.chase .track {
+  flex: 0 0 64px;
+}
+
+.track {
+  position: relative;
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--c-track, rgba(163, 184, 214, 0.14));
+}
+
+.trackFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--c-lime);
+  transform-origin: left;
+  transition: transform 1s var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) 0.3s;
+}
+
+/* ---------- weekly challenge ---------- */
+
+.challengeBody {
+  padding: 16px 18px 16px;
+}
+
+.challengeScore {
+  margin: 0;
+  color: var(--c-text);
+  font: 400 76px/0.8 var(--f-display, 'Bebas Neue', sans-serif);
+}
+
+.challengeOf {
+  margin-left: 2px;
+  color: var(--c-text-3);
+  font-size: 34px;
+}
+
+.segs {
+  display: flex;
+  gap: 3px;
+  margin-top: 14px;
+}
+
+.segs > span {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--c-track, rgba(163, 184, 214, 0.14));
+}
+
+.segs > span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.segs > .segOn::after {
+  background: var(--c-lime);
+  animation: segFill 400ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) calc(500ms + var(--n, 0) * 55ms) both;
+}
+
+.challengeBody .track {
+  margin-top: 14px;
+  height: 6px;
+}
+
+.challengeNote {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 0;
+  color: var(--c-text-2);
+  font-size: 14px;
+}
+
+.challengeNote:first-child {
+  margin-top: 0;
+}
+
+.challengeNote b {
+  margin-right: 4px;
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.challengeNote b.win {
+  color: var(--c-lime-hi, #a6e052);
+}
+
+.retry {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-text);
+  font: 600 13px var(--f-ui, var(--font-sans, system-ui));
+  cursor: pointer;
+}
+
+/* ---------- ranks ---------- */
+
+.ranks {
+  margin-top: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1.6fr) 128px 132px 132px;
+  align-items: center;
+  column-gap: 16px;
+  padding: 0 20px;
+}
+
+.colHead {
+  min-height: 36px;
+  margin: 0;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.row {
+  position: relative;
+  min-height: 64px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-top: 1px solid var(--c-line);
+  row-gap: 8px;
+}
+
+.colHead + .row {
+  border-top: 0;
+}
+
+@media (hover: hover) {
+  .row:not(.rowMine):hover {
+    background: rgba(163, 184, 214, 0.035);
+  }
+}
+
+.right {
+  justify-self: end;
+  text-align: right;
+}
+
+.rankCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rankCell > span:first-child {
+  min-width: 30px;
+  font-size: 28px;
+}
+
+.moveUp,
+.moveDown {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.moveUp {
+  color: var(--c-lime-hi, #a6e052);
+}
+
+.moveDown {
+  color: var(--c-text-2);
+}
+
+.newTag {
+  padding: 2px 6px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 999px;
+  color: var(--c-text-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.none {
+  color: var(--c-text-3);
+  font-size: 13px;
+}
+
+.rep {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.repText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.repMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--c-text-3);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 999px;
+  color: var(--c-text-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.trend {
+  display: flex;
+  align-items: center;
+}
+
+.spark {
+  color: var(--c-text-2);
+}
+
+.sparkMuted {
+  color: var(--c-text-3);
+  opacity: 0.7;
+}
+
+.sparkMine {
+  color: var(--c-lime-hi, #a6e052);
+}
+
+.score {
+  color: var(--c-text);
+  font-family: var(--f-num, var(--font-sans, system-ui));
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.score small {
+  margin-left: 2px;
+  color: var(--c-text-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.gap {
+  color: var(--c-text-2);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- footnote ---------- */
+
+.note {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  color: var(--c-text-3);
+  font-size: 12px;
+}
+
+@keyframes deskRise {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes segFill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .segs > .segOn::after {
+    animation: none;
+  }
+
+  .segs > .segOn::after {
+    transform: none;
+  }
+
+  .trackFill {
+    transition: none;
+  }
+}

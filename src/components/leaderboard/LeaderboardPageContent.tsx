@@ -10,7 +10,7 @@ import {
   type LeaderboardPeriod,
   type LeaderboardViewer,
 } from './LeaderboardTable';
-import { PeriodCountdown, periodLabel } from './PeriodCountdown';
+import { periodLabel } from './PeriodCountdown';
 import styles from './leaderboard.module.css';
 
 interface LeaderboardPageContentProps {
@@ -28,11 +28,11 @@ interface LeaderboardPageContentProps {
   active?: boolean;
 }
 
-/** The phone leaderboard: header, countdown, filters, podium, ranked rows.
- *  It is the page below 1024px only — the route renders the legacy desktop
- *  board above that — so nothing here has a desktop layout. The board data and
- *  the filter state come from the route, which is the one fetch both pages
- *  share. */
+/** The phone leaderboard: head, filters, the podium on its stage (with the
+ *  period clock), ranked rows. It is the page below 1024px only — the route
+ *  renders LeaderboardDesktop above that, built from the same pieces. The
+ *  board data and the filter state come from the route, which is the one fetch
+ *  both pages share. */
 export function LeaderboardPageContent({
   entries,
   currentUser,
@@ -48,11 +48,10 @@ export function LeaderboardPageContent({
   if (!active) return null;
 
   return (
-    <div className={styles.shell}>
-      <header className={styles.header}>
-        <h1 className="portal-display">Leaderboard</h1>
+    <div className={`${styles.scope} ${styles.shell}`}>
+      <header className={styles.head}>
+        <h1>Leaderboard</h1>
         <p>{periodLabel(period, metric)}</p>
-        <PeriodCountdown period={period} />
       </header>
       <LeaderboardFilters
         period={period}
