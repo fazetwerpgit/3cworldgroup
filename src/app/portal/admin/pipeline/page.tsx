@@ -61,6 +61,8 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState('');
+  // Sheet-local: errors raised inside a sheet show there, never the page banner.
+  const [sheetError, setSheetError] = useState('');
   const [success, setSuccess] = useState('');
   const [stageFilter, setStageFilter] = useState<PipelineStage | ''>('');
   const [managerFilter, setManagerFilter] = useState('all');
@@ -69,6 +71,7 @@ export default function PipelinePage() {
   const [channelsModal, setChannelsModal] = useState<PipelineRep | null>(null);
   const [channelRows, setChannelRows] = useState<ChannelRow[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
+  const [channelsFailed, setChannelsFailed] = useState(false);
   const [decommissionModal, setDecommissionModal] = useState<PipelineRep | null>(null);
   const [decommissionReason, setDecommissionReason] = useState<DecommissionReason>('non_activity');
   const [decommissionNotes, setDecommissionNotes] = useState('');
@@ -88,9 +91,9 @@ export default function PipelinePage() {
       setReps(json.reps);
       setCounts(json.counts);
       setLoadFailed(false);
-    } catch (err) {
+    } catch {
+      // Load failures render in place (AdminFailed); `error` is for actions only.
       setLoadFailed(true);
-      setError(err instanceof Error ? err.message : 'Failed to load pipeline');
     } finally {
       setLoading(false);
     }
@@ -104,10 +107,9 @@ export default function PipelinePage() {
     void fetchPipeline();
   };
 
-  const openChannels = async (rep: PipelineRep) => {
-    setSelectedRep(null);
-    setChannelsModal(rep);
+  const loadChannels = async (rep: PipelineRep) => {
     setChannelsLoading(true);
+    setChannelsFailed(false);
     try {
       if (!user) return;
       const response = await fetch(`/api/portal/pipeline/channels?userId=${rep.uid}`, {
@@ -116,18 +118,32 @@ export default function PipelinePage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load channels');
       setChannelRows(json.channels);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load channels');
-      setChannelsModal(null);
+    } catch {
+      setChannelsFailed(true);
     } finally {
       setChannelsLoading(false);
     }
   };
 
+  const openChannels = (rep: PipelineRep) => {
+    setSelectedRep(null);
+    setSheetError('');
+    setChannelRows([]);
+    setChannelsModal(rep);
+    void loadChannels(rep);
+  };
+
+  const closeChannels = () => {
+    setChannelsModal(null);
+    setChannelRows([]);
+    setChannelsFailed(false);
+    setSheetError('');
+  };
+
   const setChannelStatus = async (channelId: string, status: ChannelOnboardingStatus) => {
     if (!channelsModal || !user) return;
     setBusy(true);
-    setError('');
+    setSheetError('');
     try {
       const response = await fetch('/api/portal/pipeline/channels', {
         method: 'POST',
@@ -139,7 +155,7 @@ export default function PipelinePage() {
       setChannelRows((prev) => prev.map((c) => (c.id === channelId ? { ...c, status } : c)));
       await fetchPipeline();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update channel');
+      setSheetError(err instanceof Error ? err.message : 'Failed to update channel');
     } finally {
       setBusy(false);
     }
@@ -170,13 +186,20 @@ export default function PipelinePage() {
     setDecommissionModal(null);
     setDecommissionNotes('');
     setDecommissionReason('non_activity');
+    setSheetError('');
+  };
+
+  const openDecommission = (rep: PipelineRep) => {
+    setSelectedRep(null);
+    setSheetError('');
+    setDecommissionModal(rep);
   };
 
   const decommission = async () => {
     if (!user || !decommissionModal) return;
     if (!window.confirm(`Decommission ${decommissionModal.displayName}?`)) return;
     setBusy(true);
-    setError('');
+    setSheetError('');
     try {
       const response = await fetch('/api/portal/pipeline/decommission', {
         method: 'POST',
@@ -193,7 +216,7 @@ export default function PipelinePage() {
       closeDecommission();
       await fetchPipeline();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to decommission');
+      setSheetError(err instanceof Error ? err.message : 'Failed to decommission');
     } finally {
       setBusy(false);
     }
@@ -250,7 +273,7 @@ export default function PipelinePage() {
           sub="Review each rep's progress and open their details for next steps."
         />
 
-        {error && !loadFailed ? (
+        {error ? (
           <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
         ) : null}
         {success ? <AdminNotice tone="ok">{success}</AdminNotice> : null}
@@ -420,14 +443,14 @@ export default function PipelinePage() {
                 <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => void requestFieldTraining(selectedRep)}>
                   Field Train
                 </button>
-                <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => void openChannels(selectedRep)}>
+                <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => openChannels(selectedRep)}>
                   Channels
                 </button>
                 <button
                   type="button"
                   className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
                   disabled={busy}
-                  onClick={() => { setSelectedRep(null); setDecommissionModal(selectedRep); }}
+                  onClick={() => openDecommission(selectedRep)}
                 >
                   Decommission
                 </button>
@@ -479,21 +502,23 @@ export default function PipelinePage() {
         <AdminSheet
           title={`Channels · ${channelsModal.displayName}`}
           description="Xfinity is credentialed directly; all other channels go through DSI."
-          onClose={() => { setChannelsModal(null); setChannelRows([]); }}
+          onClose={closeChannels}
           footer={
             <button
               type="button"
               className={`${s.btnSecondary} ${u.sm}`}
-              onClick={() => { setChannelsModal(null); setChannelRows([]); }}
+              onClick={closeChannels}
             >
               Close
             </button>
           }
         >
           <div className={u.sheetPad}>
-            {error ? <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice> : null}
+            {sheetError ? <AdminNotice tone="error" onDismiss={() => setSheetError('')}>{sheetError}</AdminNotice> : null}
             {channelsLoading ? (
               <AdminSkeletonRows rows={3} label="Loading channels" />
+            ) : channelsFailed ? (
+              <AdminFailed what="channels" onRetry={() => void loadChannels(channelsModal)} />
             ) : (
               <ul className={p.channelList}>
                 {channelRows.map((channel) => {
@@ -546,7 +571,7 @@ export default function PipelinePage() {
           }
         >
           <div className={u.sheetPad}>
-            {error ? <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice> : null}
+            {sheetError ? <AdminNotice tone="error" onDismiss={() => setSheetError('')}>{sheetError}</AdminNotice> : null}
             <fieldset className={p.fieldset}>
               <legend className={u.label}>Reason</legend>
               <div className={p.choices}>
