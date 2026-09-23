@@ -10,8 +10,19 @@ import {
   type RefObject,
 } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, Check, CircleCheck, FileText, ImageUp, Loader2, RotateCcw, WifiOff } from 'lucide-react';
-import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  CircleCheck,
+  FileText,
+  ImageUp,
+  Loader2,
+  RotateCcw,
+  WifiOff,
+  X,
+} from 'lucide-react';
+import { friendlyError } from '@/lib/forms/friendlyError';
 import { isEmailShaped } from '@/lib/forms/managerInterview';
 import { BodyLayer } from './BodyLayer';
 import { useHideRepTabBar } from './RepShell';
@@ -308,16 +319,16 @@ export function YesNo({
 
 /** Server or network failure after submit. The form keeps what was typed. */
 export function FormAlert({ message, alertRef }: { message: string; alertRef?: RefObject<HTMLDivElement | null> }) {
-  const offline = /failed to fetch|load failed|networkerror|offline/i.test(message);
+  const shown = friendlyError(message);
   return (
     <div ref={alertRef} className={f.alert} role="alert">
-      {offline ? (
+      {shown.offline ? (
         <WifiOff size={20} strokeWidth={2} aria-hidden="true" />
       ) : (
         <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
       )}
       <p>
-        <strong>Not sent.</strong> {offline ? 'No signal. Check your connection and send again.' : message}
+        <strong>Not sent.</strong> {shown.message}
       </p>
     </div>
   );
@@ -513,9 +524,10 @@ type AttachState =
 
 /**
  * One file slot (photo, screenshot or PDF). `upload` does the work (snapshot,
- * shrink, POST) and resolves to the storage folder path. "View" opens the
- * local copy through the iOS-safe new-tab helper. `preview={false}` shows
- * neither a thumbnail nor View, for sensitive documents (license, W-9).
+ * shrink, POST) and resolves to the storage folder path. "View" shows an
+ * attached photo in an in-page viewer (a new tab opens blank in the iPhone
+ * home-screen app). `preview={false}` shows neither a thumbnail nor View, for
+ * sensitive documents (license, W-9).
  */
 export function Attachment({
   id,
@@ -548,6 +560,8 @@ export function Attachment({
     initialDone ? { kind: 'done', name: 'File on record', localUrl: null, isImage: false } : { kind: 'idle' }
   );
   const urlRef = useRef<string | null>(null);
+  const [viewing, setViewing] = useState(false);
+  const viewRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(
     () => () => {
@@ -617,16 +631,8 @@ export function Attachment({
             </span>
           </span>
           <span className={f.fileActions}>
-            {state.localUrl ? (
-              <button
-                type="button"
-                className={f.fileBtn}
-                onClick={() => {
-                  const url = state.localUrl;
-                  // Not async: the helper must open its tab inside this tap for iOS Safari.
-                  void openAttachmentInNewTab(async () => url);
-                }}
-              >
+            {state.localUrl && state.isImage ? (
+              <button ref={viewRef} type="button" className={f.fileBtn} onClick={() => setViewing(true)}>
                 View
               </button>
             ) : null}
@@ -663,6 +669,51 @@ export function Attachment({
         </label>
       )}
       <FieldNote id={id} error={shownError} hint={hint} />
+      {viewing && state.kind === 'done' && state.localUrl ? (
+        <PhotoViewer
+          src={state.localUrl}
+          name={state.name}
+          onClose={() => {
+            setViewing(false);
+            viewRef.current?.focus();
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/** A full-screen look at an attached photo, portaled to <body>. */
+function PhotoViewer({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <BodyLayer>
+      <div
+        className={`${s.backdrop} ${f.viewer}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={name}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <button ref={closeRef} type="button" className={`${s.iconBtn} ${f.viewerClose}`} aria-label="Close" onClick={onClose}>
+          <X size={22} aria-hidden="true" />
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={name} className={f.viewerImg} />
+      </div>
+    </BodyLayer>
   );
 }

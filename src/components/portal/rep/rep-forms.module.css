@@ -1025,3 +1025,27 @@
 .fieldInvalid .sigCanvas {
   border-color: var(--c-red);
 }
+
+/* ---------- attached photo viewer (portaled) ---------- */
+.viewer {
+  /* Above a sheet too: onboarding attaches files inside one. */
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top) + 64px) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4));
+  background: rgba(1, 4, 10, 0.94);
+}
+
+.viewerImg {
+  max-width: 100%;
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
+  border-radius: var(--r-control);
+  object-fit: contain;
+}
+
+.viewerClose {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--s2));
+  right: var(--s2);
+  color: var(--c-text);
+}
