@@ -5,9 +5,9 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { MoneySummary, OwnerSection, OwnerSummary, ProblemRow, RecruitingSummary } from '@/lib/owner/companySummary';
 import type { Section } from '@/hooks/useRepDashboard';
 
-// The owner's company view: one request per section, all in parallel, each
-// rendering as it lands. A failed section reports 'error' and retries alone —
-// it never shows zeros.
+// The owner's company view. The first load is ONE request for all three
+// sections, so the server reads the sales book once. A failed section reports
+// 'error' (never zeros) and its Retry asks for that section alone.
 
 export interface OwnerDashboardState {
   money: Section<MoneySummary>;
@@ -18,42 +18,56 @@ export interface OwnerDashboardState {
 const SECTIONS: OwnerSection[] = ['money', 'problems', 'recruiting'];
 const LOADING = { status: 'loading' } as const;
 
-async function loadSection(section: OwnerSection, token: string | null, signal: AbortSignal) {
-  const response = await fetch(`/api/portal/owner/summary?section=${section}`, {
+async function loadSummary(sections: OwnerSection[], token: string | null, signal: AbortSignal) {
+  const query = sections.length === 1 ? `?section=${sections[0]}` : '';
+  const response = await fetch(`/api/portal/owner/summary${query}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     signal,
   });
   const data = (await response.json().catch(() => null)) as (OwnerSummary & { error?: string }) | null;
   if (!response.ok || !data) throw new Error(data?.error || `Request failed (${response.status})`);
-  const value = data[section];
-  if (value === undefined) throw new Error(`Missing ${section}`);
-  return value;
+  return data;
 }
 
 export function useOwnerDashboard(enabled = true) {
   const [state, setState] = useState<OwnerDashboardState>({ money: LOADING, problems: LOADING, recruiting: LOADING });
+  // The request each section is waiting on; a stale response never overwrites a newer one.
   const controllers = useRef(new Map<OwnerSection, AbortController>());
 
   const run = useCallback(
     async (keys: OwnerSection[] = SECTIONS) => {
       if (!enabled) return;
+      const controller = new AbortController();
+      for (const key of keys) controllers.current.set(key, controller);
+      const current = (key: OwnerSection) =>
+        !controller.signal.aborted && controllers.current.get(key) === controller;
+
       const token = await getIdToken().catch(() => null);
-      await Promise.allSettled(
-        keys.map(async (key) => {
-          controllers.current.get(key)?.abort();
-          const controller = new AbortController();
-          controllers.current.set(key, controller);
-          try {
-            const data = await loadSection(key, token, controller.signal);
-            if (controller.signal.aborted) return;
-            setState((current) => ({ ...current, [key]: { status: 'ready', data } }));
-          } catch (error) {
-            if (controller.signal.aborted) return;
-            console.error(`Owner dashboard section "${key}" failed:`, error);
-            setState((current) => ({ ...current, [key]: { status: 'error' } }));
+      try {
+        const data = await loadSummary(keys, token, controller.signal);
+        setState((prev) => {
+          const next = { ...prev };
+          for (const key of keys) {
+            if (!current(key)) continue;
+            const value = data[key];
+            if (value === undefined) {
+              console.error(`Owner dashboard section "${key}" failed`);
+              next[key] = { status: 'error' };
+            } else {
+              (next as Record<OwnerSection, unknown>)[key] = { status: 'ready', data: value };
+            }
           }
-        })
-      );
+          return next;
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error(`Owner dashboard (${keys.join(', ')}) failed:`, error);
+        setState((prev) => {
+          const next = { ...prev };
+          for (const key of keys) if (current(key)) next[key] = { status: 'error' };
+          return next;
+        });
+      }
     },
     [enabled]
   );

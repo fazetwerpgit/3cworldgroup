@@ -192,6 +192,16 @@ describe('buildOwnerSummary', () => {
     expect(summary.problems).toBeUndefined();
   });
 
+  it('settles each section alone: a failed one is listed, the others still build', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const source = fakeSource({ loadCompPlan: vi.fn(async () => Promise.reject(new Error('quota'))) });
+    const summary = await buildOwnerSummary(source, ['money', 'problems', 'recruiting'], NOW);
+    expect(summary.failed).toEqual(['money']);
+    expect(summary.money).toBeUndefined();
+    expect(summary.problems).toBeDefined();
+    expect(summary.recruiting).toBeDefined();
+  });
+
   it('only looks up the reps who installed inside the money window', async () => {
     const source = fakeSource();
     await buildOwnerSummary(source, ['money'], NOW);
@@ -235,14 +245,17 @@ describe('buildOwnerSummary', () => {
     });
     const summary = await buildOwnerSummary(source, undefined, NOW);
     expect(summary.money && summary.problems && summary.recruiting).toBeTruthy();
-    expect(calls).toBe(3); // the Firestore source memoizes; the pure layer just asks
+    expect(calls).toBe(1); // one read shared by all three sections
     const json = JSON.stringify(summary);
     expect(json).not.toMatch(/Oak Street|Pine Avenue|Unique Road|repA/);
   });
 
   it('lets a failing read fail the section instead of reporting zeros', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const source = fakeSource({ countOpen: vi.fn(async () => Promise.reject(new Error('quota'))) });
-    await expect(buildOwnerSummary(source, ['problems'], NOW)).rejects.toThrow('quota');
+    const summary = await buildOwnerSummary(source, ['problems'], NOW);
+    expect(summary.failed).toEqual(['problems']);
+    expect(summary.problems).toBeUndefined();
   });
 });
 

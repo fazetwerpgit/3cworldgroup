@@ -9,8 +9,9 @@ export const dynamic = 'force-dynamic';
 // The owner's company view. OWNER ONLY: it carries the "3C Receives" margin,
 // which no admin, operations or field caller may see. Aggregate counts,
 // estimated dollars and page links only — never a customer or a rep's details.
-// The dashboard asks for one section per request so each loads (and fails) on
-// its own; no section means all three.
+// No section means all three, built from one read of the sales book; a section
+// that fails is listed in `failed` (the rest still return) so the dashboard can
+// show it as failed and retry just that one with ?section=.
 export async function GET(request: NextRequest) {
   const gate = await requireVerifiedManagement(request);
   if (!gate.ok) {
@@ -28,6 +29,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const summary = await buildOwnerSummary(createFirestoreOwnerSource(), sections);
+    if (summary.failed?.length === sections.length) {
+      return NextResponse.json({ error: 'Failed to build the owner summary' }, { status: 500 });
+    }
     return NextResponse.json(summary, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Owner summary failed:', error);
