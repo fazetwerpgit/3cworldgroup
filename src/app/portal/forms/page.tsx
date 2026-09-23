@@ -6,24 +6,10 @@ import { RepShell } from '@/components/portal/rep/RepShell';
 import s from '@/components/portal/rep/rep.module.css';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
+import { canOpenManagerInterview } from '@/lib/forms/managerInterview';
 
 // Forms hub, direction D. Payroll dispute leads: it is the one the dashboard
 // sends reps to ("Missing an install?").
-
-const managerInterviewRoles = [
-  'admin',
-  'operations',
-  'l1_manager',
-  'l2_manager',
-  'ibo_level_1',
-  'ibo_level_2',
-  'ibo_level_3',
-  'ibo_level_4',
-  'general_manager',
-  'office_manager',
-  'regional_manager',
-  'director',
-] as const;
 
 const FORMS: Array<{
   href: string;
@@ -71,8 +57,8 @@ const FORMS: Array<{
 
 function FormsHub() {
   const { isRole } = useAuth();
-  const canOpenManagerInterview = isRole(...managerInterviewRoles);
-  const visible = FORMS.filter((form) => !form.managerOnly || canOpenManagerInterview);
+  const canOpen = canOpenManagerInterview(isRole);
+  const visible = FORMS.filter((form) => !form.managerOnly || canOpen);
 
   return (
     <>
