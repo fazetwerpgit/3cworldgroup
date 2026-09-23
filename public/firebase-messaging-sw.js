@@ -46,17 +46,20 @@ self.addEventListener('push', (event) => {
     (async () => {
       const target = new URL(url, self.location.origin);
       const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      // Someone already reading the chat sees the message arrive live, so a
-      // banner would just be noise. A notification must still be shown for
-      // every push, so show it silently and close it straight away.
+      // Someone already reading that channel sees the message arrive live, so
+      // a banner would just be noise. The chat page keeps ?channel= set to the
+      // thread on screen; any other channel (or the channel list) still gets
+      // the banner. A notification must still be shown for every push, so show
+      // it silently and close it straight away.
+      const targetChannel = target.searchParams.get('channel');
       const watchingChat =
         target.pathname === '/portal/chat' &&
-        clientList.some(
-          (client) =>
-            client.focused &&
-            client.visibilityState === 'visible' &&
-            new URL(client.url).pathname === '/portal/chat'
-        );
+        Boolean(targetChannel) &&
+        clientList.some((client) => {
+          if (!client.focused || client.visibilityState !== 'visible') return false;
+          const open = new URL(client.url);
+          return open.pathname === '/portal/chat' && open.searchParams.get('channel') === targetChannel;
+        });
       const tag = watchingChat ? `seen-${Date.now()}` : undefined;
       await self.registration.showNotification(title, {
         body,

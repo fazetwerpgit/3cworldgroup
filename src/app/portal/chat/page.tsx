@@ -618,23 +618,30 @@ export default function TeamChatPage() {
   }, [attachPreview]);
 
   // A chat push opens /portal/chat?channel=<id>: land in that channel (the
-  // thread screen on phones), then drop the param so a reload or a later
-  // channel switch isn't overridden by it. An id the user can't see falls back
-  // to the first channel via the effect below.
+  // thread screen on phones). An id the user can't see falls back to the first
+  // channel via the effect below.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const linkedChannel = params.get('channel');
+    const linkedChannel = new URLSearchParams(window.location.search).get('channel');
     if (!linkedChannel) return;
     setActiveChannelId(linkedChannel);
     setMobileView('thread');
-    params.delete('channel');
+  }, []);
+
+  // Keep ?channel= naming the thread actually on screen (none while the phone
+  // channel list shows). The service worker reads it to silence a push only
+  // for the channel being read, not for every chat page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get('channel') ?? '') === viewingChannelId) return;
+    if (viewingChannelId) params.set('channel', viewingChannelId);
+    else params.delete('channel');
     const rest = params.toString();
     window.history.replaceState(
       window.history.state,
       '',
       `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`
     );
-  }, []);
+  }, [viewingChannelId]);
 
   useEffect(() => {
     if (!activeChannelId && channels.length > 0) {
