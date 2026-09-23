@@ -1,0 +1,256 @@
+/* Onboarding checklist, direction D. Tokens come from rep.module.css (.root in
+   the shell, .layer on the portaled sheet). Header and aside reuse the forms
+   hub classes in rep-forms.module.css. */
+
+/* ---------- progress ---------- */
+.progress {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.scoreNum {
+  font-family: var(--f-display);
+  font-size: var(--t-score);
+  font-variant-numeric: tabular-nums;
+  line-height: 0.85;
+}
+
+.scoreOf {
+  color: var(--c-text-3);
+  font-family: var(--f-display);
+  font-size: var(--t-d2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.scoreLabel {
+  margin-left: auto;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.progressDone {
+  color: var(--c-lime-hi);
+}
+
+/* ---------- checklist ---------- */
+.list {
+  display: grid;
+  margin: var(--s4) 0 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+.list > li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 84px;
+  padding: var(--s4);
+}
+
+.row[data-state='rejected'] {
+  box-shadow: inset 3px 0 0 var(--c-amber);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rowName {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.rowDesc {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.row[data-state='approved'] .rowName {
+  color: var(--c-text-2);
+}
+
+.rowBtn {
+  min-width: 96px;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+}
+
+.rowBtnPrimary {
+  border-color: var(--c-lime);
+  color: var(--c-lime-hi);
+}
+
+/* Status pill: word first, colour second. */
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+}
+
+.state::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+
+.state[data-state='approved'] {
+  color: var(--c-lime);
+}
+
+.state[data-state='approved']::before {
+  background: currentColor;
+}
+
+.state[data-state='submitted'] {
+  color: var(--c-blue);
+}
+
+.state[data-state='submitted']::before {
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+}
+
+.state[data-state='rejected'] {
+  color: var(--c-amber);
+}
+
+.state[data-state='rejected']::before {
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* ---------- loading / empty ---------- */
+.skelRow {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+}
+
+.skelRow + .skelRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.empty {
+  margin: var(--s4) 0 0;
+  padding: var(--s5) var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+/* ---------- aside ---------- */
+.asideItem {
+  display: grid;
+  gap: 4px;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--c-line);
+}
+
+.asideItem h3 {
+  margin: 0;
+  font-size: var(--t-ui);
+  font-weight: 650;
+}
+
+.asideItem p {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+/* ---------- sheet ---------- */
+.sheetStatus {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--s2) 0;
+}
+
+.sheetInner {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s4) var(--s4) var(--s5);
+}
+
+.note {
+  margin: 0;
+  padding: 14px var(--s4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  background: var(--c-ground);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.note strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--c-text);
+  font-weight: 650;
+}
+
+.noteWarn {
+  border-color: rgba(245, 185, 69, 0.45);
+  background: var(--c-amber-wash);
+}
+
+.noteWarn strong {
+  color: var(--c-amber);
+}
+
+.slots {
+  display: grid;
+  gap: var(--s4);
+}
+
+.submit {
+  width: 100%;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (min-width: 640px) {
+  .slots {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .progress {
+    padding: var(--s5);
+  }
+
+  .row {
+    padding: var(--s4) var(--s5);
+  }
+}

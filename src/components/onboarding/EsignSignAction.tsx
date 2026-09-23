@@ -5,19 +5,13 @@ import { useRouter } from 'next/navigation';
 import { loadSignWellEmbed } from '@/lib/esign/embedClient';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ESIGN_FAILURE_HELPER_TEXT } from '@/lib/onboarding/esign';
-import { Button } from '@/components/ui/button';
+import s from '@/components/portal/rep/rep.module.css';
+import o from './onboarding.module.css';
 
 const CONFIRM_POLL_MS = 3000;
 const CONFIRM_POLL_MAX = 10;
 
-type EsignActionState =
-  | 'idle'
-  | 'opening'
-  | 'signing'
-  | 'confirming'
-  | 'slow-confirming'
-  | 'declined'
-  | 'failed';
+type EsignActionState = 'idle' | 'opening' | 'signing' | 'confirming' | 'slow-confirming' | 'declined' | 'failed';
 
 interface Props {
   itemId: string;
@@ -145,42 +139,42 @@ export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
 
   if (state === 'confirming') {
     return (
-      <div className="member-line-note">
-        Signature received - confirming with the signing service. This completes automatically.
-      </div>
+      <p className={o.note} role="status">
+        Signature received. Confirming with the signing service; this completes automatically.
+      </p>
     );
   }
 
   if (state === 'slow-confirming') {
     return (
-      <div className="member-line-note">
-        Signature received. Confirmation is taking longer than usual - it finishes automatically,
-        nothing else is needed from you.
-      </div>
+      <p className={o.note} role="status">
+        Signature received. Confirmation is taking longer than usual. It finishes automatically, and nothing else is
+        needed from you.
+      </p>
     );
   }
 
   if (state === 'declined') {
     return (
-      <div className="member-line-note warn">
+      <p className={`${o.note} ${o.noteWarn}`}>
         You declined this document. Reach out to your manager if that was a mistake.
-      </div>
+      </p>
     );
   }
 
   if (state === 'failed') {
-    return <div className="member-line-note warn">{ESIGN_FAILURE_HELPER_TEXT}</div>;
+    return <p className={`${o.note} ${o.noteWarn}`}>{ESIGN_FAILURE_HELPER_TEXT}</p>;
   }
 
   return (
-    <Button
+    <button
       type="button"
       onClick={() => void open()}
       disabled={state === 'opening' || state === 'signing'}
-      className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+      className={`${s.btnPrimary} ${o.submit}`}
     >
-      {state === 'opening' ? 'Opening...' : 'Sign now'}
-    </Button>
+      {state === 'opening' ? 'Opening…' : 'Sign now'}
+    </button>
   );
 }
 

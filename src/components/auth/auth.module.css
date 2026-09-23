@@ -1,0 +1,585 @@
+/* Pre-auth screens (sign in, sign up, pending approval, profile retry, portal
+   error), direction D. Tokens come from rep.module.css's .layer wrapper; the
+   ground and its light are copied from the rep shell's .root so these screens
+   read as the same app with no RepShell mounted. Field styles follow Log Sale. */
+
+.screen {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font-size: var(--t-body);
+  line-height: 1.4;
+}
+
+/* Same navy light as the rep shell, fixed behind everything. */
+.screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(140% 62% at 50% -6%, rgba(60, 110, 200, 0.2) 0%, rgba(60, 110, 200, 0.124) 35%, rgba(60, 110, 200, 0.052) 68%, transparent 100%),
+    radial-gradient(70% 34% at 80% 20%, rgba(141, 198, 63, 0.085) 0%, rgba(141, 198, 63, 0.053) 35%, rgba(141, 198, 63, 0.022) 68%, transparent 100%),
+    radial-gradient(120% 90% at 50% 38%, transparent 55%, rgba(0, 2, 6, 0.38) 82%, rgba(0, 2, 6, 0.6) 100%);
+}
+
+/* The global body is white; without this an overscroll bounce flashes it. */
+:global(body):has(.screen) {
+  background: #03070e;
+}
+
+/* globals.css colours every .portal-scope field with the light theme's
+   foreground; D is dark only. */
+.screen :is(input, select, textarea) {
+  color: var(--c-text);
+}
+
+.screen :is(a, button):focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+/* ---------- top ---------- */
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  max-width: 1200px;
+  height: var(--topbar-h);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 34px;
+  height: auto;
+}
+
+.brandWord {
+  padding-top: 3px;
+  font-family: var(--f-display);
+  font-size: var(--t-d3);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.brandTag {
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+/* ---------- stage ---------- */
+.stage,
+.stageSolo {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: var(--s5);
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--s4) var(--gutter) var(--s5);
+}
+
+.stageSolo {
+  align-content: center;
+  justify-items: center;
+}
+
+.statement {
+  min-width: 0;
+}
+
+.display {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.92;
+}
+
+.display em {
+  color: var(--c-lime);
+  font-style: normal;
+}
+
+.statementLede {
+  max-width: 34ch;
+  margin: var(--s3) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.features {
+  display: none;
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  padding: var(--s5) var(--s4);
+}
+
+.stage .card {
+  justify-self: center;
+}
+
+/* ---------- card content ---------- */
+.kicker {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: var(--s2) 0 0;
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+.sub {
+  margin: var(--s2) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.statusIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-panel);
+  background: var(--c-ground);
+  color: var(--c-lime);
+}
+
+.statusIconWarn {
+  color: var(--c-amber);
+}
+
+.stack {
+  display: grid;
+  gap: var(--s4);
+  margin-top: var(--s5);
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+  margin-top: var(--s5);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 var(--s2);
+  border: 0;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.linkLime {
+  color: var(--c-lime-hi);
+}
+
+@media (hover: hover) {
+  .link:hover {
+    color: var(--c-text);
+  }
+}
+
+.linkRow {
+  margin: var(--s4) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: center;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--c-line);
+}
+
+.google {
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+}
+
+.btn {
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- fields (from Log Sale) ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  min-height: 24px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font: 400 var(--t-body) / 1 var(--f-ui);
+  appearance: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--c-text-3);
+}
+
+.input:focus {
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+.passWrap {
+  position: relative;
+  display: block;
+}
+
+.passWrap .input {
+  padding-right: 52px;
+}
+
+.eye {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: 14px var(--s4);
+  border: 1px solid rgba(255, 138, 128, 0.5);
+  border-radius: var(--r-panel);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--c-red);
+}
+
+.alert svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.alert p {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.alert a {
+  color: var(--c-lime-hi);
+  font-weight: 600;
+}
+
+.ok {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: 14px var(--s4);
+  border: 1px solid rgba(141, 198, 63, 0.45);
+  border-radius: var(--r-panel);
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+.ok p {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+/* Password strength: three segments. */
+.strength {
+  display: grid;
+  gap: 6px;
+}
+
+.strengthBar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.strengthBar i {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--c-track);
+}
+
+.strengthBar[data-level='weak'] i:nth-child(1) {
+  background: var(--c-red);
+}
+
+.strengthBar[data-level='okay'] i:nth-child(-n + 2) {
+  background: var(--c-amber);
+}
+
+.strengthBar[data-level='strong'] i {
+  background: var(--c-lime);
+}
+
+.strengthLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* Sign-up steps beside the form. */
+.steps {
+  display: grid;
+  gap: var(--s3);
+  margin: var(--s5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: baseline;
+  gap: var(--s3);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.steps b {
+  color: var(--c-lime);
+  font-family: var(--f-display);
+  font-size: var(--t-d3);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.note {
+  margin: var(--s5) 0 0;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+/* ---------- foot ---------- */
+.foot {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--s4);
+}
+
+.footLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .footLink:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- phone: the statement shrinks to its headline so the form's
+   submit button stays near the first screen ---------- */
+@media (max-width: 1023px) {
+  .stage {
+    gap: var(--s4);
+    padding-top: var(--s2);
+  }
+
+  .statementLede {
+    display: none;
+  }
+
+  .stack {
+    margin-top: var(--s4);
+  }
+
+  .stack + .stack {
+    margin-top: var(--s4);
+  }
+}
+
+/* ---------- desktop ---------- */
+@media (min-width: 1024px) {
+  .screen::before {
+    background:
+      radial-gradient(80% 75% at 38% -14%, rgba(60, 110, 200, 0.26) 0%, rgba(60, 110, 200, 0.161) 35%, rgba(60, 110, 200, 0.068) 68%, transparent 100%),
+      radial-gradient(30% 40% at 44% 24%, rgba(141, 198, 63, 0.09) 0%, rgba(141, 198, 63, 0.056) 35%, rgba(141, 198, 63, 0.023) 68%, transparent 100%),
+      radial-gradient(55% 70% at 96% 104%, rgba(60, 110, 200, 0.12) 0%, rgba(60, 110, 200, 0.074) 35%, rgba(60, 110, 200, 0.031) 68%, transparent 100%),
+      radial-gradient(100% 100% at 50% 40%, transparent 58%, rgba(0, 2, 6, 0.35) 84%, rgba(0, 2, 6, 0.55) 100%);
+  }
+
+  .stage {
+    grid-template-columns: minmax(0, 1fr) 440px;
+    align-content: center;
+    align-items: start;
+    gap: var(--s7);
+    padding-top: var(--s6);
+    padding-bottom: var(--s6);
+  }
+
+  .statement {
+    padding-top: var(--s7);
+  }
+
+  .display {
+    font-size: 112px;
+    line-height: 0.88;
+  }
+
+  .statementLede {
+    margin-top: var(--s5);
+    font-size: 17px;
+  }
+
+  .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2) var(--s5);
+    margin: var(--s6) 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--c-text-2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .features li {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+  }
+
+  .features li::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--c-lime);
+    box-shadow: 0 0 10px var(--c-lime-glow);
+  }
+
+  .card {
+    padding: var(--s6);
+  }
+
+  .title {
+    font-size: 48px;
+  }
+}

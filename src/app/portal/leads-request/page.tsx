@@ -1,29 +1,36 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { RepShell } from '@/components/portal/rep/RepShell';
 import {
-  FormsLineAlert,
-  FormsLineChoicePicker,
-  FormsLineControl,
-  FormsLineActions,
-  FormsLineIdentity,
-  FormsLineRail,
-  FormsLineSection,
-  FormsLineShell,
-  FormsLineSuccess,
-} from '@/components/forms/FormsLine';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-leftovers.css';
-import FileUpload from '@/components/onboarding/FileUpload';
+  Attachment,
+  Choices,
+  Field,
+  FormAlert,
+  FormFrame,
+  FormHeader,
+  FormSection,
+  FormSent,
+  UPLOADING_MESSAGE,
+  describe,
+  useAlertScroll,
+  useFormCheck,
+  useUploadsInFlight,
+  type FieldRule,
+} from '@/components/portal/rep/RepForm';
+import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
 import { LEADS_CATEGORIES, LEADS_REASONS } from '@/lib/forms/formOptions';
 import { leadsConditions } from '@/lib/forms/leadsPredicates';
-import { FORM_ATTACHMENT_TYPES, newFormUploadId } from '@/lib/forms/formUploads';
-import { RoleDisplayNames, getEffectiveRole } from '@/types';
+import { newFormUploadId } from '@/lib/forms/formUploads';
+import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
+
+// Leads request, direction D. Category, reason and location reveal the
+// conditional details and proof slots (leadsConditions, shared with the API).
+
+const FORM_ID = 'leads-request-form';
 
 const EMPTY = {
   campaign: '', managerName: '', managerEmail: '', repFirstName: '', repLastName: '',
@@ -31,8 +38,30 @@ const EMPTY = {
   situationDescription: '', hostileUploadPath: '', blindKnockUploadPath: '',
   lassoUploadPath: '', newRepPhone: '', newRepEmail: '',
 };
+type Form = typeof EMPTY;
 
-export default function LeadsRequestPage() {
+const RULES: FieldRule<Form>[] = [
+  { key: 'campaign', id: 'campaign', message: 'Pick the campaign' },
+  { key: 'managerName', id: 'managerName', message: 'Pick your manager' },
+  { key: 'managerEmail', id: 'manager-email', message: "Enter your manager's email" },
+  { key: 'repFirstName', id: 'rep-first-name', message: 'Enter the first name' },
+  { key: 'repLastName', id: 'rep-last-name', message: 'Enter the last name' },
+  { key: 'location', id: 'location', message: 'Pick a location' },
+];
+
+const getHeaders = async (): Promise<HeadersInit> => {
+  const token = await auth?.currentUser?.getIdToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+type Slot = 'hostile' | 'blind-knock' | 'lasso';
+const SLOT_FIELD: Record<Slot, keyof Form> = {
+  hostile: 'hostileUploadPath',
+  'blind-knock': 'blindKnockUploadPath',
+  lasso: 'lassoUploadPath',
+};
+
+function LeadsRequestForm() {
   const { user } = useAuth();
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
@@ -42,14 +71,57 @@ export default function LeadsRequestPage() {
   const [saving, setSaving] = useState(false);
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
+  const alertRef = useAlertScroll(error);
+  const check = useFormCheck(form, RULES);
+  const { uploading, onBusyChange } = useUploadsInFlight();
 
   const cond = leadsConditions({ category: form.category, reason: form.reason, location: form.location });
-  const hasConditionalDetails = cond.needsSpecialRequest || cond.needsLeadPackCode || cond.needsHostile || cond.needsBlindKnock || cond.needsNewRep;
+  const hasConditionalDetails =
+    cond.needsSpecialRequest || cond.needsLeadPackCode || cond.needsHostile || cond.needsBlindKnock || cond.needsNewRep;
   const hasUploads = cond.needsHostile || cond.needsBlindKnock || cond.needsLasso;
+
+  const set = (key: keyof Form, value: string) => {
+    setForm((p) => ({ ...p, [key]: value }));
+    check.clear(key);
+  };
+  const text = (key: keyof Form, id: string) => ({
+    id,
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(key, e.target.value),
+    className: f.input,
+    autoComplete: 'off',
+    ...describe(id, check.errors[key]),
+  });
+
+  const attachment = (slot: Slot, id: string, label: string) => (
+    <Attachment
+      key={`${slot}-${uploadId}`}
+      id={id}
+      label={label}
+      accept="image/*,application/pdf"
+      upload={(file) =>
+        uploadFormAttachment({
+          file,
+          itemId: `leads-request-${slot}`,
+          formType: 'leads-request',
+          slot,
+          fields: { uploadId },
+          getHeaders,
+        })
+      }
+      onUploaded={(path) => setForm((p) => ({ ...p, [SLOT_FIELD[slot]]: path }))}
+      onBusyChange={onBusyChange}
+    />
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || saving) return;
+    if (!check.validate()) return;
+    if (uploading) {
+      setError(UPLOADING_MESSAGE);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -72,154 +144,142 @@ export default function LeadsRequestPage() {
     }
   };
 
-  const getHeaders = async (): Promise<HeadersInit> => {
-    const token = await auth?.currentUser?.getIdToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
+  if (referenceId) {
+    return (
+      <FormSent
+        title="Request sent"
+        referenceId={referenceId}
+        message="The lead request is in the review queue. The team follows up through the portal record."
+        againLabel="Send another request"
+        onAgain={() => {
+          setReferenceId('');
+          check.reset();
+        }}
+      />
+    );
+  }
 
-  const displayName = user?.displayName || user?.email || 'current user';
-  const role = getEffectiveRole(user);
-  const roleLabel = role ? RoleDisplayNames[role] : 'Portal user';
-
+  let n = 0;
   return (
-    <ProtectedRoute>
-      <FormsLineShell>
-        <section className="forms-line-fill" aria-label="Leads Request">
-          <PageTitle
-            title="Leads Request"
-            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
-          />
-          {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
-          <div className="forms-line-fill-body">
-            <div>
-              <form onSubmit={submit}>
-                <FormsLineSection
-                  index={1}
-                  title="Who you are"
-                  identity={<FormsLineIdentity name={displayName} role={roleLabel} />}
-                >
-                  <FormsLineChoicePicker
-                    name="campaign"
-                    label="Campaign"
-                    value={form.campaign}
-                    options={options.leadsCampaigns}
-                    onChange={(campaign) => setForm((p) => ({ ...p, campaign }))}
-                    required
-                  />
-                  <FormsLineChoicePicker
-                    name="managerName"
-                    label="Manager name"
-                    value={form.managerName}
-                    options={options.leadsManagers}
-                    onChange={(managerName) => setForm((p) => ({ ...p, managerName }))}
-                    required
-                  />
-                  <FormsLineControl id="manager-email" label="Manager email" required>
-                    <input id="manager-email" value={form.managerEmail} onChange={(e) => setForm((p) => ({ ...p, managerEmail: e.target.value }))} required />
-                  </FormsLineControl>
-                  <FormsLineControl id="rep-first-name" label="Rep first name" required>
-                    <input id="rep-first-name" value={form.repFirstName} onChange={(e) => setForm((p) => ({ ...p, repFirstName: e.target.value }))} required />
-                  </FormsLineControl>
-                  <FormsLineControl id="rep-last-name" label="Rep last name" required>
-                    <input id="rep-last-name" value={form.repLastName} onChange={(e) => setForm((p) => ({ ...p, repLastName: e.target.value }))} required />
-                  </FormsLineControl>
-                  <FormsLineChoicePicker
-                    name="location"
-                    label="Location"
-                    value={form.location}
-                    options={options.leadsLocations}
-                    onChange={(location) => setForm((p) => ({ ...p, location }))}
-                    required
-                  />
-                </FormsLineSection>
-                <FormsLineSection index={2} title="Request details">
-                  <FormsLineChoicePicker
-                    name="category"
-                    label="Category"
-                    value={form.category}
-                    options={LEADS_CATEGORIES}
-                    onChange={(category) => setForm((p) => ({ ...p, category }))}
-                  />
-                  <FormsLineChoicePicker
-                    name="reason"
-                    label="Reason"
-                    value={form.reason}
-                    options={LEADS_REASONS}
-                    onChange={(reason) => setForm((p) => ({ ...p, reason }))}
-                    dependent
-                  />
-                </FormsLineSection>
-                {hasConditionalDetails && (
-                  <FormsLineSection index={3} title="Conditional details">
-                    {cond.needsSpecialRequest && (
-                      <FormsLineControl id="special-request" label="Special request explanation" className="forms-line-field-full">
-                        <textarea id="special-request" value={form.specialRequest} onChange={(e) => setForm((p) => ({ ...p, specialRequest: e.target.value }))} />
-                      </FormsLineControl>
-                    )}
-                    {cond.needsLeadPackCode && (
-                      <FormsLineControl id="lead-pack-code" label="Lead pack code">
-                        <input id="lead-pack-code" value={form.leadPackCode} onChange={(e) => setForm((p) => ({ ...p, leadPackCode: e.target.value }))} />
-                      </FormsLineControl>
-                    )}
-                    {(cond.needsHostile || cond.needsBlindKnock) && (
-                      <FormsLineControl id="situation-description" label="Situation description" className="forms-line-field-full">
-                        <textarea id="situation-description" value={form.situationDescription} onChange={(e) => setForm((p) => ({ ...p, situationDescription: e.target.value }))} />
-                      </FormsLineControl>
-                    )}
-                    {cond.needsNewRep && (
-                      <>
-                        <FormsLineControl id="new-rep-phone" label="New-rep phone">
-                          <input id="new-rep-phone" type="tel" value={form.newRepPhone} onChange={(e) => setForm((p) => ({ ...p, newRepPhone: e.target.value }))} />
-                        </FormsLineControl>
-                        <FormsLineControl id="new-rep-email" label="New-rep email">
-                          <input id="new-rep-email" value={form.newRepEmail} onChange={(e) => setForm((p) => ({ ...p, newRepEmail: e.target.value }))} />
-                        </FormsLineControl>
-                      </>
-                    )}
-                  </FormsLineSection>
-                )}
-                {hasUploads && (
-                  <FormsLineSection index={4} title="Proof">
-                    {cond.needsHostile && (
-                      <FormsLineControl id="hostile-attachment" label="Hostile attachment" className="forms-line-field-full">
-                        <div className="forms-line-upload">
-                          <FileUpload key={`hostile-${uploadId}`} itemId="leads-request-hostile" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'hostile', uploadId }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, hostileUploadPath: path }))} />
-                          <p className="forms-line-proof-hint">PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
-                        </div>
-                      </FormsLineControl>
-                    )}
-                    {cond.needsBlindKnock && (
-                      <FormsLineControl id="blind-knock-attachment" label="Blind-knock attachment" className="forms-line-field-full">
-                        <div className="forms-line-upload">
-                          <FileUpload key={`blind-knock-${uploadId}`} itemId="leads-request-blind-knock" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'blind-knock', uploadId }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, blindKnockUploadPath: path }))} />
-                          <p className="forms-line-proof-hint">PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
-                        </div>
-                      </FormsLineControl>
-                    )}
-                    {cond.needsLasso && (
-                      <FormsLineControl id="lasso-attachment" label="Lasso attachment" className="forms-line-field-full">
-                        <div className="forms-line-upload">
-                          <FileUpload key={`lasso-${uploadId}`} itemId="leads-request-lasso" accept="image/*,application/pdf" allowedTypes={FORM_ATTACHMENT_TYPES} uploadUrl="/api/portal/forms/upload" extraFields={{ formType: 'leads-request', slot: 'lasso', uploadId }} getHeaders={getHeaders} onUploaded={(path) => setForm((p) => ({ ...p, lassoUploadPath: path }))} />
-                          <p className="forms-line-proof-hint">PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
-                        </div>
-                      </FormsLineControl>
-                    )}
-                  </FormsLineSection>
-                )}
-                <FormsLineActions verb="request" saving={saving} />
-              </form>
-              {referenceId && (
-                <FormsLineSuccess
-                  title="Request received"
-                  referenceId={referenceId}
-                  message="The lead request is in the review queue. The owner can follow up through the portal record."
-                />
-              )}
-            </div>
-            <FormsLineRail status="Ready for lead review" note="Your choices show the team what help is needed." />
-          </div>
-        </section>
-      </FormsLineShell>
-    </ProtectedRoute>
+    <FormFrame
+      formId={FORM_ID}
+      onSubmit={submit}
+      header={<FormHeader title="Leads request" lede="Ask for a lead pack, or flag a problem in your territory." />}
+      alert={error ? <FormAlert message={error} alertRef={alertRef} /> : null}
+      submitLabel="Send request"
+      saving={saving}
+      uploading={uploading}
+      done={check.done}
+      total={check.total}
+      submitter={user?.displayName || user?.email || 'you'}
+      routeTo="Lead review"
+      note="Your choices show the team what help is needed."
+    >
+      <FormSection n={++n} title="Who it's for">
+        <Choices
+          name="campaign"
+          label="Campaign"
+          value={form.campaign}
+          options={options.leadsCampaigns}
+          onChange={(value) => set('campaign', value)}
+          required
+          error={check.errors.campaign}
+        />
+        <Choices
+          name="managerName"
+          label="Manager"
+          value={form.managerName}
+          options={options.leadsManagers}
+          onChange={(value) => set('managerName', value)}
+          required
+          error={check.errors.managerName}
+        />
+        <Field id="manager-email" label="Manager email" required error={check.errors.managerEmail} wide>
+          <input {...text('managerEmail', 'manager-email')} type="email" inputMode="email" />
+        </Field>
+        <Field id="rep-first-name" label="Rep first name" required error={check.errors.repFirstName}>
+          <input {...text('repFirstName', 'rep-first-name')} autoCapitalize="words" />
+        </Field>
+        <Field id="rep-last-name" label="Rep last name" required error={check.errors.repLastName}>
+          <input {...text('repLastName', 'rep-last-name')} autoCapitalize="words" />
+        </Field>
+        <Choices
+          name="location"
+          label="Location"
+          value={form.location}
+          options={options.leadsLocations}
+          onChange={(value) => set('location', value)}
+          required
+          error={check.errors.location}
+        />
+      </FormSection>
+
+      <FormSection n={++n} title="The request">
+        <Choices
+          name="category"
+          label="Category"
+          value={form.category}
+          options={LEADS_CATEGORIES}
+          onChange={(value) => set('category', value)}
+        />
+        <Choices
+          name="reason"
+          label="Reason"
+          value={form.reason}
+          options={LEADS_REASONS}
+          onChange={(value) => set('reason', value)}
+        />
+      </FormSection>
+
+      {hasConditionalDetails ? (
+        <FormSection n={++n} title="Details">
+          {cond.needsSpecialRequest ? (
+            <Field id="special-request" label="Special request explanation" wide>
+              <textarea {...text('specialRequest', 'special-request')} className={`${f.input} ${f.textarea}`} rows={3} />
+            </Field>
+          ) : null}
+          {cond.needsLeadPackCode ? (
+            <Field id="lead-pack-code" label="Lead pack code">
+              <input {...text('leadPackCode', 'lead-pack-code')} autoCapitalize="characters" />
+            </Field>
+          ) : null}
+          {cond.needsHostile || cond.needsBlindKnock ? (
+            <Field id="situation-description" label="What happened" wide>
+              <textarea
+                {...text('situationDescription', 'situation-description')}
+                className={`${f.input} ${f.textarea}`}
+                rows={4}
+              />
+            </Field>
+          ) : null}
+          {cond.needsNewRep ? (
+            <>
+              <Field id="new-rep-phone" label="New rep phone">
+                <input {...text('newRepPhone', 'new-rep-phone')} type="tel" inputMode="tel" />
+              </Field>
+              <Field id="new-rep-email" label="New rep email">
+                <input {...text('newRepEmail', 'new-rep-email')} type="email" inputMode="email" />
+              </Field>
+            </>
+          ) : null}
+        </FormSection>
+      ) : null}
+
+      {hasUploads ? (
+        <FormSection n={++n} title="Proof">
+          {cond.needsHostile ? attachment('hostile', 'hostile-attachment', 'Hostile situation proof') : null}
+          {cond.needsBlindKnock ? attachment('blind-knock', 'blind-knock-attachment', 'Blind-knock proof') : null}
+          {cond.needsLasso ? attachment('lasso', 'lasso-attachment', 'Lasso attachment') : null}
+        </FormSection>
+      ) : null}
+    </FormFrame>
+  );
+}
+
+export default function LeadsRequestPage() {
+  return (
+    <RepShell task="Leads request">
+      <LeadsRequestForm />
+    </RepShell>
   );
 }

@@ -1,0 +1,1027 @@
+/* Rep request forms + forms hub, direction D. Field, error and submit styles
+   are copied from rep-logsale.module.css (the finished D form) so the two
+   stay one language without coupling the files. Tokens live on .root / .layer
+   in rep.module.css. */
+
+/* The fixed submit bar replaces the tab bar on phones; leave room above it. */
+.page {
+  padding-bottom: calc(var(--s7) + var(--s4));
+}
+
+.frame {
+  display: grid;
+  gap: var(--s5);
+}
+
+.body {
+  display: grid;
+  gap: var(--s5);
+  min-width: 0;
+}
+
+/* ---------- header ---------- */
+.header {
+  display: grid;
+  gap: var(--s2);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  min-height: var(--tap);
+  margin: calc(var(--s3) * -1) 0 calc(var(--s2) * -1);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .backLink:hover {
+    color: var(--c-text);
+  }
+}
+
+.title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+.lede {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.who {
+  margin: calc(var(--s2) * -1) 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.who strong {
+  color: var(--c-text-2);
+  font-weight: 600;
+}
+
+/* Phones: the top bar carries the form name; keep the h1 for screen readers. */
+@media (max-width: 1023px) {
+  .header .backLink {
+    display: none;
+  }
+
+  .header .title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* ---------- sections ---------- */
+.form {
+  display: grid;
+  gap: var(--s6);
+}
+
+.section {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  margin: 0;
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--c-line);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sectionHead b {
+  color: var(--c-lime);
+  font-family: var(--f-display);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.grid {
+  display: grid;
+  gap: 20px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+/* ---------- fields (from Log Sale) ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  scroll-margin-top: 96px;
+}
+
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend {
+  width: 100%;
+  margin-bottom: var(--s2);
+  padding: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  min-height: 24px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.req {
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font: 400 var(--t-body) / 1 var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  appearance: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--c-text-3);
+}
+
+.input:focus {
+  border-color: var(--c-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+.input[type='date'] {
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+.textarea {
+  height: auto;
+  min-height: 112px;
+  padding: 14px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.selectWrap {
+  position: relative;
+  display: block;
+}
+
+.selectWrap .input {
+  padding-right: 44px;
+}
+
+.selectWrap svg {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--c-text-2);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.hint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px dashed var(--c-line-strong);
+  border-radius: var(--r-control);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.fieldInvalid .input,
+.fieldInvalid .chips,
+.fieldInvalid .pair,
+.fieldInvalid .rows,
+.fieldInvalid .drop,
+.fieldInvalid .fileRow,
+.fieldInvalid .empty {
+  border-color: var(--c-red);
+}
+
+.fieldInvalid .input:focus {
+  border-color: var(--c-red);
+  box-shadow: 0 0 0 3px rgba(255, 138, 128, 0.18);
+}
+
+.fieldError {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.fieldError svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ---------- choices: chips (short), segmented pair, rows (long) ---------- */
+.chips,
+.pair {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-line-strong);
+}
+
+.chips {
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--s2);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+/* Chips in a grid are separate tiles, so a short last row leaves no filled gap. */
+.chips .chip {
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+}
+
+.chips .chip:has(input:checked) {
+  border-color: var(--c-lime);
+}
+
+.pair {
+  grid-template-columns: 1fr 1fr;
+}
+
+.chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: var(--s2) var(--s3);
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.chipWide {
+  grid-column: 1 / -1;
+}
+
+.chip input,
+.row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip:has(input:checked) {
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+  box-shadow: inset 0 -2px 0 var(--c-lime);
+}
+
+.chip:has(input:focus-visible),
+.row:has(input:focus-visible) {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.rows {
+  display: grid;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 52px;
+  padding: var(--s3) var(--s4);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.row + .row {
+  border-top: 1px solid var(--c-line);
+}
+
+.row:has(input:checked) {
+  background: var(--c-lime-wash);
+}
+
+.radio {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--c-line-strong);
+  border-radius: 50%;
+  color: var(--c-on-lime);
+}
+
+.row:has(input:checked) .radio {
+  border-color: var(--c-lime);
+  background: var(--c-lime);
+}
+
+.choiceText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) {
+  .chip:hover {
+    color: var(--c-text);
+  }
+
+  .row:hover {
+    background: var(--c-panel);
+  }
+}
+
+/* ---------- attachments ---------- */
+.drop {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 72px;
+  padding: var(--s3) var(--s4);
+  border: 1px dashed var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  cursor: pointer;
+}
+
+.drop:has(input:focus-visible),
+.fileBtn:has(input:focus-visible) {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.dropBusy {
+  cursor: progress;
+}
+
+.dropIcon {
+  color: var(--c-lime);
+}
+
+.dropText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dropTitle {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.dropSub {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .drop:hover {
+    border-color: var(--c-text-2);
+  }
+}
+
+.fileRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 72px;
+  padding: var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+}
+
+.fileThumb,
+.fileIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+}
+
+.fileThumb {
+  border: 1px solid var(--c-line);
+  object-fit: cover;
+  object-position: top;
+}
+
+.fileIcon {
+  display: grid;
+  place-items: center;
+  background: var(--c-panel-hi);
+  color: var(--c-text-2);
+}
+
+.fileMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fileName {
+  overflow: hidden;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileOk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.fileActions {
+  display: flex;
+  gap: var(--s1);
+}
+
+.fileBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.spin {
+  color: var(--c-lime);
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- server / offline error (from Log Sale) ---------- */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: 14px var(--s4);
+  border: 1px solid rgba(255, 138, 128, 0.5);
+  border-radius: var(--r-panel);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--c-red);
+  scroll-margin: 96px;
+}
+
+.alert svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.alert p {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.alert strong {
+  color: var(--c-red);
+  font-weight: 600;
+}
+
+/* ---------- submit ---------- */
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 96px;
+  margin: 0;
+}
+
+.meterLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.meterNum {
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: var(--t-d3);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.meterTrack {
+  height: 4px;
+}
+
+.submit {
+  flex: 1;
+}
+
+.submit[aria-disabled='true'],
+.submit:disabled {
+  opacity: 0.6;
+}
+
+/* Phone: fixed on <body> in the tab bar's place, solid (no backdrop-filter).
+   While the soft keyboard is up it is not rendered; .submitInline shows. */
+.submitBar,
+.submitInline {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.submitBar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--c-line-strong);
+  background: var(--c-bar);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transform: translateZ(0);
+}
+
+.submitInline {
+  display: none;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.submitInline[data-keyboard='open'] {
+  display: flex;
+}
+
+/* ---------- desktop side panel ---------- */
+.aside {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s5);
+}
+
+.asideRoute {
+  margin: calc(var(--s2) * -1) 0 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d2);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.asideNote {
+  margin: 0 0 var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.aside .meter {
+  padding-top: var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.aside .submit {
+  width: 100%;
+  margin-top: var(--s2);
+}
+
+.asideWho {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-align: center;
+}
+
+.asideWho strong {
+  color: var(--c-text-2);
+  font-weight: 600;
+}
+
+/* ---------- sent ---------- */
+.sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 640px;
+  margin: var(--s4) auto 0;
+  padding: var(--s6) var(--s5) var(--s5);
+  background:
+    radial-gradient(
+      90% 60% at 50% 0%,
+      rgba(141, 198, 63, 0.11) 0%,
+      rgba(141, 198, 63, 0.068) 35%,
+      rgba(141, 198, 63, 0.029) 68%,
+      transparent 100%
+    ),
+    var(--c-panel-fill);
+  text-align: center;
+}
+
+.sentIcon {
+  color: var(--c-lime);
+}
+
+.sentTitle {
+  margin: var(--s4) 0 var(--s2);
+  font-family: var(--f-display);
+  font-size: 44px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.92;
+}
+
+.sentTitle:focus {
+  outline: none;
+}
+
+.sentMsg {
+  max-width: 40ch;
+  margin: 0 0 var(--s5);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.sentRef {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0 0 var(--s5);
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.sentRefId {
+  font-family: var(--f-display);
+  font-size: var(--t-d3);
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+
+.sentActions {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+/* ---------- forms hub ---------- */
+.hubHead {
+  display: flex;
+  max-width: 1120px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+
+.hubTitle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-d1);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+.hubCount {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.hubLede {
+  margin: 0 0 var(--s5);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.hubList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+.hubList li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.hubRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s4);
+  min-height: 84px;
+  padding: var(--s4);
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.hubIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+  color: var(--c-lime);
+}
+
+.hubText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hubName {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.hubDesc {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.hubTag {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 999px;
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+}
+
+.hubChev {
+  color: var(--c-text-3);
+}
+
+@media (hover: hover) {
+  .hubRow:hover {
+    background: rgba(163, 184, 214, 0.05);
+  }
+
+  .hubRow:hover .hubChev {
+    color: var(--c-text);
+  }
+}
+
+.hubFeature {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      80% 90% at 0% 0%,
+      rgba(141, 198, 63, 0.1) 0%,
+      rgba(141, 198, 63, 0.06) 35%,
+      rgba(141, 198, 63, 0.025) 68%,
+      transparent 100%
+    ),
+    var(--c-panel-fill);
+}
+
+.hubAside {
+  margin-top: var(--s5);
+}
+
+.hubSteps {
+  display: grid;
+  gap: var(--s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hubSteps li {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: var(--s3);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.hubSteps b {
+  color: var(--c-lime);
+  font-family: var(--f-display);
+  font-size: var(--t-d3);
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+/* ---------- desktop ---------- */
+@media (min-width: 1024px) {
+  .page {
+    padding-bottom: 0;
+  }
+
+  .frame {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--s7);
+    align-items: start;
+    max-width: 1120px;
+  }
+
+  .title {
+    font-size: 56px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s5);
+  }
+
+  .aside {
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--s5));
+  }
+
+  .submitBar,
+  .submitInline,
+  .submitInline[data-keyboard='open'] {
+    display: none;
+  }
+
+  .sent {
+    margin-top: var(--s6);
+    padding: var(--s7);
+  }
+
+  .sentTitle {
+    font-size: 56px;
+  }
+
+  .sentActions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hubWrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--s7);
+    align-items: start;
+    max-width: 1120px;
+  }
+
+  .hubRow {
+    padding: var(--s4) var(--s5);
+  }
+
+  .hubAside {
+    margin-top: 0;
+  }
+}
+
+/* ---------- signature pad (components/forms/SignaturePad) ---------- */
+.sigWrap {
+  display: grid;
+  gap: var(--s2);
+}
+
+/* Paper-white on purpose: the stored PNG is navy ink on a clear background. */
+.sigCanvas {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: #f2f5f9;
+  touch-action: none;
+}
+
+.sigBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.sigBar .fileBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fieldInvalid .sigCanvas {
+  border-color: var(--c-red);
+}

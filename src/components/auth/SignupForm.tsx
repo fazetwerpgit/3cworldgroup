@@ -1,14 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateSignup, passwordStrength, PASSWORD_STRENGTH_LABEL } from '@/lib/auth/signupValidation';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { looksLikeBotSignup } from '@/lib/auth/botDetection';
+import s from '@/components/portal/rep/rep.module.css';
+import { AuthShell } from './AuthShell';
+import a from './auth.module.css';
 
 interface Grecaptcha {
   ready(callback: () => void): void;
@@ -47,14 +49,16 @@ function loadRecaptchaScript() {
       script.defer = true;
       document.head.appendChild(script);
     }
-  }).then(() => {
-    if (!window.grecaptcha) {
-      throw new Error('reCAPTCHA did not initialize');
-    }
-  }).catch((error) => {
-    recaptchaScriptPromise = null;
-    throw error;
-  });
+  })
+    .then(() => {
+      if (!window.grecaptcha) {
+        throw new Error('reCAPTCHA did not initialize');
+      }
+    })
+    .catch((error) => {
+      recaptchaScriptPromise = null;
+      throw error;
+    });
 
   return recaptchaScriptPromise;
 }
@@ -69,12 +73,36 @@ const SIGNUP_STEPS = [
 ];
 
 const TEAM_CODE_ERROR = "That team code isn't right. Ask your manager for the current one.";
-const ACCOUNT_EXISTS_ERROR = 'You already have a portal account. Sign in instead, or reset your password from the login page.';
+const ACCOUNT_EXISTS_ERROR =
+  'You already have a portal account. Sign in instead, or reset your password from the login page.';
 
-// Scoped restyle: this component no longer renders the shared AuthShell (that
-// component stays untouched — still used by LoginForm/PendingApproval, out
-// of scope this round). Signup gets its own split brand/form canvas matching
-// the approved mockup; zero blast radius to Login or PendingApproval.
+function SignupSteps({ className }: { className?: string }) {
+  return (
+    <ol className={`${a.steps} ${className ?? ''}`} aria-label="How sign-up works">
+      {SIGNUP_STEPS.map((step) => (
+        <li key={step.n}>
+          <b>{step.n}</b>
+          <span>{step.label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function SignupStatement() {
+  return (
+    <>
+      <h2 className={a.display}>
+        Create your <em>account.</em>
+      </h2>
+      <p className={a.statementLede}>Takes about a minute. Here is how it works.</p>
+      <SignupSteps className={s.deskOnly} />
+    </>
+  );
+}
+
+// Sign-up, direction D: same shell as sign in. The team code is checked on the
+// server before the account is created.
 export function SignupForm() {
   const { signUp } = useAuth();
   const router = useRouter();
@@ -99,7 +127,9 @@ export function SignupForm() {
       return;
     }
     if (looksLikeBotSignup(email, displayName)) {
-      setError('This doesn\'t look like a real name and email. Use your everyday email address, or ask your manager to set up your account.');
+      setError(
+        "This doesn't look like a real name and email. Use your everyday email address, or ask your manager to set up your account.",
+      );
       return;
     }
     if (!teamCode.trim()) {
@@ -122,7 +152,9 @@ export function SignupForm() {
               }
               grecaptcha.ready(() => {
                 try {
-                  Promise.resolve(grecaptcha.execute(siteKey, { action: 'signup' })).then(resolve).catch(reject);
+                  Promise.resolve(grecaptcha.execute(siteKey, { action: 'signup' }))
+                    .then(resolve)
+                    .catch(reject);
                 } catch (error) {
                   reject(error);
                 }
@@ -136,13 +168,17 @@ export function SignupForm() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token }),
           });
-          const captchaData = await captchaResponse.json() as { ok?: unknown };
+          const captchaData = (await captchaResponse.json()) as { ok?: unknown };
           if (!captchaResponse.ok || captchaData.ok !== true) {
-            setError('Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.');
+            setError(
+              'Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.',
+            );
             return;
           }
         } catch {
-          setError('Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.');
+          setError(
+            'Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.',
+          );
           return;
         }
       }
@@ -152,7 +188,7 @@ export function SignupForm() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: teamCode }),
         });
-        const codeData = await codeResponse.json() as { ok?: unknown };
+        const codeData = (await codeResponse.json()) as { ok?: unknown };
         if (!codeResponse.ok || codeData.ok !== true) {
           setError(TEAM_CODE_ERROR);
           return;
@@ -166,12 +202,9 @@ export function SignupForm() {
       // real PendingApproval component (this page only knows how to show the form).
       router.push('/portal');
     } catch (err) {
-      const code = err && typeof err === 'object' && 'code' in err
-        ? String((err as { code: unknown }).code)
-        : '';
-      const isExistingAccount = code === 'account_exists'
-        || code === 'auth/email-already-in-use'
-        || code === 'auth/email-already-exists';
+      const code = err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : '';
+      const isExistingAccount =
+        code === 'account_exists' || code === 'auth/email-already-in-use' || code === 'auth/email-already-exists';
       setAccountExists(isExistingAccount);
       setError(isExistingAccount ? ACCOUNT_EXISTS_ERROR : friendlyAuthError(err));
     } finally {
@@ -180,187 +213,153 @@ export function SignupForm() {
   };
 
   return (
-    <div className="member-line-signup-page">
-      <div className="member-line-signup-shell member-line">
-        <div className="member-line-masthead">
-          <div>
-            <p className="member-line-kicker">Employee portal</p>
-            <h1>
-              <span className="accent">Create your account.</span>
-              <span>Takes about a minute.</span>
-            </h1>
-            <p className="member-line-intro">
-              Enter your team code, verify your email, and your manager activates your account.
+    <AuthShell statement={<SignupStatement />}>
+      <p className={a.kicker}>Employee portal</p>
+      <h1 className={a.title}>Join your team</h1>
+      <p className={a.sub}>Your manager gave you a team code. Use an email you check regularly.</p>
+
+      <form onSubmit={handleSubmit} className={a.stack}>
+        {error ? (
+          <div className={a.alert} role="alert">
+            <AlertCircle size={18} aria-hidden="true" />
+            <p>
+              {error}
+              {accountExists ? (
+                <>
+                  {' '}
+                  <Link href="/portal">Go to sign in</Link>
+                </>
+              ) : null}
             </p>
           </div>
-          <div className="member-line-display portal-metallic-num portal-num" aria-label="3 signup steps">
-            3
+        ) : null}
+
+        <div className={a.field}>
+          <label htmlFor="signup-name" className={a.label}>
+            Full name
+          </label>
+          <input
+            id="signup-name"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className={a.input}
+            autoComplete="name"
+            autoCapitalize="words"
+            required
+          />
+        </div>
+
+        <div className={a.field}>
+          <label htmlFor="signup-email" className={a.label}>
+            Email
+          </label>
+          <input
+            id="signup-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={a.input}
+            autoComplete="email"
+            inputMode="email"
+            required
+          />
+        </div>
+
+        <div className={a.field}>
+          <label htmlFor="signup-team-code" className={a.label}>
+            Team code
+          </label>
+          <input
+            id="signup-team-code"
+            type="text"
+            value={teamCode}
+            onChange={(e) => setTeamCode(e.target.value)}
+            className={a.input}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+          />
+        </div>
+
+        <div className={a.field}>
+          <label htmlFor="signup-password" className={a.label}>
+            Password
+          </label>
+          <div className={a.passWrap}>
+            <input
+              id="signup-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={a.input}
+              autoComplete="new-password"
+              minLength={6}
+              aria-describedby="signup-strength"
+              required
+            />
+            <button
+              type="button"
+              className={a.eye}
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <div className={a.strength}>
+            <div className={a.strengthBar} data-level={password ? strength : undefined} aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+            <p id="signup-strength" className={a.strengthLabel}>
+              {password ? PASSWORD_STRENGTH_LABEL[strength] : 'Use 6 or more characters'}
+            </p>
           </div>
         </div>
 
-        <div className="member-line-section-index">
-          <b>01</b>
-          <span>/ public entry</span>
+        <div className={a.field}>
+          <label htmlFor="signup-confirm" className={a.label}>
+            Confirm password
+          </label>
+          <input
+            id="signup-confirm"
+            type={showPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={a.input}
+            autoComplete="new-password"
+            minLength={6}
+            required
+          />
         </div>
 
-        <div className="member-line-signup">
-          <section className="member-line-form-card">
-            <p className="member-line-eyebrow">Your details</p>
-            <h2>Join with your team code</h2>
-            <p>Your manager gave you a team code. Use an email you check regularly.</p>
+        <button type="submit" className={`${s.btnPrimary} ${a.btn}`} disabled={loading}>
+          {loading ? (
+            <>
+              <LoaderCircle size={18} className={a.spin} aria-hidden="true" />
+              Creating account
+            </>
+          ) : (
+            'Create account'
+          )}
+        </button>
+      </form>
 
-            <form onSubmit={handleSubmit} className="member-line-form-stack">
-              {error && (
-                <div className="member-line-note warn" role="alert">
-                  {error}
-                  {accountExists && (
-                    <Link className="member-line-form-links" href="/portal">
-                      Go to sign in
-                    </Link>
-                  )}
-                </div>
-              )}
+      <p className={a.linkRow}>
+        Already have an account?{' '}
+        <Link href="/portal" className={`${a.link} ${a.linkLime}`}>
+          Sign in
+        </Link>
+      </p>
 
-              <div className="member-line-field">
-                <label htmlFor="signup-name">Full name / required</label>
-                <input
-                  id="signup-name"
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  autoComplete="name"
-                  required
-                />
-              </div>
+      <SignupSteps className={s.phoneOnly} />
 
-              <div className="member-line-field">
-                <label htmlFor="signup-email">Email / required</label>
-                <input
-                  id="signup-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </div>
-
-              <div className="member-line-field">
-                <label htmlFor="signup-team-code">Team code / required</label>
-                <input
-                  id="signup-team-code"
-                  type="text"
-                  value={teamCode}
-                  onChange={(e) => setTeamCode(e.target.value)}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  required
-                />
-              </div>
-
-              <div className="member-line-field">
-                <label htmlFor="signup-password">Password / required</label>
-                <div className="member-line-password">
-                  <input
-                    id="signup-password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                    minLength={6}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="show"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="inline size-3.5" /> : <Eye className="inline size-3.5" />}{' '}
-                    {showPassword ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                <div className="member-line-strength">
-                  <div className={`member-line-strength-bar ${password ? strength : ''}`}>
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                  <div className="member-line-strength-label">
-                    {password ? PASSWORD_STRENGTH_LABEL[strength] : 'Enter 6+ characters'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="member-line-field">
-                <label htmlFor="signup-confirm">Confirm password / required</label>
-                <input
-                  id="signup-confirm"
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={6}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="member-line-button primary" disabled={loading}>
-                {loading ? 'Creating account…' : 'Create account'}
-              </button>
-            </form>
-
-            <p className="member-line-note" role="note">
-              Applied for a job? You don&apos;t need an account yet. We&apos;ll reach out after we review your application.
-            </p>
-
-            <div className="member-line-steps">
-              {SIGNUP_STEPS.map((step) => (
-                <div key={step.n} className="member-line-step">
-                  <b>{step.n}</b>
-                  <span>{step.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="member-line-form-links">
-              <Link href="/portal">Sign in</Link>
-              <Link href="/">
-                <ArrowLeft className="mr-1 inline size-3" /> Back to main site
-              </Link>
-            </div>
-          </section>
-
-          <aside className="member-line-brand-card">
-            <div>
-              <div className="member-line-index-line">
-                <b>3C</b>
-                <span>Team portal</span>
-              </div>
-              <h2>
-                Make the next move <em>visible.</em>
-              </h2>
-              <p className="member-line-sub">
-                A place for the work, the proof, and the people who keep it moving.
-              </p>
-            </div>
-            <div className="member-line-brand-footer">
-              <span>verify / approve / begin</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                live /
-                <Image
-                  src="/logo.webp"
-                  alt="3C World Group"
-                  width={20}
-                  height={20}
-                  className="member-line-brand-logo"
-                />
-              </span>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </div>
+      <p className={a.note} role="note">
+        Applied for a job? You don&apos;t need an account yet. We&apos;ll reach out after we review your application.
+      </p>
+    </AuthShell>
   );
 }

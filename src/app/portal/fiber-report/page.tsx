@@ -1,42 +1,56 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { RepShell } from '@/components/portal/rep/RepShell';
 import {
-  FormsLineAlert,
-  FormsLineChoicePicker,
-  FormsLineControl,
-  FormsLineActions,
-  FormsLineIdentity,
-  FormsLineRail,
-  FormsLineSection,
-  FormsLineShell,
-  FormsLineSuccess,
-} from '@/components/forms/FormsLine';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-leftovers.css';
+  Choices,
+  Field,
+  FormAlert,
+  FormFrame,
+  FormHeader,
+  FormSection,
+  FormSent,
+  useAlertScroll,
+  useFormCheck,
+} from '@/components/portal/rep/RepForm';
+import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
-import { RoleDisplayNames, getEffectiveRole } from '@/types';
+
+// Fiber report, direction D. Every field is optional (the API only checks
+// that a chosen company is one of the configured providers).
+
+const FORM_ID = 'fiber-report-form';
 
 const EMPTY = {
   companySold: '', dateKnocked: '', packNumber: '', numberOfReps: '',
   doorsKnocked: '', customerContacts: '', numberOfSales: '', orderNumber: '',
 };
+type Form = typeof EMPTY;
 
-export default function FiberReportPage() {
+function FiberReportForm() {
   const { user } = useAuth();
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
+  const alertRef = useAlertScroll(error);
+  const check = useFormCheck(form, []);
+
+  const text = (key: keyof Form, id: string, numeric = false) => ({
+    id,
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm((p) => ({ ...p, [key]: e.target.value })),
+    className: f.input,
+    autoComplete: 'off',
+    ...(numeric ? { inputMode: 'numeric' as const } : {}),
+  });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || saving) return;
     setSaving(true);
     setError('');
     try {
@@ -58,70 +72,73 @@ export default function FiberReportPage() {
     }
   };
 
-  const displayName = user?.displayName || user?.email || 'current user';
-  const role = getEffectiveRole(user);
-  const roleLabel = role ? RoleDisplayNames[role] : 'Portal user';
+  if (referenceId) {
+    return (
+      <FormSent
+        title="Report sent"
+        referenceId={referenceId}
+        message="Your fiber activity is in the review queue. The team follows up through the portal record."
+        againLabel="Send another report"
+        onAgain={() => setReferenceId('')}
+      />
+    );
+  }
 
   return (
-    <ProtectedRoute>
-      <FormsLineShell>
-        <section className="forms-line-fill" aria-label="Fiber Report">
-          <PageTitle
-            title="Fiber Report"
-            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
-          />
-          {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
-          <div className="forms-line-fill-body">
-            <div>
-              <form onSubmit={submit}>
-                <FormsLineSection
-                  index={1}
-                  title="What happened"
-                  identity={<FormsLineIdentity name={displayName} role={roleLabel} />}
-                >
-                  <FormsLineChoicePicker
-                    name="companySold"
-                    label="Company sold"
-                    value={form.companySold}
-                    options={options.providers}
-                    onChange={(companySold) => setForm((p) => ({ ...p, companySold }))}
-                  />
-                  <FormsLineControl id="date-knocked" label="Date knocked">
-                    <input id="date-knocked" value={form.dateKnocked} onChange={(e) => setForm((p) => ({ ...p, dateKnocked: e.target.value }))} placeholder="MM/DD/YYYY" />
-                  </FormsLineControl>
-                  <FormsLineControl id="pack-number" label="Pack number">
-                    <input id="pack-number" value={form.packNumber} onChange={(e) => setForm((p) => ({ ...p, packNumber: e.target.value }))} />
-                  </FormsLineControl>
-                  <FormsLineControl id="number-of-reps" label="Number of reps">
-                    <input id="number-of-reps" inputMode="numeric" value={form.numberOfReps} onChange={(e) => setForm((p) => ({ ...p, numberOfReps: e.target.value }))} />
-                  </FormsLineControl>
-                  <FormsLineControl id="doors-knocked" label="Doors knocked">
-                    <input id="doors-knocked" inputMode="numeric" value={form.doorsKnocked} onChange={(e) => setForm((p) => ({ ...p, doorsKnocked: e.target.value }))} />
-                  </FormsLineControl>
-                  <FormsLineControl id="customer-contacts" label="Customer contacts">
-                    <input id="customer-contacts" inputMode="numeric" value={form.customerContacts} onChange={(e) => setForm((p) => ({ ...p, customerContacts: e.target.value }))} />
-                  </FormsLineControl>
-                  <FormsLineControl id="number-of-sales" label="# of sales">
-                    <input id="number-of-sales" inputMode="numeric" value={form.numberOfSales} onChange={(e) => setForm((p) => ({ ...p, numberOfSales: e.target.value }))} />
-                  </FormsLineControl>
-                  <FormsLineControl id="order-number" label="Order number" className="forms-line-field-full">
-                    <input id="order-number" value={form.orderNumber} onChange={(e) => setForm((p) => ({ ...p, orderNumber: e.target.value }))} />
-                  </FormsLineControl>
-                </FormsLineSection>
-                <FormsLineActions verb="report" saving={saving} />
-              </form>
-              {referenceId && (
-                <FormsLineSuccess
-                  title="Report received"
-                  referenceId={referenceId}
-                  message="Your fiber activity is in the review queue. The team can follow up through the portal record."
-                />
-              )}
-            </div>
-            <FormsLineRail status="Ready for field review" note="Keep the pack activity clear and easy to verify." />
-          </div>
-        </section>
-      </FormsLineShell>
-    </ProtectedRoute>
+    <FormFrame
+      formId={FORM_ID}
+      onSubmit={submit}
+      header={<FormHeader title="Fiber report" lede="Log a pack's door knocking and fiber sales." />}
+      alert={error ? <FormAlert message={error} alertRef={alertRef} /> : null}
+      submitLabel="Send report"
+      saving={saving}
+      done={check.done}
+      total={check.total}
+      submitter={user?.displayName || user?.email || 'you'}
+      routeTo="Field review"
+      note="Keep the pack activity clear and easy to verify."
+    >
+      <FormSection n={1} title="The pack">
+        <Choices
+          name="companySold"
+          label="Company sold"
+          value={form.companySold}
+          options={options.providers}
+          onChange={(companySold) => setForm((p) => ({ ...p, companySold }))}
+        />
+        <Field id="date-knocked" label="Date knocked">
+          <input {...text('dateKnocked', 'date-knocked')} placeholder="MM/DD/YYYY" />
+        </Field>
+        <Field id="pack-number" label="Pack number">
+          <input {...text('packNumber', 'pack-number')} />
+        </Field>
+      </FormSection>
+
+      <FormSection n={2} title="The numbers">
+        <Field id="number-of-reps" label="Number of reps">
+          <input {...text('numberOfReps', 'number-of-reps', true)} />
+        </Field>
+        <Field id="doors-knocked" label="Doors knocked">
+          <input {...text('doorsKnocked', 'doors-knocked', true)} />
+        </Field>
+        <Field id="customer-contacts" label="Customer contacts">
+          <input {...text('customerContacts', 'customer-contacts', true)} />
+        </Field>
+        <Field id="number-of-sales" label="Number of sales">
+          <input {...text('numberOfSales', 'number-of-sales', true)} />
+        </Field>
+        <Field id="order-number" label="Order number" wide>
+          <input {...text('orderNumber', 'order-number')} autoCapitalize="characters" />
+        </Field>
+      </FormSection>
+    </FormFrame>
+  );
+}
+
+export default function FiberReportPage() {
+  return (
+    <RepShell task="Fiber report">
+      <FiberReportForm />
+    </RepShell>
   );
 }

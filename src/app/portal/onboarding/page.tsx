@@ -1,22 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ClipboardCheck } from 'lucide-react';
+import { LoaderCircle, RotateCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { MemberLineShell } from '@/components/member/MemberLine';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-rep-b.css';
+import { RepBoot, RepShell } from '@/components/portal/rep/RepShell';
+import { Attachment, FormAlert } from '@/components/portal/rep/RepForm';
+import s from '@/components/portal/rep/rep.module.css';
+import f from '@/components/portal/rep/rep-forms.module.css';
+import o from '@/components/onboarding/onboarding.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { FieldRoles, OnboardingItem, OnboardingStatus } from '@/types';
-import FileUpload from '@/components/onboarding/FileUpload';
 import MemberLineOnboardingBoard from '@/components/onboarding/MemberLineOnboardingBoard';
 import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
+import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 
 interface ChecklistItem extends OnboardingItem {
   status: OnboardingStatus;
@@ -47,10 +45,12 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-export default function OnboardingPage() {
+function OnboardingChecklist() {
   const { user } = useAuth();
   const [data, setData] = useState<ChecklistResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  // loadError: the checklist itself failed. error: a submit failed (shown in the sheet).
+  const [loadError, setLoadError] = useState(false);
   const [error, setError] = useState('');
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [submitModal, setSubmitModal] = useState<WizardItem | null>(null);
@@ -81,8 +81,9 @@ export default function OnboardingPage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load checklist');
       setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load checklist');
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -92,14 +93,25 @@ export default function OnboardingPage() {
     fetchChecklist();
   }, [fetchChecklist]);
 
-  // The upload is multipart — send only Authorization and let fetch set the
-  // Content-Type boundary itself.
-  const uploadHeaders = useCallback(async () => authHeaders(), []);
+  const retryLoad = () => {
+    setLoading(true);
+    void fetchChecklist();
+  };
 
-  const handleSubmit = async (
-    item: WizardItem | null = submitModal,
-    submittedReference = reference
-  ) => {
+  // The upload is multipart: send only Authorization and let fetch set the
+  // Content-Type boundary itself. userId is the TARGET whose folder is written.
+  const uploadFile = (item: WizardItem, file: File, allowedTypes: string[], slot?: string) =>
+    uploadFormAttachment({
+      file,
+      itemId: item.id,
+      slot,
+      uploadUrl: '/api/portal/onboarding/upload',
+      fields: { userId: user?.uid ?? '' },
+      allowedTypes,
+      getHeaders: () => authHeaders(),
+    });
+
+  const handleSubmit = async (item: WizardItem | null = submitModal, submittedReference = reference) => {
     if (!user || !item) return;
     setSubmitting(true);
     setError('');
@@ -129,8 +141,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const getDraftReference = (item: WizardItem) =>
-    submitModal?.id === item.id ? reference : item.reference ?? '';
+  const getDraftReference = (item: WizardItem) => (submitModal?.id === item.id ? reference : (item.reference ?? ''));
 
   const startSubmission = (item: WizardItem, nextReference = item.reference ?? '') => {
     if (submitModal?.id !== item.id) {
@@ -144,57 +155,67 @@ export default function OnboardingPage() {
 
   const renderItemAction = (item: WizardItem) => {
     if (item.status === 'submitted') {
-      return (
-        <div className="member-line-note">
-          This item has been submitted and is waiting for manager review.
-        </div>
-      );
+      return <p className={o.note}>Submitted. Your manager is reviewing it.</p>;
     }
 
     const draftReference = getDraftReference(item);
     const buttonLabel = item.status === 'rejected' ? 'Resubmit for review' : 'Submit for review';
+    const busy = submitting && submitModal?.id === item.id;
+    const sendError = error && submitModal?.id === item.id ? <FormAlert message={error} /> : null;
+    const submitButton = (disabled: boolean) => (
+      <button
+        type="button"
+        onClick={() => handleSubmit(item, draftReference)}
+        disabled={disabled}
+        className={`${s.btnPrimary} ${o.submit}`}
+      >
+        {busy ? (
+          <>
+            <LoaderCircle size={18} className={f.spin} aria-hidden="true" />
+            Submitting
+          </>
+        ) : (
+          buttonLabel
+        )}
+      </button>
+    );
 
     if (isStorageItem(item.id)) {
+      // Sensitive documents (license, W-9) never show a thumbnail or a View link.
       return (
-        <div className="grid gap-3">
-          <div className="member-line-note">
-            <ClipboardCheck className="mr-1.5 inline size-3.5" />
-            Upload the requested file, then submit it for review.
-            {item.sensitive && (
-              <>
-                <br />
-                Do not enter card numbers, SSNs, or account numbers. The app stores a secure
-                reference only.
-              </>
-            )}
-          </div>
+        <>
+          <p className={o.note}>
+            <strong>Upload, then submit</strong>
+            {item.id === 'dl_photos'
+              ? 'Add both sides of your license, then submit it for review.'
+              : 'Add the requested file, then submit it for review.'}
+            {item.sensitive
+              ? ' Never type card numbers, SSNs or account numbers. The app stores a secure reference only.'
+              : ''}
+          </p>
 
           {item.id === 'dl_photos' ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <FileUpload
-                itemId="dl_photos"
-                slot="front"
+            <div className={o.slots}>
+              <Attachment
+                id="dl-front"
                 label="Front of license"
                 accept="image/*"
-                allowedTypes={IMAGE_TYPES}
-                uploadUrl="/api/portal/onboarding/upload"
-                extraFields={{ userId: user?.uid ?? '' }}
-                getHeaders={uploadHeaders}
+                kinds="Photo"
+                preview={false}
+                upload={(file) => uploadFile(item, file, IMAGE_TYPES, 'front')}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
                   if (isNewSubmission) setSubmitModal(item);
                   markDlSlot('front', path, isNewSubmission);
                 }}
               />
-              <FileUpload
-                itemId="dl_photos"
-                slot="back"
+              <Attachment
+                id="dl-back"
                 label="Back of license"
                 accept="image/*"
-                allowedTypes={IMAGE_TYPES}
-                uploadUrl="/api/portal/onboarding/upload"
-                extraFields={{ userId: user?.uid ?? '' }}
-                getHeaders={uploadHeaders}
+                kinds="Photo"
+                preview={false}
+                upload={(file) => uploadFile(item, file, IMAGE_TYPES, 'back')}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
                   if (isNewSubmission) setSubmitModal(item);
@@ -203,119 +224,126 @@ export default function OnboardingPage() {
               />
             </div>
           ) : (
-            <FileUpload
-              itemId={item.id}
+            <Attachment
+              id={`upload-${item.id}`}
+              label={item.label}
               accept="image/*,application/pdf"
-              allowedTypes={DOC_TYPES}
-              uploadUrl="/api/portal/onboarding/upload"
-              extraFields={{ userId: user?.uid ?? '' }}
-              getHeaders={uploadHeaders}
+              preview={!item.sensitive}
+              upload={(file) => uploadFile(item, file, DOC_TYPES)}
               onUploaded={(path) => startSubmission(item, path)}
             />
           )}
 
-          <Button
-            type="button"
-            onClick={() => handleSubmit(item, draftReference)}
-            disabled={submitting || !draftReference.trim()}
-            className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-          >
-            {submitting && submitModal?.id === item.id ? 'Submitting...' : buttonLabel}
-          </Button>
-        </div>
+          {sendError}
+          {submitButton(submitting || !draftReference.trim())}
+        </>
       );
     }
 
     return (
-      <div className="grid gap-3">
-        <p className="member-line-sub">
-          {item.sensitive
-            ? 'Do not enter card numbers, SSNs, or account numbers. Provide a confirmation number, document name, or reviewer note only.'
-            : 'Add an optional note, document name, or confirmation number for the reviewer.'}
-        </p>
-        <Input
-          value={draftReference}
-          onFocus={() => {
-            if (submitModal?.id !== item.id) startSubmission(item);
-          }}
-          onChange={(event) => startSubmission(item, event.target.value)}
-          placeholder="Reference or note (optional)"
-          maxLength={500}
-        />
-        <Button
-          type="button"
-          onClick={() => handleSubmit(item, draftReference)}
-          disabled={submitting}
-          className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-        >
-          {submitting && submitModal?.id === item.id ? 'Submitting...' : buttonLabel}
-        </Button>
-      </div>
+      <>
+        <div className={f.field}>
+          <label htmlFor={`reference-${item.id}`} className={f.label}>
+            Reference or note
+            <span className={f.req}>Optional</span>
+          </label>
+          <input
+            id={`reference-${item.id}`}
+            className={f.input}
+            value={draftReference}
+            onFocus={() => {
+              if (submitModal?.id !== item.id) startSubmission(item);
+            }}
+            onChange={(event) => startSubmission(item, event.target.value)}
+            maxLength={500}
+            autoComplete="off"
+            aria-describedby={`reference-${item.id}-hint`}
+          />
+          <p id={`reference-${item.id}-hint`} className={f.hint}>
+            {item.sensitive
+              ? 'A confirmation number, document name or note for the reviewer. Never card numbers, SSNs or account numbers.'
+              : 'A note, document name or confirmation number for the reviewer.'}
+          </p>
+        </div>
+        {sendError}
+        {submitButton(submitting)}
+      </>
     );
   };
 
-  const total = data?.progress?.total ?? 0;
-  const approved = data?.progress?.approved ?? 0;
-
   return (
-    <ProtectedRoute roles={Object.values(FieldRoles)}>
-      <MemberLineShell>
-        <PageTitle title="My Onboarding" meta={`${approved} of ${total} complete`} />
+    <>
+      <header className={f.hubHead}>
+        <h1 className={f.hubTitle}>Onboarding</h1>
+      </header>
+      <p className={f.hubLede}>Finish each item. Your manager reviews every one.</p>
 
-        {error && (
-          <div className="member-line-note warn" style={{ marginTop: 16 }}>
-            <AlertCircle className="mr-1.5 inline size-3.5" />
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="member-line-panel grid gap-3">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        ) : data?.items?.length ? (
-          <div className="member-line-arena">
+      <div className={f.hubWrap}>
+        <div>
+          {loading ? (
+            <div className={s.panel} aria-busy="true" aria-label="Loading your checklist">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className={o.skelRow}>
+                  <span className={s.skel} style={{ width: 72, height: 12 }} />
+                  <span className={s.skel} style={{ width: '55%', height: 18 }} />
+                  <span className={s.skel} style={{ width: '80%', height: 14 }} />
+                </div>
+              ))}
+            </div>
+          ) : loadError && !data ? (
+            <div className={`${s.panel} ${s.failed}`} role="alert">
+              <span>Couldn&apos;t load your checklist</span>
+              <button type="button" className={s.retry} onClick={retryLoad}>
+                <RotateCw size={14} aria-hidden="true" />
+                Retry
+              </button>
+            </div>
+          ) : data?.items?.length ? (
             <MemberLineOnboardingBoard
-              memberLabel={user?.displayName || 'Member'}
+              memberLabel={user?.displayName || 'you'}
               items={data.items}
               progress={data.progress ?? { approved: 0, total: 0, complete: false }}
               renderItemAction={renderItemAction}
               openItemId={openItemId}
-              onOpenItem={setOpenItemId}
+              onOpenItem={(id) => {
+                setOpenItemId(id);
+                setError('');
+              }}
               onRefresh={fetchChecklist}
             />
-            <aside className="member-line-stack">
-              <section className="member-line-panel">
-                <h2 style={{ margin: '0 0 14px', fontFamily: 'var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
-                  How to finish an item
-                </h2>
-                <div className="member-line-note">
-                  <strong style={{ color: 'var(--member-line-lime)' }}>Upload</strong>
-                  <br />
-                  PNG / JPG / PDF · 4 MB max. License has front + back slots.
-                </div>
-                <div className="member-line-note warn" style={{ marginTop: 10 }}>
-                  <strong style={{ color: 'var(--member-line-gold)' }}>E-sign</strong>
-                  <br />
-                  Check your email for the signing link. This completes automatically after you sign.
-                </div>
-              </section>
-              <section className="member-line-panel">
-                <h2 style={{ margin: 0, fontFamily: 'var(--font-archivo, "Archivo"), var(--font-sans, system-ui), Arial, sans-serif', fontWeight: 700, fontSize: 22 }}>
-                  Keep sensitive data out of this page.
-                </h2>
-                <p className="member-line-sub">Never type raw SSN or card numbers here.</p>
-              </section>
-            </aside>
+          ) : (
+            <p className={`${s.panel} ${o.empty}`}>No onboarding items for your account yet. Your manager adds them.</p>
+          )}
+        </div>
+
+        <aside className={`${s.panel} ${f.aside} ${f.hubAside}`} aria-labelledby="onboarding-how-h">
+          <h2 id="onboarding-how-h" className={s.kicker}>
+            How to finish an item
+          </h2>
+          <div className={o.asideItem}>
+            <h3>Upload</h3>
+            <p>PNG, JPG or PDF, 4 MB max. Your license has a front and a back slot.</p>
           </div>
-        ) : (
-          <Alert className="member-line-empty-card">
-            <AlertDescription>No onboarding items for your account.</AlertDescription>
-          </Alert>
-        )}
-      </MemberLineShell>
-    </ProtectedRoute>
+          <div className={o.asideItem}>
+            <h3>E-sign</h3>
+            <p>Tap Sign now on the item. It completes by itself after you sign.</p>
+          </div>
+          <div className={o.asideItem}>
+            <h3>Keep numbers out</h3>
+            <p>Never type an SSN, card or account number on this page.</p>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <RepShell>
+      <ProtectedRoute roles={Object.values(FieldRoles)} fallback={<RepBoot />}>
+        <OnboardingChecklist />
+      </ProtectedRoute>
+    </RepShell>
   );
 }
