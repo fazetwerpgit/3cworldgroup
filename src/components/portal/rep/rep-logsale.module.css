@@ -4,16 +4,6 @@
    Base tokens live on .root / .layer in rep.module.css. */
 
 .main {
-  /* C's surface ladder (DESIGN.md §2, §6), local to this page. */
-  --ls-well: #08101d;
-  --ls-s1: #111c2f;
-  --ls-s2: #16233a;
-  --ls-s3: #1d2c46;
-  --ls-edge: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --ls-sh-1: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --ls-sh-3: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -18px rgba(0, 0, 0, 0.8);
-  --ls-sh-well: inset 0 1px 3px rgba(0, 0, 0, 0.45);
-  --ls-well-edge: rgba(0, 0, 0, 0.25);
   padding-bottom: var(--s5);
 }
 
@@ -85,9 +75,9 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--c-line);
-  border-radius: 18px;
-  background: var(--ls-s2);
-  box-shadow: var(--ls-edge), var(--ls-sh-3);
+  border-radius: var(--r-card);
+  background: var(--c-raised);
+  box-shadow: var(--c-lift-3);
 }
 
 .entryBody {
@@ -129,9 +119,9 @@
 .entryWorks {
   margin: 0;
   padding: var(--s3) var(--s5);
-  border-top: 1px solid var(--ls-well-edge);
-  background: var(--ls-well);
-  box-shadow: var(--ls-sh-well);
+  border-top: 1px solid rgba(0, 0, 0, 0.25);
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
   color: var(--c-text-3);
   font-size: var(--t-min);
   line-height: 1.4;
@@ -153,9 +143,9 @@
   min-height: 72px;
   padding: var(--s3) var(--s4);
   border: 1px solid var(--c-line);
-  border-radius: 14px;
-  background: var(--ls-s1);
-  box-shadow: var(--ls-edge), var(--ls-sh-1);
+  border-radius: 12px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift);
   color: var(--c-text);
   font: inherit;
   text-align: left;
@@ -166,7 +156,7 @@
 }
 
 .manual:active {
-  background: var(--ls-s3);
+  background: var(--c-panel-hi);
   transform: scale(0.985);
 }
 
@@ -177,7 +167,7 @@
 
 @media (hover: hover) {
   .manual:hover {
-    background: var(--ls-s3);
+    background: var(--c-panel-hi);
   }
 }
 
@@ -246,8 +236,8 @@
   padding: 0 14px;
   border: 1px solid var(--c-line-strong);
   border-radius: 10px;
-  background: var(--ls-well);
-  box-shadow: var(--ls-sh-well);
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
   color: var(--c-text);
   font: 400 var(--t-body) / 1 var(--f-ui);
   font-variant-numeric: tabular-nums;
@@ -350,9 +340,9 @@
   min-width: 0;
   padding: var(--s4) var(--s4) var(--s5);
   border: 1px solid var(--c-line);
-  border-radius: 14px;
-  background: var(--ls-s1);
-  box-shadow: var(--ls-edge), var(--ls-sh-1);
+  border-radius: 12px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift);
 }
 
 .groupHead {
@@ -374,10 +364,10 @@
   gap: 4px;
   margin: 0;
   padding: 4px;
-  border: 1px solid var(--ls-well-edge);
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 10px;
-  background: var(--ls-well);
-  box-shadow: var(--ls-sh-well);
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
 }
 
 .chip {
@@ -404,9 +394,9 @@
 }
 
 .chip:has(input:checked) {
-  background: var(--ls-s3);
+  background: var(--c-panel-hi);
   color: var(--c-text);
-  box-shadow: var(--ls-edge), var(--ls-sh-1);
+  box-shadow: var(--c-lift);
 }
 
 .chip:has(input:focus-visible) {
@@ -422,8 +412,8 @@
   overflow: hidden;
   border: 1px solid var(--c-line-strong);
   border-radius: 10px;
-  background: var(--ls-well);
-  box-shadow: var(--ls-sh-well);
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
   list-style: none;
 }
 
@@ -549,9 +539,9 @@
   gap: var(--s3);
   padding: var(--s4);
   border: 1px solid var(--c-line);
-  border-radius: 14px;
-  background: var(--ls-s1);
-  box-shadow: var(--ls-edge), var(--ls-sh-1);
+  border-radius: 12px;
+  background: var(--c-panel);
+  box-shadow: var(--c-lift);
 }
 
 .proofMeta {
@@ -574,10 +564,10 @@
   gap: var(--s2);
   margin: 0;
   padding: var(--s2);
-  border: 1px solid var(--ls-well-edge);
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 12px;
-  background: var(--ls-well);
-  box-shadow: var(--ls-sh-well);
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
   list-style: none;
 }
 
@@ -596,7 +586,7 @@
   overflow: hidden;
   border: 1px solid var(--c-line-strong);
   border-radius: 8px;
-  background: var(--ls-s1);
+  background: var(--c-panel);
   cursor: pointer;
 }
 
@@ -889,8 +879,8 @@ span.thumbView {
   padding-left: var(--s3);
   border: 1px solid var(--c-line);
   border-radius: 12px;
-  background: var(--ls-s1);
-  box-shadow: var(--ls-edge);
+  background: var(--c-panel);
+  box-shadow: var(--c-edge);
   color: var(--c-text-3);
 }
 
@@ -1217,9 +1207,9 @@ span.thumbView {
     justify-content: space-between;
     padding: var(--s4) var(--s4) var(--s4) var(--s5);
     border: 1px solid var(--c-line);
-    border-radius: 18px;
-    background: var(--ls-s2);
-    box-shadow: var(--ls-edge), var(--ls-sh-3);
+    border-radius: var(--r-card);
+    background: var(--c-raised);
+    box-shadow: var(--c-lift-3);
   }
 
   .estPay {
