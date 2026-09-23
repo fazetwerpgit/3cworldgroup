@@ -5,6 +5,7 @@ import {
   doorOrders,
   matchFiberOrdersToSales,
   normalizeAddress,
+  ordersPlacedForSale,
   saleUnitId,
   unitId,
 } from './matchSales';
@@ -314,5 +315,38 @@ describe('orders placed well before the sale', () => {
     expect(pick(noonOn('2026-09-15'), [miss])).toBe(miss);
     expect(pick(noonOn('2026-03-02'), [oldActive, newPending])).toBe(oldActive);
     expect(matchFiberOrdersToSales([{ id: 's', customerAddress: '5780 Hall St SE' }], [oldActive]).get('s')).toBe(oldActive);
+  });
+});
+
+describe('ordersPlacedForSale: the 7-day cutoff', () => {
+  const soldOn = new Date('2026-09-15T17:00:00Z');
+  const placed = (orderDate: string | null) => order({ id: `o-${orderDate}`, orderDate, estInstallDate: '2026-09-24' });
+
+  it('ignores an order placed 8 days before the sale', () => {
+    expect(ordersPlacedForSale(soldOn, [placed('2026-09-07')])).toEqual([]);
+  });
+
+  it('keeps an order placed exactly 7 days before the sale', () => {
+    const lastWeek = placed('2026-09-08');
+    expect(ordersPlacedForSale(soldOn, [lastWeek])).toEqual([lastWeek]);
+  });
+
+  it('keeps an order with no order date', () => {
+    const undated = placed(null);
+    expect(ordersPlacedForSale(soldOn, [undated])).toEqual([undated]);
+  });
+
+  it('keeps every order when the sale day cannot be read', () => {
+    const old = placed('2026-01-02');
+    expect(ordersPlacedForSale(undefined, [old])).toEqual([old]);
+    expect(ordersPlacedForSale('not a date', [old])).toEqual([old]);
+  });
+
+  it('counts days on the Chicago sale day, not UTC', () => {
+    // 11pm in Chicago on 9/14 is already 9/15 in UTC; the cutoff is 9/07.
+    const lateNight = new Date('2026-09-15T04:00:00Z');
+    const eightBefore = placed('2026-09-06');
+    const sevenBefore = placed('2026-09-07');
+    expect(ordersPlacedForSale(lateNight, [eightBefore, sevenBefore])).toEqual([sevenBefore]);
   });
 });
