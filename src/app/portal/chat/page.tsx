@@ -14,7 +14,7 @@ import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { MessageActions } from '@/components/chat/MessageActions';
 import { ChannelRows, MobileChannelList } from '@/components/chat/MobileChannelList';
-import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import c from '@/components/chat/chat.module.css';
 import s from '@/components/portal/rep/rep.module.css';
 import { MobileThread } from '@/components/chat/MobileThread';
@@ -1252,7 +1252,6 @@ export default function TeamChatPage() {
     ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
     : '';
   // Role labels carry comp tiers, manager titles and IBO levels: admins only.
-  const showRoles = isRole('admin');
   const activeMemberCount = activeChannel ? memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0 : 0;
   const ActiveMark = activeChannel?.audience === 'managers' ? Lock : Hash;
   const openChannelOnPhone = (channelId: string) => {
@@ -1384,7 +1383,6 @@ export default function TeamChatPage() {
                                   {message.authorName}
                                 </strong>
                               )}
-                              {showRoles && message.authorRole && <span className={c.role}>{roleLabel(message.authorRole)}</span>}
                               <span className={c.time}>{clockTime(message.createdAt)}</span>
                               {message.isPinned && (
                                 <span className={c.pinTag}>
@@ -1589,7 +1587,6 @@ export default function TeamChatPage() {
             currentUserId={user?.uid}
             canModerate={canModerate}
             canPin={canPin}
-            showRoles={showRoles}
             draft={draft}
             gifEnabled={gifEnabled}
             authedFetch={authedFetch}

@@ -11,7 +11,7 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { gifPickerMaxHeight, keyboardInset } from '@/lib/chat/keyboard';
@@ -103,7 +103,6 @@ interface MobileThreadProps {
   // the long-press sheet shows Pin/Unpin only for eligible users.
   canPin: boolean;
   // Role labels (tiers, manager titles, IBO) show only to admins.
-  showRoles: boolean;
   draft: string;
   // GIF feature availability (probed by the page) + the shared verified-token
   // fetch the GIF picker uses to search Tenor.
@@ -271,7 +270,6 @@ export function MobileThread({
   currentUserId,
   canModerate,
   canPin,
-  showRoles,
   draft,
   gifEnabled,
   authedFetch,
@@ -786,7 +784,6 @@ export function MobileThread({
                             {message.authorName}
                           </span>
                         )}
-                        {showRoles && message.authorRole && <span className={c.role}>{roleLabel(message.authorRole)}</span>}
                       </div>
                     )}
                     <div className={c.bubbleRow}>
