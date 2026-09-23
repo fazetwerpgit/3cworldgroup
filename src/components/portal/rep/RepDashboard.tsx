@@ -42,6 +42,7 @@ import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
 import { PAY_DISPUTE_HREF, PayHelpSheet } from './PayHelpSheet';
+import { InstallDateSheet } from './InstallDateSheet';
 import { LOG_SALE_HREF } from './repNav';
 import s from './rep.module.css';
 import d from './rep-dashboard.module.css';
@@ -516,9 +517,8 @@ type TodayItem =
 
 const MAX_DATE_ROWS = 3;
 
-function todayHref(item: TodayItem) {
+function todayHref(item: Exclude<TodayItem, { kind: 'date' }>) {
   if (item.kind === 'call') return item.call.meetLink || '/portal/calls';
-  if (item.kind === 'date') return `/portal/sales/${item.row.id}/edit`;
   return item.href;
 }
 
@@ -527,11 +527,14 @@ function TodayPanels({
   extraDates,
   callsFailed,
   onRetryCalls,
+  onSetDate,
 }: {
   items: TodayItem[];
   extraDates: number;
   callsFailed: boolean;
   onRetryCalls: () => void;
+  /** Opens the install-date sheet: the rep's own sale, never the admin edit page. */
+  onSetDate: (row: NeedsDateRow) => void;
 }) {
   const external = (item: TodayItem) => item.kind === 'call' && !!item.call.meetLink;
   const linkProps = (item: TodayItem) =>
@@ -566,18 +569,27 @@ function TodayPanels({
                     ? `${item.row.missed ? 'Reschedule' : 'Add install date'} · ${item.row.customer}`
                     : item.title}
               </span>
-              <Link href={todayHref(item)} className={`${s.btnSecondary} ${d.todayBtn}`} {...linkProps(item)}>
-                {item.kind === 'call' ? (
-                  <>
-                    <Video size={16} aria-hidden="true" />
-                    Join
-                  </>
-                ) : item.kind === 'date' ? (
-                  'Add date'
-                ) : (
-                  'Open'
-                )}
-              </Link>
+              {item.kind === 'date' ? (
+                <button
+                  type="button"
+                  className={`${s.btnSecondary} ${d.todayBtn}`}
+                  aria-label={`${item.row.missed ? 'Reschedule' : 'Add install date for'} ${item.row.customer}`}
+                  onClick={() => onSetDate(item.row)}
+                >
+                  {item.row.missed ? 'Reschedule' : 'Add date'}
+                </button>
+              ) : (
+                <Link href={todayHref(item)} className={`${s.btnSecondary} ${d.todayBtn}`} {...linkProps(item)}>
+                  {item.kind === 'call' ? (
+                    <>
+                      <Video size={16} aria-hidden="true" />
+                      Join
+                    </>
+                  ) : (
+                    'Open'
+                  )}
+                </Link>
+              )}
             </li>
           ))}
         </ul>
@@ -587,47 +599,58 @@ function TodayPanels({
 
       <section className={`${s.panel} ${d.todayB} ${s.phoneOnly}`} aria-labelledby="today-b-h">
         <PanelHead id="today-b-h" title="Today" />
-        {items.map((item) => (
-          <Link key={key(item)} href={todayHref(item)} className={d.tRow} {...linkProps(item)}>
-            {item.kind === 'call' ? (
-              <span className={`${d.tile} ${d.tileBlue}`} aria-hidden="true">
-                <Video size={18} strokeWidth={2} />
-              </span>
-            ) : item.kind === 'date' ? (
-              <span className={`${d.tile} ${d.tileAmber}`} aria-hidden="true">
-                <CalendarPlus size={18} strokeWidth={2} />
-              </span>
-            ) : (
-              <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
-                {item.icon === 'signups' ? <UserPlus size={18} strokeWidth={2} /> : <Inbox size={18} strokeWidth={2} />}
-              </span>
-            )}
-            <span className={d.tText}>
-              {item.kind === 'call' ? (
-                <>
-                  <span className={d.tTitle}>{item.call.title}</span>
-                  <span className={d.tSub}>
-                    {item.call.meetLink ? 'Join' : 'Starts'} {formatCallTime(item.call.time)}
+        {items.map((item) => {
+          const body = (
+            <>
+                {item.kind === 'call' ? (
+                  <span className={`${d.tile} ${d.tileBlue}`} aria-hidden="true">
+                    <Video size={18} strokeWidth={2} />
                   </span>
-                </>
-              ) : item.kind === 'date' ? (
-                <>
-                  <span className={d.tTitle}>{item.row.missed ? 'Reschedule the install' : 'Add an install date'}</span>
-                  <span className={d.tSub}>
-                    <span className={d.tNow}>Now</span> · {item.row.customer}
-                    {item.row.plan ? `, ${item.row.plan}` : ''}
+                ) : item.kind === 'date' ? (
+                  <span className={`${d.tile} ${d.tileAmber}`} aria-hidden="true">
+                    <CalendarPlus size={18} strokeWidth={2} />
                   </span>
-                </>
-              ) : (
-                <>
-                  <span className={d.tTitle}>{item.title}</span>
-                  <span className={d.tSub}>{item.sub}</span>
-                </>
-              )}
-            </span>
-            <ChevronRight size={20} className={d.chev} aria-hidden="true" />
-          </Link>
-        ))}
+                ) : (
+                  <span className={`${d.tile} ${d.tileLime}`} aria-hidden="true">
+                    {item.icon === 'signups' ? <UserPlus size={18} strokeWidth={2} /> : <Inbox size={18} strokeWidth={2} />}
+                  </span>
+                )}
+                <span className={d.tText}>
+                  {item.kind === 'call' ? (
+                    <>
+                      <span className={d.tTitle}>{item.call.title}</span>
+                      <span className={d.tSub}>
+                        {item.call.meetLink ? 'Join' : 'Starts'} {formatCallTime(item.call.time)}
+                      </span>
+                    </>
+                  ) : item.kind === 'date' ? (
+                    <>
+                      <span className={d.tTitle}>{item.row.missed ? 'Reschedule the install' : 'Add an install date'}</span>
+                      <span className={d.tSub}>
+                        <span className={d.tNow}>Now</span> · {item.row.customer}
+                        {item.row.plan ? `, ${item.row.plan}` : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className={d.tTitle}>{item.title}</span>
+                      <span className={d.tSub}>{item.sub}</span>
+                    </>
+                  )}
+                </span>
+              <ChevronRight size={20} className={d.chev} aria-hidden="true" />
+            </>
+          );
+          return item.kind === 'date' ? (
+            <button key={key(item)} type="button" className={`${d.tRow} ${d.tRowBtn}`} onClick={() => onSetDate(item.row)}>
+              {body}
+            </button>
+          ) : (
+            <Link key={key(item)} href={todayHref(item)} className={d.tRow} {...linkProps(item)}>
+              {body}
+            </Link>
+          );
+        })}
         {more}
         {failed}
       </section>
@@ -736,6 +759,8 @@ export function RepDashboard() {
   const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
   const [helpOpen, setHelpOpen] = useState(false);
   const closeHelp = useCallback(() => setHelpOpen(false), []);
+  const [dateRow, setDateRow] = useState<NeedsDateRow | null>(null);
+  const closeDate = useCallback(() => setDateRow(null), []);
   const now = useNow();
 
   const retryMany = (...keys: RepSectionKey[]) => {
@@ -754,6 +779,7 @@ export function RepDashboard() {
     [book, data.plan.status, rates, now]
   );
   const dates = useMemo(() => (book ? needsDateRows(book.sales, book.fiberBySale, now) : []), [book, now]);
+  const dateSale = dateRow ? book?.sales.find((sale) => sale.id === dateRow.id) ?? null : null;
 
   const standing: Section<Standing | null> =
     data.standing.status === 'ready'
@@ -890,12 +916,22 @@ export function RepDashboard() {
               extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
               callsFailed={data.calls.status === 'error'}
               onRetryCalls={() => retry('calls')}
+              onSetDate={setDateRow}
             />
           ) : null}
         </div>
       </div>
 
       {helpOpen ? <PayHelpSheet onClose={closeHelp} /> : null}
+      {dateSale && dateRow ? (
+        <InstallDateSheet
+          sale={dateSale}
+          plan={dateRow.plan}
+          missed={dateRow.missed}
+          onClose={closeDate}
+          onSaved={data.installDateSaved}
+        />
+      ) : null}
     </>
   );
 }

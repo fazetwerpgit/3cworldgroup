@@ -92,6 +92,18 @@ export async function fetchRepBook(uid: string, token: string | null, signal: Ab
   return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale, carrierFailed };
 }
 
+/**
+ * The book with one sale's install date set, as the save returned it. Shown at
+ * once so est. pay, the payout window and the buckets move the moment the rep
+ * saves; the quiet refresh after it brings the server's copy.
+ */
+export function withSaleInstallDate(book: RepBook, saleId: string, installDate: string): RepBook {
+  return {
+    ...book,
+    sales: book.sales.map((sale) => (sale.id === saleId ? { ...sale, installDate: new Date(installDate) } : sale)),
+  };
+}
+
 type Loaders = { [K in RepSectionKey]: (token: string | null, signal: AbortSignal) => Promise<unknown> };
 
 export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } = {}) {
@@ -172,7 +184,7 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
   }, [active, uid, withLeads]);
 
   const run = useCallback(
-    async (keys?: RepSectionKey[]) => {
+    async (keys?: RepSectionKey[], { quiet = false }: { quiet?: boolean } = {}) => {
       const all = loaders();
       const wanted = (keys ?? (Object.keys(all) as RepSectionKey[])).filter((key) => all[key]);
       if (!wanted.length) return;
@@ -193,6 +205,8 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
             // network failure must surface as "Couldn't load", never spin forever.
             if (controller.signal.aborted) return;
             console.error(`Dashboard section "${key}" failed:`, error);
+            // A quiet refresh keeps what is on screen rather than trading it for an error.
+            if (quiet) return;
             setState((current) => ({ ...current, [key]: { status: 'error' } }));
           }
         })
@@ -218,5 +232,18 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
     [run]
   );
 
-  return { ...state, retry };
+  /** The rep saved a new install date: show it now, then refresh the book quietly. */
+  const installDateSaved = useCallback(
+    (saleId: string, installDate: string) => {
+      setState((current) =>
+        current.book.status === 'ready'
+          ? { ...current, book: { status: 'ready', data: withSaleInstallDate(current.book.data, saleId, installDate) } }
+          : current
+      );
+      void run(['book'], { quiet: true });
+    },
+    [run]
+  );
+
+  return { ...state, retry, installDateSaved };
 }

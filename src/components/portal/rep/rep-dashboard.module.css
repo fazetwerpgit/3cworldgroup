@@ -1351,3 +1351,13 @@ a.saleRow:focus-visible {
   color: var(--c-text-2);
   font-size: var(--t-sm);
 }
+
+/* A Today row that opens a sheet rather than a page. */
+.tRowBtn {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}

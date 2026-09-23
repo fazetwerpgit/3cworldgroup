@@ -1,0 +1,29 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.who {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.who strong {
+  color: var(--c-text);
+  font-weight: 650;
+}
+
+.note {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-amber-wash);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
