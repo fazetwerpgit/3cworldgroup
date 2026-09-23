@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight, RotateCw } from 'lucide-react';
 import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
@@ -18,9 +18,12 @@ import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/Push
 import s from '../rep/rep.module.css';
 import o from './owner-dashboard.module.css';
 
-// The owner's home screen (direction D): the company, not a personal pay card.
-// Money first (estimated from installs × the comp plan), then what needs
-// attention, then recruiting. Each section loads and fails on its own.
+// The owner's home screen (direction C, "split"): the company, not a personal
+// pay card. Money sits on a raised card with its week | month breakdown tucked
+// behind it; counts (installs, recruiting) sit on flatter scoreboard strips.
+// Each section loads and fails on its own.
+
+type OwnerDashboardData = ReturnType<typeof useOwnerDashboard>;
 
 // ---------------------------------------------------------------- format
 
@@ -43,6 +46,9 @@ const SHORT_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numer
 const priorDay = (iso: string) => SHORT_DAY.format(new Date(new Date(iso).getTime() - 1));
 
 const MONTH_SHORT = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'America/Chicago' });
+
+/** Stagger index for the first-load rise. */
+const rise = (i: number) => ({ '--i': i }) as CSSProperties;
 
 // ---------------------------------------------------------------- shared bits
 
@@ -69,6 +75,17 @@ function PanelHead({ id, title, children }: { id: string; title: string; childre
   );
 }
 
+/** The recessed header band that opens a scoreboard strip. */
+function Band({ id, title }: { id: string; title: string }) {
+  return (
+    <div className={o.band}>
+      <h2 id={id} className={o.bandTitle}>
+        {title}
+      </h2>
+    </div>
+  );
+}
+
 /** The hero figures' change against the prior cut. Table cells don't carry one. */
 function Delta({ current, prior, label }: { current: number; prior: number; label: string }) {
   const pct = deltaPct(current, prior);
@@ -83,11 +100,11 @@ function Delta({ current, prior, label }: { current: number; prior: number; labe
 
 // ---------------------------------------------------------------- money
 
-const MONEY_ROWS: Array<{ key: keyof MoneyFigures; label: string; format: (n: number) => string }> = [
-  { key: 'installs', label: 'Installs', format: count },
-  { key: 'revenue', label: 'Est. revenue', format: money },
-  { key: 'commissions', label: 'Rep commissions', format: money },
-  { key: 'margin', label: 'Est. margin', format: money },
+/** Money only: the install counts live on the strip. */
+const MONEY_ROWS: Array<{ key: Exclude<keyof MoneyFigures, 'installs'>; label: string }> = [
+  { key: 'revenue', label: 'Est. revenue' },
+  { key: 'commissions', label: 'Est. rep commissions' },
+  { key: 'margin', label: 'Est. margin' },
 ];
 
 function MoneyCell({ comparison, row, priorLabel }: { comparison: MoneyComparison; row: (typeof MONEY_ROWS)[number]; priorLabel: string }) {
@@ -95,14 +112,28 @@ function MoneyCell({ comparison, row, priorLabel }: { comparison: MoneyCompariso
   const prior = comparison.prior[row.key];
   return (
     <td className={o.cell}>
-      <span className={o.cellValue}>{row.format(current)}</span>
+      <span className={o.cellValue}>{money(current)}</span>
       <span className={o.cellPrior}>
         <span className={s.srOnly}>{priorLabel}: </span>
         <span aria-hidden="true">vs </span>
-        {row.format(prior)}
+        {money(prior)}
         <span aria-hidden="true"> prior</span>
       </span>
     </td>
+  );
+}
+
+/** The hero numeral: a muted, top-aligned $ and the whole dollars. */
+function HeroMoney({ value }: { value: number }) {
+  return (
+    <p className={o.moneyNum}>
+      <span className={s.srOnly}>{money(value)}</span>
+      <span aria-hidden="true" className={o.moneyNumInner}>
+        {value < 0 ? <span className={o.sign}>−</span> : null}
+        <span className={o.cur}>$</span>
+        {Math.round(Math.abs(value)).toLocaleString('en-US')}
+      </span>
+    </p>
   );
 }
 
@@ -121,37 +152,28 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
   ].filter(Boolean);
 
   return (
-    <section className={`${s.panel} ${o.board}`} aria-labelledby="money-h">
+    <section className={`${o.money} ${o.rise}`} style={rise(0)} aria-labelledby="money-h">
       <h2 id="money-h" className={s.srOnly}>
         Company money
       </h2>
-      <div className={o.cellMargin}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
-        <p className={o.score}>{money(month.current.margin)}</p>
-        <p className={o.heroSub}>
-          <Delta current={month.current.margin} prior={month.prior.margin} label={`vs ${monthPrior}`} />
-          <span>
-            vs {money(month.prior.margin)} through {priorDay(month.priorEnd)}
-          </span>
-        </p>
+      <div className={o.moneyCard}>
+        <p className={s.kicker}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+        <div className={o.moneyHero}>
+          <HeroMoney value={month.current.margin} />
+          <p className={o.moneyDelta}>
+            <Delta current={month.current.margin} prior={month.prior.margin} label={`vs ${monthPrior}`} />
+            <span>
+              vs {money(month.prior.margin)} through {priorDay(month.priorEnd)}
+            </span>
+          </p>
+        </div>
       </div>
 
-      <div className={o.cellInstalls}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
-        <p className={`${o.score} ${o.scoreLime}`}>{count(week.current.installs)}</p>
-        <p className={o.heroSub}>
-          <Delta current={week.current.installs} prior={week.prior.installs} label={`vs ${weekPrior}`} />
-          <span>
-            <strong>installs</strong> · vs {count(week.prior.installs)} by {priorDay(week.priorEnd)}
-          </span>
-        </p>
-      </div>
-
-      <div className={o.tableWrap}>
+      <div className={o.ledger}>
         <table className={o.table}>
           <caption className={s.srOnly}>
-            Estimated installs, revenue, rep commissions and margin, this week and this month, each against the same
-            point in the prior period
+            Estimated revenue, rep commissions and margin, this week and this month, each against the same point in the
+            prior period
           </caption>
           <thead>
             <tr>
@@ -172,31 +194,74 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
             ))}
           </tbody>
         </table>
-      </div>
 
-      <p className={o.foot}>
-        Estimates from installs × current comp-plan rates. &ldquo;vs&rdquo; is the same point last week or last month.
-        {gaps.length ? <span className={o.footGap}> {gaps.join(' · ')} (counted at $0).</span> : null}
-      </p>
+        <p className={o.foot}>
+          Estimates from installs × current comp-plan rates. &ldquo;vs&rdquo; is the same point last week or last month.
+          {gaps.length ? <span className={o.footGap}> {gaps.join(' · ')} (counted at $0).</span> : null}
+        </p>
+      </div>
     </section>
   );
 }
 
 function MoneySkeleton() {
   return (
-    <section className={`${s.panel} ${o.board}`} aria-busy="true" aria-label="Loading company money">
-      <div className={o.cellMargin}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
-        <span className={`${s.skel} ${o.skelScore}`} />
+    <section className={o.money} aria-busy="true" aria-label="Loading company money">
+      <div className={o.moneyCard}>
+        <p className={s.kicker}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+        <span className={`${s.skel} ${o.skelNum}`} />
         <span className={`${s.skel} ${o.skelLine}`} />
       </div>
-      <div className={o.cellInstalls}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
-        <span className={`${s.skel} ${o.skelScore}`} />
-      </div>
-      <div className={`${o.tableWrap} ${o.skelTable}`}>
+      <div className={`${o.ledger} ${o.skelTable}`}>
         {MONEY_ROWS.map((row) => (
           <span key={row.key} className={`${s.skel} ${o.skelRow}`} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- installs strip
+
+function InstallsStrip({ data }: { data: MoneySummary }) {
+  const { week, month } = data;
+  return (
+    <section className={`${o.strip} ${o.installs} ${o.rise}`} style={rise(1)} aria-labelledby="installs-h">
+      <Band id="installs-h" title="Installs" />
+      <div className={o.halves}>
+        <div className={o.half}>
+          <p className={o.halfLab}>This week</p>
+          <p className={o.big}>{count(week.current.installs)}</p>
+          <p className={o.cap}>
+            <Delta current={week.current.installs} prior={week.prior.installs} label={`vs through ${priorDay(week.priorEnd)}`} />
+            <span>
+              vs <b>{count(week.prior.installs)}</b> by {priorDay(week.priorEnd)}
+            </span>
+          </p>
+        </div>
+        <div className={o.half}>
+          <p className={o.halfLab}>This month</p>
+          <p className={o.big}>{count(month.current.installs)}</p>
+          <p className={o.cap}>
+            <span>
+              vs <b>{count(month.prior.installs)}</b> by {priorDay(month.priorEnd)}
+            </span>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function InstallsSkeleton() {
+  return (
+    <section className={`${o.strip} ${o.installs}`} aria-busy="true" aria-label="Loading installs">
+      <Band id="installs-skel" title="Installs" />
+      <div className={o.halves}>
+        {[0, 1].map((i) => (
+          <div key={i} className={o.half}>
+            <span className={`${s.skel} ${o.skelBig}`} />
+          </div>
         ))}
       </div>
     </section>
@@ -222,7 +287,7 @@ const MONEY_RISK: ReadonlySet<ProblemKey> = new Set(['carrierCancellations', 'pa
 function Attention({ rows }: { rows: ProblemRow[] }) {
   const open = rows.filter((row) => row.count > 0);
   return (
-    <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
+    <section className={`${o.panel} ${o.attention} ${o.rise}`} style={rise(2)} aria-labelledby="attn-h">
       <PanelHead id="attn-h" title="Needs attention" />
       {open.length === 0 ? (
         <p className={o.clear}>All clear</p>
@@ -261,10 +326,12 @@ const RECRUITING_TILES: Array<{ key: keyof RecruitingSummary; label: string }> =
 function RecruitingTile({ label, value }: { label: string; value: WeekCount }) {
   return (
     <div className={o.stat}>
-      <p className={o.statLabel}>{label}</p>
+      <p className={o.halfLab}>{label}</p>
       <p className={o.statValue}>{count(value.thisWeek)}</p>
-      <p className={o.statPrior}>
-        <strong>{count(value.lastWeek)}</strong> all last week
+      <p className={o.cap}>
+        <span>
+          <b>{count(value.lastWeek)}</b> all last week
+        </span>
       </p>
     </div>
   );
@@ -272,8 +339,8 @@ function RecruitingTile({ label, value }: { label: string; value: WeekCount }) {
 
 function Recruiting({ data }: { data: RecruitingSummary }) {
   return (
-    <section className={`${s.panel} ${o.recruiting}`} aria-labelledby="recruit-h">
-      <PanelHead id="recruit-h" title="Recruiting · this week" />
+    <section className={`${o.strip} ${o.recruiting} ${o.rise}`} style={rise(3)} aria-labelledby="recruit-h">
+      <Band id="recruit-h" title="Recruiting · this week" />
       <div className={o.stats}>
         {RECRUITING_TILES.map((tile) => (
           <RecruitingTile key={tile.key} label={tile.label} value={data[tile.key]} />
@@ -283,10 +350,10 @@ function Recruiting({ data }: { data: RecruitingSummary }) {
   );
 }
 
-function SkeletonPanel({ label, title, rows, className }: { label: string; title: string; rows: number; className: string }) {
+function SkeletonPanel({ label, rows, className, children }: { label: string; rows: number; className: string; children: ReactNode }) {
   return (
-    <section className={`${s.panel} ${className}`} aria-busy="true" aria-label={label}>
-      <PanelHead id={`${className}-skel`} title={title} />
+    <section className={className} aria-busy="true" aria-label={label}>
+      {children}
       <div className={o.skelBody}>
         {Array.from({ length: rows }, (_, i) => (
           <span key={i} className={`${s.skel} ${o.skelRow}`} />
@@ -298,28 +365,24 @@ function SkeletonPanel({ label, title, rows, className }: { label: string; title
 
 // ---------------------------------------------------------------- page
 
-export function OwnerDashboard() {
-  const data = useOwnerDashboard();
+/** The page body, fed by the hook (or by mock data in the design lab). */
+export function OwnerDashboardView({ data, banners }: { data: OwnerDashboardData; banners?: ReactNode }) {
   const { retry } = data;
-  const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
 
   return (
     <>
       <h1 className={s.srOnly}>Company dashboard</h1>
 
       <div className={o.grid}>
-        <div className={o.banners}>
-          <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
-          {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
-        </div>
+        <div className={o.banners}>{banners}</div>
 
         <div className={o.colMain}>
           {data.money.status === 'loading' ? (
             <MoneySkeleton />
           ) : data.money.status === 'error' ? (
-            <section className={`${s.panel} ${o.board} ${o.boardFailed}`} aria-label="Company money">
-              <div className={o.cellMargin}>
-                <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+            <section className={o.money} aria-label="Company money">
+              <div className={o.moneyCard}>
+                <p className={s.kicker}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
                 <Failed what="company money" onRetry={() => retry('money')} className={o.cellFailed} />
               </div>
             </section>
@@ -327,32 +390,59 @@ export function OwnerDashboard() {
             <MoneyBoard data={data.money.data} />
           )}
 
-        </div>
-
-        <div className={o.colSide}>
-          {data.problems.status === 'loading' ? (
-            <SkeletonPanel label="Loading needs attention" title="Needs attention" rows={4} className={o.attention} />
-          ) : data.problems.status === 'error' ? (
-            <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
-              <PanelHead id="attn-h" title="Needs attention" />
-              <Failed what="what needs attention" onRetry={() => retry('problems')} />
-            </section>
-          ) : (
-            <Attention rows={data.problems.data} />
-          )}
-
           {data.recruiting.status === 'loading' ? (
-            <SkeletonPanel label="Loading recruiting" title="Recruiting · this week" rows={2} className={o.recruiting} />
+            <SkeletonPanel label="Loading recruiting" rows={2} className={`${o.strip} ${o.recruiting}`}>
+              <Band id="recruit-skel" title="Recruiting · this week" />
+            </SkeletonPanel>
           ) : data.recruiting.status === 'error' ? (
-            <section className={`${s.panel} ${o.recruiting}`} aria-labelledby="recruit-h">
-              <PanelHead id="recruit-h" title="Recruiting · this week" />
+            <section className={`${o.strip} ${o.recruiting}`} aria-labelledby="recruit-h">
+              <Band id="recruit-h" title="Recruiting · this week" />
               <Failed what="recruiting" onRetry={() => retry('recruiting')} />
             </section>
           ) : (
             <Recruiting data={data.recruiting.data} />
           )}
         </div>
+
+        <div className={o.colSide}>
+          {/* The strip reads the money summary; a money failure shows once, on the card. */}
+          {data.money.status === 'loading' ? (
+            <InstallsSkeleton />
+          ) : data.money.status === 'ready' ? (
+            <InstallsStrip data={data.money.data} />
+          ) : null}
+
+          {data.problems.status === 'loading' ? (
+            <SkeletonPanel label="Loading needs attention" rows={4} className={`${o.panel} ${o.attention}`}>
+              <PanelHead id="attn-skel" title="Needs attention" />
+            </SkeletonPanel>
+          ) : data.problems.status === 'error' ? (
+            <section className={`${o.panel} ${o.attention}`} aria-labelledby="attn-h">
+              <PanelHead id="attn-h" title="Needs attention" />
+              <Failed what="what needs attention" onRetry={() => retry('problems')} />
+            </section>
+          ) : (
+            <Attention rows={data.problems.data} />
+          )}
+        </div>
       </div>
     </>
+  );
+}
+
+export function OwnerDashboard() {
+  const data = useOwnerDashboard();
+  const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
+
+  return (
+    <OwnerDashboardView
+      data={data}
+      banners={
+        <>
+          <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
+          {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
+        </>
+      }
+    />
   );
 }
