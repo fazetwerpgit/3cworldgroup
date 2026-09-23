@@ -72,12 +72,12 @@ async function render(props: Parameters<typeof InstallStatusSection>[0]) {
 }
 
 function openEveryGroup() {
-  const heads = [...container.querySelectorAll<HTMLButtonElement>('.sales-line-fiber-group-head')];
+  const heads = [...container.querySelectorAll<HTMLButtonElement>('[data-part="group-head"]')];
   return act(async () => { heads.forEach((head) => head.click()); });
 }
 
 function submittedAddresses() {
-  return [...container.querySelectorAll('.sales-board-sub-addr')].map((node) => node.textContent);
+  return [...container.querySelectorAll('[data-part="sub-addr"]')].map((node) => node.textContent);
 }
 
 beforeEach(() => {
@@ -113,19 +113,19 @@ describe('what a rep logged, under the carrier rows', () => {
   // whole comparison, before anything is expanded.
   it('says how many were logged on the closed group head', async () => {
     await render({ fiber: fiber([order({})]), sales: [noahSale], ownerView: true, viewerId: 'owner1' });
-    expect(container.querySelector('.sales-line-fiber-group-count')?.textContent).toBe('1 orders · 1 logged');
+    expect(container.querySelector('[data-part="group-count"]')?.textContent).toBe('1 orders · 1 logged');
   });
 
   it('a rep the carrier never reported still gets a group, so their sales are not invisible', async () => {
     const ghost = sale({ id: 's3', salesRepId: 'u3', salesRepName: 'Aaron Ghost', customerAddress: '9 Nowhere St' });
     await render({ fiber: fiber([order({})]), sales: [noahSale, ghost], ownerView: true, viewerId: 'owner1' });
-    const heads = [...container.querySelectorAll('.sales-line-fiber-group-head')].map((n) => n.textContent);
+    const heads = [...container.querySelectorAll('[data-part="group-head"]')].map((n) => n.textContent);
     expect(heads.some((text) => text?.includes('Aaron Ghost') && text?.includes('0 orders'))).toBe(true);
   });
 
   it('searching an address finds it on either side, with the group already open', async () => {
     await render({ fiber: fiber(orders), sales: [noahSale, willSale], ownerView: true, viewerId: 'owner1' });
-    const search = container.querySelector<HTMLInputElement>('.sales-line-fiber-search input')!;
+    const search = container.querySelector<HTMLInputElement>('[data-part="search"] input')!;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => {
       setter.call(search, 'jewwel');
@@ -133,7 +133,7 @@ describe('what a rep logged, under the carrier rows', () => {
     });
 
     // One group survives, expanded, and only the matching submission is in it.
-    expect(container.querySelectorAll('.sales-line-fiber-group')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-part="group"]')).toHaveLength(1);
     expect(submittedAddresses()).toEqual(['58030 Jewwel Rd.']);
   });
 });

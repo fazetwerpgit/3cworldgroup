@@ -1,11 +1,14 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import type { FiberOrder, FiberOrderStatus, FiberStatusResponse, Sale } from '@/types';
 import { SubmittedRows } from './SubmittedSales';
 import { submittedByRep, submissionMatches } from '@/lib/sales/submittedByRep';
+import s from '@/components/portal/rep/rep.module.css';
+import x from '@/components/portal/rep/rep-sales.module.css';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
 export type FiberBucket = Exclude<FiberFilter, 'all'>;
@@ -170,12 +173,26 @@ function truncateNotes(value: string) {
   return `${value.slice(0, 87).trimEnd()}...`;
 }
 
+const TONE: Record<Exclude<FiberFilter, 'all'>, string> = {
+  pending: x.t_pending,
+  active: x.t_active,
+  cancelled: x.t_cancelled,
+  attention: x.t_attention,
+};
+
+/** The carrier's own word on an order — the live status from the provider report. */
 export function FiberStatusPill({ status }: { status: FiberOrderStatus }) {
   return (
-    <span className={`sales-line-fiber-status sales-line-fiber-status-${statusGroup(status)}`}>
+    <span className={`${x.pill} ${TONE[statusGroup(status)]}`} data-part="fiber-pill">
+      <span className={x.dot} aria-hidden="true" />
       {STATUS_LABELS[status]}
     </span>
   );
+}
+
+/** Dot colour for a filter chip. */
+export function fiberTone(bucket: FiberBucket): string {
+  return TONE[bucket];
 }
 
 function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; showRepName?: boolean }) {
@@ -185,16 +202,13 @@ function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; show
   const loggedCustomerName = order.loggedCustomerName?.trim();
 
   return (
-    <article className="sales-line-fiber-row">
-      <div className="sales-line-fiber-row-primary">
-        <div className="sales-line-fiber-address">
-          <strong>{loggedCustomerName || order.address || 'Address unavailable'}</strong>
-          {loggedCustomerName && <span>{order.address || 'Address unavailable'}</span>}
-          {location && <span>{location}</span>}
-        </div>
-        <FiberStatusPill status={order.status} />
+    <article className={x.fiberRow} data-part="fiber-row">
+      <div className={x.fiberWho}>
+        <strong>{loggedCustomerName || order.address || 'Address unavailable'}</strong>
+        {loggedCustomerName && <span>{order.address || 'Address unavailable'}</span>}
+        {location && <span>{location}</span>}
       </div>
-      <div className="sales-line-fiber-meta">
+      <div className={x.fiberMeta}>
         {showRepName && order.repName && <span>{order.repName}</span>}
         {order.fiberPlan && <span>{order.fiberPlan}</span>}
         {dateLabel && <span>{date.label} {dateLabel}</span>}
@@ -204,13 +218,16 @@ function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; show
         )}
         {order.status === 'breakage' && order.customerName && <span>{order.customerName}</span>}
       </div>
+      <div className={x.fiberPill}>
+        <FiberStatusPill status={order.status} />
+      </div>
     </article>
   );
 }
 
 export function FiberRows({ orders, showRepName = false }: { orders: FiberOrder[]; showRepName?: boolean }) {
   return (
-    <div className="sales-line-fiber-list">
+    <div data-part="fiber-list">
       {orders.map((order) => <FiberOrderRow key={order.id} order={order} showRepName={showRepName} />)}
     </div>
   );
@@ -433,44 +450,71 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
 
   if (!isAdmin) return null;
 
+  const groupHead = (
+    key: string,
+    name: string,
+    count: string,
+    summary: string,
+    open: boolean,
+  ) => (
+    <button
+      type="button"
+      className={x.expander}
+      data-part="group-head"
+      aria-expanded={open}
+      aria-controls={groupDomId(key)}
+      onClick={() => toggleGroup(key)}
+    >
+      <ChevronRight size={18} className={x.chev} aria-hidden="true" />
+      <span className={x.exName}>{name}</span>
+      <span className={x.exCount} data-part="group-count">{count}</span>
+      <span className={x.exSub}>{summary}</span>
+    </button>
+  );
+
   return (
-    <section className="sales-line-fiber" aria-label="Install status">
-      <div className="sales-line-fiber-head">
-        <div>
-          <h2>Install status by rep</h2>
-          {updated && <p className="sales-line-fiber-updated">Updated {updated}</p>}
-        </div>
+    <section className={s.panel} aria-label="Install status">
+      <div className={`${s.panelHead} ${x.panelHead}`}>
+        <h2 className={x.panelTitle}>Install status by rep</h2>
+        {updated && <p className={x.panelMeta}>Updated {updated}</p>}
       </div>
 
       {loading ? (
-        <div className="sales-line-fiber-list sales-line-fiber-loading" aria-busy="true" aria-label="Loading install status">
-          {[1, 2, 3].map((item) => <span key={item} className="sales-skeleton sales-skeleton-row sales-line-fiber-skeleton-row" />)}
+        <div className={x.skelBody} aria-busy="true" aria-label="Loading install status">
+          {[1, 2, 3].map((item) => <span key={item} className={`${s.skel} ${x.skelRow}`} />)}
         </div>
       ) : error ? (
-        <p className="sales-line-fiber-message" role="alert">Install status is unavailable right now.</p>
+        <div className={s.failed} role="alert">
+          <span>Couldn&apos;t load install status</span>
+          <button type="button" className={s.retry} onClick={() => void refetch()}>
+            Retry
+          </button>
+        </div>
       ) : allOrders.length === 0 && repGroups.length === 0 ? (
-        <p className="sales-line-fiber-message">No install report data for you yet. Statuses appear here once the daily provider report includes your sales.</p>
+        <p className={x.empty}>No install report data for you yet. Statuses appear here once the daily provider report includes your sales.</p>
       ) : (
         isAdmin ? (
           <>
-          <div className="sales-line-fiber-filters" role="group" aria-label="Filter install status">
+          <div className={x.chips} role="group" aria-label="Filter install status">
             {FILTERS.map(({ key, label }) => (
               <button
                 key={key}
                 type="button"
-                className="sales-line-fiber-chip"
+                className={x.chip}
                 aria-pressed={filter === key}
                 onClick={() => setFilter(key)}
               >
-                {label} <span>({counts[key]})</span>
+                {key !== 'all' && <span className={`${x.dot} ${TONE[key]}`} aria-hidden="true" />}
+                {label} <b>{counts[key]}</b>
               </button>
             ))}
           </div>
 
-          <label className="sales-board-search sales-line-fiber-search">
-            <span className="sr-only">Find an address across install status and what reps logged</span>
+          <label className={x.search} data-part="search">
+            <span className={s.srOnly}>Find an address across install status and what reps logged</span>
             <input
               type="search"
+              className={x.input}
               value={find}
               placeholder="Find an address or customer"
               onChange={(event) => setFind(event.target.value)}
@@ -478,13 +522,13 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
           </label>
 
           {filteredOrders.length === 0 && repGroups.length === 0 ? (
-            <p className="sales-line-fiber-message">No install statuses match this filter.</p>
+            <p className={x.empty}>No install statuses match this filter.</p>
           ) : needle && repGroups.length === 0 ? (
-            <p className="sales-line-fiber-message">
+            <p className={x.empty}>
               Nothing matches that — no carrier order and nothing logged in the portal.
             </p>
           ) : (
-            <div className="sales-line-fiber-groups">
+            <div>
               {repGroups.map((group) => {
                 const groupKey = `matched:${group.key}`;
                 // A search opens what it matched: nothing is found by typing an
@@ -493,35 +537,24 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                 const logged = submissionsFor(group.userId);
                 const showLogged = canSeeSubmissions(group.userId);
                 return (
-                  <section className="sales-line-fiber-group" key={group.key} aria-label={`${group.repName}, ${group.orders.length} orders`}>
-                    <button
-                      type="button"
-                      className="sales-line-fiber-group-head"
-                      aria-expanded={open}
-                      aria-controls={groupDomId(groupKey)}
-                      onClick={() => toggleGroup(groupKey)}
-                    >
-                      <span className="sales-line-fiber-group-head-main">
-                        <strong>{group.repName}</strong>
-                        <span className="sales-line-fiber-group-count">
-                          {group.orders.length} orders{showLogged ? ` · ${logged.length} logged` : ''}
-                        </span>
-                      </span>
-                      <span className="sales-line-fiber-group-head-side">
-                        <span className="sales-line-fiber-summary">{statusSummary(group.orders)}</span>
-                        <span className="sales-line-fiber-chevron" aria-hidden="true">⌄</span>
-                      </span>
-                    </button>
+                  <section data-part="group" key={group.key} aria-label={`${group.repName}, ${group.orders.length} orders`}>
+                    {groupHead(
+                      groupKey,
+                      group.repName,
+                      `${group.orders.length} orders${showLogged ? ` · ${logged.length} logged` : ''}`,
+                      statusSummary(group.orders),
+                      open,
+                    )}
                     {open && (
-                      <div id={groupDomId(groupKey)}>
+                      <div id={groupDomId(groupKey)} className={x.nested}>
                         <FiberRows orders={group.orders} />
                         {showLogged && (
-                          <div className="sales-line-fiber-submitted">
+                          <div className={x.logged}>
                             {/* The carrier's account is above; this is the rep's
                                 own. Kept plainly apart so nobody reads one as
                                 confirming the other. */}
-                            <p className="sales-line-fiber-submitted-head">
-                              Logged in the portal <span>{logged.length}</span>
+                            <p className={x.loggedHead}>
+                              Logged in the portal <b>{logged.length}</b>
                             </p>
                             <SubmittedRows sales={logged} />
                           </div>
@@ -533,68 +566,59 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
               })}
               {unmatchedAssignmentGroups.length > 0 && (
                 <>
-                  <div className="sales-line-fiber-unmatched-divider">
-                    <span>Not linked to an account yet</span>
-                    <button type="button" className="sales-line-fiber-action" onClick={() => void handleRematch()} disabled={rematching || Boolean(assigningKey)}>
+                  <div className={x.divider}>
+                    <span className={x.panelTitle}>Not linked to an account yet</span>
+                    <button type="button" className={x.actBtn} onClick={() => void handleRematch()} disabled={rematching || Boolean(assigningKey)}>
                       {rematching ? 'Matching…' : 'Re-run matching'}
                     </button>
                   </div>
-                  {rematchError && <p className="sales-line-fiber-inline-error" role="alert">{rematchError}</p>}
+                  {rematchError && <p className={`${x.inlineError} ${x.note}`} role="alert">{rematchError}</p>}
                   {unmatchedAssignmentGroups.map((assignment) => {
                     const groupKey = `unmatched:${assignment.key}`;
+                    const open = openGroups.has(groupKey);
                     return (
-                      <section className="sales-line-fiber-group" key={assignment.key} aria-label={`${assignment.repName}, ${assignment.orders.length} orders`}>
-                        <button
-                          type="button"
-                          className="sales-line-fiber-group-head"
-                          aria-expanded={openGroups.has(groupKey)}
-                          aria-controls={groupDomId(groupKey)}
-                          onClick={() => toggleGroup(groupKey)}
-                        >
-                          <span className="sales-line-fiber-group-head-main">
-                            <strong>{assignment.repName}</strong>
-                            <span className="sales-line-fiber-group-count">{assignment.orders.length} orders</span>
-                          </span>
-                          <span className="sales-line-fiber-group-head-side">
-                            <span className="sales-line-fiber-summary">{statusSummary(assignment.orders)}</span>
-                            <span className="sales-line-fiber-chevron" aria-hidden="true">⌄</span>
-                          </span>
-                        </button>
-                        {openGroups.has(groupKey) && (
-                          <div id={groupDomId(groupKey)}>
-                            <div className="sales-line-fiber-assignments">
-                              {usersLoading && <p className="sales-line-fiber-assignment-note">Loading portal users…</p>}
-                              {usersError && <p className="sales-line-fiber-inline-error" role="alert">{usersError}</p>}
-                              <div className="sales-line-fiber-assignment">
-                                <div className="sales-line-fiber-assignment-label">
-                                  <strong>{assignment.repName} — {assignment.orders.length} orders</strong>
-                                  {!assignment.dealerId && <span>no dealer id in report</span>}
-                                </div>
-                                {assignment.dealerId && (
-                                  <>
-                                    <select
-                                      aria-label={`Assign ${assignment.repName}`}
-                                      value={selectedUsers[assignment.key] ?? ''}
-                                      onChange={(event) => setSelectedUsers((current) => ({ ...current, [assignment.key]: event.target.value }))}
-                                      disabled={usersLoading || rematching || Boolean(assigningKey)}
-                                    >
-                                      <option value="">Select portal user</option>
-                                      {users.map((user) => <option key={user.uid} value={user.uid}>{user.displayName || user.uid}</option>)}
-                                    </select>
-                                    <button
-                                      type="button"
-                                      className="sales-line-fiber-action"
-                                      onClick={() => void handleAssign(assignment)}
-                                      disabled={!selectedUsers[assignment.key] || rematching || Boolean(assigningKey)}
-                                    >
-                                      {assigningKey === assignment.key ? 'Assigning…' : 'Assign'}
-                                    </button>
-                                  </>
-                                )}
-                                {assignmentErrors[assignment.key] && (
-                                  <p className="sales-line-fiber-inline-error" role="alert">{assignmentErrors[assignment.key]}</p>
-                                )}
+                      <section data-part="group" key={assignment.key} aria-label={`${assignment.repName}, ${assignment.orders.length} orders`}>
+                        {groupHead(
+                          groupKey,
+                          assignment.repName,
+                          `${assignment.orders.length} orders`,
+                          statusSummary(assignment.orders),
+                          open,
+                        )}
+                        {open && (
+                          <div id={groupDomId(groupKey)} className={x.nested}>
+                            <div className={x.assign}>
+                              {usersLoading && <p className={x.inlineNote}>Loading portal users…</p>}
+                              {usersError && <p className={x.inlineError} role="alert">{usersError}</p>}
+                              <div className={x.assignLabel}>
+                                <strong>{assignment.repName} — {assignment.orders.length} orders</strong>
+                                {!assignment.dealerId && <span>no dealer id in report</span>}
                               </div>
+                              {assignment.dealerId && (
+                                <div className={x.assignControls}>
+                                  <select
+                                    className={x.select}
+                                    aria-label={`Assign ${assignment.repName}`}
+                                    value={selectedUsers[assignment.key] ?? ''}
+                                    onChange={(event) => setSelectedUsers((current) => ({ ...current, [assignment.key]: event.target.value }))}
+                                    disabled={usersLoading || rematching || Boolean(assigningKey)}
+                                  >
+                                    <option value="">Select portal user</option>
+                                    {users.map((user) => <option key={user.uid} value={user.uid}>{user.displayName || user.uid}</option>)}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className={x.actBtn}
+                                    onClick={() => void handleAssign(assignment)}
+                                    disabled={!selectedUsers[assignment.key] || rematching || Boolean(assigningKey)}
+                                  >
+                                    {assigningKey === assignment.key ? 'Assigning…' : 'Assign'}
+                                  </button>
+                                </div>
+                              )}
+                              {assignmentErrors[assignment.key] && (
+                                <p className={x.inlineError} role="alert">{assignmentErrors[assignment.key]}</p>
+                              )}
                             </div>
                             <FiberRows orders={assignment.orders} />
                           </div>

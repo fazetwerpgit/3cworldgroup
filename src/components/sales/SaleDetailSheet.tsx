@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
   FileText,
+  Image as ImageIcon,
   MapPin,
   Pencil,
   Phone,
@@ -16,7 +16,7 @@ import {
   Ban,
   X,
 } from 'lucide-react';
-import { Sale, FIBER_COMPANIES } from '@/types';
+import { Sale, FIBER_COMPANIES, SaleStatusConfig } from '@/types';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
@@ -24,6 +24,9 @@ import { dateToSaleDateInput, parseInstallDateInput, todaySaleDateInput } from '
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
+import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import s from '@/components/portal/rep/rep.module.css';
+import x from '@/components/portal/rep/rep-sales.module.css';
 
 interface SaleDetailSheetProps {
   sale: Sale | null;
@@ -44,6 +47,8 @@ interface SaleDetailSheetProps {
    * refetches. Optional: the sheet already shows the new date on its own.
    */
   onSaleUpdated?: () => void;
+  /** The T-Fiber estimated payout window ("Sep 21–25"), when the sale has installed. */
+  payout?: string | null;
 }
 
 const INSTALL_DATE_ERROR = 'Could not save the install date. Try again.';
@@ -75,10 +80,6 @@ function installDateAsDate(value: Date | string | null | undefined): Date | null
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
-function commissionLabel(value: number | undefined) {
-  return typeof value === 'number' ? formatMoney(value) : '—';
-}
-
 function companyLabel(company: string) {
   return FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
 }
@@ -91,10 +92,6 @@ function ageLabel(sale: Sale) {
 function ageTone(sale: Sale) {
   const days = Math.max(0, Math.floor((Date.now() - new Date(sale.saleDate).getTime()) / 86_400_000));
   return days >= 14 ? 'red' : days >= 7 ? 'amber' : '';
-}
-
-function StatusBadge({ status }: { status: Sale['status'] }) {
-  return <span className={`sales-line-badge ${status}`}>{status}</span>;
 }
 
 export function SaleDetailSheet({
@@ -111,6 +108,7 @@ export function SaleDetailSheet({
   onRequestCancel,
   onRestore,
   onSaleUpdated,
+  payout = null,
 }: SaleDetailSheetProps) {
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
@@ -185,7 +183,7 @@ export function SaleDetailSheet({
     historyPushedRef.current = false;
   };
 
-  if (!sale || typeof document === 'undefined') return null;
+  if (!sale || !open || typeof document === 'undefined') return null;
 
   const saleId = sale.id || '';
   const tone = ageTone(sale);
@@ -253,197 +251,218 @@ export function SaleDetailSheet({
     }
   };
 
-  // Portaled to <body>: on iPhones the portal locks scrolling into <main>
-  // (app-shell scroll lock), and iOS WebKit breaks position:fixed inside that
-  // scroller — the sheet gets clipped to main's box and painted UNDER the
-  // fixed header/bottom nav, hiding the close X with no way out. The
-  // display:contents wrapper re-supplies the .sales-line custom-property
-  // palette the sheet's styles read, without generating a layout box.
-  return createPortal(
-    <div className="sales-line" style={{ display: 'contents' }}>
+  // Portaled to <body> (BodyLayer): on iPhones <main> is the scroller, and iOS
+  // WebKit breaks position:fixed inside it — the sheet gets clipped to main's
+  // box and painted UNDER the fixed bars, hiding the close X with no way out.
+  // BodyLayer's display:contents wrapper re-supplies the D tokens.
+  return (
+    <BodyLayer>
       <button
         type="button"
-        className={`sales-line-backdrop ${open ? 'is-open' : ''}`}
+        className={s.backdrop}
         aria-label="Close sale detail"
-        tabIndex={open ? 0 : -1}
+        tabIndex={-1}
         onClick={() => onOpenChange(false)}
       />
-      <aside
-        className={`sales-line-detail-sheet ${open ? 'is-open' : ''}`}
-        aria-hidden={!open}
-        aria-label="Sale detail"
-      >
-        <div className="sales-line-sheet-top">
-          <div>
-            <p className="sales-line-eyebrow">Sale detail / {String(index + 1).padStart(2, '0')}</p>
-            <h2>{sale.customerName || sale.customerAddress || 'Customer pending'}</h2>
+      <aside className={`${s.sheet} ${x.detail}`} role="dialog" aria-modal="true" aria-label="Sale detail">
+        <div className={s.sheetHandle} aria-hidden="true" />
+        <div className={`${s.sheetHead} ${x.dHead}`}>
+          <div className={x.sheetHeadText}>
+            <p className={s.kicker}>Sale {index + 1} of {total}</p>
+            <h2 className={x.sheetName}>{sale.customerName || sale.customerAddress || 'Customer pending'}</h2>
           </div>
-          <button className="sales-line-icon-button" type="button" onClick={() => onOpenChange(false)} aria-label="Close detail">
-            <X className="sales-line-icon" aria-hidden="true" />
+          <button className={s.iconBtn} type="button" onClick={() => onOpenChange(false)} aria-label="Close detail">
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="sales-line-sheet-scroll">
-          <div className="sales-line-sheet-status">
-            <StatusBadge status={sale.status} />
-            <span className={`sales-line-stale ${tone}`}>{sale.status === 'pending' ? ageLabel(sale) : formatDate(sale.saleDate)}</span>
+        <div className={`${s.sheetBody} ${x.dBody}`}>
+          <div className={`${x.dBlock} ${x.dStatus}`}>
+            <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status]?.name ?? sale.status}</span>
+            <span className={`${x.dAge} ${tone ? x[`dAge_${tone}`] : ''}`}>
+              {sale.status === 'pending' ? ageLabel(sale) : `Sold ${formatDate(sale.saleDate)}`}
+            </span>
           </div>
 
           {sale.status === 'cancelled' && (
-            <p className="sales-line-cancelled-note">
+            <p className={x.dCancelled}>
               Cancelled {sale.cancelledAt ? formatDate(sale.cancelledAt) : ''}
               {sale.cancellerName ? ` by ${sale.cancellerName}` : ''}
               {sale.cancelReason ? ` — ${sale.cancelReason}` : '. No reason given.'}
             </p>
           )}
 
-          <section className="sales-line-sheet-block">
-            <span className="sales-line-sheet-label">Customer</span>
-            <div className="sales-line-customer-detail">
-              <strong>{sale.customerName || 'Customer pending'}</strong>
-              {sale.customerPhone ? <a href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}><Phone className="sales-line-inline-icon" />{sale.customerPhone}</a> : <span>No phone provided</span>}
-              <span><MapPin className="sales-line-inline-icon" />{sale.customerAddress || 'No address provided'}</span>
-            </div>
+          <section className={x.dBlock} aria-labelledby="sd-customer">
+            <h3 id="sd-customer" className={s.kicker}>Customer</h3>
+            <span className={x.dStrong}>{sale.customerName || 'Customer pending'}</span>
+            {sale.customerPhone ? (
+              <a className={x.dLine} href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}>
+                <Phone size={16} aria-hidden="true" />
+                {sale.customerPhone}
+              </a>
+            ) : (
+              <span className={x.dLine}>
+                <Phone size={16} aria-hidden="true" />
+                No phone provided
+              </span>
+            )}
+            <span className={x.dLine}>
+              <MapPin size={16} aria-hidden="true" />
+              {sale.customerAddress || 'No address provided'}
+            </span>
           </section>
 
-          <section className="sales-line-sheet-block">
-            <span className="sales-line-sheet-label">Dates</span>
-            <div className="sales-line-sheet-dates">
-              <span>Sold <b>{formatDate(sale.saleDate)}</b></span>
-              <span>
-                Install <b>{formatDate(shownInstallDate)}</b>
+          <section className={x.dBlock} aria-labelledby="sd-dates">
+            <h3 id="sd-dates" className={s.kicker}>Dates</h3>
+            <div className={x.dDates}>
+              <div className={x.dDate}>
+                <span>Sold</span>
+                <b>{formatDate(sale.saleDate)}</b>
+              </div>
+              <div className={x.dDate}>
+                <span>Install</span>
+                <b>{formatDate(shownInstallDate)}</b>
                 {canEditInstallDate && installDraft === null && (
-                  <button
-                    className="sales-line-date-change"
-                    type="button"
-                    onClick={startEditingInstall}
-                  >
+                  <button className={`${x.actBtn} ${x.dChange}`} type="button" onClick={startEditingInstall}>
                     Change
                   </button>
                 )}
-              </span>
+              </div>
             </div>
+            {payout && <span className={x.payout}>Est. payout <b>{payout}</b></span>}
             {installDraft !== null && (
-              <div className="sales-line-date-editor">
-                <label className="sales-line-date-editor-label" htmlFor="sale-install-date">
+              <div className={x.dEditor}>
+                <label className={x.dEditorLabel} htmlFor="sale-install-date">
                   Install date
                 </label>
                 <input
                   id="sale-install-date"
-                  className="sales-line-date-input"
+                  className={x.input}
                   type="date"
                   value={installDraft}
                   disabled={savingInstall}
                   onChange={(event) => setInstallDraft(event.target.value)}
                 />
-                <div className="sales-line-date-editor-actions">
-                  <button type="button" disabled={savingInstall} onClick={() => void saveInstallDate()}>
+                <div className={x.dEditorActions}>
+                  <button type="button" className={`${x.actBtn} ${x.actPrimary}`} disabled={savingInstall} onClick={() => void saveInstallDate()}>
                     {savingInstall ? 'Saving...' : 'Save'}
                   </button>
-                  <button type="button" className="quiet" disabled={savingInstall} onClick={cancelEditingInstall}>
+                  <button type="button" className={x.actBtn} disabled={savingInstall} onClick={cancelEditingInstall}>
                     Cancel
                   </button>
                 </div>
               </div>
             )}
-            {installError && <p className="sales-line-proof-error" role="alert">{installError}</p>}
+            {installError && <p className={x.inlineError} role="alert">{installError}</p>}
           </section>
 
-          <section className="sales-line-sheet-block">
-            <span className="sales-line-sheet-label">Plans sold</span>
-            <div className="sales-line-plans">
+          <section className={x.dBlock} aria-labelledby="sd-plans">
+            <h3 id="sd-plans" className={s.kicker}>Plans sold</h3>
+            <div>
               {sale.products?.map((product, productIndex) => (
-                <div className="sales-line-plan" key={`${product.productId}-${productIndex}`}>
-                  <div>
-                    <strong>{product.productName}</strong>
-                    <span>{companyLabel(product.company)}</span>
-                  </div>
+                <div className={x.dPlan} key={`${product.productId}-${productIndex}`}>
+                  <strong>{product.productName}</strong>
                   <b>{formatMoney(product.totalPrice || product.unitPrice)}/mo</b>
+                  <span>{companyLabel(product.company)}</span>
                   <em>{product.points} pts</em>
                 </div>
               ))}
             </div>
           </section>
 
-          <div className="sales-line-summary">
+          <div className={x.dSummary}>
             <div><small>Monthly value</small><strong>{formatMoney(sale.totalValue || 0)}</strong></div>
-            <div><small>Commission</small><strong>{commissionLabel(sale.commission)}</strong></div>
+            <div>
+              <small>Commission</small>
+              <strong>
+                {typeof sale.commission === 'number' ? <><span className={x.est}>est.</span>{formatMoney(sale.commission)}</> : '—'}
+              </strong>
+            </div>
             <div><small>Points</small><strong>{sale.totalPoints || 0}</strong></div>
           </div>
 
-          <section className="sales-line-sheet-block">
-            <span className="sales-line-sheet-label">Order / proof</span>
-            <div className="sales-line-proof">
-              {sale.orderNumberOrBtn && <span><FileText className="sales-line-proof-icon" />{sale.orderNumberOrBtn}</span>}
+          <section className={x.dBlock} aria-labelledby="sd-proof">
+            <h3 id="sd-proof" className={s.kicker}>Order / proof</h3>
+            <div className={x.proofList} data-part="proof">
+              {sale.orderNumberOrBtn && (
+                <span className={x.dLine}>
+                  <FileText size={16} aria-hidden="true" />
+                  {sale.orderNumberOrBtn}
+                </span>
+              )}
               {proofPaths.length > 0 ? (
                 proofPaths.map((path, proofIndex) => (
                   <button
                     key={path}
                     type="button"
+                    className={x.proofBtn}
                     onClick={() => void openScreenshot(proofIndex)}
                     disabled={proofLoading !== null}
                   >
-                    {proofLoading === proofIndex
-                      ? 'Opening proof...'
-                      : proofPaths.length > 1
-                        ? `Screenshot ${proofIndex + 1}`
-                        : 'View proof screenshot'}
+                    <ImageIcon size={18} aria-hidden="true" />
+                    <span>
+                      {proofLoading === proofIndex
+                        ? 'Opening proof...'
+                        : proofPaths.length > 1
+                          ? `Screenshot ${proofIndex + 1}`
+                          : 'View proof screenshot'}
+                    </span>
+                    <ChevronRight size={18} aria-hidden="true" />
                   </button>
                 ))
               ) : !sale.orderNumberOrBtn ? (
-                <span>No order number or proof attached</span>
+                <span className={x.inlineNote}>No order number or proof attached</span>
               ) : null}
             </div>
-            {proofError && <p className="sales-line-proof-error">{proofError}</p>}
+            {proofError && <p className={x.inlineError}>{proofError}</p>}
           </section>
 
-          <section className="sales-line-sheet-block">
-            <span className="sales-line-sheet-label">Rep notes</span>
-            <p className="sales-line-notes">{sale.notes || 'No notes added.'}</p>
+          <section className={x.dBlock} aria-labelledby="sd-notes">
+            <h3 id="sd-notes" className={s.kicker}>Rep notes</h3>
+            <p className={x.dNotes}>{sale.notes || 'No notes added.'}</p>
           </section>
 
-          <div className="sales-line-sheet-actions">
-            {isAdmin && (
-              <>
-                <Link className="admin" href={`/portal/sales/${saleId}/edit`} onClick={disownHistoryEntry}>
-                  <Pencil className="sales-line-icon" />Edit
-                </Link>
-                {/* Cancel sits before Delete deliberately: it is the answer to
-                    "the customer backed out" almost every time, and it keeps
-                    the record. Delete is for a row that should never have
-                    existed. */}
-                {sale.status === 'cancelled'
-                  ? onRestore && (
-                      <button className="admin" type="button" disabled={loading} onClick={() => onRestore(saleId)}>
-                        <RotateCcw className="sales-line-icon" />Restore
-                      </button>
-                    )
-                  : onRequestCancel && (
-                      <button className="admin" type="button" disabled={loading} onClick={() => onRequestCancel(saleId)}>
-                        <Ban className="sales-line-icon" />Cancel sale
-                      </button>
-                    )}
-                <button className="admin" type="button" disabled={loading} onClick={() => onRequestDelete(saleId)}>
-                  <Trash2 className="sales-line-icon" />Delete
-                </button>
-              </>
-            )}
-          </div>
-
-          {total > 1 && (
-            <div className="sales-line-sheet-nav">
-              <button type="button" onClick={onPrev}><ChevronLeft className="sales-line-icon" />Previous</button>
-              <span>{index + 1} / {total}</span>
-              <button type="button" onClick={onNext}>Next<ChevronRight className="sales-line-icon" /></button>
+          {isAdmin && (
+            <div className={x.dActions}>
+              <Link className={x.actBtn} href={`/portal/sales/${saleId}/edit`} onClick={disownHistoryEntry}>
+                <Pencil size={16} aria-hidden="true" />Edit
+              </Link>
+              {/* Cancel sits before Delete deliberately: it is the answer to
+                  "the customer backed out" almost every time, and it keeps
+                  the record. Delete is for a row that should never have
+                  existed. */}
+              {sale.status === 'cancelled'
+                ? onRestore && (
+                    <button className={x.actBtn} type="button" disabled={loading} onClick={() => onRestore(saleId)}>
+                      <RotateCcw size={16} aria-hidden="true" />Restore
+                    </button>
+                  )
+                : onRequestCancel && (
+                    <button className={x.actBtn} type="button" disabled={loading} onClick={() => onRequestCancel(saleId)}>
+                      <Ban size={16} aria-hidden="true" />Cancel sale
+                    </button>
+                  )}
+              <button className={`${x.actBtn} ${x.actDanger}`} type="button" disabled={loading} onClick={() => onRequestDelete(saleId)}>
+                <Trash2 size={16} aria-hidden="true" />Delete
+              </button>
             </div>
           )}
-          <Link className="sales-line-open-full" href={`/portal/sales/${saleId}`} onClick={disownHistoryEntry}>
-            Open full page <ArrowUpRight className="sales-line-icon" />
-          </Link>
+
+          {total > 1 && (
+            <div className={x.dNav}>
+              <button type="button" className={x.actBtn} onClick={onPrev}><ChevronLeft size={16} aria-hidden="true" />Previous</button>
+              <span>{index + 1} / {total}</span>
+              <button type="button" className={x.actBtn} onClick={onNext}>Next<ChevronRight size={16} aria-hidden="true" /></button>
+            </div>
+          )}
+          <div className={x.dFoot}>
+            <Link className={`${s.btnSecondary} ${s.btnBlock}`} href={`/portal/sales/${saleId}`} onClick={disownHistoryEntry}>
+              Open full page <ArrowUpRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </aside>
       <ChatLightbox image={proofImage} onClose={() => setProofImage(null)} />
-    </div>,
-    document.body
+    </BodyLayer>
   );
 }

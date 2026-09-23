@@ -158,7 +158,7 @@ describe('SaleDetailSheet proof screenshots', () => {
   const B = 'form-attachments/rep1/sale-proof/slot_bbbbbb/';
 
   function proofButtons() {
-    return Array.from(document.body.querySelectorAll('.sales-line-proof button')).map(
+    return Array.from(document.body.querySelectorAll('[data-part="proof"] button')).map(
       (button) => button.textContent?.trim()
     );
   }

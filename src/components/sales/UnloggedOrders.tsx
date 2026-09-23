@@ -5,15 +5,9 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { FiberOrder, Sale } from '@/types';
 import type { MergedRow } from '@/lib/sales/mergeBook';
 import { FiberRows, sortFiberOrders } from './InstallStatusSection';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { SalesDialog } from './SalesDialog';
+import s from '@/components/portal/rep/rep.module.css';
+import x from '@/components/portal/rep/rep-sales.module.css';
 
 // The two admin-only actions the merged board needs and the shell does not
 // already own: assigning a whole dealer's unmatched orders to a portal user
@@ -115,23 +109,24 @@ export function UnassignedOrders({ rows, onAssigned }: { rows: MergedRow[]; onAs
   }, [assigningKey, onAssigned, selected]);
 
   return (
-    <div className="sales-board-drawer-body">
-      {usersLoading && <p className="sales-board-assign-note">Loading portal users...</p>}
-      {usersError && <p className="sales-board-assign-error" role="alert">{usersError}</p>}
+    <div data-part="unassigned">
+      {usersLoading && <p className={`${x.inlineNote} ${x.assign}`}>Loading portal users...</p>}
+      {usersError && <p className={`${x.inlineError} ${x.assign}`} role="alert">{usersError}</p>}
 
       {groups.map((group) => (
-        <section className="sales-board-assign" key={group.key} aria-label={`${group.repName}, ${group.orders.length} orders`}>
-          <div className="sales-board-assign-row">
-            <span className="sales-board-assign-label">
+        <section key={group.key} aria-label={`${group.repName}, ${group.orders.length} orders`}>
+          <div className={x.assign}>
+            <div className={x.assignLabel}>
               <strong>{group.repName}</strong>
               <span>
                 {group.orders.length} order{group.orders.length === 1 ? '' : 's'}
                 {group.dealerId ? ` / dealer ${group.dealerId}` : ' / no dealer id in report'}
               </span>
-            </span>
+            </div>
             {group.dealerId && (
-              <>
+              <div className={x.assignControls}>
                 <select
+                  className={x.select}
                   aria-label={`Assign ${group.repName}`}
                   value={selected[group.key] ?? ''}
                   onChange={(event) => setSelected((current) => ({ ...current, [group.key]: event.target.value }))}
@@ -142,16 +137,16 @@ export function UnassignedOrders({ rows, onAssigned }: { rows: MergedRow[]; onAs
                 </select>
                 <button
                   type="button"
-                  className="sales-board-rowact-btn"
+                  className={x.actBtn}
                   onClick={() => void assign(group)}
                   disabled={!selected[group.key] || Boolean(assigningKey)}
                 >
                   {assigningKey === group.key ? 'Assigning' : 'Assign'}
                 </button>
-              </>
+              </div>
             )}
+            {errors[group.key] && <p className={x.inlineError} role="alert">{errors[group.key]}</p>}
           </div>
-          {errors[group.key] && <p className="sales-board-assign-error" role="alert">{errors[group.key]}</p>}
           <FiberRows orders={group.orders} />
         </section>
       ))}
@@ -214,55 +209,52 @@ export function LinkOrderDialog({
   }, [onClose, onLinked, row?.order?.id, saving]);
 
   return (
-    <Dialog open={!!row} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{row?.linkBroken ? 'Re-link this order' : 'Which sale is this?'}</DialogTitle>
-          <DialogDescription>
-            {row?.linkBroken
-              ? `${row?.address || 'This order'} is linked to a sale, but the link isn't active — pick the sale again, or say it is not one of ours. Nothing will re-join it until you do.`
-              : `${row?.address || 'This order'} is in the carrier report but nobody logged it. Point it at the sale it belongs to, or say it is not one of ours. Either answer stops the address guess deciding for you.`}
-          </DialogDescription>
-        </DialogHeader>
-
-        {candidates.length === 0 ? (
-          <p className="sales-board-assign-note">
-            {row?.repName || 'This rep'} has no sales on the books at all, in any month.
-            Marking it as not a sale is the only answer available here.
-          </p>
-        ) : (
-          <label className="sales-board-reason">
-            <span>Sale</span>
-            <select
-              value={choice}
-              onChange={(event) => setChoice(event.target.value)}
-              disabled={saving}
-              aria-label="Sale to link this order to"
-            >
-              <option value="">Select a sale</option>
-              {candidates.map(({ sale, hint }) => (
-                <option key={sale.id} value={sale.id || ''}>
-                  {sale.customerName || sale.customerAddress || 'Customer pending'}
-                  {sale.customerAddress && sale.customerName ? ` - ${sale.customerAddress}` : ''}
-                  {hint ? ` (${hint})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {error && <p className="sales-board-assign-error" role="alert">{error}</p>}
-
-        <DialogFooter>
-          <Button type="button" variant="outline" disabled={saving} onClick={onClose}>Close</Button>
-          <Button type="button" variant="outline" disabled={saving} onClick={() => void submit(null)}>
+    <SalesDialog
+      open={!!row}
+      title={row?.linkBroken ? 'Re-link this order' : 'Which sale is this?'}
+      description={row?.linkBroken
+        ? `${row?.address || 'This order'} is linked to a sale, but the link isn't active — pick the sale again, or say it is not one of ours. Nothing will re-join it until you do.`
+        : `${row?.address || 'This order'} is in the carrier report but nobody logged it. Point it at the sale it belongs to, or say it is not one of ours. Either answer stops the address guess deciding for you.`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className={s.btnSecondary} disabled={saving} onClick={() => void submit(null)}>
             Not a sale
-          </Button>
-          <Button type="button" disabled={saving || !choice} onClick={() => void submit(choice)}>
+          </button>
+          <button type="button" className={s.btnPrimary} disabled={saving || !choice} onClick={() => void submit(choice)}>
             {saving ? 'Linking' : 'Link sale'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+        </>
+      }
+    >
+      {candidates.length === 0 ? (
+        <p className={x.inlineNote}>
+          {row?.repName || 'This rep'} has no sales on the books at all, in any month.
+          Marking it as not a sale is the only answer available here.
+        </p>
+      ) : (
+        <label className={x.field}>
+          <span>Sale</span>
+          <select
+            className={x.select}
+            value={choice}
+            onChange={(event) => setChoice(event.target.value)}
+            disabled={saving}
+            aria-label="Sale to link this order to"
+          >
+            <option value="">Select a sale</option>
+            {candidates.map(({ sale, hint }) => (
+              <option key={sale.id} value={sale.id || ''}>
+                {sale.customerName || sale.customerAddress || 'Customer pending'}
+                {sale.customerAddress && sale.customerName ? ` - ${sale.customerAddress}` : ''}
+                {hint ? ` (${hint})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {error && <p className={x.inlineError} role="alert">{error}</p>}
+    </SalesDialog>
   );
 }

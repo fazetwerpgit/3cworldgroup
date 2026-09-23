@@ -1,27 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
 import { Pencil, Trash2 } from 'lucide-react';
-import { Sale, SaleStatus, FIBER_COMPANIES } from '@/types';
+import { Sale, SaleStatusConfig } from '@/types';
 import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
+import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
 import { monthLabel, salesInstalledIn, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import s from '@/components/portal/rep/rep.module.css';
+import x from '@/components/portal/rep/rep-sales.module.css';
 import { SaleDetailSheet } from './SaleDetailSheet';
-import { FiberRows, FiberStatusPill, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
+import { SalesDialog } from './SalesDialog';
+import { FiberRows, FiberStatusPill, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 
 // A rep's own ledger. Management no longer renders this at all — they get
@@ -53,28 +49,44 @@ function formatDate(value: Date | string | null | undefined) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function repInitials(name: string) {
-  const words = name.split(' ').filter(Boolean);
-  if (!words.length) return '?';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+function shortDate(value: Date | string | null | undefined) {
+  return value ? formatDate(value) : '—';
 }
 
-function productSummary(sale: Sale) {
-  return (sale.products || [])
-    .map((product) => {
-      const provider = FIBER_COMPANIES.find((item) => item.value === product.company)?.label || product.company;
-      return `${product.productName} / ${provider}`;
-    })
-    .join(' · ');
+const STATUS_CLASS: Record<RowStatus, string> = {
+  installed: x.st_installed,
+  scheduled: x.st_scheduled,
+  'needs-date': x.st_needsdate,
+  missed: x.st_missed,
+  cancelled: x.st_cancelled,
+};
+
+/** The dashboard's status line, so a sale reads the same on both pages. */
+function statusLine(status: RowStatus, installDate: Date | string | null | undefined) {
+  switch (status) {
+    case 'installed':
+      return installDate ? `Installed ${formatDate(installDate)}` : 'Installed';
+    case 'scheduled':
+      return installDate ? `Installs ${formatDate(installDate)}` : 'Scheduled';
+    case 'needs-date':
+      return 'Needs install date';
+    case 'missed':
+      return 'Missed install';
+    case 'cancelled':
+      return 'Cancelled';
+  }
 }
 
-function expectedLabel(value: number | null | undefined) {
-  return typeof value === 'number' ? formatMoney(value) : '—';
-}
-
-function StatusBadge({ status }: { status: SaleStatus }) {
-  return <span className={`sales-line-badge ${status}`}>{status}</span>;
+/** Every dollar here is an estimate, and says so. */
+function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan: boolean }) {
+  if (!hasPlan || value === null || value === undefined) return <span className={`${x.money} ${x.muted}`}>—</span>;
+  if (value === 0) return <span className={`${x.money} ${x.moneyQuiet}`}>Rate pending</span>;
+  return (
+    <span className={x.money}>
+      <small className={x.est}>est.</small>
+      {formatMoney(value)}
+    </span>
+  );
 }
 
 export function SalesTable({
@@ -129,6 +141,21 @@ export function SalesTable({
     }
     return map;
   }, [fiberBySale, rates, sales]);
+  // The dashboard's status and payout window per sale, from one frozen "now".
+  const now = useMemo(() => new Date(), []);
+  const statusBySale = useMemo(() => {
+    const map: Record<string, RowStatus> = {};
+    for (const sale of sales) map[sale.id || ''] = rowStatus(sale, fiberBySale.get(sale.id || ''), now);
+    return map;
+  }, [fiberBySale, now, sales]);
+  const payoutBySale = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const sale of sales) {
+      const window = payoutWindowForSale(sale, statusBySale[sale.id || ''] === 'installed');
+      map[sale.id || ''] = window ? formatPayoutWindow(window) : null;
+    }
+    return map;
+  }, [sales, statusBySale]);
 
   // The rows actually on screen — the ledger, or the pay list.
   const listSales = showPay ? paySales : monthSales;
@@ -140,7 +167,6 @@ export function SalesTable({
   const expectedTotal = hasPlan
     ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
-  const expectedTotalLabel = expectedLabel(expectedTotal);
   const fiberBucketCounts = useMemo(() => {
     const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };
     fiberOrders.forEach((order) => {
@@ -197,50 +223,84 @@ export function SalesTable({
   const rowActions = (sale: Sale) => {
     if (!isAdmin) return null;
     return (
-      <span className="sales-line-row-actions sales-line-quiet-actions" onClick={(event) => event.stopPropagation()}>
-        <Link className="quiet" href={`/portal/sales/${sale.id}/edit`} aria-label={`Edit ${sale.customerName || 'sale'}`}>
-          <Pencil className="sales-line-action-icon" />Edit
+      <span className={x.rowActions} onClick={(event) => event.stopPropagation()}>
+        <Link className={x.quietBtn} href={`/portal/sales/${sale.id}/edit`} aria-label={`Edit ${sale.customerName || 'sale'}`}>
+          <Pencil size={16} aria-hidden="true" />
         </Link>
-        <button className="quiet" type="button" disabled={loading} onClick={() => setDeletingId(sale.id || null)}>
-          <Trash2 className="sales-line-action-icon" />Delete
+        <button className={x.quietBtn} type="button" disabled={loading} aria-label={`Delete ${sale.customerName || 'sale'}`} onClick={() => setDeletingId(sale.id || null)}>
+          <Trash2 size={16} aria-hidden="true" />
         </button>
       </span>
     );
   };
 
+  const openRow = (sale: Sale) => ({
+    role: 'button' as const,
+    tabIndex: 0,
+    onClick: () => setSelectedId(sale.id || null),
+    onKeyDown: (event: ReactKeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        setSelectedId(sale.id || null);
+      }
+    },
+  });
+
+  const statusCell = (sale: Sale) => {
+    const order = fiberBySale.get(sale.id || '');
+    const status = statusBySale[sale.id || ''] ?? 'needs-date';
+    return (
+      <span className={x.statusStack}>
+        <span className={`${x.status} ${STATUS_CLASS[status]}`}>
+          <span className={x.dot} aria-hidden="true" />
+          {statusLine(status, sale.installDate)}
+        </span>
+        {order && <FiberStatusPill status={order.status} />}
+        {(sale.status === 'pending' || sale.status === 'rejected') && (
+          <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
+        )}
+      </span>
+    );
+  };
+
+  const selectView = (view: FiberBucket | null, pay: boolean) => {
+    setSelectedId(null);
+    setFiberView(view);
+    onPayViewChange?.(pay);
+  };
+
   return (
     <>
-      <section className="sales-line-ledger">
-        <div className="sales-line-ledger-head">
-          <div>
-            <p className="sales-line-eyebrow">{showPay ? 'Your pay' : 'Your sales'}</p>
-            {/* NOT "What you get paid". The owner's words, via Jacob
-                (2026-09-03): "if claims and final chargebacks are not accounted
-                for I will have to pay that out", and "if final reports don't
-                show that on the site I can be sued". The portal does not hold
-                chargebacks or claims, so it must never state a rep's pay — only
-                estimate it, and say so where the figure is. */}
-            <h2>{showPay ? 'Estimated pay' : 'Your sales'}</h2>
-          </div>
-          <p>{showPay
-            ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · estimate — tick one off once it lands`
-            : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · select a row to inspect`}</p>
+      <section className={s.panel} aria-labelledby="ledger-h">
+        <div className={`${s.panelHead} ${x.panelHead}`}>
+          {/* NOT "What you get paid". The owner's words, via Jacob
+              (2026-09-03): "if claims and final chargebacks are not accounted
+              for I will have to pay that out", and "if final reports don't
+              show that on the site I can be sued". The portal does not hold
+              chargebacks or claims, so it must never state a rep's pay — only
+              estimate it, and say so where the figure is. */}
+          <h2 id="ledger-h" className={x.panelTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
+          <p className={x.panelMeta}>{showPay
+            ? `${paySales.length} install${paySales.length === 1 ? '' : 's'} · tick one off once it lands`
+            : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
         </div>
 
-        <nav className="sales-line-tabs" aria-label="Sales views">
-            <button className="sales-line-tab" role="tab" type="button" aria-selected={!showPay} onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(false); }}>All</button>
-            <button className="sales-line-tab" role="tab" type="button" aria-selected={showPay} onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(true); }}>Pay</button>
-        </nav>
+        <div className={x.tabsRow}>
+          <div className={x.seg} role="tablist" aria-label="Sales views">
+            <button className={x.segBtn} role="tab" type="button" aria-selected={!showPay} onClick={() => selectView(null, false)}>Sales</button>
+            <button className={x.segBtn} role="tab" type="button" aria-selected={showPay} onClick={() => selectView(null, true)}>Pay</button>
+          </div>
+        </div>
 
-        {fiberOrders.length > 0 && (
-          <div className="sales-line-fiber-chips" role="group" aria-label="Fiber status views">
+        {fiberOrders.length > 0 && !showPay && (
+          <div className={x.chips} role="group" aria-label="Fiber status views">
             <button
               type="button"
-              className="sales-line-fiber-ledger-chip sales-line-fiber-ledger-chip-sent"
+              className={x.chip}
               aria-pressed={fiberView === null}
-              onClick={() => { setSelectedId(null); setFiberView(null); onPayViewChange?.(false); }}
+              onClick={() => selectView(null, false)}
             >
-              <span>Sent in</span>{' '}<strong>{monthSales.length}</strong>
+              Sent in <b>{monthSales.length}</b>
             </button>
             {([
               ['pending', 'Pending install'],
@@ -253,11 +313,12 @@ export function SalesTable({
                 <button
                   key={key}
                   type="button"
-                  className={`sales-line-fiber-ledger-chip sales-line-fiber-ledger-chip-${key}`}
+                  className={x.chip}
                   aria-pressed={fiberView === key}
-                  onClick={() => { setSelectedId(null); setFiberView(key); onPayViewChange?.(false); }}
+                  onClick={() => selectView(key, false)}
                 >
-                  <span>{label}</span>{' '}<strong>{fiberBucketCounts[key]}</strong>
+                  <span className={`${x.dot} ${fiberTone(key)}`} aria-hidden="true" />
+                  {label} <b>{fiberBucketCounts[key]}</b>
                 </button>
               );
             })}
@@ -265,112 +326,159 @@ export function SalesTable({
         )}
 
         {showFiberView ? (
-          <div className="sales-line-fiber-ledger">
-            <p className="sales-line-fiber-report-note">
+          <div>
+            <p className={x.note}>
               From the provider report · updated {formatDate(fiber?.data?.lastReportAt)}
             </p>
             <FiberRows orders={fiberBucketOrders} />
           </div>
         ) : showPay ? (
-        <div className="sales-line-table-wrap">
-          {!hasPlan && (
-            <p className="sales-line-pay-note">No pay plan assigned yet — ask an admin to set your role.</p>
-          )}
-          {/* Stated once, above the money, rather than as a footnote under it. */}
-          <p className="sales-line-pay-disclaimer">
-            An estimate, not a statement of pay. Chargebacks, claims and cancellations are
-            not included here, and the carrier&rsquo;s final report decides what actually pays.
-            Tick a sale off yourself once the money lands.
-          </p>
-          <div className={`sales-line-sale-row sales-line-pay-row thead${hasPlan ? '' : ' no-money'}`}>
-            <span>Customer</span>{hasPlan && <span className="sales-line-pay-head-money">Estimated pay</span>}<span>Installed</span><span>Status</span><span>Paid</span>
-          </div>
-          <div className="sales-line-sale-list">
-            {paySales.length ? paySales.map((sale) => {
-              const expected = expectedBySale[sale.id || ''] ?? null;
-              const paid = !!paidBySale[sale.id || ''];
-              return (
-                <div
-                  className={`sales-line-sale-row sales-line-pay-row ${sale.status}${hasPlan ? '' : ' no-money'}`}
-                  key={sale.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedId(sale.id || null)}
-                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}
-                >
-                  <div className="sales-line-customer-cell"><strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong><span>{productSummary(sale)}</span></div>
-                  {hasPlan && (
-                    <div className={`sales-line-money${expected ? '' : ' sales-line-rate-pending'}`}>
-                      {formatMoney(expected || 0)}{!expected && <small>rate pending</small>}
+          <div>
+            {!hasPlan && (
+              <p className={`${x.note} ${x.noteWarn}`}>No pay plan assigned yet — ask an admin to set your role.</p>
+            )}
+            {/* Stated once, above the money, rather than as a footnote under it. */}
+            <p className={x.note}>
+              An estimate, not a statement of pay. Chargebacks, claims and cancellations are
+              not included here, and the carrier&rsquo;s final report decides what actually pays.
+              Tick a sale off yourself once the money lands.
+            </p>
+            <div className={`${x.thead} ${x.payHead} ${hasPlan ? '' : x.noMoney}`} aria-hidden="true">
+              <span>Customer</span>
+              {hasPlan && <span className={x.num}>Est. pay</span>}
+              <span>Installed</span>
+              <span>Est. payout</span>
+              <span>Status</span>
+              <span className={x.num}>Paid</span>
+            </div>
+            {paySales.length ? (
+              <div>
+                {paySales.map((sale) => {
+                  const expected = expectedBySale[sale.id || ''] ?? null;
+                  const paid = !!paidBySale[sale.id || ''];
+                  const window = payoutBySale[sale.id || ''];
+                  const payout = window ? (
+                    <span className={x.payout}>Est. payout <b>{window}</b></span>
+                  ) : (
+                    <span className={x.payout}>{statusBySale[sale.id || ''] === 'installed' ? 'No published window' : 'After install'}</span>
+                  );
+                  return (
+                    <div
+                      className={`${x.row} ${x.payRow} ${hasPlan ? '' : x.noMoney}`}
+                      data-part="pay-row"
+                      key={sale.id}
+                      {...openRow(sale)}
+                    >
+                      <span className={x.cName}>
+                        <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
+                        <span>{planLabel(sale)}</span>
+                      </span>
+                      {hasPlan && (
+                        <span className={`${x.cPay} ${x.num}`}>
+                          <EstPay value={expected} hasPlan={hasPlan} />
+                        </span>
+                      )}
+                      <span className={x.cWhen}>
+                        <b>{shortDate(sale.installDate)}</b>
+                        <span>Sold {formatDate(sale.saleDate)}</span>
+                      </span>
+                      <span className={x.cPayout}>{payout}</span>
+                      <span className={x.cStatus}>
+                        {statusCell(sale)}
+                      </span>
+                      <span className={x.cMeta}>{window ? <>Est. payout {window}</> : `Sold ${formatDate(sale.saleDate)} · ${planLabel(sale)}`}</span>
+                      <span
+                        className={x.cPaid}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <label className={x.paid}>
+                          <span>Paid</span>
+                          <input
+                            type="checkbox"
+                            checked={paid}
+                            onChange={() => void togglePaid(sale.id || '')}
+                            aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
+                          />
+                        </label>
+                      </span>
                     </div>
-                  )}
-                  <div className="sales-line-date-cell"><strong>{formatDate(sale.installDate)}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
-                  <div className="sales-line-status-cell">
-                    <StatusBadge status={sale.status} />
-                    {fiberBySale.get(sale.id || '') && <FiberStatusPill status={fiberBySale.get(sale.id || '')!.status} />}
-                  </div>
-                  <div
-                    className="sales-line-paid-cell"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    <label className="sales-line-paid-toggle">
-                      <input
-                        type="checkbox"
-                        checked={paid}
-                        onChange={() => void togglePaid(sale.id || '')}
-                        aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
-                      />
-                      <span className="sales-line-paid-label">Paid</span>
-                    </label>
-                  </div>
-                </div>
-              );
-            }) : <div className="sales-line-ledger-empty">
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={x.empty}>
                 {month ? `Nothing installed in ${monthLabel(month)}.` : 'Nothing installed yet.'}
                 {' '}Pay shows up here once a sale has an install date.
-                {month && <><br />Earlier months are behind the &lsquo;&lsaquo;&rsquo; arrow above.</>}
-              </div>}
+                {month && <> Earlier months are behind the previous-month arrow above.</>}
+              </p>
+            )}
+            <div className={x.totals}>
+              <span><b>{paySales.length}</b> {paySales.length === 1 ? 'install' : 'installs'}</span>
+              {hasPlan && (
+                <span className={x.totalsPay}>
+                  Total <EstPay value={expectedTotal} hasPlan={hasPlan} />
+                </span>
+              )}
+            </div>
           </div>
-          <div className={`sales-line-totals sales-line-pay-totals${hasPlan ? '' : ' no-money'}`}>
-            <span><b>Sales</b><strong>{paySales.length}</strong></span>{hasPlan && <span className="sales-line-total-commission"><b>Estimated pay</b>{expectedTotalLabel}</span>}<span /><span /><span />
-          </div>
-        </div>
         ) : (
-        <div className="sales-line-table-wrap">
-          <div className="sales-line-sale-row thead">
-            <span>Customer</span><span>Rep</span><span>Install / Sold</span><span>Value</span><span>Estimated pay</span><span>Status</span><span>Actions</span>
-          </div>
-          <div className="sales-line-sale-list">
-            {listSales.length ? listSales.map((sale) => (
-              <div
-                className={`sales-line-sale-row ${sale.status}`}
-                key={sale.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedId(sale.id || null)}
-                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedId(sale.id || null); }}
-              >
-                <div className="sales-line-customer-cell"><strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong><span>{productSummary(sale)}</span></div>
-                <div className="sales-line-rep-cell"><span className="sales-line-avatar">{repInitials(sale.salesRepName)}</span>{sale.salesRepName}</div>
-                <div className="sales-line-date-cell"><strong>Install {sale.installDate ? formatDate(sale.installDate) : '—'}</strong><span>Sold {formatDate(sale.saleDate)}</span></div>
-                <div className="sales-line-money">{formatMoney(sale.totalValue || 0)}<small>/mo</small></div>
-                <div className="sales-line-money">{expectedLabel(expectedBySale[sale.id || ''])}</div>
-                <div className="sales-line-status-cell">
-                  <StatusBadge status={sale.status} />
-                  {fiberBySale.get(sale.id || '') && <FiberStatusPill status={fiberBySale.get(sale.id || '')!.status} />}
-                </div>
-                <div className="sales-line-actions-cell">{rowActions(sale)}</div>
+          <div>
+            <div className={`${x.thead} ${isAdmin ? x.hasAct : ''}`} aria-hidden="true">
+              <span>Customer</span>
+              <span>Install / Sold</span>
+              <span>Status</span>
+              <span className={x.num}>Value</span>
+              <span className={x.num}>Est. pay</span>
+              {isAdmin && <span />}
+            </div>
+            {listSales.length ? (
+              <div>
+                {listSales.map((sale) => {
+                  const off = statusBySale[sale.id || ''] === 'cancelled';
+                  return (
+                    <div
+                      className={`${x.row} ${isAdmin ? x.hasAct : ''} ${off ? x.rowOff : ''}`}
+                      data-part="sale-row"
+                      key={sale.id}
+                      {...openRow(sale)}
+                    >
+                      <span className={x.cName}>
+                        <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
+                        <span>{[planLabel(sale), sale.customerAddress].filter(Boolean).join(' · ')}</span>
+                      </span>
+                      <span className={x.cWhen}>
+                        <b>{sale.installDate ? `Install ${formatDate(sale.installDate)}` : 'No install date'}</b>
+                        <span>Sold {formatDate(sale.saleDate)}</span>
+                      </span>
+                      <span className={x.cStatus}>{statusCell(sale)}</span>
+                      <span className={`${x.cValue} ${x.num}`}>{formatMoney(sale.totalValue || 0)}/mo</span>
+                      <span className={`${x.cPay} ${x.num}`}>
+                        <EstPay value={expectedBySale[sale.id || '']} hasPlan={hasPlan} />
+                      </span>
+                      <span className={x.cMeta}>{[planLabel(sale), `Sold ${formatDate(sale.saleDate)}`].join(' · ')}</span>
+                      <span className={x.cActions}>{rowActions(sale)}</span>
+                    </div>
+                  );
+                })}
               </div>
-            )) : <div className="sales-line-ledger-empty">
+            ) : (
+              <p className={x.empty}>
                 {month ? `No sales sold in ${monthLabel(month)}.` : 'No sales yet.'}
-                {month && <><br />Your earlier sales are still here — tap &lsquo;&lsaquo;&rsquo; above to go back a month.</>}
-              </div>}
+                {month && <> Your earlier sales are still here — use the previous-month arrow above.</>}
+              </p>
+            )}
+            <div className={x.totals}>
+              <span>
+                <b>{listSales.length}</b> {listSales.length === 1 ? 'sale' : 'sales'} · <b>{formatMoney(totalValue)}</b>/mo value
+              </span>
+              {hasPlan && (
+                <span className={x.totalsPay}>
+                  Total <EstPay value={expectedTotal} hasPlan={hasPlan} />
+                </span>
+              )}
+            </div>
           </div>
-          <div className="sales-line-totals">
-            <span><b>Sales</b><strong>{listSales.length}</strong></span><span /><span /><span className="sales-line-total-value"><b>Value</b>{formatMoney(totalValue)}</span><span className="sales-line-total-commission"><b>Estimated pay</b>{expectedTotalLabel}</span><span /><span />
-          </div>
-        </div>
         )}
       </section>
 
@@ -386,21 +494,21 @@ export function SalesTable({
         loading={loading}
         onRequestDelete={(id) => setDeletingId(id)}
         onSaleUpdated={onSaleUpdated}
+        payout={selectedSale ? payoutBySale[selectedSale.id || ''] ?? null : null}
       />
 
-      <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete sale</DialogTitle>
-            <DialogDescription>Are you sure you want to delete this sale? This action cannot be undone.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
-            <Button type="button" variant="destructive" disabled={loading} onClick={() => void handleDelete()}>Delete Sale</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <SalesDialog
+        open={!!deletingId}
+        title="Delete sale"
+        description="Are you sure you want to delete this sale? This action cannot be undone."
+        onClose={() => setDeletingId(null)}
+        footer={(
+          <>
+            <button type="button" className={x.actBtn} onClick={() => setDeletingId(null)}>Cancel</button>
+            <button type="button" className={`${x.actBtn} ${x.actDanger}`} disabled={loading} onClick={() => void handleDelete()}>Delete sale</button>
+          </>
+        )}
+      />
     </>
   );
 }

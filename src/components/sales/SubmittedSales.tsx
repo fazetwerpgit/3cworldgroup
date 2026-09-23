@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FIBER_COMPANIES, SaleStatusConfig } from '@/types';
 import type { Sale } from '@/types';
+import x from '@/components/portal/rep/rep-sales.module.css';
 
 // What the reps actually typed in.
 //
@@ -49,11 +50,11 @@ function planSummary(sale: Sale) {
  */
 export function SubmittedRows({ sales }: { sales: Sale[] }) {
   if (sales.length === 0) {
-    return <p className="sales-line-fiber-message">Nothing logged in the portal.</p>;
+    return <p className={x.empty}>Nothing logged in the portal.</p>;
   }
 
   return (
-    <div className="sales-board-sub-list">
+    <div data-part="sub-list">
       {sales.map((sale) => {
         const sold = formatDate(sale.saleDate);
         const install = formatDate(sale.installDate);
@@ -62,22 +63,25 @@ export function SubmittedRows({ sales }: { sales: Sale[] }) {
         // exactly the question these rows are here to answer.
         const flagged = sale.status !== 'approved';
         return (
-          <Link className="sales-board-sub-row" key={sale.id} href={`/portal/sales/${sale.id}`}>
-            <span className="sales-board-sub-addr">{sale.customerAddress || 'No address given'}</span>
-            <span className="sales-board-sale-val">
-              {formatMoney(sale.totalValue || 0)}<small>/mo</small>
+          <Link className={x.subRow} data-part="sub-row" key={sale.id} href={`/portal/sales/${sale.id}`}>
+            <span className={x.subAddr} data-part="sub-addr">{sale.customerAddress || 'No address given'}</span>
+            <span className={x.bVal}>
+              <b>{formatMoney(sale.totalValue || 0)}</b>/mo
             </span>
-            <span className="sales-board-sale-prod">
+            <span className={x.subWho}>
               {[sale.customerName || 'No customer name', planSummary(sale)]
                 .filter(Boolean).join(' · ')}
             </span>
-            <span className="sales-board-when">
+            <span className={x.subWhen}>
               {[sold ? `Sold ${sold}` : 'No sale date', install ? `Installs ${install}` : 'No install date']
                 .join(' · ')}
+              {flagged && (
+                <>
+                  {' '}
+                  <span className={`${x.tag} ${x.tagWarn}`}>{SaleStatusConfig[sale.status].name}</span>
+                </>
+              )}
             </span>
-            {flagged && (
-              <span className="sales-board-sale-note warn">{SaleStatusConfig[sale.status].name}</span>
-            )}
           </Link>
         );
       })}
