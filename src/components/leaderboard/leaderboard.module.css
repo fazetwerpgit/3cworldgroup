@@ -613,6 +613,17 @@
   min-height: 54px;
   padding: 0 16px;
   border-top: 1px solid var(--c-line);
+  /* Each reveal of the board (a load, a new period): the rows fade up one
+     after another as the panel lands, 30ms apart, the ninth row on together. */
+  animation: rowIn 300ms ease-out backwards;
+  animation-delay: calc(220ms + min(var(--i, 0), 8) * 30ms);
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 
 .band + .row {
@@ -961,6 +972,7 @@
   .block,
   .stage,
   .rows,
+  .row,
   .feed {
     animation: none;
   }
