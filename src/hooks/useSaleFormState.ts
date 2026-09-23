@@ -140,6 +140,39 @@ export function validateSaleForm(input: {
   return errors;
 }
 
+/** Case and spacing never make two entries different ("1 main  st" = "1 Main St"). */
+const normalizeEntryText = (value: unknown) =>
+  (typeof value === 'string' ? value : '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+const entryProductIds = (products: unknown) =>
+  Array.isArray(products)
+    ? products.map((p) => normalizeEntryText((p as { productId?: unknown } | null)?.productId)).sort()
+    : null;
+
+/**
+ * True when a sale the server returned as a duplicate is the entry on screen:
+ * the same customer, address and plan/extras. A retry after a lost response
+ * comes back as exactly that, and it is a logged sale, not a clash. The key
+ * alone does not decide it: a rep can edit the entry into another customer
+ * after a submit that landed unseen, and that one must not be dropped.
+ */
+export function isSameSaleEntry(
+  sale: Partial<Pick<Sale, 'customerName' | 'customerAddress' | 'products'>> | null | undefined,
+  entry: { formData: Pick<SaleFormFields, 'customerName' | 'customerAddress'>; products: SaleProduct[] }
+): boolean {
+  if (!sale) return false;
+  const stored = entryProductIds(sale.products);
+  const onScreen = entryProductIds(entry.products);
+  return (
+    stored !== null &&
+    onScreen !== null &&
+    stored.length === onScreen.length &&
+    stored.every((id, i) => id === onScreen[i]) &&
+    normalizeEntryText(sale.customerName) === normalizeEntryText(entry.formData.customerName) &&
+    normalizeEntryText(sale.customerAddress) === normalizeEntryText(entry.formData.customerAddress)
+  );
+}
+
 export function useSaleFormState() {
   const { user } = useAuth();
   const { createSale, loading, error: serverError } = useSales();
@@ -367,10 +400,12 @@ export function useSaleFormState() {
   /**
    * Validate and create the sale. Resolves to the result, or null when a field,
    * the network or the server said no (the reason is in `errors`, `formError`
-   * or `serverError`). The draft is cleared only on a new sale. A `duplicate`
-   * result is the sale already stored under this entry's key: it is held in
-   * `duplicateOf` for the page to show, and the draft stays, since the entry
-   * may be a different customer (see `logAsNew`).
+   * or `serverError`). The draft is cleared once the sale is stored. A
+   * `duplicate` that is the entry on screen (a retry whose first answer was
+   * lost, see `isSameSaleEntry`) is that success and comes back as a plain,
+   * non-duplicate result. Any other `duplicate` is held in `duplicateOf` for
+   * the page to show, and the draft stays, since the entry is a different
+   * customer (see `logAsNew`).
    */
   const submit = async (
     options: { pendingUploads?: number; clientSaleId?: string } = {}
@@ -408,7 +443,12 @@ export function useSaleFormState() {
 
     // From here the key may name a stored sale, even if no answer comes back.
     setKeyUsed(true);
-    const result = await createSale(saleData);
+    const created = await createSale(saleData);
+    // The sale on screen already landed (its first answer was lost): logged.
+    const result =
+      created?.duplicate && isSameSaleEntry(created.sale, { formData, products })
+        ? { ...created, duplicate: false }
+        : created;
     if (result?.duplicate) {
       setDuplicateOf(result.sale);
     } else if (result) {

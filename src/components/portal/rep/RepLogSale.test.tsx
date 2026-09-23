@@ -146,4 +146,49 @@ describe('RepLogSale', () => {
     expect(view.getAttribute('href')).toBe(`/portal/sales/${'d'.repeat(32)}`);
     expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'Log as a new sale')).toBe(true);
   });
+
+  const storedEntry = {
+    customerName: 'carla diaz',
+    customerAddress: '1  MAIN ST',
+    saleDate: '2026-08-30T17:00:00.000Z',
+    products: [{ productId: 'tfiber-1gig' }],
+  };
+  const hasLogAsNew = () =>
+    Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'Log as a new sale');
+
+  it('logs a retry whose first answer was lost like a new sale', async () => {
+    const key = 'c'.repeat(32);
+    createSale
+      .mockResolvedValueOnce(null) // no signal, but the sale landed
+      .mockResolvedValueOnce({ sale: { ...storedEntry, id: key }, duplicate: true });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    expect(push).not.toHaveBeenCalled();
+    await submitForm();
+    expect(createSale.mock.calls.map((call) => call[0].clientSaleId)).toEqual([key, key]);
+    expect(push).toHaveBeenCalledWith(`/portal/sales?logged=${key}&month=2026-08`);
+    expect(document.body.textContent).not.toContain('This sale was already logged.');
+    expect(hasLogAsNew()).toBe(false);
+    expect(window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}r1`)).toBeNull();
+  });
+
+  it('logs a duplicate under another id that matches the entry on screen', async () => {
+    createSale.mockResolvedValue({ sale: { ...storedEntry, id: 'e'.repeat(32) }, duplicate: true });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    expect(push).toHaveBeenCalledWith(`/portal/sales?logged=${'e'.repeat(32)}&month=2026-08`);
+    expect(hasLogAsNew()).toBe(false);
+  });
+
+  it('still offers the choice when the stored sale is another customer', async () => {
+    createSale.mockResolvedValue({
+      sale: { ...storedEntry, id: 'c'.repeat(32), customerName: 'Somebody Else' },
+      duplicate: true,
+    });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    expect(push).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('This sale was already logged.');
+    expect(hasLogAsNew()).toBe(true);
+  });
 });

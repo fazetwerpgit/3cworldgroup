@@ -199,8 +199,9 @@ export function RepLogSale() {
     form.keepProvider(company);
   };
 
-  // A new sale opens Sales on the month it was sold in, confirmed by name. A
-  // duplicate stays here: it is the sale already stored under this entry.
+  // A new sale opens Sales on the month it was sold in, confirmed by name. So
+  // does a retry that finds this same entry already stored (the form reports it
+  // as a plain success). A duplicate left over is a different entry: it stays.
   const afterSubmit = (result: Awaited<ReturnType<typeof form.submit>>, saleDate: string) => {
     if (!result || result.duplicate) return;
     router.push(result.sale.id ? loggedSaleHref(result.sale.id, saleDate) : '/portal/sales');

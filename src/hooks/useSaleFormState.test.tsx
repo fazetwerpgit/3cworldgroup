@@ -15,7 +15,13 @@ vi.mock('@/hooks/useSales', () => ({
   useSales: () => ({ createSale, loading: false, error: null }),
 }));
 
-import { DRAFT_KEY_PREFIX, useSaleFormState, validateSaleForm, type SaleFormFields } from './useSaleFormState';
+import {
+  DRAFT_KEY_PREFIX,
+  isSameSaleEntry,
+  useSaleFormState,
+  validateSaleForm,
+  type SaleFormFields,
+} from './useSaleFormState';
 import { getPlanById } from '@/types';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
 
@@ -323,6 +329,70 @@ describe('useSaleFormState', () => {
     expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
   });
 
+  it('treats a retry that finds this same entry already stored as logged', async () => {
+    await mount();
+    await fillSale();
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    const key = api.proofUploadId;
+    createSale.mockResolvedValueOnce(null); // no signal: the first submit landed unseen
+    await act(async () => void (await api.submit()));
+    const stored = {
+      id: key,
+      customerName: ' carla  DIAZ ',
+      customerAddress: '1 main st',
+      products: [{ ...product, productName: 'priced by the server' }],
+    };
+    createSale.mockResolvedValueOnce({ sale: stored, duplicate: true });
+    let result: unknown;
+    await act(async () => {
+      result = await api.submit();
+    });
+    expect(createSale.mock.calls.map((call) => call[0].clientSaleId)).toEqual([key, key]);
+    expect(result).toEqual({ sale: stored, duplicate: false });
+    expect(api.duplicateOf).toBeNull();
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(api.proofUploadId).not.toBe(key);
+  });
+
+  it('still offers the choice when the stored sale under this key is a different plan', async () => {
+    await mount();
+    await fillSale();
+    const key = api.proofUploadId;
+    const stored = {
+      id: key,
+      customerName: 'Carla Diaz',
+      customerAddress: '1 Main St',
+      products: [{ ...product, productId: 'xfinity-1gig' }],
+    };
+    createSale.mockResolvedValue({ sale: stored, duplicate: true });
+    let result: unknown;
+    await act(async () => {
+      result = await api.submit();
+    });
+    expect(result).toEqual({ sale: stored, duplicate: true });
+    expect(api.duplicateOf).toEqual(stored);
+    expect(api.proofUploadId).toBe(key);
+  });
+
+  it('counts a duplicate found under another id as logged when it matches the entry', async () => {
+    await mount();
+    await fillSale();
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    const stored = { id: 'e'.repeat(32), customerName: 'Carla Diaz', customerAddress: '1 Main St', products: [product] };
+    createSale.mockResolvedValue({ sale: stored, duplicate: true });
+    let result: unknown;
+    await act(async () => {
+      result = await api.submit();
+    });
+    expect(result).toEqual({ sale: stored, duplicate: false });
+    expect(api.duplicateOf).toBeNull();
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
   it('drops the old provider’s plan and extras on a provider switch', async () => {
     await mount();
     await act(async () => {
@@ -335,5 +405,24 @@ describe('useSaleFormState', () => {
     expect(api.products).toHaveLength(1);
     await act(async () => api.keepProvider('tfiber'));
     expect(api.products).toEqual([]);
+  });
+});
+
+describe('isSameSaleEntry', () => {
+  const entry = { formData: fields({ customerName: 'Carla Diaz' }), products: [product] };
+
+  it('ignores case and spacing in the name and address', () => {
+    expect(
+      isSameSaleEntry({ customerName: 'CARLA  diaz', customerAddress: ' 1 main   st ', products: [product] }, entry)
+    ).toBe(true);
+  });
+
+  it('tells apart another customer, address or plan', () => {
+    const same = { customerName: 'Carla Diaz', customerAddress: '1 Main St', products: [product] };
+    expect(isSameSaleEntry({ ...same, customerName: 'Somebody Else' }, entry)).toBe(false);
+    expect(isSameSaleEntry({ ...same, customerAddress: '2 Main St' }, entry)).toBe(false);
+    expect(isSameSaleEntry({ ...same, products: [{ ...product, productId: 'xfinity-1gig' }] }, entry)).toBe(false);
+    expect(isSameSaleEntry({ ...same, products: undefined }, entry)).toBe(false);
+    expect(isSameSaleEntry(null, entry)).toBe(false);
   });
 });

@@ -38,7 +38,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = await form.submit();
-    // A duplicate is a sale already logged under this entry, not a new one.
+    // A duplicate here is a different entry already logged under this key.
     if (!result || result.duplicate) return;
     if (onSuccess) onSuccess();
     else router.push('/portal/sales');
