@@ -480,11 +480,11 @@
   box-sizing: content-box;
 }
 
-/* Push alerts never turned on: amber, top-left, clear of the unread badge. */
+/* Push alerts never turned on: amber, bottom-left, clear of the unread badge. */
 .pushDot {
   position: absolute;
-  top: 9px;
-  left: 9px;
+  bottom: 8px;
+  left: 8px;
   width: 8px;
   height: 8px;
   border: 2px solid var(--c-ground);
