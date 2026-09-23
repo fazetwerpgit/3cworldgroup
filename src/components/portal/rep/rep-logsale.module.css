@@ -638,6 +638,90 @@ span.thumbView {
   }
 }
 
+/* ---------- screenshot reader ---------- */
+.scanRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-top: var(--s2);
+}
+
+.scanRow .lede {
+  margin: 0;
+}
+
+.scanSkip {
+  flex: none;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  margin-right: calc(var(--s3) * -1);
+  border: 0;
+  background: none;
+  color: var(--c-lime);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* A field the read may fill: a bar where the value will land. The input stays
+   live under it, so the rep can type; focusing it drops the bar. */
+.readWrap {
+  position: relative;
+  display: block;
+}
+
+.readSkel {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  width: min(58%, 220px);
+  height: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.readWrap:focus-within .readSkel {
+  display: none;
+}
+
+.inputReading:not(:focus),
+.inputReading:not(:focus)::placeholder,
+.inputReading:not(:focus)::-webkit-datetime-edit {
+  color: transparent;
+}
+
+/* Filled from the screenshot without full confidence: "Check this". */
+.flagTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid rgba(245, 185, 69, 0.45);
+  border-radius: 4px;
+  color: var(--c-amber);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.flagMedium .input {
+  border-color: rgba(245, 185, 69, 0.45);
+}
+
+.flagLow .input {
+  border-color: var(--c-amber);
+  background: var(--c-amber-wash);
+}
+
+.flagLow .flagTag {
+  border-color: var(--c-amber);
+  background: var(--c-amber);
+  color: #1c1303;
+}
+
 /* ---------- server / offline error ---------- */
 .alert {
   display: flex;
