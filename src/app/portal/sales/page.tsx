@@ -21,8 +21,10 @@ import { countedSales } from '@/lib/sales/installBucket';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
+  clampMonth,
+  compareMonths,
   currentMonth,
-  isCurrentMonth,
+  latestPickableMonth,
   monthLabel,
   salesSoldIn,
   shiftMonth,
@@ -33,7 +35,15 @@ import x from '@/components/portal/rep/rep-sales.module.css';
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
-function MonthPicker({ month, onChange }: { month: MonthKey; onChange: (next: MonthKey) => void }) {
+function MonthPicker({
+  month,
+  max,
+  onChange,
+}: {
+  month: MonthKey;
+  max: MonthKey;
+  onChange: (next: MonthKey) => void;
+}) {
   return (
     <div className={x.month} role="group" aria-label="Month">
       <button
@@ -51,7 +61,7 @@ function MonthPicker({ month, onChange }: { month: MonthKey; onChange: (next: Mo
         type="button"
         className={x.monthBtn}
         onClick={() => onChange(shiftMonth(month, 1))}
-        disabled={isCurrentMonth(month)}
+        disabled={compareMonths(month, max) >= 0}
         aria-label="Next month"
       >
         <ChevronRight size={20} aria-hidden="true" />
@@ -60,11 +70,20 @@ function MonthPicker({ month, onChange }: { month: MonthKey; onChange: (next: Mo
   );
 }
 
-function PageHead({ month, onMonth }: { month?: MonthKey; onMonth?: (next: MonthKey) => void }) {
+function PageHead({
+  month,
+  max,
+  onMonth,
+}: {
+  month?: MonthKey;
+  /** Latest pickable month; defaults to this month. */
+  max?: MonthKey;
+  onMonth?: (next: MonthKey) => void;
+}) {
   return (
     <header className={x.head}>
       <h1 className={x.title}>Sales</h1>
-      {month && onMonth ? <MonthPicker month={month} onChange={onMonth} /> : null}
+      {month && onMonth ? <MonthPicker month={month} max={max ?? currentMonth()} onChange={onMonth} /> : null}
     </header>
   );
 }
@@ -119,6 +138,13 @@ function SalesContent() {
   // `?view=pay` opens the rep's pay list directly.
   const [payView, setPayView] = useState(() => params.get('view') === 'pay');
   const [month, setMonth] = useState<MonthKey>(() => currentMonth());
+  // The pay list may look a month ahead for scheduled installs; the ledger
+  // (what was sold) may not, so leaving Pay pulls a future month back.
+  const maxMonth = latestPickableMonth(payView);
+  const choosePayView = useCallback((pay: boolean) => {
+    setPayView(pay);
+    setMonth((current) => clampMonth(current, latestPickableMonth(pay)));
+  }, []);
   // useSales starts idle (loading false, no sales). Until the first fetch
   // settles the page shows skeletons, never a zero it has not measured.
   const [fetched, setFetched] = useState(false);
@@ -239,7 +265,11 @@ function SalesContent() {
 
   return (
     <div className={x.page}>
-      <PageHead month={month} onMonth={booting || failed || sales.length === 0 ? undefined : setMonth} />
+      <PageHead
+        month={month}
+        max={maxMonth}
+        onMonth={booting || failed || sales.length === 0 ? undefined : setMonth}
+      />
 
       {booting ? (
         <SalesSkeleton />
@@ -333,7 +363,7 @@ function SalesContent() {
             onDelete={deleteSale}
             loading={loading}
             payView={payView}
-            onPayViewChange={setPayView}
+            onPayViewChange={choosePayView}
             payPlan={payPlan}
             fiber={fiber}
             onSaleUpdated={refreshSales}

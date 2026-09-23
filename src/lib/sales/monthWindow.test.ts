@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { Sale } from '@/types';
 import {
+  clampMonth,
+  compareMonths,
   currentMonth,
+  latestPickableMonth,
   isCurrentMonth,
   isInMonth,
   monthBounds,
@@ -90,5 +93,23 @@ describe('salesSoldIn vs salesInstalledIn', () => {
 
   it('leaves a sale with no install date out of every pay month', () => {
     expect(salesInstalledIn(sales, SEP).some((s) => !s.installDate)).toBe(false);
+  });
+});
+
+describe('month picker bounds', () => {
+  const now = new Date(2026, 11, 15, 12); // Dec 2026
+
+  it('lets the pay list look one month ahead, across a year end', () => {
+    expect(latestPickableMonth(false, now)).toEqual({ year: 2026, month: 11 });
+    expect(latestPickableMonth(true, now)).toEqual({ year: 2027, month: 0 });
+  });
+
+  it('pulls a month past the limit back to it', () => {
+    const jan = { year: 2027, month: 0 };
+    const dec = { year: 2026, month: 11 };
+    expect(clampMonth(jan, dec)).toEqual(dec);
+    expect(clampMonth(SEP, dec)).toEqual(SEP);
+    expect(compareMonths(jan, dec)).toBe(1);
+    expect(compareMonths(dec, dec)).toBe(0);
   });
 });
