@@ -1,0 +1,104 @@
+/* Owner comp plan matrix, direction D. Mounted inside the Pay structure panel
+   (RepPayStructure), so the rep shell tokens from rep.module.css apply. */
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.title {
+  margin: 0;
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1.3 var(--f-ui);
+}
+
+.notices {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+.skel {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+.scroll {
+  margin-top: var(--s3);
+  overflow-x: auto;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--c-line);
+  text-align: right;
+}
+
+.table thead th {
+  background: var(--c-panel);
+  color: var(--c-text-3);
+  font-weight: 600;
+}
+
+.table thead th:first-child,
+.table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--c-panel);
+  font-weight: 500;
+  text-align: left;
+}
+
+.group th {
+  color: var(--c-text-2);
+  font-weight: 600;
+}
+
+.empty {
+  color: var(--c-text-3);
+}
+
+.margin {
+  border-left: 1px solid var(--c-line-strong);
+}
+
+.table .rateInput {
+  width: 72px;
+  height: 36px;
+  padding: 0 var(--s2);
+  font-size: var(--t-sm);
+  text-align: right;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+.actions button:disabled {
+  opacity: 0.6;
+}
+
+.updated {
+  margin: var(--s3) 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+}

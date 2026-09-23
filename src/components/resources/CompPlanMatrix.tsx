@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ArrowRight, Edit3, Save } from 'lucide-react';
+import { AlertCircle, Check, Edit3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
@@ -13,6 +13,9 @@ import {
   FIBER_PLANS,
   RoleDisplayNames,
 } from '@/types';
+import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
+import c from './comp-plan.module.css';
 
 // Column headers: the full role names would make a 14-column table unreadable,
 // so the header carries the short form and the title attribute the full one.
@@ -136,41 +139,42 @@ export function CompPlanMatrix() {
   const shownMargin = editing ? marginDraft : margin;
 
   return (
-    <section className="comp-plan" aria-labelledby="comp-plan-title">
-      <div className="comp-plan-head">
-        <h2 id="comp-plan-title">Comp plan</h2>
+    <section aria-labelledby="comp-plan-title">
+      <div className={c.head}>
+        <h3 id="comp-plan-title" className={c.title}>Comp plan</h3>
         {!editing && !loading && (
-          <button className="resources-line-edit-rates" type="button" onClick={startEditing}>
-            <Edit3 aria-hidden="true" /> Edit rates <ArrowRight aria-hidden="true" />
+          <button className={p.headLink} type="button" onClick={startEditing}>
+            <Edit3 size={14} aria-hidden="true" /> Edit plan
           </button>
         )}
       </div>
-      <p className="comp-plan-note">
-        Owner only · paid per install{version ? ` · plan ${version}` : ''}
-      </p>
 
-      {error && (
-        <div className="resources-line-status resources-line-status-error" role="alert">
-          <AlertCircle aria-hidden="true" />
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="resources-line-status resources-line-status-success" role="status">
-          <Save aria-hidden="true" />
-          {success}
+      {(error || success) && (
+        <div className={c.notices}>
+          {error && (
+            <div className={`${p.notice} ${p.noticeRed}`} role="alert">
+              <AlertCircle size={16} aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className={`${p.notice} ${p.noticeLime}`} role="status">
+              <Check size={16} aria-hidden="true" />
+              <span>{success}</span>
+            </div>
+          )}
         </div>
       )}
 
       {loading ? (
-        <div className="resources-line-pay-skeleton" aria-label="Loading comp plan">
-          <span />
-          <span />
-          <span />
+        <div className={c.skel} aria-busy="true" aria-label="Loading comp plan">
+          <span className={`${s.skel} ${p.skelLine}`} />
+          <span className={`${s.skel} ${p.skelLine}`} />
+          <span className={`${s.skel} ${p.skelLine}`} />
         </div>
       ) : (
-        <div className="comp-plan-scroll">
-          <table className="comp-plan-table">
+        <div className={c.scroll}>
+          <table className={c.table}>
             <thead>
               <tr>
                 <th scope="col">Product</th>
@@ -179,14 +183,14 @@ export function CompPlanMatrix() {
                     {ROLE_SHORT[role]}
                   </th>
                 ))}
-                <th scope="col" className="comp-plan-margin-cell">
+                <th scope="col" className={c.margin}>
                   3C Receives
                 </th>
               </tr>
             </thead>
             {FIBER_COMPANIES.map((company) => (
               <tbody key={company.value}>
-                <tr className="comp-plan-group">
+                <tr className={c.group}>
                   <th scope="colgroup" colSpan={COMP_PLAN_ROLES.length + 2}>
                     {company.label}
                   </th>
@@ -200,7 +204,7 @@ export function CompPlanMatrix() {
                         <td key={role}>
                           {editing ? (
                             <input
-                              className="resources-line-rate-input"
+                              className={`${p.input} ${c.rateInput}`}
                               type="number"
                               min="0"
                               step="0.5"
@@ -213,17 +217,17 @@ export function CompPlanMatrix() {
                           ) : rate > 0 ? (
                             money(rate)
                           ) : (
-                            <span className="comp-plan-empty" title="No contracted rate yet">
+                            <span className={c.empty} title="No contracted rate yet">
                               —
                             </span>
                           )}
                         </td>
                       );
                     })}
-                    <td className="comp-plan-margin-cell">
+                    <td className={c.margin}>
                       {editing ? (
                         <input
-                          className="resources-line-rate-input"
+                          className={`${p.input} ${c.rateInput}`}
                           type="number"
                           min="0"
                           step="0.5"
@@ -234,7 +238,7 @@ export function CompPlanMatrix() {
                       ) : (shownMargin[company.value]?.[plan.id] ?? 0) > 0 ? (
                         money(shownMargin[company.value][plan.id])
                       ) : (
-                        <span className="comp-plan-empty">—</span>
+                        <span className={c.empty}>—</span>
                       )}
                     </td>
                   </tr>
@@ -246,21 +250,23 @@ export function CompPlanMatrix() {
       )}
 
       {editing && (
-        <div className="resources-line-edit-actions">
-          <button type="button" onClick={() => setEditing(false)} disabled={saving}>
+        <div className={c.actions}>
+          <button className={s.btnSecondary} type="button" onClick={() => setEditing(false)} disabled={saving}>
             Cancel
           </button>
-          <button type="button" onClick={() => void handleSave()} disabled={saving}>
-            <Save aria-hidden="true" /> {saving ? 'Saving...' : 'Save plan'}
+          <button className={s.btnPrimary} type="button" onClick={() => void handleSave()} disabled={saving}>
+            {saving ? 'Saving…' : 'Save plan'}
           </button>
         </div>
       )}
 
-      {updatedAt && (
-        <p className="resources-line-updated">
-          Last updated{' '}
-          {new Date(updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          {updatedByName ? ` by ${updatedByName}` : ''}
+      {(version || updatedAt) && (
+        <p className={c.updated}>
+          {version ? `Plan ${version}` : ''}
+          {version && updatedAt ? ' · ' : ''}
+          {updatedAt
+            ? `Updated ${new Date(updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${updatedByName ? ` by ${updatedByName}` : ''}`
+            : ''}
         </p>
       )}
     </section>
