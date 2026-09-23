@@ -773,10 +773,12 @@
   }
 }
 
-/* Desktop drop panels under the top bar (More, account, notifications). */
+/* Desktop drop panels under the top bar (More, account, notifications).
+   RepTopBar pins each one under its own button (left/top/max-height inline);
+   the right edge here is only the pre-measure fallback. */
 .drop {
   position: fixed;
-  top: calc(var(--topbar-h) + env(safe-area-inset-top) + 6px);
+  top: calc(var(--topbar-h) + env(safe-area-inset-top) + 8px);
   right: max(var(--gutter), calc((100vw - 1360px) / 2 + var(--gutter)));
   z-index: 61;
   width: 320px;
@@ -788,6 +790,28 @@
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
   color: var(--c-text);
   animation: fadeIn 140ms ease both;
+}
+
+/* More: the grouped pages flow into 1–3 columns (--more-cols, set from the
+   item count), so an owner's admin groups fit at 1440x900 without scrolling. */
+.moreDrop {
+  width: calc(var(--more-cols, 1) * 236px + 2px);
+}
+
+.moreNav {
+  padding: var(--s2) 0;
+  columns: var(--more-cols, 1);
+  column-gap: 0;
+  column-rule: 1px solid var(--c-line);
+}
+
+.moreGroup {
+  padding-bottom: var(--s2);
+  break-inside: avoid;
+}
+
+.moreNav .navItem {
+  min-height: var(--tap);
 }
 
 .dropClear {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -14,6 +14,12 @@ import { LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, activeRepHref } from './rep
 import s from './rep.module.css';
 
 type Panel = 'menu' | 'more' | 'account' | 'notes' | null;
+
+/** Same breakpoint as the desktop rules in rep.module.css. */
+const DESKTOP_QUERY = '(min-width: 1024px)';
+/** Viewport margin a drop panel never crosses, and its gap under the top bar. */
+const DROP_MARGIN = 16;
+const DROP_GAP = 8;
 
 export const repSheetClasses: NavSheetClasses = {
   backdrop: s.backdrop,
@@ -31,6 +37,9 @@ export const repSheetClasses: NavSheetClasses = {
   actions: s.navActions,
   action: s.navItem,
 };
+
+/** The desktop More panel: groups flow into columns instead of one long list. */
+const moreNavClasses: NavSheetClasses = { ...repSheetClasses, nav: s.moreNav, group: s.moreGroup };
 
 function initials(name?: string | null, email?: string | null) {
   const value = name?.trim() || email?.split('@')[0] || 'User';
@@ -72,6 +81,8 @@ export function RepTopBar({
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [panel, setPanel] = useState<Panel>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const dropRef = useRef<HTMLDivElement | null>(null);
 
   const close = () => {
     setPanel(null);
@@ -102,6 +113,39 @@ export function RepTopBar({
     return () => document.removeEventListener('keydown', onKey);
   }, [panel]);
 
+  // Desktop drops sit under the button that opened them: More starts at the
+  // button's left edge, account and notifications end at their button's right
+  // edge. Clamped inside the viewport; phones keep the full-width CSS panel.
+  useLayoutEffect(() => {
+    if (panel !== 'more' && panel !== 'account' && panel !== 'notes') return;
+    const place = () => {
+      const drop = dropRef.current;
+      const trigger = triggerRef.current;
+      const bar = headerRef.current;
+      if (!drop || !trigger || !bar) return;
+      if (!window.matchMedia(DESKTOP_QUERY).matches) {
+        drop.style.removeProperty('top');
+        drop.style.removeProperty('left');
+        drop.style.removeProperty('right');
+        drop.style.removeProperty('max-height');
+        return;
+      }
+      const anchor = trigger.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const width = drop.offsetWidth;
+      const wanted = panel === 'more' ? anchor.left : anchor.right - width;
+      const left = Math.max(DROP_MARGIN, Math.min(wanted, viewportWidth - DROP_MARGIN - width));
+      const top = bar.getBoundingClientRect().bottom + DROP_GAP;
+      drop.style.top = `${top}px`;
+      drop.style.left = `${Math.round(left)}px`;
+      drop.style.right = 'auto';
+      drop.style.maxHeight = `${window.innerHeight - top - DROP_MARGIN}px`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [panel]);
+
   const handleSignOut = async () => {
     setPanel(null);
     try {
@@ -118,10 +162,13 @@ export function RepTopBar({
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'You';
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
   const adminBadge = pendingSignupsCount;
+  // An owner's More holds every admin group: too tall for one column at 1440x900.
+  const moreCount = groups.reduce((sum, group) => sum + group.items.filter(canAccess).length, 0);
+  const moreCols = moreCount > 14 ? 3 : moreCount > 7 ? 2 : 1;
 
   return (
     <>
-      <header className={s.topbar}>
+      <header ref={headerRef} className={s.topbar}>
         <div className={s.topbarInner}>
           {task ? (
             <Link href={brandHref} className={`${s.back} ${s.phoneOnly}`} aria-label="Back to dashboard">
@@ -231,14 +278,20 @@ export function RepTopBar({
       {panel === 'more' ? (
         <BodyLayer>
           <button type="button" className={s.dropClear} aria-label="Close menu" tabIndex={-1} onClick={close} />
-          <div className={s.drop} role="dialog" aria-label="More pages">
+          <div
+            ref={dropRef}
+            className={`${s.drop} ${s.moreDrop}`}
+            role="dialog"
+            aria-label="More pages"
+            style={{ '--more-cols': moreCols } as CSSProperties}
+          >
             <NavGroupsList
               groups={groups}
               pathname={pathname}
               canAccess={canAccess}
               pendingSignupsCount={pendingSignupsCount}
               onLinkClick={() => setPanel(null)}
-              classes={repSheetClasses}
+              classes={moreNavClasses}
             />
           </div>
         </BodyLayer>
@@ -247,7 +300,7 @@ export function RepTopBar({
       {panel === 'account' ? (
         <BodyLayer>
           <button type="button" className={s.dropClear} aria-label="Close account menu" tabIndex={-1} onClick={close} />
-          <div className={s.drop} role="dialog" aria-label="Account">
+          <div ref={dropRef} className={s.drop} role="dialog" aria-label="Account">
             <p className={s.whoami}>
               {displayName}
               <span>{user?.email}</span>
@@ -273,7 +326,7 @@ export function RepTopBar({
       {panel === 'notes' ? (
         <BodyLayer>
           <button type="button" className={s.dropClear} aria-label="Close notifications" tabIndex={-1} onClick={close} />
-          <div className={s.drop} role="dialog" aria-labelledby="rep-notes-title">
+          <div ref={dropRef} className={s.drop} role="dialog" aria-labelledby="rep-notes-title">
             <div className={s.noteHead}>
               <h2 id="rep-notes-title" className={s.kicker}>
                 Notifications
