@@ -13,6 +13,7 @@ import {
   History,
   ImageUp,
   Keyboard,
+  Loader2,
   RotateCw,
   WifiOff,
 } from 'lucide-react';
@@ -42,7 +43,13 @@ import l from './rep-logsale.module.css';
 
 const FORM_ID = 'rep-log-sale';
 const DEFAULT_PROVIDER = 'tfiber';
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+/** An amount with a muted, top-aligned dollar sign (reads as "$130"). */
+const Amount = ({ value }: { value: number }) => (
+  <>
+    <span className={l.cur}>$</span>
+    {Math.round(value).toLocaleString('en-US')}
+  </>
+);
 const shortSaleDate = (value: Date | string) =>
   new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -85,7 +92,15 @@ function useSoftKeyboardOpen(): boolean {
 }
 
 function Steps({ onDetails }: { onDetails: boolean }) {
-  return <p className={l.steps}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>;
+  return (
+    <div className={l.steps}>
+      <p className={l.stepsLabel}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>
+      <span className={l.stepsMeter} aria-hidden="true">
+        <span className={l.stepOn} />
+        <span className={onDetails ? l.stepOn : undefined} />
+      </span>
+    </div>
+  );
 }
 
 function Field({
@@ -321,7 +336,9 @@ export function RepLogSale() {
         <p className={l.estPay}>
           <span className={s.kicker}>Est. pay</span>
           {est !== null ? (
-            <span className={l.estNum}>{money(est)}</span>
+            <span className={l.estNum}>
+              <Amount value={est} />
+            </span>
           ) : (
             <span className={l.estNone}>{hasPlan ? 'Pick a plan' : '—'}</span>
           )}
@@ -347,51 +364,53 @@ export function RepLogSale() {
       <div className={l.main}>
         <Steps onDetails={false} />
         <div className={l.defaultGrid}>
-          <section className={`${s.panel} ${l.entry}`} aria-labelledby="entry-h">
-            <h1 id="entry-h" className={l.entryTitle}>
-              {scanOn ? 'Add the order confirmation' : 'Attach order confirmation'}
-            </h1>
-            <p className={l.entryLede}>
-              {scanOn
-                ? "Screenshot it and we'll fill in the details. You check them and submit."
-                : "Attach the carrier's confirmation page as proof. You type the details next."}
-            </p>
-            <div className={l.entryActions}>
-              <label className={`${s.btnPrimary} ${s.btnBlock} ${s.phoneOnly}`}>
-                <input
-                  type="file"
-                  accept={PROOF_ACCEPT}
-                  multiple
-                  className={s.srOnly}
-                  onChange={(e) => {
-                    pickFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-                <ImageUp size={20} strokeWidth={2.25} aria-hidden="true" />
-                Choose screenshot
-              </label>
-              <label className={`${s.btnPrimary} ${s.deskOnly}`} htmlFor={`${pickId}-desk`}>
-                <input
-                  id={`${pickId}-desk`}
-                  type="file"
-                  accept={PROOF_ACCEPT}
-                  multiple
-                  className={s.srOnly}
-                  onChange={(e) => {
-                    pickFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-                <ImageUp size={20} strokeWidth={2.25} aria-hidden="true" />
-                Choose screenshot
-              </label>
+          <section className={l.entry} aria-labelledby="entry-h">
+            <div className={l.entryBody}>
+              <h1 id="entry-h" className={l.entryTitle}>
+                {scanOn ? 'Add the order confirmation' : 'Attach order confirmation'}
+              </h1>
+              <p className={l.entryLede}>
+                {scanOn
+                  ? "Screenshot it and we'll fill in the details. You check them and submit."
+                  : "Attach the carrier's confirmation page as proof. You type the details next."}
+              </p>
+              <div className={l.entryActions}>
+                <label className={`${s.btnPrimary} ${s.btnBlock} ${s.phoneOnly}`}>
+                  <input
+                    type="file"
+                    accept={PROOF_ACCEPT}
+                    multiple
+                    className={s.srOnly}
+                    onChange={(e) => {
+                      pickFiles(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                  <ImageUp size={20} strokeWidth={2.25} aria-hidden="true" />
+                  Choose screenshot
+                </label>
+                <label className={`${s.btnPrimary} ${s.deskOnly}`} htmlFor={`${pickId}-desk`}>
+                  <input
+                    id={`${pickId}-desk`}
+                    type="file"
+                    accept={PROOF_ACCEPT}
+                    multiple
+                    className={s.srOnly}
+                    onChange={(e) => {
+                      pickFiles(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                  <ImageUp size={20} strokeWidth={2.25} aria-hidden="true" />
+                  Choose screenshot
+                </label>
+              </div>
             </div>
             <p className={l.entryWorks}>Whole confirmation page, up to {MAX_PROOF_SCREENSHOTS} screenshots.</p>
           </section>
 
           <div className={l.side}>
-            <button type="button" className={`${s.panel} ${l.manual}`} onClick={() => setStep('details')}>
+            <button type="button" className={l.manual} onClick={() => setStep('details')}>
               <Keyboard size={20} strokeWidth={1.75} aria-hidden="true" className={l.manualIcon} />
               <span className={l.manualText}>
                 <span className={l.manualTitle}>Enter manually</span>
@@ -445,7 +464,8 @@ export function RepLogSale() {
             <h1 className={l.title}>Sale details</h1>
             {scan.status === 'reading' ? (
               <div className={l.scanRow}>
-                <p className={l.lede} role="status">
+                <p className={`${l.lede} ${l.scanReading}`} role="status">
+                  <Loader2 size={16} strokeWidth={2.25} className={l.spin} aria-hidden="true" />
                   Reading your screenshot…
                 </p>
                 <button type="button" className={l.scanSkip} onClick={scan.skip}>
@@ -509,121 +529,141 @@ export function RepLogSale() {
             </div>
           ) : null}
 
-          <div className={l.formGrid}>
-            <fieldset className={`${l.field} ${l.fieldset} ${l.wide}`}>
-              <legend className={l.label}>Provider</legend>
-              <div className={l.segmented}>
-                {FIBER_COMPANIES.map((company) => (
-                  <label key={company.value} className={l.chip}>
-                    <input
-                      type="radio"
-                      name="provider"
-                      value={company.value}
-                      checked={provider === company.value}
-                      onChange={() => chooseProvider(company.value)}
-                    />
-                    {PROVIDER_SHORT[company.value] ?? company.label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+          <div className={l.groups}>
+            <section className={l.group} aria-labelledby="group-order">
+              <h2 id="group-order" className={`${s.kicker} ${l.groupHead}`}>
+                Order
+              </h2>
+              <div className={l.formGrid}>
+                <fieldset className={`${l.field} ${l.fieldset} ${l.wide}`}>
+                  <legend className={l.label}>Provider</legend>
+                  <div className={l.segmented}>
+                    {FIBER_COMPANIES.map((company) => (
+                      <label key={company.value} className={l.chip}>
+                        <input
+                          type="radio"
+                          name="provider"
+                          value={company.value}
+                          checked={provider === company.value}
+                          onChange={() => chooseProvider(company.value)}
+                        />
+                        {PROVIDER_SHORT[company.value] ?? company.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
 
-            <Field id="plan" label="Plan" error={errors.plan} required {...scanned('plan')}>
-              <span className={l.selectWrap}>
-                <select
-                  id="plan"
-                  className={scan.pending('plan') ? `${l.input} ${l.inputReading}` : l.input}
-                  value={internetId}
-                  onChange={(e) => {
-                    scan.edited('plan');
-                    const plan = getPlanById(e.target.value);
-                    if (plan) form.addPlan(plan);
-                  }}
-                  onFocus={() => scan.seen('plan')}
-                  aria-busy={scan.pending('plan') || undefined}
-                  {...describe('plan', errors.plan, false)}
+                <Field id="plan" label="Plan" error={errors.plan} required {...scanned('plan')}>
+                  <span className={l.selectWrap}>
+                    <select
+                      id="plan"
+                      className={scan.pending('plan') ? `${l.input} ${l.inputReading}` : l.input}
+                      value={internetId}
+                      onChange={(e) => {
+                        scan.edited('plan');
+                        const plan = getPlanById(e.target.value);
+                        if (plan) form.addPlan(plan);
+                      }}
+                      onFocus={() => scan.seen('plan')}
+                      aria-busy={scan.pending('plan') || undefined}
+                      {...describe('plan', errors.plan, false)}
+                    >
+                      <option value="" disabled>
+                        Choose a plan
+                      </option>
+                      {internetPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={18} aria-hidden="true" />
+                  </span>
+                </Field>
+
+                <Field
+                  id="orderNumberOrBtn"
+                  label="Order number or BTN"
+                  required={orderRequired}
+                  error={errors.orderNumberOrBtn}
+                  hint={orderRequired ? 'Needed when there is no screenshot.' : undefined}
+                  {...scanned('orderNumberOrBtn')}
                 >
-                  <option value="" disabled>
-                    Choose a plan
-                  </option>
-                  {internetPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={18} aria-hidden="true" />
-              </span>
-            </Field>
+                  <input
+                    {...input('orderNumberOrBtn', { error: 'orderNumberOrBtn', hint: orderRequired })}
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                  />
+                </Field>
 
-            <Field
-              id="orderNumberOrBtn"
-              label="Order number or BTN"
-              required={orderRequired}
-              error={errors.orderNumberOrBtn}
-              hint={orderRequired ? 'Needed when there is no screenshot.' : undefined}
-              {...scanned('orderNumberOrBtn')}
-            >
-              <input
-                {...input('orderNumberOrBtn', { error: 'orderNumberOrBtn', hint: orderRequired })}
-                type="text"
-                autoComplete="off"
-                autoCapitalize="characters"
-              />
-            </Field>
+                {extras.length > 0 ? (
+                  <fieldset className={`${l.field} ${l.fieldset} ${l.wide}`}>
+                    <legend className={l.label}>Extras sold</legend>
+                    <ul className={l.extras}>
+                      {extras.map((plan) => {
+                        const on = products.some((p) => p.productId === plan.id);
+                        return (
+                          <li key={plan.id}>
+                            <label className={l.extra}>
+                              <input type="checkbox" checked={on} onChange={() => form.toggleExtra(plan)} />
+                              <span className={l.extraBox} aria-hidden="true">
+                                {on ? <Check size={14} strokeWidth={3} /> : null}
+                              </span>
+                              <span className={l.extraName}>{plan.name}</span>
+                              <span className={l.extraKind}>{plan.speed}</span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </fieldset>
+                ) : null}
+              </div>
+            </section>
 
-            {extras.length > 0 ? (
-              <fieldset className={`${l.field} ${l.fieldset} ${l.wide}`}>
-                <legend className={l.label}>Extras sold</legend>
-                <ul className={l.extras}>
-                  {extras.map((plan) => {
-                    const on = products.some((p) => p.productId === plan.id);
-                    return (
-                      <li key={plan.id}>
-                        <label className={l.extra}>
-                          <input type="checkbox" checked={on} onChange={() => form.toggleExtra(plan)} />
-                          <span className={l.extraBox} aria-hidden="true">
-                            {on ? <Check size={14} strokeWidth={3} /> : null}
-                          </span>
-                          <span className={l.extraName}>{plan.name}</span>
-                          <span className={l.extraKind}>{plan.speed}</span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </fieldset>
-            ) : null}
+            <section className={l.group} aria-labelledby="group-customer">
+              <h2 id="group-customer" className={`${s.kicker} ${l.groupHead}`}>
+                Customer and install
+              </h2>
+              <div className={l.formGrid}>
+                <Field id="customerName" label="Customer name" {...scanned('customerName')}>
+                  <input {...input('customerName')} type="text" autoComplete="off" autoCapitalize="words" />
+                </Field>
 
-            <Field id="customerName" label="Customer name" {...scanned('customerName')}>
-              <input {...input('customerName')} type="text" autoComplete="off" autoCapitalize="words" />
-            </Field>
+                <Field id="customerPhone" label="Phone" {...scanned('customerPhone')}>
+                  <input {...input('customerPhone')} type="tel" inputMode="tel" autoComplete="off" />
+                </Field>
 
-            <Field id="customerPhone" label="Phone" {...scanned('customerPhone')}>
-              <input {...input('customerPhone')} type="tel" inputMode="tel" autoComplete="off" />
-            </Field>
+                <Field
+                  id="customerAddress"
+                  label="Service address"
+                  required
+                  error={errors.customerAddress}
+                  {...scanned('customerAddress')}
+                >
+                  <input
+                    {...input('customerAddress', { error: 'customerAddress' })}
+                    type="text"
+                    autoComplete="off"
+                    placeholder="Street, city, state, ZIP"
+                  />
+                </Field>
 
-            <Field
-              id="customerAddress"
-              label="Service address"
-              required
-              error={errors.customerAddress}
-              {...scanned('customerAddress')}
-            >
-              <input
-                {...input('customerAddress', { error: 'customerAddress' })}
-                type="text"
-                autoComplete="off"
-                placeholder="Street, city, state, ZIP"
-              />
-            </Field>
-
-            <Field id="installDate" label="Install date" required error={errors.installDate} {...scanned('installDate')}>
-              <input {...input('installDate', { error: 'installDate' })} type="date" />
-            </Field>
+                <Field
+                  id="installDate"
+                  label="Install date"
+                  required
+                  error={errors.installDate}
+                  {...scanned('installDate')}
+                >
+                  <input {...input('installDate', { error: 'installDate' })} type="date" />
+                </Field>
+              </div>
+            </section>
 
             <details
-              className={`${l.more} ${l.wide}`}
+              className={`${l.group} ${l.more}`}
               open={showMore}
               onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
             >

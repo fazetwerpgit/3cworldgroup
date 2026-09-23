@@ -1,8 +1,19 @@
-/* Log a sale, direction D. Ported from design-lab/d/logsale.module.css with
-   the aura knobs baked in at 1 and the scan/confidence styles dropped (nothing
-   is read from the screenshot). Tokens live on .root / .layer in rep.module.css. */
+/* Log a sale, direction C (docs/redesign/design-refresh/DESIGN.md). Depth
+   comes from the surface ladder: the Proof step is one raised (L2) card, the
+   details sit in flatter L1 groups, and every input is a recessed well.
+   Base tokens live on .root / .layer in rep.module.css. */
 
 .main {
+  /* C's surface ladder (DESIGN.md §2, §6), local to this page. */
+  --ls-well: #08101d;
+  --ls-s1: #111c2f;
+  --ls-s2: #16233a;
+  --ls-s3: #1d2c46;
+  --ls-edge: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --ls-sh-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --ls-sh-3: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -18px rgba(0, 0, 0, 0.8);
+  --ls-sh-well: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  --ls-well-edge: rgba(0, 0, 0, 0.25);
   padding-bottom: var(--s5);
 }
 
@@ -11,22 +22,48 @@
   padding-bottom: calc(var(--s7) + var(--s4));
 }
 
-/* ---------- step label ---------- */
+/* ---------- step label + two-segment meter ---------- */
 .steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
   margin: 0 0 var(--s4);
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
+}
+
+.stepsLabel {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
   font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.stepsMeter {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  width: 56px;
+}
+
+.stepsMeter > span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--c-track);
+}
+
+.stepsMeter > .stepOn {
+  background: var(--c-lime);
 }
 
 /* ---------- headings ---------- */
 .title {
   margin: 0;
-  font-family: var(--f-display);
-  font-size: 40px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 0.95;
+  font: 600 26px / 1.15 var(--f-ui);
+  letter-spacing: -0.025em;
 }
 
 .lede {
@@ -42,34 +79,38 @@
   gap: var(--s5);
 }
 
+/* The one raised card on the step (L2): the heaviest shadow on the page. */
 .entry {
-  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding: var(--s5);
   overflow: hidden;
-  background: var(--c-panel-fill);
-  box-shadow:
-    inset 0 2px 0 var(--c-lime),
-    var(--c-lift);
+  border: 1px solid var(--c-line);
+  border-radius: 18px;
+  background: var(--ls-s2);
+  box-shadow: var(--ls-edge), var(--ls-sh-3);
+}
+
+.entryBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--s5) var(--s5) var(--s5);
 }
 
 .entryTitle {
   margin: 0 0 var(--s2);
-  font-family: var(--f-display);
-  font-size: 44px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 0.92;
+  font: 600 28px / 1.1 var(--f-ui);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 
 .entryLede {
-  max-width: 32ch;
+  max-width: 34ch;
   margin: 0 0 var(--s5);
   color: var(--c-text-2);
   font-size: var(--t-ui);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .entryActions {
@@ -84,10 +125,16 @@
   outline-offset: 2px;
 }
 
+/* The fine print sits in a recessed band along the card's foot. */
 .entryWorks {
-  margin: var(--s3) 0 0;
+  margin: 0;
+  padding: var(--s3) var(--s5);
+  border-top: 1px solid var(--ls-well-edge);
+  background: var(--ls-well);
+  box-shadow: var(--ls-sh-well);
   color: var(--c-text-3);
   font-size: var(--t-min);
+  line-height: 1.4;
 }
 
 .side {
@@ -96,6 +143,7 @@
   align-content: start;
 }
 
+/* The other way in: a flat L1 row under the raised card. */
 .manual {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -104,10 +152,33 @@
   width: 100%;
   min-height: 72px;
   padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--ls-s1);
+  box-shadow: var(--ls-edge), var(--ls-sh-1);
   color: var(--c-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 140ms var(--ease);
+}
+
+.manual:active {
+  background: var(--ls-s3);
+  transform: scale(0.985);
+}
+
+.manual:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .manual:hover {
+    background: var(--ls-s3);
+  }
 }
 
 .manualIcon {
@@ -168,20 +239,20 @@
   font-weight: 500;
 }
 
+/* Every input is a recessed well (DESIGN.md §6, level -1). */
 .input {
   width: 100%;
   height: 52px;
   padding: 0 14px;
   border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
-  background: var(--c-ground);
+  border-radius: 10px;
+  background: var(--ls-well);
+  box-shadow: var(--ls-sh-well);
   color: var(--c-text);
   font: 400 var(--t-body) / 1 var(--f-ui);
   font-variant-numeric: tabular-nums;
   appearance: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .input::placeholder {
@@ -190,8 +261,8 @@
 
 .input:focus {
   border-color: var(--c-lime);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--c-lime-wash);
+  outline: 1px solid var(--c-lime);
+  outline-offset: -2px;
 }
 
 /* iOS draws date inputs centred and short; keep them in line with the rest. */
@@ -249,7 +320,7 @@
 
 .fieldInvalid .input:focus {
   border-color: var(--c-red);
-  box-shadow: 0 0 0 3px rgba(255, 138, 128, 0.18);
+  outline-color: var(--c-red);
 }
 
 .fieldError {
@@ -268,6 +339,26 @@
   margin-top: 2px;
 }
 
+/* ---------- field groups (L1) ---------- */
+.groups {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.group {
+  min-width: 0;
+  padding: var(--s4) var(--s4) var(--s5);
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--ls-s1);
+  box-shadow: var(--ls-edge), var(--ls-sh-1);
+}
+
+.groupHead {
+  margin-bottom: var(--s4);
+}
+
 .formGrid {
   display: grid;
   gap: 20px;
@@ -277,16 +368,16 @@
   grid-column: 1 / -1;
 }
 
-/* ---------- provider (segmented) ---------- */
+/* ---------- provider (segmented, set in a well) ---------- */
 .segmented {
   display: flex;
-  gap: 1px;
+  gap: 4px;
   margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
-  background: var(--c-line-strong);
+  padding: 4px;
+  border: 1px solid var(--ls-well-edge);
+  border-radius: 10px;
+  background: var(--ls-well);
+  box-shadow: var(--ls-sh-well);
 }
 
 .chip {
@@ -295,9 +386,9 @@
   flex: 1 1 auto;
   align-items: center;
   justify-content: center;
-  min-height: var(--tap);
+  min-height: 42px;
   padding: 0 var(--s2);
-  background: var(--c-panel);
+  border-radius: 7px;
   color: var(--c-text-2);
   font-size: var(--t-sm);
   font-weight: 600;
@@ -313,9 +404,9 @@
 }
 
 .chip:has(input:checked) {
-  background: var(--c-lime-wash);
-  color: var(--c-lime-hi);
-  box-shadow: inset 0 -2px 0 var(--c-lime);
+  background: var(--ls-s3);
+  color: var(--c-text);
+  box-shadow: var(--ls-edge), var(--ls-sh-1);
 }
 
 .chip:has(input:focus-visible) {
@@ -330,7 +421,9 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
+  border-radius: 10px;
+  background: var(--ls-well);
+  box-shadow: var(--ls-sh-well);
   list-style: none;
 }
 
@@ -345,7 +438,6 @@
   gap: var(--s3);
   min-height: 52px;
   padding: 0 var(--s4);
-  background: var(--c-ground);
   cursor: pointer;
 }
 
@@ -386,9 +478,9 @@
 }
 
 /* ---------- More details ---------- */
-.more {
-  border-top: 1px solid var(--c-line);
-  border-bottom: 1px solid var(--c-line);
+/* More details is the third group; its summary is the group's head. */
+.group.more {
+  padding-block: 0;
 }
 
 .moreSummary {
@@ -434,7 +526,8 @@
 .moreGrid {
   display: grid;
   gap: 20px;
-  padding: var(--s2) 0 var(--s5);
+  padding: var(--s4) 0 var(--s5);
+  border-top: 1px solid var(--c-line);
 }
 
 /* ---------- details layout ---------- */
@@ -450,14 +543,15 @@
 }
 
 /* ---------- proof card ---------- */
+/* Details step: the attached proof is an L1 card, thumbnails in a well. */
 .proofCard {
   display: grid;
   gap: var(--s3);
-  padding: var(--s3);
+  padding: var(--s4);
   border: 1px solid var(--c-line);
-  border-radius: var(--r-panel);
-  background: var(--c-panel-fill);
-  box-shadow: var(--c-lift);
+  border-radius: 14px;
+  background: var(--ls-s1);
+  box-shadow: var(--ls-edge), var(--ls-sh-1);
 }
 
 .proofMeta {
@@ -479,7 +573,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--s2);
   margin: 0;
-  padding: 0;
+  padding: var(--s2);
+  border: 1px solid var(--ls-well-edge);
+  border-radius: 12px;
+  background: var(--ls-well);
+  box-shadow: var(--ls-sh-well);
   list-style: none;
 }
 
@@ -497,8 +595,8 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
-  background: var(--c-ground);
+  border-radius: 8px;
+  background: var(--ls-s1);
   cursor: pointer;
 }
 
@@ -590,7 +688,7 @@ span.thumbView {
   height: 100%;
   padding: var(--s1);
   border: 1px dashed var(--c-line-strong);
-  border-radius: var(--r-control);
+  border-radius: 8px;
   color: var(--c-text-2);
   font-size: var(--t-min);
   font-weight: 600;
@@ -601,6 +699,26 @@ span.thumbView {
 
 .thumbAdd svg {
   color: var(--c-lime);
+}
+
+/* Nothing attached yet: no empty well, just a full-width add row. */
+.thumbs:not(:has(.thumbView)) {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.thumbs:not(:has(.thumbView)) .thumb {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  height: 64px;
+}
+
+.thumbs:not(:has(.thumbView)) .thumbAdd {
+  flex-direction: row;
+  gap: var(--s2);
+  font-size: var(--t-sm);
 }
 
 .thumbAdd:has(input:focus-visible) {
@@ -649,6 +767,17 @@ span.thumbView {
 
 .scanRow .lede {
   margin: 0;
+}
+
+.scanReading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.scanReading svg {
+  flex: none;
+  color: var(--c-text-3);
 }
 
 .scanSkip {
@@ -713,7 +842,6 @@ span.thumbView {
 
 .flagLow .input {
   border-color: var(--c-amber);
-  background: var(--c-amber-wash);
 }
 
 .flagLow .flagTag {
@@ -729,7 +857,7 @@ span.thumbView {
   gap: var(--s3);
   padding: 14px var(--s4);
   border: 1px solid rgba(255, 138, 128, 0.5);
-  border-radius: var(--r-panel);
+  border-radius: 12px;
   background: rgba(255, 138, 128, 0.1);
   color: var(--c-red);
   scroll-margin: 96px;
@@ -760,8 +888,9 @@ span.thumbView {
   margin: calc(-1 * var(--s2)) 0 var(--s5);
   padding-left: var(--s3);
   border: 1px solid var(--c-line);
-  border-radius: var(--r-panel);
-  background: var(--c-panel);
+  border-radius: 12px;
+  background: var(--ls-s1);
+  box-shadow: var(--ls-edge);
   color: var(--c-text-3);
 }
 
@@ -802,7 +931,7 @@ span.thumbView {
   gap: var(--s3);
   padding: 14px var(--s4);
   border: 1px solid rgba(245, 185, 69, 0.45);
-  border-radius: var(--r-panel);
+  border-radius: 12px;
   background: var(--c-amber-wash);
   color: var(--c-amber);
   scroll-margin: 96px;
@@ -897,12 +1026,20 @@ span.thumbView {
   margin: 0;
 }
 
+/* Money in Geist 600 tabular, with a muted top-aligned dollar sign. */
 .estNum {
-  font-family: var(--f-display);
-  font-size: var(--t-d2);
+  font: 600 24px / 1 var(--f-ui);
   font-variant-numeric: tabular-nums;
-  line-height: 0.9;
-  padding-top: 2px;
+  letter-spacing: -0.04em;
+}
+
+.cur {
+  margin-right: 0.08em;
+  color: var(--c-text-2);
+  font-size: 0.58em;
+  font-weight: 500;
+  letter-spacing: 0;
+  vertical-align: 0.55em;
 }
 
 .estNone {
@@ -955,27 +1092,32 @@ span.thumbView {
   }
 
   .steps {
-    margin-bottom: var(--s6);
+    justify-content: flex-start;
+    margin-bottom: var(--s5);
+  }
+
+  .stepsMeter {
+    width: 72px;
   }
 
   .title {
-    font-size: 56px;
+    font-size: 32px;
   }
 
+  /* The raised card and the manual route side by side, one height. */
   .defaultGrid {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    gap: var(--s6);
-    align-items: start;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    gap: var(--s5);
+    align-items: stretch;
   }
 
-  .entry {
+  .entryBody {
     justify-content: center;
-    min-height: 500px;
-    padding: var(--s7);
+    padding: var(--s7) var(--s7) var(--s6);
   }
 
   .entryTitle {
-    font-size: 72px;
+    font-size: 40px;
   }
 
   .entryLede {
@@ -988,6 +1130,38 @@ span.thumbView {
 
   .entryActions > label {
     min-width: 300px;
+  }
+
+  .entryWorks {
+    padding: var(--s4) var(--s7);
+    font-size: var(--t-sm);
+  }
+
+  .side {
+    align-content: stretch;
+  }
+
+  /* Desktop: the manual route is a full-height L1 panel, not a row. */
+  .manual {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-content: center;
+    gap: var(--s4) var(--s5);
+    height: 100%;
+    padding: var(--s6) var(--s6) var(--s6) var(--s7);
+  }
+
+  .manual > svg:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .manualTitle {
+    font-size: 20px;
+    letter-spacing: -0.015em;
+  }
+
+  .manualSub {
+    font-size: var(--t-ui);
+    line-height: 1.45;
   }
 
   .reviewGrid {
@@ -1015,6 +1189,14 @@ span.thumbView {
     grid-area: main;
   }
 
+  .group {
+    padding: var(--s5) var(--s5) var(--s6);
+  }
+
+  .group.more {
+    padding-block: 0;
+  }
+
   .formGrid,
   .moreGrid {
     grid-template-columns: 1fr 1fr;
@@ -1025,19 +1207,29 @@ span.thumbView {
     display: none;
   }
 
+  /* Desktop: the est. pay and Submit ride a raised (L2) card, the heaviest
+     shadow on the step. */
   .submitInline,
   .submitInline[data-keyboard='open'] {
     display: flex;
     grid-area: bar;
     align-self: start;
     justify-content: space-between;
-    padding: var(--s5) 0 0;
+    padding: var(--s4) var(--s4) var(--s4) var(--s5);
+    border: 1px solid var(--c-line);
+    border-radius: 18px;
+    background: var(--ls-s2);
+    box-shadow: var(--ls-edge), var(--ls-sh-3);
   }
 
   .estPay {
     flex-direction: row;
     align-items: baseline;
     gap: var(--s3);
+  }
+
+  .estNum {
+    font-size: 32px;
   }
 
   .submit {
