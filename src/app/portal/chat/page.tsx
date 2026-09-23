@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { AlertCircle, ArrowDown, Check, Clock, Hash, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, Clock, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
@@ -1253,7 +1253,6 @@ export default function TeamChatPage() {
     : '';
   // Role labels carry comp tiers, manager titles and IBO levels: admins only.
   const activeMemberCount = activeChannel ? memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0 : 0;
-  const ActiveMark = activeChannel?.audience === 'managers' ? Lock : Hash;
   const openChannelOnPhone = (channelId: string) => {
     setActiveChannelId(channelId);
     setMobileView('thread');
@@ -1295,10 +1294,10 @@ export default function TeamChatPage() {
 
         <section className={`${s.panel} ${c.convo}`} aria-label={activeChannel ? `${activeChannel.name} conversation` : 'Conversation'}>
           <header className={c.convoHead}>
-            <button type="button" onClick={() => setInfoOpen(true)} disabled={!activeChannel} className={c.titleBtn} aria-label={activeChannel ? `#${activeChannel.name}, channel details` : 'Channel details'}>
+            <button type="button" onClick={() => setInfoOpen(true)} disabled={!activeChannel} className={c.titleBtn} aria-label={activeChannel ? `${activeChannel.name}, channel details` : 'Channel details'}>
               <span className={c.convoTitle}>
-                <ActiveMark size={18} aria-hidden="true" />
                 {activeChannel?.name ?? 'Select a channel'}
+                {activeChannel?.audience === 'managers' ? <Lock size={12} aria-hidden="true" /> : null}
               </span>
               <span className={c.convoDesc}>{activeChannel?.description ?? 'Choose a channel to view messages.'}</span>
             </button>

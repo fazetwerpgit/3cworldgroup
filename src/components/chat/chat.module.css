@@ -139,7 +139,7 @@
 
 .channel {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--s3);
   width: 100%;
@@ -176,22 +176,6 @@
 
 .channel:active {
   background: rgba(163, 184, 214, 0.08);
-}
-
-.channelMark {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-control);
-  background: var(--c-panel-hi);
-  color: var(--c-text-2);
-}
-
-.channel[aria-current='true'] .channelMark {
-  border-color: rgba(141, 198, 63, 0.4);
-  color: var(--c-lime);
 }
 
 .channelCopy {
@@ -252,12 +236,6 @@
 
 .channelUnread .channelDesc {
   color: var(--c-text);
-}
-
-.channelUnread .channelMark {
-  border-color: rgba(141, 198, 63, 0.4);
-  background: var(--c-lime-wash);
-  color: var(--c-lime);
 }
 
 .channelUnread .channelMeta {
@@ -1603,8 +1581,8 @@
   border-bottom: 1px solid var(--c-line);
 }
 
-.infoHead > svg {
-  flex: none;
+.infoTitle svg {
+  margin-left: 6px;
   color: var(--c-text-3);
 }
 

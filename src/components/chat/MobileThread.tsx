@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject, TouchEvent } from 'react';
-import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -663,7 +663,6 @@ export function MobileThread({
   }, [gifOpen]);
 
   const memberTotal = channel ? memberCount ?? channel.memberIds?.length ?? 0 : 0;
-  const ChannelMark = channel?.audience === 'managers' ? Lock : Hash;
   const pinnedCopy = pinnedMessage
     ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
     : '';
@@ -676,8 +675,8 @@ export function MobileThread({
         </button>
         <button type="button" onClick={onOpenInfo} aria-label="Channel details" className={c.threadTitle}>
           <span className={c.threadName}>
-            <ChannelMark size={16} aria-hidden="true" />
             {channel?.name ?? 'Channel'}
+            {channel?.audience === 'managers' ? <Lock size={12} aria-hidden="true" /> : null}
           </span>
           <span className={c.threadSub}>
             {channel ? `${memberTotal} member${memberTotal === 1 ? '' : 's'}` : 'Choose a channel'}

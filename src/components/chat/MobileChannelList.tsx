@@ -1,6 +1,6 @@
 'use client';
 
-import { Hash, Lock, RotateCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { Lock, RotateCw, ShieldAlert, WifiOff } from 'lucide-react';
 import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
 import s from '@/components/portal/rep/rep.module.css';
 import c from './chat.module.css';
@@ -85,7 +85,6 @@ export function ChannelRows({
       <ul className={c.channels}>
         {channels.map((channel) => {
           const unread = !!unreadByChannel?.[channel.id];
-          const Mark = channel.audience === 'managers' ? Lock : Hash;
           return (
             <li key={channel.id}>
               <button
@@ -94,11 +93,11 @@ export function ChannelRows({
                 aria-current={activeChannelId === channel.id ? 'true' : undefined}
                 className={`${c.channel} ${unread ? c.channelUnread : ''}`}
               >
-                <span className={c.channelMark} aria-hidden="true">
-                  <Mark size={18} strokeWidth={2} />
-                </span>
                 <span className={c.channelCopy}>
-                  <span className={c.channelName}>{channel.name}</span>
+                  <span className={c.channelName}>
+                    {channel.name}
+                    {channel.audience === 'managers' ? <Lock size={12} role="img" aria-label="Private" /> : null}
+                  </span>
                   {channel.description ? <span className={c.channelDesc}>{channel.description}</span> : null}
                 </span>
                 <span className={c.channelMeta}>

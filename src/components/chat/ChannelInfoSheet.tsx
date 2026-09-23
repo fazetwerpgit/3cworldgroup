@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Hash, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
+import { ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import s from '@/components/portal/rep/rep.module.css';
@@ -335,9 +335,9 @@ export function ChannelInfoSheet({
         <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="chat-info-title">
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={c.infoHead}>
-            {isLocked ? <Lock size={18} aria-hidden="true" /> : <Hash size={18} aria-hidden="true" />}
             <h2 id="chat-info-title" className={c.infoTitle}>
               {channel?.name ?? 'Channel'}
+              {isLocked ? <Lock size={12} aria-hidden="true" /> : null}
             </h2>
             {channel && <span className={c.chip}>{audienceCopy[channel.audience]}</span>}
             <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={() => onOpenChange(false)}>
