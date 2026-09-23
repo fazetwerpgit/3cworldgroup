@@ -88,11 +88,20 @@ export async function PUT(
       );
     }
 
-    // Only the owning rep or management may edit a sale. Gate before the body is
-    // read so no client-supplied field can influence who the caller is.
+    // Management only. Gate before the body is read so no client-supplied field
+    // can influence who the caller is. A rep changes one thing on their own sale,
+    // the install date, through ./install-date; every other correction goes
+    // through management, so a rep cannot rewrite a sale's plan, value or
+    // customer after it is logged.
     const requester = await requireVerifiedRequester(request);
     if (!requester.ok) {
       return NextResponse.json({ error: requester.error }, { status: requester.status });
+    }
+    if (!requester.isManagement) {
+      return NextResponse.json(
+        { error: 'Ask an admin to change this sale' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -229,6 +238,10 @@ export async function PUT(
           existing?.salesRepId === requester.uid ? 'rep' : 'admin';
         updateData.installDatePreviousDate = existing?.installDate ?? null;
         updateData.installDateChangedAt = new Date();
+        // A full edit is not the rep's date-only fallback: drop the carrier date
+        // an earlier install-date edit recorded, so the report sync treats this
+        // date like any other and a stale value cannot shield it.
+        updateData.repEditCarrierDate = null;
       }
     }
 
