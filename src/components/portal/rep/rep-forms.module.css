@@ -1060,6 +1060,16 @@
   object-fit: contain;
 }
 
+.viewerDoc {
+  width: min(100%, 760px);
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);
+  padding: 0 var(--s3) var(--s3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--r-control);
+  background: var(--c-panel);
+}
+
 .viewerClose {
   position: absolute;
   top: calc(env(safe-area-inset-top) + var(--s2));

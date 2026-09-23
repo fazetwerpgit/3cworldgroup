@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FormUploadError } from '@/lib/forms/uploadFormAttachment';
-import { attachReducer, uploadFailure, type AttachDone, type AttachState } from './attachmentState';
+import { attachReducer, fileView, uploadFailure, type AttachDone, type AttachState } from './attachmentState';
 
 const idle: AttachState = { kind: 'idle' };
-const attached: AttachDone = { kind: 'done', name: 'old.png', localUrl: 'blob:old', isImage: true };
+const attached: AttachDone = { kind: 'done', name: 'old.png', localUrl: 'blob:old', view: 'image' };
 
 describe('attachReducer', () => {
   it('cancel clears a first upload back to an empty slot', () => {
@@ -19,7 +19,7 @@ describe('attachReducer', () => {
 
   it('ignores a late result from a cancelled run', () => {
     const cancelled = attachReducer(attachReducer(idle, { type: 'start', run: 1, name: 'a.png' }), { type: 'cancel' });
-    const late = attachReducer(cancelled, { type: 'done', run: 1, name: 'a.png', localUrl: null, isImage: true });
+    const late = attachReducer(cancelled, { type: 'done', run: 1, name: 'a.png', localUrl: null, view: 'image' });
     expect(late).toEqual(idle);
   });
 
@@ -28,7 +28,7 @@ describe('attachReducer', () => {
     state = attachReducer(state, { type: 'start', run: 2, name: 'b.png' });
     state = attachReducer(state, { type: 'fail', run: 1, message: 'Upload timed out', retry: true });
     expect(state).toMatchObject({ kind: 'uploading', run: 2 });
-    state = attachReducer(state, { type: 'done', run: 2, name: 'b.png', localUrl: null, isImage: true });
+    state = attachReducer(state, { type: 'done', run: 2, name: 'b.png', localUrl: null, view: 'image' });
     expect(state).toMatchObject({ kind: 'done', name: 'b.png' });
   });
 
@@ -66,5 +66,15 @@ describe('uploadFailure', () => {
       message: 'No signal. Check your connection and upload again.',
       retry: true,
     });
+  });
+});
+
+describe('fileView', () => {
+  it('views photos and PDFs in the page, nothing else', () => {
+    expect(fileView({ type: 'image/heic', name: 'a.heic' })).toBe('image');
+    expect(fileView({ type: 'application/pdf', name: 'stub.pdf' })).toBe('pdf');
+    // Some pickers leave the type empty; the extension still says PDF.
+    expect(fileView({ type: '', name: 'Stub.PDF' })).toBe('pdf');
+    expect(fileView({ type: 'text/plain', name: 'notes.txt' })).toBeNull();
   });
 });
