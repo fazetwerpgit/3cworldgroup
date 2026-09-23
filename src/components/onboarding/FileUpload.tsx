@@ -5,6 +5,7 @@ import { Loader2, UploadCloud, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { Button } from '@/components/ui/button';
+import { maybeDownscale } from '@/lib/forms/uploadFormAttachment';
 
 interface FileUploadProps {
   itemId: string;
@@ -21,34 +22,6 @@ interface FileUploadProps {
 }
 
 type UploadState = 'idle' | 'uploading' | 'uploaded' | 'error';
-
-// MIME types we can safely re-encode on a canvas to shrink large phone photos.
-const DOWNSCALABLE = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-// Downscale a large image client-side so it fits under the body-size cap.
-// Returns the original file when it already fits or cannot be decoded.
-async function maybeDownscale(file: File, maxBytes: number): Promise<File> {
-  if (file.size <= maxBytes || !DOWNSCALABLE.has(file.type)) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const maxDim = 2000;
-    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return file;
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob: Blob | null = await new Promise((resolve) =>
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85)
-    );
-    if (!blob) return file;
-    return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-  } catch {
-    return file;
-  }
-}
 
 export default function FileUpload({
   itemId,

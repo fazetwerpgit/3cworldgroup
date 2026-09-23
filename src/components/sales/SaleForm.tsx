@@ -1,290 +1,52 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Trash2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSales } from '@/hooks/useSales';
-import { FiberPlan, SaleType, SaleProduct, SALE_TYPES } from '@/types';
+import { SALE_TYPES } from '@/types';
 import { PlanPicker } from '@/components/sales/PlanPicker';
-import { addPlanToProducts } from '@/lib/sales/planSelection';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { FORM_ATTACHMENT_TYPES } from '@/lib/forms/formUploads';
-import { hasSaleProof } from '@/lib/sales/proof';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
+import { useSaleFormState } from '@/hooks/useSaleFormState';
 import { auth } from '@/lib/firebase/config';
 
 interface SaleFormProps {
   onSuccess?: () => void;
 }
 
-// In-progress sale kept in sessionStorage so a reload, a crash or a lost
-// connection mid-submit never costs the rep the entry. Keyed per user so a
-// shared phone never shows one rep's customer to the next. File objects are
-// never stored — an uploaded screenshot survives as its storage path.
-const DRAFT_KEY_PREFIX = 'sale-draft:v1:';
-const DRAFT_SAVE_DELAY_MS = 400;
-const CLIENT_SALE_ID_RE = /^[a-f0-9]{32}$/;
-
-type SaleFormData = {
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
-  customerAddress: string;
-  saleType: SaleType;
-  saleDate: string;
-  installDate: string;
-  notes: string;
-  orderNumberOrBtn: string;
-  proofScreenshotPath: string;
-};
-
-interface SaleDraft {
-  formData: SaleFormData;
-  products: SaleProduct[];
-  saleDateTouched: boolean;
-  proofUploadId: string;
-}
-
-function readDraft(key: string): SaleDraft | null {
-  try {
-    const raw = window.sessionStorage.getItem(key);
-    if (!raw) return null;
-    const draft = JSON.parse(raw) as Partial<SaleDraft>;
-    if (!draft || typeof draft !== 'object' || !draft.formData || !Array.isArray(draft.products)) {
-      return null;
-    }
-    return draft as SaleDraft;
-  } catch {
-    return null;
-  }
-}
-
-function writeDraft(key: string, draft: SaleDraft | null) {
-  try {
-    if (draft) window.sessionStorage.setItem(key, JSON.stringify(draft));
-    else window.sessionStorage.removeItem(key);
-  } catch {
-    // Storage full or blocked (private mode) — the draft is a convenience only.
-  }
-}
-
-/** Anything the rep actually entered; a pristine form is not worth restoring. */
-function hasDraftContent(formData: SaleFormData, products: SaleProduct[]): boolean {
-  return (
-    products.length > 0 ||
-    [
-      formData.customerName,
-      formData.customerPhone,
-      formData.customerEmail,
-      formData.customerAddress,
-      formData.installDate,
-      formData.notes,
-      formData.orderNumberOrBtn,
-      formData.proofScreenshotPath,
-    ].some((value) => value.trim() !== '')
-  );
-}
-
+// The pre-D new-sale form. Its state, draft, validation and submit live in
+// useSaleFormState, shared with the direction-D Log Sale page
+// (components/portal/rep/RepLogSale.tsx); this is markup only.
 export function SaleForm({ onSuccess }: SaleFormProps) {
   const router = useRouter();
-  const { user } = useAuth();
-  const { createSale, loading, error } = useSales();
-
-  const [formData, setFormData] = useState<SaleFormData>({
-    customerName: '',
-    customerPhone: '',
-    customerEmail: '',
-    customerAddress: '',
-    saleType: 'new_service' as SaleType,
-    saleDate: todaySaleDateInput(),
-    installDate: '',
-    notes: '',
-    orderNumberOrBtn: '',
-    proofScreenshotPath: '',
-  });
-  const [products, setProducts] = useState<SaleProduct[]>([]);
-  // Once the rep sets the sale date themselves the install date stops driving
-  // it; `saleDateFromInstall` only controls which hint is shown.
-  const [saleDateTouched, setSaleDateTouched] = useState(false);
-  const [saleDateFromInstall, setSaleDateFromInstall] = useState(false);
-  const [formError, setFormError] = useState('');
-  // Doubles as the sale's idempotency key (sent as clientSaleId): a resubmit
-  // after a lost response lands on the same sale instead of a duplicate.
-  const [proofUploadId, setProofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
-  const errorRef = useRef<HTMLDivElement>(null);
-  const draftKey = user ? `${DRAFT_KEY_PREFIX}${user.uid}` : null;
-  const [draftRestored, setDraftRestored] = useState(false);
-  const submittedRef = useRef(false);
-
-  /** True for a YYYY-MM-DD value on a day earlier than today. */
-  const isBeforeToday = (value: string) =>
-    /^\d{4}-\d{2}-\d{2}$/.test(value) && value < todaySaleDateInput();
-
-  // Restore once the user is known. An untouched sale date is re-derived
-  // rather than restored, so a draft from yesterday is not dated yesterday.
-  useEffect(() => {
-    if (!draftKey || draftRestored) return;
-    const draft = readDraft(draftKey);
-    if (draft) {
-      const restored = { ...formData, ...draft.formData };
-      if (!draft.saleDateTouched) {
-        const backdated = isBeforeToday(restored.installDate);
-        restored.saleDate = backdated ? restored.installDate : todaySaleDateInput();
-        setSaleDateFromInstall(backdated);
-      }
-      setFormData(restored);
-      setProducts(draft.products);
-      setSaleDateTouched(Boolean(draft.saleDateTouched));
-      if (CLIENT_SALE_ID_RE.test(draft.proofUploadId)) setProofUploadId(draft.proofUploadId);
-    }
-    setDraftRestored(true);
-    // Runs once per user; formData is only the fallback for missing fields.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey, draftRestored]);
-
-  // Debounced save of the in-progress entry.
-  useEffect(() => {
-    if (!draftKey || !draftRestored || submittedRef.current) return;
-    const timer = window.setTimeout(() => {
-      if (submittedRef.current) return;
-      writeDraft(
-        draftKey,
-        hasDraftContent(formData, products)
-          ? { formData, products, saleDateTouched, proofUploadId }
-          : null
-      );
-    }, DRAFT_SAVE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [draftKey, draftRestored, formData, products, saleDateTouched, proofUploadId]);
-
-  // Bring a submit error into view — on a phone the rep is at the bottom of a
-  // long form and would otherwise never see why nothing happened.
-  const shownError = formError || error;
-  useEffect(() => {
-    if (shownError) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [shownError]);
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-
-    if (name === 'saleDate') {
-      setSaleDateTouched(true);
-      setSaleDateFromInstall(false);
-      setFormData((prev) => ({ ...prev, saleDate: value }));
-      return;
-    }
-
-    // An install that already happened means the sale happened by then too — an
-    // install never precedes its sale — so date the sale to it. Same rule the
-    // server applies when no sale date is sent. A today or future install is the
-    // normal "sold now, installs later" case and leaves the sale date on today.
-    if (name === 'installDate' && !saleDateTouched) {
-      const backdated = isBeforeToday(value);
-      setSaleDateFromInstall(backdated);
-      setFormData((prev) => ({
-        ...prev,
-        installDate: value,
-        saleDate: backdated ? value : todaySaleDateInput(),
-      }));
-      return;
-    }
-
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const addPlan = (plan: FiberPlan) => {
-    // One internet plan per sale — picking a second one swaps, it does not add.
-    // See src/lib/sales/planSelection.ts for why.
-    setProducts((prev) => addPlanToProducts(prev, plan));
-    setFormError('');
-  };
-
-  const removeProduct = (index: number) => {
-    setProducts((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const calculateTotalValue = () => {
-    return products.reduce((sum, p) => sum + p.totalPrice, 0);
-  };
-
-  const calculateTotalPoints = () => {
-    return products.reduce((sum, p) => sum + p.points, 0);
-  };
+  const { formRef, errorRef, ...form } = useSaleFormState();
+  const {
+    formData,
+    handleChange,
+    products,
+    addPlan,
+    removeProduct,
+    proofPaths,
+    setProofPaths,
+    proofUploadId,
+    saleDateFromInstall,
+    errors,
+    submitting: loading,
+    totals,
+  } = form;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
-
-    if (!formData.customerAddress.trim()) {
-      setFormError('Please enter the customer address');
-      return;
-    }
-
-    if (products.length === 0) {
-      setFormError('Please add at least one plan');
-      return;
-    }
-
-    if (!formData.saleDate) {
-      setFormError('Please select the sale date');
-      return;
-    }
-
-    if (formData.saleDate > todaySaleDateInput()) {
-      setFormError('Sale date cannot be in the future');
-      return;
-    }
-
-    if (!formData.installDate) {
-      setFormError('Please select the install date');
-      return;
-    }
-
-    // An install can never precede its own sale; catch it here so the rep sees
-    // it inline rather than as the server's 400 on submit.
-    if (formData.saleDate > formData.installDate) {
-      setFormError('Sale date cannot be after the install date');
-      return;
-    }
-
-    if (!hasSaleProof(formData)) {
-      setFormError('Enter an order number / BTN, or upload a screenshot');
-      return;
-    }
-
-    if (!user) {
-      setFormError('You must be logged in to submit a sale');
-      return;
-    }
-
-    const productSold = products.map((p) => p.productName).join(', ');
-
-    const saleData = {
-      ...formData,
-      productSold,
-      salesRepId: user.uid,
-      salesRepName: user.displayName || user.email || '',
-      managerId: user.reportsToId,
-      products,
-      totalValue: calculateTotalValue(),
-      totalPoints: calculateTotalPoints(),
-      clientSaleId: proofUploadId,
-    };
-
-    const result = await createSale(saleData);
-    if (result) {
-      submittedRef.current = true;
-      if (draftKey) writeDraft(draftKey, null);
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push('/portal/sales');
-      }
-    }
+    const result = await form.submit();
+    if (!result) return;
+    if (onSuccess) onSuccess();
+    else router.push('/portal/sales');
   };
+
+  // One message at a time, as before: the first field error, else the block error.
+  const firstFieldError = Object.values(errors)[0];
+  const shownError = firstFieldError || form.blockError;
+  const invalid = (key: keyof typeof errors) => (errors[key] ? true : undefined);
 
   const productSoldPreview = products.map((p) => p.productName).join(', ');
 
@@ -300,7 +62,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
           : '';
 
   return (
-    <form onSubmit={handleSubmit} className="sales-line-form">
+    <form ref={formRef} onSubmit={handleSubmit} className="sales-line-form">
 
       <section className="sales-line-panel">
         <div className="sales-line-panel-head">
@@ -318,6 +80,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             value={formData.customerAddress}
             onChange={handleChange}
             required
+            aria-invalid={invalid('customerAddress')}
             placeholder="123 Main St, City, State 12345"
           />
           <p className="sales-line-field-hint">Enter the full address where service will be installed</p>
@@ -395,7 +158,7 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             </div>
             <div>
               <label className="sales-line-field-label" htmlFor="saleDate">Sale date <span className="req">*</span></label>
-              <input id="saleDate" className="sales-line-input" type="date" name="saleDate" value={formData.saleDate} onChange={handleChange} max={todaySaleDateInput()} required />
+              <input id="saleDate" className="sales-line-input" type="date" name="saleDate" value={formData.saleDate} onChange={handleChange} max={todaySaleDateInput()} required aria-invalid={invalid('saleDate')} />
               <p className="sales-line-field-hint">
                 {saleDateFromInstall
                   ? 'Dated to the install day — change it if the sale happened earlier.'
@@ -404,11 +167,11 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
             </div>
             <div>
               <label className="sales-line-field-label" htmlFor="installDate">Install date <span className="req">*</span></label>
-              <input id="installDate" className="sales-line-input" type="date" name="installDate" value={formData.installDate} onChange={handleChange} required />
+              <input id="installDate" className="sales-line-input" type="date" name="installDate" value={formData.installDate} onChange={handleChange} required aria-invalid={invalid('installDate')} />
             </div>
             <div>
               <label className="sales-line-field-label" htmlFor="orderNumberOrBtn">Order number or BTN</label>
-              <input id="orderNumberOrBtn" className="sales-line-input" type="text" name="orderNumberOrBtn" value={formData.orderNumberOrBtn} onChange={handleChange} placeholder="Order # or billing phone number" />
+              <input id="orderNumberOrBtn" className="sales-line-input" type="text" name="orderNumberOrBtn" value={formData.orderNumberOrBtn} onChange={handleChange} aria-invalid={invalid('orderNumberOrBtn')} placeholder="Order # or billing phone number" />
               <p className="sales-line-field-hint">Required unless you upload a screenshot below.</p>
             </div>
             <div>
@@ -421,12 +184,12 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
                   allowedTypes={FORM_ATTACHMENT_TYPES}
                   uploadUrl="/api/portal/forms/upload"
                   extraFields={{ formType: 'sale-proof' }}
-                  existingPath={formData.proofScreenshotPath || undefined}
+                  existingPath={proofPaths[0]}
                   getHeaders={async (): Promise<HeadersInit> => {
                     const t = await auth?.currentUser?.getIdToken();
                     return t ? { Authorization: `Bearer ${t}` } : {};
                   }}
-                  onUploaded={(path) => setFormData((p) => ({ ...p, proofScreenshotPath: path }))}
+                  onUploaded={(path) => setProofPaths([path])}
                 />
               </div>
             </div>
@@ -441,9 +204,9 @@ export function SaleForm({ onSuccess }: SaleFormProps) {
       {products.length > 0 && (
         <div className="sales-line-summary-bar">
           <div className="sales-line-summary-stats">
-            <div><small>Monthly value</small><strong>${calculateTotalValue().toFixed(2)}/mo</strong></div>
+            <div><small>Monthly value</small><strong>${totals.value.toFixed(2)}/mo</strong></div>
             <div><small>Plans</small><strong>{products.length}</strong></div>
-            <div><small>Points</small><strong>+{calculateTotalPoints()}</strong></div>
+            <div><small>Points</small><strong>+{totals.points}</strong></div>
           </div>
           <div className="sales-line-auto-product">
             <b>Product sold (auto):</b> <span className="val">{productSoldPreview || '—'}</span>
