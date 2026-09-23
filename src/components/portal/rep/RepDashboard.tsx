@@ -78,7 +78,7 @@ function statusLine(row: RecentSaleRow) {
     case 'needs-date':
       return 'Needs install date';
     case 'missed':
-      return 'Missed install';
+      return 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
   }
@@ -99,6 +99,7 @@ function payoutLine(row: RecentSaleRow) {
   if (row.payoutLabel) return `Est. payout ${row.payoutLabel}`;
   if (row.status === 'cancelled') return 'No pay';
   if (row.status === 'installed') return '';
+  if (row.status === 'missed') return 'After reschedule';
   return 'After install';
 }
 
@@ -245,6 +246,10 @@ function Board({
         {/* Money on sales with nothing on the calendar yet: it has no month. */}
         {hasPlan && pay.estNoDate ? (
           <p className={d.noDate}>est. {money(pay.estNoDate)} no install date yet</p>
+        ) : null}
+        {/* Missed installs: their date is stale, so their money waits on a new one. */}
+        {hasPlan && pay.estMissed ? (
+          <p className={d.noDate}>est. {money(pay.estMissed)} needs a new install date</p>
         ) : null}
       </div>
 

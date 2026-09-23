@@ -20,7 +20,7 @@ import {
   salesSoldIn,
   shiftMonth,
 } from '@/lib/sales/monthWindow';
-import { datedSales, sumExpectedPay, undatedSales } from '@/lib/pay/payGroups';
+import { datedSales, missedInstallSales, sumExpectedPay, undatedSales } from '@/lib/pay/payGroups';
 import { periodBounds } from '@/lib/leaderboard/periods';
 
 // Everything the rep dashboard shows, derived from the rep's OWN book. Pure, so
@@ -47,6 +47,8 @@ export interface PaySummary {
   deltaPct: number | null;
   /** Est. pay on non-cancelled sales with no install date yet. Null = no pay plan. */
   estNoDate: number | null;
+  /** Est. pay on missed installs (carrier breakage), waiting on a new date. Null = no pay plan. */
+  estMissed: number | null;
   /** This month's counted sales (by SALE date) by install bucket — a count, not money. */
   counts: InstallCounts;
   monthCount: number;
@@ -81,6 +83,7 @@ export function summarizePay(
     estThisMonth,
     deltaPct,
     estNoDate: sumExpectedPay(undatedSales(sales, fiberBySale), rates),
+    estMissed: sumExpectedPay(missedInstallSales(sales, fiberBySale), rates),
     counts,
     monthCount: soldThisMonth.length,
     payout: nextPayout(dated, rates, now),
@@ -100,7 +103,7 @@ export interface RecentSaleRow {
   installDate: Date | null;
   /** Null = no pay plan (show a dash); 0 = no contracted rate yet. */
   estPay: number | null;
-  /** "Oct 7–11" for a dated, non-cancelled T-Fiber sale (scheduled or completed), else null. */
+  /** "Oct 7–11" for a dated, live T-Fiber sale (scheduled or completed; not missed or cancelled), else null. */
   payoutLabel: string | null;
 }
 
@@ -134,7 +137,8 @@ export function recentSaleRows(
 ): RecentSaleRow[] {
   return sales.slice(0, limit).map((sale) => {
     const status = rowStatus(sale, orderFor(sale, fiberBySale), now);
-    const window = payoutWindowForSale(sale, status !== 'cancelled');
+    // A missed install's date is stale, so it has no window until it is rescheduled.
+    const window = payoutWindowForSale(sale, status !== 'cancelled' && status !== 'missed');
     return {
       id: sale.id || '',
       customer: sale.customerName || 'Customer',

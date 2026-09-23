@@ -72,7 +72,7 @@ function statusLine(status: RowStatus, installDate: Date | string | null | undef
     case 'needs-date':
       return 'Needs install date';
     case 'missed':
-      return 'Missed install';
+      return 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
   }
@@ -93,6 +93,7 @@ function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan:
 const GROUP_NOTE: Record<PayGroup['kind'], string> = {
   window: 'T-Fiber payout window',
   other: 'No published payout window',
+  missed: 'Gets a window once it is rescheduled',
   undated: 'Gets a window once it has a date',
 };
 
@@ -172,7 +173,8 @@ export function SalesTable({
     [fiberBySale, hasPlan, month, rates, sales]
   );
   const paySales = useMemo(() => payGroups.flatMap((group) => group.sales), [payGroups]);
-  const datedPayGroups = payGroups.filter((group) => group.kind !== 'undated');
+  // Money with a date that stands: missed and undated sales wait on a new date.
+  const datedPayGroups = payGroups.filter((group) => group.kind === 'window' || group.kind === 'other');
   const datedPayCount = datedPayGroups.reduce((sum, group) => sum + group.sales.length, 0);
   const datedPayTotal = hasPlan
     ? datedPayGroups.reduce((sum, group) => sum + (group.amount ?? 0), 0)
@@ -195,8 +197,10 @@ export function SalesTable({
   const payoutBySale = useMemo(() => {
     const map: Record<string, string | null> = {};
     for (const sale of sales) {
-      // Scheduled and completed installs alike; only a cancellation has none.
-      const window = payoutWindowForSale(sale, statusBySale[sale.id || ''] !== 'cancelled');
+      // Scheduled and completed installs alike. A cancellation has none, and a
+      // missed install gets one again once it is rescheduled.
+      const status = statusBySale[sale.id || ''];
+      const window = payoutWindowForSale(sale, status !== 'cancelled' && status !== 'missed');
       map[sale.id || ''] = window ? formatPayoutWindow(window) : null;
     }
     return map;
@@ -409,7 +413,13 @@ export function SalesTable({
                     const payout = window ? (
                       <span className={x.payout}>Est. payout <b>{window}</b></span>
                     ) : (
-                      <span className={x.payout}>{sale.installDate ? 'No published window' : 'Once it has a date'}</span>
+                      <span className={x.payout}>
+                        {statusBySale[sale.id || ''] === 'missed'
+                          ? 'Once rescheduled'
+                          : sale.installDate
+                            ? 'No published window'
+                            : 'Once it has a date'}
+                      </span>
                     );
                     return (
                       <div

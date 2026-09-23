@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { FiberOrder, Sale, SaleProduct } from '@/types';
 import { formatPayoutWindow } from './payoutWindow';
-import { datedSales, groupPaySales, hasInstallDate, sumExpectedPay, undatedSales } from './payGroups';
+import {
+  datedSales,
+  groupPaySales,
+  hasInstallDate,
+  isMissedInstall,
+  missedInstallSales,
+  sumExpectedPay,
+  undatedSales,
+} from './payGroups';
+import { nextPayout } from './payoutWindow';
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day, 12, 0, 0);
 
@@ -145,5 +154,46 @@ describe('groupPaySales', () => {
     const [group] = groupPaySales([sale({ installDate: d(2026, 9, 5) })], noFiber, null);
     expect(group.amount).toBeNull();
     expect(group.sales).toHaveLength(1);
+  });
+});
+
+describe('missed installs (carrier breakage)', () => {
+  const breakage = (...ids: string[]) =>
+    new Map<string, FiberOrder>(ids.map((id) => [id, { status: 'breakage' } as FiberOrder]));
+
+  it('keeps a missed install out of dated money but in the count', () => {
+    const missed = sale({ installDate: d(2026, 9, 9) });
+    const live = sale({ installDate: d(2026, 9, 10) });
+    const fiber = breakage(missed.id!);
+    expect(isMissedInstall(missed, fiber)).toBe(true);
+    expect(datedSales([missed, live], fiber)).toEqual([live]);
+    expect(missedInstallSales([missed, live], fiber)).toEqual([missed]);
+    expect(undatedSales([missed, live], fiber)).toEqual([]);
+  });
+
+  it('gives a missed install no payout window and no next payout', () => {
+    const missed = sale({ installDate: d(2026, 9, 9) });
+    const fiber = breakage(missed.id!);
+    expect(nextPayout(datedSales([missed], fiber), rates, d(2026, 9, 10))).toBeNull();
+    const groups = groupPaySales([missed], fiber, rates, { month: SEP, includeUndated: true });
+    expect(groups.map((g) => [g.kind, g.label, g.window, g.amount])).toEqual([['missed', 'Missed install', null, 140]]);
+  });
+
+  it('lists the missed group only with the live groups, after the windows', () => {
+    const missed = sale({ installDate: d(2026, 9, 9) });
+    const live = sale({ installDate: d(2026, 9, 10) });
+    const undated = sale({});
+    const fiber = breakage(missed.id!);
+    expect(groupPaySales([missed, live, undated], fiber, rates, { month: SEP }).map((g) => g.kind)).toEqual(['window']);
+    expect(
+      groupPaySales([missed, live, undated], fiber, rates, { month: SEP, includeUndated: true }).map((g) => g.kind)
+    ).toEqual(['window', 'missed', 'undated']);
+  });
+
+  it('treats a breakage sale with no date as plain undated', () => {
+    const noDate = sale({});
+    const fiber = breakage(noDate.id!);
+    expect(isMissedInstall(noDate, fiber)).toBe(false);
+    expect(undatedSales([noDate], fiber)).toEqual([noDate]);
   });
 });
