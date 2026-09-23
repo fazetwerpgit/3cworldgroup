@@ -1,7 +1,7 @@
 import type { CompPlanCompanyRates, FiberOrder, Sale } from '@/types';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale, type PayoutWindow } from '@/lib/pay/payoutWindow';
-import { countedSales } from '@/lib/sales/installBucket';
+import { countedSales, isStandingBreakage } from '@/lib/sales/installBucket';
 import { isInMonth, type MonthKey } from '@/lib/sales/monthWindow';
 
 // Owner, 2026-09-22: pay is estimated off the INSTALL date, scheduled or
@@ -26,9 +26,10 @@ export function hasInstallDate(sale: Pick<Sale, 'installDate'>): boolean {
  * The carrier reports the install broke at the door (breakage): the customer
  * missed, rescheduled or cancelled, so the date on the sale is stale. The sale
  * still counts, but its money waits on a new install date like an undated one.
+ * A later date on the sale is the reschedule, and it counts again.
  */
 export function isMissedInstall(sale: Pick<Sale, 'id' | 'installDate'>, fiberBySale: FiberMap): boolean {
-  return hasInstallDate(sale) && fiberBySale.get(sale.id || '')?.status === 'breakage';
+  return hasInstallDate(sale) && isStandingBreakage(sale, fiberBySale.get(sale.id || ''));
 }
 
 /**

@@ -190,6 +190,16 @@ describe('missed installs (carrier breakage)', () => {
     ).toEqual(['window', 'missed', 'undated']);
   });
 
+  it('puts a rescheduled sale back in the money once its date is past the broken one', () => {
+    const rescheduled = sale({ installDate: d(2026, 9, 16) });
+    const fiber = new Map<string, FiberOrder>([
+      [rescheduled.id!, { status: 'breakage', estInstallDate: '2026-09-09' } as FiberOrder],
+    ]);
+    expect(isMissedInstall(rescheduled, fiber)).toBe(false);
+    expect(datedSales([rescheduled], fiber)).toEqual([rescheduled]);
+    expect(missedInstallSales([rescheduled], fiber)).toEqual([]);
+  });
+
   it('treats a breakage sale with no date as plain undated', () => {
     const noDate = sale({});
     const fiber = breakage(noDate.id!);

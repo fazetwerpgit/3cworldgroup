@@ -1,5 +1,6 @@
 import type { FiberOrder, Sale } from '@/types';
 import { isPayableSale } from '@/lib/pay/expectedPay';
+import { installDayKey } from '@/lib/sales/saleDate';
 
 // Where a sale sits in the install pipeline. With sale approval removed, this is
 // the ONLY lifecycle the Sales page shows, so it has to be derived in exactly one
@@ -12,6 +13,24 @@ export type InstallBucket = 'attention' | 'scheduled' | 'installed';
 export const INSTALL_BUCKETS: readonly InstallBucket[] = ['attention', 'scheduled', 'installed'];
 
 export type InstallCounts = Record<InstallBucket, number>;
+
+/**
+ * A breakage row reports one install day that broke at the door. Once the sale
+ * carries a LATER day (the rep or an admin rescheduled it), that row is
+ * history and the new day stands until the carrier reports on it. A breakage
+ * row with no readable day, or a sale still on the broken day or earlier, is
+ * a missed install.
+ */
+export function isStandingBreakage(
+  sale: Pick<Sale, 'installDate'>,
+  fiberOrder?: FiberOrder | null
+): boolean {
+  if (fiberOrder?.status !== 'breakage') return false;
+  const brokeDay = installDayKey(fiberOrder.estInstallDate);
+  const saleDay = installDayKey(sale.installDate);
+  if (!brokeDay || !saleDay) return true;
+  return saleDay <= brokeDay;
+}
 
 /**
  * The fiber report is display-only "peace of mind" data (see types/fiberOrder),
@@ -27,7 +46,7 @@ export function installBucketForSale(
   if (!sale.installDate) return 'attention';
   // Breakage means the customer missed, rescheduled or cancelled at the door —
   // the date on the sale is stale and somebody has to chase it.
-  if (fiberOrder?.status === 'breakage') return 'attention';
+  if (isStandingBreakage(sale, fiberOrder)) return 'attention';
   // The carrier is the record of what actually happened (CALL 2). A cancelled
   // or churned order never installed, or no longer is, so the install date on
   // the sale is stale — without this the row reads 'installed' off its own past

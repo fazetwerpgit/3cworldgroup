@@ -81,6 +81,19 @@ describe('buildRepDigest', () => {
     expect(digest.needsDate[1].missed).toBe(true);
   });
 
+  it('moves a missed install to upcoming once it is rescheduled past the broken day', () => {
+    const input = busyWeekInput();
+    input.orders = input.orders.map((order) =>
+      order.id === 'brk_9' ? { ...order, estInstallDate: '2026-09-10' } : order
+    );
+    input.sales = input.sales.map((sale) =>
+      sale.id === 's9' ? { ...sale, installDate: new Date(2026, 8, 22, 12) } : sale
+    );
+    const rescheduled = buildRepDigest(input);
+    expect(ids(rescheduled.needsDate)).toEqual(['s8']);
+    expect(ids(rescheduled.upcoming)).toContain('s9');
+  });
+
   it('caps the needs-a-date list and counts the rest', () => {
     const input = lightWeekInput();
     for (let i = 0; i < NEEDS_DATE_LIMIT + 3; i += 1) {
