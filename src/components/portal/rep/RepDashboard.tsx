@@ -374,10 +374,25 @@ function WeekStrip({
               <Failed what="rank" onRetry={onRetryStanding} className={d.cellFailed} />
             ) : rank ? (
               <>
-                <p className={d.big} aria-label={`${rank.rank}${ordinalSuffix(rank.rank)} of ${rank.of}`}>
-                  {rank.rank}
-                  <sup>{ordinalSuffix(rank.rank)}</sup>
-                </p>
+                <div className={d.rankRow}>
+                  <p className={d.big} aria-label={`${rank.rank}${ordinalSuffix(rank.rank)} of ${rank.of}`}>
+                    {rank.rank}
+                    <sup>{ordinalSuffix(rank.rank)}</sup>
+                  </p>
+                  {rank.movement ? (
+                    <p className={`${d.delta} ${d.rankMove}`}>
+                      <b className={rank.movement < 0 ? d.deltaDown : ''}>
+                        {rank.movement < 0 ? (
+                          <TrendingDown size={16} strokeWidth={2.25} aria-hidden="true" />
+                        ) : (
+                          <TrendingUp size={16} strokeWidth={2.25} aria-hidden="true" />
+                        )}
+                        {rank.movement > 0 ? 'Up' : 'Down'} {Math.abs(rank.movement)}
+                      </b>
+                      today
+                    </p>
+                  ) : null}
+                </div>
                 <p className={d.cap}>
                   of {rank.of} · <b>{rank.points.toLocaleString('en-US')} pts</b>
                 </p>

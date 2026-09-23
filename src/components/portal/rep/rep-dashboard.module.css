@@ -123,6 +123,21 @@
   color: var(--c-text-2);
 }
 
+/* Rank movement sits beside the big rank when there is room (desktop), and
+   drops under it on a phone's half-width cell. Same look as the pay change. */
+.rankRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  column-gap: var(--s4);
+}
+
+.delta.rankMove {
+  flex-shrink: 0;
+  margin: 6px 0 4px;
+  white-space: nowrap;
+}
+
 .moneyNote {
   margin: var(--s1) 0 0;
   color: var(--c-text-2);

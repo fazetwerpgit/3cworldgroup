@@ -4,7 +4,7 @@ import type { Standing } from '@/lib/dashboard/repSummary';
 import { standLine } from './RepDashboard';
 
 const line = (s: Partial<Standing>) =>
-  renderToStaticMarkup(<>{standLine({ rank: 4, of: 14, points: 34, ahead: null, leadBy: null, tiedWith: null, ...s })}</>);
+  renderToStaticMarkup(<>{standLine({ rank: 4, of: 14, points: 34, ahead: null, leadBy: null, tiedWith: null, movement: null, ...s })}</>);
 
 describe('standLine fallback', () => {
   it('says top of the board only for rank 1', () => {

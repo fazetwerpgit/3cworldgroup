@@ -221,6 +221,8 @@ export interface LeaderboardRow {
   rank: number;
   totalPoints: number;
   totalSales: number;
+  /** Places gained since yesterday (negative = dropped); null when there is no yesterday to compare. */
+  movement?: number | null;
 }
 
 export interface Standing {
@@ -233,6 +235,8 @@ export interface Standing {
   leadBy: number | null;
   /** Level on points with the rep one place up. */
   tiedWith: string | null;
+  /** Places gained since yesterday; 0 or null shows nothing. */
+  movement: number | null;
 }
 
 /** "Braeden Carter" → "Braeden C." */
@@ -266,6 +270,7 @@ export function standingFrom(
         : null,
     leadBy: me.rank === 1 && below ? me.totalPoints - below.totalPoints : null,
     tiedWith: tied,
+    movement: me.movement ?? null,
   };
 }
 
