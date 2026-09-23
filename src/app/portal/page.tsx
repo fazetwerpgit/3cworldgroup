@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { PendingApproval } from '@/components/auth/PendingApproval';
-import { RepBoot } from '@/components/portal/rep/RepShell';
+import { RepBoot } from '@/components/portal/rep/RepBoot';
 
 export default function PortalLoginPage() {
   const { user, loading, pendingApproval } = useAuth();

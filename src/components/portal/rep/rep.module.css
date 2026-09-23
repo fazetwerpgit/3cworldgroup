@@ -180,20 +180,6 @@
   }
 }
 
-/* Auth / first paint: same ground, no white flash. */
-.boot {
-  display: grid;
-  place-items: center;
-  min-height: 100dvh;
-  background: #03070e;
-}
-
-.bootMark {
-  width: 40px;
-  height: auto;
-  opacity: 0.8;
-}
-
 /* ---------- buttons ---------- */
 .btnPrimary,
 .btnSecondary {

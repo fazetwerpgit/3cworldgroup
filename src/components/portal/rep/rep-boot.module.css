@@ -1,0 +1,14 @@
+/* The auth / first-paint placeholder. Its own module so the login page can show
+   it without loading the rep shell (chat, presence, command palette). */
+.boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  background: #03070e;
+}
+
+.bootMark {
+  width: 40px;
+  height: auto;
+  opacity: 0.8;
+}
