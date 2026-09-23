@@ -451,14 +451,32 @@
 /* Company line (All Company, phone): one quiet row of live numbers. */
 .tape {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 2px var(--s2);
+  gap: var(--s2);
   padding: var(--s2) var(--s4);
+  overflow-x: auto;
   border-bottom: 1px solid var(--c-line);
   color: var(--c-text-2);
   font-size: var(--t-sm);
   line-height: 1.4;
+  white-space: nowrap;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  /* Too long for a phone: it scrolls sideways, and the right edge fades so it
+     reads as "more this way" rather than cut off. The end padding lets the last
+     item scroll clear of the fade. */
+  padding-right: 40px;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent);
+}
+
+.tape::-webkit-scrollbar {
+  display: none;
+}
+
+.tape > * {
+  flex: none;
 }
 
 .tapeLabel {
@@ -1232,6 +1250,24 @@
   padding: var(--s2);
 }
 
+/* Phone thread: cap the picker to the room above the composer (--gif-max, set
+   by MobileThread) so the search box stays on screen with the keyboard up. */
+.thread .gif {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--gif-max, none);
+}
+
+.thread .gifSearch,
+.thread .gifFoot {
+  flex: none;
+}
+
+.thread .gifBody {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .gifGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1826,6 +1862,15 @@ button.person {
   white-space: nowrap;
 }
 
+.sheetConfirm {
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s1);
+  color: var(--c-text);
+  font-size: var(--t-body);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .sheetList {
   padding: var(--s1) 0 var(--s2);
 }
@@ -1857,4 +1902,117 @@ button.person {
 .sheetDanger,
 .sheetDanger svg {
   color: var(--c-red);
+}
+
+/* ---------- Connection + upload progress (send reliability) ---------- */
+.connection {
+  position: absolute;
+  top: var(--s2);
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - var(--s4) * 2);
+  min-height: 32px;
+  margin: 0;
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: 16px;
+  background: var(--c-panel-hi);
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.8);
+  color: var(--c-text-2);
+  font: 500 var(--t-sm) / 1.2 var(--f-ui);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: connectionIn 0.2s ease-out both;
+}
+
+.connection[hidden] {
+  display: none;
+}
+
+.connection[data-state='offline'] {
+  color: var(--c-amber);
+}
+
+.connectionSpin {
+  animation: connectionSpin 1.2s linear infinite;
+}
+
+@keyframes connectionIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+@keyframes connectionSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progress {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(3, 7, 14, 0.6);
+  pointer-events: none;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--c-lime);
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection,
+  .connectionSpin {
+    animation: none;
+  }
+}
+
+/* Channel listener failed after channels loaded: a quiet row above the stale list. */
+.listOffline {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+  padding: var(--s1) var(--s2) var(--s1) var(--s4);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-amber);
+  font-size: var(--t-sm);
+}
+
+.listOffline svg {
+  flex: none;
+}
+
+.listOffline > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.listOfflineRetry {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
 }

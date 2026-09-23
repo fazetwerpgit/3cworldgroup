@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, RefObject } from 'react';
-import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Loader2, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
+import type { CSSProperties, RefObject, TouchEvent } from 'react';
+import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -11,12 +11,17 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { clockTime, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, pendingStatusLabel, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { CompanyTape } from '@/components/chat/CompanyTape';
+import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
+import { gifPickerMaxHeight, keyboardInset } from '@/lib/chat/keyboard';
+import type { ConnectionNotice as ConnectionNoticeState } from '@/lib/chat/reconnect';
 import { useHideRepTabBar } from '@/components/portal/rep/RepShell';
 import s from '@/components/portal/rep/rep.module.css';
 import { GROW_STEP, MAX_WINDOW } from '@/hooks/chat/useMessages';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
+import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 import c from './chat.module.css';
 
@@ -43,6 +48,17 @@ export type ThreadMessage = ChatMessageView & {
   // Set on optimistic reply echoes so the page's postMessage includes it and the
   // pending bubble can show its quote before the server echo reconciles.
   replyToMessageId?: string;
+  // Send reliability (echoes only): the idempotency key the POST sends (the
+  // echo's id is the doc id the server derives from it), the id the POST
+  // reported once it landed, attempts made in the current auto-retry run and
+  // when that run started, the photo prepared once (so a retry never re-reads
+  // the picked file), and upload progress 0..1 while a photo is uploading.
+  clientMessageId?: string;
+  deliveredId?: string;
+  sendAttempts?: number;
+  retryWindowStart?: number;
+  preparedUpload?: { file: File; width?: number; height?: number };
+  uploadProgress?: number;
 };
 
 interface MobileThreadProps {
@@ -89,7 +105,6 @@ interface MobileThreadProps {
   // Role labels (tiers, manager titles, IBO) show only to admins.
   showRoles: boolean;
   draft: string;
-  sending: boolean;
   // GIF feature availability (probed by the page) + the shared verified-token
   // fetch the GIF picker uses to search Tenor.
   gifEnabled: boolean;
@@ -117,6 +132,8 @@ interface MobileThreadProps {
   onReactionError: (message: string) => void;
   onRetryPending: (message: ThreadMessage) => void;
   onDiscardPending: (messageId: string) => void;
+  // Offline / reconnecting chip (already delayed by the page's hook).
+  connectionNotice: ConnectionNoticeState;
   // Message-action callbacks (Reply/Copy/Edit) + composer mode cancels/save.
   onReply: (message: ThreadMessage) => void;
   onEdit: (message: ThreadMessage) => void;
@@ -180,6 +197,11 @@ function BubbleImage({
         style={aspectStyle}
       />
       {isUploading && <span className={c.uploading} />}
+      {isUploading && typeof message.uploadProgress === 'number' && (
+        <span className={c.progress} aria-hidden="true">
+          <span style={{ transform: `scaleX(${message.uploadProgress})` }} />
+        </span>
+      )}
     </button>
   );
 }
@@ -214,6 +236,15 @@ function dayLabel(date: Date) {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+// Caps the GIF picker (opening upward from the composer) to the room left in
+// the thread, via --gif-max on the thread element.
+function fitGifPicker(thread: HTMLElement) {
+  const anchor = thread.querySelector<HTMLElement>('[data-gif-anchor]');
+  if (!anchor) return;
+  const max = gifPickerMaxHeight(anchor.getBoundingClientRect().top, thread.getBoundingClientRect().top);
+  thread.style.setProperty('--gif-max', `${max}px`);
+}
+
 /**
  * Phone conversation screen: a back/title row under the D top bar, bubbles that
  * fill the height, and the composer on the bottom edge. The composer replaces
@@ -242,7 +273,6 @@ export function MobileThread({
   canPin,
   showRoles,
   draft,
-  sending,
   gifEnabled,
   authedFetch,
   messagesEndRef,
@@ -262,6 +292,7 @@ export function MobileThread({
   onDelete,
   onReactionError,
   onRetryPending,
+  connectionNotice,
   onDiscardPending,
   onReply,
   onEdit,
@@ -278,6 +309,10 @@ export function MobileThread({
   const [actionSheet, setActionSheet] = useState<ThreadMessage | null>(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
   const longPressTimer = useRef<number | undefined>(undefined);
+  // The sheet opens while the finger is still down; the tap the browser makes
+  // from that touch's release must not land on a sheet row (Delete sits last,
+  // right under the thumb).
+  const longPressFired = useRef(false);
   const clearLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -286,7 +321,18 @@ export function MobileThread({
   };
   const startLongPress = (message: ThreadMessage) => {
     clearLongPress();
-    longPressTimer.current = window.setTimeout(() => setActionSheet(message), 500);
+    longPressFired.current = false;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = undefined;
+      longPressFired.current = true;
+      setActionSheet(message);
+    }, 500);
+  };
+  const endLongPress = (event: TouchEvent) => {
+    clearLongPress();
+    if (!longPressFired.current) return;
+    longPressFired.current = false;
+    if (event.cancelable) event.preventDefault();
   };
   // Composer media state (mobile owns its own, mirroring the desktop composer).
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -341,51 +387,26 @@ export function MobileThread({
   // adjusted during render (React's "info from previous renders" pattern —
   // avoids a cascading setState inside an effect).
   const [prevLen, setPrevLen] = useState(messages.length);
-  // The previous render's last (newest) message id — the unseen-count math
-  // below locates it in the new array to count only messages appended AFTER
-  // it, so a loadOlder prepend of older history (which doesn't move the tail)
-  // never gets mistaken for new arrivals.
-  const [prevNewestId, setPrevNewestId] = useState<string | undefined>(messages[messages.length - 1]?.id);
+  // The previous render's newest DELIVERED message id — the unseen-count math
+  // (countNewArrivals) counts only delivered messages from others that landed
+  // after it, so a loadOlder prepend of older history never counts, and an
+  // arrival above an unsent echo (echoes render at the tail) still does.
+  const [prevNewestId, setPrevNewestId] = useState<string | undefined>(newestDeliveredId(messages));
   const [prevChannel, setPrevChannel] = useState(channelId);
   const contextRef = useRef('');
   const signalRef = useRef(scrollToBottomSignal);
 
+  const newestId = newestDeliveredId(messages);
   if (channelId !== prevChannel) {
     setPrevChannel(channelId);
     setPrevLen(messages.length);
-    setPrevNewestId(messages[messages.length - 1]?.id);
+    setPrevNewestId(newestId);
     setNewCount(0);
-  } else if (
-    messages.length !== prevLen ||
-    // Also run on a tail-id-only change (own echo reconciling to its delivered
-    // doc id at unchanged length) so prevNewestId never goes stale — a stale
-    // pending-… id would make the next real arrival unfindable and undercount.
-    messages[messages.length - 1]?.id !== prevNewestId
-  ) {
+  } else if (messages.length !== prevLen || newestId !== prevNewestId) {
     setPrevLen(messages.length);
-    const previousNewestId = prevNewestId;
-    const newest = messages[messages.length - 1];
-    setPrevNewestId(newest?.id);
-    // Count only messages appended AFTER the previous newest one — a loadOlder
-    // prepend adds older history at the FRONT and leaves the tail untouched,
-    // so it must never inflate this. Locate the previous newest id from the
-    // end: still last element → 0 (pure prepend); not found at all (e.g. it
-    // was deleted) → fall back to 0 rather than a fabricated count.
-    let grew = 0;
-    if (previousNewestId) {
-      let foundIndex = -1;
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].id === previousNewestId) {
-          foundIndex = i;
-          break;
-        }
-      }
-      grew = foundIndex === -1 ? 0 : messages.length - (foundIndex + 1);
-    }
-    // Own sends force-scroll to the bottom anyway — don't flash the pill when
-    // the newest arrival is the reader's own message (or echo).
-    const ownArrival = !!newest && newest.authorId === currentUserId;
-    if (grew > 0 && !pinned && !ownArrival) setNewCount((count) => count + grew);
+    setPrevNewestId(newestId);
+    const grew = countNewArrivals(messages, prevNewestId, currentUserId);
+    if (grew > 0 && !pinned) setNewCount((count) => count + grew);
   }
 
   // Pinned detection: the bottom anchor is "intersecting" while the reader is
@@ -598,27 +619,50 @@ export function MobileThread({
     if (!el) return;
     const vv = window.visualViewport;
     const update = () => {
-      const covered = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-      const inset = covered > 80 ? Math.round(covered) : 0;
+      const inset = vv
+        ? keyboardInset({ innerHeight: window.innerHeight, height: vv.height, offsetTop: vv.offsetTop, scale: vv.scale })
+        : 0;
+      // Pinch-zoomed: the shrunken viewport isn't a keyboard; leave it be.
+      if (inset === null) return;
       el.style.setProperty('--kb', `${inset}px`);
       if (inset && vv && vv.offsetTop > 0) window.scrollTo(0, 0);
+      fitGifPicker(el);
       const active = document.activeElement;
       const typing = active instanceof HTMLTextAreaElement && el.contains(active);
       setKeyboardOpen(inset > 0 || (typing && window.matchMedia('(pointer: coarse)').matches));
+    };
+    // Coming back to the app (keyboard dismissed while away, rotation) doesn't
+    // always fire a viewport resize, so measure again on resume.
+    let resumeFrame = 0;
+    const onResume = () => {
+      if (document.visibilityState !== 'visible') return;
+      window.cancelAnimationFrame(resumeFrame);
+      resumeFrame = window.requestAnimationFrame(update);
     };
     const frame = window.requestAnimationFrame(update);
     vv?.addEventListener('resize', update);
     vv?.addEventListener('scroll', update);
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('pageshow', onResume);
     return () => {
       window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(resumeFrame);
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('pageshow', onResume);
     };
   }, []);
+
+  // Size the GIF picker to the room above the composer as soon as it opens
+  // (the keyboard its search box raises re-fits it through update above).
+  useLayoutEffect(() => {
+    if (gifOpen && threadRef.current) fitGifPicker(threadRef.current);
+  }, [gifOpen]);
 
   const memberTotal = channel ? memberCount ?? channel.memberIds?.length ?? 0 : 0;
   const ChannelMark = channel?.audience === 'managers' ? Lock : Hash;
@@ -647,26 +691,7 @@ export function MobileThread({
         </button>
       </div>
 
-      {companyStats && (
-        <p className={c.tape}>
-          <span className={c.tapeLabel}>Company</span>
-          <span>
-            <strong>{companyStats.mtdCount}</strong> sale{companyStats.mtdCount === 1 ? '' : 's'} this month
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>
-            <strong>${companyStats.mtdMonthlyValue.toLocaleString('en-US')}</strong>/mo on the board
-          </span>
-          {companyStats.lastSale && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>
-                Last: <strong>{companyStats.lastSale.repName}</strong>
-              </span>
-            </>
-          )}
-        </p>
-      )}
+      {companyStats && <CompanyTape stats={companyStats} />}
 
       {pinnedMessage && (
         <div className={c.pinned}>
@@ -682,6 +707,7 @@ export function MobileThread({
           is per-message so grouped bubbles can tighten up. The relative stage
           hosts the floating jump-to-latest pill. */}
       <div className={c.stage}>
+        <ConnectionNotice notice={connectionNotice} />
         <div ref={scrollRef} onScroll={handleScroll} className={c.threadScroller}>
           {!loading && messages.length > 0 && hasMore && (
             <p className={c.pager}>Earlier messages load as you scroll</p>
@@ -782,7 +808,7 @@ export function MobileThread({
                         className={c.bubbleCol}
                         onTouchStart={() => !isPending && startLongPress(message)}
                         onTouchMove={clearLongPress}
-                        onTouchEnd={clearLongPress}
+                        onTouchEnd={endLongPress}
                         onTouchCancel={clearLongPress}
                         onContextMenu={(event) => {
                           // Long-press on mobile also fires the browser context menu —
@@ -842,7 +868,7 @@ export function MobileThread({
                       ) : (
                         <span className={c.status}>
                           <Clock size={12} aria-hidden="true" />
-                          Sending…
+                          {pendingStatusLabel(message)}
                         </span>
                       )
                     ) : (
@@ -954,7 +980,7 @@ export function MobileThread({
             <ImagePlus size={22} aria-hidden="true" />
           </button>
           {gifEnabled && (
-            <div className={c.gifWrap}>
+            <div className={c.gifWrap} data-gif-anchor="">
               <button
                 type="button"
                 onClick={() => setGifOpen((open) => !open)}
@@ -995,13 +1021,11 @@ export function MobileThread({
           <button
             type="button"
             onClick={handleSend}
-            disabled={!channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}
+            disabled={!channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile)}
             className={c.send}
-            aria-label={editTarget ? 'Save edit' : sending ? 'Sending' : 'Send message'}
+            aria-label={editTarget ? 'Save edit' : 'Send message'}
           >
-            {sending ? (
-              <Loader2 size={18} className={c.spin} aria-hidden="true" />
-            ) : editTarget ? (
+            {editTarget ? (
               <Check size={20} aria-hidden="true" />
             ) : (
               <Send size={18} aria-hidden="true" />

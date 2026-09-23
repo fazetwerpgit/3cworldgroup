@@ -62,7 +62,7 @@ describe('GET /api/portal/sales/company-stats', () => {
 
     expect(json.mtdCount).toBe(1);
     expect(json.mtdMonthlyValue).toBe(120);
-    expect(json.lastSale).toEqual({ repName: 'Wil Teasdale' });
+    expect(json.lastSale).toEqual({ repName: 'Wil Teasdale', at: thisMonth.toISOString() });
   });
 
   it('excludes a back-entered sale whose saleDate is last month', async () => {
@@ -89,7 +89,7 @@ describe('GET /api/portal/sales/company-stats', () => {
     expect(json.mtdCount).toBe(1);
     expect(json.mtdMonthlyValue).toBe(90);
     // Latest by sale date too — the back-entered row is older, not newest.
-    expect(json.lastSale).toEqual({ repName: 'This Month' });
+    expect(json.lastSale).toEqual({ repName: 'This Month', at: thisMonth.toISOString() });
   });
 
   it('falls back to createdAt for older docs with no saleDate', async () => {
@@ -108,6 +108,21 @@ describe('GET /api/portal/sales/company-stats', () => {
 
     const json = await (await GET(get())).json();
 
-    expect(json).toEqual({ mtdCount: 0, mtdMonthlyValue: 0, lastSale: null });
+    expect(json).toEqual({ mtdCount: 0, mtdMonthlyValue: 0, lastSale: null, topRep: null });
+  });
+
+  it('names the month leader by rep id with a count and no money', async () => {
+    const later = new Date(thisMonth.getTime() + 3_600_000);
+    state.docs = [
+      { salesRepId: 'r1', salesRepName: 'Braeden Crouse', totalValue: 80, saleDate: stamp(thisMonth) },
+      { salesRepId: 'r1', salesRepName: 'Braeden Crouse', totalValue: 80, saleDate: stamp(later) },
+      { salesRepId: 'r2', salesRepName: 'Cole Hart', totalValue: 80, saleDate: stamp(later) },
+      { salesRepId: 'r2', salesRepName: 'Cole Hart', totalValue: 80, saleDate: stamp(lastMonth) },
+    ];
+
+    const json = await (await GET(get())).json();
+
+    expect(json.mtdCount).toBe(3);
+    expect(json.topRep).toEqual({ repName: 'Braeden Crouse', count: 2 });
   });
 });

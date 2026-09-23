@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/config';
@@ -23,30 +23,30 @@ function toDate(value: unknown): Date | null {
   return null;
 }
 
+const NO_CHANNELS: ChatChannelDoc[] = [];
+
+// Channels, loading and error are derived from the latest snapshot / failure
+// for the signed-in uid, so a first visit shows the skeleton (not "No channels
+// yet") until the first snapshot lands, and a listener failure after channels
+// loaded keeps the stale list alongside the error. retry() resubscribes.
 export function useChatChannels() {
-  const { user } = useAuth();
-  const [channels, setChannels] = useState<ChatChannelDoc[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { user, loading: authLoading } = useAuth();
+  const [snap, setSnap] = useState<{ key: string; channels: ChatChannelDoc[] } | null>(null);
+  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   // Pending reps lack rules access to chat, so only active users subscribe.
   const uid = user?.status === 'active' ? user.uid : undefined;
+  const key = uid ? `${uid}:${attempt}` : '';
 
   useEffect(() => {
-    if (!db || !uid) {
-      setChannels([]);
-      setLoading(false);
-      setError(db ? '' : 'Firebase is not configured');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
+    if (!db || !uid) return;
 
     const q = query(
       collection(db, 'chatChannels'),
       where('memberIds', 'array-contains', uid),
       where('active', '==', true)
     );
+    const listenKey = `${uid}:${attempt}`;
 
     return onSnapshot(
       q,
@@ -67,16 +67,21 @@ export function useChatChannels() {
           })
           .sort((a, b) => a.order - b.order);
 
-        setChannels(next);
-        setLoading(false);
+        setSnap({ key: listenKey, channels: next });
       },
       (err) => {
         console.error('Error listening to chat channels:', err);
-        setError('Failed to load live channels');
-        setLoading(false);
+        setFailure({ key: listenKey, message: 'Failed to load live channels' });
       }
     );
-  }, [uid]);
+  }, [uid, attempt]);
 
-  return { channels, loading, error };
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  // A retry keeps showing the last list it had for this user while it resubscribes.
+  const channels = uid && snap?.key.startsWith(`${uid}:`) ? snap.channels : NO_CHANNELS;
+  const error = !db ? 'Firebase is not configured' : failure && failure.key === key ? failure.message : '';
+  const loading = Boolean(db) && !error && (uid ? snap?.key !== key && channels.length === 0 : authLoading);
+
+  return { channels, loading, error, retry };
 }

@@ -14,7 +14,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type SnapshotDoc = { id: string; data: () => Record<string, unknown> };
-type Listener = { limit: number; next: (snapshot: { docs: SnapshotDoc[] }) => void };
+type RawSnapshot = { docs: SnapshotDoc[]; metadata: { fromCache: boolean }; docChanges: () => SnapshotDoc[] };
+type Listener = {
+  limit: number;
+  next: (snapshot: { docs: SnapshotDoc[] }) => void;
+  raw: (snapshot: RawSnapshot) => void;
+};
 
 const listeners: Listener[] = [];
 
@@ -31,9 +36,15 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: vi.fn(
     (
       q: { __limit: number },
-      next: Listener['next']
+      _options: { includeMetadataChanges?: boolean },
+      next: (snapshot: RawSnapshot) => void
     ) => {
-      listeners.push({ limit: q.__limit, next });
+      // Tests hand over plain { docs }; every doc counts as a change.
+      listeners.push({
+        limit: q.__limit,
+        next: ({ docs }) => next({ docs, metadata: { fromCache: false }, docChanges: () => docs }),
+        raw: next,
+      });
       return () => {};
     }
   ),
@@ -45,11 +56,13 @@ import { useMessages } from './useMessages';
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 function Probe({ channelId }: { channelId: string | null }) {
-  const { messages, loading } = useMessages(channelId);
+  const { messages, loading, fromCache, snapshotVersion } = useMessages(channelId);
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
       <span data-testid="count">{String(messages.length)}</span>
+      <span data-testid="fromCache">{String(fromCache)}</span>
+      <span data-testid="version">{String(snapshotVersion)}</span>
     </div>
   );
 }
@@ -137,5 +150,26 @@ describe('useMessages loading behavior', () => {
 
     act(() => latest.next({ docs: makeDocs(10, 50_000) }));
     expect(readProbe()).toEqual({ loading: 'false', count: '10' });
+  });
+});
+
+describe('useMessages connection metadata', () => {
+  it('reports fromCache from metadata-only snapshots without re-committing the window', () => {
+    act(() => root.render(<Probe channelId="c1" />));
+    const docs = makeDocs(3, 10_000);
+    act(() => listeners[0].next({ docs }));
+    const text = (id: string) => container.querySelector(`[data-testid="${id}"]`)?.textContent;
+    expect(text('version')).toBe('1');
+    expect(text('fromCache')).toBe('false');
+
+    // The app resumed and the stream is being rebuilt: same docs, no changes.
+    act(() => listeners[0].raw({ docs, metadata: { fromCache: true }, docChanges: () => [] }));
+    expect(text('fromCache')).toBe('true');
+    expect(text('version')).toBe('1');
+    expect(text('count')).toBe('3');
+
+    act(() => listeners[0].raw({ docs, metadata: { fromCache: false }, docChanges: () => [] }));
+    expect(text('fromCache')).toBe('false');
+    expect(text('version')).toBe('1');
   });
 });

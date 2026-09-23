@@ -128,6 +128,10 @@ export function useMessages(channelId: string | null) {
   // the OLD channel's messages, and consumers detect that stale render by
   // renderedChannel !== channelId.
   const [renderedChannel, setRenderedChannel] = useState<string | null>(null);
+  // Snapshot metadata: true while Firestore is serving this window from its
+  // local view without server confirmation (offline, or reconnecting after the
+  // app resumed). Drives the thread's calm "Reconnecting…" notice.
+  const [fromCache, setFromCache] = useState(false);
 
   // Ref twin of renderedChannel for the subscribe effect's loading gate (a
   // state read there would force it into the deps and churn the listener).
@@ -184,9 +188,18 @@ export function useMessages(channelId: string | null) {
       limit(windowSize)
     );
 
+    // Metadata changes are included so the listener reports when it loses and
+    // regains the server; those snapshots only move fromCache (see below).
+    let committedHere = false;
     return onSnapshot(
       q,
+      { includeMetadataChanges: true },
       (snapshot) => {
+        setFromCache(snapshot.metadata.fromCache);
+        // Metadata-only snapshot (connection dropped or came back, nothing in
+        // the window changed): committing it would bump snapshotVersion and
+        // churn the scroll-anchor effects for no visible change.
+        if (committedHere && snapshot.docChanges().length === 0) return;
         const uid = auth?.currentUser?.uid;
         const rawDocs = snapshot.docs;
         const docs = rawDocs.filter((doc) => !doc.data().deletedAt);
@@ -237,6 +250,7 @@ export function useMessages(channelId: string | null) {
           return;
         }
 
+        committedHere = true;
         oldestDeliveredRef.current = rawOldest ?? prevOldest;
         renderedChannelRef.current = channelId;
         setRenderedChannel(channelId);
@@ -270,5 +284,6 @@ export function useMessages(channelId: string | null) {
     snapshotVersion,
     lastSnapshotWindow,
     renderedChannel,
+    fromCache,
   };
 }

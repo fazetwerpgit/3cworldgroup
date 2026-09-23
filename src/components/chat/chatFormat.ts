@@ -13,8 +13,18 @@ export function roleLabel(role: string): string {
 }
 
 /** The All Company line, from /api/portal/sales/company-stats. */
+// GET /api/portal/sales/company-stats (see lib/sales/companyTape). `at` and
+// topRep are optional so an older deployment's response still renders.
 export interface CompanyStats {
   mtdCount: number;
   mtdMonthlyValue: number;
-  lastSale: { repName: string } | null;
+  lastSale: { repName: string; at?: string } | null;
+  topRep?: { repName: string; count: number } | null;
+}
+
+/** Status caption under a pending echo: upload progress for a photo, else "Sending…". */
+export function pendingStatusLabel(message: { uploadProgress?: number }): string {
+  const progress = message.uploadProgress;
+  if (typeof progress === 'number' && progress < 1) return `Uploading photo · ${Math.round(progress * 100)}%`;
+  return 'Sending…';
 }

@@ -5,6 +5,7 @@ import { ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { buildChatPushBody, resolveChatPushRecipients } from '@/lib/push/chatPush';
+import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   getChatStorageBucketName,
@@ -117,6 +118,12 @@ export async function GET(request: NextRequest) {
 }
 
 // POST — send a message as the VERIFIED caller. Author identity is stamped server-side.
+// Admin SDK create() on an existing doc rejects with gRPC ALREADY_EXISTS (6).
+function isAlreadyExists(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 6 || code === 'already-exists' || code === 'ALREADY_EXISTS';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const result = await getVerifiedChatUser(request);
@@ -188,21 +195,38 @@ export async function POST(request: NextRequest) {
     await ensureChatChannelMember(channelId, user.uid);
 
     const channelRef = adminDb!.collection('chatChannels').doc(channelId);
-    const messageRef = await channelRef
-      .collection('messages')
-      .add({
-        channelId,
-        text: text.slice(0, 1000),
-        authorId: user.uid,
-        authorName: user.displayName,
-        authorRole: user.effectiveRole ?? null,
-        createdAt: FieldValue.serverTimestamp(),
-        deletedAt: null,
-        // hasAttachment lets Firestore query media messages; both set iff valid attachment.
-        ...(attachment ? { attachment, hasAttachment: true } : {}),
-        // Reply quote only when a valid source resolved.
-        ...(replyTo ? { replyTo } : {}),
-      });
+    const messageDoc = {
+      channelId,
+      text: text.slice(0, 1000),
+      authorId: user.uid,
+      authorName: user.displayName,
+      authorRole: user.effectiveRole ?? null,
+      createdAt: FieldValue.serverTimestamp(),
+      deletedAt: null,
+      // hasAttachment lets Firestore query media messages; both set iff valid attachment.
+      ...(attachment ? { attachment, hasAttachment: true } : {}),
+      // Reply quote only when a valid source resolved.
+      ...(replyTo ? { replyTo } : {}),
+    };
+
+    // Idempotent send: a client key becomes the doc id (scoped to the author), and
+    // create() refuses to overwrite. A retry after a lost response, or a queued
+    // message re-sent after the app was killed, lands on the same doc and is
+    // answered as a success without a second message, bump or push.
+    const clientMessageId = isValidClientMessageId(body.clientMessageId) ? body.clientMessageId : '';
+    let messageId: string;
+    if (clientMessageId) {
+      const messageRef = channelRef.collection('messages').doc(chatMessageDocId(user.uid, clientMessageId));
+      try {
+        await messageRef.create(messageDoc);
+      } catch (createError) {
+        if (!isAlreadyExists(createError)) throw createError;
+        return NextResponse.json({ success: true, messageId: messageRef.id, duplicate: true });
+      }
+      messageId = messageRef.id;
+    } else {
+      messageId = (await channelRef.collection('messages').add(messageDoc)).id;
+    }
 
     // Stamp the channel's last-activity time so clients can badge unread channels
     // (users/{uid}/chatReads receipts are compared against this). Merged so the
@@ -223,13 +247,18 @@ export async function POST(request: NextRequest) {
       after(async () => {
         await Promise.all(
           recipients.map((uid) =>
-            sendPushToUser(uid, { title: found.channel.name, body: pushBody, url: '/portal/chat' })
+            sendPushToUser(uid, {
+              title: found.channel.name,
+              body: pushBody,
+              // Tapping the notification opens this channel, not just the chat tab.
+              url: `/portal/chat?channel=${encodeURIComponent(channelId)}`,
+            })
           )
         );
       });
     }
 
-    return NextResponse.json({ success: true, messageId: messageRef.id });
+    return NextResponse.json({ success: true, messageId });
   } catch (error) {
     console.error('Error sending chat message:', error);
     return NextResponse.json({ error: 'Failed to send chat message' }, { status: 500 });

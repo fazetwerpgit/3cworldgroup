@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2 } from 'lucide-react';
+import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,10 +105,15 @@ export function MessageActions({
   );
 }
 
+// A tap that lands this soon after the sheet opens came from the long-press
+// that opened it (its release), not from a choice, so it's ignored.
+export const SHEET_TAP_GUARD_MS = 350;
+
 /**
  * Phone message actions: the D bottom sheet, opened by a long-press on a bubble
  * (the parent owns the long-press timer and the open message). Portaled to
- * <body> through BodyLayer; closes on backdrop tap or Esc.
+ * <body> through BodyLayer; closes on backdrop tap, Cancel or Esc. Delete asks
+ * once more before it runs.
  */
 export function MessageActionSheet({
   open,
@@ -121,16 +126,40 @@ export function MessageActionSheet({
   authorName?: string;
   onClose: () => void;
 }) {
+  if (!open || !config) return null;
+  // Mounted per opening, so the confirm step and the tap guard start fresh.
+  return <ActionSheetBody config={config} authorName={authorName} onClose={onClose} />;
+}
+
+function ActionSheetBody({
+  config,
+  authorName,
+  onClose,
+}: {
+  config: MessageActionsConfig;
+  authorName?: string;
+  onClose: () => void;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [armed, setArmed] = useState(false);
+
   useEffect(() => {
-    if (!open) return;
+    const timer = window.setTimeout(() => setArmed(true), SHEET_TAP_GUARD_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [onClose]);
 
-  if (!open || !config) return null;
+  const choose = (run: () => void) => () => {
+    if (armed) run();
+  };
+
   const items = buildActions(config);
 
   return (
@@ -138,41 +167,74 @@ export function MessageActionSheet({
       <div
         className={s.backdrop}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget && armed) onClose();
         }}
       >
         <section className={s.sheet} role="dialog" aria-modal="true" aria-label="Message actions">
           <div className={s.sheetHandle} aria-hidden="true" />
-          {authorName && <p className={c.sheetWho}>{authorName}</p>}
-          <div className={c.sheetList}>
-            {config.onAddReaction && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  config.onAddReaction?.();
-                }}
-                className={c.sheetItem}
-              >
-                <SmilePlus size={20} aria-hidden="true" />
-                React
-              </button>
-            )}
-            {items.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => {
-                  onClose();
-                  item.onSelect();
-                }}
-                className={`${c.sheetItem} ${item.destructive ? c.sheetDanger : ''}`}
-              >
-                <item.icon size={20} aria-hidden="true" />
-                {item.label}
-              </button>
-            ))}
-          </div>
+          {confirmingDelete ? (
+            <>
+              <p className={c.sheetConfirm}>Delete this message? This can&apos;t be undone.</p>
+              <div className={c.sheetList}>
+                <button
+                  type="button"
+                  onClick={choose(() => {
+                    onClose();
+                    config.onDelete();
+                  })}
+                  className={`${c.sheetItem} ${c.sheetDanger}`}
+                >
+                  <Trash2 size={20} aria-hidden="true" />
+                  Delete message
+                </button>
+                <button type="button" onClick={choose(() => setConfirmingDelete(false))} className={c.sheetItem}>
+                  <X size={20} aria-hidden="true" />
+                  Keep it
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {authorName && <p className={c.sheetWho}>{authorName}</p>}
+              <div className={c.sheetList}>
+                {config.onAddReaction && (
+                  <button
+                    type="button"
+                    onClick={choose(() => {
+                      onClose();
+                      config.onAddReaction?.();
+                    })}
+                    className={c.sheetItem}
+                  >
+                    <SmilePlus size={20} aria-hidden="true" />
+                    React
+                  </button>
+                )}
+                {items.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={choose(() => {
+                      if (item.key === 'delete') {
+                        setConfirmingDelete(true);
+                        return;
+                      }
+                      onClose();
+                      item.onSelect();
+                    })}
+                    className={`${c.sheetItem} ${item.destructive ? c.sheetDanger : ''}`}
+                  >
+                    <item.icon size={20} aria-hidden="true" />
+                    {item.label}
+                  </button>
+                ))}
+                <button type="button" onClick={choose(onClose)} className={c.sheetItem}>
+                  <X size={20} aria-hidden="true" />
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </BodyLayer>
