@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AlertCircle, Check, ChevronDown, RotateCw, Search, X } from 'lucide-react';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { AdminPageHead, StatusDot as AdminStatusDot } from '@/components/portal/admin-d/AdminUi';
 import rep from '@/components/portal/rep/rep.module.css';
 import s from './admin-ops.module.css';
 
@@ -12,41 +13,35 @@ export function cx(...names: Array<string | false | null | undefined>): string {
   return names.filter(Boolean).join(' ');
 }
 
+/** The admin page head (admin-d's): title, live count beside it, optional lede, actions. */
 export function AdminHead({
-  kicker,
   title,
   lede,
   count,
   countLabel,
   actions,
 }: {
-  kicker: string;
   title: string;
   lede?: string;
-  /** The page's scoreboard number (open items, channels…). Omitted while loading. */
+  /** Open items, channels… Omitted while loading. */
   count?: number | null;
   countLabel?: string;
   actions?: ReactNode;
 }) {
   return (
-    <header className={s.head}>
-      <div className={s.headText}>
-        <p className={rep.kicker}>{kicker}</p>
-        <h1 className={s.title}>{title}</h1>
-        {lede ? <p className={s.lede}>{lede}</p> : null}
-      </div>
-      {count != null || actions ? (
-        <div className={s.headSide}>
-          {count != null ? (
-            <p className={s.stat} style={{ margin: 0 }}>
-              <span className={cx(s.statNum, count === 0 && s.statNumZero)}>{count.toLocaleString('en-US')}</span>
-              {countLabel ? <span className={s.statLabel}>{countLabel}</span> : null}
-            </p>
-          ) : null}
-          {actions}
-        </div>
-      ) : null}
-    </header>
+    <AdminPageHead
+      title={title}
+      meta={
+        count != null ? (
+          <>
+            <b>{count.toLocaleString('en-US')}</b>
+            {countLabel ? <span> {countLabel}</span> : null}
+          </>
+        ) : null
+      }
+      sub={lede}
+      actions={actions}
+    />
   );
 }
 
@@ -216,10 +211,11 @@ export function ConfirmStrip({
   );
 }
 
+const STATUS_TONE = { new: 'amber', done: 'lime', muted: 'muted' } as const;
+
+/** Amber waits on you, lime is done. Same dot as the rest of admin. */
 export function StatusDot({ tone, children }: { tone: 'new' | 'done' | 'muted'; children: ReactNode }) {
-  return (
-    <span className={cx(s.status, tone === 'new' ? s.stNew : tone === 'done' ? s.stDone : s.stMuted)}>{children}</span>
-  );
+  return <AdminStatusDot tone={STATUS_TONE[tone]}>{children}</AdminStatusDot>;
 }
 
 /** Bottom sheet on phones, centred dialog on desktop; portaled to <body> (iOS fixed-in-scroller bug). */

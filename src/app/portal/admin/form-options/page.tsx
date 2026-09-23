@@ -116,7 +116,6 @@ export default function AdminFormOptionsPage() {
     <ProtectedRoute roles={['admin']}>
       <div className={s.page}>
         <AdminHead
-          kicker="Admin"
           title="Form Options"
           lede="The choices reps see in form dropdowns. Each list saves on its own."
           count={loading || loadFailed ? null : EDITABLE_OPTION_KEYS.length}

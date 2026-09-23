@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { FileText, GraduationCap, Link2, ListChecks, Plus, Search, Video } from 'lucide-react';
+import { FileText, Link2, ListChecks, Plus, Search, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { randomHex } from '@/lib/randomHex';
@@ -242,7 +242,6 @@ function AdminUniversity() {
             </>
           )
         }
-        sub="Keep training documents and videos ready for reps."
         actions={
           showAdd ? (
             <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setShowAdd(false)} disabled={saving}>
@@ -417,7 +416,7 @@ function AdminUniversity() {
             <AdminEmpty title="No content matches">Try a broader search or clear the category filter.</AdminEmpty>
           ) : (
             <AdminEmpty
-              icon={<GraduationCap size={28} aria-hidden="true" />}
+             
               title="No content yet"
               action={
                 showAdd ? undefined : (

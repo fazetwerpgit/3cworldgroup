@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Download,
   ExternalLink,
-  FileText,
   Link2,
   Loader2,
   RotateCw,
@@ -19,7 +18,6 @@ import { toCsv, downloadCsv } from '@/lib/export/csv';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { INVITABLE_FIELD_ROLES } from '@/types/auth';
 import {
-  AdminAvatar,
   AdminEmpty,
   AdminFailed,
   AdminGate,
@@ -280,15 +278,6 @@ export default function RecruitingCommandCenterPage() {
   const waitingApplications = applications.length;
   const showCounts = !loading && !loadFailed;
 
-  const stat = (value: number, hot = false) =>
-    loading ? (
-      <span className={s.skel} style={{ width: 56, height: 38 }} aria-hidden="true" />
-    ) : (
-      <strong className={`${u.statValue} ${!showCounts ? u.toneMuted : hot && value > 0 ? u.statHot : ''}`}>
-        {showCounts ? value : '—'}
-      </strong>
-    );
-
   return (
     <AdminGate
       roles={[
@@ -308,7 +297,6 @@ export default function RecruitingCommandCenterPage() {
         <AdminPageHead
           title="Recruiting"
           meta={showCounts ? <><b>{waitingApplications}</b> applications</> : null}
-          sub="Send invites, review applications, and activate submitted profiles."
           actions={
             <>
               <button
@@ -335,29 +323,6 @@ export default function RecruitingCommandCenterPage() {
           }
         />
 
-        <div className={`${u.stats} ${r.stats}`} aria-busy={loading}>
-          <div className={u.stat}>
-            <span className={s.kicker}>Invited</span>
-            {stat(inProgressCount)}
-            <span className={u.statNote}>{showCounts ? 'in progress' : '\u00a0'}</span>
-          </div>
-          <div className={u.stat}>
-            <span className={s.kicker}>Submitted</span>
-            {stat(submittedCount, true)}
-            <span className={u.statNote}>{showCounts ? 'ready to review' : '\u00a0'}</span>
-          </div>
-          <div className={u.stat}>
-            <span className={s.kicker}>Activated</span>
-            {stat(activeCount)}
-            <span className={u.statNote}>{showCounts ? 'now reps' : '\u00a0'}</span>
-          </div>
-          <div className={u.stat}>
-            <span className={s.kicker}>Applications</span>
-            {stat(waitingApplications)}
-            <span className={u.statNote}>{showCounts ? 'from the website' : '\u00a0'}</span>
-          </div>
-        </div>
-
         {error ? (
           <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
         ) : null}
@@ -368,8 +333,16 @@ export default function RecruitingCommandCenterPage() {
         <section className={s.panel} aria-labelledby="recruiting-invites-heading">
           <div className={s.panelHead}>
             <h2 id="recruiting-invites-heading" className={s.kicker}>Invites</h2>
-            {showCounts && submittedCount > 0 ? (
-              <span className={u.panelMeta}>{submittedCount} ready to review</span>
+            {showCounts && invites.length > 0 ? (
+              <span className={u.panelMeta}>
+                {[
+                  submittedCount ? `${submittedCount} ready to review` : null,
+                  inProgressCount ? `${inProgressCount} in progress` : null,
+                  activeCount ? `${activeCount} activated` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
             ) : null}
           </div>
           {loading ? (
@@ -377,7 +350,7 @@ export default function RecruitingCommandCenterPage() {
           ) : loadFailed ? (
             <AdminFailed what="recruits" onRetry={fetchRecruiting} />
           ) : invites.length === 0 ? (
-            <AdminEmpty icon={<Link2 size={24} aria-hidden="true" />} title="No invites yet">
+            <AdminEmpty title="No invites yet">
               Create one below and send the link to your recruit.
             </AdminEmpty>
           ) : (
@@ -397,7 +370,6 @@ export default function RecruitingCommandCenterPage() {
                   <li key={invite.id}>
                     <div className={`${u.row} ${r.invite} ${submitted ? u.rowHot : ''}`}>
                       <span className={`${u.cellMain} ${u.person}`}>
-                        <AdminAvatar name={invite.candidateName} />
                         <span className={u.personText}>
                           <span className={u.personName}>
                             <span>{invite.candidateName}</span>
@@ -650,13 +622,12 @@ export default function RecruitingCommandCenterPage() {
             ) : loadFailed ? (
               <AdminFailed what="applications" onRetry={fetchRecruiting} />
             ) : applications.length === 0 ? (
-              <AdminEmpty icon={<FileText size={24} aria-hidden="true" />} title="No website applications yet" />
+              <AdminEmpty title="No website applications yet" />
             ) : (
               <ul className={`${u.rows} ${r.appCols}`}>
                 {applications.map((application) => (
                   <li key={application.id} className={`${u.row} ${r.app}`}>
                     <span className={`${u.cellMain} ${u.person}`}>
-                      <AdminAvatar name={application.name} />
                       <span className={u.personText}>
                         <span className={u.personName}>
                           <span>{application.name}</span>

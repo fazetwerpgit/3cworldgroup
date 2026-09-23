@@ -12,75 +12,6 @@
   min-width: 0;
 }
 
-/* ---------- page head ---------- */
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--s3) var(--s4);
-  padding-bottom: var(--s1);
-}
-
-.headText {
-  flex: 1 1 240px;
-  min-width: 0;
-}
-
-.title {
-  margin: 6px 0 0;
-  font-family: var(--f-display);
-  font-size: 40px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 0.95;
-}
-
-.lede {
-  margin: var(--s2) 0 0;
-  max-width: 60ch;
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  line-height: 1.45;
-}
-
-.headSide {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--s4);
-}
-
-/* The count is the page's scoreboard number. */
-.stat {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.statNum {
-  color: var(--c-lime);
-  font-family: var(--f-display);
-  font-size: var(--t-d1);
-  line-height: 0.82;
-}
-
-.statNumZero {
-  color: var(--c-text-2);
-}
-
-.statLabel {
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  font-weight: 600;
-}
-
-@media (min-width: 1024px) {
-  .title {
-    font-size: var(--t-d1);
-  }
-}
-
 /* ---------- buttons ---------- */
 .btn,
 .btnLime,
@@ -687,37 +618,6 @@
   .qDone .qWhen .qName {
     color: var(--c-text-2);
   }
-}
-
-/* One status language: amber waits on you, lime is done. */
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--t-sm);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.status::before {
-  content: '';
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.stNew {
-  color: var(--c-amber);
-}
-
-.stDone {
-  color: var(--c-lime);
-}
-
-.stMuted {
-  color: var(--c-text-3);
 }
 
 /* ---------- detail sheet ---------- */

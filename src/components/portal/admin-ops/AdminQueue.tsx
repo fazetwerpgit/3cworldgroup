@@ -217,7 +217,6 @@ export function AdminQueue({
   return (
     <div className={s.page}>
       <AdminHead
-        kicker="Review queue"
         title={title}
         lede={lede}
         count={loading || failed ? null : openCount}

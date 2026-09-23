@@ -1,11 +1,5 @@
 /* Recruiting (direction D). Shared pieces are admin-ui.module.css. */
 
-@media (min-width: 1024px) {
-  .stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 /* Phone-only / desktop-only cells. Two classes so they beat admin-ui's .cell. */
 :is(.invite, .app) > .deskOnly {
   display: none;

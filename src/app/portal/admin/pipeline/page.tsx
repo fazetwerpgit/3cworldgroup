@@ -1,12 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2, Search, Users } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { latestRequest } from '@/lib/fetch/latestRequest';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
-  AdminAvatar,
   AdminEmpty,
   AdminFailed,
   AdminGate,
@@ -17,6 +16,7 @@ import {
   type Tone,
 } from '@/components/portal/admin-d/AdminUi';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
+import { Seg } from '@/components/portal/admin-ops/AdminKit';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import p from './pipeline.module.css';
@@ -285,7 +285,6 @@ export default function PipelinePage() {
         <AdminPageHead
           title="Recruiting Pipeline"
           meta={showCounts ? <><b>{heroCount}</b> need attention</> : null}
-          sub="Review each rep's progress and open their details for next steps."
         />
 
         {error ? (
@@ -293,32 +292,20 @@ export default function PipelinePage() {
         ) : null}
         {success ? <AdminNotice tone="ok">{success}</AdminNotice> : null}
 
-        <div className={p.stages} role="group" aria-label="Pipeline stage filter">
-          {PIPELINE_STAGE_ORDER.map((stage) => {
-            const cfg = PipelineStageConfig[stage];
-            const selected = stageFilter === stage;
-            const count = counts[stage] ?? 0;
-            return (
-              <button
-                key={stage}
-                type="button"
-                className={p.stage}
-                aria-pressed={selected}
-                onClick={() => setStageFilter(selected ? '' : stage)}
-                title={cfg.description}
-              >
-                <StatusDot tone={STAGE_TONE[stage]}>{cfg.name}</StatusDot>
-                {loading ? (
-                  <span className={s.skel} style={{ width: 40, height: 34 }} aria-hidden="true" />
-                ) : (
-                  <b className={`${p.stageCount} ${!showCounts || count === 0 ? p.stageZero : ''}`}>
-                    {showCounts ? count : '—'}
-                  </b>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <Seg<PipelineStage | ''>
+          label="Pipeline stage filter"
+          scroll
+          value={stageFilter}
+          onChange={setStageFilter}
+          options={[
+            { value: '', label: 'All', count: showCounts ? reps.length : undefined },
+            ...PIPELINE_STAGE_ORDER.map((stage) => ({
+              value: stage,
+              label: PipelineStageConfig[stage].name,
+              count: showCounts ? (counts[stage] ?? 0) : undefined,
+            })),
+          ]}
+        />
 
         <div className={u.toolbar}>
           <label className={u.search}>
@@ -365,14 +352,13 @@ export default function PipelinePage() {
             <AdminFailed what="the pipeline" onRetry={retry} />
           ) : visibleReps.length === 0 ? (
             <AdminEmpty
-              icon={<Users size={24} aria-hidden="true" />}
               title={stageFilter ? `No reps in ${PipelineStageConfig[stageFilter].name}` : filtered ? 'No reps match' : 'No field reps yet'}
             >
               {stageFilter
-                ? 'Tap the stage again to clear the filter.'
+                ? 'Pick All to clear the filter.'
                 : filtered
                   ? 'Try another name or manager.'
-                  : 'Create field users in User Management to start the pipeline.'}
+                  : 'Field reps show up here once their signup is approved.'}
             </AdminEmpty>
           ) : (
             <ul className={`${u.rows} ${p.cols}`}>
@@ -396,7 +382,6 @@ export default function PipelinePage() {
                       aria-label={`${rep.displayName}, ${PipelineStageConfig[rep.stage].name}. Open details`}
                     >
                       <span className={`${u.cellMain} ${u.person}`}>
-                        <AdminAvatar name={rep.displayName} />
                         <span className={u.personText}>
                           <span className={u.personName}>
                             <span>{rep.displayName}</span>

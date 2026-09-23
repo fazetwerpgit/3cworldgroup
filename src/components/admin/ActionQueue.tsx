@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { AdminAvatar, AdminFailed, AdminNotice, AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
+import { AdminFailed, AdminNotice, AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import q from './action-queue.module.css';
@@ -226,7 +226,6 @@ export default function ActionQueue() {
             return (
               <li key={task.id} className={`${u.row} ${q.task} ${task.kind === 'activation_ready' ? u.rowHot : ''}`}>
                 <span className={u.person}>
-                  <AdminAvatar name={task.subjectName || '?'} />
                   <span className={u.personText}>
                     <span className={u.personName}>
                       <span>{task.subjectName}</span>
