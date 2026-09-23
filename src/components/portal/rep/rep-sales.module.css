@@ -154,6 +154,11 @@
   font-weight: 600;
 }
 
+/* "Couldn't load pay rates · Retry" in the Est. payout cell. */
+.kpiFailed {
+  padding: var(--s1) 0 0;
+}
+
 .kpiDash {
   color: var(--c-text-3);
 }
@@ -711,6 +716,11 @@
 
 .totalsPay .money {
   color: var(--c-lime);
+}
+
+/* "Couldn't load pay rates · Retry" above the pay list. */
+.planFailed {
+  border-bottom: 1px solid var(--c-line);
 }
 
 .note {

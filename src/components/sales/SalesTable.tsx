@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
 import type { FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
@@ -33,8 +33,17 @@ interface SalesTableProps {
   onPayViewChange?: (payView: boolean) => void;
   /** The month the page's picker is on. Omitted, the whole book is listed. */
   month?: MonthKey;
-  /** The viewer's own comp-plan slice. A planless rep sees no dollar figures. */
-  payPlan?: { rates: CompPlanCompanyRates | null; payDelayDays: number; hasPlan: boolean };
+  /**
+   * The viewer's own comp-plan slice. A planless rep sees no dollar figures;
+   * `error` means the rates failed to load (not "no plan"), with `onRetry`.
+   */
+  payPlan?: {
+    rates: CompPlanCompanyRates | null;
+    payDelayDays: number;
+    hasPlan: boolean;
+    error?: boolean;
+    onRetry?: () => void;
+  };
   /** Provider install status, fetched once by the page. */
   fiber?: { data: FiberStatusResponse | null; loading: boolean; error: string | null };
   /** Refetches the book after the detail sheet edits a sale's install date. */
@@ -384,9 +393,19 @@ export function SalesTable({
           </div>
         ) : showPay ? (
           <div>
-            {!hasPlan && (
-              <p className={`${x.note} ${x.noteWarn}`}>No pay plan assigned yet — ask an admin to set your role.</p>
-            )}
+            {payPlan?.error ? (
+              <div className={`${s.failed} ${x.planFailed}`} role="alert">
+                <span>Couldn&apos;t load pay rates</span>
+                {payPlan.onRetry ? (
+                  <button type="button" className={s.retry} onClick={payPlan.onRetry}>
+                    <RotateCw size={14} aria-hidden="true" />
+                    Retry
+                  </button>
+                ) : null}
+              </div>
+            ) : !hasPlan ? (
+              <p className={`${x.note} ${x.noteWarn}`}>No pay plan assigned yet. Ask an admin to set your role.</p>
+            ) : null}
             {/* Stated once, above the money, rather than as a footnote under it. */}
             <p className={x.note}>
               An estimate, not a statement of pay. Chargebacks, claims and cancellations are

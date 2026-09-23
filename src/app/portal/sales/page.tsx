@@ -148,10 +148,18 @@ function SalesContent() {
   // useSales starts idle (loading false, no sales). Until the first fetch
   // settles the page shows skeletons, never a zero it has not measured.
   const [fetched, setFetched] = useState(false);
-  const { rates, payDelayDays, hasPlan, compRole, loading: planLoading } = useCompPlan();
+  const {
+    rates,
+    payDelayDays,
+    hasPlan,
+    compRole,
+    loading: planLoading,
+    error: planError,
+    retry: retryPlan,
+  } = useCompPlan();
   const payPlan = useMemo(
-    () => ({ rates, payDelayDays, hasPlan, compRole }),
-    [compRole, hasPlan, payDelayDays, rates]
+    () => ({ rates, payDelayDays, hasPlan, compRole, error: planError, onRetry: retryPlan }),
+    [compRole, hasPlan, payDelayDays, planError, rates, retryPlan]
   );
 
   const refreshSales = useCallback(() => {
@@ -330,6 +338,14 @@ function SalesContent() {
               </p>
               {planLoading ? (
                 <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
+              ) : planError ? (
+                <div className={`${s.failed} ${x.kpiFailed}`} role="alert">
+                  <span>Couldn&apos;t load pay rates</span>
+                  <button type="button" className={s.retry} onClick={retryPlan}>
+                    <RotateCw size={14} aria-hidden="true" />
+                    Retry
+                  </button>
+                </div>
               ) : !hasPlan ? (
                 <>
                   <p className={`${x.kpiNum} ${x.kpiDash}`}>—</p>

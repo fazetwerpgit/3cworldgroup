@@ -799,6 +799,28 @@ span.thumbView {
   line-height: 1.4;
 }
 
+/* Rates failed to load: the whole est. block is the Retry target. */
+.estRetry {
+  max-width: 160px;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.estRetryLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-lime);
+  font-size: var(--t-min);
+  font-weight: 600;
+}
+
 .estWhen {
   color: var(--c-text-3);
   font-size: var(--t-min);

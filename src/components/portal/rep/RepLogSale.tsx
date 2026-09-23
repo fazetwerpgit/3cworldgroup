@@ -2,7 +2,18 @@
 
 import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, Check, ChevronDown, ChevronRight, ImageUp, Keyboard, ScanLine, WifiOff, AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ImageUp,
+  Keyboard,
+  RotateCw,
+  ScanLine,
+  WifiOff,
+} from 'lucide-react';
 import { FIBER_COMPANIES, SALE_TYPES, getPlanById, getPlansByCompany } from '@/types';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useSaleFormState, type SaleFieldKey, type SaleFormFields } from '@/hooks/useSaleFormState';
@@ -135,7 +146,7 @@ function describe(id: string, error: string | undefined, hasHint: boolean) {
 export function RepLogSale() {
   const router = useRouter();
   const { formRef, errorRef, ...form } = useSaleFormState();
-  const { rates, hasPlan } = useCompPlan();
+  const { rates, hasPlan, error: planError, retry: retryPlan } = useCompPlan();
   const uploads = useProofUploads({
     paths: form.proofPaths,
     onAdd: form.addProofPath,
@@ -206,17 +217,29 @@ export function RepLogSale() {
 
   const submitBar = (fixed: boolean) => (
     <div className={fixed ? l.submitBar : l.submitInline} data-keyboard={keyboardOpen ? 'open' : undefined}>
-      <p className={l.estPay}>
-        <span className={s.kicker}>Est. pay</span>
-        {est !== null ? (
-          <span className={l.estNum}>{money(est)}</span>
-        ) : (
-          <span className={l.estNone}>{hasPlan ? 'Pick a plan' : '—'}</span>
-        )}
-        <span className={l.estWhen}>
-          {payoutLabel ? `est. payout ${payoutLabel}` : est !== null ? 'Once it installs' : ' '}
-        </span>
-      </p>
+      {planError ? (
+        // The rates failed to load. That is not "no plan", so say so and retry.
+        <button type="button" className={`${l.estPay} ${l.estRetry}`} onClick={retryPlan}>
+          <span className={s.kicker}>Est. pay</span>
+          <span className={l.estNone}>Couldn&apos;t load pay rates</span>
+          <span className={l.estRetryLabel}>
+            <RotateCw size={12} strokeWidth={2.5} aria-hidden="true" />
+            Retry
+          </span>
+        </button>
+      ) : (
+        <p className={l.estPay}>
+          <span className={s.kicker}>Est. pay</span>
+          {est !== null ? (
+            <span className={l.estNum}>{money(est)}</span>
+          ) : (
+            <span className={l.estNone}>{hasPlan ? 'Pick a plan' : '—'}</span>
+          )}
+          <span className={l.estWhen}>
+            {payoutLabel ? `est. payout ${payoutLabel}` : est !== null ? 'Once it installs' : ' '}
+          </span>
+        </p>
+      )}
       <button
         type="submit"
         form={FORM_ID}
