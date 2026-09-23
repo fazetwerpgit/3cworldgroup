@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import OnboardingGate from '@/components/portal/OnboardingGate';
+import FirestoreResumeGuard from '@/components/portal/FirestoreResumeGuard';
 import PushTokenRefresher from '@/components/portal/PushTokenRefresher';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 import '@/styles/sweep-shell.css';
@@ -33,6 +34,8 @@ export default function PortalLayout({
           <ServiceWorkerRegistrar />
           {/* Heals iOS push-subscription rotation on every open — see component. */}
           <PushTokenRefresher />
+          {/* Reconnects live data (chat, unread dot) when the app resumes. */}
+          <FirestoreResumeGuard />
           {/* .portal-scope gates the portal reskin tokens/overrides in
               globals.css; display:contents keeps it out of the layout. */}
           <div className={`portal-scope contents ${archivo.variable}`}>
