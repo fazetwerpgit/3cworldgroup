@@ -296,6 +296,20 @@
 
 .chips {
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--s2);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+/* Chips in a grid are separate tiles, so a short last row leaves no filled gap. */
+.chips .chip {
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+}
+
+.chips .chip:has(input:checked) {
+  border-color: var(--c-lime);
 }
 
 .pair {

@@ -269,7 +269,8 @@ export function Choices({
                   {value === option ? <Check size={14} strokeWidth={3} /> : null}
                 </span>
               ) : null}
-              <span className={f.choiceText}>{option}</span>
+              {/* Let "Centurylink/Quantum" wrap at the slash, not mid-word. */}
+              <span className={f.choiceText}>{option.replace(/\//g, '/\u200b')}</span>
             </label>
           ))}
         </div>
@@ -510,8 +511,8 @@ type AttachState =
 /**
  * One file slot (photo, screenshot or PDF). `upload` does the work (snapshot,
  * shrink, POST) and resolves to the storage folder path. "View" opens the
- * local copy through the iOS-safe new-tab helper. `preview={false}` keeps a
- * thumbnail off screen for sensitive documents (license, W-9).
+ * local copy through the iOS-safe new-tab helper. `preview={false}` shows
+ * neither a thumbnail nor View, for sensitive documents (license, W-9).
  */
 export function Attachment({
   id,
@@ -559,7 +560,8 @@ export function Attachment({
     try {
       const path = await upload(file);
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      const localUrl = URL.createObjectURL(file);
+      // Sensitive slots never get a local copy, so there is nothing to view.
+      const localUrl = preview ? URL.createObjectURL(file) : null;
       urlRef.current = localUrl;
       setState({ kind: 'done', name: file.name, localUrl, isImage: file.type.startsWith('image/') });
       onUploaded(path);
