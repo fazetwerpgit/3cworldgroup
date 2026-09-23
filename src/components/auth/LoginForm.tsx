@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import s from '@/components/portal/rep/rep.module.css';
-import { AuthShell, PortalStatement } from './AuthShell';
+import { AuthShell } from './AuthShell';
 import a from './auth.module.css';
 
 type FormMode = 'login' | 'forgot';
@@ -113,10 +113,9 @@ export function LoginForm() {
   const spinner = <LoaderCircle size={18} className={a.spin} aria-hidden="true" />;
 
   return (
-    <AuthShell statement={<PortalStatement />}>
+    <AuthShell>
       {formMode === 'forgot' ? (
         <>
-          <p className={a.kicker}>Employee portal</p>
           <h1 className={a.title}>Reset password</h1>
           <p className={a.sub}>We&apos;ll email you a reset link.</p>
 
@@ -174,7 +173,6 @@ export function LoginForm() {
         </>
       ) : (
         <>
-          <p className={a.kicker}>Employee portal</p>
           <h1 className={a.title}>Sign in</h1>
           <p className={a.sub}>Use your Google account or company email.</p>
 

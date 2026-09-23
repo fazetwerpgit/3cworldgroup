@@ -76,9 +76,9 @@ const TEAM_CODE_ERROR = "That team code isn't right. Ask your manager for the cu
 const ACCOUNT_EXISTS_ERROR =
   'You already have a portal account. Sign in instead, or reset your password from the login page.';
 
-function SignupSteps({ className }: { className?: string }) {
+function SignupSteps() {
   return (
-    <ol className={`${a.steps} ${className ?? ''}`} aria-label="How sign-up works">
+    <ol className={a.steps} aria-label="How sign-up works">
       {SIGNUP_STEPS.map((step) => (
         <li key={step.n}>
           <b>{step.n}</b>
@@ -86,18 +86,6 @@ function SignupSteps({ className }: { className?: string }) {
         </li>
       ))}
     </ol>
-  );
-}
-
-function SignupStatement() {
-  return (
-    <>
-      <h2 className={a.display}>
-        Create your <em>account.</em>
-      </h2>
-      <p className={a.statementLede}>Takes about a minute. Here is how it works.</p>
-      <SignupSteps className={s.deskOnly} />
-    </>
   );
 }
 
@@ -213,8 +201,7 @@ export function SignupForm() {
   };
 
   return (
-    <AuthShell statement={<SignupStatement />}>
-      <p className={a.kicker}>Employee portal</p>
+    <AuthShell>
       <h1 className={a.title}>Join your team</h1>
       <p className={a.sub}>Your manager gave you a team code. Use an email you check regularly.</p>
 
@@ -355,7 +342,7 @@ export function SignupForm() {
         </Link>
       </p>
 
-      <SignupSteps className={s.phoneOnly} />
+      <SignupSteps />
 
       <p className={a.note} role="note">
         Applied for a job? You don&apos;t need an account yet. We&apos;ll reach out after we review your application.
