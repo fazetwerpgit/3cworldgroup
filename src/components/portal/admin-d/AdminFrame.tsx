@@ -167,7 +167,7 @@ function AdminSwitcher({ nav }: { nav: ReturnType<typeof useAdminNav> }) {
  * Admin section chrome inside RepShell. Owners hop between a dozen admin pages,
  * so the top bar's More menu is not enough: desktop gets a sticky rail, phones
  * a one-tap switcher. Someone who can open only one admin page (a manager on
- * Recruit Onboarding) gets neither.
+ * Recruiting) gets neither.
  */
 export function AdminFrame({ children }: { children: ReactNode }) {
   const nav = useAdminNav();
