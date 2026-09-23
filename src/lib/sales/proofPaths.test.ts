@@ -113,3 +113,22 @@ describe('newProofSlot', () => {
     expect(slot).toMatch(SLOT_RULE);
   });
 });
+
+describe('validateProofPaths alsoAllow', () => {
+  const rep = 'form-attachments/r1/sale-proof/a_111111/';
+  const admin = 'form-attachments/a1/sale-proof/b_222222/';
+
+  it("accepts an extra uploader's prefix only when asked", () => {
+    expect(validateProofPaths({ proofScreenshotPaths: [rep, admin] }, 'r1').ok).toBe(false);
+    expect(validateProofPaths({ proofScreenshotPaths: [rep, admin] }, 'r1', { alsoAllow: { uids: ['a1'] } })).toEqual({
+      ok: true,
+      paths: [rep, admin],
+    });
+  });
+
+  it('accepts a path the sale already stores, but not a traversal under an allowed prefix', () => {
+    expect(validateProofPaths({ proofScreenshotPaths: [admin] }, 'r1', { alsoAllow: { paths: [admin] } }).ok).toBe(true);
+    const climb = 'form-attachments/a1/sale-proof/../../r2/x/';
+    expect(validateProofPaths({ proofScreenshotPaths: [climb] }, 'r1', { alsoAllow: { uids: ['a1'] } }).ok).toBe(false);
+  });
+});

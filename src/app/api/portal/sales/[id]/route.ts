@@ -131,9 +131,18 @@ export async function PUT(
       (body.proofScreenshotPaths !== undefined || body.proofScreenshotPath !== undefined);
     let proofFields: ReturnType<typeof proofPathFields> | null = null;
     if (proofTouched) {
+      // The sale's rep owns the proof, but an admin fixing a rep's sale uploads
+      // under their OWN uid, so their prefix is accepted too (reps stay on
+      // theirs). Paths already on the sale are kept whoever uploaded them.
       const proof = validateProofPaths(
         { proofScreenshotPaths: body.proofScreenshotPaths, proofScreenshotPath: body.proofScreenshotPath },
-        String(existing?.salesRepId ?? '')
+        String(existing?.salesRepId ?? ''),
+        {
+          alsoAllow: {
+            uids: requester.isAdmin ? [requester.uid] : [],
+            paths: saleProofPaths(existing ?? {}),
+          },
+        }
       );
       if (!proof.ok) {
         return NextResponse.json({ error: proof.error }, { status: 400 });

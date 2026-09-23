@@ -262,15 +262,43 @@ describe('PUT /api/portal/sales/[id] proof screenshots', () => {
     expect(saleUpdateMock).not.toHaveBeenCalled();
   });
 
-  it('validates against the sale rep, not the admin making the edit', async () => {
+  it("lets an admin attach proof they uploaded to a rep's sale", async () => {
     requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
     existingSale({ orderNumberOrBtn: 'ORD-1' });
 
     const own = await put({ proofScreenshotPaths: [SHOT_A] });
     expect(own.status).toBe(200);
 
-    const adminPath = await put({ proofScreenshotPaths: ['form-attachments/admin-1/sale-proof/x_123456/'] });
-    expect(adminPath.status).toBe(400);
+    const adminShot = 'form-attachments/admin-1/sale-proof/x_123456/';
+    const adminPath = await put({ proofScreenshotPaths: [SHOT_A, adminShot] });
+    expect(adminPath.status).toBe(200);
+    expect(saleUpdateMock.mock.calls.at(-1)?.[0].proofScreenshotPaths).toEqual([SHOT_A, adminShot]);
+  });
+
+  it("still refuses an admin a third party's prefix or a climb out of their own", async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+
+    const other = await put({ proofScreenshotPaths: ['form-attachments/rep-2/sale-proof/x_123456/'] });
+    expect(other.status).toBe(400);
+    const climb = await put({ proofScreenshotPaths: ['form-attachments/admin-1/sale-proof/../../rep-2/x/'] });
+    expect(climb.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a rep on their own prefix, even an admin's", async () => {
+    existingSale({ orderNumberOrBtn: 'ORD-1' });
+    const response = await put({ proofScreenshotPaths: ['form-attachments/admin-1/sale-proof/x_123456/'] });
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('lets the rep re-save a sale that carries an admin-uploaded screenshot', async () => {
+    const adminShot = 'form-attachments/admin-1/sale-proof/x_123456/';
+    existingSale({ proofScreenshotPaths: [adminShot], proofScreenshotPath: adminShot });
+    const response = await put({ proofScreenshotPaths: [adminShot, SHOT_A] });
+    expect(response.status).toBe(200);
+    expect(saleUpdateMock.mock.calls.at(-1)?.[0].proofScreenshotPaths).toEqual([adminShot, SHOT_A]);
   });
 
   it('turns a legacy single-path sale into a list when a screenshot is added', async () => {
