@@ -9,6 +9,7 @@ import {
   formFileMime,
   FormUploadError,
   isUploadCancelled,
+  prepareFormFile,
   uploadFormAttachment,
 } from '@/lib/forms/uploadFormAttachment';
 import { MAX_PROOF_SCREENSHOTS, newProofSlot } from '@/lib/sales/proofPaths';
@@ -90,6 +91,10 @@ export function useProofUploads({
   const requested = useRef<Set<string>>(new Set());
   // One controller per upload in flight, so the rep can cancel a stalled one.
   const controllers = useRef<Map<string, AbortController>>(new Map());
+  // Each tile's file as sent: read and shrunk once, reused by Retry. Android can
+  // let go of a picked file after a while, so a retry that read it again would
+  // fail with "could not be read" however good the signal had become.
+  const preparedFiles = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
     const urls = objectUrls.current;
@@ -121,8 +126,14 @@ export function useProofUploads({
       const controller = new AbortController();
       controllers.current.set(item.key, controller);
       try {
+        let file = preparedFiles.current.get(item.key);
+        if (!file) {
+          file = await prepareFormFile(item.file);
+          preparedFiles.current.set(item.key, file);
+        }
         const path = await uploadFormAttachment({
-          file: item.file,
+          file,
+          prepared: true,
           itemId: 'sale-proof',
           formType: 'sale-proof',
           slot: newProofSlot(slotKey),
@@ -131,6 +142,7 @@ export function useProofUploads({
         });
         if (item.preview) setPreviews((prev) => ({ ...prev, [path]: item.preview as Preview }));
         requested.current.add(path);
+        preparedFiles.current.delete(item.key);
         setPending((prev) => prev.filter((p) => p.key !== item.key));
         onAdd(path);
       } catch (error) {
@@ -191,6 +203,7 @@ export function useProofUploads({
   const discard = (key: string) => {
     controllers.current.get(key)?.abort();
     controllers.current.delete(key);
+    preparedFiles.current.delete(key);
     setOverCap(false);
     setPending((prev) => prev.filter((p) => p.key !== key));
   };

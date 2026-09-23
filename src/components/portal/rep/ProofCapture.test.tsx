@@ -94,6 +94,25 @@ describe('useProofUploads', () => {
     expect(api.tiles.map((t) => t.kind)).toEqual(['done']);
   });
 
+  it('retries with the bytes it already read, never the picked file again', async () => {
+    const picked = png();
+    const read = vi.spyOn(picked, 'arrayBuffer');
+    uploadMock.mockRejectedValueOnce(new FormUploadError('Upload timed out'));
+    await act(async () => void api.addFiles([picked]));
+    expect(read).toHaveBeenCalledTimes(1);
+    const first = uploadMock.mock.calls[0][0] as { file: File; prepared: boolean };
+    expect(first.prepared).toBe(true);
+
+    // Android has let go of the picked file by now.
+    read.mockRejectedValue(new Error('NotReadableError'));
+    uploadMock.mockResolvedValueOnce('form-attachments/r1/sale-proof/x_222222/');
+    await act(async () => api.retry(api.tiles[0].key));
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect((uploadMock.mock.calls[1][0] as { file: File }).file).toBe(first.file);
+    expect(api.tiles.map((t) => t.kind)).toEqual(['done']);
+  });
+
   it('keeps a timeout as its own message', async () => {
     uploadMock.mockRejectedValueOnce(new FormUploadError('Upload timed out'));
     await act(async () => void api.addFiles([png()]));
