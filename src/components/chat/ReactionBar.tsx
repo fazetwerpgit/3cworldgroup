@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { auth } from '@/lib/firebase/config';
 import { CHAT_REACTION_EMOJIS } from '@/lib/chat/reactions';
+import c from './chat.module.css';
 
 interface ReactionBarProps {
   channelId: string;
@@ -122,7 +123,10 @@ export function ReactionBar({
   );
 
   return (
-    <div className={`chat-line-reactions mt-2 flex flex-wrap items-center gap-1.5 ${active.length > 0 ? 'chat-line-reactions-has' : 'chat-line-reactions-empty'} ${forcePickerOpen ? 'chat-line-reaction-picker-open' : ''}`} aria-label="Message reactions">
+    <div
+      className={`${c.reactions} ${active.length > 0 ? '' : c.reactionsEmpty} ${forcePickerOpen || pickerOpen ? c.pickerOpen : ''}`}
+      aria-label="Message reactions"
+    >
       {active.map((emoji) => {
         const count = effectiveCount(emoji);
         const mine = effectiveMine(emoji);
@@ -132,31 +136,23 @@ export function ReactionBar({
             type="button"
             onClick={() => toggle(emoji)}
             aria-pressed={mine}
-            title={mine ? 'Remove your reaction' : 'React'}
-            className={`chat-line-reaction portal-num flex h-7 items-center gap-1 rounded-full border px-2 text-sm transition-colors duration-150 ${
-              mine
-                ? 'border-[#8dc63f]/60 bg-[#8dc63f]/10 text-[#3f6212] dark:bg-[#8dc63f]/15 dark:text-[#d7ecc0]'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-[#8dc63f]/50 hover:bg-[#8dc63f]/5 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:text-foreground'
-            }`}
+            aria-label={`${emoji} ${count}${mine ? ', remove your reaction' : ', react'}`}
+            className={`${c.reaction} ${mine ? c.reactionMine : ''}`}
           >
             <span aria-hidden="true">{emoji}</span>
-            {count > 0 && <span className="text-[11px] font-semibold">{count}</span>}
+            {count > 0 && <span aria-hidden="true">{count}</span>}
           </button>
         );
       })}
 
       <DropdownMenu open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); onPickerOpenChange?.(open); }}>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label="Add reaction"
-            className="chat-line-add-reaction grid h-7 w-7 place-items-center rounded-full border border-transparent text-slate-400 transition-colors duration-150 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-600 dark:text-muted-foreground dark:hover:border-border dark:hover:bg-muted dark:hover:text-foreground"
-          >
-            <SmilePlus className="h-4 w-4" />
+          <button type="button" aria-label="Add reaction" className={c.addReaction}>
+            <SmilePlus size={18} aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" sideOffset={4} className="min-w-0 p-1.5">
-          <div className="flex items-center gap-0.5">
+        <DropdownMenuContent align="start" sideOffset={6} className={c.picker}>
+          <div className={c.pickerRow}>
             {CHAT_REACTION_EMOJIS.map((emoji) => {
               const mine = effectiveMine(emoji);
               return (
@@ -166,9 +162,7 @@ export function ReactionBar({
                   onClick={() => toggle(emoji)}
                   aria-pressed={mine}
                   aria-label={`React with ${emoji}`}
-                  className={`grid h-9 w-9 place-items-center rounded-md text-lg transition-transform duration-150 hover:scale-110 hover:bg-slate-100 dark:hover:bg-muted ${
-                    mine ? 'bg-[#8dc63f]/15' : ''
-                  }`}
+                  className={`${c.pickerEmoji} ${mine ? c.pickerEmojiMine : ''}`}
                 >
                   {emoji}
                 </button>

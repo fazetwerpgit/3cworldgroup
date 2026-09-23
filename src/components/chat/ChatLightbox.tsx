@@ -68,7 +68,7 @@ export function ChatLightbox({
       aria-modal="true"
       aria-label="Image viewer"
       onClick={onClose}
-      className="chat-line-lightbox portal-motion pointer-events-auto fixed inset-0 z-[120] flex flex-col bg-black/90 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm"
+      className="chat-line-lightbox portal-motion pointer-events-auto fixed inset-0 z-[120] flex flex-col bg-black/90 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]"
     >
       <div className="flex justify-end">
         <button
@@ -76,7 +76,7 @@ export function ChatLightbox({
           type="button"
           onClick={onClose}
           aria-label="Close image"
-          className="chat-line-lightbox-close grid size-10 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f]"
+          className="chat-line-lightbox-close grid size-11 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f]"
         >
           <X className="size-5" />
         </button>

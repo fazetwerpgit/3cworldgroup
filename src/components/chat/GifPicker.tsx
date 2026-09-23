@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
+import s from '@/components/portal/rep/rep.module.css';
+import c from './chat.module.css';
 
 // One GIPHY result mapped by the /api/portal/chat/gifs proxy.
 export interface GifResult {
@@ -71,7 +72,7 @@ export function GifPicker({
         if (!response.ok) throw new Error(json.error || 'Failed to load GIFs');
         if (active) setResults(Array.isArray(json.results) ? json.results : []);
       } catch {
-        if (active) setError('Could not load GIFs. Try again.');
+        if (active) setError("Couldn't load GIFs. Try again.");
       } finally {
         if (active) setLoading(false);
       }
@@ -83,39 +84,33 @@ export function GifPicker({
   }, [query, authedFetch]);
 
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-label="Search GIFs"
-      className="chat-line-gif-picker portal-motion absolute bottom-full left-0 z-30 mb-2 w-[19rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-black/10 dark:border-border dark:bg-card dark:shadow-black/40"
-    >
-      <div className="border-b border-slate-200 p-2.5 dark:border-border">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400 dark:text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search GIFs"
-            aria-label="Search GIFs"
-            className="pl-8"
-          />
-        </div>
+    <div ref={panelRef} role="dialog" aria-label="Search GIFs" className={c.gif}>
+      <div className={c.gifSearch}>
+        <Search size={16} aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search GIFs"
+          aria-label="Search GIFs"
+          enterKeyHint="search"
+        />
       </div>
 
-      <div className="max-h-[18rem] overflow-auto p-2.5">
+      <div className={c.gifBody}>
         {loading ? (
-          <div className="flex items-center justify-center py-10 text-slate-400 dark:text-muted-foreground">
-            <Loader2 className="size-5 animate-spin" />
+          <div className={c.gifGrid} aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((cell) => (
+              <span key={cell} className={s.skel} style={{ aspectRatio: '1', borderRadius: 6 }} />
+            ))}
           </div>
         ) : error ? (
-          <p className="py-8 text-center text-sm text-slate-500 dark:text-muted-foreground">{error}</p>
+          <p className={c.gifNote}>{error}</p>
         ) : results.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500 dark:text-muted-foreground">
-            No GIFs found.
-          </p>
+          <p className={c.gifNote}>No GIFs found.</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className={c.gifGrid}>
             {results.map((gif) => (
               <button
                 key={gif.id}
@@ -124,24 +119,17 @@ export function GifPicker({
                   onSelect(gif);
                   onClose();
                 }}
-                className="aspect-square overflow-hidden rounded-md border border-slate-200 bg-slate-100 transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:border-border dark:bg-muted"
+                className={c.gifCell}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={gif.previewUrl}
-                  alt="GIF"
-                  loading="lazy"
-                  className="size-full object-cover"
-                />
+                <img src={gif.previewUrl} alt="GIF" loading="lazy" />
               </button>
             ))}
           </div>
         )}
       </div>
 
-      <p className="border-t border-slate-100 px-2.5 py-1.5 text-[10px] text-slate-400 dark:border-border dark:text-muted-foreground">
-        Powered By GIPHY
-      </p>
+      <p className={c.gifFoot}>Powered by GIPHY</p>
     </div>
   );
 }

@@ -1,19 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Hash, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
+import { Hash, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import s from '@/components/portal/rep/rep.module.css';
+import { getInitials } from '@/lib/chat/authorColor';
 import { ChatAttachment, ChatChannel } from '@/types';
+import c from './chat.module.css';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
   all: 'Everyone',
@@ -61,10 +56,8 @@ interface ChannelInfoSheetProps {
   authedFetch: (url: string, init?: RequestInit) => Promise<Response>;
   // Opens the shared full-screen image viewer (owned by the chat page).
   onOpenImage: (image: LightboxImage) => void;
-  // True while that viewer is open. The sheet is a modal Radix Dialog whose own
-  // Escape/pointer-outside dismissal would otherwise close it underneath the
-  // (portaled) lightbox; these let us suppress the sheet's dismissal at its
-  // source so only the lightbox closes first.
+  // True while that viewer is open over the sheet: Escape then closes only the
+  // lightbox, never the sheet underneath it.
   lightboxOpen: boolean;
 }
 
@@ -81,41 +74,29 @@ function formatMediaTime(iso: string | null): string {
   });
 }
 
-/** First letters of first+last name words (mirrors chatInitials in MobileThread). */
-function chatInitials(name: string) {
-  const words = name.split(' ').filter(Boolean);
-  if (words.length === 0) return '?';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
-
 /** Member row avatar: photo when available, else the initials chip, with a
  *  fail-soft fallback (never a broken-image icon) if the photo fails to load. */
 function MemberAvatarChip({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
   const [failed, setFailed] = useState(false);
   const showPhoto = !!avatarUrl && !failed;
   return (
-    <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
+    <span className={`${c.avatar} ${c.avatarMd}`} aria-hidden="true">
       {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={avatarUrl}
-          alt=""
-          className="size-full object-cover"
-          onError={() => setFailed(true)}
-        />
+        <img src={avatarUrl} alt="" onError={() => setFailed(true)} />
       ) : (
-        chatInitials(name)
+        getInitials(name)
       )}
     </span>
   );
 }
 
 /**
- * Channel-info Sheet (Connecteam-style): channel identity, audience, description,
- * member count and the full member list. Members are fetched lazily the first
- * time the sheet opens for a channel. Shared by the mobile thread top bar and the
- * desktop conversation header. Admins get a "Manage channels" shortcut.
+ * Channel details on the D sheet (bottom sheet on phones, centred dialog on
+ * desktop, portaled through BodyLayer): identity, audience, description and
+ * Members | Pinned | Photos. Each list is fetched lazily the first time it is
+ * shown for a channel. Shared by the phone thread header and the desktop
+ * conversation header. Admins get add/remove people and "Manage channels".
  */
 export function ChannelInfoSheet({
   channel,
@@ -313,239 +294,168 @@ export function ChannelInfoSheet({
 
   const isLocked = channel?.audience === 'managers';
 
+  // Esc closes the sheet, except while the lightbox is up: it consumes Escape
+  // in the capture phase and stops it, so this bubble listener only sees the
+  // ones meant for the sheet. Focus lands on the close button when it opens.
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !lightboxOpen) {
+        event.preventDefault();
+        onOpenChange(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, lightboxOpen, onOpenChange]);
+
+  if (!open) return null;
+
+  const skeletonRows = (count: number, square = false) => (
+    <div aria-hidden="true">
+      {Array.from({ length: count }, (_, row) => (
+        <div key={row} className={c.skelRow}>
+          <span className={s.skel} style={{ width: 36, height: 36, borderRadius: square ? 6 : '50%' }} />
+          <span className={s.skel} style={{ width: `${40 + ((row * 17) % 30)}%`, height: 14 }} />
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="chat-line-info-sheet w-full gap-0 p-0 sm:max-w-md"
-        onEscapeKeyDown={(event) => {
-          // While the lightbox is up, let it consume Escape — don't close the sheet.
-          if (lightboxOpen) event.preventDefault();
-        }}
-        onPointerDownOutside={(event) => {
-          // Clicks landing on the portaled lightbox must not dismiss the sheet.
-          if ((event.target as Element)?.closest?.('[data-chat-lightbox]')) {
-            event.preventDefault();
-          }
+    <BodyLayer>
+      <div
+        className={s.backdrop}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) onOpenChange(false);
         }}
       >
-        <SheetHeader className="chat-line-info-header border-b border-slate-200 dark:border-border p-4 pr-14">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              aria-label="Back to chat"
-              className="grid size-10 shrink-0 place-items-center rounded-md text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted -ml-2"
-            >
-              <ChevronLeft className="size-6" />
-            </button>
-            {isLocked ? (
-              <Lock className="size-5 shrink-0 text-slate-500 dark:text-muted-foreground" />
-            ) : (
-              <Hash className="size-5 shrink-0 text-slate-500 dark:text-muted-foreground" />
-            )}
-            <SheetTitle className="truncate text-lg text-slate-950 dark:text-foreground">
+        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="chat-info-title">
+          <div className={s.sheetHandle} aria-hidden="true" />
+          <div className={c.infoHead}>
+            {isLocked ? <Lock size={18} aria-hidden="true" /> : <Hash size={18} aria-hidden="true" />}
+            <h2 id="chat-info-title" className={c.infoTitle}>
               {channel?.name ?? 'Channel'}
-            </SheetTitle>
-            {channel && (
-              <Badge variant="secondary" className="shrink-0 text-[11px]">
-                {audienceCopy[channel.audience]}
-              </Badge>
-            )}
+            </h2>
+            {channel && <span className={c.chip}>{audienceCopy[channel.audience]}</span>}
+            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={() => onOpenChange(false)}>
+              <X size={20} aria-hidden="true" />
+            </button>
           </div>
-          {channel?.description ? (
-            <SheetDescription className="text-slate-600 dark:text-muted-foreground">
-              {channel.description}
-            </SheetDescription>
-          ) : (
-            <SheetDescription className="sr-only">Channel details</SheetDescription>
-          )}
-        </SheetHeader>
+          {channel?.description ? <p className={c.infoDesc}>{channel.description}</p> : null}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* Members | Pinned | Media segmented control (house-style track + raised
-              active segment; lime is reserved for primary actions, so the active tab
-              stays neutral). */}
-          <div className="px-4 pt-3 pb-1">
-            <div className="chat-line-info-tabs grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-muted/60">
-              {(['members', 'pinned', 'media'] as const).map((key) => {
-                const isActive = tab === key;
-                const Icon = key === 'members' ? Users : key === 'pinned' ? Pin : ImageIcon;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setTab(key)}
-                    aria-pressed={isActive}
-                    className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
-                      isActive
-                        ? 'bg-white text-slate-950 shadow-sm dark:bg-card dark:text-foreground'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-muted-foreground dark:hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className="size-4" />
-                    {key}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Members | Pinned | Media segmented control. */}
+          <div className={c.segs} role="group" aria-label="Channel details">
+            {(['members', 'pinned', 'media'] as const).map((key) => {
+              const Icon = key === 'members' ? Users : key === 'pinned' ? Pin : ImageIcon;
+              return (
+                <button key={key} type="button" onClick={() => setTab(key)} aria-pressed={tab === key} className={c.seg}>
+                  <Icon size={16} aria-hidden="true" />
+                  {key === 'members' ? 'Members' : key === 'pinned' ? 'Pinned' : 'Photos'}
+                </button>
+              );
+            })}
           </div>
 
-          {tab === 'members' ? (
-            <>
-              <div className="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
-                <Users className="size-4" />
-                {loading ? 'Members' : `${members.length} member${members.length === 1 ? '' : 's'}`}
-              </div>
+          <div className={`${s.sheetBody} ${c.infoBody}`}>
+            {tab === 'members' ? (
+              <>
+                <p className={c.infoLabel}>
+                  {loading ? 'Members' : `${members.length} member${members.length === 1 ? '' : 's'}`}
+                </p>
 
-              {/* Admin-only: add people. Toggles an inline pick-list of active users not
-                  already in the channel. Non-admins never see this (isAdmin gate). */}
-              {isAdmin && (
-                <div className="px-4 pb-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowAddPeople((v) => !v)}
-                    aria-expanded={showAddPeople}
-                    className="w-full justify-center border-slate-200 dark:border-border"
-                  >
-                    <UserPlus className="size-4" />
-                    Add people
-                  </Button>
+                {/* Admin-only: add people. Toggles an inline pick-list of active users not
+                    already in the channel. Non-admins never see this (isAdmin gate). */}
+                {isAdmin && (
+                  <div className={c.infoActions}>
+                    <button
+                      type="button"
+                      className={`${s.btnSecondary} ${s.btnBlock}`}
+                      onClick={() => setShowAddPeople((v) => !v)}
+                      aria-expanded={showAddPeople}
+                    >
+                      <UserPlus size={18} aria-hidden="true" />
+                      Add people
+                    </button>
+                    {actionError && <p className={c.actionError} role="alert">{actionError}</p>}
+                    {showAddPeople && (
+                      <div className={c.addList}>
+                        {addable.length === 0 ? (
+                          <p className={c.empty}>{loading ? 'Loading…' : 'Everyone is already here.'}</p>
+                        ) : (
+                          <ul className={c.people}>
+                            {addable.map((person) => (
+                              <li key={person.uid}>
+                                <div className={c.person}>
+                                  <MemberAvatarChip name={person.name} />
+                                  <span className={c.personName}>
+                                    {person.name}
+                                    {person.role && <span className={c.personSub}>{person.role}</span>}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => void addMember(person.uid)}
+                                    disabled={mutatingUid !== null}
+                                    className={c.addBtn}
+                                  >
+                                    {mutatingUid === person.uid ? <Loader2 size={16} className={c.spin} aria-label="Adding" /> : 'Add'}
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                  {actionError && (
-                    <p className="mt-2 text-center text-xs text-red-600 dark:text-red-400">{actionError}</p>
-                  )}
-
-                  {showAddPeople && (
-                    <div className="mt-2 rounded-lg border border-slate-200 dark:border-border">
-                      {addable.length === 0 ? (
-                        <p className="px-3 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                          {loading ? 'Loading…' : 'Everyone is already here.'}
-                        </p>
-                      ) : (
-                        <ul className="max-h-56 space-y-0.5 overflow-auto p-1">
-                          {addable.map((person) => (
-                            <li
-                              key={person.uid}
-                              className="flex items-center gap-3 rounded-md px-2 py-1.5"
-                            >
-                              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#0A1F44]/10 text-xs font-semibold text-[#0A1F44] dark:bg-white/10 dark:text-white">
-                                {chatInitials(person.name)}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950 dark:text-foreground">
-                                {person.name}
-                              </span>
-                              {person.role && (
-                                <Badge variant="secondary" className="shrink-0 text-[10px]">
-                                  {person.role}
-                                </Badge>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => void addMember(person.uid)}
-                                disabled={mutatingUid !== null}
-                                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#8dc63f] px-3 py-1 text-xs font-semibold text-[#0A1F44] transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] disabled:opacity-50"
-                              >
-                                {mutatingUid === person.uid ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  'Add'
-                                )}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
                 {loading ? (
-                  <ul className="space-y-1" aria-hidden="true">
-                    {[0, 1, 2, 3, 4].map((row) => (
-                      <li key={row} className="flex items-center gap-3 px-2 py-2">
-                        <span className="size-8 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-muted" />
-                        <span className="h-3.5 w-32 animate-pulse rounded bg-slate-200 dark:bg-muted" />
-                      </li>
-                    ))}
-                  </ul>
+                  skeletonRows(5)
                 ) : error ? (
-                  <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                    {error}
-                  </p>
+                  <p className={c.empty} role="alert">Couldn&apos;t load members. {error}</p>
                 ) : members.length === 0 ? (
-                  <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                    No members yet.
-                  </p>
+                  <p className={c.empty}>No members yet.</p>
                 ) : (
-                  <ul className="space-y-0.5">
+                  <ul className={c.people}>
                     {members.map((member) => (
-                      <li
-                        key={member.uid}
-                        className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-slate-50 dark:hover:bg-muted/60"
-                      >
-                        <MemberAvatarChip name={member.name} avatarUrl={member.avatarUrl} />
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950 dark:text-foreground">
-                          {member.name}
-                        </span>
-                        {member.isExtra && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 border-[#8dc63f]/50 text-[10px] text-[#4f7a12] dark:text-[#a5d65e]"
-                          >
-                            Added
-                          </Badge>
-                        )}
-                        {member.role && (
-                          <Badge variant="secondary" className="shrink-0 text-[10px]">
-                            {member.role}
-                          </Badge>
-                        )}
-                        {isAdmin && member.isExtra && (
-                          <button
-                            type="button"
-                            onClick={() => void removeMember(member.uid, member.name)}
-                            disabled={mutatingUid !== null}
-                            aria-label={`Remove ${member.name}`}
-                            className="grid size-6 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
-                          >
-                            {mutatingUid === member.uid ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <X className="size-3.5" />
-                            )}
-                          </button>
-                        )}
+                      <li key={member.uid}>
+                        <div className={c.person}>
+                          <MemberAvatarChip name={member.name} avatarUrl={member.avatarUrl} />
+                          <span className={c.personName}>
+                            {member.name}
+                            {/* Role labels (tiers, manager titles, IBO) stay admin-only. */}
+                            {isAdmin && member.role && <span className={c.personSub}>{member.role}</span>}
+                          </span>
+                          {isAdmin && member.isExtra && <span className={`${c.chip} ${c.chipLime}`}>Added</span>}
+                          {isAdmin && member.isExtra && (
+                            <button
+                              type="button"
+                              onClick={() => void removeMember(member.uid, member.name)}
+                              disabled={mutatingUid !== null}
+                              aria-label={`Remove ${member.name}`}
+                              className={c.iconBtn}
+                            >
+                              {mutatingUid === member.uid ? <Loader2 size={16} className={c.spin} aria-hidden="true" /> : <X size={18} aria-hidden="true" />}
+                            </button>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
-              </div>
-            </>
-          ) : tab === 'pinned' ? (
-            <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
-              {pinsLoading ? (
-                <ul className="space-y-1" aria-hidden="true">
-                  {[0, 1, 2].map((row) => (
-                    <li key={row} className="flex items-center gap-3 px-2 py-2">
-                      <span className="size-8 shrink-0 animate-pulse rounded bg-slate-200 dark:bg-muted" />
-                      <span className="h-3.5 w-40 animate-pulse rounded bg-slate-200 dark:bg-muted" />
-                    </li>
-                  ))}
-                </ul>
+              </>
+            ) : tab === 'pinned' ? (
+              pinsLoading ? (
+                skeletonRows(3, true)
               ) : pinsError ? (
-                <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                  {pinsError}
-                </p>
+                <p className={c.empty} role="alert">Couldn&apos;t load pinned messages. {pinsError}</p>
               ) : pins.length === 0 ? (
-                <p className="px-2 py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                  No pinned messages yet.
-                </p>
+                <p className={c.empty}>Nothing pinned yet. Managers can pin a message from its menu.</p>
               ) : (
-                <ul className="space-y-0.5">
+                <ul className={c.people}>
                   {pins.map((pin) => {
                     const snippet = pin.text
                       ? pin.text
@@ -565,121 +475,83 @@ export function ChannelInfoSheet({
                     };
                     const rowInner = (
                       <>
-                        {pin.attachment && isImage ? (
-                          <span className="size-9 shrink-0 overflow-hidden rounded bg-[#0A1F44]/5 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-border">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={pin.attachment.url}
-                              alt=""
-                              loading="lazy"
-                              className="size-full object-cover"
-                            />
-                          </span>
-                        ) : (
-                          <span className="grid size-9 shrink-0 place-items-center rounded text-slate-400 dark:text-muted-foreground">
-                            <Pin className="size-4" />
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold text-slate-950 dark:text-foreground">
-                            {pin.authorName}
-                          </span>
-                          <span className="block truncate text-xs text-slate-500 dark:text-muted-foreground">
-                            {snippet}
-                          </span>
+                        <span className={c.pinThumb}>
+                          {pin.attachment && isImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={pin.attachment.url} alt="" loading="lazy" />
+                          ) : (
+                            <Pin size={16} aria-hidden="true" />
+                          )}
                         </span>
-                        <span className="shrink-0 text-[11px] tabular-nums text-slate-400 dark:text-muted-foreground">
-                          {formatMediaTime(pin.pinnedAt)}
+                        <span className={c.personName}>
+                          {pin.authorName}
+                          <span className={c.personSub}>{snippet}</span>
                         </span>
+                        <span className={c.personTime}>{formatMediaTime(pin.pinnedAt)}</span>
                       </>
                     );
                     return (
                       <li key={pin.messageId}>
                         {pin.attachment && isImage ? (
-                          <button
-                            type="button"
-                            onClick={openImage}
-                            aria-label={`Pinned photo from ${pin.authorName}`}
-                            className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:hover:bg-muted/60"
-                          >
+                          <button type="button" onClick={openImage} aria-label={`Pinned photo from ${pin.authorName}`} className={c.person}>
                             {rowInner}
                           </button>
                         ) : (
-                          <div className="flex items-center gap-3 rounded-md px-2 py-2">
-                            {rowInner}
-                          </div>
+                          <div className={c.person}>{rowInner}</div>
                         )}
                       </li>
                     );
                   })}
                 </ul>
-              )}
-            </div>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-              {mediaLoading ? (
-                <div className="grid grid-cols-3 gap-2" aria-hidden="true">
-                  {[0, 1, 2, 3, 4, 5].map((cell) => (
-                    <span
-                      key={cell}
-                      className="aspect-square animate-pulse rounded-md bg-slate-200 dark:bg-muted"
-                    />
-                  ))}
-                </div>
-              ) : mediaError ? (
-                <p className="py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                  {mediaError}
-                </p>
-              ) : media.length === 0 ? (
-                <p className="py-6 text-center text-sm text-slate-500 dark:text-muted-foreground">
-                  No photos yet.
-                </p>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {media.map((item) => (
-                    <button
-                      key={item.messageId}
-                      type="button"
-                      onClick={() =>
-                        onOpenImage({
-                          url: item.attachment.url,
-                          author: item.authorName,
-                          time: formatMediaTime(item.createdAt),
-                        })
-                      }
-                      aria-label={`Photo from ${item.authorName}`}
-                      className="aspect-square overflow-hidden rounded-md bg-[#0A1F44]/5 ring-1 ring-slate-200 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:bg-white/5 dark:ring-border"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.attachment.url}
-                        alt={`Shared by ${item.authorName}`}
-                        loading="lazy"
-                        className="size-full object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+              )
+            ) : mediaLoading ? (
+              <div className={c.mediaGrid} aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5].map((cell) => (
+                  <span key={cell} className={s.skel} style={{ aspectRatio: '1', borderRadius: 6 }} />
+                ))}
+              </div>
+            ) : mediaError ? (
+              <p className={c.empty} role="alert">Couldn&apos;t load photos. {mediaError}</p>
+            ) : media.length === 0 ? (
+              <p className={c.empty}>No photos yet.</p>
+            ) : (
+              <div className={c.mediaGrid}>
+                {media.map((item) => (
+                  <button
+                    key={item.messageId}
+                    type="button"
+                    onClick={() =>
+                      onOpenImage({
+                        url: item.attachment.url,
+                        author: item.authorName,
+                        time: formatMediaTime(item.createdAt),
+                      })
+                    }
+                    aria-label={`Photo from ${item.authorName}`}
+                    className={c.mediaCell}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.attachment.url} alt={`Shared by ${item.authorName}`} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {isAdmin && (
-            <div className="border-t border-slate-200 dark:border-border p-4">
-              <Button
-                asChild
-                variant="outline"
-                className="w-full border-slate-200 dark:border-border"
+            <div className={c.infoFoot}>
+              <Link
+                href="/portal/admin/chat-channels"
+                className={`${s.btnSecondary} ${s.btnBlock}`}
+                onClick={() => onOpenChange(false)}
               >
-                <Link href="/portal/admin/chat-channels" onClick={() => onOpenChange(false)}>
-                  <Settings2 className="size-4" />
-                  Manage channels
-                </Link>
-              </Button>
+                <Settings2 size={18} aria-hidden="true" />
+                Manage channels
+              </Link>
             </div>
           )}
-        </div>
-      </SheetContent>
-    </Sheet>
+        </section>
+      </div>
+    </BodyLayer>
   );
 }

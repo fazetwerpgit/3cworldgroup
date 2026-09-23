@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
-import { ArrowDown, Check, ChevronLeft, Clock, ImagePlus, Loader2, Pencil, Pin, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Loader2, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -11,14 +11,14 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { clockTime, roleLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { useHideRepTabBar } from '@/components/portal/rep/RepShell';
+import s from '@/components/portal/rep/rep.module.css';
 import { GROW_STEP, MAX_WINDOW } from '@/hooks/chat/useMessages';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
+import c from './chat.module.css';
 
 /**
  * A message as rendered in the thread: a real Firestore message, or an
@@ -69,10 +69,9 @@ interface MobileThreadProps {
   // the top requests more history.
   hasMore: boolean;
   onLoadOlder: () => void;
-  // Pre-formatted "COMPANY LINE · …" tape copy, already gated to the All
-  // Company channel by the page (empty string elsewhere) — rendered as-is,
-  // never fabricated here.
-  companyTapeText: string;
+  // The All Company line, already gated to that channel by the page (null
+  // elsewhere, or when the stats call failed) — rendered as-is, never fabricated.
+  companyStats: CompanyStats | null;
   // uid -> photo URL, resolved server-side from the active channel's members
   // (already-visible data — the same population whose names are shown per message).
   authorAvatars: Record<string, string>;
@@ -87,6 +86,8 @@ interface MobileThreadProps {
   // Pin eligibility (admin/operations or l1/l2 managers) — the page derives it and
   // the long-press sheet shows Pin/Unpin only for eligible users.
   canPin: boolean;
+  // Role labels (tiers, manager titles, IBO) show only to admins.
+  showRoles: boolean;
   draft: string;
   sending: boolean;
   // GIF feature availability (probed by the page) + the shared verified-token
@@ -127,8 +128,8 @@ interface MobileThreadProps {
 }
 
 /**
- * A message's image/GIF rendered as a chat bubble (Connecteam style). Shows the
- * local preview with an upload shimmer while a pending image echo uploads (not
+ * A message's image/GIF as a rounded tile in the bubble column. Shows the local
+ * preview with an upload shimmer while a pending image echo uploads (not
  * clickable then); a delivered image/GIF opens the lightbox. Nothing for text.
  */
 function BubbleImage({
@@ -164,9 +165,8 @@ function BubbleImage({
       disabled={isPendingLocal}
       aria-label="Open image"
       data-attachment-type={message.attachment?.type ?? 'image'}
-      className={`chat-line-mobile-attachment relative block w-60 max-w-full overflow-hidden bg-[#0A1F44]/5 shadow-sm ring-1 disabled:cursor-default dark:bg-white/5 ${
-        isFailed ? 'ring-red-400/70 dark:ring-red-500/50' : 'ring-slate-200 dark:ring-border'
-      } ${isOwn ? 'rounded-2xl rounded-br-md' : 'rounded-2xl rounded-bl-md'}`}
+      data-own={isOwn ? 'true' : undefined}
+      className={`${c.attachment} ${isFailed ? c.attachmentFailed : ''}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -178,11 +178,8 @@ function BubbleImage({
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         style={aspectStyle}
-        className={`chat-line-attachment-image max-h-64 w-full object-contain ${isUploading ? 'opacity-70' : ''}`}
       />
-      {isUploading && (
-        <span className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-t from-[#0A1F44]/30 to-transparent" />
-      )}
+      {isUploading && <span className={c.uploading} />}
     </button>
   );
 }
@@ -218,10 +215,11 @@ function dayLabel(date: Date) {
 }
 
 /**
- * Phone conversation screen (Connecteam-style): compact back bar, chat-bubble
- * messages that fill the height, and a composer pinned to the bottom edge.
- * The chat page hides the bottom nav while this is mounted. Desktop never
- * renders this (lg:hidden owner).
+ * Phone conversation screen: a back/title row under the D top bar, bubbles that
+ * fill the height, and the composer on the bottom edge. The composer replaces
+ * the tab bar while this is mounted (a thread is a task screen: back returns to
+ * the channel list, where the tabs come back). Sized to the visual viewport so
+ * the iOS keyboard never covers the input. Desktop hides it.
  */
 export function MobileThread({
   pinnedMessage,
@@ -234,7 +232,7 @@ export function MobileThread({
   lastSnapshotWindow,
   hasMore,
   onLoadOlder,
-  companyTapeText,
+  companyStats,
   authorAvatars,
   loading,
   renderedChannel,
@@ -242,6 +240,7 @@ export function MobileThread({
   currentUserId,
   canModerate,
   canPin,
+  showRoles,
   draft,
   sending,
   gifEnabled,
@@ -532,7 +531,7 @@ export function MobileThread({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // `.chat-line-thread-messages` inherits scroll-behavior: smooth from the
+    // The thread scroller can inherit scroll-behavior: smooth from the
     // global html rule, which would animate a plain scrollTop assignment —
     // visibly glide instead of snapping, and re-fire handleScroll mid-animation
     // while scrollTop still reads <200. Toggle to 'auto' for the instant jump.
@@ -583,321 +582,325 @@ export function MobileThread({
     remeasureFirst();
   }, [snapshotVersion, lastSnapshotWindow]);
 
+  // The composer takes the tab bar's place while a conversation is open.
+  useHideRepTabBar(true);
+
+  // iOS keyboard: Safari keeps the layout viewport and overlays the keyboard,
+  // so the thread pads its bottom by the covered height (--kb) and the composer
+  // rides just above the keys; any pan Safari applied to reveal the input is
+  // taken back out so the header stays on screen. The installed app shrinks the
+  // layout viewport instead, which 100dvh already follows (--kb stays 0).
+  // data-keyboard drops the home-indicator padding while the keys are up.
+  const threadRef = useRef<HTMLDivElement | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    const vv = window.visualViewport;
+    const update = () => {
+      const covered = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+      const inset = covered > 80 ? Math.round(covered) : 0;
+      el.style.setProperty('--kb', `${inset}px`);
+      if (inset && vv && vv.offsetTop > 0) window.scrollTo(0, 0);
+      const active = document.activeElement;
+      const typing = active instanceof HTMLTextAreaElement && el.contains(active);
+      setKeyboardOpen(inset > 0 || (typing && window.matchMedia('(pointer: coarse)').matches));
+    };
+    const frame = window.requestAnimationFrame(update);
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', update);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', update);
+    };
+  }, []);
+
+  const memberTotal = channel ? memberCount ?? channel.memberIds?.length ?? 0 : 0;
+  const ChannelMark = channel?.audience === 'managers' ? Lock : Hash;
+  const pinnedCopy = pinnedMessage
+    ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
+    : '';
+
   return (
-    <div className="chat-line-thread chat-slide-in flex h-[calc(100dvh-4rem-env(safe-area-inset-top))] flex-col bg-slate-50 dark:bg-muted/40">
-      {/* Compact top bar with back arrow (≥40px target). */}
-      <div className="chat-line-thread-header flex items-center gap-1 border-b border-slate-200 dark:border-border bg-white/95 dark:bg-card/95 px-1.5 py-1.5 backdrop-blur">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to channels"
-          className="chat-line-back grid size-10 shrink-0 place-items-center rounded-md text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted"
-        >
-          <ChevronLeft className="size-6" />
+    <div ref={threadRef} className={c.thread} data-keyboard={keyboardOpen ? 'open' : undefined}>
+      <div className={c.threadHead}>
+        <button type="button" onClick={onBack} aria-label="Back to channels" className={c.iconBtn}>
+          <ChevronLeft size={26} aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          onClick={onOpenInfo}
-          aria-label="Channel details"
-          className="chat-line-thread-info min-w-0 flex-1 rounded-md px-1.5 text-left hover:bg-slate-100 dark:hover:bg-muted"
-        >
-          <span className="chat-line-thread-head-copy">
-            <span className="chat-line-thread-name portal-display">{channel?.name ?? 'Channel'}</span>
-            <span className="chat-line-thread-description">{channel?.description ?? 'Choose a channel to view messages.'}</span>
+        <button type="button" onClick={onOpenInfo} aria-label="Channel details" className={c.threadTitle}>
+          <span className={c.threadName}>
+            <ChannelMark size={16} aria-hidden="true" />
+            {channel?.name ?? 'Channel'}
+          </span>
+          <span className={c.threadSub}>
+            {channel ? `${memberTotal} member${memberTotal === 1 ? '' : 's'}` : 'Choose a channel'}
+            {channel?.description ? ` · ${channel.description}` : ''}
           </span>
         </button>
-        <div className="chat-line-thread-meta">
-          <span>{channel ? `${memberCount ?? channel.memberIds?.length ?? 0} members` : 'No members'}</span>
-        </div>
+        <button type="button" onClick={onOpenInfo} aria-label="Members, pinned and photos" className={c.threadInfo}>
+          <Info size={20} aria-hidden="true" />
+        </button>
       </div>
 
-      {companyTapeText && (
-        <div className="chat-line-tape chat-line-tape-mobile" role="status" aria-label="Company sales line">
-          <div className="chat-line-tape-track">
-            <div className="chat-line-tape-seg"><span>{companyTapeText}</span></div>
-            <div className="chat-line-tape-seg" aria-hidden="true"><span>{companyTapeText}</span></div>
-          </div>
+      {companyStats && (
+        <p className={c.tape}>
+          <span className={c.tapeLabel}>Company</span>
+          <span>
+            <strong>{companyStats.mtdCount}</strong> sale{companyStats.mtdCount === 1 ? '' : 's'} this month
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            <strong>${companyStats.mtdMonthlyValue.toLocaleString('en-US')}</strong>/mo on the board
+          </span>
+          {companyStats.lastSale && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                Last: <strong>{companyStats.lastSale.repName}</strong>
+              </span>
+            </>
+          )}
+        </p>
+      )}
+
+      {pinnedMessage && (
+        <div className={c.pinned}>
+          <Pin size={16} aria-hidden="true" />
+          <span className={s.srOnly}>Pinned:</span>
+          <span className={c.pinnedText}>{pinnedCopy}</span>
+          <span className={c.pinnedBy}>{pinnedMessage.authorName}</span>
         </div>
       )}
 
-      <div className="chat-line-thread-pinned-band">
-        <span className="chat-line-pinned-label"><Pin aria-hidden="true" /> PINNED</span>
-        <span className="chat-line-pinned-copy">
-          {pinnedMessage?.text || (pinnedMessage?.attachment?.type === 'gif' ? 'GIF' : pinnedMessage?.attachment ? 'Photo' : 'No pinned message yet')}
-          {pinnedMessage?.authorName && <em> · {pinnedMessage.authorName}</em>}
-        </span>
-        <span className="chat-line-pinned-time">{pinnedMessage ? formatTime(pinnedMessage.createdAt) : ''}</span>
-      </div>
+      {/* Message list — newest at the bottom; the scroller's ::before spacer
+          bottom-anchors a sparse conversation onto the composer. Vertical rhythm
+          is per-message so grouped bubbles can tighten up. The relative stage
+          hosts the floating jump-to-latest pill. */}
+      <div className={c.stage}>
+        <div ref={scrollRef} onScroll={handleScroll} className={c.threadScroller}>
+          {!loading && messages.length > 0 && hasMore && (
+            <p className={c.pager}>Earlier messages load as you scroll</p>
+          )}
+          {loading ? (
+            <div className={c.msgSkels} aria-hidden="true">
+              {[62, 44, 70, 38].map((width, row) => (
+                <div key={row} className={c.msgSkel}>
+                  <span className={s.skel} style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                  <span>
+                    <span className={s.skel} style={{ width: '28%', height: 12 }} />
+                    <span className={s.skel} style={{ width: `${width}%`, height: 36, borderRadius: 12 }} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : messages.length === 0 ? (
+            <div className={c.emptyThread}>
+              <strong>No messages yet</strong>
+              <span>Start with a short update, question, or field note.</span>
+            </div>
+          ) : (
+            messages.map((message, index) => {
+              const prev = index > 0 ? messages[index - 1] : null;
+              const next = index < messages.length - 1 ? messages[index + 1] : null;
+              const isOwn = message.authorId === currentUserId;
+              const isPending = !!message.pendingState;
+              const isFailed = message.pendingState === 'failed';
+              const isDev = isDeveloperAuthor(message.authorId);
 
-      {/* Message list — newest at the bottom. flex-col + mt-auto spacer
-          bottom-anchors sparse conversations so the latest message sits just
-          above the composer, chat-style. Vertical rhythm is per-message so
-          grouped bubbles can tighten up (see mt-* below). The relative wrapper
-          hosts the floating jump-to-latest pill so it clears the composer. */}
-      <div className="chat-line-thread-stage relative flex flex-1 flex-col overflow-hidden">
-        <div ref={scrollRef} onScroll={handleScroll} className="chat-line-thread-messages flex flex-1 flex-col overflow-auto p-3">
-        <div aria-hidden="true" className="mt-auto" />
-        {!loading && messages.length > 0 && hasMore && (
-          <div className="chat-line-history-pager">Earlier messages load as you scroll</div>
-        )}
-        {loading ? (
-          <p className="text-sm text-slate-500 dark:text-muted-foreground">Loading messages...</p>
-        ) : messages.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-muted-foreground">
-            Start with a short update, question, or field note.
-          </p>
-        ) : (
-          messages.map((message, index) => {
-            const prev = index > 0 ? messages[index - 1] : null;
-            const next = index < messages.length - 1 ? messages[index + 1] : null;
-            const isOwn = message.authorId === currentUserId;
-            const isPending = !!message.pendingState;
-            const isFailed = message.pendingState === 'failed';
+              // Day separator whenever the calendar day changes (or at the top).
+              const showDaySeparator = !prev || !sameCalendarDay(message.createdAt, prev.createdAt);
 
-            // Day separator whenever the calendar day changes (or at the top).
-            const showDaySeparator = !prev || !sameCalendarDay(message.createdAt, prev.createdAt);
+              // A message merges with the previous one when it shares author, day,
+              // and falls inside the 5-minute window. First-of-group carries the
+              // name + avatar; last-of-group carries the timestamp.
+              const groupWithPrev =
+                !!prev &&
+                !showDaySeparator &&
+                prev.authorId === message.authorId &&
+                withinGroupWindow(prev.createdAt, message.createdAt);
+              const groupWithNext =
+                !!next &&
+                next.authorId === message.authorId &&
+                sameCalendarDay(message.createdAt, next.createdAt) &&
+                withinGroupWindow(message.createdAt, next.createdAt);
+              const isFirstOfGroup = !groupWithPrev;
+              const isLastOfGroup = !groupWithNext;
 
-            // A message merges with the previous one when it shares author, day,
-            // and falls inside the 5-minute window. First-of-group carries the
-            // name + avatar; last-of-group carries the timestamp.
-            const groupWithPrev =
-              !!prev &&
-              !showDaySeparator &&
-              prev.authorId === message.authorId &&
-              withinGroupWindow(prev.createdAt, message.createdAt);
-            const groupWithNext =
-              !!next &&
-              next.authorId === message.authorId &&
-              sameCalendarDay(message.createdAt, next.createdAt) &&
-              withinGroupWindow(message.createdAt, next.createdAt);
-            const isFirstOfGroup = !groupWithPrev;
-            const isLastOfGroup = !groupWithNext;
+              // Tighten spacing inside a group; keep breathing room between groups.
+              const spacing = showDaySeparator || index === 0 ? '' : isFirstOfGroup ? c.gapGroup : c.gapTight;
 
-            // Tighten spacing inside a group; keep breathing room between groups.
-            const spacing = showDaySeparator
-              ? ''
-              : index === 0
-                ? ''
-                : isFirstOfGroup
-                  ? 'mt-3'
-                  : 'mt-0.5';
-
-            return (
-              <div key={message.id}>
-                {showDaySeparator && message.createdAt && (
-                    <div className="chat-line-thread-day my-3 flex items-center gap-3 px-1">
-                    <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
-                    <span className="chat-line-thread-day-label text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-muted-foreground">
-                      {dayLabel(message.createdAt)}
-                    </span>
-                    <span className="h-px flex-1 bg-slate-200 dark:bg-border" />
-                  </div>
-                )}
-                {/* data-mid anchors the scroll compensation. It lives HERE, not
-                    on the outer keyed wrapper: the wrapper also contains the
-                    day separator, which disappears when a prepend gives this
-                    message a same-day predecessor — anchoring the wrapper would
-                    then hold its top steady while the visible message shifts. */}
-                <div data-mid={message.id} className={`chat-line-mobile-message flex flex-col ${isOwn ? 'items-end' : 'items-start'} ${spacing}`}>
-                  {/* Own-message headers are hidden by design, except the
-                      developer identity — it shows on the author's own phone too. */}
-                  {(!isOwn || isDeveloperAuthor(message.authorId)) && isFirstOfGroup && (
-                    <div
-                      className={`chat-line-mobile-author mb-1 flex flex-wrap items-center gap-2 ${
-                        isOwn ? 'justify-end pr-1' : 'pl-9 pr-1'
-                      }`}
-                    >
-                      {isDeveloperAuthor(message.authorId) ? (
-                        <>
-                          <span className="text-xs font-semibold chat-dev-name">
+              return (
+                <div key={message.id}>
+                  {showDaySeparator && message.createdAt && <div className={c.threadDay}>{dayLabel(message.createdAt)}</div>}
+                  {/* data-mid anchors the scroll compensation. It lives HERE, not
+                      on the outer keyed wrapper: the wrapper also contains the
+                      day separator, which disappears when a prepend gives this
+                      message a same-day predecessor — anchoring the wrapper would
+                      then hold its top steady while the visible message shifts. */}
+                  <div data-mid={message.id} className={`${c.bubbleWrap} ${isOwn ? c.bubbleWrapOwn : ''} ${spacing}`}>
+                    {/* Own-message headers are hidden by design, except the
+                        developer identity — it shows on the author's own phone too. */}
+                    {(!isOwn || isDev) && isFirstOfGroup && (
+                      <div className={c.bubbleAuthor}>
+                        {isDev ? (
+                          <>
+                            <span className="chat-dev-name">{message.authorName}</span>
+                            <span className="chat-dev-badge">DEV</span>
+                          </>
+                        ) : (
+                          <span
+                            className={c.author}
+                            style={{ '--an': getAuthorColor(message.authorId).nameDark } as CSSProperties}
+                          >
                             {message.authorName}
                           </span>
-                          <span className="chat-dev-badge">DEV</span>
-                        </>
-                      ) : (
-                        <span
-                          style={
-                            {
-                              '--an': getAuthorColor(message.authorId).name,
-                              '--an-dark': getAuthorColor(message.authorId).nameDark,
-                            } as CSSProperties
-                          }
-                          className="text-xs font-semibold text-[var(--an)] dark:text-[var(--an-dark)]"
-                        >
-                          {message.authorName}
-                        </span>
-                      )}
-                      {message.authorRole && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {message.authorRole.replace('_', ' ')}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                  <div className={`chat-line-mobile-bubble-row flex max-w-[85%] items-end gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {/* Avatar gutter (others only): 32px chip on first-of-group,
-                        empty spacer otherwise so grouped bubbles stay aligned. */}
-                    {!isOwn && (
-                      <div className="chat-line-mobile-avatar-gutter w-8 shrink-0 self-end">
-                        {isFirstOfGroup && (
-                          <ChatAvatar
-                            authorId={message.authorId}
-                            authorName={message.authorName}
-                            avatarUrl={authorAvatars[message.authorId]}
-                            size="md"
-                            className="chat-line-avatar"
-                          />
                         )}
+                        {showRoles && message.authorRole && <span className={c.role}>{roleLabel(message.authorRole)}</span>}
                       </div>
                     )}
-                    <div
-                      className={`chat-line-mobile-content flex min-w-0 flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}
-                      onTouchStart={() => !isPending && startLongPress(message)}
-                      onTouchMove={clearLongPress}
-                      onTouchEnd={clearLongPress}
-                      onTouchCancel={clearLongPress}
-                      onContextMenu={(event) => {
-                        // Long-press on mobile also fires the browser context menu —
-                        // suppress it so our action sheet is the only affordance.
-                        if (!isPending) event.preventDefault();
-                      }}
-                    >
-                      {message.replyTo && (
-                        <div
-                          className={`chat-line-quote max-w-full rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1.5 dark:border-border dark:bg-muted/70 ${
-                            isOwn ? 'rounded-br-md' : 'rounded-bl-md'
-                          }`}
-                        >
-                          <p className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                            {message.replyTo.authorName}
-                          </p>
-                          <p className="line-clamp-2 text-[11px] text-slate-500 dark:text-muted-foreground">
-                            {message.replyTo.text}
-                          </p>
-                        </div>
-                      )}
-                      {(message.attachment || message.localPreviewUrl) && (
-                        <BubbleImage
-                          message={message}
-                          isOwn={isOwn}
-                          eager={index >= messages.length - 12}
-                          onOpen={() =>
-                            onOpenImage({
-                              url: message.attachment?.url ?? message.localPreviewUrl ?? '',
-                              author: message.authorName,
-                              time: formatTime(message.createdAt),
-                            })
-                          }
-                        />
-                      )}
-                      {message.text && (
-                        <div
-                          className={`chat-line-mobile-bubble whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-6 shadow-sm portal-motion ${
-                            isOwn
-                              ? 'rounded-br-md bg-[#0A1F44] text-white'
-                              : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-border dark:bg-card dark:text-slate-200'
-                          } ${message.pendingState === 'sending' ? 'opacity-70' : ''} ${
-                            isFailed ? 'ring-1 ring-red-400/70 dark:ring-red-500/50' : ''
-                          }`}
-                        >
-                          {message.text}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Pending echoes swap the timestamp/reactions for a status
-                      caption; failed sends offer retry/discard inline. */}
-                  {isPending ? (
-                    isFailed ? (
-                        <div className="chat-line-mobile-failed mt-1 flex items-center gap-2 px-1">
-                        <button
-                          type="button"
-                          onClick={() => onRetryPending(message)}
-                          className="flex items-center gap-1 text-[11px] font-medium text-red-600 hover:underline dark:text-red-400"
-                        >
-                          <RotateCw className="size-3" />
-                          Failed — tap to retry
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDiscardPending(message.id)}
-                          aria-label="Discard message"
-                          className="text-slate-400 hover:text-red-600 dark:text-muted-foreground dark:hover:text-red-400"
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="chat-line-mobile-status mt-1 flex items-center gap-1 px-1 text-[11px] text-slate-400 dark:text-muted-foreground">
-                        <Clock className="size-3" />
-                        Sending…
-                      </span>
-                    )
-                  ) : (
-                    <>
-                      {isLastOfGroup && (
-                        <span
-                          className={`chat-line-mobile-timestamp mt-1 text-[11px] text-slate-400 dark:text-muted-foreground ${
-                            isOwn ? 'px-1' : 'pl-9 pr-1'
-                          }`}
-                        >
-                          {formatTime(message.createdAt)}
-                          {message.editedAt && <span className="ml-1">(edited)</span>}
-                          {message.isPinned && (
-                            <Pin aria-label="Pinned" className="ml-1 inline-block size-3 align-[-1px]" />
+                    <div className={c.bubbleRow}>
+                      {/* Avatar gutter (others only): chip on first-of-group,
+                          empty spacer otherwise so grouped bubbles stay aligned. */}
+                      {!isOwn && (
+                        <div className={c.gutter}>
+                          {isFirstOfGroup && (
+                            <ChatAvatar
+                              authorId={message.authorId}
+                              authorName={message.authorName}
+                              avatarUrl={authorAvatars[message.authorId]}
+                              size="md"
+                            />
                           )}
-                        </span>
+                        </div>
                       )}
-                      <div className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start pl-9'}`}>
-                        <ReactionBar
-                          channelId={channelId}
-                          messageId={message.id}
-                          reactionCounts={message.reactionCounts}
-                          myReactions={message.myReactions}
-                          forcePickerOpen={reactionPickerMessageId === message.id}
-                          onPickerOpenChange={(open) => {
-                            if (!open && reactionPickerMessageId === message.id) setReactionPickerMessageId(null);
-                          }}
-                          onError={onReactionError}
-                        />
+                      <div
+                        className={c.bubbleCol}
+                        onTouchStart={() => !isPending && startLongPress(message)}
+                        onTouchMove={clearLongPress}
+                        onTouchEnd={clearLongPress}
+                        onTouchCancel={clearLongPress}
+                        onContextMenu={(event) => {
+                          // Long-press on mobile also fires the browser context menu —
+                          // suppress it so our action sheet is the only affordance.
+                          if (!isPending) event.preventDefault();
+                        }}
+                      >
+                        {message.replyTo && (
+                          <div className={c.quote}>
+                            <strong>{message.replyTo.authorName}</strong>
+                            <span>{message.replyTo.text}</span>
+                          </div>
+                        )}
+                        {(message.attachment || message.localPreviewUrl) && (
+                          <BubbleImage
+                            message={message}
+                            isOwn={isOwn}
+                            eager={index >= messages.length - 12}
+                            onOpen={() =>
+                              onOpenImage({
+                                url: message.attachment?.url ?? message.localPreviewUrl ?? '',
+                                author: message.authorName,
+                                time: formatTime(message.createdAt),
+                              })
+                            }
+                          />
+                        )}
+                        {message.text && (
+                          <div
+                            className={`${c.bubble} ${isOwn ? c.bubbleOwn : ''} ${
+                              message.pendingState === 'sending' ? c.bubbleSending : ''
+                            } ${isFailed ? c.bubbleFailed : ''}`}
+                          >
+                            {message.text}
+                          </div>
+                        )}
                       </div>
-                    </>
-                  )}
+                    </div>
+                    {/* Pending echoes swap the timestamp/reactions for a status
+                        caption; failed sends offer retry/discard inline. */}
+                    {isPending ? (
+                      isFailed ? (
+                        <div className={c.failed}>
+                          <button type="button" onClick={() => onRetryPending(message)} className={c.retryBtn}>
+                            <RotateCw size={14} aria-hidden="true" />
+                            Not sent · Tap to retry
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDiscardPending(message.id)}
+                            aria-label="Discard message"
+                            className={c.discardBtn}
+                          >
+                            <X size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={c.status}>
+                          <Clock size={12} aria-hidden="true" />
+                          Sending…
+                        </span>
+                      )
+                    ) : (
+                      <>
+                        {isLastOfGroup && (
+                          <span className={c.stamp}>
+                            {clockTime(message.createdAt)}
+                            {message.editedAt && <span>· edited</span>}
+                            {message.isPinned && <Pin size={12} aria-label="Pinned" />}
+                          </span>
+                        )}
+                        <div className={c.bubbleReactions}>
+                          <ReactionBar
+                            channelId={channelId}
+                            messageId={message.id}
+                            reactionCounts={message.reactionCounts}
+                            myReactions={message.myReactions}
+                            forcePickerOpen={reactionPickerMessageId === message.id}
+                            onPickerOpenChange={(open) => {
+                              if (!open && reactionPickerMessageId === message.id) setReactionPickerMessageId(null);
+                            }}
+                            onError={onReactionError}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Jump-to-latest pill — only while scrolled up with unseen messages. */}
         {newCount > 0 && (
-          <button
-            type="button"
-            onClick={jumpToLatest}
-            className="chat-line-jump-pill portal-motion absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#8dc63f] px-3.5 py-1.5 text-xs font-semibold text-[#0A1F44] shadow-lg shadow-black/10 hover:bg-[#7ab82e] dark:shadow-black/40"
-          >
+          <button type="button" onClick={jumpToLatest} className={c.jump}>
             {newCount} new message{newCount > 1 ? 's' : ''}
-            <ArrowDown className="size-3.5" />
+            <ArrowDown size={16} aria-hidden="true" />
           </button>
         )}
       </div>
 
       {error && (
-        <Alert className="chat-line-thread-error mx-3 mb-2 w-auto border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <p className={c.threadError} role="alert">
+          <AlertCircle size={16} aria-hidden="true" />
+          {error}
+        </p>
       )}
 
-      {/* Composer pinned to the bottom edge. */}
-      <div className="chat-line-thread-composer border-t border-slate-200 dark:border-border bg-white dark:bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {/* Composer on the bottom edge, in the tab bar's place. */}
+      <div className={c.threadComposer}>
         {/* Hidden file input — opened by the ImagePlus button. */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          className="hidden"
+          hidden
           onChange={(event) => {
             const file = event.target.files?.[0];
             // Clear so re-picking the same file fires onChange again.
@@ -905,101 +908,69 @@ export function MobileThread({
             pickFile(file);
           }}
         />
-        {/* Reply / edit staging bar, with a quiet border and X to cancel. */}
         {replyTarget && (
-          <div className="chat-line-compose-strip mb-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-border dark:bg-muted/60">
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                Replying to {replyTarget.authorName}
-              </p>
-              <p className="truncate text-[11px] text-slate-500 dark:text-muted-foreground">
-                {replySnippet(replyTarget).text}
-              </p>
+          <div className={c.strip}>
+            <div className={c.stripCopy}>
+              <strong>Replying to {replyTarget.authorName}</strong>
+              <span>{replySnippet(replyTarget).text}</span>
             </div>
-            <button
-              type="button"
-              onClick={onCancelReply}
-              aria-label="Cancel reply"
-              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
-            >
-              <X className="size-4" />
+            <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className={c.iconBtn}>
+              <X size={18} aria-hidden="true" />
             </button>
           </div>
         )}
         {editTarget && (
-          <div className="chat-line-compose-strip mb-2 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-border dark:bg-muted/60">
-            <Pencil className="size-3.5 shrink-0 text-slate-500 dark:text-muted-foreground" />
-            <span className="flex-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-              Editing message
-            </span>
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              aria-label="Cancel edit"
-              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
-            >
-              <X className="size-4" />
+          <div className={c.strip}>
+            <div className={c.stripCopy}>
+              <strong>Editing message</strong>
+              <span>{editTarget.text}</span>
+            </div>
+            <button type="button" onClick={onCancelEdit} aria-label="Cancel edit" className={c.iconBtn}>
+              <X size={18} aria-hidden="true" />
             </button>
           </div>
         )}
-        {/* Staged-image preview chip. */}
         {attachFile && attachPreview && (
-          <div className="chat-line-attachment-preview mb-2 flex items-center gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-border dark:bg-muted/60">
+          <div className={c.strip}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={attachPreview}
-              alt="Selected image preview"
-              className="size-10 shrink-0 rounded object-cover ring-1 ring-slate-200 dark:ring-border"
-            />
-            <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-muted-foreground">
-              {attachFile.name}
-            </span>
-            <button
-              type="button"
-              onClick={clearAttachment}
-              aria-label="Remove image"
-              className="grid size-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-muted-foreground dark:hover:bg-muted"
-            >
-              <X className="size-4" />
+            <img src={attachPreview} alt="Selected image preview" className={c.stripThumb} />
+            <div className={c.stripCopy}>
+              <strong>Photo ready</strong>
+              <span>{attachFile.name}</span>
+            </div>
+            <button type="button" onClick={clearAttachment} aria-label="Remove image" className={c.iconBtn}>
+              <X size={18} aria-hidden="true" />
             </button>
           </div>
         )}
-        <div className="chat-line-thread-composer-row flex items-end gap-1.5">
-          <Button
+        <div className={c.composeRow}>
+          <button
             type="button"
-            variant="ghost"
-            size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={!channelId || !!editTarget}
             aria-label="Attach an image"
-            className="chat-line-tool size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+            className={c.tool}
           >
-            <ImagePlus className="size-5" />
-          </Button>
+            <ImagePlus size={22} aria-hidden="true" />
+          </button>
           {gifEnabled && (
-            <div className="relative">
-              <Button
+            <div className={c.gifWrap}>
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
                 onClick={() => setGifOpen((open) => !open)}
                 disabled={!channelId || !!editTarget}
                 aria-label="Add a GIF"
                 aria-expanded={gifOpen}
-                className="chat-line-tool chat-line-gif-button size-10 shrink-0 text-slate-500 hover:text-[#0A1F44] dark:text-muted-foreground dark:hover:text-foreground"
+                className={c.tool}
               >
-                <Sparkles className="size-5" />
-              </Button>
+                GIF
+              </button>
               {gifOpen && channelId && (
-                <GifPicker
-                  authedFetch={authedFetch}
-                  onSelect={onSendGif}
-                  onClose={() => setGifOpen(false)}
-                />
+                <GifPicker authedFetch={authedFetch} onSelect={onSendGif} onClose={() => setGifOpen(false)} />
               )}
             </div>
           )}
-          <Textarea
+          <textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value.slice(0, 1000))}
             onFocus={handleComposerFocus}
@@ -1014,38 +985,32 @@ export function MobileThread({
                 onCancelEdit();
               }
             }}
-            placeholder={
-              editTarget ? 'Edit your message...' : 'Write an update…'
-            }
+            placeholder={editTarget ? 'Edit your message' : 'Message #' + (channel?.name ?? 'channel')}
+            aria-label={editTarget ? 'Edit your message' : 'Message'}
             disabled={!channelId}
             rows={1}
-            className="chat-line-textarea max-h-32 min-h-[2.5rem] flex-1 resize-none"
+            enterKeyHint="send"
+            className={c.input}
           />
-          <Button
+          <button
             type="button"
             onClick={handleSend}
-            disabled={
-              !channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending
-            }
-            size="icon"
-            className="chat-line-send size-10 shrink-0 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
+            disabled={!channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}
+            className={c.send}
             aria-label={editTarget ? 'Save edit' : sending ? 'Sending' : 'Send message'}
           >
             {sending ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2 size={18} className={c.spin} aria-hidden="true" />
             ) : editTarget ? (
-              <Check className="size-4" />
+              <Check size={20} aria-hidden="true" />
             ) : (
-              <Send className="size-4" />
+              <Send size={18} aria-hidden="true" />
             )}
-          </Button>
+          </button>
         </div>
-        <p className="chat-line-thread-composer-meta mt-1.5 text-[11px] text-slate-500 dark:text-muted-foreground">
-          Enter to send
-        </p>
       </div>
 
-      {/* Long-press action sheet — Reply / Copy / Edit / Delete for one message. */}
+      {/* Long-press action sheet — React / Reply / Copy / Pin / Edit / Delete for one message. */}
       <MessageActionSheet
         open={!!actionSheet}
         authorName={actionSheet?.authorName}
