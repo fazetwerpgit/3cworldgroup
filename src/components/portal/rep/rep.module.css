@@ -420,6 +420,30 @@
   padding-top: 3px;
 }
 
+/* Task pages (Log a sale): back link + title in place of the phone brand. */
+.back {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin-left: calc(var(--s2) * -1);
+  border-radius: var(--r-control);
+  color: var(--c-text);
+}
+
+.barTitle {
+  margin: 0 auto 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 1023px) {
+  .brandTask {
+    display: none;
+  }
+}
+
 .iconBtn {
   position: relative;
   display: grid;

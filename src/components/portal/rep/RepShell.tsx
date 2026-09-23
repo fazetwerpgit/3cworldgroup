@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { CommandPalette } from '@/components/portal/CommandPalette';
@@ -22,24 +22,40 @@ export function RepBoot() {
   );
 }
 
-function RepChrome({ children }: { children: ReactNode }) {
+/** Lets a page swap the phone tab bar for its own bottom bar (Log Sale's submit bar). */
+const TabBarHiddenContext = createContext<((hidden: boolean) => void) | null>(null);
+
+/** Hide the phone tab bar while `hidden` is true and this component is mounted. */
+export function useHideRepTabBar(hidden: boolean) {
+  const setHidden = useContext(TabBarHiddenContext);
+  useEffect(() => {
+    if (!setHidden) return;
+    setHidden(hidden);
+    return () => setHidden(false);
+  }, [hidden, setHidden]);
+}
+
+function RepChrome({ children, task }: { children: ReactNode; task?: string }) {
   const { user, isRole } = useAuth();
   usePresenceHeartbeat();
   const { channels } = useChatChannels();
   const { anyUnread } = useChatUnread(channels, user?.uid);
   const pendingSignupsCount = usePendingSignupsCount(isRole('admin'));
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [tabBarHidden, setTabBarHidden] = useState(false);
 
   return (
-    <div className={s.root} data-shell="rep">
-      <RepTopBar chatUnread={anyUnread} pendingSignupsCount={pendingSignupsCount} />
-      <main className={s.scroller} id="rep-main">
-        <div className={s.main}>{children}</div>
-      </main>
-      <RepTabBar chatUnread={anyUnread} />
-      {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-    </div>
+    <TabBarHiddenContext.Provider value={setTabBarHidden}>
+      <div className={s.root} data-shell="rep">
+        <RepTopBar chatUnread={anyUnread} pendingSignupsCount={pendingSignupsCount} task={task} />
+        <main className={s.scroller} id="rep-main">
+          <div className={s.main}>{children}</div>
+        </main>
+        {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} />}
+        {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      </div>
+    </TabBarHiddenContext.Provider>
   );
 }
 
@@ -51,13 +67,16 @@ function RepChrome({ children }: { children: ReactNode }) {
 export function RepShell({
   children,
   permissions,
+  task,
 }: {
   children: ReactNode;
   permissions?: string[];
+  /** A task page's title: on phones the top bar shows a back link and this instead of the brand. */
+  task?: string;
 }) {
   return (
     <ProtectedRoute permissions={permissions} fallback={<RepBoot />}>
-      <RepChrome>{children}</RepChrome>
+      <RepChrome task={task}>{children}</RepChrome>
     </ProtectedRoute>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Bug, ChevronDown, LogOut, Menu, Plus, Settings, X } from 'lucide-react';
+import { Bell, Bug, ChevronDown, ChevronLeft, LogOut, Menu, Plus, Settings, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
@@ -58,9 +58,12 @@ function timeAgo(date: Date | string) {
 export function RepTopBar({
   chatUnread = false,
   pendingSignupsCount = 0,
+  task,
 }: {
   chatUnread?: boolean;
   pendingSignupsCount?: number;
+  /** Task page title (Log a sale): phones get a back link and this in place of the brand. */
+  task?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -120,10 +123,17 @@ export function RepTopBar({
     <>
       <header className={s.topbar}>
         <div className={s.topbarInner}>
-          <Link href={brandHref} className={s.brand} aria-label="3C World Group home">
+          {task ? (
+            <Link href={brandHref} className={`${s.back} ${s.phoneOnly}`} aria-label="Back to dashboard">
+              <ChevronLeft size={24} strokeWidth={2} aria-hidden="true" />
+            </Link>
+          ) : null}
+          <Link href={brandHref} className={`${s.brand} ${task ? s.brandTask : ''}`} aria-label="3C World Group home">
             <Image src="/logo.webp" alt="" width={550} height={516} sizes="34px" className={s.brandMark} priority />
             <span className={s.brandWord}>3C World Group</span>
           </Link>
+
+          {task ? <p className={`${s.barTitle} ${s.phoneOnly}`}>{task}</p> : null}
 
           <ul className={s.deskNav}>
             {deskLinks.map((tab) => (
