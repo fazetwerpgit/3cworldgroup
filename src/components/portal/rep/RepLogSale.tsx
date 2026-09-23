@@ -449,7 +449,7 @@ export function RepLogSale() {
         )
       ) : null}
       <form id={FORM_ID} ref={formRef} className={l.reviewGrid} onSubmit={onSubmit} noValidate>
-        <ProofCapture uploads={uploads} orderRequired={orderRequired && proofTiles === 0} />
+        <ProofCapture uploads={uploads} orderRequired={orderRequired && proofTiles === 0} autofill={scanOn} />
 
         <div className={l.reviewMain}>
           <header>

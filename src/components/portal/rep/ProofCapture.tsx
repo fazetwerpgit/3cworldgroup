@@ -242,8 +242,20 @@ function Thumb({ preview, label }: { preview: Preview | null; label: string }) {
   );
 }
 
-/** Thumbnails with remove buttons plus an add tile until the cap is reached. */
-export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads; orderRequired: boolean }) {
+/**
+ * Thumbnails with remove buttons plus an add tile until the cap is reached.
+ * `autofill`: the screenshot reader is on, so an empty card says a screenshot
+ * fills in the details.
+ */
+export function ProofCapture({
+  uploads,
+  orderRequired,
+  autofill = false,
+}: {
+  uploads: ProofUploads;
+  orderRequired: boolean;
+  autofill?: boolean;
+}) {
   const { tiles, room } = uploads;
   const count = tiles.filter((t) => t.kind === 'done').length;
 
@@ -275,6 +287,9 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
               ? 'No screenshot, order number needed'
               : 'No screenshot yet'}
         </p>
+        {autofill && tiles.length === 0 ? (
+          <p className={l.proofHint}>Add the order confirmation screenshot and we&apos;ll fill in the details for you.</p>
+        ) : null}
       </div>
       <ul className={l.thumbs}>
         {tiles.map((tile, index) => {

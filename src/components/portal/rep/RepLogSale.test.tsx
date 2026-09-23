@@ -52,6 +52,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('RepLogSale', () => {
@@ -73,6 +74,23 @@ describe('RepLogSale', () => {
     await mount();
     expect(document.body.textContent).toContain('2 screenshots attached');
     expect(container.querySelector<HTMLInputElement>('#customerName')!.value).toBe('Alicia');
+  });
+
+  it('with the screenshot reader on, an empty proof card says a screenshot fills the details', async () => {
+    const hint = "Add the order confirmation screenshot and we'll fill in the details for you.";
+    vi.stubEnv('SALE_SCAN_ENABLED', 'true');
+    await mount();
+    const manual = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Enter manually'))!;
+    await act(async () => manual.click());
+    expect(container.textContent).toContain(hint);
+    vi.stubEnv('SALE_SCAN_ENABLED', '');
+    await act(async () => root.render(<RepLogSale key="off" />));
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((b) => b.textContent?.includes('Enter manually'))!
+        .click();
+    });
+    expect(container.textContent).not.toContain(hint);
   });
 
   it('marks each missing field and asks for the order number on a manual entry', async () => {
