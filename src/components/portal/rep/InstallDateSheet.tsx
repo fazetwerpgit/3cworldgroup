@@ -17,6 +17,12 @@ function inputDay(value: unknown): string {
   return installDayKey(value) ?? '';
 }
 
+/** The day after a YYYY-MM-DD, for the date input's min. */
+function nextDay(day: string): string {
+  const [year, month, date] = day.split('-').map(Number);
+  return dateToSaleDateInput(new Date(year, month - 1, date + 1, 12));
+}
+
 function maxInstallDay(): string {
   const max = new Date();
   max.setDate(max.getDate() + 365);
@@ -27,18 +33,24 @@ function maxInstallDay(): string {
  * The rep sets or moves the install date on one of their own sales: bottom
  * sheet on phone, centred dialog on desktop, portaled to <body>. A missed
  * install starts empty and needs a day after the one that broke, so the
- * reschedule is what puts the money back on the board.
+ * reschedule is what puts the money back on the board. The day that broke is
+ * the carrier's (`missedDay`, the breakage row's est install day), since that is
+ * what decides whether the install still counts as missed (isStandingBreakage);
+ * the sale's own date stands in only when the carrier gave none.
  */
 export function InstallDateSheet({
   sale,
   plan,
   missed,
+  missedDay,
   onClose,
   onSaved,
 }: {
   sale: SheetSale;
   plan?: string;
   missed: boolean;
+  /** The carrier's missed install day (YYYY-MM-DD), when it gave one. */
+  missedDay?: string | null;
   onClose: () => void;
   onSaved: (saleId: string, installDate: string) => void;
 }) {
@@ -63,6 +75,8 @@ export function InstallDateSheet({
 
   const title = missed ? 'Reschedule the install' : current ? 'Change install date' : 'Add install date';
   const soldDay = inputDay(sale.saleDate);
+  const brokeDay = missed ? (/^\d{4}-\d{2}-\d{2}$/.test(missedDay ?? '') ? missedDay! : current) : '';
+  const firstDay = brokeDay && nextDay(brokeDay) > soldDay ? nextDay(brokeDay) : soldDay;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -80,7 +94,7 @@ export function InstallDateSheet({
       setError('Install date is before the sale date.');
       return;
     }
-    if (missed && current && day <= current) {
+    if (brokeDay && day <= brokeDay) {
       setError('Pick a day after the missed one.');
       return;
     }
@@ -112,7 +126,15 @@ export function InstallDateSheet({
             <h2 id="install-date-title" className={s.sheetTitle}>
               {title}
             </h2>
-            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={onClose}>
+            <button
+              ref={closeRef}
+              type="button"
+              className={s.iconBtn}
+              aria-label="Close"
+              // Closing mid-save would hide whether the date went through.
+              disabled={saving}
+              onClick={onClose}
+            >
               <X size={20} aria-hidden="true" />
             </button>
           </div>
@@ -133,7 +155,7 @@ export function InstallDateSheet({
                 className={l.input}
                 type="date"
                 value={day}
-                min={soldDay || undefined}
+                min={firstDay || undefined}
                 max={maxInstallDay()}
                 disabled={saving}
                 aria-invalid={error ? true : undefined}

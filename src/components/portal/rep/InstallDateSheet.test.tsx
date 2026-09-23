@@ -39,13 +39,14 @@ function noon(days: number): Date {
   return date;
 }
 
-function render(props: { missed: boolean; installDate?: Date }) {
+function render(props: { missed: boolean; installDate?: Date; missedDay?: string | null }) {
   act(() => {
     root.render(
       <InstallDateSheet
         sale={{ id: 's1', customerName: 'Priya Nair', saleDate: noon(-10), installDate: props.installDate }}
         plan="TFiber 2 Gig"
         missed={props.missed}
+        missedDay={props.missedDay}
         onClose={onClose}
         onSaved={onSaved}
       />
@@ -115,6 +116,41 @@ describe('InstallDateSheet', () => {
     await submit();
     expect(alertText()).toBe('Pick a day after the missed one.');
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("measures a missed install against the carrier's missed day, not the sale's", async () => {
+    // The sale still says two days ago, but the carrier's miss was yesterday:
+    // yesterday would still count as missed, so it has to be today or later.
+    render({ missed: true, installDate: noon(-2), missedDay: dayFromToday(-1) });
+    expect(input().min).toBe(dayFromToday(0));
+
+    pick(dayFromToday(-1));
+    await submit();
+    expect(alertText()).toBe('Pick a day after the missed one.');
+    expect(saveMock).not.toHaveBeenCalled();
+
+    saveMock.mockResolvedValue({ ok: true, installDate: noon(0).toISOString() });
+    pick(dayFromToday(0));
+    await submit();
+    expect(saveMock).toHaveBeenCalledWith('s1', dayFromToday(0));
+  });
+
+  it('keeps Close disabled while a save is in flight', async () => {
+    let finish: (value: unknown) => void = () => {};
+    saveMock.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+    render({ missed: false, installDate: noon(2) });
+    const close = container.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+
+    pick(dayFromToday(5));
+    act(() => {
+      save().click();
+    });
+    expect(close.disabled).toBe(true);
+    close.click();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => finish({ ok: false, error: "Couldn't save the date. Tap Save to try again." }));
+    expect(close.disabled).toBe(false);
   });
 
   it('refuses a day before the sale without a round trip', async () => {

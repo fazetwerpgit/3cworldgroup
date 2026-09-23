@@ -158,18 +158,24 @@ export interface NeedsDateRow {
   plan: string;
   /** True when a date existed but the install broke at the door. */
   missed: boolean;
+  /** The carrier's missed install day (its breakage row), when it gave one. */
+  missedDay: string | null;
 }
 
 /** Counted sales that still need an install date on the calendar, newest first. */
 export function needsDateRows(sales: Sale[], fiberBySale: FiberMap, now: Date = new Date()): NeedsDateRow[] {
   return countedSales(sales, fiberBySale)
     .filter((sale) => installBucketForSale(sale, orderFor(sale, fiberBySale), now) === 'attention')
-    .map((sale) => ({
-      id: sale.id || '',
-      customer: sale.customerName || 'Customer',
-      plan: planLabel(sale),
-      missed: !!sale.installDate,
-    }));
+    .map((sale) => {
+      const order = orderFor(sale, fiberBySale);
+      return {
+        id: sale.id || '',
+        customer: sale.customerName || 'Customer',
+        plan: planLabel(sale),
+        missed: !!sale.installDate,
+        missedDay: order?.status === 'breakage' ? order.estInstallDate ?? null : null,
+      };
+    });
 }
 
 // ---------------------------------------------------------------- standing

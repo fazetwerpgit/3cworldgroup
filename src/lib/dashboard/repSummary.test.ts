@@ -202,6 +202,15 @@ describe('needsDateRows', () => {
     const rows = needsDateRows([sale(), missed, sale({ status: 'cancelled' }), sale({ installDate: d(2026, 9, 30) })], fiber, NOW);
     expect(rows.map((r) => r.missed)).toEqual([false, true]);
   });
+
+  it("carries the carrier's missed day for the reschedule sheet", () => {
+    const missed = sale({ installDate: d(2026, 9, 12) });
+    const fiber = new Map<string, FiberOrder>([
+      [missed.id!, { status: 'breakage', estInstallDate: '2026-09-14' } as FiberOrder],
+    ]);
+    const rows = needsDateRows([sale(), missed], fiber, NOW);
+    expect(rows.map((r) => r.missedDay)).toEqual([null, '2026-09-14']);
+  });
 });
 
 describe('standingFrom', () => {

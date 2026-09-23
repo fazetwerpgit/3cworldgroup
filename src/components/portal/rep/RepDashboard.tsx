@@ -928,6 +928,7 @@ export function RepDashboard() {
           sale={dateSale}
           plan={dateRow.plan}
           missed={dateRow.missed}
+          missedDay={dateRow.missedDay}
           onClose={closeDate}
           onSaved={data.installDateSaved}
         />
