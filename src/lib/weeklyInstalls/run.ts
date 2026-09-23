@@ -13,19 +13,34 @@ import { reportWeekFor, type ReportWeek } from '@/lib/weeklyInstalls/week';
 //                                  WOULD go out).
 //   WEEKLY_INSTALLS_EMAIL_ONLY_TO  optional; every send goes to this one address
 //                                  instead of the rep (the owner's test run).
+//                                  Set but not a valid address (a typo) forces a
+//                                  dry run: it must never fall back to mailing
+//                                  every rep.
 
 export interface WeeklyRunConfig {
   enabled: boolean;
   onlyTo: string | null;
   baseUrl: string;
+  /** Why the run was forced dry despite ENABLED (a malformed ONLY_TO). */
+  configError: string | null;
 }
+
+const EMAIL = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+
+export const ONLY_TO_INVALID =
+  'WEEKLY_INSTALLS_EMAIL_ONLY_TO is set but is not one valid email address, so nothing was sent. Fix it, or clear it for the live send to every rep.';
 
 export function weeklyRunConfig(env: NodeJS.ProcessEnv = process.env): WeeklyRunConfig {
   const onlyTo = (env.WEEKLY_INSTALLS_EMAIL_ONLY_TO ?? '').trim();
+  const baseUrl = emailBaseUrl(env.APP_BASE_URL);
+  if (onlyTo && !EMAIL.test(onlyTo)) {
+    return { enabled: false, onlyTo: null, baseUrl, configError: ONLY_TO_INVALID };
+  }
   return {
     enabled: env.WEEKLY_INSTALLS_EMAIL_ENABLED === 'true',
-    onlyTo: onlyTo.includes('@') ? onlyTo : null,
-    baseUrl: emailBaseUrl(env.APP_BASE_URL),
+    onlyTo: onlyTo || null,
+    baseUrl,
+    configError: null,
   };
 }
 
@@ -33,6 +48,8 @@ export interface WeeklyRunSummary {
   week: { from: string; to: string };
   enabled: boolean;
   redirectedTo: string | null;
+  /** Set when the config forced a dry run (see WeeklyRunConfig.configError). */
+  configError?: string;
   /** Active reps with any sales or carrier orders at all. */
   considered: number;
   /** Reps whose digest had nothing in it (never emailed). */
@@ -71,6 +88,10 @@ export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSu
     alreadySent: 0,
     failed: 0,
   };
+  if (config.configError) {
+    console.error(`[weekly-installs] ${config.configError}`);
+    summary.configError = config.configError;
+  }
 
   const reps = await gatherAllReps(db);
   summary.considered = reps.length;
@@ -93,8 +114,8 @@ export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSu
       continue;
     }
     summary.eligible += 1;
-    // Kill switch: off means a read-only dry run. No claim, no send.
-    if (!config.enabled) continue;
+    // Kill switch: off (or a bad config) means a read-only dry run. No claim, no send.
+    if (!config.enabled || config.configError) continue;
 
     const email = renderWeeklyInstallsEmail(digest, { baseUrl: config.baseUrl });
     const subject = config.onlyTo ? `[Test: ${rep.name}] ${email.subject}` : email.subject;

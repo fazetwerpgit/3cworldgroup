@@ -97,6 +97,24 @@ describe('GET /api/cron/weekly-installs', () => {
     expect(fake.writes).toHaveLength(0);
   });
 
+  it('never mass-sends when ONLY_TO is set but malformed: dry run with a clear error', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('WEEKLY_INSTALLS_EMAIL_ENABLED', 'true');
+    for (const value of ['jmyers', 'jmyers@', 'a@b.com, c@d.com']) {
+      vi.stubEnv('WEEKLY_INSTALLS_EMAIL_ONLY_TO', value);
+      const body = await (await GET(request())).json();
+      expect(body).toMatchObject({ enabled: false, redirectedTo: null, eligible: 2, sent: 0 });
+      expect(body.configError).toContain('WEEKLY_INSTALLS_EMAIL_ONLY_TO');
+      // force=1 cannot skip the hour gate for it either.
+      vi.setSystemTime(MONDAY_9AM_CDT);
+      expect(await (await GET(request({ query: '?force=1' }))).json()).toMatchObject({ skipped: 'not_send_hour' });
+      vi.setSystemTime(MONDAY_8AM_CDT);
+    }
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(fake.writes).toHaveLength(0);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('WEEKLY_INSTALLS_EMAIL_ONLY_TO'));
+  });
+
   it('sends each active rep with something to say their own email, awaited, once', async () => {
     vi.stubEnv('WEEKLY_INSTALLS_EMAIL_ENABLED', 'true');
     const body = await (await GET(request())).json();

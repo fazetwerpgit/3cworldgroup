@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from './managerInterview';
+import type { UserRole } from '@/types';
+import { canOpenManagerInterview, isPromotionRole, validateSignatureDataUrl, isEmailShaped } from './managerInterview';
 
 describe('isPromotionRole', () => {
   it('Account Executive is not a promotion', () => {
@@ -49,5 +50,24 @@ describe('isEmailShaped', () => {
     expect(isEmailShaped('a@b')).toBe(false);
     expect(isEmailShaped('a b@c.com')).toBe(false);
     expect(isEmailShaped('')).toBe(false);
+  });
+});
+
+describe('canOpenManagerInterview (forms hub row and page gate)', () => {
+  const as = (role: UserRole) => (...roles: UserRole[]) => roles.includes(role);
+
+  it('shows the row to the roles the page lets in', () => {
+    for (const role of ['admin', 'operations', 'l1_manager', 'regional_manager', 'director'] as const) {
+      expect(canOpenManagerInterview(as(role))).toBe(true);
+    }
+  });
+
+  it('hides it from general and office managers, whom the page turns away', () => {
+    expect(canOpenManagerInterview(as('general_manager'))).toBe(false);
+    expect(canOpenManagerInterview(as('office_manager'))).toBe(false);
+  });
+
+  it('hides it from reps', () => {
+    expect(canOpenManagerInterview(as('entry_rep'))).toBe(false);
   });
 });

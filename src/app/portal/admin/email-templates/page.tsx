@@ -95,6 +95,7 @@ export default function EmailTemplatesPage() {
   const [templates, setTemplates] = useState<TemplateEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,8 +113,10 @@ export default function EmailTemplatesPage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load templates');
       setTemplates(json.templates);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load templates');
+      setLoadFailed(false);
+    } catch {
+      // Load failures show "Couldn't load · Retry" in the list; `error` is for actions.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -123,14 +126,7 @@ export default function EmailTemplatesPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // A failed first load shows "Couldn't load · Retry"; later action errors show a banner.
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    if (!loading && !error) setLoaded(true);
-  }, [loading, error]);
-  const loadFailed = !loading && !loaded && Boolean(error);
   const retry = () => {
-    setError('');
     setLoading(true);
     fetchTemplates();
   };
@@ -375,7 +371,7 @@ export default function EmailTemplatesPage() {
           }))}
         />
 
-        {error && !loadFailed ? <Banner tone="error">{error}</Banner> : null}
+        {error ? <Banner tone="error">{error}</Banner> : null}
         {success ? <Banner tone="ok">{success}</Banner> : null}
 
         {editingId ? (

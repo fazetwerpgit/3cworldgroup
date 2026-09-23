@@ -191,12 +191,17 @@ export default function OnboardingReviewPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectModal, setRejectModal] = useState<Submission | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  // Reject failures show inside the sheet; the page banner sits behind it.
+  const [rejectError, setRejectError] = useState('');
+  const [notice, setNotice] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [personFilter, setPersonFilter] = useState('all');
   const [atRiskOnly, setAtRiskOnly] = useState(false);
   const [sendState, setSendState] = useState<Record<string, { message: string; error?: boolean }>>({});
 
-  const fetchQueue = useCallback(async () => {
+  // `background` refreshes after an action keep the current list on failure,
+  // so a confirmation the admin just got is not swapped for a load error.
+  const fetchQueue = useCallback(async (background = false) => {
     if (!user) return;
     try {
       const response = await fetch('/api/portal/onboarding/review', {
@@ -209,18 +214,34 @@ export default function OnboardingReviewPage() {
       setCompleted(Array.isArray(json.completed) ? json.completed : []);
       setLoadFailed(false);
     } catch {
-      // A failed load says so (with a retry) instead of showing an empty queue.
-      setLoadFailed(true);
+      if (background) {
+        setError("Couldn't refresh the queue. Tap refresh to try again.");
+      } else {
+        // A failed load says so (with a retry) instead of showing an empty queue.
+        setLoadFailed(true);
+      }
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  useEffect(() => { fetchQueue(); }, [fetchQueue]);
+  useEffect(() => { void fetchQueue(); }, [fetchQueue]);
 
   const retryLoad = () => {
     setLoading(true);
+    setError('');
     void fetchQueue();
+  };
+
+  const openReject = (submission: Submission) => {
+    setRejectError('');
+    setRejectModal(submission);
+  };
+
+  const closeReject = () => {
+    setRejectModal(null);
+    setRejectionReason('');
+    setRejectError('');
   };
 
   // The signed-pdf route verifies a Bearer token, which a plain link cannot
@@ -250,7 +271,8 @@ export default function OnboardingReviewPage() {
   const review = async (submission: Submission, status: 'approved' | 'rejected', reason?: string) => {
     if (!user) return;
     setProcessingId(submission.id);
-    setError('');
+    const fail = status === 'rejected' ? setRejectError : setError;
+    fail('');
     try {
       const response = await fetch('/api/portal/onboarding/review', {
         method: 'POST',
@@ -266,10 +288,9 @@ export default function OnboardingReviewPage() {
       if (!response.ok) throw new Error(json.error || 'Failed to review submission');
       setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
       setEsignPending((prev) => prev.filter((s) => s.id !== submission.id));
-      setRejectModal(null);
-      setRejectionReason('');
+      closeReject();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to review submission');
+      fail(err instanceof Error ? err.message : 'Failed to review submission');
     } finally {
       setProcessingId(null);
     }
@@ -287,11 +308,18 @@ export default function OnboardingReviewPage() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to send for signature');
-      setSendState((prev) => ({
-        ...prev,
-        [submission.id]: { message: json.reason === 'envelope_exists' ? 'Already sent.' : 'Sent. The rep can sign it in their portal.' },
-      }));
-      await fetchQueue();
+      // The row moves to "Out for signature" on refresh, so confirm at page level.
+      setSendState((prev) => {
+        const next = { ...prev };
+        delete next[submission.id];
+        return next;
+      });
+      setNotice(
+        json.reason === 'envelope_exists'
+          ? `${submission.itemLabel} was already sent to ${repLabel(submission.userName, submission.userId)}.`
+          : `Sent ${submission.itemLabel} to ${repLabel(submission.userName, submission.userId)}. They can sign it in their portal.`
+      );
+      await fetchQueue(true);
     } catch (err) {
       setSendState((prev) => ({
         ...prev,
@@ -450,6 +478,11 @@ export default function OnboardingReviewPage() {
             {error}
           </AdminNotice>
         ) : null}
+        {notice ? (
+          <AdminNotice tone="ok" onDismiss={() => setNotice('')}>
+            {notice}
+          </AdminNotice>
+        ) : null}
 
         <Section
           id="onb-waiting"
@@ -602,7 +635,7 @@ export default function OnboardingReviewPage() {
                                     type="button"
                                     className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
                                     disabled={working}
-                                    onClick={() => setRejectModal(submission)}
+                                    onClick={() => openReject(submission)}
                                   >
                                     Reject
                                   </button>
@@ -727,7 +760,7 @@ export default function OnboardingReviewPage() {
                                   type="button"
                                   className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
                                   disabled={processingId === submission.id}
-                                  onClick={() => setRejectModal(submission)}
+                                  onClick={() => openReject(submission)}
                                 >
                                   Reject
                                 </button>
@@ -813,19 +846,13 @@ export default function OnboardingReviewPage() {
           title={`Reject ${rejectModal.itemLabel}`}
           tone="danger"
           description={`Give a reason. It is shared with ${repLabel(rejectModal.userName, rejectModal.userId)}.`}
-          onClose={() => {
-            setRejectModal(null);
-            setRejectionReason('');
-          }}
+          onClose={closeReject}
           footer={
             <>
               <button
                 type="button"
                 className={`${s.btnSecondary} ${u.sm}`}
-                onClick={() => {
-                  setRejectModal(null);
-                  setRejectionReason('');
-                }}
+                onClick={closeReject}
               >
                 Cancel
               </button>
@@ -841,6 +868,11 @@ export default function OnboardingReviewPage() {
           }
         >
           <div className={u.sheetPad}>
+            {rejectError ? (
+              <AdminNotice tone="error" onDismiss={() => setRejectError('')}>
+                {rejectError}
+              </AdminNotice>
+            ) : null}
             <div className={u.field}>
               <label className={u.label} htmlFor="onb-reject-reason">
                 Reason

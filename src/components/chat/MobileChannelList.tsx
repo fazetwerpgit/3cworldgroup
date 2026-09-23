@@ -1,6 +1,6 @@
 'use client';
 
-import { Hash, Lock, RotateCw, ShieldAlert } from 'lucide-react';
+import { Hash, Lock, RotateCw, ShieldAlert, WifiOff } from 'lucide-react';
 import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
 import s from '@/components/portal/rep/rep.module.css';
 import c from './chat.module.css';
@@ -27,10 +27,20 @@ interface ChannelRowsProps {
   /** Desktop rail only: the open channel gets the current-row treatment. */
   activeChannelId?: string;
   onSelect: (channelId: string) => void;
+  /** Resubscribe after a listener failure (falls back to a reload). */
+  onRetry?: () => void;
 }
 
 /** Channel rows shared by the phone channel screen and the desktop rail. */
-export function ChannelRows({ channels, loading, error, unreadByChannel, activeChannelId, onSelect }: ChannelRowsProps) {
+export function ChannelRows({
+  channels,
+  loading,
+  error,
+  unreadByChannel,
+  activeChannelId,
+  onSelect,
+  onRetry = () => window.location.reload(),
+}: ChannelRowsProps) {
   if (loading) {
     return (
       <div aria-hidden="true">
@@ -50,7 +60,7 @@ export function ChannelRows({ channels, loading, error, unreadByChannel, activeC
     return (
       <div className={s.failed} role="alert">
         Couldn&apos;t load channels
-        <button type="button" className={s.retry} onClick={() => window.location.reload()}>
+        <button type="button" className={s.retry} onClick={onRetry}>
           <RotateCw size={14} aria-hidden="true" /> Retry
         </button>
       </div>
@@ -60,39 +70,52 @@ export function ChannelRows({ channels, loading, error, unreadByChannel, activeC
     return <p className={c.empty}>No channels yet. An admin can sync them from Chat channels.</p>;
   }
   return (
-    <ul className={c.channels}>
-      {channels.map((channel) => {
-        const unread = !!unreadByChannel?.[channel.id];
-        const Mark = channel.audience === 'managers' ? Lock : Hash;
-        return (
-          <li key={channel.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(channel.id)}
-              aria-current={activeChannelId === channel.id ? 'true' : undefined}
-              className={`${c.channel} ${unread ? c.channelUnread : ''}`}
-            >
-              <span className={c.channelMark} aria-hidden="true">
-                <Mark size={18} strokeWidth={2} />
-              </span>
-              <span className={c.channelCopy}>
-                <span className={c.channelName}>{channel.name}</span>
-                {channel.description ? <span className={c.channelDesc}>{channel.description}</span> : null}
-              </span>
-              <span className={c.channelMeta}>
-                {formatChannelTime(channel.lastMessageAt)}
-                {unread ? (
-                  <>
-                    <i className={c.unreadDot} aria-hidden="true" />
-                    <span className={s.srOnly}>Unread messages</span>
-                  </>
-                ) : null}
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      {error ? (
+        // The listener died after channels loaded: the list is stale (no new
+        // unread dots or times), so say so without taking it away.
+        <p className={c.listOffline} role="status">
+          <WifiOff size={16} aria-hidden="true" />
+          <span>Chat&apos;s offline</span>
+          <button type="button" onClick={onRetry} className={c.listOfflineRetry}>
+            <RotateCw size={14} aria-hidden="true" /> Retry
+          </button>
+        </p>
+      ) : null}
+      <ul className={c.channels}>
+        {channels.map((channel) => {
+          const unread = !!unreadByChannel?.[channel.id];
+          const Mark = channel.audience === 'managers' ? Lock : Hash;
+          return (
+            <li key={channel.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(channel.id)}
+                aria-current={activeChannelId === channel.id ? 'true' : undefined}
+                className={`${c.channel} ${unread ? c.channelUnread : ''}`}
+              >
+                <span className={c.channelMark} aria-hidden="true">
+                  <Mark size={18} strokeWidth={2} />
+                </span>
+                <span className={c.channelCopy}>
+                  <span className={c.channelName}>{channel.name}</span>
+                  {channel.description ? <span className={c.channelDesc}>{channel.description}</span> : null}
+                </span>
+                <span className={c.channelMeta}>
+                  {formatChannelTime(channel.lastMessageAt)}
+                  {unread ? (
+                    <>
+                      <i className={c.unreadDot} aria-hidden="true" />
+                      <span className={s.srOnly}>Unread messages</span>
+                    </>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
@@ -103,12 +126,14 @@ export function MobileChannelList({
   error,
   unreadByChannel,
   onOpenChannel,
+  onRetry,
 }: {
   channels: ChatChannelDoc[];
   loading: boolean;
   error?: string;
   unreadByChannel?: Record<string, boolean>;
   onOpenChannel: (channelId: string) => void;
+  onRetry?: () => void;
 }) {
   const unreadCount = channels.filter((channel) => unreadByChannel?.[channel.id]).length;
   return (
@@ -126,6 +151,7 @@ export function MobileChannelList({
           error={error}
           unreadByChannel={unreadByChannel}
           onSelect={onOpenChannel}
+          onRetry={onRetry}
         />
       </div>
       <p className={c.guide}>

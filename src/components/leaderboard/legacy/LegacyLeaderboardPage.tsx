@@ -23,7 +23,6 @@ import type { LeaderboardEntry } from '../LeaderboardTable';
 type Period = 'week' | 'month' | 'year' | 'all';
 type Metric = 'totalPoints' | 'totalSales';
 
-export const WEEKLY_CHALLENGE = { targetSales: 7 } as const;
 
 const periodOptions: { value: Period; label: string }[] = [
   { value: 'week', label: 'This Week' },
@@ -83,14 +82,47 @@ function LegacyLeaderboardFilters({
   );
 }
 
-function WeeklyChallenge({ sales, loading, target }: { sales: number | null; loading: boolean; target: number }) {
+// `target` is null until the setting loads; a failed read says so rather than
+// showing a made-up target.
+function WeeklyChallenge({
+  sales,
+  loading,
+  target,
+  failed,
+  onRetry,
+}: {
+  sales: number | null;
+  loading: boolean;
+  target: number | null;
+  failed: boolean;
+  onRetry: () => void;
+}) {
   const [now, setNow] = useState(() => new Date());
-  const complete = sales !== null && sales >= target;
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  if (target === null) {
+    return (
+      <div className="relative grid gap-3 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] py-4 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
+        <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</h2>
+        {failed ? (
+          <span className="flex items-center gap-3 text-[14px] text-white/85" role="alert">
+            Couldn&apos;t load
+            <button type="button" className="min-h-[44px] font-black underline underline-offset-4" onClick={onRetry}>
+              Retry
+            </button>
+          </span>
+        ) : (
+          <span className="portal-display text-[12px] font-black text-white/85">Loading</span>
+        )}
+      </div>
+    );
+  }
+
+  const complete = sales !== null && sales >= target;
 
   return (
     <div className="relative grid gap-3 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] py-4 text-white dark:border-[#e7edf4] dark:bg-[linear-gradient(145deg,#142f5f,#07162e)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
@@ -189,7 +221,9 @@ export function LegacyLeaderboardPage({
   viewerName,
 }: LegacyLeaderboardPageProps) {
   const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard } = useLeaderboard();
-  const [challengeTarget, setChallengeTarget] = useState<number>(WEEKLY_CHALLENGE.targetSales);
+  const [challengeTarget, setChallengeTarget] = useState<number | null>(null);
+  const [challengeFailed, setChallengeFailed] = useState(false);
+  const [challengeAttempt, setChallengeAttempt] = useState(0);
 
   useEffect(() => {
     if (!active) return;
@@ -207,19 +241,27 @@ export function LegacyLeaderboardPage({
         const response = await fetch('/api/portal/settings/weekly-challenge', {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
-        if (!response.ok) return;
+        if (!response.ok) throw new Error('Failed to load weekly challenge');
         const data = await response.json();
-        if (!cancelled && typeof data.targetSales === 'number') {
+        if (typeof data.targetSales !== 'number') throw new Error('Weekly challenge target missing');
+        if (!cancelled) {
           setChallengeTarget(data.targetSales);
+          setChallengeFailed(false);
         }
       } catch {
-        // Keep the WEEKLY_CHALLENGE fallback silently.
+        // Never fall back to a made-up target: the card says it couldn't load.
+        if (!cancelled) setChallengeFailed(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [active]);
+  }, [active, challengeAttempt]);
+
+  const retryChallenge = () => {
+    setChallengeFailed(false);
+    setChallengeAttempt((value) => value + 1);
+  };
 
   // Nothing below is on screen on a phone, and the board it would draw runs a
   // count-up animation per row, so the whole tree stays unbuilt there.
@@ -240,7 +282,13 @@ export function LegacyLeaderboardPage({
         <PageTitle title="Leaderboard" meta={`${entries.length} ranked`} />
         <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} />
         <div className="portal-leaderboard-summary-grid">
-          <WeeklyChallenge sales={weeklySales} loading={weeklyLoading} target={challengeTarget} />
+          <WeeklyChallenge
+            sales={weeklySales}
+            loading={weeklyLoading}
+            target={challengeTarget}
+            failed={challengeFailed}
+            onRetry={retryChallenge}
+          />
           <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
         </div>
 

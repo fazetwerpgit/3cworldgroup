@@ -32,6 +32,9 @@ export default function TrainingDetailPage() {
   const [marking, setMarking] = useState(false);
   const [markFailed, setMarkFailed] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  // The signed file URL failed (no signal, missing file): say so instead of Loading… forever.
+  const [fileFailed, setFileFailed] = useState(false);
+  const [fileAttempt, setFileAttempt] = useState(0);
 
   const resourceId = params.id as string;
   const resourceProgress = progress[resourceId];
@@ -46,9 +49,12 @@ export default function TrainingDetailPage() {
 
   useEffect(() => {
     const path = currentResource?.storagePath;
-    if (!path || !storage) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFileUrl(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFileUrl(null);
+    setFileFailed(false);
+    if (!path) return;
+    if (!storage) {
+      setFileFailed(true);
       return;
     }
 
@@ -58,13 +64,13 @@ export default function TrainingDetailPage() {
         if (active) setFileUrl(url);
       })
       .catch(() => {
-        if (active) setFileUrl(null);
+        if (active) setFileFailed(true);
       });
 
     return () => {
       active = false;
     };
-  }, [currentResource?.storagePath]);
+  }, [currentResource?.storagePath, fileAttempt]);
 
   const handleMarkComplete = async () => {
     if (!user || !resourceId) return;
@@ -145,7 +151,11 @@ export default function TrainingDetailPage() {
               {currentResource.storagePath && (
                 <div>
                   <div className={l.media}>
-                    {!fileUrl ? (
+                    {fileFailed ? (
+                      <div className={l.mediaLoading}>
+                        <LoadFailed what="this file" onRetry={() => setFileAttempt((n) => n + 1)} />
+                      </div>
+                    ) : !fileUrl ? (
                       <div className={l.mediaLoading}>Loading…</div>
                     ) : currentResource.type === 'video' ? (
                       <video controls playsInline preload="metadata" src={fileUrl} className={l.video} />

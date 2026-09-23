@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import Image from 'next/image';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { CommandPalette } from '@/components/portal/CommandPalette';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,18 +8,12 @@ import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
+import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
 import s from './rep.module.css';
 
-/** Auth / first-paint placeholder on the D ground, so a load never flashes white. */
-export function RepBoot() {
-  return (
-    <div className={s.boot} role="status" aria-label="Loading">
-      <Image src="/logo.webp" alt="" width={550} height={516} sizes="40px" className={s.bootMark} priority />
-    </div>
-  );
-}
+export { RepBoot };
 
 /** Lets a page swap the phone tab bar for its own bottom bar (Log Sale's submit bar). */
 const TabBarHiddenContext = createContext<((hidden: boolean) => void) | null>(null);

@@ -77,11 +77,18 @@ export interface CompPlanTables {
   margin: CompPlanMargin;
 }
 
-/** A user doc as the recruiting count needs it (activation stamp only). */
+/** A user doc as the recruiting count needs it (activation stamps only). */
 export interface ActivatedUser {
   status?: string | null;
   fieldRole?: string | null;
+  /** Set on every pending -> active flip. Older docs lack it. */
+  activatedAt?: Date | null;
   hireDate: Date | null;
+}
+
+/** When a user went active: activatedAt, else hireDate for docs written before it existed. */
+export function activationDate(user: ActivatedUser): Date | null {
+  return user.activatedAt ?? user.hireDate;
 }
 
 export type OpenQueue = 'payrollDisputes' | 'expediteOrders' | 'leadsRequests' | 'bugReports';
@@ -349,13 +356,14 @@ export function firstInstallsByWeek(installs: InstallRecord[], periods: OwnerPer
   return counts;
 }
 
-/** Active field reps whose activation (hireDate) lands in each week. */
+/** Active field reps whose activation (activatedAt, else hireDate) lands in each week. */
 export function activationsByWeek(users: ActivatedUser[], periods: OwnerPeriods): WeekCount {
   const counts: WeekCount = { thisWeek: 0, lastWeek: 0 };
   for (const user of users) {
     if (user.status !== 'active' || !user.fieldRole) continue;
-    if (inWindow(user.hireDate, periods.thisWeek)) counts.thisWeek += 1;
-    else if (inWindow(user.hireDate, periods.lastWeek)) counts.lastWeek += 1;
+    const date = activationDate(user);
+    if (inWindow(date, periods.thisWeek)) counts.thisWeek += 1;
+    else if (inWindow(date, periods.lastWeek)) counts.lastWeek += 1;
   }
   return counts;
 }
@@ -427,22 +435,40 @@ export interface OwnerSummary {
   money?: MoneySummary;
   problems?: ProblemRow[];
   recruiting?: RecruitingSummary;
+  /** Sections that failed to build. Each is absent above; the rest still render. */
+  failed?: OwnerSection[];
 }
 
-/** One or more sections. The dashboard asks for one at a time; the Monday brief asks for all three. */
+/**
+ * One or more sections, built from ONE read of the sales book however many are
+ * asked for (all three sections need it). Each section settles on its own: a
+ * failed section is listed in `failed` and left out, never zeroed, so the
+ * dashboard can load everything in one request and still retry a section alone.
+ */
 export async function buildOwnerSummary(
   source: OwnerSummarySource,
   sections: readonly OwnerSection[] = OWNER_SECTIONS,
   now: Date = new Date()
 ): Promise<OwnerSummary> {
   const periods = ownerPeriods(now);
+  let book: ReturnType<OwnerSummarySource['loadBook']> | undefined;
+  const shared: OwnerSummarySource = Object.create(source);
+  shared.loadBook = () => (book ??= source.loadBook());
+
   const summary: OwnerSummary = { generatedAt: now.toISOString() };
+  const failed: OwnerSection[] = [];
   await Promise.all(
     sections.map(async (section) => {
-      if (section === 'money') summary.money = await buildMoney(source, periods);
-      else if (section === 'problems') summary.problems = await buildProblems(source, periods);
-      else summary.recruiting = await buildRecruiting(source, periods);
+      try {
+        if (section === 'money') summary.money = await buildMoney(shared, periods);
+        else if (section === 'problems') summary.problems = await buildProblems(shared, periods);
+        else summary.recruiting = await buildRecruiting(shared, periods);
+      } catch (error) {
+        console.error(`Owner summary section "${section}" failed:`, error);
+        failed.push(section);
+      }
     })
   );
+  if (failed.length) summary.failed = sections.filter((section) => failed.includes(section));
   return summary;
 }

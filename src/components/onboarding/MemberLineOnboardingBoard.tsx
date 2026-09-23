@@ -76,17 +76,52 @@ export default function MemberLineOnboardingBoard({
   const pct = progress.total === 0 ? 0 : Math.round((progress.approved / progress.total) * 100);
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
+  const openId = openItem?.id ?? null;
+  const sheetRef = useRef<HTMLElement | null>(null);
+
+  // Focus Close when a different item opens, never on a re-render: the page
+  // re-renders on every keystroke in the sheet, and refocusing then would drop
+  // the rep's typing.
   useEffect(() => {
-    if (!openItem) return;
-    closeRef.current?.focus();
+    if (openId) closeRef.current?.focus();
+  }, [openId]);
+
+  useEffect(() => {
+    if (!openId) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onOpenItem(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // Focus the close button when a different item opens, not on every refetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openItem?.id, onOpenItem]);
+  }, [openId, onOpenItem]);
+
+  // iPhone keyboard: the sheet is fixed to the layout viewport's bottom, which
+  // the keyboard covers. Lift it by the covered height (--kb) so the field and
+  // Submit stay above the keys, as the chat composer does.
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    const vv = window.visualViewport;
+    if (!openId || !sheet || !vv) return;
+    const update = () => {
+      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const inset = covered > 80 ? Math.round(covered) : 0;
+      sheet.style.setProperty('--kb', `${inset}px`);
+      if (inset) {
+        sheet.dataset.kb = 'open';
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && sheet.contains(active)) active.scrollIntoView({ block: 'nearest' });
+      } else {
+        delete sheet.dataset.kb;
+      }
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [openId]);
 
   return (
     <>
@@ -133,12 +168,13 @@ export default function MemberLineOnboardingBoard({
         <BodyLayer>
           <div
             className={s.backdrop}
-            onMouseDown={(e) => {
+            onClick={(e) => {
               if (e.target === e.currentTarget) onOpenItem(null);
             }}
           >
             <section
-              className={s.sheet}
+              ref={sheetRef}
+              className={`${s.sheet} ${o.sheet}`}
               role="dialog"
               aria-modal="true"
               aria-labelledby="onboarding-sheet-title"

@@ -1,46 +1,101 @@
-/* Firebase Cloud Messaging service worker — handles push while the app is in the
-   background or closed. Config values below are the public NEXT_PUBLIC_* Firebase
-   keys (safe to expose; they already ship in the client bundle). */
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+/* The portal's one service worker: makes the app installable and shows web push.
 
-firebase.initializeApp({
-  apiKey: 'AIzaSyDwfYWGNc9SOfog1MNuDJ-RP5idQh9A3hY',
-  authDomain: 'cworldgroup-cca68.firebaseapp.com',
-  projectId: 'cworldgroup-cca68',
-  storageBucket: 'cworldgroup-cca68.firebasestorage.app',
-  messagingSenderId: '55311478672',
-  appId: '1:55311478672:web:2a2bd59248e0da03154d15',
+   It used to be two scripts at the same "/" scope: sw.js (registered on every
+   page load) and this one (registered by the FCM token code). A scope holds one
+   script, so each registration swapped the other out, and any push that landed
+   while sw.js was active showed nothing. iOS revokes a web-push subscription
+   that receives pushes without showing a notification, which is one way
+   devices went silent. Both registrations now point here, and sw.js only
+   imports this file for clients still on the old registration.
+
+   Push is handled directly instead of through the Firebase SW SDK: FCM delivers
+   our data-only messages as JSON ({ data: { title, body, url } }), and the SDK
+   deliberately shows nothing while any app window is visible, which iOS counts
+   against the subscription too. */
+
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
 
-const messaging = firebase.messaging();
-
-// Background push → show a notification. Data-only messages land here too.
-messaging.onBackgroundMessage((payload) => {
-  const title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || '3C Console';
-  const body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || '';
-  const url = (payload.data && payload.data.url) || '/portal/dashboard';
-  self.registration.showNotification(title, {
-    body,
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    data: { url },
-  });
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
 
-// Clicking the notification focuses/opens the app at the deep link.
+// Network passthrough. A fetch handler must exist for some browsers to treat
+// the portal as installable; no caching, so deploys never serve a stale shell.
+self.addEventListener('fetch', () => {});
+
+function readPushPayload(event) {
+  if (!event.data) return {};
+  try {
+    return event.data.json() || {};
+  } catch {
+    return { data: { body: event.data.text() } };
+  }
+}
+
+self.addEventListener('push', (event) => {
+  const payload = readPushPayload(event);
+  const data = payload.data || {};
+  const notification = payload.notification || {};
+  const title = notification.title || data.title || '3C Console';
+  const body = notification.body || data.body || '';
+  const url = data.url || '/portal/dashboard';
+
+  event.waitUntil(
+    (async () => {
+      const target = new URL(url, self.location.origin);
+      const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Someone already reading that channel sees the message arrive live, so
+      // a banner would just be noise. The chat page keeps ?channel= set to the
+      // thread on screen; any other channel (or the channel list) still gets
+      // the banner. A notification must still be shown for every push, so show
+      // it silently and close it straight away.
+      const targetChannel = target.searchParams.get('channel');
+      const watchingChat =
+        target.pathname === '/portal/chat' &&
+        Boolean(targetChannel) &&
+        clientList.some((client) => {
+          if (!client.focused || client.visibilityState !== 'visible') return false;
+          const open = new URL(client.url);
+          return open.pathname === '/portal/chat' && open.searchParams.get('channel') === targetChannel;
+        });
+      const tag = watchingChat ? `seen-${Date.now()}` : undefined;
+      await self.registration.showNotification(title, {
+        body,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: { url },
+        ...(tag ? { tag, silent: true } : {}),
+      });
+      if (tag) {
+        const shown = await self.registration.getNotifications({ tag });
+        shown.forEach((item) => item.close());
+      }
+    })()
+  );
+});
+
+// Tapping a notification opens its deep link (a chat push links to its
+// channel): reuse an open app window when there is one, else open a new one.
+// focus() goes first, while the click still counts as a user gesture.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || '/portal/dashboard';
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    (async () => {
+      const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of clientList) {
-        if ('focus' in client) {
-          client.navigate(url);
-          return client.focus();
+        if (!('focus' in client)) continue;
+        try {
+          const focused = await client.focus();
+          await (focused || client).navigate(url);
+          return;
+        } catch {
+          // Not controlled by this worker (navigate rejects): try the next one.
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
+      if (self.clients.openWindow) await self.clients.openWindow(url);
+    })()
   );
 });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { LoaderCircle, RotateCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RepBoot, RepShell } from '@/components/portal/rep/RepShell';
-import { Attachment, FormAlert } from '@/components/portal/rep/RepForm';
+import { Attachment, FormAlert, useUploadsInFlight } from '@/components/portal/rep/RepForm';
 import s from '@/components/portal/rep/rep.module.css';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import o from '@/components/onboarding/onboarding.module.css';
@@ -56,6 +56,8 @@ function OnboardingChecklist() {
   const [submitModal, setSubmitModal] = useState<WizardItem | null>(null);
   const [reference, setReference] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Submit waits while a file (or a Replace) is still uploading.
+  const { uploading, onBusyChange } = useUploadsInFlight();
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. Only read inside the setter's updater, so the value binding is unused.
   const [, setDlSlots] = useState<{ front: string; back: string }>({
@@ -92,6 +94,12 @@ function OnboardingChecklist() {
   useEffect(() => {
     fetchChecklist();
   }, [fetchChecklist]);
+
+  // Stable, so the open sheet does not re-run its effects on every keystroke.
+  const openItem = useCallback((id: string | null) => {
+    setOpenItemId(id);
+    setError('');
+  }, []);
 
   const retryLoad = () => {
     setLoading(true);
@@ -169,10 +177,10 @@ function OnboardingChecklist() {
         disabled={disabled}
         className={`${s.btnPrimary} ${o.submit}`}
       >
-        {busy ? (
+        {busy || uploading ? (
           <>
             <LoaderCircle size={18} className={f.spin} aria-hidden="true" />
-            Submitting
+            {busy ? 'Submitting' : 'Uploading'}
           </>
         ) : (
           buttonLabel
@@ -203,6 +211,7 @@ function OnboardingChecklist() {
                 kinds="Photo"
                 preview={false}
                 upload={(file) => uploadFile(item, file, IMAGE_TYPES, 'front')}
+                onBusyChange={onBusyChange}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
                   if (isNewSubmission) setSubmitModal(item);
@@ -216,6 +225,7 @@ function OnboardingChecklist() {
                 kinds="Photo"
                 preview={false}
                 upload={(file) => uploadFile(item, file, IMAGE_TYPES, 'back')}
+                onBusyChange={onBusyChange}
                 onUploaded={(path) => {
                   const isNewSubmission = submitModal?.id !== item.id;
                   if (isNewSubmission) setSubmitModal(item);
@@ -230,12 +240,13 @@ function OnboardingChecklist() {
               accept="image/*,application/pdf"
               preview={!item.sensitive}
               upload={(file) => uploadFile(item, file, DOC_TYPES)}
+              onBusyChange={onBusyChange}
               onUploaded={(path) => startSubmission(item, path)}
             />
           )}
 
           {sendError}
-          {submitButton(submitting || !draftReference.trim())}
+          {submitButton(submitting || uploading || !draftReference.trim())}
         </>
       );
     }
@@ -305,10 +316,7 @@ function OnboardingChecklist() {
               progress={data.progress ?? { approved: 0, total: 0, complete: false }}
               renderItemAction={renderItemAction}
               openItemId={openItemId}
-              onOpenItem={(id) => {
-                setOpenItemId(id);
-                setError('');
-              }}
+              onOpenItem={openItem}
               onRefresh={fetchChecklist}
             />
           ) : (

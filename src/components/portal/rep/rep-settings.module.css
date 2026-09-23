@@ -289,3 +289,8 @@
   display: grid;
   gap: var(--s4);
 }
+
+/* A password field the last attempt flagged. */
+.stack [aria-invalid='true'] {
+  border-color: var(--c-red);
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   MANAGEMENT_PLATFORM_ROLES,
@@ -121,6 +122,8 @@ export async function POST(request: NextRequest) {
       ...addressCheck.clean,
       status: requiresOnboarding ? 'pending' : 'active',
       hireDate: new Date(),
+      // Created active: that is its activation (owner "Activated" tile).
+      ...(requiresOnboarding ? {} : { activatedAt: FieldValue.serverTimestamp() }),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
