@@ -117,7 +117,10 @@
    fixed on <body>, the same lock the old chrome uses (globals.css "Mobile
    app-shell scroll lock") so WebKit has nothing to mis-anchor after a resume. */
 @media (max-width: 1023px) {
+  /* The bar's colour, so any strip iOS leaves below the fixed tab bar blends
+     into it instead of reading as a band. .root paints the ground over it. */
   :global(body):has(.root) {
+    background: #070f1c;
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
