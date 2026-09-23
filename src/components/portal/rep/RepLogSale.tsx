@@ -14,7 +14,6 @@ import {
   ImageUp,
   Keyboard,
   RotateCw,
-  ScanLine,
   WifiOff,
 } from 'lucide-react';
 import { FIBER_COMPANIES, SALE_TYPES, getPlanById, getPlansByCompany } from '@/types';
@@ -82,25 +81,8 @@ function useSoftKeyboardOpen(): boolean {
   return useSyncExternalStore(subscribeKeyboard, keyboardOpenNow, () => false);
 }
 
-function Steps({ onDetails, detailPct }: { onDetails: boolean; detailPct: number }) {
-  const steps = [
-    { label: 'Proof', pct: onDetails ? 100 : 0, current: !onDetails },
-    { label: 'Details', pct: onDetails ? detailPct : 0, current: onDetails },
-  ];
-  return (
-    <ol className={l.steps} aria-label="Progress">
-      {steps.map((st, i) => (
-        <li key={st.label} className={st.current ? l.stepOn : l.step} aria-current={st.current ? 'step' : undefined}>
-          <span className={s.track}>
-            <span className={s.fill} style={{ width: `${st.pct}%` }} />
-          </span>
-          <span className={l.stepLabel}>
-            <b>{i + 1}</b> {st.label}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
+function Steps({ onDetails }: { onDetails: boolean }) {
+  return <p className={l.steps}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>;
 }
 
 function Field({
@@ -184,13 +166,6 @@ export function RepLogSale() {
   const est = hasPlan && products.length > 0 ? expectedPayForSale({ products }, rates) : null;
   // T-Fiber + an install date: the estimated payout window, live as the date changes.
   const payoutLabel = payoutLabelForDraft(products, formData.installDate);
-
-  const requiredDone = [
-    Boolean(internetId || products.length),
-    Boolean(formData.customerAddress.trim()),
-    Boolean(formData.installDate),
-    Boolean(screenshotCount || formData.orderNumberOrBtn.trim()),
-  ].filter(Boolean).length;
 
   const pickFiles = (files: FileList | null) => {
     const taken = uploads.addFiles(Array.from(files ?? []));
@@ -308,10 +283,9 @@ export function RepLogSale() {
   if (!onDetails) {
     return (
       <div className={l.main}>
-        <Steps onDetails={false} detailPct={0} />
+        <Steps onDetails={false} />
         <div className={l.defaultGrid}>
           <section className={`${s.panel} ${l.entry}`} aria-labelledby="entry-h">
-            <ScanLine size={36} strokeWidth={1.75} className={l.entryIcon} aria-hidden="true" />
             <h1 id="entry-h" className={l.entryTitle}>
               Attach order confirmation
             </h1>
@@ -349,27 +323,10 @@ export function RepLogSale() {
                 Choose screenshot
               </label>
             </div>
-            <p className={l.entryWorks}>
-              Up to {MAX_PROOF_SCREENSHOTS} screenshots. TFiber, AT&amp;T Fiber, Frontier, Xfinity.
-            </p>
+            <p className={l.entryWorks}>Whole confirmation page, up to {MAX_PROOF_SCREENSHOTS} screenshots.</p>
           </section>
 
           <div className={l.side}>
-            <section className={l.tips} aria-labelledby="tips-h">
-              <h2 id="tips-h" className={s.kicker}>
-                For good proof
-              </h2>
-              <ul>
-                <li>
-                  <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                  Whole page in frame, order number down to install date
-                </li>
-                <li>
-                  <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                  Confirmation runs long? Attach up to {MAX_PROOF_SCREENSHOTS} screenshots
-                </li>
-              </ul>
-            </section>
             <button type="button" className={`${s.panel} ${l.manual}`} onClick={() => setStep('details')}>
               <Keyboard size={20} strokeWidth={1.75} aria-hidden="true" className={l.manualIcon} />
               <span className={l.manualText}>
@@ -386,7 +343,7 @@ export function RepLogSale() {
 
   return (
     <div className={`${l.main} ${l.mainDetails}`}>
-      <Steps onDetails detailPct={(requiredDone / 4) * 100} />
+      <Steps onDetails />
       {form.fromDraft ? (
         confirmClear ? (
           <div className={`${l.dupe} ${l.draftConfirm}`} role="group" aria-labelledby="clear-h">

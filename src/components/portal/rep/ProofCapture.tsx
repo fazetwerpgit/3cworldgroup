@@ -355,7 +355,6 @@ export function ProofCapture({ uploads, orderRequired }: { uploads: ProofUploads
           Only {MAX_PROOF_SCREENSHOTS} screenshots per sale. The extra ones were left off.
         </p>
       ) : null}
-      <p className={l.proofCap}>Up to {MAX_PROOF_SCREENSHOTS} screenshots</p>
       {viewer.viewer}
     </section>
   );
