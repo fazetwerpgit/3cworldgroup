@@ -454,6 +454,33 @@ describe('several carrier rows at one door', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
+  it("keeps a rep's date when both rows come back unchanged, and takes the move", async () => {
+    // The rep rescheduled after the miss; the current row then was the miss.
+    const repSale = {
+      ...sale,
+      installDate: noon(6),
+      installDateSource: 'rep',
+      repEditCarrierDate: reportDay(1),
+    };
+    const miss = order({ id: 'brk', status: 'breakage', estInstallDate: reportDay(1) });
+    setSales([repSale]);
+
+    const same = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', orderDate: reportDay(-10), estInstallDate: reportDay(1) }), miss],
+      now: NOW,
+    });
+    expect(same).toMatchObject({ updated: 0, unchanged: 1, skippedAmbiguous: 0 });
+    expect(updateMock).not.toHaveBeenCalled();
+
+    const moved = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', orderDate: reportDay(-10), estInstallDate: reportDay(9) }), miss],
+      now: NOW,
+    });
+    expect(moved).toMatchObject({ updated: 1, skippedAmbiguous: 0 });
+    expect(installDayKey(updateMock.mock.calls[0][1].installDate)).toBe(reportDay(9));
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("records the current row's day for a rep edit", () => {
     const data = { customerAddress: '123 Main St', salesRepId: 'rep-1' };
     expect(
