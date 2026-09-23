@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Plus, RotateCw } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Plus, RotateCw, X } from 'lucide-react';
 import { CarrierNotice } from '@/components/portal/rep/CarrierNotice';
 import { RepShell } from '@/components/portal/rep/RepShell';
 import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
@@ -18,6 +18,7 @@ import { isOwner } from '@/types';
 import { datedSales } from '@/lib/pay/payGroups';
 import { formatPayoutWindow, nextPayout } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
+import { monthFromParam } from '@/lib/sales/loggedSale';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
@@ -123,6 +124,22 @@ function LoadFailed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+/** "Sale logged · Carla Diaz": Log Sale lands here, on the sale's month. */
+function LoggedBanner({ name, onDismiss }: { name: string | null; onDismiss: () => void }) {
+  return (
+    <div className={x.logged} role="status">
+      <CheckCircle2 size={20} strokeWidth={2.25} aria-hidden="true" className={x.loggedIcon} />
+      <p className={x.loggedText}>
+        <strong>Sale logged</strong>
+        {name ? <> · {name}</> : null}
+      </p>
+      <button type="button" className={x.loggedClose} onClick={onDismiss} aria-label="Dismiss">
+        <X size={18} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 function SalesContent() {
   const { user, hasPermission } = useAuth();
   const params = useSearchParams();
@@ -137,7 +154,18 @@ function SalesContent() {
 
   // `?view=pay` opens the rep's pay list directly.
   const [payView, setPayView] = useState(() => params.get('view') === 'pay');
-  const [month, setMonth] = useState<MonthKey>(() => currentMonth());
+  // Log Sale sends `?logged=<id>&month=YYYY-MM`: open on the month the sale was
+  // sold in (a backdated sale is not in this month) and confirm it by name.
+  const [month, setMonth] = useState<MonthKey>(() => monthFromParam(params.get('month')) ?? currentMonth());
+  const [loggedId, setLoggedId] = useState(() => params.get('logged'));
+  useEffect(() => {
+    // Consumed: a reload or Back should not confirm the same sale again.
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('logged') && !url.searchParams.has('month')) return;
+    url.searchParams.delete('logged');
+    url.searchParams.delete('month');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
   // The pay list may look a month ahead for scheduled installs; the ledger
   // (what was sold) may not, so leaving Pay pulls a future month back.
   const maxMonth = latestPickableMonth(payView);
@@ -218,6 +246,14 @@ function SalesContent() {
 
   const booting = !fetched || (loading && sales.length === 0);
   const failed = !!error && sales.length === 0;
+  const loggedSale = loggedId ? sales.find((sale) => sale.id === loggedId) : undefined;
+  const loggedBanner =
+    loggedId && !booting ? (
+      <LoggedBanner
+        name={loggedSale ? loggedSale.customerName || loggedSale.customerAddress || null : null}
+        onDismiss={() => setLoggedId(null)}
+      />
+    ) : null;
   const staleNote = error ? (
     <p className={x.alert} role="alert">
       Couldn&apos;t refresh just now. What you see may be out of date.
@@ -228,6 +264,7 @@ function SalesContent() {
     return (
       <div className={x.page}>
         <PageHead month={month} onMonth={setMonth} />
+        {loggedBanner}
         {booting ? (
           <SalesSkeleton label="Loading the company book" />
         ) : failed ? (
@@ -278,6 +315,7 @@ function SalesContent() {
         max={maxMonth}
         onMonth={booting || failed || sales.length === 0 ? undefined : setMonth}
       />
+      {loggedBanner}
 
       {booting ? (
         <SalesSkeleton />

@@ -8,8 +8,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createSale = vi.fn();
+const push = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push, back: vi.fn() }),
 }));
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { uid: 'r1', displayName: 'Wil Teasdale', email: 'w@x.com', status: 'active' } }),
@@ -41,6 +42,7 @@ async function mount() {
 beforeEach(() => {
   window.sessionStorage.clear();
   createSale.mockReset();
+  push.mockReset();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ url: null }), { status: 200 })));
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query }) as MediaQueryList);
   Element.prototype.scrollIntoView ??= () => {};
@@ -90,5 +92,58 @@ describe('RepLogSale', () => {
       expect(container.querySelector(`#${id}-error`)).not.toBeNull();
     }
     expect(container.querySelector('#orderNumberOrBtn-error')!.textContent).toMatch(/order number/i);
+  });
+
+  /** A complete manual entry, restored from a draft so no typing is needed. */
+  async function mountFilled(saleDate: string) {
+    window.sessionStorage.setItem(
+      `${DRAFT_KEY_PREFIX}r1`,
+      JSON.stringify({
+        formData: {
+          customerName: 'Carla Diaz',
+          customerPhone: '',
+          customerEmail: '',
+          customerAddress: '1 Main St',
+          saleType: 'new_service',
+          saleDate,
+          installDate: saleDate,
+          notes: '',
+          orderNumberOrBtn: 'TMF-1',
+        },
+        products: [
+          { productId: 'tfiber-1gig', productName: 'TFiber 1 Gig', company: 'tfiber', quantity: 1, unitPrice: 0, totalPrice: 0, points: 0 },
+        ],
+        saleDateTouched: true,
+        proofUploadId: 'c'.repeat(32),
+      })
+    );
+    await mount();
+  }
+
+  async function submitForm() {
+    await act(async () => {
+      container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+  }
+
+  it('opens Sales on the month the sale was sold in', async () => {
+    createSale.mockResolvedValue({ sale: { id: 'new-sale' }, duplicate: false });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    expect(push).toHaveBeenCalledWith('/portal/sales?logged=new-sale&month=2026-08');
+  });
+
+  it('says a duplicate was already logged and stays put', async () => {
+    createSale.mockResolvedValue({
+      sale: { id: 'd'.repeat(32), customerName: 'Carla Diaz', saleDate: '2026-08-30T17:00:00.000Z' },
+      duplicate: true,
+    });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    expect(push).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('This sale was already logged.');
+    const view = Array.from(container.querySelectorAll('a')).find((a) => a.textContent === 'View it')!;
+    expect(view.getAttribute('href')).toBe(`/portal/sales/${'d'.repeat(32)}`);
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'Log as a new sale')).toBe(true);
   });
 });
