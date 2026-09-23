@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { AlertCircle, ArrowDown, Check, Clock, Hash, ImagePlus, Loader2, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, Clock, Hash, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
@@ -71,6 +71,18 @@ function formatChatLineDayDivider(createdAt: Date | null) {
 // up; abort sooner and let the retry policy take over (the send is idempotent,
 // so an abort after the server stored it can't duplicate it).
 const SEND_TIMEOUT_MS = 20_000;
+
+// Runs one network step of a send; its rejection (fetch failing, a timeout
+// abort, the ID-token refresh failing offline) becomes a retryable network
+// failure. Everything else thrown on the send path stays permanent.
+async function networkStep<T>(step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    if (error instanceof SendRequestError) throw error;
+    throw new SendRequestError('Message not sent. Check your connection.', { kind: 'network' });
+  }
+}
 
 // Probe the GIF feature at most once per browser session (shared across mounts):
 // the proxy answers { enabled } based on whether a Tenor key is configured. The
@@ -141,7 +153,6 @@ export default function TeamChatPage() {
   // Channel-info Sheet (shared by desktop header title + mobile thread top bar).
   const [infoOpen, setInfoOpen] = useState(false);
   const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   // Reply/edit composer modes (shared by both layouts — the composer state lives
   // here so mobile and desktop stay in lockstep). replyTarget quotes a message on
@@ -397,10 +408,11 @@ export default function TeamChatPage() {
   // key, identical texts never cross-match, and a "failed" echo whose POST did
   // land (response lost) still resolves when its message shows up.
   const deliveredIds = useMemo(() => new Set(messages.map((message) => message.id)), [messages]);
+  const windowFloorMs = hasMoreMessages ? messages[0]?.createdAt?.getTime() ?? null : null;
   const threadMessages = useMemo<ThreadMessage[]>(() => {
-    const { unreconciled } = reconcileEchoes(deliveredIds, pendingMessages, activeChannelId);
+    const { unreconciled } = reconcileEchoes(deliveredIds, pendingMessages, activeChannelId, windowFloorMs);
     return [...messages, ...unreconciled];
-  }, [messages, deliveredIds, pendingMessages, activeChannelId]);
+  }, [messages, deliveredIds, pendingMessages, activeChannelId, windowFloorMs]);
 
   // State hygiene only: drop reconciled echoes from state so pendingMessages
   // doesn't grow without bound (and the outbox forgets them). Render
@@ -408,12 +420,12 @@ export default function TeamChatPage() {
   useEffect(() => {
     setPendingMessages((prev) => {
       if (prev.length === 0) return prev;
-      const { reconciledIds } = reconcileEchoes(deliveredIds, prev, activeChannelId);
+      const { reconciledIds } = reconcileEchoes(deliveredIds, prev, activeChannelId, windowFloorMs);
       if (reconciledIds.length === 0) return prev;
       const done = new Set(reconciledIds);
       return prev.filter((echo) => !done.has(echo.id));
     });
-  }, [deliveredIds, activeChannelId]);
+  }, [deliveredIds, activeChannelId, windowFloorMs]);
 
   // Render list with optimistic edits layered on top of the reconciled thread. The
   // reconcile memo above is left untouched (edits never change the message count, so
@@ -727,9 +739,14 @@ export default function TeamChatPage() {
     if (timer !== undefined) window.clearTimeout(timer);
     retryTimersRef.current.delete(echoId);
   }, []);
+  // Unmounted (left the chat mid-send): an attempt still in flight must not
+  // schedule a retry through this dead instance.
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     const timers = retryTimersRef.current;
     return () => {
+      mountedRef.current = false;
       for (const timer of timers.values()) window.clearTimeout(timer);
       timers.clear();
     };
@@ -756,7 +773,6 @@ export default function TeamChatPage() {
       inFlightRef.current.add(echo.id);
       clearRetryTimer(echo.id);
       const attempts = (echo.sendAttempts ?? 0) + 1;
-      setSending(true);
       setError('');
       try {
         let attachment: ChatAttachment | undefined =
@@ -773,7 +789,7 @@ export default function TeamChatPage() {
               ...(ready.width && ready.height ? { localPreviewWidth: ready.width, localPreviewHeight: ready.height } : {}),
             });
           }
-          const idToken = (await auth?.currentUser?.getIdToken()) ?? '';
+          const idToken = await networkStep(async () => (await auth?.currentUser?.getIdToken()) ?? '');
           let shownStep = -1;
           attachment = await uploadChatImageWithProgress(
             idToken,
@@ -795,7 +811,7 @@ export default function TeamChatPage() {
         const timeout = window.setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
         let response: Response;
         try {
-          response = await authedFetch('/api/portal/chat/messages', {
+          response = await networkStep(() => authedFetch('/api/portal/chat/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal: controller.signal,
@@ -807,13 +823,20 @@ export default function TeamChatPage() {
               // Reply rides the same send path; the server re-stamps the snippet.
               ...(echo.replyToMessageId ? { replyToMessageId: echo.replyToMessageId } : {}),
             }),
-          });
+          }));
         } finally {
           window.clearTimeout(timeout);
         }
         const json = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new SendRequestError(json.error || 'Failed to send message', { kind: 'http', status: response.status });
+        }
+        if (json.duplicate === true) {
+          // Stored by an earlier attempt whose response was lost: the message is
+          // already in the feed (possibly older than the loaded window, where
+          // reconciliation can't see it), so the echo is done.
+          setPendingMessages((prev) => prev.filter((p) => p.id !== echo.id));
+          return;
         }
         updateEcho(echo.id, {
           deliveredId: typeof json.messageId === 'string' ? json.messageId : echo.id,
@@ -835,9 +858,12 @@ export default function TeamChatPage() {
           updateEcho(echo.id, { pendingState: 'failed', sendAttempts: 0, uploadProgress: undefined });
         } else {
           // Still "Sending…": retried on a timer, or by flushOutbox when the
-          // connection comes back.
-          updateEcho(echo.id, { sendAttempts: attempts, uploadProgress: undefined });
-          if (decision.action === 'retry') {
+          // connection comes back. Waiting on 'online' doesn't use up an attempt.
+          updateEcho(echo.id, {
+            sendAttempts: decision.action === 'retry' ? attempts : attempts - 1,
+            uploadProgress: undefined,
+          });
+          if (decision.action === 'retry' && mountedRef.current) {
             const timer = window.setTimeout(() => {
               retryTimersRef.current.delete(echo.id);
               const latest = pendingRef.current.find((p) => p.id === echo.id);
@@ -848,7 +874,6 @@ export default function TeamChatPage() {
         }
       } finally {
         inFlightRef.current.delete(echo.id);
-        setSending(false);
       }
     },
     [authedFetch, clearRetryTimer, updateEcho]
@@ -1495,9 +1520,9 @@ export default function TeamChatPage() {
                 type="button"
                 className={c.send}
                 onClick={editTarget ? () => void saveEdit() : handleDesktopSend}
-                disabled={!activeChannelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}
+                disabled={!activeChannelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile)}
               >
-                {sending ? <Loader2 size={18} className={c.spin} aria-hidden="true" /> : editTarget ? <Check size={18} aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
+                {editTarget ? <Check size={18} aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
                 {editTarget ? 'Save' : 'Send'}
               </button>
             </div>
@@ -1533,7 +1558,6 @@ export default function TeamChatPage() {
             canPin={canPin}
             showRoles={showRoles}
             draft={draft}
-            sending={sending}
             gifEnabled={gifEnabled}
             authedFetch={authedFetch}
             messagesEndRef={mobileMessagesEndRef}

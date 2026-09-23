@@ -55,15 +55,11 @@ export class SendRequestError extends Error {
   }
 }
 
+// Only failures the send path explicitly wrapped as SendRequestError (network
+// steps, HTTP statuses) can retry. A TypeError from a bug or a photo that won't
+// decode fails fast instead of retrying for minutes.
 export function classifySendError(error: unknown): SendFailure | null {
   if (error instanceof SendRequestError) return error.failure;
-  // fetch() rejects with a TypeError when the request never completes; an
-  // aborted (timed-out) request and Firebase Auth's token refresh failing
-  // offline are the same situation.
-  if (error instanceof TypeError) return { kind: 'network' };
-  const name = (error as { name?: unknown } | null)?.name;
-  if (name === 'AbortError' || name === 'TimeoutError') return { kind: 'network' };
-  if ((error as { code?: unknown } | null)?.code === 'auth/network-request-failed') return { kind: 'network' };
   return null;
 }
 
@@ -107,6 +103,7 @@ interface EchoLike {
   // The doc id the POST reported (normally equal to id; differs only for a
   // legacy send the server stored under a random id).
   deliveredId?: string;
+  createdAt?: Date | null;
 }
 
 /**
@@ -115,16 +112,26 @@ interface EchoLike {
  * cross-match, and a "failed" echo whose POST actually landed (response lost)
  * still resolves the moment its message shows up.
  */
+// windowFloorMs: createdAt of the oldest loaded message when older ones exist
+// beyond the live window (null when the whole channel is loaded). A delivered
+// echo from before that floor can never be matched (its message is outside the
+// window), so it resolves instead of sitting on "Sending…".
 export function reconcileEchoes<E extends EchoLike>(
   deliveredIds: ReadonlySet<string>,
   echoes: E[],
-  channelId: string
+  channelId: string,
+  windowFloorMs: number | null = null
 ): { unreconciled: E[]; reconciledIds: string[] } {
   const unreconciled: E[] = [];
   const reconciledIds: string[] = [];
   for (const echo of echoes) {
     if (echo.channelId !== channelId) continue;
-    if (deliveredIds.has(echo.id) || (echo.deliveredId && deliveredIds.has(echo.deliveredId))) {
+    const beforeWindow =
+      windowFloorMs !== null && echo.createdAt != null && echo.createdAt.getTime() < windowFloorMs;
+    if (
+      deliveredIds.has(echo.id) ||
+      (echo.deliveredId && (deliveredIds.has(echo.deliveredId) || beforeWindow))
+    ) {
       reconciledIds.push(echo.id);
     } else {
       unreconciled.push(echo);

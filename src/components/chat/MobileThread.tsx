@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
-import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Loader2, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, Hash, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -103,7 +103,6 @@ interface MobileThreadProps {
   // Role labels (tiers, manager titles, IBO) show only to admins.
   showRoles: boolean;
   draft: string;
-  sending: boolean;
   // GIF feature availability (probed by the page) + the shared verified-token
   // fetch the GIF picker uses to search Tenor.
   gifEnabled: boolean;
@@ -263,7 +262,6 @@ export function MobileThread({
   canPin,
   showRoles,
   draft,
-  sending,
   gifEnabled,
   authedFetch,
   messagesEndRef,
@@ -993,13 +991,11 @@ export function MobileThread({
           <button
             type="button"
             onClick={handleSend}
-            disabled={!channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile) || sending}
+            disabled={!channelId || (editTarget ? !draft.trim() : !draft.trim() && !attachFile)}
             className={c.send}
-            aria-label={editTarget ? 'Save edit' : sending ? 'Sending' : 'Send message'}
+            aria-label={editTarget ? 'Save edit' : 'Send message'}
           >
-            {sending ? (
-              <Loader2 size={18} className={c.spin} aria-hidden="true" />
-            ) : editTarget ? (
+            {editTarget ? (
               <Check size={20} aria-hidden="true" />
             ) : (
               <Send size={18} aria-hidden="true" />

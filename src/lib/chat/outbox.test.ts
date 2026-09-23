@@ -83,6 +83,19 @@ describe('retry policy', () => {
 describe('reconcileEchoes', () => {
   const echo = (id: string, extra: Record<string, unknown> = {}) => ({ id, channelId: 'c1', ...extra });
 
+  it('resolves a delivered echo that is older than the loaded window', () => {
+    const floor = Date.parse('2026-09-22T12:00:00Z');
+    const echoes = [
+      echo('uid-1_old', { deliveredId: 'uid-1_old', createdAt: new Date(floor - 60_000) }),
+      echo('uid-1_undelivered', { createdAt: new Date(floor - 60_000) }),
+      echo('uid-1_new', { deliveredId: 'uid-1_new', createdAt: new Date(floor + 60_000) }),
+    ];
+    const { reconciledIds } = reconcileEchoes(new Set(), echoes, 'c1', floor);
+    expect(reconciledIds).toEqual(['uid-1_old']);
+    // Whole channel loaded (no floor): it waits for its message as usual.
+    expect(reconcileEchoes(new Set(), echoes, 'c1').reconciledIds).toEqual([]);
+  });
+
   it('matches by doc id, never by text', () => {
     const echoes = [echo('uid-1_a'), echo('uid-1_b')];
     const { unreconciled, reconciledIds } = reconcileEchoes(new Set(['uid-1_a', 'random']), echoes, 'c1');
@@ -178,20 +191,16 @@ describe('outbox persistence', () => {
 });
 
 describe('classifySendError', () => {
-  it('treats fetch rejections, aborts and offline token refreshes as network failures', () => {
-    expect(classifySendError(new TypeError('Failed to fetch'))).toEqual({ kind: 'network' });
-    expect(classifySendError(Object.assign(new Error('aborted'), { name: 'AbortError' }))).toEqual({ kind: 'network' });
-    expect(classifySendError({ code: 'auth/network-request-failed' })).toEqual({ kind: 'network' });
-  });
-
   it('passes through a classified request error', () => {
+    expect(classifySendError(new SendRequestError('offline', { kind: 'network' }))).toEqual({ kind: 'network' });
     expect(classifySendError(new SendRequestError('nope', { kind: 'http', status: 403 }))).toEqual({
       kind: 'http',
       status: 403,
     });
   });
 
-  it('leaves anything else unclassified (permanent)', () => {
+  it('treats anything unwrapped as permanent, including stray TypeErrors', () => {
+    expect(classifySendError(new TypeError('x is undefined'))).toBeNull();
     expect(classifySendError(new Error('That photo could not be read from your phone.'))).toBeNull();
   });
 });
