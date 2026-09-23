@@ -47,7 +47,7 @@ export function formatLeaderboardValue(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-export function EmptyState() {
+function EmptyState() {
   return (
     <div className={styles.empty}>
       <p className="portal-display">The board is open</p>

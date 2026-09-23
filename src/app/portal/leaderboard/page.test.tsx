@@ -50,7 +50,8 @@ let container: HTMLDivElement;
 let root: Root;
 
 /** jsdom has no layout, so the route's breakpoint is whatever this says.
- *  Reduced motion is left on, as it is for any rep who sets it. */
+ *  Reduced motion is left on: the legacy board's count-up then settles in one
+ *  frame instead of animating through a test. */
 function setViewport(wide: boolean) {
   window.matchMedia = ((query: string) => ({
     matches: query.includes('1024') ? wide : true,
@@ -154,11 +155,11 @@ describe('breakpoint switch', () => {
 
     expect(container.querySelectorAll('[data-rank]')).toHaveLength(3);
     expect(container.textContent).not.toContain('Weekly challenge');
-    // The desktop page's own calls stay off with it.
+    // The legacy board's own calls stay off with it.
     expect(testState.fetchLeaderboard).not.toHaveBeenCalledWith('week', 'totalSales', 1, 'submitted');
   });
 
-  it('builds only the desktop board at 1024px and up', async () => {
+  it('builds only the legacy desktop board at 1024px and up', async () => {
     setViewport(true);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     testState.leaderboard = board();
@@ -167,10 +168,8 @@ describe('breakpoint switch', () => {
 
     expect(container.textContent).toContain('Weekly challenge');
     expect(container.textContent).toContain('Your standing');
-    expect(container.textContent).toContain('Gap to next');
-    // One podium and one head: the phone tree is not built beside it.
-    expect(container.querySelectorAll('[data-rank]')).toHaveLength(3);
-    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    // The phone podium is the redesign's alone.
+    expect(container.querySelectorAll('[data-rank]')).toHaveLength(0);
     expect(testState.fetchLeaderboard).toHaveBeenCalledWith('week', 'totalPoints', 100);
     expect(testState.fetchLeaderboard).toHaveBeenCalledWith('week', 'totalSales', 1, 'submitted');
   });

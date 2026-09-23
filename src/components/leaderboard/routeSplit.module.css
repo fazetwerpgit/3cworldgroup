@@ -1,14 +1,13 @@
-/* The leaderboard route carries two layouts: the phone page below 1024px and
-   the desktop layout above it. Which one shows is a
+/* The leaderboard route carries two pages: the phone redesign below 1024px and
+   the desktop board as it shipped on master above it. Which one shows is a
    media query, so it is right in the first painted frame; the components also
    skip building the hidden side (see useWideViewport).
    Both sit on the direction D shell (RepShell), whose navy ground is the page
    background at every width. */
 
-/* The shell sets its own UI face, line height and tabular figures on its root.
-   The podium was approved in the portal's body type and line height, so both
-   layouts keep them here; the scoreboard pieces set tabular figures and their
-   own faces where they need them. */
+/* The D shell sets its own UI face, line height and tabular figures on its
+   root. Both boards were approved in the portal's body type, so they keep it
+   (the same stack as the global body rule); the chrome around them is D's. */
 .phoneOnly,
 .desktopOnly {
   font-family: var(--font-sans, system-ui), Arial, Helvetica, sans-serif;

@@ -1,0 +1,37 @@
+import { sparklineGeometry } from '@/lib/leaderboard/sparkline';
+
+// 7-day rank trend. Line going up = climbing (rank axis is inverted in the
+// geometry helper). Nulls (unranked days) break the line into segments.
+export function LegacySparkline({ spark, mine }: { spark: (number | null)[]; mine?: boolean }) {
+  const { polylines, dots } = sparklineGeometry(spark, 96, 27, 3);
+  const values = spark.filter((value): value is number => value !== null);
+  const mutedLine = !mine && (polylines.length > 1 || (values.length > 1 && new Set(values).size === 1));
+  if (polylines.length === 0 && dots.length === 0) {
+    return <span aria-hidden="true" className="text-[12px] font-semibold text-slate-300 dark:text-muted-foreground">--</span>;
+  }
+  return (
+    <svg
+      width={96}
+      height={27}
+      viewBox="0 0 96 27"
+      aria-hidden="true"
+      className={mine ? 'text-white dark:text-[#0A1F44]' : mutedLine ? 'text-[#687384] dark:text-[#75869d]' : 'text-[#8dc63f] dark:text-[#d1d8e1]'}
+    >
+      {polylines.map((points, index) => (
+        <polyline
+          key={index}
+          className={mutedLine ? 'text-[#687384] dark:text-[#75869d]' : undefined}
+          points={points}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+      {dots.map((dot, index) => (
+        <circle key={index} cx={dot.x} cy={dot.y} r={1.5} fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
