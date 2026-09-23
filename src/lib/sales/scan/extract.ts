@@ -106,7 +106,7 @@ export function scanInstructions(today: string): string {
     'All screenshots are from the same order. Copy only what is printed. Never guess, complete or invent a value.',
     'A field that is not shown gets an empty value with confidence "low".',
     'Confidence: "high" = printed and fully legible; "medium" = legible but cut off, blurred, or you had to choose between two candidates; "low" = barely legible or not shown.',
-    `Install date: return YYYY-MM-DD. If the year is not printed, use the next such date on or after ${today}.`,
+    `Install date: return YYYY-MM-DD. If the year is not printed, use the next such date on or after ${today}, and confidence no higher than "medium".`,
     'Address: the service or install address, split into its parts. Ignore billing and shipping addresses.',
   ].join('\n');
 }
