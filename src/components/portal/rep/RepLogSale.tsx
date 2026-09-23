@@ -92,15 +92,7 @@ function useSoftKeyboardOpen(): boolean {
 }
 
 function Steps({ onDetails }: { onDetails: boolean }) {
-  return (
-    <div className={l.steps}>
-      <p className={l.stepsLabel}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>
-      <span className={l.stepsMeter} aria-hidden="true">
-        <span className={l.stepOn} />
-        <span className={onDetails ? l.stepOn : undefined} />
-      </span>
-    </div>
-  );
+  return <p className={l.steps}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>;
 }
 
 function Field({
