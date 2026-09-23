@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import f from '@/components/portal/rep/rep-forms.module.css';
 
 interface SignaturePadProps {
   onChange: (dataUrl: string | null) => void;
@@ -68,7 +68,7 @@ export default function SignaturePad({ onChange, width = 600, height = 200 }: Si
   };
 
   return (
-    <div className="space-y-2">
+    <div className={f.sigWrap}>
       <canvas
         ref={canvasRef}
         width={width}
@@ -77,16 +77,18 @@ export default function SignaturePad({ onChange, width = 600, height = 200 }: Si
         onPointerMove={move}
         onPointerUp={end}
         onPointerLeave={end}
-        className="w-full touch-none rounded-md border border-slate-300 bg-white"
+        aria-label="Signature box. Draw your signature with a finger or the mouse."
+        // White paper on purpose: the stored PNG is dark ink on a clear background.
+        className={f.sigCanvas}
         style={{ aspectRatio: `${width} / ${height}` }}
       />
-      <div className="flex items-center gap-3">
-        <Button type="button" variant="outline" size="sm" onClick={clear}>
-          Clear
-        </Button>
-        <span className="text-xs text-slate-500">
+      <div className={f.sigBar}>
+        <span className={empty ? f.hint : f.fileOk}>
           {empty ? 'Draw your signature above' : 'Signature captured'}
         </span>
+        <button type="button" className={f.fileBtn} onClick={clear} disabled={empty}>
+          Clear
+        </button>
       </div>
     </div>
   );

@@ -1,21 +1,14 @@
 'use client';
 
-import {
-  BarChart3,
-  CheckSquare,
-  ReceiptText,
-  Users,
-  Zap,
-} from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { PageTitle } from '@/components/portal/PageTitle';
-import {
-  FORMS_LINE_ORDER,
-  FormsLineHubRow,
-  FormsLineShell,
-} from '@/components/forms/FormsLine';
+import Link from 'next/link';
+import { BarChart3, CheckSquare, ChevronRight, ReceiptText, Users, Zap, type LucideIcon } from 'lucide-react';
+import { RepShell } from '@/components/portal/rep/RepShell';
+import s from '@/components/portal/rep/rep.module.css';
+import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
-import '@/styles/sweep-rep-a.css';
+
+// Forms hub, direction D. Payroll dispute leads: it is the one the dashboard
+// sends reps to ("Missing an install?").
 
 const managerInterviewRoles = [
   'admin',
@@ -32,69 +25,110 @@ const managerInterviewRoles = [
   'director',
 ] as const;
 
-const formRows = [
+const FORMS: Array<{
+  href: string;
+  title: string;
+  description: string;
+  tag?: string;
+  icon: LucideIcon;
+  managerOnly?: boolean;
+}> = [
   {
-    ...FORMS_LINE_ORDER[0],
-    description: 'Log door-knocking + fiber sales for a pack.',
-    audience: 'Field reps',
-    icon: BarChart3,
-    managerOnly: false,
-  },
-  {
-    ...FORMS_LINE_ORDER[1],
-    description: "Request a faster customer install when timing matters.",
-    audience: 'Reps + managers',
-    icon: Zap,
-    managerOnly: false,
-  },
-  {
-    ...FORMS_LINE_ORDER[2],
-    description: 'Report missing or incorrect pay — attach proof.',
-    audience: 'Everyone',
+    href: '/portal/payroll-dispute',
+    title: 'Payroll dispute',
+    description: 'Install missing from your pay, or paid wrong. Attach proof.',
     icon: ReceiptText,
-    managerOnly: false,
   },
   {
-    ...FORMS_LINE_ORDER[3],
-    description: 'Request lead packs or report a territory issue.',
-    audience: 'Field reps',
+    href: '/portal/expedite-order',
+    title: 'Expedite order',
+    description: 'Ask for a faster install when the timing matters.',
+    icon: Zap,
+  },
+  {
+    href: '/portal/fiber-report',
+    title: 'Fiber report',
+    description: "Log a pack's door knocking and fiber sales.",
+    tag: 'Field reps',
+    icon: BarChart3,
+  },
+  {
+    href: '/portal/leads-request',
+    title: 'Leads request',
+    description: 'Ask for a lead pack, or flag a territory problem.',
+    tag: 'Field reps',
     icon: Users,
-    managerOnly: false,
   },
   {
-    ...FORMS_LINE_ORDER[4],
-    description: 'Complete a final candidate interview with a signature.',
-    audience: 'Managers only',
+    href: '/portal/manager-interview',
+    title: 'Manager interview',
+    description: 'Record a final candidate interview and sign off.',
+    tag: 'Managers',
     icon: CheckSquare,
     managerOnly: true,
   },
 ];
 
-export default function FormsPage() {
+function FormsHub() {
   const { isRole } = useAuth();
   const canOpenManagerInterview = isRole(...managerInterviewRoles);
-  const visibleForms = formRows.filter((form) => !form.managerOnly || canOpenManagerInterview);
+  const visible = FORMS.filter((form) => !form.managerOnly || canOpenManagerInterview);
 
   return (
-    <ProtectedRoute>
-      <FormsLineShell>
-        <PageTitle title="Forms" meta={`${visibleForms.length} forms`} />
+    <>
+      <header className={f.hubHead}>
+        <h1 className={f.hubTitle}>Forms</h1>
+        <span className={f.hubCount}>{visible.length} forms</span>
+      </header>
+      <p className={f.hubLede}>Send a request to the office. Each one goes to a review queue.</p>
 
-        <section className="forms-line-list" aria-labelledby="forms-line-list-title">
-          <h2 id="forms-line-list-title" className="sr-only">Choose a form</h2>
-          <div>
-            {visibleForms.map((form) => (
-              <FormsLineHubRow
-                key={form.slug}
-                title={form.title}
-                description={form.description}
-                audience={form.audience}
-                href={`/portal/${form.slug}`}
-              />
-            ))}
-          </div>
-        </section>
-      </FormsLineShell>
-    </ProtectedRoute>
+      <div className={f.hubWrap}>
+        <ul className={`${s.panel} ${f.hubList}`} aria-label="Forms">
+          {visible.map(({ href, title, description, tag, icon: Icon }) => (
+            <li key={href}>
+              <Link href={href} className={f.hubRow}>
+                <span className={f.hubIcon} aria-hidden="true">
+                  <Icon size={20} strokeWidth={2} />
+                </span>
+                <span className={f.hubText}>
+                  <span className={f.hubName}>{title}</span>
+                  <span className={f.hubDesc}>{description}</span>
+                  {tag ? <span className={f.hubTag}>{tag}</span> : null}
+                </span>
+                <ChevronRight size={20} className={f.hubChev} aria-hidden="true" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <aside className={`${s.panel} ${f.aside} ${f.hubAside}`} aria-labelledby="forms-after-h">
+          <h2 id="forms-after-h" className={s.kicker}>
+            After you send
+          </h2>
+          <ol className={f.hubSteps}>
+            <li>
+              <b>1</b>
+              <span>It lands in the office&apos;s review queue.</span>
+            </li>
+            <li>
+              <b>2</b>
+              <span>You get a reference number on screen. Keep it if you follow up.</span>
+            </li>
+            <li>
+              <b>3</b>
+              <span>The team follows up through the portal record.</span>
+            </li>
+          </ol>
+        </aside>
+      </div>
+    </>
+  );
+}
+
+export default function FormsPage() {
+  return (
+    <RepShell>
+      <FormsHub />
+    </RepShell>
   );
 }

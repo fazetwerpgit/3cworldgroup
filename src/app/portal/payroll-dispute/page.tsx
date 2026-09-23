@@ -1,34 +1,55 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { RepShell } from '@/components/portal/rep/RepShell';
 import {
-  FormsLineAlert,
-  FormsLineChoicePicker,
-  FormsLineControl,
-  FormsLineActions,
-  FormsLineIdentity,
-  FormsLineRail,
-  FormsLineSection,
-  FormsLineShell,
-  FormsLineSuccess,
-} from '@/components/forms/FormsLine';
-import { PageTitle } from '@/components/portal/PageTitle';
-import '@/styles/sweep-leftovers.css';
-import FileUpload from '@/components/onboarding/FileUpload';
+  Attachment,
+  Choices,
+  Field,
+  FormAlert,
+  FormFrame,
+  FormHeader,
+  FormSection,
+  FormSent,
+  UPLOADING_MESSAGE,
+  describe,
+  useAlertScroll,
+  useFormCheck,
+  useUploadsInFlight,
+  type FieldRule,
+} from '@/components/portal/rep/RepForm';
+import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
-import { FORM_ATTACHMENT_TYPES, newFormUploadId } from '@/lib/forms/formUploads';
-import { RoleDisplayNames, getEffectiveRole } from '@/types';
+import { newFormUploadId } from '@/lib/forms/formUploads';
+import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
+
+// Payroll dispute, direction D. The dashboard's "Missing an install?" link and
+// the pay help sheet's "Report a missing install" both land here.
+
+const FORM_ID = 'payroll-dispute-form';
 
 const EMPTY = {
   contractorName: '', contractorEmail: '', campaign: '',
   typeOfOrder: '', dateOfInstall: '', orderScreenshotPath: '',
 };
+type Form = typeof EMPTY;
 
-export default function PayrollDisputePage() {
+const RULES: FieldRule<Form>[] = [
+  { key: 'contractorName', id: 'contractor-name', message: 'Enter your name' },
+  { key: 'contractorEmail', id: 'contractor-email', message: 'Enter your email', email: true },
+  { key: 'campaign', id: 'campaign', message: 'Pick the campaign' },
+  { key: 'typeOfOrder', id: 'type-of-order', message: 'Enter the type of order' },
+  { key: 'dateOfInstall', id: 'date-of-install', message: 'Enter the install date' },
+];
+
+const getHeaders = async (): Promise<HeadersInit> => {
+  const token = await auth?.currentUser?.getIdToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+function PayrollDisputeForm() {
   const { user } = useAuth();
   const { options } = useFormOptions();
   const [form, setForm] = useState(EMPTY);
@@ -38,10 +59,30 @@ export default function PayrollDisputePage() {
   const [saving, setSaving] = useState(false);
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
+  const alertRef = useAlertScroll(error);
+  const check = useFormCheck(form, RULES);
+  const { uploading, onBusyChange } = useUploadsInFlight();
+
+  const set = (key: keyof Form, value: string) => {
+    setForm((p) => ({ ...p, [key]: value }));
+    check.clear(key);
+  };
+  const text = (key: keyof Form, id: string) => ({
+    id,
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => set(key, e.target.value),
+    className: f.input,
+    ...describe(id, check.errors[key]),
+  });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || saving) return;
+    if (!check.validate()) return;
+    if (uploading) {
+      setError(UPLOADING_MESSAGE);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -64,84 +105,96 @@ export default function PayrollDisputePage() {
     }
   };
 
-  const displayName = user?.displayName || user?.email || 'current user';
-  const role = getEffectiveRole(user);
-  const roleLabel = role ? RoleDisplayNames[role] : 'Portal user';
+  if (referenceId) {
+    return (
+      <FormSent
+        title="Dispute sent"
+        referenceId={referenceId}
+        message="Payroll has it with your proof. They follow up through the portal record."
+        againLabel="Send another dispute"
+        onAgain={() => {
+          setReferenceId('');
+          check.reset();
+        }}
+      />
+    );
+  }
 
   return (
-    <ProtectedRoute>
-      <FormsLineShell>
-        <section className="forms-line-fill" aria-label="Payroll Dispute">
-          <PageTitle
-            title="Payroll Dispute"
-            back={<Link className="forms-line-back-link" href="/portal/forms">← Back to forms</Link>}
-          />
-          {error && <FormsLineAlert kind="error">{error}</FormsLineAlert>}
-          <div className="forms-line-fill-body">
-            <div>
-              <form onSubmit={submit}>
-                <FormsLineSection
-                  index={1}
-                  title="Who you are"
-                  identity={<FormsLineIdentity name={displayName} role={roleLabel} />}
-                >
-                  <FormsLineControl id="contractor-name" label="Contractor name" required>
-                    <input id="contractor-name" autoComplete="name" value={form.contractorName} onChange={(e) => setForm((p) => ({ ...p, contractorName: e.target.value }))} required />
-                  </FormsLineControl>
-                  <FormsLineControl id="contractor-email" label="Contractor email" required>
-                    <input id="contractor-email" autoComplete="email" value={form.contractorEmail} onChange={(e) => setForm((p) => ({ ...p, contractorEmail: e.target.value }))} required />
-                  </FormsLineControl>
-                </FormsLineSection>
-                <FormsLineSection index={2} title="What happened">
-                  <FormsLineChoicePicker
-                    name="campaign"
-                    label="Campaign"
-                    value={form.campaign}
-                    options={options.payrollCampaigns}
-                    onChange={(campaign) => setForm((p) => ({ ...p, campaign }))}
-                    required
-                  />
-                  <FormsLineControl id="type-of-order" label="Type of order" required>
-                    <input id="type-of-order" value={form.typeOfOrder} onChange={(e) => setForm((p) => ({ ...p, typeOfOrder: e.target.value }))} required />
-                  </FormsLineControl>
-                  <FormsLineControl id="date-of-install" label="Date of install" required>
-                    <input id="date-of-install" placeholder="MM/DD/YYYY" value={form.dateOfInstall} onChange={(e) => setForm((p) => ({ ...p, dateOfInstall: e.target.value }))} required />
-                  </FormsLineControl>
-                </FormsLineSection>
-                <FormsLineSection index={3} title="Proof">
-                  <FormsLineControl id="payroll-proof" label="Screenshot or proof" className="forms-line-field-full">
-                    <div className="forms-line-upload">
-                      <FileUpload
-                        key={uploadId}
-                        itemId="payroll-dispute"
-                        accept="image/*,application/pdf"
-                        allowedTypes={FORM_ATTACHMENT_TYPES}
-                        uploadUrl="/api/portal/forms/upload"
-                        extraFields={{ formType: 'payroll-dispute', uploadId }}
-                        getHeaders={async (): Promise<HeadersInit> => {
-                          const token = await auth?.currentUser?.getIdToken();
-                          return token ? { Authorization: `Bearer ${token}` } : {};
-                        }}
-                        onUploaded={(path) => setForm((p) => ({ ...p, orderScreenshotPath: path }))}
-                      />
-                      <p className="forms-line-proof-hint"><strong>Good proof:</strong> order ID, campaign, and pay line visible in one frame. PNG, JPG, WEBP, HEIC, or PDF · 4 MB max.</p>
-                    </div>
-                  </FormsLineControl>
-                </FormsLineSection>
-                <FormsLineActions verb="dispute" saving={saving} />
-              </form>
-              {referenceId && (
-                <FormsLineSuccess
-                  title="Dispute received"
-                  referenceId={referenceId}
-                  message="We received the dispute and its supporting details. The payroll owner can follow up through the portal record."
-                />
-              )}
-            </div>
-            <FormsLineRail status="Ready for payroll review" note="A clear screenshot helps the payroll team review this." />
-          </div>
-        </section>
-      </FormsLineShell>
-    </ProtectedRoute>
+    <FormFrame
+      formId={FORM_ID}
+      onSubmit={submit}
+      header={
+        <FormHeader
+          title="Payroll dispute"
+          lede="Install missing from your pay, or paid wrong? Send the order and a screenshot and payroll looks at the account."
+        />
+      }
+      alert={error ? <FormAlert message={error} alertRef={alertRef} /> : null}
+      submitLabel="Send dispute"
+      saving={saving}
+      uploading={uploading}
+      done={check.done}
+      total={check.total}
+      submitter={user?.displayName || user?.email || 'you'}
+      routeTo="Payroll review"
+      note="A clear screenshot with the order ID and pay line in one frame is the fastest way to a fix."
+    >
+      <FormSection n={1} title="Who you are">
+        <Field id="contractor-name" label="Contractor name" required error={check.errors.contractorName}>
+          <input {...text('contractorName', 'contractor-name')} autoComplete="name" />
+        </Field>
+        <Field id="contractor-email" label="Contractor email" required error={check.errors.contractorEmail}>
+          <input {...text('contractorEmail', 'contractor-email')} type="email" inputMode="email" autoComplete="email" />
+        </Field>
+      </FormSection>
+
+      <FormSection n={2} title="What happened">
+        <Choices
+          name="campaign"
+          label="Campaign"
+          value={form.campaign}
+          options={options.payrollCampaigns}
+          onChange={(value) => set('campaign', value)}
+          required
+          error={check.errors.campaign}
+        />
+        <Field id="type-of-order" label="Type of order" required error={check.errors.typeOfOrder}>
+          <input {...text('typeOfOrder', 'type-of-order')} autoComplete="off" />
+        </Field>
+        <Field id="date-of-install" label="Date of install" required error={check.errors.dateOfInstall}>
+          <input {...text('dateOfInstall', 'date-of-install')} autoComplete="off" placeholder="MM/DD/YYYY" />
+        </Field>
+      </FormSection>
+
+      <FormSection n={3} title="Proof">
+        <Attachment
+          key={uploadId}
+          id="payroll-proof"
+          label="Screenshot or proof"
+          accept="image/*,application/pdf"
+          hint="Order ID, campaign and pay line visible in one frame."
+          upload={(file) =>
+            uploadFormAttachment({
+              file,
+              itemId: 'payroll-dispute',
+              formType: 'payroll-dispute',
+              fields: { uploadId },
+              getHeaders,
+            })
+          }
+          onUploaded={(path) => setForm((p) => ({ ...p, orderScreenshotPath: path }))}
+          onBusyChange={onBusyChange}
+        />
+      </FormSection>
+    </FormFrame>
+  );
+}
+
+export default function PayrollDisputePage() {
+  return (
+    <RepShell task="Payroll dispute">
+      <PayrollDisputeForm />
+    </RepShell>
   );
 }
