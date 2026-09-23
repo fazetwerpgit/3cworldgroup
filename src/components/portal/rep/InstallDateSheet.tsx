@@ -137,12 +137,15 @@ export function InstallDateSheet({
                 max={maxInstallDay()}
                 disabled={saving}
                 aria-invalid={error ? true : undefined}
-                aria-describedby={error ? 'install-date-error' : undefined}
+                aria-describedby={error ? 'install-date-hint install-date-error' : 'install-date-hint'}
                 onChange={(event) => {
                   setDay(event.target.value);
                   setError(null);
                 }}
               />
+              <p id="install-date-hint" className={l.hint}>
+                We&apos;ll update this automatically when the carrier&apos;s report changes it.
+              </p>
               {error ? (
                 <p id="install-date-error" className={l.fieldError} role="alert">
                   <AlertCircle size={16} aria-hidden="true" />

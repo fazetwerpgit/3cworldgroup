@@ -91,6 +91,7 @@ describe('InstallDateSheet', () => {
     render({ missed: false, installDate: noon(2) });
 
     expect(container.textContent).toContain('Change install date');
+    expect(container.textContent).toContain("We'll update this automatically when the carrier's report changes it.");
     expect(input().value).toBe(dayFromToday(2));
     expect(input().min).toBe(dayFromToday(-10));
     pick(dayFromToday(4));

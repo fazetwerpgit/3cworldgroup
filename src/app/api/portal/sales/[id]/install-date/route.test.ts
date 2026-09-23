@@ -15,17 +15,30 @@ const update = vi.fn(async (payload: Record<string, unknown>) => {
   state.updates.push(payload);
 });
 
+const carrier = vi.hoisted(() => ({ orders: [] as unknown[], fail: false }));
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
-    collection: vi.fn(() => ({
-      doc: vi.fn(() => ({
-        get: vi.fn(async () => ({ exists: state.exists, data: () => state.data })),
-        update,
-      })),
+    collection: vi.fn((name: string) => ({
+      doc: vi.fn(() =>
+        name === 'config'
+          ? { get: vi.fn(async () => ({ exists: true, data: () => ({ lastReportAt: '2026-09-22T12:00:00.000Z' }) })) }
+          : {
+              get: vi.fn(async () => ({ exists: state.exists, data: () => state.data })),
+              update,
+            }
+      ),
     })),
   },
   initError: null,
 }));
+vi.mock('@/lib/fiberReport/ordersCache', () => ({
+  getAllFiberOrders: vi.fn(async () => {
+    if (carrier.fail) throw new Error('read failed');
+    return carrier.orders;
+  }),
+}));
+vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: vi.fn() }));
 
 import { PATCH } from './route';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
@@ -62,6 +75,8 @@ beforeEach(() => {
   state.exists = true;
   state.data = { salesRepId: 'rep1', status: 'approved', saleDate: noon(-10), installDate: noon(-3) };
   state.updates = [];
+  carrier.orders = [];
+  carrier.fail = false;
 });
 
 describe('PATCH /api/portal/sales/[id]/install-date', () => {
@@ -75,9 +90,37 @@ describe('PATCH /api/portal/sales/[id]/install-date', () => {
     expect(written.installDateSource).toBe('rep');
     expect(written.installDatePreviousDate).toEqual(noon(-3));
     expect(written.installDateChangedAt).toBeInstanceOf(Date);
-    expect(Object.keys(written).sort()).toEqual(
-      ['installDate', 'installDateChangedAt', 'installDatePreviousDate', 'installDateSource', 'updatedAt']
-    );
+    expect(written.installDateSetAt).toBeInstanceOf(Date);
+    expect(written.repEditCarrierDate).toBeNull();
+    expect(Object.keys(written).sort()).toEqual([
+      'installDate',
+      'installDateChangedAt',
+      'installDatePreviousDate',
+      'installDateSetAt',
+      'installDateSource',
+      'repEditCarrierDate',
+      'updatedAt',
+    ]);
+  });
+
+  it("records the carrier's date at edit time so the report sync can tell news from old news", async () => {
+    state.data = { ...state.data, customerAddress: '77 Elm Ct, Tulsa, OK' };
+    carrier.orders = [
+      { id: 'brk_1', status: 'breakage', address: '77 Elm Ct', estInstallDate: dayFromToday(-3), saleLink: null },
+    ];
+
+    await PATCH(patch({ installDate: dayFromToday(5) }), { params });
+
+    expect(state.updates[0].repEditCarrierDate).toBe(dayFromToday(-3));
+  });
+
+  it("still saves when the carrier's date can't be read", async () => {
+    carrier.fail = true;
+
+    const response = await PATCH(patch({ installDate: dayFromToday(5) }), { params });
+
+    expect(response.status).toBe(200);
+    expect(state.updates[0].repEditCarrierDate).toBeNull();
   });
 
   it('sets a first install date on an undated sale', async () => {

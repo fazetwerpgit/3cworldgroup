@@ -358,6 +358,11 @@ export function SaleDetailSheet({
                   disabled={savingInstall}
                   onChange={(event) => setInstallDraft(event.target.value)}
                 />
+                {ownSale && (
+                  <p className={x.dEditorHint}>
+                    We&apos;ll update this automatically when the carrier&apos;s report changes it.
+                  </p>
+                )}
                 <div className={x.dEditorActions}>
                   <button type="button" className={`${x.actBtn} ${x.actPrimary}`} disabled={savingInstall} onClick={() => void saveInstallDate()}>
                     {savingInstall ? 'Saving...' : 'Save'}
