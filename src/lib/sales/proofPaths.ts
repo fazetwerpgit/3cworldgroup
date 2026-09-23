@@ -7,6 +7,8 @@
 // still written as the first one so older readers keep working. Old sales only
 // have the single field, so ALWAYS read through saleProofPaths().
 
+import { randomHex } from '@/lib/randomHex';
+
 export const MAX_PROOF_SCREENSHOTS = 4;
 
 const cleanPath = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -79,6 +81,6 @@ export function proofPathFields(paths: string[]): { proofScreenshotPaths: string
  * `{saleKey}_{6 hex}` (matches the sale-proof slot rule [A-Za-z0-9_-]{8,64}).
  */
 export function newProofSlot(saleKey: string): string {
-  const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 6);
+  const suffix = randomHex(3);
   return `${saleKey.slice(0, 57)}_${suffix}`;
 }

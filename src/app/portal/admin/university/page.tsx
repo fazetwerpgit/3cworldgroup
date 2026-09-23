@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'rea
 import { FileText, GraduationCap, Link2, ListChecks, Plus, Search, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { randomHex } from '@/lib/randomHex';
 import { useTrainingUpload } from '@/hooks/useTrainingUpload';
 import { TRAINING_CATEGORIES, TrainingResource } from '@/types';
 import {
@@ -99,7 +100,7 @@ function AdminUniversity() {
     if (!file) return;
     setErr('');
     setMsg('');
-    const uploadId = crypto.randomUUID().replace(/-/g, '');
+    const uploadId = randomHex();
     const result = await upload(file, uploadId);
     if (result) setPending(result);
   };

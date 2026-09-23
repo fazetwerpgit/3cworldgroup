@@ -1,6 +1,9 @@
 // Generic form-attachment upload validation (NOT onboarding-coupled). Files for
 // rep forms (e.g. Payroll Dispute screenshot) go to
 // form-attachments/{uid}/{formType}/{uploadId}/ (see resolveFormUploadFolder).
+
+import { randomHex } from '@/lib/randomHex';
+
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -53,12 +56,12 @@ export function isAllowedFormUpload(formType: string, slot: string): boolean {
 // Payroll Dispute + Leads Request: every submission gets its own upload id
 // (generated client-side when the form opens), so a rep's second dispute or an
 // abandoned upload can never replace/delete the proof on an earlier submission.
-// Format: crypto.randomUUID() with the dashes stripped (32 lowercase hex).
+// Format: 32 lowercase hex (randomHex, the dash-stripped randomUUID shape).
 const FORM_UPLOAD_ID = /^[0-9a-f]{32}$/;
 const PER_SUBMISSION_FORMS = new Set(['payroll-dispute', 'leads-request']);
 
 export function newFormUploadId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
+  return randomHex();
 }
 
 export function isValidFormUploadId(id: unknown): id is string {

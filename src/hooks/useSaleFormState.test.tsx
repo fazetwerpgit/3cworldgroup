@@ -165,6 +165,41 @@ describe('useSaleFormState', () => {
     expect(api.products).toHaveLength(1);
   });
 
+  it('mounts on a plain-http origin, where crypto.randomUUID does not exist', async () => {
+    // A phone on the LAN dev server (http://192.168.x.x) is not a secure
+    // context: randomUUID is missing there, and calling it crashed the page.
+    const real = globalThis.crypto;
+    vi.stubGlobal('crypto', { getRandomValues: real.getRandomValues.bind(real) });
+    try {
+      await mount();
+      expect(api.proofUploadId).toMatch(/^[a-f0-9]{32}$/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps the usable parts of a malformed draft instead of crashing', async () => {
+    window.sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        formData: { customerName: null, customerAddress: 42, notes: 'Gate code 12', installDate: ['x'] },
+        products: [null, 'tfiber-1gig', { productId: 7 }, product],
+        saleDateTouched: 'yes',
+        proofUploadId: 12,
+      })
+    );
+    await mount();
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(api.formData.customerName).toBe('');
+    expect(api.formData.customerAddress).toBe('');
+    expect(api.formData.installDate).toBe('');
+    expect(api.formData.notes).toBe('Gate code 12');
+    expect(api.products).toEqual([product]);
+    expect(api.proofUploadId).toMatch(/^[a-f0-9]{32}$/);
+  });
+
   it('caps proof screenshots at 4 and ignores duplicates', async () => {
     await mount();
     await act(async () => {

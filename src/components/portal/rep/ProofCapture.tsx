@@ -13,6 +13,7 @@ import {
   uploadFormAttachment,
 } from '@/lib/forms/uploadFormAttachment';
 import { MAX_PROOF_SCREENSHOTS, newProofSlot } from '@/lib/sales/proofPaths';
+import { randomHex } from '@/lib/randomHex';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
 
@@ -178,7 +179,7 @@ export function useProofUploads({
         preview = { url, isPdf: false };
       }
       return {
-        key: crypto.randomUUID(),
+        key: randomHex(),
         file,
         preview,
         status: typeError ? 'failed' : 'uploading',

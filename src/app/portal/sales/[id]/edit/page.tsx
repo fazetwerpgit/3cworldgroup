@@ -23,6 +23,7 @@ import { hasSaleProof } from '@/lib/sales/proof';
 import { MAX_PROOF_SCREENSHOTS, newProofSlot, saleProofPaths } from '@/lib/sales/proofPaths';
 import { openAttachmentInNewTab } from '@/lib/forms/openAttachment';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
+import { randomHex } from '@/lib/randomHex';
 import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
 import { auth } from '@/lib/firebase/config';
 
@@ -80,7 +81,7 @@ export default function EditSalePage() {
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [proofUploadId] = useState(() => crypto.randomUUID().replace(/-/g, ''));
+  const [proofUploadId] = useState(() => randomHex());
   // The upload route clears a slot's folder before writing, so every screenshot
   // gets its own slot: a fresh one is drawn after each upload, and the next
   // "Add another" can never overwrite a screenshot already on the list.

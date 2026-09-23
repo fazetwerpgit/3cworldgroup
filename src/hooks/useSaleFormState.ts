@@ -8,6 +8,7 @@ import { addPlanToProducts, isExtraPlanId } from '@/lib/sales/planSelection';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { MAX_PROOF_SCREENSHOTS, proofPathFields, saleProofPaths } from '@/lib/sales/proofPaths';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
+import { randomHex } from '@/lib/randomHex';
 
 // Everything a new-sale form needs except its markup, so the old SaleForm and
 // the direction-D Log Sale page share one set of rules: the draft, the
@@ -52,18 +53,62 @@ export interface SaleDraft {
 
 /** A fresh idempotency key: 32 hex, the CLIENT_SALE_ID_RE shape. */
 export function newClientSaleId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
+  return randomHex();
 }
 
+const DRAFT_TEXT_FIELDS = [
+  'customerName',
+  'customerPhone',
+  'customerEmail',
+  'customerAddress',
+  'saleDate',
+  'installDate',
+  'notes',
+  'orderNumberOrBtn',
+] as const;
+const SALE_TYPES: readonly unknown[] = ['new_service', 'upgrade', 'add_on', 'renewal'] satisfies SaleType[];
+
+const isFiniteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
+
+/** A saved product the page can render; anything else in a draft is dropped. */
+function isDraftProduct(value: unknown): value is SaleProduct {
+  if (!value || typeof value !== 'object') return false;
+  const p = value as Record<string, unknown>;
+  return (
+    typeof p.productId === 'string' &&
+    typeof p.productName === 'string' &&
+    typeof p.company === 'string' &&
+    [p.quantity, p.unitPrice, p.totalPrice, p.points].every(isFiniteNumber)
+  );
+}
+
+/**
+ * The saved draft, reduced to what the form can safely show. A draft from an
+ * older build, or one damaged in storage, must never crash the page: a field
+ * that is not a string is left empty and a product that is not whole is dropped.
+ */
 export function readSaleDraft(key: string): SaleDraft | null {
   try {
     const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
-    const draft = JSON.parse(raw) as Partial<SaleDraft>;
-    if (!draft || typeof draft !== 'object' || !draft.formData || !Array.isArray(draft.products)) {
+    const draft = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!draft || typeof draft !== 'object' || !draft.formData || typeof draft.formData !== 'object') {
       return null;
     }
-    return draft as SaleDraft;
+    if (!Array.isArray(draft.products)) return null;
+    const saved = draft.formData as Record<string, unknown>;
+    const formData: Partial<SaleDraft['formData']> = proofPathFields(saleProofPaths(saved));
+    for (const name of DRAFT_TEXT_FIELDS) {
+      if (typeof saved[name] === 'string') formData[name] = saved[name];
+    }
+    if (SALE_TYPES.includes(saved.saleType)) formData.saleType = saved.saleType as SaleType;
+    return {
+      formData: formData as SaleDraft['formData'],
+      products: draft.products.filter(isDraftProduct),
+      saleDateTouched: draft.saleDateTouched === true,
+      proofUploadId: typeof draft.proofUploadId === 'string' ? draft.proofUploadId : '',
+      keyUsed: draft.keyUsed === true,
+    };
   } catch {
     return null;
   }
