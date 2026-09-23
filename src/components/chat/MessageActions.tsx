@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import type { LucideIcon } from 'lucide-react';
 import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2 } from 'lucide-react';
 import {
@@ -10,6 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import s from '@/components/portal/rep/rep.module.css';
+import c from './chat.module.css';
 
 // The permissions/handlers a message row hands to its action affordances. Reply is
 // always available; Copy only when there's text to copy; Edit for the author only;
@@ -65,10 +67,10 @@ function buildActions(config: MessageActionsConfig): ActionItem[] {
 }
 
 /**
- * Desktop (lg+) message actions: a ghost "..." button that reveals on row hover
- * and opens a themed dropdown. The Radix content portals to <body>, which now
- * carries the theme class (Task 1), so dark mode is correct. Mobile uses the
- * long-press sheet below instead (this trigger is hidden by the caller's markup).
+ * Desktop message actions: a quiet "..." button that reveals on row hover and
+ * opens a dropdown. Radix portals the content to <body>, outside the D token
+ * layer, so its classes carry the D colours themselves. Phones use the
+ * long-press sheet below instead.
  */
 export function MessageActions({
   config,
@@ -82,22 +84,19 @@ export function MessageActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Message actions"
-          className={`chat-line-action-trigger grid size-8 shrink-0 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8dc63f] dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground ${triggerClassName}`}
-        >
-          <MoreHorizontal className="size-4" />
+        <button type="button" aria-label="Message actions" className={`${c.iconBtn} ${triggerClassName}`.trim()}>
+          <MoreHorizontal size={18} aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuContent align="end" className={c.menu}>
         {items.map((item) => (
           <DropdownMenuItem
             key={item.key}
             variant={item.destructive ? 'destructive' : 'default'}
             onSelect={item.onSelect}
+            className={`${c.menuItem} ${item.destructive ? c.menuDanger : ''}`}
           >
-            <item.icon className="size-4" />
+            <item.icon aria-hidden="true" />
             {item.label}
           </DropdownMenuItem>
         ))}
@@ -107,9 +106,9 @@ export function MessageActions({
 }
 
 /**
- * Mobile (<lg) message actions: a bottom action sheet opened by a long-press on a
- * bubble (the parent owns the long-press timer and the open message). Portaled to
- * <body>, closes on backdrop tap or Esc. Rounded top, safe-area padding.
+ * Phone message actions: the D bottom sheet, opened by a long-press on a bubble
+ * (the parent owns the long-press timer and the open message). Portaled to
+ * <body> through BodyLayer; closes on backdrop tap or Esc.
  */
 export function MessageActionSheet({
   open,
@@ -131,60 +130,51 @@ export function MessageActionSheet({
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  if (!open || !config || typeof document === 'undefined') return null;
+  if (!open || !config) return null;
   const items = buildActions(config);
 
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Message actions"
-      onClick={onClose}
-      className="chat-line-action-backdrop portal-motion fixed inset-0 z-[130] flex flex-col justify-end bg-black/50 backdrop-blur-sm"
-    >
+  return (
+    <BodyLayer>
       <div
-        onClick={(event) => event.stopPropagation()}
-        className="chat-line-action-sheet rounded-t-2xl border-t border-slate-200 bg-white pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl dark:border-border dark:bg-card"
+        className={s.backdrop}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
       >
-        <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-slate-200 dark:bg-border" />
-        {authorName && (
-          <p className="chat-line-action-author truncate px-4 py-1.5 text-xs font-medium text-slate-400 dark:text-muted-foreground">
-            {authorName}
-          </p>
-        )}
-        {config.onAddReaction && (
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              config.onAddReaction?.();
-            }}
-            className="chat-line-action-reaction flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-muted"
-          >
-            <SmilePlus className="size-5 shrink-0" />
-            React
-          </button>
-        )}
-        {items.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => {
-              onClose();
-              item.onSelect();
-            }}
-            className={`chat-line-action-item flex w-full items-center gap-3 px-4 py-3 text-left text-sm ${
-              item.destructive
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-slate-700 dark:text-slate-200'
-            } hover:bg-slate-50 dark:hover:bg-muted`}
-          >
-            <item.icon className="size-5 shrink-0" />
-            {item.label}
-          </button>
-        ))}
+        <section className={s.sheet} role="dialog" aria-modal="true" aria-label="Message actions">
+          <div className={s.sheetHandle} aria-hidden="true" />
+          {authorName && <p className={c.sheetWho}>{authorName}</p>}
+          <div className={c.sheetList}>
+            {config.onAddReaction && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  config.onAddReaction?.();
+                }}
+                className={c.sheetItem}
+              >
+                <SmilePlus size={20} aria-hidden="true" />
+                React
+              </button>
+            )}
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  onClose();
+                  item.onSelect();
+                }}
+                className={`${c.sheetItem} ${item.destructive ? c.sheetDanger : ''}`}
+              >
+                <item.icon size={20} aria-hidden="true" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
-    </div>,
-    document.body
+    </BodyLayer>
   );
 }
