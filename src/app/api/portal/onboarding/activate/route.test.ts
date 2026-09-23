@@ -29,7 +29,7 @@ const firestore = vi.hoisted(() => {
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: firestore.adminDb }));
 vi.mock('firebase-admin/firestore', () => ({
-  FieldValue: { delete: vi.fn(() => '__DELETE__') },
+  FieldValue: { delete: vi.fn(() => '__DELETE__'), serverTimestamp: vi.fn(() => '__SERVER_TS__') },
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(),

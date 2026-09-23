@@ -48,7 +48,7 @@ const firestore = vi.hoisted(() => {
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: firestore.adminDb, adminAuth: firestore.adminAuth }));
 vi.mock('firebase-admin/firestore', () => ({
-  FieldValue: { delete: vi.fn(() => '__DELETE__') },
+  FieldValue: { delete: vi.fn(() => '__DELETE__'), serverTimestamp: vi.fn(() => '__SERVER_TS__') },
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(),
@@ -140,7 +140,9 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(firestore.updates[0]?.data).toMatchObject({
       fieldRole: 'general_manager',
       status: 'active',
+      activatedAt: '__SERVER_TS__',
     });
+    expect(firestore.updates[0]?.data).not.toHaveProperty('hireDate');
   });
 
   it('does not re-kick onboarding when the user already holds that role', async () => {
@@ -173,9 +175,25 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(firestore.updates[0]?.data).toMatchObject({
       status: 'active',
       fieldRole: 'entry_rep',
+      activatedAt: '__SERVER_TS__',
     });
+    expect(firestore.updates[0]?.data).not.toHaveProperty('hireDate');
     expect(mockResolveAlertTasks).not.toHaveBeenCalled();
     expect(sendPendingEsignDocs).not.toHaveBeenCalled();
+  });
+
+  it('does not stamp activatedAt when an inactive account is reactivated', async () => {
+    firestore.users.set('pending-user', {
+      status: 'inactive',
+      fieldRole: 'entry_rep',
+      displayName: 'Inactive Rep',
+    });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({ status: 'active' });
+    expect(firestore.updates[0]?.data).not.toHaveProperty('activatedAt');
   });
 
   it('does not kick off onboarding when an active user is promoted', async () => {

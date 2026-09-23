@@ -229,6 +229,12 @@ export async function PUT(
       doc.get('status') === 'pending' &&
       !roleRequiresOnboarding(fieldRole);
     if (shouldActivateImmediately) updateData.status = 'active';
+    // Stamp the pending -> active flip (Accept, or immediate activation above)
+    // for the owner "Activated" tile. hireDate is left as is. Reactivating an
+    // inactive account is not a new activation, so it is not stamped.
+    if (updateData.status === 'active' && doc.get('status') === 'pending') {
+      updateData.activatedAt = FieldValue.serverTimestamp();
+    }
 
     // Update displayName in Firebase Auth if changed
     if (trimmedDisplayName) {

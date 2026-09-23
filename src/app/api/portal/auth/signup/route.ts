@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
 
 // POST /api/portal/auth/signup - Register new employee as entry_level_rep
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       fieldRole: 'entry_level_rep',
       status: 'active',
       hireDate: new Date(),
+      activatedAt: FieldValue.serverTimestamp(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };

@@ -76,6 +76,22 @@ describe('GET /api/portal/owner/summary', () => {
     expect((await GET(req('?section=payroll'))).status).toBe(400);
   });
 
+  it('returns the sections that built and lists the failed ones', async () => {
+    gate.mockResolvedValue({ ok: true, uid: 'w1', name: 'Owner', isAdmin: true, isOwner: true });
+    build.mockResolvedValueOnce({ generatedAt: 'x', problems: [], recruiting: {}, failed: ['money'] });
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ failed: ['money'] });
+  });
+
+  it('is a 500 when every requested section failed', async () => {
+    gate.mockResolvedValue({ ok: true, uid: 'w1', name: 'Owner', isAdmin: true, isOwner: true });
+    build.mockResolvedValueOnce({ generatedAt: 'x', failed: ['money'] });
+    const res = await GET(req('?section=money'));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Failed to build the owner summary' });
+  });
+
   it('reports a failed build as a 500, never as zeros', async () => {
     gate.mockResolvedValue({ ok: true, uid: 'w1', name: 'Owner', isAdmin: true, isOwner: true });
     build.mockRejectedValueOnce(new Error('quota'));

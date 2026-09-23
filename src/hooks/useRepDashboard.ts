@@ -54,7 +54,6 @@ export interface RepDashboardState {
 export type RepSectionKey = Exclude<keyof RepDashboardState, never>;
 
 const LOADING = { status: 'loading' } as const;
-const DEFAULT_CHALLENGE_TARGET = 7;
 
 async function getJson<T>(url: string, token: string | null, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, {
@@ -125,10 +124,8 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
       },
       challenge: async (token, signal) => {
         const [setting, week] = await Promise.all([
-          getJson<{ targetSales?: number }>('/api/portal/settings/weekly-challenge', token, signal).catch((error) => {
-            if (signal.aborted) throw error;
-            return { targetSales: DEFAULT_CHALLENGE_TARGET };
-          }),
+          // A failed read errors the card ("Couldn't load · Retry"); never a made-up target.
+          getJson<{ targetSales?: number }>('/api/portal/settings/weekly-challenge', token, signal),
           // 'submitted' counts sales as they are logged (the Leaderboard page's challenge).
           getJson<{ currentUser?: LeaderboardRow | null }>(
             '/api/portal/leaderboard?period=week&metric=totalSales&limit=1&scope=submitted',
@@ -136,8 +133,8 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
             signal
           ),
         ]);
-        const target = typeof setting.targetSales === 'number' ? setting.targetSales : DEFAULT_CHALLENGE_TARGET;
-        return { target, done: week.currentUser?.totalSales ?? 0 } satisfies RepChallenge;
+        if (typeof setting.targetSales !== 'number') throw new Error('Weekly challenge target missing');
+        return { target: setting.targetSales, done: week.currentUser?.totalSales ?? 0 } satisfies RepChallenge;
       },
       calls: async (token, signal) => {
         const data = await getJson<{ calls?: DashboardCall[] }>('/api/portal/calls', token, signal);

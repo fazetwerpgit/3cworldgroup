@@ -166,9 +166,9 @@ export default function RecruitingCommandCenterPage() {
       setInvites(json.invites);
       setApplications(json.applications);
       setLoadFailed(false);
-    } catch (err) {
+    } catch {
+      // Load failures render in place (AdminFailed); `error` is for actions only.
       setLoadFailed(true);
-      setError(err instanceof Error ? err.message : 'Failed to load recruiting data');
     } finally {
       setLoading(false);
     }
@@ -358,7 +358,7 @@ export default function RecruitingCommandCenterPage() {
           </div>
         </div>
 
-        {error && !loadFailed ? (
+        {error ? (
           <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
         ) : null}
         {success ? (

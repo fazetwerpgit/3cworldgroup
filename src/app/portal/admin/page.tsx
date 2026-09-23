@@ -76,7 +76,8 @@ export default function OpsHomePage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'failed');
         const rows: { status?: string; createdAt?: string | null }[] = Array.isArray(json.submissions) ? json.submissions : [];
-        const open = rows.filter((r) => r.status !== 'handled');
+        // Same definition as the owner's Needs-attention count: status == 'new'.
+        const open = rows.filter((r) => r.status === 'new');
         return {
           key,
           label,

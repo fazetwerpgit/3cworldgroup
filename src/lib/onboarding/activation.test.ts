@@ -42,7 +42,7 @@ const { store, updates, db, dispatchMock, resolveMock, sendPacketMock } = vi.hoi
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: db }));
 vi.mock('firebase-admin/firestore', () => ({
-  FieldValue: { delete: vi.fn(() => '__DELETE__') },
+  FieldValue: { delete: vi.fn(() => '__DELETE__'), serverTimestamp: vi.fn(() => '__SERVER_TS__') },
 }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: resolveMock }));
@@ -79,6 +79,7 @@ describe('activateUser', () => {
       fieldRole: 'l1_manager',
       atRisk: '__DELETE__',
       hireDate: expect.any(Date),
+      activatedAt: '__SERVER_TS__',
       updatedAt: expect.any(Date),
     });
     expect(dispatchMock).toHaveBeenCalledWith(
