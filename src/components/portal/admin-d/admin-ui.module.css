@@ -193,7 +193,6 @@
 
 .statHot {
   color: var(--c-lime);
-  text-shadow: 0 0 24px var(--c-lime-glow);
 }
 
 .statWarn {

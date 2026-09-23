@@ -65,7 +65,6 @@
   font-size: var(--t-d1);
   font-weight: 400;
   line-height: 0.9;
-  text-shadow: 0 0 22px rgba(141, 198, 63, 0.4);
 }
 
 .countLabel {

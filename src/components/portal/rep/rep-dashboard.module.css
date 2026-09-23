@@ -94,16 +94,12 @@
   display: flex;
   align-items: flex-start;
   color: var(--c-lime);
-  text-shadow:
-    0 0 var(--rank-r1, 22px) rgba(141, 198, 63, calc(0.45 * 1)),
-    0 0 var(--rank-r2, 64px) rgba(141, 198, 63, calc(0.22 * 1));
 }
 
 .ord {
   margin: 0.06em 0 0 0.04em;
   font-size: 0.36em;
   line-height: 1;
-  text-shadow: none;
 }
 
 .delta {
@@ -278,7 +274,7 @@
 }
 
 /* ---------- where you stand: phone (B's tiles, C's surface) ----------
-   The score panel above already carries the hero rank (76px lime, glowing).
+   The score panel above already carries the hero rank (76px lime).
    These tiles restate it as plain facts: white 48px numerals, no glow, "#4 of 18". */
 .statTiles {
   display: grid;

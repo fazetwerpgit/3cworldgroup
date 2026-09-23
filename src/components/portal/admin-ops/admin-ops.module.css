@@ -63,12 +63,10 @@
   font-family: var(--f-display);
   font-size: var(--t-d1);
   line-height: 0.82;
-  text-shadow: 0 0 24px var(--c-lime-glow);
 }
 
 .statNumZero {
   color: var(--c-text-2);
-  text-shadow: none;
 }
 
 .statLabel {

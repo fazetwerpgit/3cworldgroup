@@ -100,9 +100,6 @@
 
 .scoreLime {
   color: var(--c-lime);
-  text-shadow:
-    0 0 22px rgba(141, 198, 63, 0.45),
-    0 0 64px rgba(141, 198, 63, 0.22);
 }
 
 .heroSub {
