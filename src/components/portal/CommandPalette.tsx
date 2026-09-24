@@ -71,7 +71,7 @@ const platformRoles: UserRole[] = ['admin', 'operations'];
 // This is the single portal navigation source of truth. The sidebar, mobile
 // sheet, and palette all consume these same labels, routes, and gates. The
 // admin side is six pages; the old admin pages live on as tabs inside People,
-// Requests and Settings (see admin-d/adminHubs.ts), each tab under its old gate.
+// Requests and Admin settings (see admin-d/adminHubs.ts), each tab under its old gate.
 export const portalNavGroups: PortalNavGroup[] = [
   {
     items: [
@@ -94,7 +94,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Onboarding', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
       { label: 'Requests', href: REQUESTS_HUB.href, icon: Inbox, roles: hubRoles(REQUESTS_HUB), hub: REQUESTS_HUB },
       { label: 'Announcements', href: '/portal/admin/announcements', icon: Megaphone, roles: ['owner'] },
-      { label: 'Settings', href: SETTINGS_HUB.href, icon: Settings, roles: hubRoles(SETTINGS_HUB), hub: SETTINGS_HUB },
+      { label: 'Admin settings', href: SETTINGS_HUB.href, icon: Settings, roles: hubRoles(SETTINGS_HUB), hub: SETTINGS_HUB },
     ],
   },
 ];

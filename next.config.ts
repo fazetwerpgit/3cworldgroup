@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 // form when signed out and forwards to the dashboard when signed in.
 const LOGIN_ALIASES = ['/login', '/signin', '/employee'];
 
-// Pages folded into the Learn and admin hub pages (People, Requests, Settings)
+// Pages folded into the Learn and admin hub pages (People, Requests, Admin settings)
 // keep their old URLs: bookmarks, and links already stored in notifications and
 // emails, land on the right tab. A request's own query string passes through.
 const MOVED_PAGES: [source: string, destination: string][] = [

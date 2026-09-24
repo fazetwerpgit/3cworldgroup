@@ -149,7 +149,7 @@ describe('rep menu sheet', () => {
     expect(renderToStaticMarkup(<RepMenu />)).not.toContain('>People<');
     setUser({ status: 'active', role: 'admin', uid: 'a-1' }, [...REP_PERMISSIONS, 'users:read']);
     const admin = renderToStaticMarkup(<RepMenu />);
-    for (const label of ['Ops Home', 'People', 'Onboarding', 'Requests', 'Settings']) {
+    for (const label of ['Ops Home', 'People', 'Onboarding', 'Requests', 'Admin settings']) {
       expect(admin).toContain(`>${label}<`);
     }
     expect(admin).not.toContain('>Announcements<');

@@ -8,14 +8,14 @@ import { FormOptions } from './FormOptions';
 import { SystemSettings } from './SystemSettings';
 import { UniversityContent } from './UniversityContent';
 
-// Settings: System, Form options, Chat channels, Email templates, University
+// Admin settings: System, Form options, Chat channels, Email templates, University
 // content, each under its old gate. /portal/admin/form-options and the other
 // old URLs redirect to their tab (next.config.ts).
 export default function SettingsPage() {
   return (
     <AdminHub
       hub={SETTINGS_HUB}
-      title="Settings"
+      title="Admin settings"
       panels={{
         system: () => <SystemSettings />,
         'form-options': () => <FormOptions />,

@@ -77,7 +77,7 @@ describe('portal nav groups', () => {
       'Onboarding',
       'Requests',
       'Announcements',
-      'Settings',
+      'Admin settings',
     ]);
     const adminHrefs = portalNavGroups
       .flatMap((group) => group.items)
