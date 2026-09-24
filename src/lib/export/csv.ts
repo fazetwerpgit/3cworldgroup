@@ -17,9 +17,9 @@ export function toCsv(columns: CsvColumn[], rows: Record<string, unknown>[]): st
   return [header, ...body].join('\r\n');
 }
 
-// Browser-only: trigger a client-side download of the given CSV text.
-export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+// Browser-only: save a Blob as a file. The object URL outlives the click so
+// Safari (which starts the download asynchronously) can still read it.
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -27,5 +27,10 @@ export function downloadCsv(filename: string, csv: string): void {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+// Browser-only: trigger a client-side download of the given CSV text.
+export function downloadCsv(filename: string, csv: string): void {
+  downloadBlob(filename, new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
 }

@@ -3,10 +3,10 @@
 import { useState, type ChangeEvent } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { ImportField, PersonView } from '@/lib/employeeImport/plan';
-import { AdminEmpty, AdminNotice, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
+import { AdminEmpty, AdminNotice } from '@/components/portal/admin-d/AdminUi';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
-import e from './employee-import.module.css';
+import e from './employee-data.module.css';
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -41,7 +41,7 @@ function Tags({ fields, tone }: { fields: ImportField[]; tone?: string }) {
   );
 }
 
-/** The owner's employee spreadsheet import. Its page wraps it in the owner gate. */
+/** The owner's employee spreadsheet import: the Import half of the Employee data page. */
 export function EmployeeImportManager() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportResponse | null>(null);
@@ -117,19 +117,7 @@ export function EmployeeImportManager() {
   const peopleWord = (count: number) => (count === 1 ? 'person' : 'people');
 
   return (
-    <div className={u.page}>
-      <AdminPageHead
-        title="Employee Import"
-        meta={
-          preview ? (
-            <>
-              <b>{toUpdate}</b> to update
-            </>
-          ) : null
-        }
-        sub="Fills empty profile fields for active portal users from the employee spreadsheet. Anything already in the portal stays as it is."
-      />
-
+    <>
       {error ? (
         <AdminNotice tone="error" onDismiss={() => setError('')}>
           {error}
@@ -145,8 +133,9 @@ export function EmployeeImportManager() {
       <section className={s.panel} aria-labelledby="import-file-heading">
         <div className={`${s.panelHead} ${u.band}`}>
           <h2 id="import-file-heading" className={s.kicker}>
-            Spreadsheet
+            Import
           </h2>
+          {preview ? <span className={u.panelMeta}>{toUpdate} to update</span> : null}
         </div>
         <div className={`${u.panelBody} ${u.formGrid}`}>
           <div className={u.field}>
@@ -163,8 +152,9 @@ export function EmployeeImportManager() {
               disabled={busy !== null}
             />
             <p className={u.hint}>
-              Up to 2 MB. The file is read on the server and not stored. Phone, address, shirt size, SSN and
-              driver&apos;s license fill in only where the portal has nothing yet.
+              Fills empty profile fields for active portal users from the employee spreadsheet. Anything already in
+              the portal stays as it is. Up to 2 MB. The file is read on the server and not stored. Phone, address,
+              shirt size, SSN and driver&apos;s license fill in only where the portal has nothing yet.
             </p>
           </div>
           <div className={u.btnRow}>
@@ -303,6 +293,6 @@ export function EmployeeImportManager() {
           ) : null}
         </>
       ) : null}
-    </div>
+    </>
   );
 }

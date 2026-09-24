@@ -143,7 +143,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Form Options', href: '/portal/admin/form-options', icon: SlidersHorizontal },
       { label: 'Chat Channels', href: '/portal/admin/chat-channels', icon: MessagesSquare },
       { label: 'Announcements', href: '/portal/admin/announcements', icon: Megaphone, roles: ['owner'] },
-      { label: 'Employee Import', href: '/portal/admin/employee-import', icon: FileSpreadsheet, roles: ['owner'] },
+      { label: 'Employee data', href: '/portal/admin/employee-data', icon: FileSpreadsheet, roles: ['owner'] },
       { label: 'System Settings', href: '/portal/admin/settings', icon: Settings, permissions: ['settings:read'] },
     ],
   },

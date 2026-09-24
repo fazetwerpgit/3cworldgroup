@@ -1,4 +1,4 @@
-/* Owner employee import (direction D). Shared pieces are admin-ui.module.css. */
+/* Owner Employee data page, export and import (direction D). Shared pieces are admin-ui.module.css. */
 
 .cols {
   --cols: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 1.6fr);
@@ -37,7 +37,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Import confirm: neutral, like the announcements send-now confirm. */
+/* Export / import confirm: neutral, like the announcements send-now confirm. */
 .confirm {
   display: grid;
   gap: var(--s3);
