@@ -181,16 +181,27 @@ export async function POST(
     }
 
     if (!isShirtSize(body.shirtSize)) {
-      return NextResponse.json({ error: 'Pick a shirt size' }, { status: 400 });
+      return NextResponse.json({ error: 'Pick a shirt size', field: 'shirtSize' }, { status: 400 });
     }
     const shirtSize = body.shirtSize;
 
     const heavyVetting = requiresHeavyVetting(data.intendedFieldRole);
+    // Heavy vetting runs a background / drug screen: it needs the SSN and the
+    // candidate's authorization.
+    if (heavyVetting && !clean(body.ssn, 40)) {
+      return NextResponse.json({ error: 'Enter your Social Security number', field: 'ssn' }, { status: 400 });
+    }
+    if (heavyVetting && body.backgroundCheckAuth !== true) {
+      return NextResponse.json(
+        { error: 'Check the box to authorize the background / drug screen', field: 'backgroundCheckAuth' },
+        { status: 400 }
+      );
+    }
     const items = getOnboardingItemsForUser(data.intendedFieldRole, data.isIBO ?? false);
     // The license item needs the typed number as well as both photos.
     const needsDlNumber = items.some((item) => item.id === 'dl_photos');
     if (needsDlNumber && !clean(body.dlNumber, 40)) {
-      return NextResponse.json({ error: "Enter your driver's license number" }, { status: 400 });
+      return NextResponse.json({ error: "Enter your driver's license number", field: 'dlNumber' }, { status: 400 });
     }
     const missing = items.filter(
       (item) => !isEsignItem(item.id) && !clean(references[item.id], 500)
@@ -250,7 +261,7 @@ export async function POST(
           typeof body.backgroundCheckAuth === 'boolean' ? body.backgroundCheckAuth : undefined,
       });
       if (!sensitive.ok) {
-        return NextResponse.json({ error: sensitive.error }, { status: 400 });
+        return NextResponse.json({ error: sensitive.error, field: sensitive.field }, { status: 400 });
       }
       sensitiveDoc = sensitive.doc;
     }

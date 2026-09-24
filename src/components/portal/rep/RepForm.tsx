@@ -38,16 +38,71 @@ import f from './rep-forms.module.css';
 // "Required", inline errors under the field, a block alert for server errors,
 // and a submit bar fixed in the tab bar's place on phones.
 
-// ---------- soft keyboard (same rule as Log Sale) ----------
+// ---------- soft keyboard (shared with Log Sale) ----------
+// The soft keyboard is up: a text field has focus on a touch device, or the
+// visual viewport has shrunk well below the layout viewport. While it is, the
+// submit bar leaves the fixed layer and sits at the end of the form, so it
+// never rides the keyboard or covers the field being typed in.
+//
+// A tap that blurs a field collapses the in-flow submit bar. Collapsing it
+// between the tap's down and its click moved the page under the finger, so the
+// click missed its row (the e-sign consent box, TesterB 9/24). A change that
+// arrives mid-tap is held until the click has landed; the snapshot is cached so
+// an unrelated re-render cannot pick it up early either.
+let keyboardShown = false;
+
 function subscribeKeyboard(onChange: () => void) {
   const vv = window.visualViewport;
-  vv?.addEventListener('resize', onChange);
-  document.addEventListener('focusin', onChange);
-  document.addEventListener('focusout', onChange);
+  let pressing = false;
+  let held = false;
+  let timer: number | undefined;
+  const flush = () => {
+    keyboardShown = keyboardOpenNow();
+    onChange();
+  };
+  const notify = () => {
+    if (pressing) held = true;
+    else flush();
+  };
+  // After the click's own handlers, so the row it hit gets it.
+  const release = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      pressing = false;
+      if (held) {
+        held = false;
+        flush();
+      }
+    }, 0);
+  };
+  // Fallbacks: a long press or a drag may never click.
+  const later = (ms: number) => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(release, ms);
+  };
+  const press = () => {
+    pressing = true;
+    later(2000);
+  };
+  const lift = () => later(500);
+
+  keyboardShown = keyboardOpenNow();
+  vv?.addEventListener('resize', notify);
+  document.addEventListener('focusin', notify);
+  document.addEventListener('focusout', notify);
+  document.addEventListener('pointerdown', press, true);
+  document.addEventListener('pointerup', lift, true);
+  document.addEventListener('pointercancel', release, true);
+  document.addEventListener('click', release, true);
   return () => {
-    vv?.removeEventListener('resize', onChange);
-    document.removeEventListener('focusin', onChange);
-    document.removeEventListener('focusout', onChange);
+    window.clearTimeout(timer);
+    vv?.removeEventListener('resize', notify);
+    document.removeEventListener('focusin', notify);
+    document.removeEventListener('focusout', notify);
+    document.removeEventListener('pointerdown', press, true);
+    document.removeEventListener('pointerup', lift, true);
+    document.removeEventListener('pointercancel', release, true);
+    document.removeEventListener('click', release, true);
   };
 }
 
@@ -62,7 +117,7 @@ function keyboardOpenNow(): boolean {
 }
 
 export function useSoftKeyboardOpen(): boolean {
-  return useSyncExternalStore(subscribeKeyboard, keyboardOpenNow, () => false);
+  return useSyncExternalStore(subscribeKeyboard, () => keyboardShown, () => false);
 }
 
 // ---------- validation ----------

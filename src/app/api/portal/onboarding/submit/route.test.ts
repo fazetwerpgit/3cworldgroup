@@ -112,6 +112,21 @@ describe('POST /api/portal/onboarding/submit', () => {
     expect(response.status).toBe(403);
     expect(batchSetMock).not.toHaveBeenCalled();
   });
+
+  // Same rule as the invite form: a non-upload item needs a note.
+  it('rejects a blank note and accepts a typed one', async () => {
+    const blank = await POST(request({ userId: 'u1', itemId: 'onboarding_submission', reference: '   ' }));
+    expect(blank.status).toBe(400);
+    await expect(blank.json()).resolves.toEqual({ error: 'Add a note or reference' });
+    expect(batchSetMock).not.toHaveBeenCalled();
+
+    const typed = await POST(request({ userId: 'u1', itemId: 'onboarding_submission', reference: ' Start 10/1 ' }));
+    expect(typed.status).toBe(200);
+    expect(writeTo('userOnboarding/u1_onboarding_submission')?.[1]).toMatchObject({
+      status: 'submitted',
+      reference: 'Start 10/1',
+    });
+  });
 });
 
 describe('POST /api/portal/onboarding/submit - driver license', () => {

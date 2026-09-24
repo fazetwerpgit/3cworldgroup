@@ -1,7 +1,7 @@
 /* Onboarding checklist and the invite-link packet (/onboard/[token]),
    direction D. Tokens come from rep.module.css (.root in the shell, .layer on
-   the portaled sheet and the pre-auth ground). Header and aside reuse the forms
-   hub classes in rep-forms.module.css. */
+   the portaled sheet and the pre-auth ground). The page header reuses the
+   forms hub classes in rep-forms.module.css. */
 
 /* ---------- progress ---------- */
 .progress {
@@ -164,7 +164,26 @@
   font-size: var(--t-ui);
 }
 
-/* ---------- aside ---------- */
+/* ---------- aside ----------
+   "How to finish an item": a padded panel under the list on phones, a sticky
+   column beside it on desktop. */
+.wrap {
+  display: grid;
+  gap: var(--s5);
+  min-width: 0;
+}
+
+.aside {
+  display: grid;
+  align-content: start;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.aside > h2 {
+  margin: 0;
+}
+
 .asideItem {
   display: grid;
   gap: 4px;
@@ -247,6 +266,19 @@
 }
 
 @media (min-width: 1024px) {
+  .wrap {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    gap: var(--s6);
+    max-width: 1120px;
+  }
+
+  .aside {
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--s5));
+    padding: var(--s5);
+  }
+
   .progress {
     padding: var(--s5);
   }

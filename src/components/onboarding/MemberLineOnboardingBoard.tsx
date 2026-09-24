@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
+import { awaitsSignature, ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
 import { EsignSignAction } from '@/components/onboarding/EsignSignAction';
 import type { WizardItem } from '@/components/onboarding/types';
 import type { OnboardingStatus } from '@/types/onboarding';
@@ -31,6 +31,7 @@ function nextActionLabel(item: WizardItem) {
 
 /** The row button leads (lime outline) only when the next move is the rep's. */
 function isRepsMove(item: WizardItem) {
+  if (awaitsSignature(item)) return true;
   if (item.status === 'approved' || item.status === 'submitted') return false;
   if (isEsignItem(item.id)) return item.esignDispatch?.state !== 'failed';
   return true;
@@ -40,10 +41,13 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function StatusPill({ status }: { status: OnboardingStatus }) {
+// A document out for signature is 'submitted' on the server but still the
+// rep's to do, so it wears the To do look, not In review.
+function StatusPill({ item }: { item: WizardItem }) {
+  const signNeeded = awaitsSignature(item);
   return (
-    <span className={o.state} data-state={status}>
-      {STATUS_LABEL[status]}
+    <span className={o.state} data-state={signNeeded ? 'not_started' : item.status}>
+      {signNeeded ? 'Needs your signature' : STATUS_LABEL[item.status]}
     </span>
   );
 }
@@ -145,7 +149,7 @@ export default function MemberLineOnboardingBoard({
         {ordered.map((item) => (
           <li key={item.id} className={o.row} data-state={item.status}>
             <div className={o.rowText}>
-              <StatusPill status={item.status} />
+              <StatusPill item={item} />
               <span className={o.rowName}>{item.label}</span>
               <span className={o.rowDesc}>{rowDescription(item)}</span>
             </div>
@@ -183,7 +187,7 @@ export default function MemberLineOnboardingBoard({
               <div className={s.sheetHandle} aria-hidden="true" />
               <div className={s.sheetHead}>
                 <div className={o.sheetStatus}>
-                  <StatusPill status={openItem.status} />
+                  <StatusPill item={openItem} />
                   <h2 id="onboarding-sheet-title" className={s.sheetTitle}>
                     {openItem.label}
                   </h2>

@@ -115,7 +115,8 @@ export default function EditUserPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     const d = await r.json();
-    setRevealed({ ssn: d.ssn, dlNumber: d.dlNumber });
+    // Stored as 9 bare digits; shown the way people read an SSN.
+    setRevealed({ ssn: d.ssn?.replace(/^(\d{3})(\d{2})(\d{4})$/, '$1-$2-$3') ?? null, dlNumber: d.dlNumber });
     setRevealLogged(true);
   };
 

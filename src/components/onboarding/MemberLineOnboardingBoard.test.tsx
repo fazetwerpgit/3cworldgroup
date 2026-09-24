@@ -125,6 +125,32 @@ describe('MemberLineOnboardingBoard esign sheet body', () => {
   });
 });
 
+// A sent document is 'submitted' on the server, but the rep still has to sign
+// it. Calling it "In review" told new hires there was nothing left to do.
+describe('MemberLineOnboardingBoard row status', () => {
+  function row() {
+    const li = container.querySelector('li');
+    return { text: li?.textContent ?? '', button: li?.querySelector('button') ?? null };
+  }
+
+  it('asks the rep to sign a sent document and leads with its button', async () => {
+    await renderBoard(makeItem({ status: 'submitted', esignSigningUrl: '/portal/onboarding/sign/env-1' }));
+
+    expect(row().text).toContain('Needs your signature');
+    expect(row().text).not.toContain('In review');
+    expect(row().button?.className).toMatch(/rowBtnPrimary/);
+  });
+
+  it('keeps a submitted upload in review with a plain button', async () => {
+    await renderBoard(
+      makeItem({ id: 'orientation', label: 'Orientation', referenceKind: 'manual', status: 'submitted' }),
+    );
+
+    expect(row().text).toContain('In review');
+    expect(row().button?.className).not.toMatch(/rowBtnPrimary/);
+  });
+});
+
 // Review finding 1: the page passes a fresh onOpenItem on every render, and
 // the sheet used to refocus Close each time, so typing in "Reference or note"
 // lost every keystroke after the first.

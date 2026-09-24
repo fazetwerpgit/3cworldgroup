@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   inviteRef,
@@ -126,7 +126,8 @@ vi.mock('@/lib/onboarding/sensitiveFields', () => ({
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignDocsMock }));
 
 import { NextRequest } from 'next/server';
-import { getOnboardingItemsForUser } from '@/types';
+import { getOnboardingItemsForUser, requiresHeavyVetting } from '@/types';
+import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { GET, POST } from './route';
 
 function request(references: Record<string, string>, password = 'password', extra: Record<string, unknown> = {}) {
@@ -289,10 +290,6 @@ describe('POST /api/public/onboarding/[token]', () => {
     expect(createUserMock).not.toHaveBeenCalled();
   });
 
-  it('rejects an active portal account', async () => {
-    expect(true).toBe(true);
-  });
-
   it('returns success when notification creation fails', async () => {
     const db = (await import('@/lib/firebase/admin')).adminDb!;
     (db.collection('notifications').add as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('nope'));
@@ -319,7 +316,7 @@ describe('POST /api/public/onboarding/[token]', () => {
         params()
       );
       expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({ error: 'Pick a shirt size' });
+      await expect(response.json()).resolves.toEqual({ error: 'Pick a shirt size', field: 'shirtSize' });
     }
     expect(batchSetMock).not.toHaveBeenCalled();
   });
@@ -345,7 +342,7 @@ describe('POST /api/public/onboarding/[token]', () => {
       const response = await POST(request({ dl_photos: 'onboarding/invites/invite-1/dl_photos/' }), params());
 
       expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({ error: "Enter your driver's license number" });
+      await expect(response.json()).resolves.toEqual({ error: "Enter your driver's license number", field: 'dlNumber' });
       expect(batchSetMock).not.toHaveBeenCalled();
     });
 
@@ -368,6 +365,66 @@ describe('POST /api/public/onboarding/[token]', () => {
       for (const [, data] of batchSetMock.mock.calls) {
         expect(JSON.stringify(data)).not.toContain('D1234567');
       }
+    });
+  });
+
+  describe('heavy vetting', () => {
+    const complete = { ssn: '123-45-6789', backgroundCheckAuth: true };
+
+    beforeEach(() => {
+      vi.mocked(requiresHeavyVetting).mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      vi.mocked(requiresHeavyVetting).mockReturnValue(false);
+    });
+
+    it('rejects the packet without an SSN', async () => {
+      const response = await POST(
+        request({ onboarding_submission: 'completed' }, 'password', { ...complete, ssn: '  ' }),
+        params()
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Enter your Social Security number', field: 'ssn' });
+      expect(batchSetMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects the packet without the background / drug screen authorization', async () => {
+      for (const backgroundCheckAuth of [undefined, false, 'true']) {
+        const response = await POST(
+          request({ onboarding_submission: 'completed' }, 'password', { ...complete, backgroundCheckAuth }),
+          params()
+        );
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({ field: 'backgroundCheckAuth' });
+      }
+      expect(batchSetMock).not.toHaveBeenCalled();
+    });
+
+    it('names the field the SSN / license check rejected', async () => {
+      vi.mocked(buildSensitiveDoc).mockReturnValueOnce({
+        ok: false,
+        error: 'Enter a valid 9-digit Social Security Number',
+        field: 'ssn',
+      });
+      const response = await POST(
+        request({ onboarding_submission: 'completed' }, 'password', { ...complete, ssn: '123-45-678' }),
+        params()
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Enter a valid 9-digit Social Security Number',
+        field: 'ssn',
+      });
+    });
+
+    it('accepts the packet with an SSN and the authorization', async () => {
+      const response = await POST(request({ onboarding_submission: 'completed' }, 'password', complete), params());
+
+      expect(response.status).toBe(200);
     });
   });
 });

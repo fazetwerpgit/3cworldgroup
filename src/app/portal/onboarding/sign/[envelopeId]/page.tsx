@@ -58,13 +58,18 @@ type FieldValues = Record<string, string | boolean>;
  * The server's one-of rules, mirrored here only so the Sign button can say what
  * is missing before the round trip. `validateFields` on the server stays the
  * authority; this never lets anything through that it would reject.
+ * `none` shows while nothing is filled, `many` while more than one is.
  */
-const ONE_OF_RULES: Record<string, { keys: string[]; message: string }[]> = {
+const ONE_OF_RULES: Record<string, { keys: string[]; none: string; many: string }[]> = {
   w9: [
-    { keys: ['ssn', 'ein'], message: 'Enter either an SSN or an EIN, not both.' },
-    { keys: ['individual_sole_prop', 'llc'], message: 'Choose a tax classification.' },
+    { keys: ['ssn', 'ein'], none: 'Enter your SSN or EIN.', many: 'Enter either an SSN or an EIN, not both.' },
+    {
+      keys: ['individual_sole_prop', 'llc'],
+      none: 'Choose a tax classification.',
+      many: 'Choose one tax classification.',
+    },
   ],
-  direct_deposit: [{ keys: ['checking', 'savings'], message: 'Choose checking or savings.' }],
+  direct_deposit: [{ keys: ['checking', 'savings'], none: 'Choose checking or savings.', many: 'Choose checking or savings, not both.' }],
 };
 
 const NUMERIC_KEYBOARD_FIELDS = new Set([
@@ -181,7 +186,9 @@ function EsignSign() {
       }
     }
     for (const rule of ONE_OF_RULES[envelope.docKey] ?? []) {
-      if (rule.keys.filter((key) => isFilled(values[key])).length !== 1) return rule.message;
+      const filled = rule.keys.filter((key) => isFilled(values[key])).length;
+      if (filled === 0) return rule.none;
+      if (filled > 1) return rule.many;
     }
     if (!signature) return 'Add your signature.';
     if (!consent) return 'Read and accept the statement above.';
@@ -410,29 +417,19 @@ function EsignSign() {
             </label>
           </section>
 
-          {/* Phones with the keyboard up: in the page flow. */}
+          {/* Desktop, and phones with the keyboard up: in the page flow. */}
           <div className={`${f.submitInline} ${styles.bar}`} data-keyboard={keyboardOpen ? 'open' : undefined}>
-            <p className={styles.status} data-state={statusState}>
-              {status}
-            </p>
+            <div className={styles.barText}>
+              <p className={styles.status} data-state={statusState} role={statusState ? 'alert' : undefined}>
+                {status}
+              </p>
+              <p className={`${f.who} ${s.deskOnly}`}>
+                Signing as <strong>{envelope.signerName}</strong>
+              </p>
+            </div>
             {signButton}
           </div>
         </div>
-
-        <aside className={`${s.panel} ${f.aside} ${s.deskOnly}`} aria-label="Sign">
-          <p className={s.kicker}>Signing as</p>
-          <p className={f.asideRoute}>{envelope.signerName}</p>
-          <p className={f.asideNote}>{envelope.signerEmail}</p>
-          <p
-            className={styles.asideStatus}
-            data-ready={blocker === null && !error ? 'yes' : undefined}
-            data-state={statusState}
-            role={statusState ? 'alert' : undefined}
-          >
-            {status}
-          </p>
-          {signButton}
-        </aside>
       </div>
 
       {/* Phones with the keyboard down: fixed in the tab bar's place. */}

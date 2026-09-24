@@ -69,6 +69,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Uploads carry their storage path. Every other item needs a typed note or
+    // reference, the same rule as the invite form.
+    if (!isStorageItem(itemId) && !(typeof reference === 'string' && reference.trim())) {
+      return NextResponse.json({ error: 'Add a note or reference' }, { status: 400 });
+    }
+
     // Sensitive items must carry a reference/vendor token, never raw PII.
     if (
       item.sensitive &&

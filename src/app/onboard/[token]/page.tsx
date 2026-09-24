@@ -36,6 +36,18 @@ interface OnboardingResponse {
   existingAccount?: boolean;
 }
 
+// Fields the POST can reject by name (its `field` key), and the control to mark.
+const FIELD_INPUT_ID = {
+  ssn: 'onboard-ssn',
+  dlNumber: 'onboard-dl-number',
+  shirtSize: 'onboard-shirt',
+  backgroundCheckAuth: 'onboard-bg-auth',
+} as const;
+type PacketField = keyof typeof FIELD_INPUT_ID;
+
+const SSN_REQUIRED = 'Enter your Social Security number';
+const CONSENT_REQUIRED = 'Check the box to authorize the background / drug screen';
+
 // The invite-link onboarding packet, direction D. Public: the candidate has no
 // account yet, so it sits on the pre-auth ground (AuthShell) and uses the rep
 // forms kit for fields, uploads and the send error.
@@ -65,6 +77,8 @@ export default function PublicOnboardingPage() {
   const [taxClassification, setTaxClassification] = useState('');
   const [accountTypeError, setAccountTypeError] = useState(false);
   const [taxClassificationError, setTaxClassificationError] = useState(false);
+  // Inline errors on named fields: the server's, or a required box left empty.
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PacketField, string>>>({});
   const [references, setReferences] = useState<Record<string, string>>({});
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. We only read the slots inside the setter's updater, so the value
@@ -104,11 +118,20 @@ export default function PublicOnboardingPage() {
     if (token) loadInvite();
   }, [token]);
 
+  const clearFieldError = (field: PacketField) =>
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
   type TextField = Exclude<keyof typeof profile, 'backgroundCheckAuth'>;
   const setText =
     (key: TextField) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const value = event.target.value;
       setProfile((prev) => ({ ...prev, [key]: value }));
+      if (key in FIELD_INPUT_ID) clearFieldError(key as PacketField);
     };
 
   const updateReference = (itemId: string, value: string) => {
@@ -153,6 +176,7 @@ export default function PublicOnboardingPage() {
 
     setSubmitting(true);
     setError('');
+    setFieldErrors({});
 
     try {
       const response = await fetch(`/api/public/onboarding/${token}`, {
@@ -166,7 +190,21 @@ export default function PublicOnboardingPage() {
         }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to submit onboarding');
+      if (!response.ok) {
+        // A named field goes red in place and takes focus: it may be far above Submit.
+        const field =
+          typeof json.field === 'string' && Object.hasOwn(FIELD_INPUT_ID, json.field)
+            ? (json.field as PacketField)
+            : null;
+        if (field && json.error) {
+          setFieldErrors({ [field]: json.error });
+          const input = document.getElementById(FIELD_INPUT_ID[field]);
+          input?.focus({ preventScroll: true });
+          input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          return;
+        }
+        throw new Error(json.error || 'Failed to submit onboarding');
+      }
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -185,6 +223,8 @@ export default function PublicOnboardingPage() {
     !!references[item.id]?.trim() && (item.id !== 'dl_photos' || !!profile.dlNumber.trim());
   const completed = actionableItems.filter(isItemComplete).length;
   const total = actionableItems.length;
+  // E-sign items are signed in the portal after this form, so the count leaves them out.
+  const signLater = data ? data.items.length - total : 0;
   const roleLabel = data?.invite.intendedFieldRole
     ? RoleDisplayNames[data.invite.intendedFieldRole]
     : 'Field Representative';
@@ -240,16 +280,16 @@ export default function PublicOnboardingPage() {
           </span>
         )}
         <h1 className={a.title}>
-          {data?.existingAccount ? 'You already have a portal account' : 'Your onboarding packet is in review'}
+          {data?.existingAccount ? 'You already have a portal account' : 'Your onboarding packet is sent'}
         </h1>
         <p className={a.sub}>
           {data?.existingAccount
             ? `Sign in with ${data.invite.candidateEmail}. If you forgot your password, reset it from the login page.`
-            : 'Your manager can review this in the 3C portal. Your portal account is pending until management activates it.'}
+            : 'Next: sign in and sign your documents. Your manager reviews the rest.'}
         </p>
         <div className={a.actions}>
           <Link href="/portal" className={`${s.btnPrimary} ${a.btn}`}>
-            {data?.existingAccount ? 'Sign in to the portal' : 'Go to portal login'}
+            Sign in to the portal
           </Link>
         </div>
         {data?.existingAccount && (
@@ -292,10 +332,17 @@ export default function PublicOnboardingPage() {
               <span className={s.track} aria-hidden="true">
                 <span className={s.fill} style={{ width: total ? `${(completed / total) * 100}%` : '0%' }} />
               </span>
+              {signLater > 0 ? (
+                <p className={f.hint}>
+                  Plus {signLater} {signLater === 1 ? 'document' : 'documents'} you sign after you log in.
+                </p>
+              ) : null}
             </div>
           </section>
           <p className={`${o.note} ${o.noteWarn}`}>
-            Do not enter SSNs, bank account numbers, or full card numbers. Use confirmation references only.
+            {heavyVetting
+              ? 'Your SSN and license number are encrypted and only visible to the owners. In the reference boxes, use confirmation references only, never bank account or card numbers.'
+              : 'Do not enter bank account or full card numbers. Use confirmation references only.'}
           </p>
         </aside>
 
@@ -348,7 +395,7 @@ export default function PublicOnboardingPage() {
                 {...describe('onboard-zip', zipMessage)}
               />
             </Field>
-            <Field id="onboard-shirt" label="Shirt size" required>
+            <Field id="onboard-shirt" label="Shirt size" error={fieldErrors.shirtSize} required>
               <span className={f.selectWrap}>
                 <select
                   id="onboard-shirt"
@@ -356,6 +403,7 @@ export default function PublicOnboardingPage() {
                   value={profile.shirtSize}
                   onChange={setText('shirtSize')}
                   required
+                  {...describe('onboard-shirt', fieldErrors.shirtSize)}
                 >
                   <option value="">Select size</option>
                   {SHIRT_SIZES.map((size) => (
@@ -373,6 +421,8 @@ export default function PublicOnboardingPage() {
                   id="onboard-ssn"
                   label="Social Security number"
                   hint="Your SSN is encrypted and only visible to authorized administrators."
+                  error={fieldErrors.ssn}
+                  required
                   wide
                 >
                   <input
@@ -380,21 +430,29 @@ export default function PublicOnboardingPage() {
                     className={f.input}
                     value={profile.ssn}
                     onChange={setText('ssn')}
+                    onInvalid={() => setFieldErrors((prev) => ({ ...prev, ssn: SSN_REQUIRED }))}
                     placeholder="123-45-6789"
                     inputMode="numeric"
                     autoComplete="off"
-                    {...describe('onboard-ssn', undefined, true)}
+                    required
+                    {...describe('onboard-ssn', fieldErrors.ssn, true)}
                   />
                 </Field>
-                <div className={`${f.field} ${f.wide}`}>
+                <div className={`${f.field} ${f.wide} ${fieldErrors.backgroundCheckAuth ? f.fieldInvalid : ''}`}>
                   <div className={f.rows}>
                     <label className={f.row}>
                       <input
+                        id="onboard-bg-auth"
                         type="checkbox"
                         checked={profile.backgroundCheckAuth}
-                        onChange={(event) =>
-                          setProfile((prev) => ({ ...prev, backgroundCheckAuth: event.target.checked }))
-                        }
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setProfile((prev) => ({ ...prev, backgroundCheckAuth: checked }));
+                          clearFieldError('backgroundCheckAuth');
+                        }}
+                        onInvalid={() => setFieldErrors((prev) => ({ ...prev, backgroundCheckAuth: CONSENT_REQUIRED }))}
+                        required
+                        {...describe('onboard-bg-auth', fieldErrors.backgroundCheckAuth)}
                       />
                       <span className={`${f.radio} ${o.tick}`} aria-hidden="true">
                         {profile.backgroundCheckAuth ? <Check size={14} strokeWidth={3} /> : null}
@@ -402,6 +460,12 @@ export default function PublicOnboardingPage() {
                       <span className={f.choiceText}>I authorize a background / drug screen.</span>
                     </label>
                   </div>
+                  {fieldErrors.backgroundCheckAuth ? (
+                    <p id="onboard-bg-auth-error" className={f.fieldError}>
+                      <AlertTriangle size={14} strokeWidth={2.25} aria-hidden="true" />
+                      {fieldErrors.backgroundCheckAuth}
+                    </p>
+                  ) : null}
                 </div>
               </>
             )}
@@ -466,6 +530,7 @@ export default function PublicOnboardingPage() {
                             id="onboard-dl-number"
                             label="License number"
                             hint="Encrypted. Only authorized administrators can see it."
+                            error={fieldErrors.dlNumber}
                             required
                           >
                             <input
@@ -476,7 +541,7 @@ export default function PublicOnboardingPage() {
                               maxLength={40}
                               autoComplete="off"
                               required
-                              {...describe('onboard-dl-number', undefined, true)}
+                              {...describe('onboard-dl-number', fieldErrors.dlNumber, true)}
                             />
                           </Field>
                           <div className={o.slots}>

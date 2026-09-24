@@ -14,6 +14,7 @@ import { FieldRoles, OnboardingItem, OnboardingStatus } from '@/types';
 import MemberLineOnboardingBoard from '@/components/onboarding/MemberLineOnboardingBoard';
 import type { WizardItem } from '@/components/onboarding/types';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
+import { isEsignItem } from '@/lib/onboarding/esign';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 
 interface ChecklistItem extends OnboardingItem {
@@ -306,7 +307,7 @@ function OnboardingChecklist() {
         <div className={f.field}>
           <label htmlFor={`reference-${item.id}`} className={f.label}>
             Reference or note
-            <span className={f.req}>Optional</span>
+            <span className={f.req}>Required</span>
           </label>
           <input
             id={`reference-${item.id}`}
@@ -327,19 +328,33 @@ function OnboardingChecklist() {
           </p>
         </div>
         {sendError}
-        {submitButton(submitting)}
+        {submitButton(submitting || !draftReference.trim())}
       </>
     );
   };
+
+  // An active rep's list holds only documents still to sign, so empty means done.
+  const activeAndDone = user?.status === 'active' && !!data && !data.items?.length;
+  // Every item is signed, approved, or in the manager's hands. E-sign items
+  // approve themselves once signed, so a 'submitted' one still needs the rep.
+  const repDone =
+    activeAndDone ||
+    (!!data?.items?.length &&
+      data.items.every((item) => item.status === 'approved' || (item.status === 'submitted' && !isEsignItem(item.id))));
+  const lede = !repDone
+    ? 'Finish each item. Your manager reviews every one.'
+    : activeAndDone || data?.progress?.complete
+      ? "You're done."
+      : "You're done. Your manager will review the rest.";
 
   return (
     <>
       <header className={f.hubHead}>
         <h1 className={f.hubTitle}>Onboarding</h1>
       </header>
-      <p className={f.hubLede}>Finish each item. Your manager reviews every one.</p>
+      <p className={f.hubLede}>{lede}</p>
 
-      <div className={f.hubWrap}>
+      <div className={o.wrap}>
         <div>
           {loading ? (
             <div className={s.panel} aria-busy="true" aria-label="Loading your checklist">
@@ -369,12 +384,14 @@ function OnboardingChecklist() {
               onOpenItem={openItem}
               onRefresh={fetchChecklist}
             />
+          ) : activeAndDone ? (
+            <p className={`${s.panel} ${o.empty}`}>Onboarding complete.</p>
           ) : (
             <p className={`${s.panel} ${o.empty}`}>No onboarding items for your account yet. Your manager adds them.</p>
           )}
         </div>
 
-        <aside className={`${s.panel} ${f.aside} ${f.hubAside}`} aria-labelledby="onboarding-how-h">
+        <aside className={`${s.panel} ${o.aside}`} aria-labelledby="onboarding-how-h">
           <h2 id="onboarding-how-h" className={s.kicker}>
             How to finish an item
           </h2>
