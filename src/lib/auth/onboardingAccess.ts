@@ -46,6 +46,8 @@ export const ONBOARDING_ALLOWED_APIS = [
 // so the administrative sub-routes are subtracted explicitly.
 export const DENIED_API_PATHS: readonly string[] = [
   '/api/portal/onboarding/esign-send',
+  // Owner-only override; a hire must never reach it (the route also gates on owner).
+  '/api/portal/onboarding/mark-complete',
   '/api/portal/chat/channels/manage',
   '/api/portal/chat/channels/sync',
 ];
