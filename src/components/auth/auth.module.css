@@ -105,6 +105,12 @@
   padding: var(--s5) var(--s4);
 }
 
+/* A long form (the invite-link onboarding packet): top-aligned, full width. */
+.stageWide {
+  align-content: start;
+  justify-items: stretch;
+}
+
 /* ---------- card content ---------- */
 .title {
   margin: 0;

@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT, isEsignItem } from '@/lib/onboarding/esign';
 import { EsignSignAction } from '@/components/onboarding/EsignSignAction';
-import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
+import type { WizardItem } from '@/components/onboarding/types';
 import type { OnboardingStatus } from '@/types/onboarding';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import s from '@/components/portal/rep/rep.module.css';

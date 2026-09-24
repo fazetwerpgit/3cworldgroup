@@ -9,11 +9,21 @@ import a from './auth.module.css';
 
 /**
  * Direction D ground for the screens with no signed-in user (sign in, sign up,
- * pending approval, profile retry, the portal error boundary): the rep shell's
- * navy ground and light, the logo and Bebas wordmark, one panel. There is no
- * RepShell here because there is no user to build its nav for.
+ * pending approval, profile retry, the portal error boundary, the invite-link
+ * onboarding form): the rep shell's navy ground and light, the logo and Bebas
+ * wordmark, one panel. There is no RepShell here because there is no user to
+ * build its nav for. `wide` drops the single panel for a long form that lays
+ * out its own panels.
  */
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({
+  children,
+  tag = 'Employee portal',
+  wide = false,
+}: {
+  children: ReactNode;
+  tag?: string;
+  wide?: boolean;
+}) {
   return (
     <div className={s.layer}>
       <div className={a.screen}>
@@ -22,11 +32,11 @@ export function AuthShell({ children }: { children: ReactNode }) {
             <Image src="/logo.webp" alt="" width={550} height={516} sizes="34px" className={a.brandMark} priority />
             <span className={a.brandWord}>3C World Group</span>
           </Link>
-          <span className={a.brandTag}>Employee portal</span>
+          <span className={a.brandTag}>{tag}</span>
         </header>
 
-        <main className={a.stage}>
-          <div className={`${s.panel} ${a.card}`}>{children}</div>
+        <main className={wide ? `${a.stage} ${a.stageWide}` : a.stage}>
+          {wide ? children : <div className={`${s.panel} ${a.card}`}>{children}</div>}
         </main>
 
         <footer className={a.foot}>
