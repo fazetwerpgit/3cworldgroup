@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { OnboardingItem, RoleDisplayNames, FieldRole, requiresHeavyVetting } from '@/types';
+import { OnboardingItem, RoleDisplayNames, FieldRole, requiresHeavyVetting, SHIRT_SIZES } from '@/types';
 import FileUpload from '@/components/onboarding/FileUpload';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
@@ -73,6 +73,7 @@ export default function PublicOnboardingPage() {
     zip: '',
     ssn: '',
     dlNumber: '',
+    shirtSize: '',
     backgroundCheckAuth: false,
     password: '',
   });
@@ -106,6 +107,7 @@ export default function PublicOnboardingPage() {
           zip: '',
           ssn: '',
           dlNumber: '',
+          shirtSize: '',
           backgroundCheckAuth: false,
           password: '',
         });
@@ -176,7 +178,10 @@ export default function PublicOnboardingPage() {
   // webhook, so they are not part of what the candidate fills in here and must
   // not hold the progress bar below 100%.
   const actionableItems = data ? data.items.filter((item) => !isEsignItem(item.id)) : [];
-  const completed = actionableItems.filter((item) => references[item.id]?.trim()).length;
+  // The license item needs its typed number as well as both photos.
+  const isItemComplete = (item: OnboardingItem) =>
+    !!references[item.id]?.trim() && (item.id !== 'dl_photos' || !!profile.dlNumber.trim());
+  const completed = actionableItems.filter(isItemComplete).length;
   const total = actionableItems.length;
   const roleLabel = data?.invite.intendedFieldRole
     ? RoleDisplayNames[data.invite.intendedFieldRole]
@@ -401,6 +406,25 @@ export default function PublicOnboardingPage() {
                     </p>
                   )}
                 </div>
+                <div className="member-line-field">
+                  <Label htmlFor="onboard-shirt">Shirt size</Label>
+                  <NativeSelect
+                    id="onboard-shirt"
+                    value={profile.shirtSize}
+                    onChange={(event) =>
+                      setProfile((prev) => ({ ...prev, shirtSize: event.target.value }))
+                    }
+                    required
+                    className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
+                  >
+                    <NativeSelectOption value="">Select size</NativeSelectOption>
+                    {SHIRT_SIZES.map((size) => (
+                      <NativeSelectOption key={size} value={size}>
+                        {size}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
                 {heavyVetting && (
                   <>
                     <div className="member-line-field">
@@ -412,16 +436,6 @@ export default function PublicOnboardingPage() {
                         }
                         placeholder="123-45-6789"
                         inputMode="numeric"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div className="member-line-field">
-                      <Label>Driver&apos;s License Number</Label>
-                      <Input
-                        value={profile.dlNumber}
-                        onChange={(event) =>
-                          setProfile((prev) => ({ ...prev, dlNumber: event.target.value }))
-                        }
                         autoComplete="off"
                       />
                     </div>
@@ -439,7 +453,7 @@ export default function PublicOnboardingPage() {
                       I authorize a background / drug screen.
                     </label>
                     <p className="full member-line-sub" style={{ fontSize: 11 }}>
-                      Your SSN and license number are encrypted and only visible to authorized administrators.
+                      Your SSN is encrypted and only visible to authorized administrators.
                     </p>
                   </>
                 )}
@@ -476,7 +490,7 @@ export default function PublicOnboardingPage() {
 
               <div className="member-line-board" style={{ marginTop: 16 }}>
                 {data?.items.map((item, index) => {
-                  const isComplete = references[item.id]?.trim();
+                  const isComplete = isItemComplete(item);
                   return (
                     <div key={item.id} className="member-line-row" style={{ gridTemplateColumns: '1fr' }}>
                       <div>
@@ -495,9 +509,11 @@ export default function PublicOnboardingPage() {
                               {String(index + 1).padStart(2, '0')}. {item.label}
                             </strong>
                             <small>
-                              {item.sensitive
-                                ? 'Reference or confirmation only. Do not paste private numbers.'
-                                : 'Confirm completion or add a short reference.'}
+                              {item.id === 'dl_photos'
+                                ? 'Your license number and a photo of each side.'
+                                : item.sensitive
+                                  ? 'Reference or confirmation only. Do not paste private numbers.'
+                                  : 'Confirm completion or add a short reference.'}
                             </small>
                           </div>
                           {isEsignItem(item.id) ? null : isComplete ? (
@@ -509,6 +525,22 @@ export default function PublicOnboardingPage() {
                         {isStorageItem(item.id) ? (
                           item.id === 'dl_photos' ? (
                             <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="member-line-field sm:col-span-2">
+                                <Label htmlFor="onboard-dl-number">License number</Label>
+                                <Input
+                                  id="onboard-dl-number"
+                                  value={profile.dlNumber}
+                                  onChange={(event) =>
+                                    setProfile((prev) => ({ ...prev, dlNumber: event.target.value }))
+                                  }
+                                  maxLength={40}
+                                  autoComplete="off"
+                                  required
+                                />
+                                <p className="member-line-sub" style={{ fontSize: 11 }}>
+                                  Encrypted. Only authorized administrators can see it.
+                                </p>
+                              </div>
                               <FileUpload
                                 itemId="dl_photos"
                                 slot="front"

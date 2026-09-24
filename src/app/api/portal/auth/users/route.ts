@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         reportsToId: data.reportsToId ?? data.managerId,
         territoryId: data.territoryId,
         phone: data.phone,
+        shirtSize: data.shirtSize,
         avatarUrl: data.avatarUrl,
         status: data.status,
         hireDate: data.hireDate?.toDate(),

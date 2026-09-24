@@ -61,6 +61,7 @@ export function UserTable({
         <span>Role</span>
         <span>Status</span>
         <span>Hired</span>
+        <span>Shirt</span>
         <span className={u.alignEnd}>Sales</span>
         <span />
         <span />
@@ -113,6 +114,10 @@ export function UserTable({
                 {dateValue || (isPending ? '—' : 'N/A')}
                 {isPending ? <span className={`${u.cellSub} ${t.deskOnly}`}>requested</span> : null}
               </span>
+            </span>
+
+            <span className={`${u.cell} ${t.shirt}`}>
+              {user.shirtSize ?? <span className={u.toneMuted}>—</span>}
             </span>
 
             <span className={`${u.cell} ${u.num} ${u.alignEnd}`} data-label="Approved sales">

@@ -63,6 +63,7 @@ export async function GET(
       city: data?.city,
       state: data?.state,
       zip: data?.zip,
+      shirtSize: data?.shirtSize,
       avatarUrl: data?.avatarUrl,
       status: data?.status,
       hireDate: data?.hireDate?.toDate(),

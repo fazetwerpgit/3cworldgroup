@@ -1,7 +1,7 @@
 /* Member directory (direction D). Rows and cells come from admin-ui.module.css. */
 
 .cols {
-  --cols: minmax(0, 1.5fr) minmax(0, 1.25fr) 100px 116px 56px 124px 20px;
+  --cols: minmax(0, 1.5fr) minmax(0, 1.25fr) 100px 116px 48px 56px 124px 20px;
 }
 
 .row {
@@ -54,6 +54,7 @@
 }
 
 .cols .chev,
+.cols .shirt,
 .deskOnly {
   display: none;
 }
@@ -78,6 +79,7 @@
   }
 
   .cols .chev,
+  .cols .shirt,
   .deskOnly {
     display: block;
   }

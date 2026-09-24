@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { isShirtSize } from '@/types/auth';
 
 // PUT /api/portal/profile - Update user profile
 export async function PUT(request: NextRequest) {
@@ -23,7 +24,11 @@ export async function PUT(request: NextRequest) {
     const userId = gate.uid;
 
     const body = await request.json();
-    const { displayName, phone } = body;
+    const { displayName, phone, shirtSize } = body;
+
+    if (shirtSize !== undefined && !isShirtSize(shirtSize)) {
+      return NextResponse.json({ error: 'Pick a shirt size from the list' }, { status: 400 });
+    }
 
     // Only allow updating specific fields
     const updates: Record<string, unknown> = {
@@ -36,6 +41,10 @@ export async function PUT(request: NextRequest) {
 
     if (phone !== undefined) {
       updates.phone = phone.trim();
+    }
+
+    if (shirtSize !== undefined) {
+      updates.shirtSize = shirtSize;
     }
 
     await adminDb.collection('users').doc(userId).update(updates);

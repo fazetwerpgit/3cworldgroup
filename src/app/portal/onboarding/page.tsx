@@ -32,6 +32,9 @@ interface ChecklistResponse {
   fieldRole: string | null;
   isIBO: boolean;
   progress: { approved: number; total: number; complete: boolean };
+  // Last 4 of a license number already on file, or null. The number itself
+  // never leaves the server.
+  dlLast4?: string | null;
 }
 
 // The onboarding routes verify the caller from the ID token and allow self or
@@ -64,6 +67,10 @@ function OnboardingChecklist() {
     front: '',
     back: '',
   });
+  // Typed license number for dl_photos. Sent once on submit, never read back.
+  const [dlNumber, setDlNumber] = useState('');
+  // A number is on file; the rep chose to replace it.
+  const [dlReplace, setDlReplace] = useState(false);
 
   const markDlSlot = (slot: 'front' | 'back', folderPath: string, reset = false) => {
     setDlSlots((prev) => {
@@ -133,6 +140,7 @@ function OnboardingChecklist() {
           userId: user.uid,
           itemId: item.id,
           reference: submittedReference,
+          ...(item.id === 'dl_photos' && dlNumber.trim() ? { dlNumber } : {}),
         }),
       });
       const json = await response.json();
@@ -141,6 +149,8 @@ function OnboardingChecklist() {
       setSubmitModal(null);
       setReference('');
       setDlSlots({ front: '', back: '' });
+      setDlNumber('');
+      setDlReplace(false);
       setOpenItemId(null);
       await fetchChecklist();
     } catch (err) {
@@ -190,20 +200,59 @@ function OnboardingChecklist() {
     );
 
     if (isStorageItem(item.id)) {
+      const isLicense = item.id === 'dl_photos';
+      const dlOnFile = isLicense && !!data?.dlLast4 && !dlReplace;
+      const missingNumber = isLicense && !dlOnFile && !dlNumber.trim();
       // Sensitive documents (license, W-9) never show a thumbnail or a View link.
       return (
         <>
           <p className={o.note}>
-            <strong>Upload, then submit</strong>
-            {item.id === 'dl_photos'
-              ? 'Add both sides of your license, then submit it for review.'
-              : 'Add the requested file, then submit it for review.'}
-            {item.sensitive
+            <strong>{isLicense ? 'Number and photos' : 'Upload, then submit'}</strong>
+            {!isLicense
+              ? 'Add the requested file, then submit it for review.'
+              : dlOnFile
+                ? 'Add both sides of your license, then submit it for review.'
+                : 'Type your license number and add both sides, then submit it for review.'}
+            {item.sensitive && !isLicense
               ? ' Never type card numbers, SSNs or account numbers. The app stores a secure reference only.'
               : ''}
           </p>
 
-          {item.id === 'dl_photos' ? (
+          {isLicense ? (
+            dlOnFile ? (
+              <div className={f.field}>
+                <span className={f.label}>License number</span>
+                <p className={f.hint}>
+                  On file, ending in {data?.dlLast4}.{' '}
+                  <button type="button" className={s.textBtn} onClick={() => setDlReplace(true)}>
+                    Use a different number
+                  </button>
+                </p>
+              </div>
+            ) : (
+              <div className={f.field}>
+                <label htmlFor="dl-number" className={f.label}>
+                  License number
+                </label>
+                <input
+                  id="dl-number"
+                  className={f.input}
+                  value={dlNumber}
+                  onChange={(event) => setDlNumber(event.target.value)}
+                  maxLength={40}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  aria-describedby="dl-number-hint"
+                />
+                <p id="dl-number-hint" className={f.hint}>
+                  Encrypted. Only admins can see it.
+                </p>
+              </div>
+            )
+          ) : null}
+
+          {isLicense ? (
             <div className={o.slots}>
               <Attachment
                 id="dl-front"
@@ -247,7 +296,7 @@ function OnboardingChecklist() {
           )}
 
           {sendError}
-          {submitButton(submitting || uploading || !draftReference.trim())}
+          {submitButton(submitting || uploading || !draftReference.trim() || missingNumber)}
         </>
       );
     }

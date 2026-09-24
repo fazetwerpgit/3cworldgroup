@@ -127,6 +127,23 @@ describe('GET /api/portal/onboarding', () => {
 
     expect(item.esignSigningUrl).toBeNull();
   });
+
+  it('tells the rep a license number is on file by its last 4 only', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+    store.set('userSensitive/u1', {
+      dlNumberEncrypted: 'iv.tag.cipher',
+      dlLast4: '4567',
+      ssnEncrypted: 'iv.tag.ssn',
+      ssnLast4: '6789',
+    });
+
+    const res = await GET(makeRequest('u1'));
+    const body = await res.text();
+
+    expect(JSON.parse(body).dlLast4).toBe('4567');
+    expect(body).not.toContain('iv.tag');
+    expect(body).not.toContain('6789');
+  });
 });
 
 describe('GET /api/portal/onboarding status gate', () => {

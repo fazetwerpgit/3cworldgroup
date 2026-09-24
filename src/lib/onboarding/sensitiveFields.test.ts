@@ -24,6 +24,13 @@ describe('buildSensitiveDoc', () => {
     expect(buildSensitiveDoc({ ssn: '12345' }).ok).toBe(false);
   });
 
+  it('rejects a license number that is too short or has stray characters', async () => {
+    const { buildSensitiveDoc } = await import('./sensitiveFields');
+    expect(buildSensitiveDoc({ dlNumber: 'D12' }).ok).toBe(false);
+    expect(buildSensitiveDoc({ dlNumber: 'D1234567; drop' }).ok).toBe(false);
+    expect(buildSensitiveDoc({ dlNumber: 'D123 456-78' }).ok).toBe(true);
+  });
+
   it('allows omitting fields (all optional)', async () => {
     const { buildSensitiveDoc } = await import('./sensitiveFields');
     const r = buildSensitiveDoc({ backgroundCheckAuth: false });
