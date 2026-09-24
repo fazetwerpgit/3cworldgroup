@@ -541,7 +541,7 @@ export function ChannelInfoSheet({
           {isAdmin && (
             <div className={c.infoFoot}>
               <Link
-                href="/portal/admin/chat-channels"
+                href="/portal/admin/settings?tab=chat-channels"
                 className={`${s.btnSecondary} ${s.btnBlock}`}
                 onClick={() => onOpenChange(false)}
               >

@@ -894,22 +894,13 @@ h2.kicker::before {
   animation: fadeIn 140ms ease both;
 }
 
-/* More: the grouped pages flow into 1–3 columns (--more-cols, set from the
-   item count), so an owner's admin groups fit at 1440x900 without scrolling. */
+/* More: one short column (Calls, Forms, Learn, then the admin pages). */
 .moreDrop {
-  width: calc(var(--more-cols, 1) * 236px + 2px);
+  width: 238px;
 }
 
 .moreNav {
-  padding: var(--s2) 0;
-  columns: var(--more-cols, 1);
-  column-gap: 0;
-  column-rule: 1px solid var(--c-line);
-}
-
-.moreGroup {
-  padding-bottom: var(--s2);
-  break-inside: avoid;
+  padding: var(--s1) 0;
 }
 
 .moreNav .navItem {

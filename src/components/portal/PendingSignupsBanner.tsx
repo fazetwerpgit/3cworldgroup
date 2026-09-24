@@ -34,7 +34,7 @@ export function PendingSignupsBanner() {
           </p>
         </div>
         <Link
-          href="/portal/admin/users"
+          href="/portal/admin/people?tab=everyone"
           className="group inline-flex items-center gap-1.5 text-sm font-semibold text-amber-800 hover:text-amber-950 dark:text-amber-300 dark:hover:text-amber-100"
         >
           Review

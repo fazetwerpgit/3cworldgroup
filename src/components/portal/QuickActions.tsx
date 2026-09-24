@@ -25,7 +25,7 @@ const actions: QuickAction[] = [
   {
     title: 'Training Library',
     description: 'Review modules and required resources.',
-    href: '/portal/training',
+    href: '/portal/learn?tab=training',
     icon: <GraduationCap className="h-5 w-5" />,
     permissions: ['training:read'],
   },

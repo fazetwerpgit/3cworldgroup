@@ -4,36 +4,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BadgeDollarSign,
-  BarChart3,
-  BookOpen,
-  Bug,
   CalendarClock,
-  CheckSquare,
   ClipboardCheck,
-  FileSpreadsheet,
   Gauge,
   GraduationCap,
+  Inbox,
   LayoutDashboard,
-  Mail,
   Megaphone,
   MessageSquare,
-  MessagesSquare,
-  PanelTop,
   ReceiptText,
   Search,
   Settings,
-  SlidersHorizontal,
   Trophy,
-  UserPlus,
   Users,
-  WalletCards,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { Sale, UserRole } from '@/types';
+import {
+  PEOPLE_HUB,
+  REQUESTS_HUB,
+  SETTINGS_HUB,
+  canOpenHubTab,
+  hubRoles,
+  hubTabHref,
+  type HubConfig,
+} from '@/components/portal/admin-d/adminHubs';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -47,6 +45,8 @@ export interface PortalNavItem {
   permissions?: string[];
   roles?: UserRole[];
   onboardingOnly?: boolean;
+  /** A hub page: its tabs are searchable in the palette under their own names. */
+  hub?: HubConfig;
 }
 
 export interface PortalNavGroup {
@@ -66,25 +66,12 @@ interface ActionDestination {
 
 type PaletteRow = { key: string; label: string; href: string; meta?: string };
 
-const managerRoles: UserRole[] = [
-  'admin',
-  'operations',
-  'l1_manager',
-  'l2_manager',
-  'ibo_level_1',
-  'ibo_level_2',
-  'ibo_level_3',
-  'ibo_level_4',
-  'general_manager',
-  'office_manager',
-  'regional_manager',
-  'director',
-];
-
 const platformRoles: UserRole[] = ['admin', 'operations'];
 
 // This is the single portal navigation source of truth. The sidebar, mobile
-// sheet, and palette all consume these same labels, routes, and gates.
+// sheet, and palette all consume these same labels, routes, and gates. The
+// admin side is six pages; the old admin pages live on as tabs inside People,
+// Requests and Settings (see admin-d/adminHubs.ts), each tab under its old gate.
 export const portalNavGroups: PortalNavGroup[] = [
   {
     items: [
@@ -93,58 +80,21 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Team Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
       { label: 'Calls', href: '/portal/calls', icon: CalendarClock },
       { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
+      { label: 'Forms', href: '/portal/forms', icon: ReceiptText },
+      { label: 'Learn', href: '/portal/learn', icon: GraduationCap },
       { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, onboardingOnly: true },
     ],
   },
   {
-    label: 'Forms',
-    items: [
-      { label: 'Forms', href: '/portal/forms', icon: ReceiptText },
-    ],
-  },
-  {
-    label: 'Resources',
-    items: [
-      { label: 'Resources', href: '/portal/resources', icon: WalletCards },
-      { label: 'University', href: '/portal/training', icon: GraduationCap, permissions: ['training:read'] },
-    ],
-  },
-  {
-    label: 'Recruiting',
-    roles: managerRoles,
-    collapsible: true,
-    items: [
-      { label: 'Recruiting Pipeline', href: '/portal/admin/pipeline', icon: PanelTop, roles: platformRoles },
-      { label: 'Manager Interviews', href: '/portal/admin/manager-interviews', icon: CheckSquare, roles: platformRoles },
-      { label: 'Recruiting', href: '/portal/admin/recruiting', icon: UserPlus, roles: managerRoles },
-      { label: 'Onboarding Review', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
-    ],
-  },
-  {
-    label: 'Operations',
-    roles: managerRoles,
+    label: 'Admin',
     collapsible: true,
     items: [
       { label: 'Ops Home', href: '/portal/admin', icon: Gauge, roles: platformRoles },
-      { label: 'University Content', href: '/portal/admin/university', icon: BookOpen, roles: platformRoles },
-      { label: 'Fiber Reports', href: '/portal/admin/fiber-reports', icon: BarChart3, roles: platformRoles },
-      { label: 'Expedite Orders', href: '/portal/admin/expedite-orders', icon: Zap, roles: platformRoles },
-      { label: 'Payroll Disputes', href: '/portal/admin/payroll-disputes', icon: ReceiptText, roles: platformRoles },
-      { label: 'Leads Requests', href: '/portal/admin/leads-requests', icon: Users, roles: platformRoles },
-      { label: 'Email Templates', href: '/portal/admin/email-templates', icon: Mail, roles: platformRoles },
-      { label: 'Bug Reports', href: '/portal/admin/bug-reports', icon: Bug, roles: platformRoles },
-    ],
-  },
-  {
-    label: 'Admin',
-    roles: ['admin'],
-    items: [
-      { label: 'User Management', href: '/portal/admin/users', icon: Users, permissions: ['users:read'] },
-      { label: 'Form Options', href: '/portal/admin/form-options', icon: SlidersHorizontal },
-      { label: 'Chat Channels', href: '/portal/admin/chat-channels', icon: MessagesSquare },
+      { label: 'People', href: PEOPLE_HUB.href, icon: Users, roles: hubRoles(PEOPLE_HUB), hub: PEOPLE_HUB },
+      { label: 'Onboarding', href: '/portal/admin/onboarding', icon: ClipboardCheck, roles: platformRoles },
+      { label: 'Requests', href: REQUESTS_HUB.href, icon: Inbox, roles: hubRoles(REQUESTS_HUB), hub: REQUESTS_HUB },
       { label: 'Announcements', href: '/portal/admin/announcements', icon: Megaphone, roles: ['owner'] },
-      { label: 'Employee data', href: '/portal/admin/employee-data', icon: FileSpreadsheet, roles: ['owner'] },
-      { label: 'System Settings', href: '/portal/admin/settings', icon: Settings, permissions: ['settings:read'] },
+      { label: 'Settings', href: SETTINGS_HUB.href, icon: Settings, roles: hubRoles(SETTINGS_HUB), hub: SETTINGS_HUB },
     ],
   },
 ];
@@ -265,9 +215,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
     const result: { heading: string; rows: PaletteRow[] }[] = [];
 
-    const pageRows = pageDestinations
+    const pageRows: PaletteRow[] = pageDestinations
       .filter((p) => matches(p.label))
       .map((p) => ({ key: `page:${p.href}`, label: p.label, href: p.href }));
+    // A hub's tabs (Payroll disputes, Email templates…) are findable by their
+    // own names once someone types, so folding pages into hubs loses no search.
+    if (tokens.length) {
+      for (const p of pageDestinations) {
+        if (!p.hub) continue;
+        for (const tab of p.hub.tabs) {
+          if (!canOpenHubTab(tab, isRole, hasPermission) || !matches(`${tab.label} ${p.label}`)) continue;
+          const href = hubTabHref(p.hub, tab.key);
+          pageRows.push({ key: `page:${href}`, label: tab.label, meta: p.label, href });
+        }
+      }
+    }
     if (pageRows.length) result.push({ heading: 'Pages', rows: pageRows });
 
     const actionRows = actions
@@ -296,7 +258,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
 
     return result;
-  }, [pageDestinations, actions, sales, q, hasPermission, onboardingUser]);
+  }, [pageDestinations, actions, sales, q, hasPermission, isRole, onboardingUser]);
 
   const flat = useMemo(() => sections.flatMap((s) => s.rows), [sections]);
 

@@ -27,6 +27,7 @@ import {
   StatusDot,
   type Tone,
 } from '@/components/portal/admin-d/AdminUi';
+import { RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './recruiting.module.css';
@@ -123,7 +124,7 @@ function formatMissingItems(missing: unknown): string {
     : '';
 }
 
-export default function RecruitingCommandCenterPage() {
+export function Invites() {
   const { user, hasPermission, isRole } = useAuth();
   const [invites, setInvites] = useState<InviteView[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
@@ -279,20 +280,7 @@ export default function RecruitingCommandCenterPage() {
   const showCounts = !loading && !loadFailed;
 
   return (
-    <AdminGate
-      roles={[
-        'admin',
-        'operations',
-        'l1_manager',
-        'l2_manager',
-        'ibo_level_1',
-        'ibo_level_2',
-        'ibo_level_3',
-        'ibo_level_4',
-        'regional_manager',
-        'director',
-      ]}
-    >
+    <AdminGate roles={RECRUITING_ROLES}>
       <div className={u.page}>
         <AdminPageHead
           title="Recruiting"

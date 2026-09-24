@@ -12,6 +12,7 @@ import {
   type PortalNavGroup,
   type PortalNavItem,
 } from '@/components/portal/CommandPalette';
+import { PEOPLE_HUB } from '@/components/portal/admin-d/adminHubs';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 
 const EXACT_MATCH_ROUTES = new Set(['/portal/dashboard', '/portal/admin']);
@@ -190,7 +191,7 @@ export function PortalSidebar() {
   const showAdminSection = isRole('admin');
   const pendingSignupsCount = usePendingSignupsCount(showAdminSection);
   const getBadgeCount = (item: PortalNavItem) =>
-    item.href === '/portal/admin/users' ? pendingSignupsCount : undefined;
+    item.href === PEOPLE_HUB.href ? pendingSignupsCount : undefined;
   const railWidth = collapsed ? '66px' : '240px';
 
   return (

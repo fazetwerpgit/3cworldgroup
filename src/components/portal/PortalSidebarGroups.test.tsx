@@ -69,36 +69,20 @@ afterEach(() => {
 });
 
 describe('portal nav groups', () => {
-  it('puts Recruiting directly above Operations with its own four items', () => {
-    const labels = portalNavGroups.map((group) => group.label);
-    expect(labels.indexOf('Recruiting')).toBe(labels.indexOf('Operations') - 1);
-
-    const recruiting = portalNavGroups.find((group) => group.label === 'Recruiting');
-    expect(recruiting?.items.map((item) => item.href)).toEqual([
-      '/portal/admin/pipeline',
-      '/portal/admin/manager-interviews',
-      '/portal/admin/recruiting',
-      '/portal/admin/onboarding',
-    ]);
-
-    const operations = portalNavGroups.find((group) => group.label === 'Operations');
-    expect(operations?.items.map((item) => item.label)).toEqual([
+  it('keeps the admin side to six pages in one group', () => {
+    const admin = portalNavGroups.find((group) => group.label === 'Admin');
+    expect(admin?.items.map((item) => item.label)).toEqual([
       'Ops Home',
-      'University Content',
-      'Fiber Reports',
-      'Expedite Orders',
-      'Payroll Disputes',
-      'Leads Requests',
-      'Email Templates',
-      'Bug Reports',
+      'People',
+      'Onboarding',
+      'Requests',
+      'Announcements',
+      'Settings',
     ]);
-  });
-
-  it('marks Recruiting and Operations collapsible and leaves the other groups alone', () => {
-    const collapsible = portalNavGroups
-      .filter((group) => group.collapsible)
-      .map((group) => group.label);
-    expect(collapsible).toEqual(['Recruiting', 'Operations']);
+    const adminHrefs = portalNavGroups
+      .flatMap((group) => group.items)
+      .filter((item) => item.href.startsWith('/portal/admin'));
+    expect(adminHrefs).toHaveLength(6);
   });
 });
 
@@ -106,26 +90,21 @@ describe('PortalSidebar collapsible groups', () => {
   it('renders a collapsible group closed by default', () => {
     render();
 
-    expect(groupToggle('Operations').getAttribute('aria-expanded')).toBe('false');
-    expect(groupItems('Operations').hasAttribute('hidden')).toBe(true);
-    expect(groupToggle('Recruiting').getAttribute('aria-expanded')).toBe('false');
-    expect(groupItems('Recruiting').hasAttribute('hidden')).toBe(true);
+    expect(groupToggle('Admin').getAttribute('aria-expanded')).toBe('false');
+    expect(groupItems('Admin').hasAttribute('hidden')).toBe(true);
   });
 
   it('opens a group when its toggle is clicked, and persists the choice', () => {
     render();
 
     act(() => {
-      groupToggle('Operations').click();
+      groupToggle('Admin').click();
     });
 
-    expect(groupToggle('Operations').getAttribute('aria-expanded')).toBe('true');
-    expect(groupItems('Operations').hasAttribute('hidden')).toBe(false);
-    // Sibling groups are unaffected.
-    expect(groupToggle('Recruiting').getAttribute('aria-expanded')).toBe('false');
-
+    expect(groupToggle('Admin').getAttribute('aria-expanded')).toBe('true');
+    expect(groupItems('Admin').hasAttribute('hidden')).toBe(false);
     expect(JSON.parse(window.localStorage.getItem('portal-rail-groups-open') ?? '{}')).toEqual({
-      Operations: true,
+      Admin: true,
     });
   });
 
@@ -133,42 +112,39 @@ describe('PortalSidebar collapsible groups', () => {
     render();
 
     act(() => {
-      groupToggle('Operations').click();
+      groupToggle('Admin').click();
     });
     act(() => {
-      groupToggle('Operations').click();
+      groupToggle('Admin').click();
     });
 
-    expect(groupItems('Operations').hasAttribute('hidden')).toBe(true);
+    expect(groupItems('Admin').hasAttribute('hidden')).toBe(true);
   });
 
   it('auto-expands the group holding the current page', () => {
-    testState.pathname = '/portal/admin/pipeline';
+    testState.pathname = '/portal/admin/people';
     render();
 
-    expect(groupToggle('Recruiting').getAttribute('aria-expanded')).toBe('true');
-    expect(groupItems('Recruiting').hasAttribute('hidden')).toBe(false);
-    // Operations no longer owns the recruiting routes, so it stays closed.
-    expect(groupToggle('Operations').getAttribute('aria-expanded')).toBe('false');
+    expect(groupToggle('Admin').getAttribute('aria-expanded')).toBe('true');
+    expect(groupItems('Admin').hasAttribute('hidden')).toBe(false);
   });
 
   it('lets a manual toggle close an auto-expanded group', () => {
-    testState.pathname = '/portal/admin/pipeline';
+    testState.pathname = '/portal/admin/people';
     render();
 
     act(() => {
-      groupToggle('Recruiting').click();
+      groupToggle('Admin').click();
     });
 
-    expect(groupItems('Recruiting').hasAttribute('hidden')).toBe(true);
+    expect(groupItems('Admin').hasAttribute('hidden')).toBe(true);
   });
 
   it('restores a stored open group on mount', () => {
-    window.localStorage.setItem('portal-rail-groups-open', JSON.stringify({ Operations: true }));
+    window.localStorage.setItem('portal-rail-groups-open', JSON.stringify({ Admin: true }));
     render();
 
-    expect(groupItems('Operations').hasAttribute('hidden')).toBe(false);
-    expect(groupItems('Recruiting').hasAttribute('hidden')).toBe(true);
+    expect(groupItems('Admin').hasAttribute('hidden')).toBe(false);
   });
 
   it('drops the toggles entirely when the rail is in icon-only mode', () => {
@@ -181,19 +157,13 @@ describe('PortalSidebar collapsible groups', () => {
     expect(hiddenItems).toHaveLength(0);
   });
 
-  it('keeps non-collapsible groups as plain labels with visible items', () => {
+  it('keeps a non-collapsible group always open', () => {
     render();
 
-    const labels = Array.from(container.querySelectorAll('.portal-rail-group-label')).map(
-      (node) => node.textContent
+    const primary = Array.from(container.querySelectorAll('.portal-rail-group')).find((node) =>
+      node.querySelector('a[href="/portal/learn"]')
     );
-    expect(labels).toContain('Resources');
-    expect(labels).not.toContain('Operations');
-
-    const resources = Array.from(container.querySelectorAll('.portal-rail-group')).find((node) =>
-      node.querySelector('.portal-rail-group-label')?.textContent === 'Resources'
-    );
-    const items = resources?.querySelector('.portal-rail-group-items');
+    const items = primary?.querySelector('.portal-rail-group-items');
     expect(items?.hasAttribute('hidden')).toBe(false);
     expect(items?.hasAttribute('id')).toBe(false);
   });

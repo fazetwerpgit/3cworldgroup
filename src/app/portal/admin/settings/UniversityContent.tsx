@@ -557,7 +557,7 @@ function AdminUniversity() {
   );
 }
 
-export default function AdminUniversityPage() {
+export function UniversityContent() {
   return (
     <AdminGate roles={['admin', 'operations']}>
       <AdminUniversity />

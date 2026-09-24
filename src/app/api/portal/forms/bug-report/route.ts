@@ -29,7 +29,7 @@ async function notifyAdmins(title: string, message: string) {
           type: 'system',
           title,
           message,
-          link: '/portal/admin/bug-reports',
+          link: '/portal/admin/requests?type=bug-reports',
           metadata: {},
           read: false,
           createdAt: new Date(),

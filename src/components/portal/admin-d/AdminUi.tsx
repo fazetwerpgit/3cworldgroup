@@ -1,12 +1,19 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, CircleAlert, RotateCw, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import type { UserRole } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import u from './admin-ui.module.css';
+
+/**
+ * True inside a hub tab (People, Requests, Settings): the hub owns the page
+ * title and tabs, so a hosted page's head keeps only its figure, sentence and
+ * actions, and its title steps down to a hidden h2.
+ */
+export const AdminHubContext = createContext(false);
 
 /** Page title block: Bebas title, live figure, one plain sentence, main action(s). */
 export function AdminPageHead({
@@ -23,6 +30,22 @@ export function AdminPageHead({
   actions?: ReactNode;
   back?: { href: string; label: string };
 }) {
+  const inHub = useContext(AdminHubContext);
+  if (inHub) {
+    const heading = <h2 className={s.srOnly}>{title}</h2>;
+    if (!meta && !sub && !actions) return heading;
+    return (
+      <header className={u.head}>
+        <div className={u.headText}>
+          {heading}
+          {meta ? <span className={u.meta}>{meta}</span> : null}
+          {sub ? <p className={u.sub}>{sub}</p> : null}
+        </div>
+        {actions ? <div className={u.headActions}>{actions}</div> : null}
+      </header>
+    );
+  }
+
   return (
     <header className={u.head}>
       <div className={u.headText}>

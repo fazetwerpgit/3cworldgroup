@@ -10,6 +10,7 @@ import {
   type PortalNavGroup,
   type PortalNavItem,
 } from '@/components/portal/CommandPalette';
+import { PEOPLE_HUB } from '@/components/portal/admin-d/adminHubs';
 
 // The full grouped portal navigation, shared by the old chrome's mobile "More"
 // sheet (MobileBottomNav) and the direction D shell's menu button. Both render
@@ -118,7 +119,7 @@ export function NavGroupsList({
               {visibleItems.map((item) => {
                 const Icon = item.icon;
                 const active = isNavItemActive(pathname, item.href);
-                const badgeCount = item.href === '/portal/admin/users' ? pendingSignupsCount : 0;
+                const badgeCount = item.href === PEOPLE_HUB.href ? pendingSignupsCount : 0;
                 return (
                   <Link
                     key={item.href}

@@ -55,7 +55,7 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-export default function PipelinePage() {
+export function Pipeline() {
   const { user } = useAuth();
   const [reps, setReps] = useState<PipelineRep[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});

@@ -4,6 +4,28 @@ import type { NextConfig } from "next";
 // form when signed out and forwards to the dashboard when signed in.
 const LOGIN_ALIASES = ['/login', '/signin', '/employee'];
 
+// Pages folded into the Learn and admin hub pages (People, Requests, Settings)
+// keep their old URLs: bookmarks, and links already stored in notifications and
+// emails, land on the right tab. A request's own query string passes through.
+const MOVED_PAGES: [source: string, destination: string][] = [
+  ['/portal/resources', '/portal/learn?tab=pay'],
+  ['/portal/training', '/portal/learn?tab=training'],
+  ['/portal/admin/users', '/portal/admin/people?tab=everyone'],
+  ['/portal/admin/recruiting', '/portal/admin/people?tab=invites'],
+  ['/portal/admin/pipeline', '/portal/admin/people?tab=pipeline'],
+  ['/portal/admin/employee-data', '/portal/admin/people?tab=employee-data'],
+  ['/portal/admin/payroll-disputes', '/portal/admin/requests?type=payroll-disputes'],
+  ['/portal/admin/expedite-orders', '/portal/admin/requests?type=expedite-orders'],
+  ['/portal/admin/leads-requests', '/portal/admin/requests?type=leads-requests'],
+  ['/portal/admin/fiber-reports', '/portal/admin/requests?type=fiber-reports'],
+  ['/portal/admin/manager-interviews', '/portal/admin/requests?type=manager-interviews'],
+  ['/portal/admin/bug-reports', '/portal/admin/requests?type=bug-reports'],
+  ['/portal/admin/form-options', '/portal/admin/settings?tab=form-options'],
+  ['/portal/admin/chat-channels', '/portal/admin/settings?tab=chat-channels'],
+  ['/portal/admin/email-templates', '/portal/admin/settings?tab=email-templates'],
+  ['/portal/admin/university', '/portal/admin/settings?tab=university'],
+];
+
 const nextConfig: NextConfig = {
   // The Log Sale screenshot reader's kill switch, ONE variable for both sides:
   // the scan route reads it, and this inlines it into the client bundle so the
@@ -19,11 +41,21 @@ const nextConfig: NextConfig = {
     '/**': ['assets/esign/**'],
   },
   async redirects() {
-    return LOGIN_ALIASES.map((source) => ({
-      source,
-      destination: '/portal',
-      permanent: true,
-    }));
+    return [
+      ...LOGIN_ALIASES.map((source) => ({
+        source,
+        destination: '/portal',
+        permanent: true,
+      })),
+      // University's old Short videos link: the destination's tab wins over the request's.
+      {
+        source: '/portal/training',
+        has: [{ type: 'query' as const, key: 'tab', value: 'shorts' }],
+        destination: '/portal/learn?tab=training&view=shorts',
+        permanent: false,
+      },
+      ...MOVED_PAGES.map(([source, destination]) => ({ source, destination, permanent: false })),
+    ];
   },
   images: {
     remotePatterns: [

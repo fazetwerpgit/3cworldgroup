@@ -18,7 +18,7 @@ const COLUMNS = [
   { key: 'createdAt', label: 'Submitted' },
 ];
 
-export default function BugReportsReviewPage() {
+export function BugReports() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);

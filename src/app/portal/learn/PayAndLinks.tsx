@@ -12,9 +12,9 @@ import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import l from '@/components/portal/rep/rep-learn.module.css';
 
-// The chrome (top bar, tab bar, auth gate) comes from ./layout.tsx: RepShell.
-// /portal/links and /portal/pay-structure redirect here.
-export default function ResourcesHubPage() {
+// Learn's "Pay & links" tab (the old Resources page): University progress,
+// field tools, short videos, pay structure. The Learn page owns the title.
+export function PayAndLinks() {
   const { user, isRole, hasPermission } = useAuth();
   const { loading, fetchResources, fetchProgress, getOverallProgress, getIncompleteRequired } = useTraining();
 
@@ -33,11 +33,7 @@ export default function ResourcesHubPage() {
   const showCompPlan = isRole('owner') && hasPermission('finance:read');
 
   return (
-    <div className={p.page}>
-      <header className={p.head}>
-        <h1 className={p.title}>Resources</h1>
-      </header>
-
+    <>
       <div className={`${l.layout} ${l.hub}`}>
         <div className={l.col}>
           <ProgressCard
@@ -45,7 +41,7 @@ export default function ResourcesHubPage() {
             total={total}
             requiredLeft={getIncompleteRequired().length}
             loading={loading}
-            link={{ href: '/portal/training', label: 'Open University' }}
+            link={{ href: '/portal/learn?tab=training', label: 'Open training' }}
           />
 
           <section className={s.panel} aria-labelledby="tools-title">
@@ -81,7 +77,7 @@ export default function ResourcesHubPage() {
           <section className={s.panel} aria-labelledby="shorts-title">
             <div className={s.panelHead}>
               <h2 id="shorts-title" className={s.kicker}>Short videos</h2>
-              <Link href="/portal/training?tab=shorts" className={p.headLink}>
+              <Link href="/portal/learn?tab=training&view=shorts" className={p.headLink}>
                 See all <ChevronRight size={16} aria-hidden="true" />
               </Link>
             </div>
@@ -96,6 +92,6 @@ export default function ResourcesHubPage() {
           <CompPlanMatrix />
         </div>
       )}
-    </div>
+    </>
   );
 }
