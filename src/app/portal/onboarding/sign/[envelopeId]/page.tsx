@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Check, CircleCheck, RotateCw } from 'lucide-react';
@@ -60,9 +60,15 @@ type FieldValues = Record<string, string | boolean>;
  * authority; this never lets anything through that it would reject.
  * `none` shows while nothing is filled, `many` while more than one is.
  */
-const ONE_OF_RULES: Record<string, { keys: string[]; none: string; many: string }[]> = {
+const ONE_OF_RULES: Record<string, { keys: string[]; none: string; many: string; label?: string }[]> = {
   w9: [
-    { keys: ['ssn', 'ein'], none: 'Enter your SSN or EIN.', many: 'Enter either an SSN or an EIN, not both.' },
+    {
+      keys: ['ssn', 'ein'],
+      none: 'Enter your SSN or EIN.',
+      many: 'Enter either an SSN or an EIN, not both.',
+      // Each box alone is optional, but one of them is not: say so on both.
+      label: 'SSN or EIN required',
+    },
     {
       keys: ['individual_sole_prop', 'llc'],
       none: 'Choose a tax classification.',
@@ -72,24 +78,51 @@ const ONE_OF_RULES: Record<string, { keys: string[]; none: string; many: string 
   direct_deposit: [{ keys: ['checking', 'savings'], none: 'Choose checking or savings.', many: 'Choose checking or savings, not both.' }],
 };
 
-const NUMERIC_KEYBOARD_FIELDS = new Set([
-  'ssn',
-  'ein',
-  'routing_number',
-  'account_number',
-  'cell_phone',
-  'office_phone',
-]);
+type FieldInputProps = Pick<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'inputMode' | 'autoComplete' | 'autoCapitalize' | 'autoCorrect' | 'spellCheck'
+>;
+
+/** Numbers never go into autofill, autocorrect or the suggestion bar. */
+const PRIVATE_NUMBER: FieldInputProps = {
+  inputMode: 'numeric',
+  autoComplete: 'off',
+  autoCapitalize: 'off',
+  autoCorrect: 'off',
+  spellCheck: false,
+};
+const PERSON_NAME: FieldInputProps = { autoComplete: 'name', autoCapitalize: 'words', autoCorrect: 'off', spellCheck: false };
+const STREET: FieldInputProps = { autoComplete: 'address-line1', autoCapitalize: 'words', autoCorrect: 'off' };
+
+/**
+ * The phone keyboard and autofill for each document field. Fields not listed
+ * take a plain sentence-case text box with autofill off.
+ */
+const FIELD_INPUT: Record<string, FieldInputProps> = {
+  ssn: PRIVATE_NUMBER,
+  ein: PRIVATE_NUMBER,
+  routing_number: PRIVATE_NUMBER,
+  account_number: PRIVATE_NUMBER,
+  cell_phone: { type: 'tel', autoComplete: 'mobile tel' },
+  office_phone: { type: 'tel', autoComplete: 'work tel' },
+  email: { type: 'email', autoComplete: 'email', autoCapitalize: 'off', autoCorrect: 'off', spellCheck: false },
+  website: { type: 'url', autoComplete: 'url', autoCapitalize: 'off', autoCorrect: 'off', spellCheck: false },
+  name: PERSON_NAME,
+  legal_name: PERSON_NAME,
+  agent_name: PERSON_NAME,
+  business_name: { autoComplete: 'organization', autoCapitalize: 'words', autoCorrect: 'off' },
+  bank_name: { autoComplete: 'off', autoCapitalize: 'words', autoCorrect: 'off' },
+  street_address: STREET,
+  address: STREET,
+  city_state_zip: { autoComplete: 'off', autoCapitalize: 'words', autoCorrect: 'off' },
+  llc_classification: { autoComplete: 'off', autoCapitalize: 'characters', autoCorrect: 'off', spellCheck: false },
+  deposit_amount: { inputMode: 'decimal', autoComplete: 'off' },
+};
 
 function isFilled(value: string | boolean | undefined): boolean {
   return typeof value === 'boolean' ? value : String(value ?? '').trim().length > 0;
 }
 
-function inputModeFor(key: string): 'numeric' | 'email' | 'text' {
-  if (NUMERIC_KEYBOARD_FIELDS.has(key)) return 'numeric';
-  if (key === 'email') return 'email';
-  return 'text';
-}
 
 function EsignSign() {
   const { envelopeId } = useParams<{ envelopeId: string }>();
@@ -101,6 +134,9 @@ function EsignSign() {
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // The Sign request in flight: a double tap never signs twice, and a page
+  // restored from the back/forward cache can drop an answer that never came.
+  const signRef = useRef<AbortController | null>(null);
   const [completed, setCompleted] = useState(false);
   // error: the last Sign attempt failed (shown in the sign bar's status line).
   const [error, setError] = useState('');
@@ -158,6 +194,30 @@ function EsignSign() {
     };
   }, [envelopeId, authHeaders, attempt]);
 
+  // iOS Safari can freeze the page mid-sign (the rep switches apps) and later
+  // restore it from the back/forward cache with the answer lost, leaving
+  // "Signing…" up forever. Drop that request and ask whether the envelope was
+  // signed: if so, show it done; if not, Sign is ready again. The fields and
+  // the signature stay as the rep left them.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted || !signRef.current) return;
+      signRef.current.abort();
+      signRef.current = null;
+      setSubmitting(false);
+      void (async () => {
+        const response = await fetch(`/api/portal/onboarding/esign/envelope/${envelopeId}`, {
+          headers: await authHeaders(),
+          cache: 'no-store',
+        });
+        const view = (await response.json().catch(() => null)) as EnvelopeView | null;
+        if (response.ok && view?.status === 'completed') setCompleted(true);
+      })().catch(() => {});
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, [envelopeId, authHeaders]);
+
   const setFieldValue = (key: string, value: string | boolean) => {
     setError('');
     setValues((current) => ({ ...current, [key]: value }));
@@ -196,12 +256,15 @@ function EsignSign() {
   }, [envelope, values, signature, consent]);
 
   const submit = async () => {
-    if (!envelope || !signature || blocker) return;
+    if (!envelope || !signature || blocker || signRef.current) return;
+    const sign = new AbortController();
+    signRef.current = sign;
     setSubmitting(true);
     setError('');
     try {
       const response = await fetch('/api/portal/onboarding/esign/sign', {
         method: 'POST',
+        signal: sign.signal,
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           envelopeId,
@@ -220,10 +283,15 @@ function EsignSign() {
       const fallback = response.status >= 500 ? 'Server hiccup, try again.' : 'Try again.';
       throw new Error(payload?.error || fallback);
     } catch (cause: unknown) {
+      // Dropped on a back/forward-cache restore: the pageshow handler took over.
+      if (sign.signal.aborted) return;
       const raw = cause instanceof Error ? cause.message : '';
       setError(raw ? friendlyError(raw, 'sign').message : 'Try again.');
     } finally {
-      setSubmitting(false);
+      if (signRef.current === sign) {
+        signRef.current = null;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -248,10 +316,13 @@ function EsignSign() {
     // Prefilled values come from the rep's own profile; they stay read-only
     // until the rep asks to change them, so a stray tap cannot blank a name.
     const readOnly = field.prefilled && !unlocked[field.key];
+    const oneOf = ONE_OF_RULES[envelope?.docKey ?? '']?.find((rule) => rule.label && rule.keys.includes(field.key));
     return (
       <div key={field.key} className={f.field}>
         <div className={f.label}>
-          <label htmlFor={`esign-${field.key}`}>{fieldLabelWithOptional(field.label, field.required)}</label>
+          <label htmlFor={`esign-${field.key}`}>
+            {oneOf ? `${field.label.trim()} (${oneOf.label})` : fieldLabelWithOptional(field.label, field.required)}
+          </label>
           {readOnly && (
             <button
               type="button"
@@ -268,10 +339,10 @@ function EsignSign() {
           value={String(values[field.key] ?? '')}
           readOnly={readOnly}
           onChange={(event) => setFieldValue(field.key, event.target.value)}
-          inputMode={inputModeFor(field.key)}
           autoComplete="off"
           autoCapitalize={field.sensitive ? 'off' : 'sentences'}
           spellCheck={field.sensitive ? false : undefined}
+          {...FIELD_INPUT[field.key]}
           maxLength={200}
         />
         {field.sensitive && (

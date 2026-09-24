@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ExternalLink, FileText, Loader2, X } from 'lucide-react';
 import { isPdfUrl } from '@/lib/forms/openAttachment';
+import PdfPages from '@/components/esign/PdfPages';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
 import v from './image-viewer.module.css';
@@ -11,6 +12,8 @@ export type ViewerContent =
   | { status: 'loading' }
   | { status: 'image'; url: string }
   | { status: 'pdf'; url: string }
+  /** A PDF drawn in the page, page by page (the e-sign reader). */
+  | { status: 'document'; src: string; authHeaders?: () => Promise<Record<string, string>> }
   | { status: 'error'; message: string };
 
 /**
@@ -20,7 +23,8 @@ export type ViewerContent =
  * Escape, a tap on the dark area and the back gesture all dismiss it; focus
  * returns to whatever opened it. A PDF resolved while open gets an Open PDF
  * link instead (iOS has no reliable inline PDF preview), which is a real tap,
- * so Safari lets the new tab through.
+ * so Safari lets the new tab through. A PDF the page can fetch itself
+ * (`document`) is drawn here instead, so nothing leaves the app at all.
  *
  * Render it only while open: mounting pushes a history entry, unmounting
  * consumes it again.
@@ -161,6 +165,10 @@ export function ImageViewer({
                 Open PDF
               </a>
             </div>
+          ) : content.status === 'document' ? (
+            <div className={v.doc}>
+              <PdfPages src={content.src} authHeaders={content.authHeaders} />
+            </div>
           ) : content.status === 'image' ? (
             // eslint-disable-next-line @next/next/no-img-element -- blob: and signed URLs
             <img className={v.img} src={content.url} alt={label} onError={() => setBroken(true)} />
@@ -192,6 +200,24 @@ export function useAttachmentViewer() {
     setState({ content: isPdfUrl(url) ? { status: 'pdf', url } : { status: 'image', url }, label, returnFocus });
   }, []);
 
+  /**
+   * Draw a PDF in the viewer. `authHeaders` must be referentially stable (it
+   * keys PdfPages' fetch). For a file behind a Bearer token, which a plain
+   * link cannot send.
+   */
+  const showDocument = useCallback(
+    (
+      src: string,
+      label: string,
+      authHeaders?: () => Promise<Record<string, string>>,
+      returnFocus?: HTMLElement | null
+    ) => {
+      request.current += 1;
+      setState({ content: { status: 'document', src, authHeaders }, label, returnFocus });
+    },
+    []
+  );
+
   const open = useCallback(
     (resolveUrl: () => Promise<string | null>, label: string, returnFocus?: HTMLElement | null) => {
       const id = ++request.current;
@@ -217,5 +243,5 @@ export function useAttachmentViewer() {
     />
   ) : null;
 
-  return { open, show, close, viewer };
+  return { open, show, showDocument, close, viewer };
 }

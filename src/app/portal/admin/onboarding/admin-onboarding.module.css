@@ -139,6 +139,12 @@
   text-decoration: none;
 }
 
+.fileBtn {
+  background: transparent;
+  font-family: var(--f-ui);
+  cursor: pointer;
+}
+
 .file svg {
   flex: none;
   color: var(--c-text-3);

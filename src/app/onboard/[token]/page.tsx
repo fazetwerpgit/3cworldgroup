@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, Check, ChevronDown, LoaderCircle } from 'lucide-react';
@@ -38,15 +38,28 @@ interface OnboardingResponse {
 
 // Fields the POST can reject by name (its `field` key), and the control to mark.
 const FIELD_INPUT_ID = {
+  displayName: 'onboard-name',
+  phone: 'onboard-phone',
   ssn: 'onboard-ssn',
   dlNumber: 'onboard-dl-number',
   shirtSize: 'onboard-shirt',
   backgroundCheckAuth: 'onboard-bg-auth',
+  password: 'onboard-password',
 } as const;
 type PacketField = keyof typeof FIELD_INPUT_ID;
 
-const SSN_REQUIRED = 'Enter your Social Security number';
-const CONSENT_REQUIRED = 'Check the box to authorize the background / drug screen';
+// Shown under a required box the browser finds empty on Submit: on a phone the
+// native bubble alone is easy to miss and gone after one scroll.
+const REQUIRED_MESSAGE: Record<PacketField, string> = {
+  displayName: 'Enter your name',
+  phone: 'Enter your phone number',
+  ssn: 'Enter your Social Security number',
+  dlNumber: "Enter your driver's license number",
+  shirtSize: 'Pick a shirt size',
+  backgroundCheckAuth: 'Check the box to authorize the background / drug screen',
+  password: 'Create a password (6+ characters)',
+};
+const REFERENCE_REQUIRED = 'Add a reference or note';
 
 // The invite-link onboarding packet, direction D. Public: the candidate has no
 // account yet, so it sits on the pre-auth ground (AuthShell) and uses the rep
@@ -57,6 +70,9 @@ export default function PublicOnboardingPage() {
   const [data, setData] = useState<OnboardingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // The send in flight, if any: a second tap never sends twice, and a page
+  // restored from the back/forward cache can drop an answer that never came.
+  const sendRef = useRef<AbortController | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [profile, setProfile] = useState({
@@ -78,7 +94,8 @@ export default function PublicOnboardingPage() {
   const [accountTypeError, setAccountTypeError] = useState(false);
   const [taxClassificationError, setTaxClassificationError] = useState(false);
   // Inline errors on named fields: the server's, or a required box left empty.
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PacketField, string>>>({});
+  // Keyed by PacketField, or `ref:<itemId>` for an item's reference box.
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
   const [references, setReferences] = useState<Record<string, string>>({});
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. We only read the slots inside the setter's updater, so the value
@@ -118,7 +135,32 @@ export default function PublicOnboardingPage() {
     if (token) loadInvite();
   }, [token]);
 
-  const clearFieldError = (field: PacketField) =>
+  // iOS Safari can freeze the page mid-send (the candidate switches apps) and
+  // later restore it from the back/forward cache with the request's answer
+  // lost, which would leave Submit spinning forever. Drop that send and ask the
+  // server whether the packet went in: if it did, show it as sent; if not,
+  // Submit is ready again (the server refuses a second packet either way).
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted || !sendRef.current) return;
+      sendRef.current.abort();
+      sendRef.current = null;
+      setSubmitting(false);
+      void fetch(`/api/public/onboarding/${token}`, { cache: 'no-store' })
+        .then(async (response) => {
+          const json = await response.json();
+          if (response.ok && json.locked) setData(json);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, [token]);
+
+  const markInvalid = (field: string, message: string) =>
+    setFieldErrors((prev) => (prev[field] === message ? prev : { ...prev, [field]: message }));
+
+  const clearFieldError = (field: string) =>
     setFieldErrors((prev) => {
       if (!(field in prev)) return prev;
       const next = { ...prev };
@@ -131,7 +173,7 @@ export default function PublicOnboardingPage() {
     (key: TextField) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const value = event.target.value;
       setProfile((prev) => ({ ...prev, [key]: value }));
-      if (key in FIELD_INPUT_ID) clearFieldError(key as PacketField);
+      clearFieldError(key);
     };
 
   const updateReference = (itemId: string, value: string) => {
@@ -174,6 +216,9 @@ export default function PublicOnboardingPage() {
       return;
     }
 
+    if (sendRef.current) return;
+    const send = new AbortController();
+    sendRef.current = send;
     setSubmitting(true);
     setError('');
     setFieldErrors({});
@@ -181,6 +226,7 @@ export default function PublicOnboardingPage() {
     try {
       const response = await fetch(`/api/public/onboarding/${token}`, {
         method: 'POST',
+        signal: send.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...profile,
@@ -208,9 +254,14 @@ export default function PublicOnboardingPage() {
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
+      // Dropped on a back/forward-cache restore: the pageshow handler took over.
+      if (send.signal.aborted) return;
       setError(err instanceof Error ? err.message : 'Failed to submit onboarding');
     } finally {
-      setSubmitting(false);
+      if (sendRef.current === send) {
+        sendRef.current = null;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -348,27 +399,63 @@ export default function PublicOnboardingPage() {
 
         <form onSubmit={submit} className={f.form}>
           <FormSection title="Portal account">
-            <Field id="onboard-name" label="Name" required>
+            <Field id="onboard-name" label="Name" error={fieldErrors.displayName} required>
               <input
                 id="onboard-name"
                 className={f.input}
                 value={profile.displayName}
                 onChange={setText('displayName')}
+                onInvalid={() => markInvalid('displayName', REQUIRED_MESSAGE.displayName)}
+                autoComplete="name"
+                autoCapitalize="words"
+                autoCorrect="off"
+                spellCheck={false}
                 required
+                {...describe('onboard-name', fieldErrors.displayName)}
               />
             </Field>
-            <Field id="onboard-phone" label="Phone" required>
-              <input id="onboard-phone" className={f.input} value={profile.phone} onChange={setText('phone')} required />
+            <Field id="onboard-phone" label="Phone" error={fieldErrors.phone} required>
+              <input
+                id="onboard-phone"
+                type="tel"
+                className={f.input}
+                value={profile.phone}
+                onChange={setText('phone')}
+                onInvalid={() => markInvalid('phone', REQUIRED_MESSAGE.phone)}
+                autoComplete="tel"
+                required
+                {...describe('onboard-phone', fieldErrors.phone)}
+              />
             </Field>
             <Field id="onboard-address" label="Street address" wide>
-              <input id="onboard-address" className={f.input} value={profile.address} onChange={setText('address')} />
+              <input
+                id="onboard-address"
+                className={f.input}
+                value={profile.address}
+                onChange={setText('address')}
+                autoComplete="address-line1"
+                autoCapitalize="words"
+              />
             </Field>
             <Field id="onboard-city" label="City">
-              <input id="onboard-city" className={f.input} value={profile.city} onChange={setText('city')} />
+              <input
+                id="onboard-city"
+                className={f.input}
+                value={profile.city}
+                onChange={setText('city')}
+                autoComplete="address-level2"
+                autoCapitalize="words"
+              />
             </Field>
             <Field id="onboard-state" label="State">
               <span className={f.selectWrap}>
-                <select id="onboard-state" className={f.input} value={profile.state} onChange={setText('state')}>
+                <select
+                  id="onboard-state"
+                  className={f.input}
+                  value={profile.state}
+                  onChange={setText('state')}
+                  autoComplete="address-level1"
+                >
                   <option value="">Select state</option>
                   {US_STATES.map((state) => (
                     <option key={state.code} value={state.code}>
@@ -392,6 +479,8 @@ export default function PublicOnboardingPage() {
                 }}
                 onBlur={() => setZipError(profile.zip !== '' && !isValidZip(profile.zip))}
                 placeholder="12345"
+                inputMode="numeric"
+                autoComplete="postal-code"
                 {...describe('onboard-zip', zipMessage)}
               />
             </Field>
@@ -402,6 +491,7 @@ export default function PublicOnboardingPage() {
                   className={f.input}
                   value={profile.shirtSize}
                   onChange={setText('shirtSize')}
+                  onInvalid={() => markInvalid('shirtSize', REQUIRED_MESSAGE.shirtSize)}
                   required
                   {...describe('onboard-shirt', fieldErrors.shirtSize)}
                 >
@@ -420,7 +510,7 @@ export default function PublicOnboardingPage() {
                 <Field
                   id="onboard-ssn"
                   label="Social Security number"
-                  hint="Your SSN is encrypted and only visible to authorized administrators."
+                  hint="Your SSN is encrypted and only visible to the owners."
                   error={fieldErrors.ssn}
                   required
                   wide
@@ -430,7 +520,7 @@ export default function PublicOnboardingPage() {
                     className={f.input}
                     value={profile.ssn}
                     onChange={setText('ssn')}
-                    onInvalid={() => setFieldErrors((prev) => ({ ...prev, ssn: SSN_REQUIRED }))}
+                    onInvalid={() => markInvalid('ssn', REQUIRED_MESSAGE.ssn)}
                     placeholder="123-45-6789"
                     inputMode="numeric"
                     autoComplete="off"
@@ -450,7 +540,7 @@ export default function PublicOnboardingPage() {
                           setProfile((prev) => ({ ...prev, backgroundCheckAuth: checked }));
                           clearFieldError('backgroundCheckAuth');
                         }}
-                        onInvalid={() => setFieldErrors((prev) => ({ ...prev, backgroundCheckAuth: CONSENT_REQUIRED }))}
+                        onInvalid={() => markInvalid('backgroundCheckAuth', REQUIRED_MESSAGE.backgroundCheckAuth)}
                         required
                         {...describe('onboard-bg-auth', fieldErrors.backgroundCheckAuth)}
                       />
@@ -473,9 +563,20 @@ export default function PublicOnboardingPage() {
               id="onboard-password"
               label="Create portal password"
               hint="Your account stays pending until management reviews the packet."
+              error={fieldErrors.password}
               required
               wide
             >
+              {/* The account's username, for the iPhone keychain: without it
+                  a saved password is filed under no name. */}
+              <input
+                type="email"
+                name="username"
+                autoComplete="username"
+                value={data?.invite.candidateEmail ?? ''}
+                readOnly
+                hidden
+              />
               <input
                 id="onboard-password"
                 type="password"
@@ -483,8 +584,10 @@ export default function PublicOnboardingPage() {
                 minLength={6}
                 value={profile.password}
                 onChange={setText('password')}
+                onInvalid={() => markInvalid('password', REQUIRED_MESSAGE.password)}
+                autoComplete="new-password"
                 required
-                {...describe('onboard-password', undefined, true)}
+                {...describe('onboard-password', fieldErrors.password, true)}
               />
             </Field>
           </FormSection>
@@ -529,7 +632,7 @@ export default function PublicOnboardingPage() {
                           <Field
                             id="onboard-dl-number"
                             label="License number"
-                            hint="Encrypted. Only authorized administrators can see it."
+                            hint="Encrypted. Only the owners can see it."
                             error={fieldErrors.dlNumber}
                             required
                           >
@@ -538,8 +641,12 @@ export default function PublicOnboardingPage() {
                               className={f.input}
                               value={profile.dlNumber}
                               onChange={setText('dlNumber')}
+                              onInvalid={() => markInvalid('dlNumber', REQUIRED_MESSAGE.dlNumber)}
                               maxLength={40}
                               autoComplete="off"
+                              autoCapitalize="characters"
+                              autoCorrect="off"
+                              spellCheck={false}
                               required
                               {...describe('onboard-dl-number', fieldErrors.dlNumber, true)}
                             />
@@ -643,12 +750,21 @@ export default function PublicOnboardingPage() {
                         )}
                       </>
                     ) : (
-                      <Field id={`onboard-ref-${item.id}`} label="Reference or note" required>
+                      <Field
+                        id={`onboard-ref-${item.id}`}
+                        label="Reference or note"
+                        error={fieldErrors[`ref:${item.id}`]}
+                        required
+                      >
                         <textarea
                           id={`onboard-ref-${item.id}`}
                           className={`${f.input} ${f.textarea}`}
                           value={references[item.id] || ''}
-                          onChange={(event) => updateReference(item.id, event.target.value)}
+                          onChange={(event) => {
+                            updateReference(item.id, event.target.value);
+                            clearFieldError(`ref:${item.id}`);
+                          }}
+                          onInvalid={() => markInvalid(`ref:${item.id}`, REFERENCE_REQUIRED)}
                           placeholder={
                             item.sensitive
                               ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
@@ -656,6 +772,7 @@ export default function PublicOnboardingPage() {
                           }
                           rows={3}
                           required
+                          {...describe(`onboard-ref-${item.id}`, fieldErrors[`ref:${item.id}`])}
                         />
                       </Field>
                     )}

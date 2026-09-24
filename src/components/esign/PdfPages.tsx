@@ -155,12 +155,19 @@ export function PdfPages({ src, authHeaders }: Props) {
     return () => {
       cancelled = true;
       for (const task of tasks) task.cancel();
+      // iOS Safari caps the memory all canvases on a page may hold and frees a
+      // detached one late: a few rotations or zoom toggles on a six-page W-9
+      // would otherwise stop drawing. Zeroing the size lets it go now.
+      for (const canvas of host.querySelectorAll('canvas')) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
     };
   }, [doc, containerWidth, zoomed]);
 
   return (
     <div>
-      {/* Sticky: the pages sit in their own 60vh scroller, so a static toolbar
+      {/* Sticky: the pages sit in their own 60svh scroller, so a static toolbar
           would scroll out of reach on the second page. */}
       <div className={e.pdfBar}>
         <p className={e.pdfHint}>

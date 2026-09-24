@@ -16,6 +16,7 @@ import {
 } from '@/components/portal/admin-d/AdminUi';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { Collapse } from '@/components/portal/Collapse';
+import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import o from './admin-onboarding.module.css';
@@ -152,6 +153,9 @@ export default function OnboardingReviewPage() {
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
   const [markTarget, setMarkTarget] = useState<MarkCompleteTarget | null>(null);
   const canMarkComplete = isOwner(user?.role);
+  // In-app viewer, not a new tab: a tab opened after an await is blocked or
+  // opens blank in Safari and strands an iPhone home-screen app.
+  const viewer = useAttachmentViewer();
 
   // `background` refreshes after an action keep the current list on failure,
   // so a confirmation the admin just got is not swapped for a load error.
@@ -199,30 +203,22 @@ export default function OnboardingReviewPage() {
   };
 
   // The signed-pdf route verifies a Bearer token, which a plain link cannot
-  // send, so fetch the PDF with the token and open it as a blob URL. The tab is
-  // opened synchronously in the click so popup blockers allow it.
-  const openSignedPdf = async (item: ChecklistItem) => {
-    const tab = window.open('', '_blank');
-    try {
-      const response = await fetch(
-        `/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(item.userId)}&itemId=${encodeURIComponent(item.itemId)}`,
-        { headers: await authHeaders() }
-      );
-      if (!response.ok) {
-        const json = await response.json().catch(() => ({}));
-        throw new Error(json.error || 'Failed to open signed PDF');
-      }
-      const url = URL.createObjectURL(await response.blob());
-      if (tab) tab.location.href = url;
-      else window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err) {
-      tab?.close();
-      setError(err instanceof Error ? err.message : 'Failed to open signed PDF');
-    }
-  };
+  // send. The viewer fetches it with the token and draws it in the page, as
+  // the e-sign reader does.
+  const openSignedPdf = (item: ChecklistItem, repName: string, opener: HTMLElement) =>
+    viewer.showDocument(
+      `/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(item.userId)}&itemId=${encodeURIComponent(item.itemId)}`,
+      `${item.itemLabel}, signed by ${repName}`,
+      authHeaders,
+      opener
+    );
 
-  const review = async (item: ChecklistItem, status: 'approved' | 'rejected', reason?: string) => {
+  const review = async (
+    item: ChecklistItem,
+    status: 'approved' | 'rejected',
+    repName: string,
+    reason?: string
+  ) => {
     if (!user) return;
     setProcessingId(item.id);
     const fail = status === 'rejected' ? setRejectError : setError;
@@ -241,6 +237,7 @@ export default function OnboardingReviewPage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to review submission');
       closeReject();
+      if (status === 'approved') setNotice(`${item.itemLabel} approved for ${repName}.`);
       await fetchQueue(true);
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Failed to review submission');
@@ -323,18 +320,32 @@ export default function OnboardingReviewPage() {
               item.files.length > 0 ? (
                 <>
                   <div className={o.files}>
-                    {item.files.map((file) => (
-                      <a
-                        key={`${item.id}-${file.name}`}
-                        href={file.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={o.file}
-                      >
-                        <FileText size={16} aria-hidden="true" />
-                        <span>{file.name}</span>
-                      </a>
-                    ))}
+                    {item.files.map((file) =>
+                      // Photos open in the page. A PDF (or a HEIC, which only
+                      // Apple's browsers draw) stays a link: a real tap opens it.
+                      /^image\/(jpeg|png|webp)$/.test(file.contentType) ? (
+                        <button
+                          key={`${item.id}-${file.name}`}
+                          type="button"
+                          className={`${o.file} ${o.fileBtn}`}
+                          onClick={(event) => viewer.show(file.url, `${item.itemLabel}: ${file.name}`, event.currentTarget)}
+                        >
+                          <FileText size={16} aria-hidden="true" />
+                          <span>{file.name}</span>
+                        </button>
+                      ) : (
+                        <a
+                          key={`${item.id}-${file.name}`}
+                          href={file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={o.file}
+                        >
+                          <FileText size={16} aria-hidden="true" />
+                          <span>{file.name}</span>
+                        </a>
+                      )
+                    )}
                   </div>
                   <p className={u.hint}>Links expire in 15 minutes.</p>
                 </>
@@ -354,7 +365,7 @@ export default function OnboardingReviewPage() {
                 type="button"
                 className={`${s.btnPrimary} ${u.primarySm}`}
                 disabled={working}
-                onClick={() => void review(item, 'approved')}
+                onClick={() => void review(item, 'approved', repName)}
               >
                 {working ? 'Working…' : 'Approve'}
               </button>
@@ -388,7 +399,11 @@ export default function OnboardingReviewPage() {
                 Admin only
               </span>
             ) : showPdf ? (
-              <button type="button" className={o.pdfBtn} onClick={() => void openSignedPdf(item)}>
+              <button
+                type="button"
+                className={o.pdfBtn}
+                onClick={(event) => openSignedPdf(item, repName, event.currentTarget)}
+              >
                 <FileText size={16} aria-hidden="true" />
                 Signed PDF
               </button>
@@ -594,7 +609,7 @@ export default function OnboardingReviewPage() {
                 type="button"
                 className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
                 disabled={processingId === rejectTarget.item.id || !rejectionReason.trim()}
-                onClick={() => void review(rejectTarget.item, 'rejected', rejectionReason)}
+                onClick={() => void review(rejectTarget.item, 'rejected', rejectTarget.repName, rejectionReason)}
               >
                 {processingId === rejectTarget.item.id ? 'Rejecting…' : 'Confirm reject'}
               </button>
@@ -623,6 +638,8 @@ export default function OnboardingReviewPage() {
           </div>
         </AdminSheet>
       ) : null}
+
+      {viewer.viewer}
 
       {markTarget ? (
         <MarkCompleteSheet

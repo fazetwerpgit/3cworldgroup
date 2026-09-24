@@ -241,10 +241,10 @@ describe('shrinkImage', () => {
       height: 0,
       getContext: () => ({ drawImage: vi.fn() }),
       toBlob: (done: (blob: Blob) => void, type: string, quality: number) => {
-        canvas.encoded = { type, quality };
+        canvas.encoded = { type, quality, size: [canvas.width, canvas.height] };
         done(new Blob([new Uint8Array(jpegBytes)], { type }));
       },
-      encoded: null as { type: string; quality: number } | null,
+      encoded: null as { type: string; quality: number; size: number[] } | null,
     };
     vi.stubGlobal('document', { createElement: (tag: string) => (tag === 'canvas' ? canvas : null) });
     return canvas;
@@ -259,8 +259,9 @@ describe('shrinkImage', () => {
     expect(shrunk.type).toBe('image/jpeg');
     expect(shrunk.name).toBe('IMG_0412.jpg');
     expect(shrunk.size).toBe(300);
-    expect([canvas.width, canvas.height]).toEqual([924, 2000]);
-    expect(canvas.encoded).toEqual({ type: 'image/jpeg', quality: 0.8 });
+    expect(canvas.encoded).toEqual({ type: 'image/jpeg', quality: 0.8, size: [924, 2000] });
+    // The backing store is let go at once (iOS caps total canvas memory).
+    expect([canvas.width, canvas.height]).toEqual([0, 0]);
   });
 
   it('sends the original when the re-encode is no smaller, or it is not a photo', async () => {
@@ -269,5 +270,55 @@ describe('shrinkImage', () => {
     expect(await shrinkImage(small)).toBe(small);
     const pdf = new File([new Uint8Array(900)], 'a.pdf', { type: 'application/pdf' });
     expect(await shrinkImage(pdf)).toBe(pdf);
+  });
+
+  it('turns a HEIC the browser can decode into a JPEG, even when that is larger', async () => {
+    stubCanvas(5000);
+    const heic = new File([new Uint8Array(900)], 'IMG_0001.HEIC', { type: 'image/heic' });
+    const out = await shrinkImage(heic);
+    expect(out.type).toBe('image/jpeg');
+    expect(out.name).toBe('IMG_0001.jpg');
+  });
+});
+
+describe('a photo this browser cannot decode', () => {
+  const IPHONE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+  beforeEach(() => {
+    // A HEIC outside Safari, or a canvas out of memory: the decode throws.
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => {
+        throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+      })
+    );
+  });
+
+  it('uploads the original bytes, typed from the extension when iOS gave none', async () => {
+    const bytes = new Uint8Array([7, 8, 9, 10]);
+    const heic = new File([bytes], 'IMG_0001.HEIC', { type: '' });
+
+    const result = uploadFormAttachment({
+      file: heic,
+      itemId: 'dl_photos',
+      slot: 'front',
+      uploadUrl: '/api/public/onboarding/t/upload',
+      allowedTypes: IPHONE_TYPES,
+    });
+    const xhr = await sent();
+    const uploaded = xhr.body?.get('file') as File;
+    expect(uploaded.name).toBe('IMG_0001.HEIC');
+    expect(uploaded.type).toBe('image/heic');
+    expect(new Uint8Array(await uploaded.arrayBuffer())).toEqual(bytes);
+    xhr.respond(200, { path: 'onboarding/invite_i/dl_photos/' });
+    await expect(result).resolves.toBe('onboarding/invite_i/dl_photos/');
+  });
+
+  it('says the file is too big, rather than failing quietly, when the original is over the cap', async () => {
+    const heic = new File([new Uint8Array(4 * 1024 * 1024 + 1)], 'IMG_0002.HEIC', { type: 'image/heic' });
+    await expect(
+      uploadFormAttachment({ file: heic, itemId: 'dl_photos', slot: 'back', allowedTypes: IPHONE_TYPES })
+    ).rejects.toThrow(new FormUploadError('File must be 4 MB or smaller'));
+    expect(FakeXHR.all).toHaveLength(0);
   });
 });

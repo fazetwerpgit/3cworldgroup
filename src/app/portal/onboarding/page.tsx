@@ -243,6 +243,7 @@ function OnboardingChecklist() {
                   maxLength={40}
                   autoComplete="off"
                   autoCapitalize="characters"
+                  autoCorrect="off"
                   spellCheck={false}
                   aria-describedby="dl-number-hint"
                 />
@@ -341,6 +342,7 @@ function OnboardingChecklist() {
     activeAndDone ||
     (!!data?.items?.length &&
       data.items.every((item) => item.status === 'approved' || (item.status === 'submitted' && !isEsignItem(item.id))));
+  const hasUploads = !!data?.items?.some((item) => isStorageItem(item.id));
   const lede = !repDone
     ? 'Finish each item. Your manager reviews every one.'
     : activeAndDone || data?.progress?.complete
@@ -384,30 +386,33 @@ function OnboardingChecklist() {
               onOpenItem={openItem}
               onRefresh={fetchChecklist}
             />
-          ) : activeAndDone ? (
-            <p className={`${s.panel} ${o.empty}`}>Onboarding complete.</p>
-          ) : (
+          ) : activeAndDone ? null : (
             <p className={`${s.panel} ${o.empty}`}>No onboarding items for your account yet. Your manager adds them.</p>
           )}
         </div>
 
-        <aside className={`${s.panel} ${o.aside}`} aria-labelledby="onboarding-how-h">
-          <h2 id="onboarding-how-h" className={s.kicker}>
-            How to finish an item
-          </h2>
-          <div className={o.asideItem}>
-            <h3>Upload</h3>
-            <p>PNG, JPG or PDF, 4 MB max. Your license has a front and a back slot.</p>
-          </div>
-          <div className={o.asideItem}>
-            <h3>E-sign</h3>
-            <p>Tap Sign now on the item. It completes by itself after you sign.</p>
-          </div>
-          <div className={o.asideItem}>
-            <h3>Keep numbers out</h3>
-            <p>Never type an SSN, card or account number on this page.</p>
-          </div>
-        </aside>
+        {/* Nothing left for the rep to finish, so no how-to. */}
+        {repDone ? null : (
+          <aside className={`${s.panel} ${o.aside}`} aria-labelledby="onboarding-how-h">
+            <h2 id="onboarding-how-h" className={s.kicker}>
+              How to finish an item
+            </h2>
+            {hasUploads ? (
+              <div className={o.asideItem}>
+                <h3>Upload</h3>
+                <p>PNG, JPG or PDF, 4 MB max. Your license has a front and a back slot.</p>
+              </div>
+            ) : null}
+            <div className={o.asideItem}>
+              <h3>E-sign</h3>
+              <p>Tap Sign now on the item. It completes by itself after you sign.</p>
+            </div>
+            <div className={o.asideItem}>
+              <h3>Keep numbers out</h3>
+              <p>Never type an SSN, card or account number on this page.</p>
+            </div>
+          </aside>
+        )}
       </div>
     </>
   );

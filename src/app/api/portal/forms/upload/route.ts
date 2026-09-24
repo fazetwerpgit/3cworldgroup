@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { validateFormUpload, resolveFormUploadFolder } from '@/lib/forms/formUploads';
+import { validateFormUpload, resolveFormUploadFolder, resolveUploadMime } from '@/lib/forms/formUploads';
 
 // POST /api/portal/forms/upload - verified user uploads a form attachment.
 // Writes ONLY under the verified caller's own folder. Payroll Dispute / Leads
@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const check = validateFormUpload({ mime: file.type, size: file.size });
+    // iOS can send a HEIC with an empty type: judge it by its extension then.
+    const mime = resolveUploadMime(file.type, file.name);
+    const check = validateFormUpload({ mime, size: file.size });
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
     const objectPath = `${folder}file.${check.ext}`;
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
     await bucket.deleteFiles({ prefix: folder, force: true });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    await bucket.file(objectPath).save(buffer, { contentType: file.type, resumable: false });
+    await bucket.file(objectPath).save(buffer, { contentType: mime, resumable: false });
 
     return NextResponse.json({ path: folder });
   } catch (error) {

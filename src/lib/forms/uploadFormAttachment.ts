@@ -1,4 +1,4 @@
-import { FORM_ATTACHMENT_TYPES, MAX_FORM_FILE_BYTES } from './formUploads';
+import { FORM_ATTACHMENT_TYPES, MAX_FORM_FILE_BYTES, resolveUploadMime } from './formUploads';
 
 // Client-side half of POST /api/portal/forms/upload, shared by FileUpload and the
 // Log Sale proof capture so both shrink and send a file the same way.
@@ -40,32 +40,31 @@ export function isUploadCancelled(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
-// MIME types we can safely re-encode on a canvas to shrink large phone photos.
-const DOWNSCALABLE = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  pdf: 'application/pdf',
+// MIME types we try to re-encode on a canvas. HEIC/HEIF decode in Safari (the
+// iPhone sends them when the picker also takes PDFs, or from Files); elsewhere
+// the decode fails and the original goes out as it is.
+const DOWNSCALABLE: Record<string, true> = {
+  'image/jpeg': true,
+  'image/png': true,
+  'image/webp': true,
+  'image/heic': true,
+  'image/heif': true,
 };
+// Every browser shows these; a HEIC opens nowhere but Apple's, so the reviewer
+// on a desktop could not see it.
+const BROWSER_SAFE: Record<string, true> = { 'image/jpeg': true, 'image/png': true, 'image/webp': true };
 
-/** Some Android pickers hand over an empty or generic MIME; fall back to the extension. */
+/** Some pickers hand over an empty or generic MIME; fall back to the extension. */
 export function formFileMime(file: File): string {
-  const supplied = file.type.toLowerCase().split(';', 1)[0].trim();
-  if (supplied === 'image/jpg') return 'image/jpeg';
-  if (supplied && supplied !== 'application/octet-stream') return supplied;
-  const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
-  return MIME_BY_EXTENSION[extension] ?? supplied;
+  return resolveUploadMime(file.type, file.name);
 }
 
 /** Re-encode an image at most SHRINK_MAX_DIM on its long edge, as JPEG. null when it can't be decoded. */
 async function reencode(file: File, maxDim: number, quality: number): Promise<File | null> {
   try {
-    const bitmap = await createImageBitmap(file);
+    // from-image: an iPhone photo is stored sideways with an EXIF rotation;
+    // the JPEG drawn here carries no EXIF, so the rotation must be applied now.
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * scale);
@@ -77,6 +76,10 @@ async function reencode(file: File, maxDim: number, quality: number): Promise<Fi
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
     );
+    // iOS Safari frees a canvas's backing store late and caps the total; a
+    // few photos in a row would otherwise fail to draw.
+    canvas.width = 0;
+    canvas.height = 0;
     if (!blob) return null;
     return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
   } catch {
@@ -89,19 +92,22 @@ async function reencode(file: File, maxDim: number, quality: number): Promise<Fi
  * Returns the original file when it already fits or cannot be decoded.
  */
 export async function maybeDownscale(file: File, maxBytes: number): Promise<File> {
-  if (file.size <= maxBytes || !DOWNSCALABLE.has(file.type)) return file;
+  if (file.size <= maxBytes || !DOWNSCALABLE[file.type]) return file;
   return (await reencode(file, SHRINK_MAX_DIM, 0.85)) ?? file;
 }
 
 /**
  * Shrink every photo before it goes out, whatever its size: an iPhone
  * screenshot is a 1 to 3 MB PNG, and on one bar every byte is seconds. A photo
- * whose re-encode comes out no smaller is sent as it is.
+ * whose re-encode comes out no smaller is sent as it is, except a HEIC, which
+ * goes out as the JPEG whenever this browser can decode it. When the decode
+ * fails (a HEIC outside Safari, a canvas out of memory) the original is sent.
  */
 export async function shrinkImage(file: File): Promise<File> {
-  if (!DOWNSCALABLE.has(file.type)) return file;
+  if (!DOWNSCALABLE[file.type]) return file;
   const shrunk = await reencode(file, SHRINK_MAX_DIM, SHRINK_QUALITY);
-  return shrunk && shrunk.size < file.size ? shrunk : file;
+  if (!shrunk) return file;
+  return shrunk.size < file.size || !BROWSER_SAFE[file.type] ? shrunk : file;
 }
 
 /**

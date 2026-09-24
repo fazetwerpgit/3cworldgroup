@@ -16,6 +16,31 @@ const EXT_BY_MIME: Record<string, string> = {
 export const FORM_ATTACHMENT_TYPES: string[] = Object.keys(EXT_BY_MIME);
 export const MAX_FORM_FILE_BYTES = 4 * 1024 * 1024;
 
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  pdf: 'application/pdf',
+};
+
+/**
+ * The MIME an upload really is. Pickers do not always say: iOS can hand over a
+ * HEIC from Files with an empty type, some Android pickers send
+ * application/octet-stream, and a few send the non-standard image/jpg. Those
+ * fall back to the file extension. Shared by the client (before sending) and
+ * the upload routes (before validating), so both judge a file the same way.
+ */
+export function resolveUploadMime(type: string, name: string): string {
+  const supplied = type.toLowerCase().split(';', 1)[0].trim();
+  if (supplied === 'image/jpg' || supplied === 'image/pjpeg') return 'image/jpeg';
+  if (supplied && supplied !== 'application/octet-stream') return supplied;
+  const extension = name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
+  return MIME_BY_EXTENSION[extension] ?? supplied;
+}
+
 export function validateFormUpload(input: {
   mime: string;
   size: number;
