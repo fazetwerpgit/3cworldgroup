@@ -158,10 +158,9 @@ export async function GET(request: NextRequest) {
         reviewerName: (data?.reviewerName as string | undefined) ?? null,
         rejectionReason: (data?.rejectionReason as string | undefined) ?? null,
         esignEnvelopeId: typeof data?.esignEnvelopeId === 'string' ? data.esignEnvelopeId : null,
-        // A manual completion leaves the envelope unsigned: only a stored PDF counts then.
-        hasSignedPdf:
-          item.referenceKind === 'esign' &&
-          Boolean(data?.completedPdfPath || (data?.esignEnvelopeId && !data?.manualCompletion)),
+        // Only a stored PDF opens. Envelopes from the old provider (Mason's 8/24
+        // documents) and unsigned ones can't be fetched, so they read "No PDF".
+        hasSignedPdf: item.referenceKind === 'esign' && Boolean(data?.completedPdfPath),
         manualCompletion: data?.manualCompletion
           ? {
               note: data.manualCompletion.note as string,
