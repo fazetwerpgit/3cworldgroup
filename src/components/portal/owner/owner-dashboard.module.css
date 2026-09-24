@@ -336,6 +336,9 @@
 
   .colSide {
     grid-column: 9 / span 4;
+    /* Money and the queue list make the left column the long one; recruiting
+       keeps its own height instead of stretching down beside the queues. */
+    align-self: start;
   }
 
   .cellMargin,
