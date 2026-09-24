@@ -17,28 +17,13 @@ ${bodyHtml}
 </div></body></html>`;
 }
 
-export function inviteEmail(p: {
-  candidateName: string;
-  ownerName: string;
-  inviteUrl: string;
-  /** The portal team code (PORTAL_TEAM_CODE), so a hire who lands on Sign up is not stuck. */
-  teamCode?: string | null;
-}): EmailContent {
+export function inviteEmail(p: { candidateName: string; ownerName: string; inviteUrl: string }): EmailContent {
   const subject = 'Welcome to 3C World Group - start your onboarding';
-  const code = p.teamCode?.trim() || null;
-  const codeText = code ? `\nYour team code is ${code}. You only need it if you ever sign up on the site instead of using the link above.\n` : '';
-  const codeHtml = code
-    ? `<p>Your team code is <strong>${escapeHtml(code)}</strong>. You only need it if you ever sign up on the site instead of using the link above.</p>`
-    : '';
   return {
     subject,
-    textBody: `Hi ${p.candidateName},\n\n${p.ownerName} invited you to join the team. Complete your onboarding here: ${p.inviteUrl} (link expires in 14 days).\n${codeText}`,
-    htmlBody: layout(subject, `<p>Hi ${p.candidateName},</p><p>${p.ownerName} invited you to join the team.</p><p><a href="${p.inviteUrl}">Start your onboarding</a> (link expires in 14 days).</p><p>${p.inviteUrl}</p>${codeHtml}`),
+    textBody: `Hi ${p.candidateName},\n\n${p.ownerName} invited you to join the team. Complete your onboarding here: ${p.inviteUrl} (link expires in 14 days).\n`,
+    htmlBody: layout(subject, `<p>Hi ${p.candidateName},</p><p>${p.ownerName} invited you to join the team.</p><p><a href="${p.inviteUrl}">Start your onboarding</a> (link expires in 14 days).</p><p>${p.inviteUrl}</p>`),
   };
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] ?? ch);
 }
 
 export type NudgeTier = 'h24' | 'h72' | 'd7';
