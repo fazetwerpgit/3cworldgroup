@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import MemberLineOnboardingBoard from './MemberLineOnboardingBoard';
-import type { WizardItem } from './OnboardingWizard';
+import type { WizardItem } from './types';
 import { ESIGN_FAILURE_HELPER_TEXT, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

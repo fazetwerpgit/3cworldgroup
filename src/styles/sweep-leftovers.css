@@ -34,8 +34,7 @@
 
 /* PageTitle inside old page wrappers: never inherit uppercase/tracking. */
 .portal-scope .sales-line .pt-head-title,
-.portal-scope .admin-line .pt-head-title,
-.portal-scope .member-line .pt-head-title {
+.portal-scope .admin-line .pt-head-title {
   text-transform: none;
   letter-spacing: -0.01em;
 }

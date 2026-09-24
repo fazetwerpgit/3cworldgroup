@@ -3,24 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardCheck,
-  LockKeyhole,
-  ShieldCheck,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AlertTriangle, Check, ChevronDown, LoaderCircle } from 'lucide-react';
 import { OnboardingItem, RoleDisplayNames, FieldRole, requiresHeavyVetting, SHIRT_SIZES } from '@/types';
-import FileUpload from '@/components/onboarding/FileUpload';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 import { US_STATES, isValidZip } from '@/lib/validation/address';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { Attachment, Field, FormAlert, FormSection, describe } from '@/components/portal/rep/RepForm';
+import s from '@/components/portal/rep/rep.module.css';
+import f from '@/components/portal/rep/rep-forms.module.css';
+import a from '@/components/auth/auth.module.css';
+import o from '@/components/onboarding/onboarding.module.css';
 
 interface InviteView {
   id: string;
@@ -42,20 +36,9 @@ interface OnboardingResponse {
   existingAccount?: boolean;
 }
 
-// Kicker line shared by every state on this pre-auth page (masthead + the
-// three narrow-card states) — this page is public and cannot import
-// PortalHeader/PortalSidebar/MemberLineShell, so the mark is a plain literal
-// reproduction of the portal's navy/lime kicker treatment rather than the
-// `.member-line-kicker` class, which needs a `.member-line` ancestor's CSS
-// vars to resolve.
-function OnboardKicker() {
-  return (
-    <p className="font-mono text-[10px] font-black uppercase tracking-[.18em] text-[#5a8f1f] dark:text-[#8dc63f]">
-      3C World Group - Onboarding
-    </p>
-  );
-}
-
+// The invite-link onboarding packet, direction D. Public: the candidate has no
+// account yet, so it sits on the pre-auth ground (AuthShell) and uses the rep
+// forms kit for fields, uploads and the send error.
 export default function PublicOnboardingPage() {
   const params = useParams();
   const token = params.token as string;
@@ -121,6 +104,13 @@ export default function PublicOnboardingPage() {
     if (token) loadInvite();
   }, [token]);
 
+  type TextField = Exclude<keyof typeof profile, 'backgroundCheckAuth'>;
+  const setText =
+    (key: TextField) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const value = event.target.value;
+      setProfile((prev) => ({ ...prev, [key]: value }));
+    };
+
   const updateReference = (itemId: string, value: string) => {
     setReferences((prev) => ({ ...prev, [itemId]: value }));
   };
@@ -134,6 +124,18 @@ export default function PublicOnboardingPage() {
       return next;
     });
   };
+
+  // Multipart to the token's upload route: itemId, optional slot, file. No auth
+  // header; the token in the URL is the credential.
+  const upload = (itemId: string, allowedTypes: string[], slot?: string) => (file: File, signal: AbortSignal) =>
+    uploadFormAttachment({
+      file,
+      itemId,
+      slot,
+      uploadUrl: `/api/public/onboarding/${token}/upload`,
+      allowedTypes,
+      signal,
+    });
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -187,262 +189,206 @@ export default function PublicOnboardingPage() {
     ? RoleDisplayNames[data.invite.intendedFieldRole]
     : 'Field Representative';
   const heavyVetting = data ? requiresHeavyVetting(data.invite.intendedFieldRole) : false;
+  const zipMessage = zipError ? 'Enter a valid ZIP (12345 or 12345-6789)' : undefined;
+  const accountTypeMessage = accountTypeError ? 'Select an account type' : undefined;
+  const taxClassificationMessage = taxClassificationError ? 'Select a federal tax classification' : undefined;
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#E8F0F8] p-4 dark:bg-[#030916]">
-        <div className="w-full max-w-md border border-[#0A1F44]/[.14] bg-white p-8 dark:border-white/[.14] dark:bg-[#08101d]">
-          <OnboardKicker />
-          <p className="mt-4 text-sm text-[#687384] dark:text-[#9caabd]">Loading onboarding link...</p>
-          <div className="mt-5 space-y-2" aria-hidden="true">
-            <Skeleton className="h-2.5 w-3/4 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-            <Skeleton className="h-2.5 w-1/2 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-            <Skeleton className="h-8 w-full rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-          </div>
+      <AuthShell tag="Onboarding">
+        <h1 className={a.title}>Onboarding</h1>
+        <p className={a.sub} role="status">
+          Loading onboarding link…
+        </p>
+        <div className={a.stack} aria-hidden="true">
+          <span className={s.skel} style={{ width: '75%', height: 12 }} />
+          <span className={s.skel} style={{ width: '50%', height: 12 }} />
+          <span className={s.skel} style={{ height: 52 }} />
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   if (error && !data) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#E8F0F8] p-4 dark:bg-[#030916]">
-        <div className="w-full max-w-md border border-[#0A1F44]/[.14] bg-white p-8 text-center dark:border-white/[.14] dark:bg-[#08101d]">
-          <OnboardKicker />
-          <AlertTriangle className="mx-auto mt-4 mb-3 size-10 text-red-600" />
-          <h1 className="text-lg font-semibold text-[#0A1F44] dark:text-[#f4f7fa]">Onboarding link unavailable</h1>
-          <p className="mt-2 text-sm text-[#687384] dark:text-[#9caabd]">{error}</p>
-          <Button asChild className="mt-5 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-            <Link href="/apply">Back to 3C</Link>
-          </Button>
+      <AuthShell tag="Onboarding">
+        <span className={`${a.statusIcon} ${a.statusIconWarn}`} aria-hidden="true">
+          <AlertTriangle size={22} />
+        </span>
+        <h1 className={a.title}>Onboarding link unavailable</h1>
+        <p className={a.sub} role="alert">
+          {error}
+        </p>
+        <div className={a.actions}>
+          <Link href="/apply" className={`${s.btnPrimary} ${a.btn}`}>
+            Back to 3C
+          </Link>
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   if (submitted || data?.locked) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#E8F0F8] p-4 dark:bg-[#030916]">
-        <div className="w-full max-w-xl border border-[#0A1F44]/[.14] bg-white p-8 text-center dark:border-white/[.14] dark:bg-[#08101d]">
-          <OnboardKicker />
-          <CheckCircle2 className="mx-auto mt-4 mb-4 size-12 text-[#5a8f1f] dark:text-[#8dc63f]" />
-          {!data?.existingAccount && (
-            <span className="inline-flex rounded-full border border-[#8dc63f] bg-[#8dc63f]/15 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[.12em] text-[#4f7f1e] dark:text-[#8dc63f]">
-              Submitted
-            </span>
-          )}
-          <h1 className="mt-4 text-2xl font-semibold text-[#0A1F44] dark:text-[#f4f7fa]">
-            {data?.existingAccount ? 'You already have a portal account' : 'Your onboarding packet is in review'}
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-[#687384] dark:text-[#9caabd]">
-            {data?.existingAccount
-              ? `Sign in with ${data.invite.candidateEmail}. If you forgot your password, reset it from the login page.`
-              : 'Your manager can review this in the 3C portal. Your portal account is pending until management activates it.'}
-          </p>
-          <Button asChild className="mt-6 bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]">
-            <Link href="/portal">{data?.existingAccount ? 'Sign in to the portal' : 'Go to Portal Login'}</Link>
-          </Button>
-          {data?.existingAccount && (
-            <Link
-              href="/portal"
-              className="mt-4 inline-block text-sm font-medium text-[#0A1F44] underline decoration-[#8dc63f] underline-offset-4 hover:text-[#5a8f1f] dark:text-[#f4f7fa] dark:hover:text-[#8dc63f]"
-            >
+      <AuthShell tag="Onboarding">
+        <span className={a.statusIcon} aria-hidden="true">
+          <Check size={22} />
+        </span>
+        {!data?.existingAccount && (
+          <span className={o.state} data-state="submitted">
+            Submitted
+          </span>
+        )}
+        <h1 className={a.title}>
+          {data?.existingAccount ? 'You already have a portal account' : 'Your onboarding packet is in review'}
+        </h1>
+        <p className={a.sub}>
+          {data?.existingAccount
+            ? `Sign in with ${data.invite.candidateEmail}. If you forgot your password, reset it from the login page.`
+            : 'Your manager can review this in the 3C portal. Your portal account is pending until management activates it.'}
+        </p>
+        <div className={a.actions}>
+          <Link href="/portal" className={`${s.btnPrimary} ${a.btn}`}>
+            {data?.existingAccount ? 'Sign in to the portal' : 'Go to portal login'}
+          </Link>
+        </div>
+        {data?.existingAccount && (
+          <p className={a.linkRow}>
+            <Link href="/portal" className={`${a.link} ${a.linkLime}`}>
               Use Forgot password on the login page
             </Link>
-          )}
-        </div>
-      </main>
+          </p>
+        )}
+      </AuthShell>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#E8F0F8] dark:bg-[#030916]">
-      <div className="member-line">
-        <OnboardKicker />
+    <AuthShell tag="Onboarding" wide>
+      <div className={o.invite}>
+        <header>
+          <h1 className={a.title}>Finish your onboarding</h1>
+          <p className={a.sub}>Complete each item here and submit it directly to management.</p>
+        </header>
 
-        <div className="member-line-masthead" style={{ paddingTop: 10 }}>
-          <div>
-            <h1>
-              <span className="accent">{data?.invite.candidateName || 'Welcome'}.</span>
-              <span>Finish your onboarding online.</span>
-            </h1>
-            <p className="member-line-intro">
-              This link replaces document chasing by email. Complete each item here and submit it directly to management.
-            </p>
-          </div>
-          <div
-            className="member-line-display portal-metallic-num portal-num"
-            aria-label={`${completed} of ${total} items complete`}
-          >
-            {completed}/{total}
-          </div>
-        </div>
-
-        <form onSubmit={submit} className="portal-enter grid gap-5 pt-6 lg:grid-cols-[320px_1fr]">
-          <aside className="lg:sticky lg:top-6 lg:self-start">
-            <div className="member-line-panel">
-              <p className="member-line-eyebrow">candidate</p>
-              <p style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{data?.invite.candidateName}</p>
-              <p className="member-line-sub">{data?.invite.candidateEmail}</p>
-              <p className="member-line-sub">{roleLabel}</p>
-
-              <div className="member-line-progress" style={{ marginTop: 18 }}>
-                <span style={{ width: total ? `${(completed / total) * 100}%` : '0%' }} />
-              </div>
-              <div className="member-line-meta" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Progress</span>
-                <span>{completed}/{total}</span>
-              </div>
-
-              <div
-                className="member-line-note warn"
-                style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'flex-start' }}
-              >
-                <ShieldCheck className="size-4" style={{ flexShrink: 0, marginTop: 2 }} />
-                <span>
-                  Do not enter SSNs, bank account numbers, or full card numbers. Use confirmation references only.
+        <aside className={o.inviteAside} aria-labelledby="onboard-progress-h">
+          <section className={s.panel}>
+            <div className={o.progress}>
+              <h2 id="onboard-progress-h" className={s.kicker}>
+                Candidate
+              </h2>
+              <p className={o.candidate}>
+                <strong>{data?.invite.candidateName}</strong>
+                <span>{data?.invite.candidateEmail}</span>
+                <span>{roleLabel}</span>
+              </p>
+              <p className={o.score}>
+                <span className={`${o.scoreNum} ${total && completed === total ? o.progressDone : ''}`}>
+                  {completed}
                 </span>
-              </div>
+                <span className={o.scoreOf}>/{total}</span>
+                <span className={o.scoreLabel}>complete</span>
+              </p>
+              <span className={s.track} aria-hidden="true">
+                <span className={s.fill} style={{ width: total ? `${(completed / total) * 100}%` : '0%' }} />
+              </span>
             </div>
-          </aside>
+          </section>
+          <p className={`${o.note} ${o.noteWarn}`}>
+            Do not enter SSNs, bank account numbers, or full card numbers. Use confirmation references only.
+          </p>
+        </aside>
 
-          <section className="grid gap-5" style={{ alignContent: 'start' }}>
-            {error && (
-              <div
-                className="member-line-note warn"
-                role="alert"
-                style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}
-              >
-                <AlertTriangle className="size-4" style={{ flexShrink: 0, marginTop: 2 }} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="member-line-section-index">
-              <b>01</b>
-              <span>/ portal account</span>
-            </div>
-
-            <div className="member-line-panel">
-              <div className="member-line-panel-head">
-                <div>
-                  <h2>Portal Account</h2>
-                </div>
-                <LockKeyhole className="size-5" style={{ color: 'var(--member-line-lime)' }} aria-hidden="true" />
-              </div>
-
-              <div className="member-line-profile-grid">
-                <div className="member-line-field full">
-                  <Label>Name</Label>
-                  <Input
-                    value={profile.displayName}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, displayName: event.target.value }))
-                    }
-                    required
+        <form onSubmit={submit} className={f.form}>
+          <FormSection title="Portal account">
+            <Field id="onboard-name" label="Name" required>
+              <input
+                id="onboard-name"
+                className={f.input}
+                value={profile.displayName}
+                onChange={setText('displayName')}
+                required
+              />
+            </Field>
+            <Field id="onboard-phone" label="Phone" required>
+              <input id="onboard-phone" className={f.input} value={profile.phone} onChange={setText('phone')} required />
+            </Field>
+            <Field id="onboard-address" label="Street address" wide>
+              <input id="onboard-address" className={f.input} value={profile.address} onChange={setText('address')} />
+            </Field>
+            <Field id="onboard-city" label="City">
+              <input id="onboard-city" className={f.input} value={profile.city} onChange={setText('city')} />
+            </Field>
+            <Field id="onboard-state" label="State">
+              <span className={f.selectWrap}>
+                <select id="onboard-state" className={f.input} value={profile.state} onChange={setText('state')}>
+                  <option value="">Select state</option>
+                  {US_STATES.map((state) => (
+                    <option key={state.code} value={state.code}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} aria-hidden="true" />
+              </span>
+            </Field>
+            <Field id="onboard-zip" label="ZIP" error={zipMessage}>
+              <input
+                id="onboard-zip"
+                className={f.input}
+                value={profile.zip}
+                onChange={(event) => {
+                  const zip = event.target.value;
+                  setProfile((prev) => ({ ...prev, zip }));
+                  // Clear a showing error as soon as the value becomes valid/empty.
+                  if (zipError && (zip === '' || isValidZip(zip))) setZipError(false);
+                }}
+                onBlur={() => setZipError(profile.zip !== '' && !isValidZip(profile.zip))}
+                placeholder="12345"
+                {...describe('onboard-zip', zipMessage)}
+              />
+            </Field>
+            <Field id="onboard-shirt" label="Shirt size" required>
+              <span className={f.selectWrap}>
+                <select
+                  id="onboard-shirt"
+                  className={f.input}
+                  value={profile.shirtSize}
+                  onChange={setText('shirtSize')}
+                  required
+                >
+                  <option value="">Select size</option>
+                  {SHIRT_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} aria-hidden="true" />
+              </span>
+            </Field>
+            {heavyVetting && (
+              <>
+                <Field
+                  id="onboard-ssn"
+                  label="Social Security number"
+                  hint="Your SSN is encrypted and only visible to authorized administrators."
+                  wide
+                >
+                  <input
+                    id="onboard-ssn"
+                    className={f.input}
+                    value={profile.ssn}
+                    onChange={setText('ssn')}
+                    placeholder="123-45-6789"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    {...describe('onboard-ssn', undefined, true)}
                   />
-                </div>
-                <div className="member-line-field">
-                  <Label>Phone</Label>
-                  <Input
-                    value={profile.phone}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, phone: event.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="member-line-field full">
-                  <Label>Street Address</Label>
-                  <Input
-                    value={profile.address}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, address: event.target.value }))
-                    }
-                  />
-                </div>
-                <div className="member-line-field">
-                  <Label>City</Label>
-                  <Input
-                    value={profile.city}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, city: event.target.value }))
-                    }
-                  />
-                </div>
-                <div className="member-line-field">
-                  <Label>State</Label>
-                  <NativeSelect
-                    value={profile.state}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, state: event.target.value }))
-                    }
-                    className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
-                  >
-                    <NativeSelectOption value="">Select state</NativeSelectOption>
-                    {US_STATES.map((s) => (
-                      <NativeSelectOption key={s.code} value={s.code}>
-                        {s.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </div>
-                <div className="member-line-field">
-                  <Label>ZIP</Label>
-                  <Input
-                    value={profile.zip}
-                    onChange={(event) => {
-                      const zip = event.target.value;
-                      setProfile((prev) => ({ ...prev, zip }));
-                      // Clear a showing error as soon as the value becomes valid/empty.
-                      if (zipError && (zip === '' || isValidZip(zip))) setZipError(false);
-                    }}
-                    onBlur={() => setZipError(profile.zip !== '' && !isValidZip(profile.zip))}
-                    placeholder="12345"
-                  />
-                  {zipError && (
-                    <p className="text-xs" style={{ color: 'var(--member-line-red)' }}>
-                      Enter a valid ZIP (12345 or 12345-6789)
-                    </p>
-                  )}
-                </div>
-                <div className="member-line-field">
-                  <Label htmlFor="onboard-shirt">Shirt size</Label>
-                  <NativeSelect
-                    id="onboard-shirt"
-                    value={profile.shirtSize}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, shirtSize: event.target.value }))
-                    }
-                    required
-                    className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
-                  >
-                    <NativeSelectOption value="">Select size</NativeSelectOption>
-                    {SHIRT_SIZES.map((size) => (
-                      <NativeSelectOption key={size} value={size}>
-                        {size}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </div>
-                {heavyVetting && (
-                  <>
-                    <div className="member-line-field">
-                      <Label>Social Security Number</Label>
-                      <Input
-                        value={profile.ssn}
-                        onChange={(event) =>
-                          setProfile((prev) => ({ ...prev, ssn: event.target.value }))
-                        }
-                        placeholder="123-45-6789"
-                        inputMode="numeric"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <label
-                      className="full"
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--member-line-muted)' }}
-                    >
+                </Field>
+                <div className={`${f.field} ${f.wide}`}>
+                  <div className={f.rows}>
+                    <label className={f.row}>
                       <input
                         type="checkbox"
                         checked={profile.backgroundCheckAuth}
@@ -450,221 +396,225 @@ export default function PublicOnboardingPage() {
                           setProfile((prev) => ({ ...prev, backgroundCheckAuth: event.target.checked }))
                         }
                       />
-                      I authorize a background / drug screen.
+                      <span className={`${f.radio} ${o.tick}`} aria-hidden="true">
+                        {profile.backgroundCheckAuth ? <Check size={14} strokeWidth={3} /> : null}
+                      </span>
+                      <span className={f.choiceText}>I authorize a background / drug screen.</span>
                     </label>
-                    <p className="full member-line-sub" style={{ fontSize: 11 }}>
-                      Your SSN is encrypted and only visible to authorized administrators.
-                    </p>
-                  </>
-                )}
-                <div className="member-line-field full">
-                  <Label>Create Portal Password</Label>
-                  <Input
-                    type="password"
-                    minLength={6}
-                    value={profile.password}
-                    onChange={(event) =>
-                      setProfile((prev) => ({ ...prev, password: event.target.value }))
-                    }
-                    required
-                  />
-                  <p className="member-line-sub" style={{ fontSize: 11 }}>
-                    Your account stays pending until management reviews the packet.
-                  </p>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
+            <Field
+              id="onboard-password"
+              label="Create portal password"
+              hint="Your account stays pending until management reviews the packet."
+              required
+              wide
+            >
+              <input
+                id="onboard-password"
+                type="password"
+                className={f.input}
+                minLength={6}
+                value={profile.password}
+                onChange={setText('password')}
+                required
+                {...describe('onboard-password', undefined, true)}
+              />
+            </Field>
+          </FormSection>
 
-            <div className="member-line-section-index">
-              <b>02</b>
-              <span>/ required items</span>
-            </div>
-
-            <div className="member-line-panel">
-              <div className="member-line-panel-head">
-                <div>
-                  <h2>Required Items</h2>
-                </div>
-                <ClipboardCheck className="size-5" style={{ color: 'var(--member-line-lime)' }} aria-hidden="true" />
-              </div>
-
-              <div className="member-line-board" style={{ marginTop: 16 }}>
-                {data?.items.map((item, index) => {
-                  const isComplete = isItemComplete(item);
-                  return (
-                    <div key={item.id} className="member-line-row" style={{ gridTemplateColumns: '1fr' }}>
-                      <div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            alignItems: 'flex-start',
-                            justifyContent: 'space-between',
-                            gap: 12,
-                            marginBottom: 12,
-                          }}
-                        >
-                          <div>
-                            <strong>
-                              {String(index + 1).padStart(2, '0')}. {item.label}
-                            </strong>
-                            <small>
-                              {item.id === 'dl_photos'
-                                ? 'Your license number and a photo of each side.'
-                                : item.sensitive
-                                  ? 'Reference or confirmation only. Do not paste private numbers.'
-                                  : 'Confirm completion or add a short reference.'}
-                            </small>
-                          </div>
-                          {isEsignItem(item.id) ? null : isComplete ? (
-                            <span className="member-line-state done">Complete</span>
-                          ) : (
-                            <span className="member-line-state todo">Needed</span>
-                          )}
-                        </div>
-                        {isStorageItem(item.id) ? (
-                          item.id === 'dl_photos' ? (
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="member-line-field sm:col-span-2">
-                                <Label htmlFor="onboard-dl-number">License number</Label>
-                                <Input
-                                  id="onboard-dl-number"
-                                  value={profile.dlNumber}
-                                  onChange={(event) =>
-                                    setProfile((prev) => ({ ...prev, dlNumber: event.target.value }))
-                                  }
-                                  maxLength={40}
-                                  autoComplete="off"
-                                  required
-                                />
-                                <p className="member-line-sub" style={{ fontSize: 11 }}>
-                                  Encrypted. Only authorized administrators can see it.
-                                </p>
-                              </div>
-                              <FileUpload
-                                itemId="dl_photos"
-                                slot="front"
-                                label="Front of license"
-                                accept="image/*"
-                                allowedTypes={IMAGE_TYPES}
-                                uploadUrl={`/api/public/onboarding/${token}/upload`}
-                                onUploaded={(path) => markDlSlot('front', path)}
-                              />
-                              <FileUpload
-                                itemId="dl_photos"
-                                slot="back"
-                                label="Back of license"
-                                accept="image/*"
-                                allowedTypes={IMAGE_TYPES}
-                                uploadUrl={`/api/public/onboarding/${token}/upload`}
-                                onUploaded={(path) => markDlSlot('back', path)}
-                              />
-                            </div>
-                          ) : (
-                            <FileUpload
-                              itemId={item.id}
-                              accept="image/*,application/pdf"
-                              allowedTypes={DOC_TYPES}
-                              uploadUrl={`/api/public/onboarding/${token}/upload`}
-                              onUploaded={(path) => updateReference(item.id, path)}
-                            />
-                          )
-                        ) : isEsignItem(item.id) ? (
-                          <div className="grid gap-2">
-                            <span className="member-line-chip" style={{ width: 'fit-content' }}>
-                              E-signature
-                            </span>
-                            <p className="member-line-sub">{ESIGN_HELPER_TEXT}</p>
-                            {item.id === 'direct_deposit' && (
-                              <div className="member-line-field">
-                                <Label>Account type</Label>
-                                <NativeSelect
-                                  value={accountType}
-                                  onChange={(event) => {
-                                    setAccountType(event.target.value);
-                                    if (event.target.value) setAccountTypeError(false);
-                                  }}
-                                  onBlur={() => setAccountTypeError(!accountType)}
-                                  onInvalid={(event) => {
-                                    event.preventDefault();
-                                    setAccountTypeError(true);
-                                  }}
-                                  required
-                                  aria-invalid={accountTypeError}
-                                  className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
-                                >
-                                  <NativeSelectOption value="">Select account type</NativeSelectOption>
-                                  <NativeSelectOption value="checking">Checking</NativeSelectOption>
-                                  <NativeSelectOption value="savings">Savings</NativeSelectOption>
-                                </NativeSelect>
-                                {accountTypeError && (
-                                  <p className="text-xs" style={{ color: 'var(--member-line-red)' }}>
-                                    Select an account type
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                            {item.id === 'w9' && (
-                              <div className="member-line-field">
-                                <Label>Federal tax classification</Label>
-                                <NativeSelect
-                                  value={taxClassification}
-                                  onChange={(event) => {
-                                    setTaxClassification(event.target.value);
-                                    if (event.target.value) setTaxClassificationError(false);
-                                  }}
-                                  onBlur={() => setTaxClassificationError(!taxClassification)}
-                                  onInvalid={(event) => {
-                                    event.preventDefault();
-                                    setTaxClassificationError(true);
-                                  }}
-                                  required
-                                  aria-invalid={taxClassificationError}
-                                  className="w-full rounded-none border-[#0A1F44]/20 dark:border-white/20"
-                                >
-                                  <NativeSelectOption value="">Select tax classification</NativeSelectOption>
-                                  <NativeSelectOption value="individual">Individual / sole proprietor</NativeSelectOption>
-                                  <NativeSelectOption value="llc">LLC</NativeSelectOption>
-                                </NativeSelect>
-                                {taxClassificationError && (
-                                  <p className="text-xs" style={{ color: 'var(--member-line-red)' }}>
-                                    Select a federal tax classification
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Textarea
-                            value={references[item.id] || ''}
-                            onChange={(event) => updateReference(item.id, event.target.value)}
-                            placeholder={
-                              item.sensitive
-                                ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
-                                : 'Example: Completed, acknowledged, or upload/reference note'
-                            }
-                            required
-                          />
-                        )}
-                      </div>
+          <section className={f.section} aria-labelledby="onboard-items-h">
+            <h2 id="onboard-items-h" className={f.sectionHead}>
+              Required items
+            </h2>
+            <ol className={o.inviteItems}>
+              {data?.items.map((item, index) => {
+                const esign = isEsignItem(item.id);
+                const isComplete = isItemComplete(item);
+                return (
+                  <li key={item.id} className={`${s.panel} ${o.inviteItem}`}>
+                    <div className={o.rowText}>
+                      {esign ? (
+                        <span className={o.state} data-state="submitted">
+                          E-signature
+                        </span>
+                      ) : (
+                        <span className={o.state} data-state={isComplete ? 'approved' : undefined}>
+                          {isComplete ? 'Complete' : 'Needed'}
+                        </span>
+                      )}
+                      <h3 className={o.rowName}>
+                        {String(index + 1).padStart(2, '0')}. {item.label}
+                      </h3>
+                      <p className={o.rowDesc}>
+                        {esign
+                          ? ESIGN_HELPER_TEXT
+                          : item.id === 'dl_photos'
+                            ? 'Your license number and a photo of each side.'
+                            : item.sensitive
+                              ? 'Reference or confirmation only. Do not paste private numbers.'
+                              : 'Confirm completion or add a short reference.'}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="bg-[#8dc63f] text-[#0A1F44] hover:bg-[#7ab82e]"
-              >
-                {submitting ? 'Submitting...' : 'Submit Onboarding Packet'}
-              </Button>
-            </div>
+                    {isStorageItem(item.id) ? (
+                      item.id === 'dl_photos' ? (
+                        <>
+                          <Field
+                            id="onboard-dl-number"
+                            label="License number"
+                            hint="Encrypted. Only authorized administrators can see it."
+                            required
+                          >
+                            <input
+                              id="onboard-dl-number"
+                              className={f.input}
+                              value={profile.dlNumber}
+                              onChange={setText('dlNumber')}
+                              maxLength={40}
+                              autoComplete="off"
+                              required
+                              {...describe('onboard-dl-number', undefined, true)}
+                            />
+                          </Field>
+                          <div className={o.slots}>
+                            <Attachment
+                              id="onboard-dl-front"
+                              label="Front of license"
+                              accept="image/*"
+                              kinds="Photo"
+                              preview={false}
+                              upload={upload('dl_photos', IMAGE_TYPES, 'front')}
+                              onUploaded={(path) => markDlSlot('front', path)}
+                            />
+                            <Attachment
+                              id="onboard-dl-back"
+                              label="Back of license"
+                              accept="image/*"
+                              kinds="Photo"
+                              preview={false}
+                              upload={upload('dl_photos', IMAGE_TYPES, 'back')}
+                              onUploaded={(path) => markDlSlot('back', path)}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <Attachment
+                          id={`onboard-upload-${item.id}`}
+                          label="File"
+                          accept="image/*,application/pdf"
+                          preview={!item.sensitive}
+                          upload={upload(item.id, DOC_TYPES)}
+                          onUploaded={(path) => updateReference(item.id, path)}
+                        />
+                      )
+                    ) : esign ? (
+                      <>
+                        {item.id === 'direct_deposit' && (
+                          <Field
+                            id="onboard-account-type"
+                            label="Account type"
+                            error={accountTypeMessage}
+                            required
+                          >
+                            <span className={f.selectWrap}>
+                              <select
+                                id="onboard-account-type"
+                                className={f.input}
+                                value={accountType}
+                                onChange={(event) => {
+                                  setAccountType(event.target.value);
+                                  if (event.target.value) setAccountTypeError(false);
+                                }}
+                                onBlur={() => setAccountTypeError(!accountType)}
+                                onInvalid={(event) => {
+                                  event.preventDefault();
+                                  setAccountTypeError(true);
+                                }}
+                                required
+                                {...describe('onboard-account-type', accountTypeMessage)}
+                              >
+                                <option value="">Select account type</option>
+                                <option value="checking">Checking</option>
+                                <option value="savings">Savings</option>
+                              </select>
+                              <ChevronDown size={18} aria-hidden="true" />
+                            </span>
+                          </Field>
+                        )}
+                        {item.id === 'w9' && (
+                          <Field
+                            id="onboard-tax-classification"
+                            label="Federal tax classification"
+                            error={taxClassificationMessage}
+                            required
+                          >
+                            <span className={f.selectWrap}>
+                              <select
+                                id="onboard-tax-classification"
+                                className={f.input}
+                                value={taxClassification}
+                                onChange={(event) => {
+                                  setTaxClassification(event.target.value);
+                                  if (event.target.value) setTaxClassificationError(false);
+                                }}
+                                onBlur={() => setTaxClassificationError(!taxClassification)}
+                                onInvalid={(event) => {
+                                  event.preventDefault();
+                                  setTaxClassificationError(true);
+                                }}
+                                required
+                                {...describe('onboard-tax-classification', taxClassificationMessage)}
+                              >
+                                <option value="">Select tax classification</option>
+                                <option value="individual">Individual / sole proprietor</option>
+                                <option value="llc">LLC</option>
+                              </select>
+                              <ChevronDown size={18} aria-hidden="true" />
+                            </span>
+                          </Field>
+                        )}
+                      </>
+                    ) : (
+                      <Field id={`onboard-ref-${item.id}`} label="Reference or note" required>
+                        <textarea
+                          id={`onboard-ref-${item.id}`}
+                          className={`${f.input} ${f.textarea}`}
+                          value={references[item.id] || ''}
+                          onChange={(event) => updateReference(item.id, event.target.value)}
+                          placeholder={
+                            item.sensitive
+                              ? 'Example: Vendor confirmation, uploaded file reference, or manager note'
+                              : 'Example: Completed, acknowledged, or upload/reference note'
+                          }
+                          rows={3}
+                          required
+                        />
+                      </Field>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
           </section>
+
+          <div className={o.inviteActions}>
+            {error ? <FormAlert message={error} /> : null}
+            <button type="submit" disabled={submitting} className={`${s.btnPrimary} ${o.submit}`}>
+              {submitting ? (
+                <>
+                  <LoaderCircle size={18} className={f.spin} aria-hidden="true" />
+                  Submitting
+                </>
+              ) : (
+                'Submit onboarding packet'
+              )}
+            </button>
+          </div>
         </form>
       </div>
-    </main>
+    </AuthShell>
   );
 }

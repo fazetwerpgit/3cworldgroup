@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { FieldRoles, OnboardingItem, OnboardingStatus } from '@/types';
 import MemberLineOnboardingBoard from '@/components/onboarding/MemberLineOnboardingBoard';
-import type { WizardItem } from '@/components/onboarding/OnboardingWizard';
+import type { WizardItem } from '@/components/onboarding/types';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 
