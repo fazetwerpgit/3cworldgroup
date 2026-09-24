@@ -1,6 +1,6 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { hashInviteToken } from '@/lib/recruiting/tokens';
+import { getInviteByToken, isInviteExpired, SUBMITTED_INVITE_STATUSES } from '@/lib/recruiting/inviteLookup';
 import { getOnboardingItemsForUser, looksLikeRawSensitiveData, requiresHeavyVetting } from '@/types';
 import { isShirtSize } from '@/types/auth';
 import type { SensitiveDoc } from '@/types/sensitive';
@@ -14,23 +14,6 @@ import { findActivePortalAccount } from '@/lib/auth/existingAccount';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-async function getInviteByToken(token: string) {
-  if (!adminDb) return null;
-  const tokenHash = hashInviteToken(token);
-  const snapshot = await adminDb
-    .collection('onboardingInvites')
-    .where('tokenHash', '==', tokenHash)
-    .limit(1)
-    .get();
-  if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ref: doc.ref, data: doc.data() };
-}
-
-function isExpired(expiresAt: FirebaseFirestore.Timestamp | undefined) {
-  return !!expiresAt?.toDate && expiresAt.toDate().getTime() < Date.now();
 }
 
 export async function GET(
@@ -49,12 +32,12 @@ export async function GET(
     }
 
     const data = invite.data;
-    if (isExpired(data.expiresAt) || data.status === 'expired') {
+    if (isInviteExpired(data.expiresAt) || data.status === 'expired') {
       await invite.ref.set({ status: 'expired', updatedAt: new Date() }, { merge: true });
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
 
-    if (['submitted', 'approved', 'converted'].includes(data.status)) {
+    if (SUBMITTED_INVITE_STATUSES.includes(data.status)) {
       return NextResponse.json({
         invite: {
           id: invite.id,
@@ -138,11 +121,11 @@ export async function POST(
     }
 
     const data = invite.data;
-    if (isExpired(data.expiresAt)) {
+    if (isInviteExpired(data.expiresAt)) {
       await invite.ref.set({ status: 'expired', updatedAt: new Date() }, { merge: true });
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
-    if (['submitted', 'approved', 'converted'].includes(data.status)) {
+    if (SUBMITTED_INVITE_STATUSES.includes(data.status)) {
       return NextResponse.json({ error: 'This onboarding packet was already submitted' }, { status: 400 });
     }
 

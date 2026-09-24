@@ -3,11 +3,12 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { AlertCircle, CircleCheck, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateSignup, passwordStrength, PASSWORD_STRENGTH_LABEL } from '@/lib/auth/signupValidation';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { looksLikeBotSignup } from '@/lib/auth/botDetection';
+import { useSignupInvite } from '@/lib/onboarding/rememberedInvite';
 import s from '@/components/portal/rep/rep.module.css';
 import { AuthShell } from './AuthShell';
 import a from './auth.module.css';
@@ -63,9 +64,9 @@ function loadRecaptchaScript() {
   return recaptchaScriptPromise;
 }
 
-// Real 3-step structural fact describing the account flow (team code ->
-// verify -> manager activates) — not measured data, same reasoning as
-// Settings' static 5 (member-the-line-goal.md).
+// Real 3-step structural fact describing the account flow (team code or 3C
+// invite -> verify -> manager activates) — not measured data, same reasoning
+// as Settings' static 5 (member-the-line-goal.md).
 const SIGNUP_STEPS = [
   { n: 1, label: 'Enter your team code' },
   { n: 2, label: 'Verify your email' },
@@ -73,24 +74,26 @@ const SIGNUP_STEPS = [
 ];
 
 const TEAM_CODE_ERROR = "That team code isn't right. Ask your manager for the current one.";
+const INVITE_ERROR = 'Your invite from 3C is no longer open. Ask your manager for a new invite or the team code.';
 const ACCOUNT_EXISTS_ERROR =
   'You already have a portal account. Sign in instead, or reset your password from the login page.';
 
-function SignupSteps() {
+function SignupSteps({ invited }: { invited: boolean }) {
   return (
     <ol className={a.steps} aria-label="How sign-up works">
       {SIGNUP_STEPS.map((step) => (
         <li key={step.n}>
           <b>{step.n}</b>
-          <span>{step.label}</span>
+          <span>{invited && step.n === 1 ? 'Use your invite from 3C' : step.label}</span>
         </li>
       ))}
     </ol>
   );
 }
 
-// Sign-up, direction D: same shell as sign in. The team code is checked on the
-// server before the account is created.
+// Sign-up, direction D: same shell as sign in. The team code — or, for a hire
+// 3C invited, their invite — is checked on the server before the account is
+// created. An invited hire is pointed back to their onboarding packet first.
 export function SignupForm() {
   const { signUp } = useAuth();
   const router = useRouter();
@@ -103,6 +106,9 @@ export function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [accountExists, setAccountExists] = useState(false);
+  // `?invite=<token>` or an invite opened on this device, confirmed by the server.
+  const invite = useSignupInvite({ fromUrl: true });
+  const invited = invite?.state === 'open';
 
   const strength = useMemo(() => passwordStrength(password), [password]);
 
@@ -120,7 +126,7 @@ export function SignupForm() {
       );
       return;
     }
-    if (!teamCode.trim()) {
+    if (!invited && !teamCode.trim()) {
       setError(TEAM_CODE_ERROR);
       return;
     }
@@ -170,19 +176,20 @@ export function SignupForm() {
           return;
         }
       }
+      const gateError = invited ? INVITE_ERROR : TEAM_CODE_ERROR;
       try {
         const codeResponse = await fetch('/api/portal/auth/team-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: teamCode }),
+          body: JSON.stringify(invited ? { inviteToken: invite.token } : { code: teamCode }),
         });
-        const codeData = (await codeResponse.json()) as { ok?: unknown };
-        if (!codeResponse.ok || codeData.ok !== true) {
-          setError(TEAM_CODE_ERROR);
+        const codeData = (await codeResponse.json()) as { ok?: unknown; state?: unknown };
+        if (!codeResponse.ok || codeData.ok !== true || (invited && codeData.state !== 'open')) {
+          setError(gateError);
           return;
         }
       } catch {
-        setError(TEAM_CODE_ERROR);
+        setError(gateError);
         return;
       }
       await signUp(email.trim(), password, displayName.trim());
@@ -203,9 +210,31 @@ export function SignupForm() {
   return (
     <AuthShell>
       <h1 className={a.title}>Join your team</h1>
-      <p className={a.sub}>Your manager gave you a team code. Use an email you check regularly.</p>
+      <p className={a.sub}>
+        {invited
+          ? 'You have an invite from 3C. Your onboarding packet sets up your account.'
+          : 'Your manager gave you a team code. Use an email you check regularly.'}
+      </p>
+
+      {invited ? (
+        <div className={a.stack}>
+          <Link href={`/onboard/${invite.token}`} className={`${s.btnPrimary} ${a.btn}`}>
+            Continue your onboarding
+          </Link>
+          <div className={a.divider}>or</div>
+        </div>
+      ) : null}
 
       <form onSubmit={handleSubmit} className={a.stack}>
+        {invite?.state === 'submitted' ? (
+          <div className={a.ok} role="status">
+            <CircleCheck size={18} aria-hidden="true" />
+            <p>
+              You already set up your account during onboarding.{' '}
+              <Link href="/portal">Sign in with the password you set there</Link>
+            </p>
+          </div>
+        ) : null}
         {error ? (
           <div className={a.alert} role="alert">
             <AlertCircle size={18} aria-hidden="true" />
@@ -253,22 +282,26 @@ export function SignupForm() {
           />
         </div>
 
-        <div className={a.field}>
-          <label htmlFor="signup-team-code" className={a.label}>
-            Team code
-          </label>
-          <input
-            id="signup-team-code"
-            type="text"
-            value={teamCode}
-            onChange={(e) => setTeamCode(e.target.value)}
-            className={a.input}
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            required
-          />
-        </div>
+        {invited ? (
+          <p className={a.hint}>Invited by 3C — no team code needed.</p>
+        ) : (
+          <div className={a.field}>
+            <label htmlFor="signup-team-code" className={a.label}>
+              Team code
+            </label>
+            <input
+              id="signup-team-code"
+              type="text"
+              value={teamCode}
+              onChange={(e) => setTeamCode(e.target.value)}
+              className={a.input}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              required
+            />
+          </div>
+        )}
 
         <div className={a.field}>
           <label htmlFor="signup-password" className={a.label}>
@@ -342,7 +375,7 @@ export function SignupForm() {
         </Link>
       </p>
 
-      <SignupSteps />
+      <SignupSteps invited={invited} />
 
       <p className={a.note} role="note">
         Applied for a job? You don&apos;t need an account yet. We&apos;ll reach out after we review your application.
