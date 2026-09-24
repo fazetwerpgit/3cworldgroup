@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, FileText, Lock, RotateCw } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
+import { MarkCompleteSheet, type MarkCompleteTarget } from './MarkCompleteSheet';
 import {
   AdminEmpty,
   AdminFailed,
@@ -11,15 +12,17 @@ import {
   AdminPageHead,
   AdminSkeletonRows,
   StatusDot,
+  type Tone,
 } from '@/components/portal/admin-d/AdminUi';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
+import { Collapse } from '@/components/portal/Collapse';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import o from './admin-onboarding.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isEsignItem } from '@/lib/onboarding/esign';
-import { OnboardingCategory, OnboardingCategoryLabels } from '@/types';
+import { isOwner, OnboardingCategoryLabels, type OnboardingCategory, type OnboardingStatus } from '@/types';
 
 // The review route verifies the reviewer from the ID token and stamps their uid
 // and name onto the submission — the rep sees that name, so it must not be
@@ -32,7 +35,7 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-interface Submission {
+interface ChecklistItem {
   id: string;
   userId: string;
   itemId: string;
@@ -40,61 +43,41 @@ interface Submission {
   category: OnboardingCategory;
   sensitive: boolean;
   /** Sensitive item whose files this caller (operations) may not open. */
-  adminOnly?: boolean;
+  adminOnly: boolean;
   referenceKind: 'vendor' | 'storage' | 'esign' | 'manual';
   reference: string | null;
   files: { name: string; url: string; contentType: string }[];
-  userName: string;
-  userEmail: string;
-  atRisk: boolean;
+  status: OnboardingStatus;
   submittedAt: string | null;
-  label: string;
-  status: 'submitted' | 'approved' | 'rejected' | null;
   reviewedAt: string | null;
   reviewerName: string | null;
+  rejectionReason: string | null;
+  esignEnvelopeId: string | null;
   hasSignedPdf: boolean;
-  esignEnvelopeId?: string | null;
+  /** Set when an owner marked the item complete by hand. */
+  manualCompletion: { note: string; byName: string; at: string | null } | null;
 }
 
-interface SubmissionGroup {
+interface Person {
   userId: string;
   userName: string;
-  items: Submission[];
+  userEmail: string;
+  roleLabel: string | null;
   atRisk: boolean;
+  items: ChecklistItem[];
+  done: number;
+  total: number;
+  /** Submitted, waiting on management. */
+  toReview: number;
+  /** Out for signature, waiting on the rep. */
+  unsigned: number;
 }
 
-/** Display-only fallback for submissions missing a resolved userName — never touches
-    the write path. The API falls back to the uid itself when no displayName exists,
-    so "name equals uid" also counts as unnamed. */
-function hasRealName(userName: string, userId: string): boolean {
-  return Boolean(userName) && userName !== userId;
-}
+type View = 'all' | 'new' | 'handled';
 
-function repLabel(userName: string, userId: string): string {
-  return hasRealName(userName, userId) ? userName : `Unnamed rep · ${userId.slice(-6)}`;
-}
-
-function repKey(userName: string, userId: string): string {
-  return hasRealName(userName, userId) ? userName : userId;
-}
-
-function groupSubmissions(items: Submission[]): SubmissionGroup[] {
-  const groups = new Map<string, SubmissionGroup>();
-  items.forEach((submission) => {
-    const existing = groups.get(submission.userId);
-    if (existing) {
-      existing.items.push(submission);
-      existing.atRisk ||= submission.atRisk;
-      return;
-    }
-    groups.set(submission.userId, {
-      userId: submission.userId,
-      userName: submission.userName,
-      items: [submission],
-      atRisk: submission.atRisk,
-    });
-  });
-  return Array.from(groups.values());
+/** New: something submitted is waiting (review or signature). Handled: everyone else. */
+function isNew(person: Person) {
+  return person.toReview + person.unsigned > 0;
 }
 
 function waitLabel(submittedAt: string | null): string {
@@ -107,95 +90,67 @@ function waitLabel(submittedAt: string | null): string {
   return `${days} day${days === 1 ? '' : 's'}`;
 }
 
-function groupSize(count: number) {
-  return `${count} item${count === 1 ? '' : 's'}`;
+function formatDate(date: string | null) {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** One rep's block inside a section: who, at-risk flag, item count, then their rows. */
-function RepGroup({ group, children }: { group: SubmissionGroup; children: ReactNode }) {
-  const name = repLabel(group.userName, group.userId);
-  return (
-    <li className={o.group}>
-      <div className={o.groupHead}>
-        <span className={u.person}>
-          <span className={u.personText}>
-            <span className={u.personName}>
-              <span>{name}</span>
-              {group.atRisk ? (
-                <span className={`${u.tag} ${u.tagAmber}`}>
-                  <AlertTriangle size={12} aria-hidden="true" />
-                  At risk
-                </span>
-              ) : null}
-            </span>
-            <span className={u.personSub}>{groupSize(group.items.length)}</span>
-          </span>
-        </span>
-      </div>
-      <ul className={`${u.rows} ${o.cols}`}>{children}</ul>
-    </li>
-  );
+function personStatus(person: Person): { tone: Tone; label: string } {
+  if (person.toReview > 0) return { tone: 'amber', label: 'Needs review' };
+  if (person.unsigned > 0) return { tone: 'blue', label: 'Out for signature' };
+  if (person.total > 0 && person.done === person.total) return { tone: 'lime', label: 'Complete' };
+  return { tone: 'muted', label: 'In progress' };
 }
 
-/** Section panel: kicker title, live count, one-line explanation. */
-function Section({
-  id,
-  title,
-  count,
-  sub,
-  action,
-  children,
-}: {
-  id: string;
-  title: string;
-  count?: ReactNode;
-  sub?: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className={s.panel} aria-labelledby={id}>
-      <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id={id} className={s.kicker}>
-          {title}
-        </h2>
-        <span className={o.headRight}>
-          {count !== undefined ? <span className={u.panelMeta}>{count}</span> : null}
-          {action}
-        </span>
-      </div>
-      {sub ? <p className={o.sectionSub}>{sub}</p> : null}
-      {children}
-    </section>
-  );
-}
-
-function evidenceLabel(submission: Submission) {
-  if (submission.adminOnly) return 'Admin only';
-  if (submission.referenceKind === 'storage') {
-    return `${submission.files.length} file${submission.files.length === 1 ? '' : 's'}`;
+function itemStatus(item: ChecklistItem): { tone: Tone; label: string } {
+  switch (item.status) {
+    case 'approved':
+      return { tone: 'lime', label: 'Approved' };
+    case 'rejected':
+      return { tone: 'red', label: 'Rejected' };
+    case 'submitted':
+      if (!isEsignItem(item.itemId)) return { tone: 'amber', label: 'Needs review' };
+      return item.esignEnvelopeId ? { tone: 'blue', label: 'Out for signature' } : { tone: 'amber', label: 'Not sent' };
+    default:
+      return { tone: 'muted', label: 'Not started' };
   }
-  return 'Reference';
+}
+
+function itemDetail(item: ChecklistItem): string | null {
+  switch (item.status) {
+    case 'approved':
+      if (item.manualCompletion) {
+        return `Marked complete by ${item.manualCompletion.byName}: ${item.manualCompletion.note}`;
+      }
+      return `Approved ${formatDate(item.reviewedAt)}${item.reviewerName ? ` by ${item.reviewerName}` : ''}`;
+    case 'rejected':
+      return `Rejected ${formatDate(item.reviewedAt)}${item.reviewerName ? ` by ${item.reviewerName}` : ''}${
+        item.rejectionReason ? `: ${item.rejectionReason}` : ''
+      }`;
+    case 'submitted':
+      return `${isEsignItem(item.itemId) ? 'Sent' : 'Submitted'} ${formatDate(item.submittedAt)} · ${waitLabel(item.submittedAt)}`;
+    default:
+      return null;
+  }
 }
 
 export default function OnboardingReviewPage() {
   const { user } = useAuth();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [esignPending, setEsignPending] = useState<Submission[]>([]);
-  const [completed, setCompleted] = useState<Submission[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadFailed, setLoadFailed] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [rejectModal, setRejectModal] = useState<Submission | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<{ item: ChecklistItem; repName: string } | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   // Reject failures show inside the sheet; the page banner sits behind it.
   const [rejectError, setRejectError] = useState('');
   const [notice, setNotice] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [personFilter, setPersonFilter] = useState('all');
+  const [view, setView] = useState<View>('new');
   const [atRiskOnly, setAtRiskOnly] = useState(false);
-  const [sendState, setSendState] = useState<Record<string, { message: string; error?: boolean }>>({});
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [markTarget, setMarkTarget] = useState<MarkCompleteTarget | null>(null);
+  const canMarkComplete = isOwner(user?.role);
 
   // `background` refreshes after an action keep the current list on failure,
   // so a confirmation the admin just got is not swapped for a load error.
@@ -207,15 +162,13 @@ export default function OnboardingReviewPage() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load review queue');
-      setSubmissions(Array.isArray(json.submissions) ? json.submissions : []);
-      setEsignPending(Array.isArray(json.esignPending) ? json.esignPending : []);
-      setCompleted(Array.isArray(json.completed) ? json.completed : []);
+      setPeople(Array.isArray(json.people) ? json.people : []);
       setLoadFailed(false);
     } catch {
       if (background) {
-        setError("Couldn't refresh the queue. Tap refresh to try again.");
+        setError("Couldn't refresh the list. Tap refresh to try again.");
       } else {
-        // A failed load says so (with a retry) instead of showing an empty queue.
+        // A failed load says so (with a retry) instead of showing an empty list.
         setLoadFailed(true);
       }
     } finally {
@@ -231,13 +184,15 @@ export default function OnboardingReviewPage() {
     void fetchQueue();
   };
 
-  const openReject = (submission: Submission) => {
-    setRejectError('');
-    setRejectModal(submission);
-  };
+  const toggle = (userId: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(userId)) next.add(userId);
+      return next;
+    });
 
   const closeReject = () => {
-    setRejectModal(null);
+    setRejectTarget(null);
     setRejectionReason('');
     setRejectError('');
   };
@@ -245,11 +200,11 @@ export default function OnboardingReviewPage() {
   // The signed-pdf route verifies a Bearer token, which a plain link cannot
   // send, so fetch the PDF with the token and open it as a blob URL. The tab is
   // opened synchronously in the click so popup blockers allow it.
-  const openSignedPdf = async (submission: Submission) => {
+  const openSignedPdf = async (item: ChecklistItem) => {
     const tab = window.open('', '_blank');
     try {
       const response = await fetch(
-        `/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(submission.userId)}&itemId=${encodeURIComponent(submission.itemId)}`,
+        `/api/portal/onboarding/signed-pdf?userId=${encodeURIComponent(item.userId)}&itemId=${encodeURIComponent(item.itemId)}`,
         { headers: await authHeaders() }
       );
       if (!response.ok) {
@@ -266,9 +221,9 @@ export default function OnboardingReviewPage() {
     }
   };
 
-  const review = async (submission: Submission, status: 'approved' | 'rejected', reason?: string) => {
+  const review = async (item: ChecklistItem, status: 'approved' | 'rejected', reason?: string) => {
     if (!user) return;
-    setProcessingId(submission.id);
+    setProcessingId(item.id);
     const fail = status === 'rejected' ? setRejectError : setError;
     fail('');
     try {
@@ -276,17 +231,16 @@ export default function OnboardingReviewPage() {
         method: 'POST',
         headers: await authHeaders(true),
         body: JSON.stringify({
-          userId: submission.userId,
-          itemId: submission.itemId,
+          userId: item.userId,
+          itemId: item.itemId,
           status,
           rejectionReason: reason,
         }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to review submission');
-      setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
-      setEsignPending((prev) => prev.filter((s) => s.id !== submission.id));
       closeReject();
+      await fetchQueue(true);
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Failed to review submission');
     } finally {
@@ -294,89 +248,167 @@ export default function OnboardingReviewPage() {
     }
   };
 
-  const sendForSignature = async (submission: Submission) => {
+  const sendForSignature = async (item: ChecklistItem, repName: string) => {
     if (!user) return;
-    setProcessingId(submission.id);
-    setSendState((prev) => ({ ...prev, [submission.id]: { message: '' } }));
+    setProcessingId(item.id);
+    setError('');
     try {
       const response = await fetch('/api/portal/onboarding/esign-send', {
         method: 'POST',
         headers: await authHeaders(true),
-        body: JSON.stringify({ userId: submission.userId, itemId: submission.itemId }),
+        body: JSON.stringify({ userId: item.userId, itemId: item.itemId }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to send for signature');
-      // The row moves to "Out for signature" on refresh, so confirm at page level.
-      setSendState((prev) => {
-        const next = { ...prev };
-        delete next[submission.id];
-        return next;
-      });
       setNotice(
         json.reason === 'envelope_exists'
-          ? `${submission.itemLabel} was already sent to ${repLabel(submission.userName, submission.userId)}.`
-          : `Sent ${submission.itemLabel} to ${repLabel(submission.userName, submission.userId)}. They can sign it in their portal.`
+          ? `${item.itemLabel} was already sent to ${repName}.`
+          : `Sent ${item.itemLabel} to ${repName}. They can sign it in their portal.`
       );
       await fetchQueue(true);
     } catch (err) {
-      setSendState((prev) => ({
-        ...prev,
-        [submission.id]: { message: err instanceof Error ? err.message : 'Failed to send for signature', error: true },
-      }));
+      setError(err instanceof Error ? err.message : 'Failed to send for signature');
     } finally {
       setProcessingId(null);
     }
   };
 
-  const formatDate = (date: string | null) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
-  };
-
-  const people = useMemo(() => {
-    const seen = new Map<string, string>();
-    [...submissions, ...esignPending, ...completed].forEach((s) => {
-      const key = repKey(s.userName, s.userId);
-      if (!seen.has(key)) seen.set(key, repLabel(s.userName, s.userId));
-    });
-    return Array.from(seen.entries()).map(([key, label]) => ({ key, label }));
-  }, [submissions, esignPending, completed]);
-  const filtered = useMemo(
+  const visible = useMemo(
     () =>
-      submissions.filter(
-        (s) =>
-          (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
-          (!atRiskOnly || s.atRisk)
+      people.filter(
+        (person) =>
+          (view === 'all' || (view === 'new') === isNew(person)) && (!atRiskOnly || person.atRisk)
       ),
-    [submissions, personFilter, atRiskOnly]
-  );
-  const filteredEsignPending = useMemo(
-    () =>
-      esignPending.filter(
-        (s) =>
-          (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
-          (!atRiskOnly || s.atRisk)
-      ),
-    [esignPending, personFilter, atRiskOnly]
-  );
-  const filteredCompleted = useMemo(
-    () =>
-      completed.filter(
-        (s) =>
-          (personFilter === 'all' || repKey(s.userName, s.userId) === personFilter) &&
-          (!atRiskOnly || s.atRisk)
-      ),
-    [completed, personFilter, atRiskOnly]
+    [people, view, atRiskOnly]
   );
 
-  const waitingPeople = new Set(submissions.map((item) => item.userId)).size;
-  const atRiskPeople = new Set(
-    [...submissions, ...esignPending].filter((item) => item.atRisk).map((item) => item.userId),
-  ).size;
+  const newCount = people.filter(isNew).length;
+  const toReviewTotal = people.reduce((sum, person) => sum + person.toReview, 0);
+  const unsignedTotal = people.reduce((sum, person) => sum + person.unsigned, 0);
+  const atRiskPeople = people.filter((person) => person.atRisk && isNew(person)).length;
   const showStats = !loading && !loadFailed;
-  const catLabel = (submission: Submission) => OnboardingCategoryLabels[submission.category] ?? submission.category;
+
+  const renderItem = (item: ChecklistItem, repName: string) => {
+    const status = itemStatus(item);
+    const detail = itemDetail(item);
+    const working = processingId === item.id;
+    const esign = isEsignItem(item.itemId);
+    const underReview = item.status === 'submitted' && !esign;
+    const showPdf = esign && item.status === 'approved' && item.hasSignedPdf;
+    const markable = canMarkComplete && item.status !== 'approved';
+    const hasActions = item.status === 'submitted' || showPdf || markable;
+    return (
+      <li key={item.id} className={o.item}>
+        <div className={o.itemHead}>
+          <span className={o.itemText}>
+            <strong className={o.itemName}>{item.itemLabel}</strong>
+            <span className={u.cellSub}>
+              {OnboardingCategoryLabels[item.category] ?? item.category}
+              {item.sensitive ? ' · Sensitive' : ''}
+            </span>
+          </span>
+          <StatusDot tone={status.tone}>{status.label}</StatusDot>
+        </div>
+        {detail ? <p className={o.itemDetail}>{detail}</p> : null}
+
+        {underReview ? (
+          <div className={o.reference}>
+            {item.referenceKind === 'storage' && item.adminOnly ? (
+              <p className={o.locked}>
+                <Lock size={16} aria-hidden="true" />
+                Admin only. Sensitive files are visible to admins.
+              </p>
+            ) : item.referenceKind === 'storage' ? (
+              item.files.length > 0 ? (
+                <>
+                  <div className={o.files}>
+                    {item.files.map((file) => (
+                      <a
+                        key={`${item.id}-${file.name}`}
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={o.file}
+                      >
+                        <FileText size={16} aria-hidden="true" />
+                        <span>{file.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                  <p className={u.hint}>Links expire in 15 minutes.</p>
+                </>
+              ) : (
+                <p className={o.quote}>No files found at {item.reference ?? 'this reference'}.</p>
+              )
+            ) : (
+              <p className={o.quote}>{item.reference ?? 'No reference on file.'}</p>
+            )}
+          </div>
+        ) : null}
+
+        {hasActions ? (
+          <div className={u.btnRow}>
+            {underReview ? (
+              <button
+                type="button"
+                className={`${s.btnPrimary} ${u.primarySm}`}
+                disabled={working}
+                onClick={() => void review(item, 'approved')}
+              >
+                {working ? 'Working…' : 'Approve'}
+              </button>
+            ) : null}
+            {item.status === 'submitted' ? (
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                disabled={working}
+                onClick={() => {
+                  setRejectError('');
+                  setRejectTarget({ item, repName });
+                }}
+              >
+                Reject
+              </button>
+            ) : null}
+            {esign && item.status === 'submitted' && !item.esignEnvelopeId ? (
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm}`}
+                disabled={working}
+                onClick={() => void sendForSignature(item, repName)}
+              >
+                {working ? 'Sending…' : 'Send for signature'}
+              </button>
+            ) : null}
+            {showPdf && item.adminOnly ? (
+              <span className={`${u.tag} ${u.tagAmber}`}>
+                <Lock size={12} aria-hidden="true" />
+                Admin only
+              </span>
+            ) : showPdf ? (
+              <button type="button" className={o.pdfBtn} onClick={() => void openSignedPdf(item)}>
+                <FileText size={16} aria-hidden="true" />
+                Signed PDF
+              </button>
+            ) : null}
+            {markable ? (
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
+                disabled={working}
+                onClick={() =>
+                  setMarkTarget({ userId: item.userId, itemId: item.itemId, itemLabel: item.itemLabel, repName })
+                }
+              >
+                Mark complete
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </li>
+    );
+  };
 
   return (
     <AdminGate roles={['admin', 'operations']}>
@@ -386,8 +418,8 @@ export default function OnboardingReviewPage() {
           meta={
             showStats ? (
               <>
-                <b>{submissions.length}</b> waiting
-                {waitingPeople ? ` from ${waitingPeople} ${waitingPeople === 1 ? 'person' : 'people'}` : null}
+                <b>{toReviewTotal}</b> to review
+                {unsignedTotal ? ` · ${unsignedTotal} out for signature` : null}
                 {atRiskPeople ? ` · ${atRiskPeople} at risk` : null}
               </>
             ) : null
@@ -397,26 +429,16 @@ export default function OnboardingReviewPage() {
         <ActionQueue />
 
         <div className={u.toolbar}>
-          <div className={u.chips} role="group" aria-label="Person filter">
-            <button
-              type="button"
-              className={u.chip}
-              aria-pressed={personFilter === 'all'}
-              onClick={() => setPersonFilter('all')}
-            >
-              All People
+          <div className={u.segmented} role="group" aria-label="Filter people">
+            <button type="button" aria-pressed={view === 'new'} onClick={() => setView('new')}>
+              New{showStats ? ` ${newCount}` : ''}
             </button>
-            {people.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                className={u.chip}
-                aria-pressed={personFilter === p.key}
-                onClick={() => setPersonFilter(p.key)}
-              >
-                {p.label}
-              </button>
-            ))}
+            <button type="button" aria-pressed={view === 'handled'} onClick={() => setView('handled')}>
+              Handled
+            </button>
+            <button type="button" aria-pressed={view === 'all'} onClick={() => setView('all')}>
+              All
+            </button>
           </div>
           <button
             type="button"
@@ -440,385 +462,140 @@ export default function OnboardingReviewPage() {
           </AdminNotice>
         ) : null}
 
-        <Section
-          id="onb-waiting"
-          title="Waiting for review"
-          action={
-            <button
-              type="button"
-              className={s.iconBtn}
-              onClick={retryLoad}
-              disabled={loading}
-              aria-label="Refresh review queue"
-            >
-              <RotateCw size={18} className={loading ? u.spin : undefined} aria-hidden="true" />
-            </button>
-          }
-          count={showStats ? `${filtered.length} of ${submissions.length}` : undefined}
-        >
+        <section className={s.panel} aria-labelledby="onb-people">
+          <div className={`${s.panelHead} ${u.band}`}>
+            <h2 id="onb-people" className={s.kicker}>
+              People
+            </h2>
+            <span className={o.headRight}>
+              {showStats ? <span className={u.panelMeta}>{visible.length} of {people.length}</span> : null}
+              <button
+                type="button"
+                className={s.iconBtn}
+                onClick={retryLoad}
+                disabled={loading}
+                aria-label="Refresh onboarding"
+              >
+                <RotateCw size={18} className={loading ? u.spin : undefined} aria-hidden="true" />
+              </button>
+            </span>
+          </div>
+
           {loading ? (
-            <AdminSkeletonRows rows={3} label="Loading submissions" />
+            <AdminSkeletonRows rows={3} label="Loading onboarding" />
           ) : loadFailed ? (
-            <AdminFailed what="the review queue" onRetry={retryLoad} />
-          ) : filtered.length === 0 ? (
-            submissions.length === 0 ? (
-              <AdminEmpty title="Review queue is clear">
-                No onboarding submissions need review right now.
-              </AdminEmpty>
+            <AdminFailed what="onboarding" onRetry={retryLoad} />
+          ) : visible.length === 0 ? (
+            view === 'new' && !atRiskOnly ? (
+              <AdminEmpty title="Nothing waiting">No one has onboarding waiting on review or a signature.</AdminEmpty>
             ) : (
-              <AdminEmpty title="No submissions match this view">Clear filters to see all submissions.</AdminEmpty>
+              <AdminEmpty title="No one matches this view">Change the filter to see more people.</AdminEmpty>
             )
           ) : (
             <>
               <div className={`${u.tHead} ${o.cols}`} aria-hidden="true">
-                <span>Item</span>
+                <span>Person</span>
+                <span>Done</span>
                 <span>Waiting</span>
-                <span>Access</span>
-                <span>Evidence</span>
+                <span>Status</span>
                 <span />
               </div>
-              <ul className={o.groups}>
-                {groupSubmissions(filtered).map((group) => (
-                  <RepGroup key={group.userId} group={group}>
-                    {group.items.map((submission) => {
-                      const expanded = expandedId === submission.id;
-                      const working = processingId === submission.id;
-                      return (
-                        <li key={submission.id} className={submission.atRisk ? u.rowWarn : undefined}>
-                          <button
-                            type="button"
-                            className={`${u.row} ${o.itemRow}`}
-                            onClick={() => setExpandedId(expanded ? null : submission.id)}
-                            aria-expanded={expanded}
-                          >
-                            <span className={u.cellMain}>
-                              <strong className={o.itemName}>{submission.itemLabel}</strong>
-                              <span className={u.cellSub}>{catLabel(submission)}</span>
+              <ul className={`${u.rows} ${o.cols}`}>
+                {visible.map((person) => {
+                  const open = openIds.has(person.userId);
+                  // The API falls back to the uid when there is no name, so "name equals uid" is unnamed.
+                  const name =
+                    person.userName && person.userName !== person.userId
+                      ? person.userName
+                      : `Unnamed rep · ${person.userId.slice(-6)}`;
+                  const status = personStatus(person);
+                  const panelId = `onb-person-${person.userId}`;
+                  return (
+                    <li
+                      key={person.userId}
+                      className={person.atRisk ? u.rowWarn : isNew(person) ? u.rowHot : undefined}
+                    >
+                      <button
+                        type="button"
+                        className={u.row}
+                        onClick={() => toggle(person.userId)}
+                        aria-expanded={open}
+                        aria-controls={panelId}
+                      >
+                        <span className={`${u.cellMain} ${u.person}`}>
+                          <span className={u.personText}>
+                            <span className={u.personName}>
+                              <span>{name}</span>
+                              {person.atRisk ? (
+                                <span className={`${u.tag} ${u.tagAmber}`}>
+                                  <AlertTriangle size={12} aria-hidden="true" />
+                                  At risk
+                                </span>
+                              ) : null}
                             </span>
-                            <span className={`${u.cell} ${u.num}`} data-label="Waiting">
-                              {waitLabel(submission.submittedAt)}
+                            <span className={u.personSub}>{person.roleLabel ?? person.userEmail}</span>
+                          </span>
+                        </span>
+                        <span className={`${u.cell} ${u.num}`} data-label="Done">
+                          {person.done} of {person.total} done
+                        </span>
+                        <span className={u.cell} data-label="Waiting">
+                          {isNew(person) ? (
+                            <span className={o.waiting}>
+                              {person.toReview ? (
+                                <span className={`${u.tag} ${u.tagAmber}`}>{person.toReview} to review</span>
+                              ) : null}
+                              {person.unsigned ? <span className={u.tag}>{person.unsigned} unsigned</span> : null}
                             </span>
-                            <span className={u.cell} data-label="Access">
-                              <span className={o.access}>
-                                {submission.sensitive ? <Lock size={14} aria-hidden="true" /> : null}
-                                {submission.sensitive ? 'Sensitive' : 'Standard'}
-                              </span>
-                            </span>
-                            <span className={u.cell} data-label="Evidence">
-                              <span className={`${u.tag} ${submission.adminOnly ? u.tagAmber : ''}`}>
-                                {submission.adminOnly ? <Lock size={12} aria-hidden="true" /> : null}
-                                {evidenceLabel(submission)}
-                              </span>
-                            </span>
-                            <span className={u.cellEnd}>
-                              <ChevronDown
-                                size={20}
-                                className={`${u.chev} ${expanded ? o.chevOpen : ''}`}
-                                aria-hidden="true"
-                              />
-                            </span>
-                          </button>
-
-                          {expanded ? (
-                            <div className={o.detail}>
-                              <div className={o.reference}>
-                                <p className={s.kicker}>Reference</p>
-                                {submission.referenceKind === 'storage' && submission.adminOnly ? (
-                                  <p className={o.locked}>
-                                    <Lock size={16} aria-hidden="true" />
-                                    Admin only. Sensitive files are visible to admins.
-                                  </p>
-                                ) : submission.referenceKind === 'storage' ? (
-                                  submission.files.length > 0 ? (
-                                    <>
-                                      <div className={o.files}>
-                                        {submission.files.map((file) => (
-                                          <a
-                                            key={`${submission.id}-${file.name}`}
-                                            href={file.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={o.file}
-                                          >
-                                            <FileText size={16} aria-hidden="true" />
-                                            <span>{file.name}</span>
-                                          </a>
-                                        ))}
-                                      </div>
-                                      <p className={u.hint}>Links expire in 15 minutes.</p>
-                                    </>
-                                  ) : (
-                                    <p className={o.quote}>
-                                      No files found at {submission.reference ?? 'this reference'}.
-                                    </p>
-                                  )
-                                ) : (
-                                  <p className={o.quote}>{submission.reference ?? 'No reference on file.'}</p>
-                                )}
-                              </div>
-                              <div className={o.detailMain}>
-                                <dl className={u.facts}>
-                                  <div>
-                                    <dt>Person</dt>
-                                    <dd>{repLabel(submission.userName, submission.userId)}</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Category</dt>
-                                    <dd>{catLabel(submission)}</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Waiting</dt>
-                                    <dd>{waitLabel(submission.submittedAt)}</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Access</dt>
-                                    <dd>{submission.sensitive ? 'Sensitive / locked' : 'Standard'}</dd>
-                                  </div>
-                                </dl>
-                                <p className={u.hint}>
-                                  Submitted {formatDate(submission.submittedAt)} · {submission.userEmail}
-                                </p>
-                                <div className={u.btnRow}>
-                                  <button
-                                    type="button"
-                                    className={`${s.btnPrimary} ${u.primarySm}`}
-                                    disabled={working}
-                                    onClick={() => review(submission, 'approved')}
-                                  >
-                                    {working ? 'Working…' : 'Approve'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                                    disabled={working}
-                                    onClick={() => openReject(submission)}
-                                  >
-                                    Reject
-                                  </button>
-                                  {isEsignItem(submission.itemId) && !submission.esignEnvelopeId && (
-                                    <button
-                                      type="button"
-                                      className={`${s.btnSecondary} ${u.sm}`}
-                                      disabled={working}
-                                      onClick={() => void sendForSignature(submission)}
-                                    >
-                                      {working ? 'Sending…' : 'Send for signature'}
-                                    </button>
-                                  )}
-                                </div>
-                                {sendState[submission.id]?.message ? (
-                                  <AdminNotice tone={sendState[submission.id].error ? 'error' : 'ok'}>
-                                    {sendState[submission.id].message}
-                                  </AdminNotice>
-                                ) : null}
-                              </div>
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </RepGroup>
-                ))}
+                          ) : (
+                            <span className={u.toneMuted}>Nothing</span>
+                          )}
+                        </span>
+                        <span className={u.cell} data-label="Status">
+                          <StatusDot tone={status.tone}>{status.label}</StatusDot>
+                        </span>
+                        <span className={u.cellEnd}>
+                          <ChevronDown
+                            size={20}
+                            className={`${u.chev} ${o.chev} ${open ? o.chevOpen : ''}`}
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </button>
+                      <Collapse open={open} id={panelId} className={o.personItems}>
+                        {person.items.length === 0 ? (
+                          <p className={o.none}>No onboarding items apply to this person.</p>
+                        ) : (
+                          <ul className={o.items}>{person.items.map((item) => renderItem(item, name))}</ul>
+                        )}
+                      </Collapse>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}
-        </Section>
-
-        {!loading && !loadFailed && filteredEsignPending.length > 0 && (
-          <Section
-            id="esign-pending-heading"
-            title="Out for signature"
-            count={`${filteredEsignPending.length} out`}
-            sub="These documents are with the rep. Reject one only when a fresh signature is needed."
-          >
-            <div className={`${u.tHead} ${o.cols}`} aria-hidden="true">
-              <span>Item</span>
-              <span>Out for</span>
-              <span>Access</span>
-              <span>Status</span>
-              <span />
-            </div>
-            <ul className={o.groups}>
-              {groupSubmissions(filteredEsignPending).map((group) => (
-                <RepGroup key={group.userId} group={group}>
-                  {group.items.map((submission) => {
-                    const expanded = expandedId === submission.id;
-                    return (
-                      <li key={submission.id} className={submission.atRisk ? u.rowWarn : undefined}>
-                        <button
-                          type="button"
-                          className={`${u.row} ${o.itemRow}`}
-                          onClick={() => setExpandedId(expanded ? null : submission.id)}
-                          aria-expanded={expanded}
-                        >
-                          <span className={u.cellMain}>
-                            <strong className={o.itemName}>{submission.itemLabel}</strong>
-                            <span className={u.cellSub}>{catLabel(submission)}</span>
-                          </span>
-                          <span className={`${u.cell} ${u.num}`} data-label="Out for">
-                            {waitLabel(submission.submittedAt)}
-                          </span>
-                          <span className={u.cell} data-label="Access">
-                            <span className={o.access}>
-                              {submission.sensitive ? <Lock size={14} aria-hidden="true" /> : null}
-                              {submission.sensitive ? 'Sensitive' : 'E-signature'}
-                            </span>
-                          </span>
-                          <span className={u.cell} data-label="Status">
-                            <StatusDot tone="blue">Out for signature</StatusDot>
-                          </span>
-                          <span className={u.cellEnd}>
-                            <ChevronDown
-                              size={20}
-                              className={`${u.chev} ${expanded ? o.chevOpen : ''}`}
-                              aria-hidden="true"
-                            />
-                          </span>
-                        </button>
-
-                        {expanded ? (
-                          <div className={o.detail}>
-                            <div className={o.reference}>
-                              <p className={s.kicker}>Reference</p>
-                              <p className={o.quote}>
-                                {submission.reference
-                                  ? `E-signature reference: ${submission.reference}`
-                                  : 'No envelope reference on file.'}
-                              </p>
-                            </div>
-                            <div className={o.detailMain}>
-                              <dl className={u.facts}>
-                                <div>
-                                  <dt>Person</dt>
-                                  <dd>{repLabel(submission.userName, submission.userId)}</dd>
-                                </div>
-                                <div>
-                                  <dt>Category</dt>
-                                  <dd>{catLabel(submission)}</dd>
-                                </div>
-                                <div>
-                                  <dt>Out for</dt>
-                                  <dd>{waitLabel(submission.submittedAt)}</dd>
-                                </div>
-                                <div>
-                                  <dt>Access</dt>
-                                  <dd>Provider-managed</dd>
-                                </div>
-                              </dl>
-                              <p className={u.hint}>
-                                Dispatched {formatDate(submission.submittedAt)} · {submission.userEmail}
-                                {submission.status === 'submitted' && submission.esignEnvelopeId
-                                  ? ' · Awaiting rep signature'
-                                  : ''}
-                              </p>
-                              <div className={u.btnRow}>
-                                <button
-                                  type="button"
-                                  className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                                  disabled={processingId === submission.id}
-                                  onClick={() => openReject(submission)}
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </RepGroup>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {!loading && !loadFailed && (
-          <Section
-            id="completed-heading"
-            title="Completed"
-            count={`${filteredCompleted.length} completed`}
-            sub="Approved and rejected items, newest review first."
-          >
-            {filteredCompleted.length === 0 ? (
-              <p className={o.none}>Nothing completed yet.</p>
-            ) : (
-              <>
-                <div className={`${u.tHead} ${o.cols}`} aria-hidden="true">
-                  <span>Item</span>
-                  <span>Reviewed</span>
-                  <span>Reviewer</span>
-                  <span>Signed PDF</span>
-                  <span className={u.alignEnd}>Result</span>
-                </div>
-                <ul className={o.groups}>
-                  {groupSubmissions(filteredCompleted).map((group) => (
-                    <RepGroup key={group.userId} group={group}>
-                      {group.items.map((submission) => (
-                        <li key={submission.id} className={`${u.row} ${o.itemRow} ${o.doneRow}`}>
-                          <span className={u.cellMain}>
-                            <strong className={o.itemName}>{submission.itemLabel}</strong>
-                            <span className={u.cellSub}>{catLabel(submission)}</span>
-                          </span>
-                          <span className={`${u.cell} ${u.num}`} data-label="Reviewed">
-                            {formatDate(submission.reviewedAt)}
-                          </span>
-                          <span className={u.cell} data-label="Reviewer">
-                            {submission.reviewerName || '—'}
-                          </span>
-                          <span className={u.cell} data-label="Signed PDF">
-                            {submission.hasSignedPdf && submission.adminOnly ? (
-                              <span className={`${u.tag} ${u.tagAmber}`}>
-                                <Lock size={12} aria-hidden="true" />
-                                Admin only
-                              </span>
-                            ) : submission.hasSignedPdf ? (
-                              <button type="button" className={o.pdfBtn} onClick={() => openSignedPdf(submission)}>
-                                <FileText size={16} aria-hidden="true" />
-                                Signed PDF
-                              </button>
-                            ) : (
-                              <span className={u.toneMuted}>No PDF</span>
-                            )}
-                          </span>
-                          <span className={`${u.cellEnd} ${u.alignEnd}`}>
-                            <StatusDot tone={submission.status === 'approved' ? 'lime' : 'red'}>
-                              {submission.status === 'approved' ? 'Approved' : 'Rejected'}
-                            </StatusDot>
-                          </span>
-                        </li>
-                      ))}
-                    </RepGroup>
-                  ))}
-                </ul>
-              </>
-            )}
-          </Section>
-        )}
+        </section>
       </div>
 
-      {rejectModal ? (
+      {rejectTarget ? (
         <AdminSheet
-          title={`Reject ${rejectModal.itemLabel}`}
+          title={`Reject ${rejectTarget.item.itemLabel}`}
           tone="danger"
-          description={`Give a reason. It is shared with ${repLabel(rejectModal.userName, rejectModal.userId)}.`}
+          description={`Give a reason. It is shared with ${rejectTarget.repName}.`}
           onClose={closeReject}
           footer={
             <>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm}`}
-                onClick={closeReject}
-              >
+              <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={closeReject}>
                 Cancel
               </button>
               <button
                 type="button"
                 className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                disabled={processingId === rejectModal.id || !rejectionReason.trim()}
-                onClick={() => review(rejectModal, 'rejected', rejectionReason)}
+                disabled={processingId === rejectTarget.item.id || !rejectionReason.trim()}
+                onClick={() => void review(rejectTarget.item, 'rejected', rejectionReason)}
               >
-                {processingId === rejectModal.id ? 'Rejecting…' : 'Confirm reject'}
+                {processingId === rejectTarget.item.id ? 'Rejecting…' : 'Confirm reject'}
               </button>
             </>
           }
@@ -844,6 +621,18 @@ export default function OnboardingReviewPage() {
             </div>
           </div>
         </AdminSheet>
+      ) : null}
+
+      {markTarget ? (
+        <MarkCompleteSheet
+          target={markTarget}
+          onClose={() => setMarkTarget(null)}
+          onDone={() => {
+            setNotice(`${markTarget.itemLabel} marked complete for ${markTarget.repName}.`);
+            setMarkTarget(null);
+            void fetchQueue(true);
+          }}
+        />
       ) : null}
     </AdminGate>
   );
