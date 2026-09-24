@@ -63,13 +63,17 @@ export async function GET(request: NextRequest) {
           console.error('[onboarding] esign auto-send failed', error);
         })
       );
-    } else if (gate.uid === userId) {
-      // Own checklist, no longer pending: there is nothing left to work through.
+    } else if (gate.uid === userId && userData?.status !== 'active') {
+      // Own checklist, neither pending nor active: nothing to work through.
       return NextResponse.json({ items: [], fieldRole, isIBO });
     }
+    // An activated rep can still owe signatures: reps activated before e-sign
+    // existed, or approved before they signed (Bryan, Mason 9/23). Their own
+    // checklist is just the documents still unsigned; empty once all are signed.
+    const signOff = gate.uid === userId && userData?.status === 'active';
     // Management reading someone else's non-pending checklist falls through:
     // Onboarding Review still has to show what a now-active hire completed.
-    const checklist = getOnboardingItemsForUser(fieldRole, isIBO);
+    const checklist = getOnboardingItemsForUser(fieldRole, isIBO).filter((item) => !signOff || isEsignItem(item.id));
 
     // Bearer capability: an embedded signing URL is only ever handed to the
     // checklist owner. Management viewing someone else's checklist gets null.
@@ -96,7 +100,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const items = checklist.map((item, i) => {
+    const merged = checklist.map((item, i) => {
       const progress = progressDocs[i]?.exists ? progressDocs[i].data() : null;
       return {
         ...item,
@@ -115,6 +119,7 @@ export async function GET(request: NextRequest) {
         esignSigningUrl: isOwner ? (signingUrlByItemId.get(item.id) ?? null) : null,
       };
     });
+    const items = signOff ? merged.filter((item) => item.status !== 'approved') : merged;
 
     const approvedCount = items.filter((i) => i.status === 'approved').length;
 

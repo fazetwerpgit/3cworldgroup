@@ -147,17 +147,35 @@ describe('GET /api/portal/onboarding status gate', () => {
     expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('u1');
   });
 
-  it('returns an empty checklist and never auto-sends for an active user reading their own', async () => {
+  // Bryan and Mason 9/23: activated with documents unsigned, the checklist was
+  // empty and the "sign your documents" notification led nowhere.
+  it("shows an active user only their unsigned documents, and never auto-sends", async () => {
     activeUser();
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
     store.set('userOnboarding/u1_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
+    store.set('userOnboarding/u1_w9', { status: 'submitted', esignEnvelopeId: 'env_2' });
 
     const res = await GET(makeRequest('u1'));
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.items).toEqual([]);
+    const ids = json.items.map((i: { id: string }) => i.id);
+    expect(ids).toContain('w9');
+    expect(ids).not.toContain('contract');
+    // Uploads and admin-reviewed items are not the rep's to redo.
+    expect(ids).not.toContain('dl_photos');
     expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+
+  it('is empty for an active user once every document is signed', async () => {
+    activeUser();
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+    for (const id of ['w9', 'contract', 'pay_structure', 'direct_deposit', 'fcra_auth', 'ibo_agreement', 'chargeback_card']) {
+      store.set(`userOnboarding/u1_${id}`, { status: 'approved', esignEnvelopeId: `env_${id}` });
+    }
+
+    const json = await (await GET(makeRequest('u1'))).json();
+    expect(json.items).toEqual([]);
   });
 
   it('still returns records to management viewing an active user, without auto-sending', async () => {

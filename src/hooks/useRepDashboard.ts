@@ -58,6 +58,8 @@ export interface RepDashboardState {
   calls: Section<DashboardCall[]>;
   /** Open leads requests (platform roles only; null when not asked for). */
   leads: Section<number> | null;
+  /** Onboarding documents the rep still has to sign (0 once all are signed). */
+  paperwork: Section<number>;
 }
 
 export type RepSectionKey = Exclude<keyof RepDashboardState, never>;
@@ -120,6 +122,7 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
     challenge: LOADING,
     calls: LOADING,
     leads: withLeads ? LOADING : null,
+    paperwork: LOADING,
   }));
   const controllers = useRef(new Map<RepSectionKey, AbortController>());
 
@@ -168,6 +171,15 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
       calls: async (token, signal) => {
         const data = await getJson<{ calls?: DashboardCall[] }>('/api/portal/calls', token, signal);
         return data.calls ?? [];
+      },
+      // For an active rep the checklist route returns only unsigned documents.
+      paperwork: async (token, signal) => {
+        const data = await getJson<{ items?: unknown[] }>(
+          `/api/portal/onboarding?userId=${encodeURIComponent(uid)}`,
+          token,
+          signal
+        );
+        return data.items?.length ?? 0;
       },
     };
     if (withLeads) {

@@ -753,6 +753,16 @@ export function RepDashboard() {
     ),
     ...dates.slice(0, MAX_DATE_ROWS).map((row) => ({ kind: 'date', row }) as const),
   ];
+  if (data.paperwork.status === 'ready' && data.paperwork.data > 0) {
+    const left = data.paperwork.data;
+    todayItems.push({
+      kind: 'queue',
+      key: 'paperwork',
+      title: `Sign ${left} onboarding ${left === 1 ? 'document' : 'documents'}`,
+      sub: 'Still open from onboarding',
+      href: '/portal/onboarding',
+    });
+  }
   if (isAdmin && pendingSignups > 0) {
     todayItems.push({
       kind: 'queue',
