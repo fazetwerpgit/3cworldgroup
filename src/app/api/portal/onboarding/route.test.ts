@@ -154,6 +154,9 @@ describe('GET /api/portal/onboarding status gate', () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
     store.set('userOnboarding/u1_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
     store.set('userOnboarding/u1_w9', { status: 'submitted', esignEnvelopeId: 'env_2' });
+    store.set('esignSigningUrls/u1_w9', { url: '/portal/onboarding/sign/env_2' });
+    // Never sent (no signing link): nothing the rep can act on, so not listed.
+    store.set('userOnboarding/u1_pay_structure', { status: 'not_started' });
 
     const res = await GET(makeRequest('u1'));
     const json = await res.json();
@@ -162,9 +165,18 @@ describe('GET /api/portal/onboarding status gate', () => {
     const ids = json.items.map((i: { id: string }) => i.id);
     expect(ids).toContain('w9');
     expect(ids).not.toContain('contract');
+    expect(ids).not.toContain('pay_structure');
     // Uploads and admin-reviewed items are not the rep's to redo.
     expect(ids).not.toContain('dl_photos');
     expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+
+  it('is empty for an active rep activated before e-sign existed (nothing sent)', async () => {
+    activeUser();
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+
+    const json = await (await GET(makeRequest('u1'))).json();
+    expect(json.items).toEqual([]);
   });
 
   it('is empty for an active user once every document is signed', async () => {

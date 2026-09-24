@@ -119,7 +119,11 @@ export async function GET(request: NextRequest) {
         esignSigningUrl: isOwner ? (signingUrlByItemId.get(item.id) ?? null) : null,
       };
     });
-    const items = signOff ? merged.filter((item) => item.status !== 'approved') : merged;
+    // Only what the rep can act on: sent (it has a signing link) and unsigned.
+    // Reps activated before e-sign existed have nothing sent, so nothing shows.
+    const items = signOff
+      ? merged.filter((item) => item.status !== 'approved' && item.esignSigningUrl)
+      : merged;
 
     const approvedCount = items.filter((i) => i.status === 'approved').length;
 
