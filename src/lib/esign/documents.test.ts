@@ -196,3 +196,19 @@ describe('ESIGN_CONSENT_TEXT', () => {
     );
   });
 });
+
+// Jacob 9/23: the W-9 SSN ran across the boxes. One digit per printed cell,
+// inside the field's own width, in the IRS 3-2-4 / 2-7 groups.
+describe('W-9 TIN boxes', () => {
+  it.each([
+    ['ssn', [3, 2, 4]],
+    ['ein', [2, 7]],
+  ] as const)('%s has one cell per digit, inside the field', (key, groups) => {
+    const field = DOCUMENTS.w9.extra?.find((f) => f.key === key);
+    expect(field?.comb?.map((run) => run.count)).toEqual(groups);
+    for (const run of field?.comb ?? []) {
+      expect(run.x).toBeGreaterThanOrEqual(field!.x);
+      expect(run.x + run.width).toBeLessThanOrEqual(field!.x + field!.width + 0.01);
+    }
+  });
+});
