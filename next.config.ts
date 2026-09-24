@@ -14,6 +14,7 @@ const MOVED_PAGES: [source: string, destination: string][] = [
   ['/portal/admin/recruiting', '/portal/admin/people?tab=invites'],
   ['/portal/admin/pipeline', '/portal/admin/people?tab=pipeline'],
   ['/portal/admin/employee-data', '/portal/admin/people?tab=employee-data'],
+  ['/portal/admin/employee-import', '/portal/admin/people?tab=employee-data'],
   ['/portal/admin/payroll-disputes', '/portal/admin/requests?type=payroll-disputes'],
   ['/portal/admin/expedite-orders', '/portal/admin/requests?type=expedite-orders'],
   ['/portal/admin/leads-requests', '/portal/admin/requests?type=leads-requests'],
