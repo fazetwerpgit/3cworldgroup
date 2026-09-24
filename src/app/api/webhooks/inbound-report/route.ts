@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
+import { isOlderReport, mailSentAt, reportAsOf, type ReportStamp } from '@/lib/fiberReport/staleReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
@@ -25,6 +26,8 @@ type InboundAttachment = {
 type InboundPayload = {
   From?: string;
   Subject?: string;
+  /** The mail's own Date header (RFC 2822). */
+  Date?: string;
   Attachments?: InboundAttachment[];
 };
 
@@ -154,6 +157,25 @@ export async function POST(request: NextRequest) {
     const parsed = await parseFiberReport(Buffer.from(attachment.Content, 'base64'), receivedAt);
     if (!adminDb) throw new Error('Database not configured');
 
+    // An older daily report re-sent with the new one is skipped: loading it
+    // would move install dates back (and push reps) until the newer file lands.
+    const stamp: ReportStamp = {
+      sentAt: mailSentAt(body.Date),
+      asOf: reportAsOf(parsed.orders, receivedAt.slice(0, 10)),
+    };
+    const statusRef = adminDb.collection('config').doc('fiberReportStatus');
+    const loaded = (await statusRef.get()).data();
+    if (isOlderReport(stamp, { sentAt: loaded?.lastReportSentAt ?? null, asOf: loaded?.lastReportAsOf ?? null })) {
+      console.log(`[inbound-report] skipped an older report (sent ${stamp.sentAt}, as of ${stamp.asOf})`);
+      await writeImportLog(
+        importLog(receivedAt, filename, fromEmail, subject, {
+          rowCounts: parsed.rowCounts,
+          error: `skipped: older report (sent ${stamp.sentAt ?? 'unknown'}, as of ${stamp.asOf ?? 'unknown'})`,
+        })
+      );
+      return NextResponse.json({ ok: true, skipped: 'older_report' });
+    }
+
     const mapSnapshot = await adminDb.collection('config').doc('fiberRepMap').get();
     const mappedDealerIds: Record<string, string> = {
       ...((mapSnapshot.data()?.map ?? {}) as Record<string, string>),
@@ -233,8 +255,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await adminDb.collection('config').doc('fiberReportStatus').set(
-      { lastReportAt: receivedAt, lastFilename: filename, lastUpserted: orders.length },
+    await statusRef.set(
+      {
+        lastReportAt: receivedAt,
+        lastFilename: filename,
+        lastUpserted: orders.length,
+        lastReportSentAt: stamp.sentAt,
+        lastReportAsOf: stamp.asOf,
+      },
       { merge: true }
     );
     await writeImportLog(
