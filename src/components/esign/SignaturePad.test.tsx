@@ -127,4 +127,65 @@ describe('SignaturePad drawing through a rotation', () => {
     expect(onChange).not.toHaveBeenCalledWith(null, 'draw');
     vi.unstubAllGlobals();
   });
+
+  it('keeps ink drawn in landscape when rotated back to portrait (smoke 9/24)', async () => {
+    let box = { width: 200, height: 160 };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ left: 0, top: 0, ...box }) as DOMRect
+    );
+    const drawn: [string, number, number][] = [];
+    const ctx = {
+      scale: vi.fn(),
+      beginPath: vi.fn(),
+      arc: (x: number, y: number) => drawn.push(['arc', x, y]),
+      fill: vi.fn(),
+      moveTo: (x: number, y: number) => drawn.push(['moveTo', x, y]),
+      lineTo: (x: number, y: number) => drawn.push(['lineTo', x, y]),
+      stroke: vi.fn(),
+      clearRect: vi.fn(),
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4).fill(255) }),
+      drawImage: vi.fn(),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,SIG');
+    HTMLCanvasElement.prototype.setPointerCapture = vi.fn();
+    let resized = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    const onChange = vi.fn();
+
+    await act(async () => {
+      root.render(<SignaturePad value={null} onChange={onChange} />);
+    });
+    const canvas = container.querySelector('canvas');
+    if (!canvas) throw new Error('pad did not render');
+    // Portrait stroke, then rotate to landscape and draw near the right edge.
+    await act(async () => {
+      canvas.dispatchEvent(pointer('pointerdown', 20, 20));
+      canvas.dispatchEvent(pointer('pointerup', 20, 20));
+    });
+    box = { width: 800, height: 160 };
+    await act(async () => resized());
+    await act(async () => {
+      canvas.dispatchEvent(pointer('pointerdown', 700, 100));
+      canvas.dispatchEvent(pointer('pointerup', 700, 100));
+    });
+    // Back to portrait: every stroke must repaint inside the 200px pad.
+    box = { width: 200, height: 160 };
+    drawn.length = 0;
+    await act(async () => resized());
+    const xs = drawn.map(([, x]) => x);
+    expect(xs.length).toBeGreaterThan(0);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(200);
+    expect(xs).toContain(700 / 4);
+    vi.unstubAllGlobals();
+  });
 });

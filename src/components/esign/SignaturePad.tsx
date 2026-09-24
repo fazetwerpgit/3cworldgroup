@@ -205,12 +205,15 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
   };
 
   const record = (canvas: HTMLCanvasElement, point: { x: number; y: number }, newStroke: boolean) => {
-    if (!inkBox.current) {
-      const rect = canvas.getBoundingClientRect();
-      inkBox.current = { width: rect.width, height: rect.height };
-    }
+    const rect = canvas.getBoundingClientRect();
+    if (!inkBox.current) inkBox.current = { width: rect.width, height: rect.height };
     const scale = inkScale(canvas);
     const stored = { x: point.x / scale, y: point.y / scale };
+    // Ink drawn on a larger pad (landscape) grows the box, so rotating back to
+    // a smaller pad shrinks every stroke to fit instead of clipping it.
+    const box = inkBox.current;
+    box.width = Math.max(box.width, rect.width / scale);
+    box.height = Math.max(box.height, rect.height / scale);
     if (newStroke) strokes.current.push([stored]);
     else strokes.current[strokes.current.length - 1]?.push(stored);
   };

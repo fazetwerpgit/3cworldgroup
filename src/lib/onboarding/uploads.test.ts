@@ -7,6 +7,7 @@ import {
   buildFolderPath,
   expectedFileBases,
   MAX_FILE_BYTES,
+  replacedSlotFiles,
 } from './uploads';
 
 describe('storage item identification', () => {
@@ -126,5 +127,14 @@ describe('buildFolderPath', () => {
     expect(buildFolderPath({ kind: 'invite', inviteId: 'inv1' }, 'insurance')).toBe(
       'onboarding/invite_inv1/insurance/'
     );
+  });
+});
+
+// Smoke 9/24: replacing back.png with back.jpg left both for the reviewer.
+describe('replacedSlotFiles', () => {
+  const folder = 'onboarding/invite_x/dl_photos/';
+  it('removes the same slot with another extension, keeps the new file and the other slot', () => {
+    const existing = [`${folder}back.png`, `${folder}back.jpg`, `${folder}front.png`, `${folder}sub/back.png`];
+    expect(replacedSlotFiles(existing, folder, 'back', 'jpg')).toEqual([`${folder}back.png`]);
   });
 });

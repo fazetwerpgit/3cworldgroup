@@ -102,3 +102,13 @@ export function buildFolderPath(scope: UploadScope, itemId: string): string {
       : `onboarding/invite_${scope.inviteId}`;
   return `${base}/${itemId}/`;
 }
+
+/**
+ * Files in the folder that the new upload replaces: same slot name
+ * (`back.png` when `back.jpg` is uploaded), different extension. Without this a
+ * replaced photo stays next to the new one and the reviewer sees two backs.
+ */
+export function replacedSlotFiles(existing: readonly string[], folder: string, fileBase: string, ext: string): string[] {
+  const keep = `${folder}${fileBase}.${ext}`;
+  return existing.filter((name) => name !== keep && name.startsWith(`${folder}${fileBase}.`) && !name.slice(folder.length).includes('/'));
+}

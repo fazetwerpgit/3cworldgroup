@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { hashInviteToken } from '@/lib/recruiting/tokens';
-import { validateUpload, buildFolderPath } from '@/lib/onboarding/uploads';
+import { validateUpload, buildFolderPath, replacedSlotFiles } from '@/lib/onboarding/uploads';
 import { resolveUploadMime } from '@/lib/forms/formUploads';
 
 const LOCKED_STATUSES = ['submitted', 'approved', 'converted'];
@@ -79,6 +79,17 @@ export async function POST(
       contentType: mime,
       resumable: false,
     });
+    // A replaced photo with a different extension (png -> jpg) is removed.
+    try {
+      const [existing] = await bucket.getFiles({ prefix: folder });
+      await Promise.all(
+        replacedSlotFiles(existing.map((f) => f.name), folder, check.fileBase, check.ext).map((name) =>
+          bucket.file(name).delete({ ignoreNotFound: true })
+        )
+      );
+    } catch (error) {
+      console.error('[onboarding-upload] could not remove the replaced file', error);
+    }
 
     return NextResponse.json({ path: folder });
   } catch (error) {
