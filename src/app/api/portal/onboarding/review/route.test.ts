@@ -41,14 +41,21 @@ vi.mock('firebase-admin/firestore', () => ({
     arrayUnion: vi.fn((value: string) => `__FIELD_VALUE_ARRAY_UNION__:${value}`),
   },
 }));
-vi.mock('@/types', () => ({
-  ONBOARDING_ITEMS: [
-    { id: 'w9', label: 'W-9', category: 'paperwork', sensitive: true, referenceKind: 'esign' },
-    { id: 'contract', label: 'Contract', category: 'paperwork', sensitive: false, referenceKind: 'esign' },
-    { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', sensitive: false, referenceKind: 'manual' },
-    { id: 'dl_photos', label: "Driver's License Photos", category: 'paperwork', sensitive: true, referenceKind: 'storage' },
-  ],
-}));
+vi.mock('@/types', () => {
+  const ONBOARDING_ITEMS = [
+    { id: 'w9', label: 'W-9', category: 'paperwork', sensitive: true, referenceKind: 'esign', order: 1 },
+    { id: 'contract', label: 'Contract', category: 'paperwork', sensitive: false, referenceKind: 'esign', order: 2 },
+    { id: 'onboarding_submission', label: 'Onboarding Submission', category: 'paperwork', sensitive: false, referenceKind: 'manual', order: 3 },
+    { id: 'dl_photos', label: "Driver's License Photos", category: 'paperwork', sensitive: true, referenceKind: 'storage', order: 4 },
+  ];
+  return {
+    ONBOARDING_ITEMS,
+    // Every field role gets every item here; which items apply is not under test.
+    getOnboardingItemsForUser: () => ONBOARDING_ITEMS,
+    resolveRoles: (role?: string, fieldRole?: string) => ({ role, fieldRole }),
+    RoleDisplayNames: { entry_level_rep: 'Entry Level Rep' },
+  };
+});
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: vi.fn(() => false) }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: vi.fn(async () => undefined) }));
@@ -161,99 +168,91 @@ describe('POST /api/portal/onboarding/review', () => {
 });
 
 describe('GET /api/portal/onboarding/review', () => {
-  it('excludes submitted e-sign items while retaining submitted non-e-sign items', async () => {
-    queryGetMock.mockResolvedValueOnce({
-      docs: [
-        {
-          id: 'user-1_contract',
-          data: () => ({ userId: 'user-1', itemId: 'contract', submittedAt: { toDate: () => new Date('2026-07-26') } }),
-        },
-        {
-          id: 'user-2_onboarding_submission',
-          data: () => ({ userId: 'user-2', itemId: 'onboarding_submission', submittedAt: { toDate: () => new Date('2026-07-27') } }),
-        },
-      ],
-    });
-    queryGetMock.mockResolvedValueOnce({ docs: [] });
-    getAllMock
-      .mockResolvedValueOnce([
-        { exists: true, id: 'user-2', data: () => ({ displayName: 'Rep', email: 'rep@example.com' }), get: () => false },
-      ]);
-
-    const response = await GET(new NextRequest('http://localhost/api/portal/onboarding/review'));
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      submissions: [expect.objectContaining({
-        id: 'user-2_onboarding_submission',
-        itemId: 'onboarding_submission',
-      })],
-      esignPending: [expect.objectContaining({
-        id: 'user-1_contract',
-        itemId: 'contract',
-      })],
-      completed: [],
-    });
+  const progress = (userId: string, itemId: string, fields: Record<string, unknown>) => ({
+    id: `${userId}_${itemId}`,
+    data: () => ({ userId, itemId, ...fields }),
   });
+  const at = (iso: string) => ({ toDate: () => new Date(iso) });
 
-  it('returns approved and rejected items newest reviewed first with signed PDF availability', async () => {
-    queryGetMock.mockResolvedValueOnce({ docs: [] });
+  it('groups every rep with their whole checklist, reps with something waiting first', async () => {
+    // submitted
     queryGetMock.mockResolvedValueOnce({
       docs: [
-        {
-          id: 'user-1_contract',
-          data: () => ({
-            userId: 'user-1',
-            itemId: 'contract',
-            status: 'approved',
-            submittedAt: { toDate: () => new Date('2026-07-20') },
-            reviewedAt: { toDate: () => new Date('2026-07-28') },
-            reviewerName: 'Manager',
-            esignEnvelopeId: 'env-1',
-          }),
-        },
-        {
-          id: 'user-2_w9',
-          data: () => ({
-            userId: 'user-2',
-            itemId: 'w9',
-            status: 'rejected',
-            submittedAt: { toDate: () => new Date('2026-07-21') },
-            reviewedAt: { toDate: () => new Date('2026-07-27') },
-            reviewerName: 'Operations',
-          }),
-        },
+        progress('user-2', 'onboarding_submission', { status: 'submitted', submittedAt: at('2026-07-27') }),
+        progress('user-2', 'w9', { status: 'submitted', submittedAt: at('2026-07-26'), esignEnvelopeId: 'env-w9' }),
       ],
     });
-    getAllMock.mockResolvedValue([
-      { exists: true, id: 'user-1', data: () => ({ displayName: 'Rep One', email: 'one@example.com' }), get: () => false },
-      { exists: true, id: 'user-2', data: () => ({ displayName: 'Rep Two', email: 'two@example.com' }), get: () => false },
+    // approved / rejected
+    queryGetMock.mockResolvedValueOnce({
+      docs: [
+        progress('user-2', 'contract', {
+          status: 'approved',
+          reviewedAt: at('2026-07-28'),
+          reviewerName: 'Jeremy',
+          // Sent, then signed on paper: the envelope was never signed.
+          esignEnvelopeId: 'env-contract',
+          manualCompletion: { note: 'Signed on paper', by: 'owner-1', byName: 'Jeremy', at: at('2026-07-28') },
+        }),
+      ],
+    });
+    // pending users: a new hire who has not started, and a self-signup with no field role
+    queryGetMock.mockResolvedValueOnce({
+      docs: [
+        { id: 'user-1', data: () => ({ displayName: 'Anna New', fieldRole: 'entry_level_rep', status: 'pending' }) },
+        { id: 'signup-1', data: () => ({ displayName: 'Signup', status: 'pending' }) },
+      ],
+    });
+    getAllMock.mockResolvedValueOnce([
+      { exists: true, id: 'user-2', data: () => ({ displayName: 'Zed Waiting', fieldRole: 'entry_level_rep', atRisk: true }) },
     ]);
 
     const response = await GET(new NextRequest('http://localhost/api/portal/onboarding/review'));
     const json = await response.json();
 
     expect(response.status).toBe(200);
-    expect(json.completed).toEqual([
-      expect.objectContaining({
-        id: 'user-1_contract',
-        userId: 'user-1',
-        userName: 'Rep One',
-        itemId: 'contract',
-        label: 'Contract',
-        category: 'paperwork',
-        referenceKind: 'esign',
-        sensitive: false,
-        status: 'approved',
-        reviewerName: 'Manager',
-        hasSignedPdf: true,
-      }),
-      expect.objectContaining({
-        id: 'user-2_w9',
-        status: 'rejected',
-        hasSignedPdf: false,
-      }),
+    expect(json.people.map((p: { userId: string }) => p.userId)).toEqual(['user-2', 'user-1']);
+    const [waiting, fresh] = json.people;
+    expect(waiting).toMatchObject({
+      userName: 'Zed Waiting',
+      roleLabel: 'Entry Level Rep',
+      atRisk: true,
+      done: 1,
+      total: 4,
+      toReview: 1,
+      unsigned: 1,
+    });
+    expect(waiting.items.map((i: { itemId: string; status: string }) => [i.itemId, i.status])).toEqual([
+      ['w9', 'submitted'],
+      ['contract', 'approved'],
+      ['onboarding_submission', 'submitted'],
+      ['dl_photos', 'not_started'],
     ]);
+    expect(waiting.items[1]).toMatchObject({
+      reviewerName: 'Jeremy',
+      manualCompletion: { note: 'Signed on paper', byName: 'Jeremy' },
+      hasSignedPdf: false,
+    });
+    expect(fresh).toMatchObject({ userName: 'Anna New', done: 0, total: 4, toReview: 0, unsigned: 0 });
+    // The dashboard's queue: submitted, never e-sign.
+    expect(json.submissions).toEqual([
+      expect.objectContaining({ id: 'user-2_onboarding_submission', itemId: 'onboarding_submission' }),
+    ]);
+  });
+
+  it('does not sign files for an item that is no longer under review', async () => {
+    vi.mocked(isStorageItem).mockImplementation((itemId: string) => itemId === 'dl_photos');
+    const getFiles = vi.fn(async () => [[]]);
+    vi.mocked(getOnboardingBucket).mockReturnValue({ getFiles } as never);
+    queryGetMock.mockResolvedValueOnce({ docs: [] });
+    queryGetMock.mockResolvedValueOnce({
+      docs: [progress('user-1', 'dl_photos', { status: 'approved', reference: 'onboarding/user-1/dl_photos' })],
+    });
+
+    const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+
+    expect(json.people[0].items).toEqual([expect.objectContaining({ itemId: 'dl_photos', files: [] })]);
+    expect(getFiles).not.toHaveBeenCalled();
+    expect(logAddMock).not.toHaveBeenCalled();
   });
 
   describe('sensitive storage files', () => {
@@ -272,6 +271,7 @@ describe('GET /api/portal/onboarding/review', () => {
           data: () => ({
             userId: 'user-1',
             itemId: 'dl_photos',
+            status: 'submitted',
             reference: 'onboarding/user-1/dl_photos',
             submittedAt: { toDate: () => new Date('2026-07-26') },
           }),

@@ -1,7 +1,14 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
-import { ONBOARDING_ITEMS } from '@/types';
+import {
+  getOnboardingItemsForUser,
+  ONBOARDING_ITEMS,
+  resolveRoles,
+  RoleDisplayNames,
+  type OnboardingItem,
+  type OnboardingStatus,
+} from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
@@ -44,8 +51,13 @@ async function signFolderFiles(
   }
 }
 
-// GET /api/portal/onboarding/review - List submitted items awaiting review.
-// Used by the ops review queue. Joins item metadata + user display info.
+type ProgressData = FirebaseFirestore.DocumentData;
+
+// GET /api/portal/onboarding/review - Onboarding grouped by person.
+// `people`: every rep with onboarding progress or still pending, each with
+// their whole checklist (items never started included), reps with something
+// waiting first. `submissions`: the flat review queue (submitted, not e-sign),
+// oldest first; the admin dashboard counts it.
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -63,38 +75,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    const snapshot = await adminDb
-      .collection('userOnboarding')
-      .where('status', '==', 'submitted')
-      .get();
-    const completedSnapshot = await adminDb
-      .collection('userOnboarding')
-      .where('status', 'in', ['approved', 'rejected'])
-      .get();
-    const reviewableDocs = snapshot.docs.filter((doc) => !isEsignItem(doc.data().itemId));
-    const esignDocs = snapshot.docs.filter((doc) => isEsignItem(doc.data().itemId));
+    const [submittedSnap, reviewedSnap, pendingSnap] = await Promise.all([
+      adminDb.collection('userOnboarding').where('status', '==', 'submitted').get(),
+      adminDb.collection('userOnboarding').where('status', 'in', ['approved', 'rejected']).get(),
+      // A new hire who has not submitted anything yet still has a checklist.
+      adminDb.collection('users').where('status', '==', 'pending').get(),
+    ]);
 
-    // Collect unique user ids to join display names in one batch
-    const userIds = [
-      ...new Set([
-        ...snapshot.docs.map((d) => d.data().userId as string),
-        ...completedSnapshot.docs.map((d) => d.data().userId as string),
-      ]),
-    ];
-    const userMap = new Map<string, { displayName?: string; email?: string; atRisk: boolean }>();
-    if (userIds.length > 0) {
-      const userDocs = await adminDb.getAll(
-        ...userIds.map((id) => adminDb!.collection('users').doc(id))
-      );
+    const progressByUser = new Map<string, Map<string, ProgressData>>();
+    for (const doc of [...submittedSnap.docs, ...reviewedSnap.docs]) {
+      const data = doc.data();
+      const userId = data.userId as string | undefined;
+      const itemId = data.itemId as string | undefined;
+      if (!userId || !itemId) continue;
+      if (!progressByUser.has(userId)) progressByUser.set(userId, new Map());
+      progressByUser.get(userId)!.set(itemId, data);
+    }
+
+    const users = new Map<string, ProgressData>();
+    for (const doc of pendingSnap.docs) {
+      // A pending self-signup has no field role yet, so no checklist.
+      const data = doc.data();
+      if (resolveRoles(data.role, data.fieldRole).fieldRole) users.set(doc.id, data);
+    }
+    const missing = [...progressByUser.keys()].filter((id) => !users.has(id));
+    if (missing.length > 0) {
+      const userDocs = await adminDb.getAll(...missing.map((id) => adminDb!.collection('users').doc(id)));
       for (const doc of userDocs) {
-        if (doc.exists) {
-          const d = doc.data();
-          userMap.set(doc.id, {
-            displayName: d?.displayName,
-            email: d?.email,
-            atRisk: !!doc.get('atRisk'),
-          });
-        }
+        if (doc.exists) users.set(doc.id, doc.data() ?? {});
       }
     }
 
@@ -126,56 +134,102 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    const toSubmission = async (doc: (typeof snapshot.docs)[number]) => {
-      const data = doc.data();
-      const item = ONBOARDING_ITEMS.find((i) => i.id === data.itemId);
-      const user = userMap.get(data.userId);
-      const sensitive = item?.sensitive ?? false;
+    const toRow = async (userId: string, item: OnboardingItem, data: ProgressData | null) => {
+      const status = (data?.status ?? 'not_started') as OnboardingStatus;
+      const reference = (data?.reference as string | undefined) ?? null;
       return {
-        id: doc.id,
-        userId: data.userId,
-        itemId: data.itemId,
-        label: item?.label ?? data.itemId,
-        itemLabel: item?.label ?? data.itemId,
-        category: item?.category ?? 'paperwork',
-        sensitive,
+        id: `${userId}_${item.id}`,
+        userId,
+        itemId: item.id,
+        itemLabel: item.label,
+        category: item.category,
+        sensitive: item.sensitive,
         // True when the item holds sensitive files this caller may not open
         // (operations). The UI shows an "Admin only" note instead of links.
-        adminOnly: sensitive && !gate.isAdmin,
-        referenceKind: item?.referenceKind ?? 'manual',
-        reference: data.reference ?? null,
-        files: await filesFor(data.userId, data.itemId, data.reference ?? null, sensitive),
-        userName: user?.displayName ?? user?.email ?? data.userId,
-        userEmail: user?.email ?? '',
-        atRisk: !!user?.atRisk,
-        status: data.status ?? null,
-        submittedAt: data.submittedAt?.toDate() ?? null,
-        reviewedAt: data.reviewedAt?.toDate() ?? null,
-        reviewerName: data.reviewerName ?? null,
-        esignEnvelopeId: typeof data.esignEnvelopeId === 'string' ? data.esignEnvelopeId : null,
+        adminOnly: item.sensitive && !gate.isAdmin,
+        referenceKind: item.referenceKind,
+        reference,
+        // Files are signed only for items under review: that is where they
+        // are looked at, and each sensitive signing is an audited reveal.
+        files: status === 'submitted' ? await filesFor(userId, item.id, reference, item.sensitive) : [],
+        status,
+        submittedAt: (data?.submittedAt?.toDate?.() as Date | undefined) ?? null,
+        reviewedAt: (data?.reviewedAt?.toDate?.() as Date | undefined) ?? null,
+        reviewerName: (data?.reviewerName as string | undefined) ?? null,
+        rejectionReason: (data?.rejectionReason as string | undefined) ?? null,
+        esignEnvelopeId: typeof data?.esignEnvelopeId === 'string' ? data.esignEnvelopeId : null,
+        // A manual completion leaves the envelope unsigned: only a stored PDF counts then.
         hasSignedPdf:
-          item?.referenceKind === 'esign' && Boolean(data.completedPdfPath || data.esignEnvelopeId),
+          item.referenceKind === 'esign' &&
+          Boolean(data?.completedPdfPath || (data?.esignEnvelopeId && !data?.manualCompletion)),
+        manualCompletion: data?.manualCompletion
+          ? {
+              note: data.manualCompletion.note as string,
+              byName: data.manualCompletion.byName as string,
+              at: (data.manualCompletion.at?.toDate?.() as Date | undefined) ?? null,
+            }
+          : null,
       };
     };
 
-    const submissions = await Promise.all(reviewableDocs.map(toSubmission));
-    const esignPending = await Promise.all(esignDocs.map(toSubmission));
-    const completed = await Promise.all(completedSnapshot.docs.map(toSubmission));
+    const userIds = new Set([...users.keys(), ...progressByUser.keys()]);
+    const people = await Promise.all(
+      [...userIds].map(async (userId) => {
+        const user = users.get(userId);
+        const progress = progressByUser.get(userId) ?? new Map<string, ProgressData>();
+        const { role, fieldRole } = resolveRoles(user?.role, user?.fieldRole);
+        // The rep's checklist, plus anything they have progress on that no
+        // longer applies (a role change) so nothing they did is hidden.
+        const applicable = new Set(
+          (fieldRole ? getOnboardingItemsForUser(fieldRole, user?.isIBO === true) : []).map((item) => item.id)
+        );
+        const checklist = ONBOARDING_ITEMS.filter(
+          (item) => applicable.has(item.id) || progress.has(item.id)
+        ).sort((a, b) => a.order - b.order);
+        const items = await Promise.all(
+          checklist.map((item) => toRow(userId, item, progress.get(item.id) ?? null))
+        );
+        const waitingItems = items.filter((item) => item.status === 'submitted');
+        const waitingSince = waitingItems.reduce(
+          (min, item) => Math.min(min, item.submittedAt?.getTime() ?? Infinity),
+          Infinity
+        );
+        const roleKey = fieldRole ?? role;
+        return {
+          userId,
+          userName: (user?.displayName as string | undefined) || (user?.email as string | undefined) || userId,
+          userEmail: (user?.email as string | undefined) ?? '',
+          roleLabel: roleKey ? RoleDisplayNames[roleKey] : null,
+          atRisk: user?.atRisk === true,
+          items,
+          done: items.filter((item) => item.status === 'approved').length,
+          total: items.length,
+          // Submitted and waiting on management.
+          toReview: waitingItems.filter((item) => !isEsignItem(item.itemId)).length,
+          // Out for signature and waiting on the rep.
+          unsigned: waitingItems.filter((item) => isEsignItem(item.itemId)).length,
+          waitingSince: Number.isFinite(waitingSince) ? new Date(waitingSince) : null,
+        };
+      })
+    );
 
-    const sortOldestFirst = (a: typeof submissions[number], b: typeof submissions[number]) => {
-      const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-      const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-      return ta - tb; // oldest first - FIFO review queue
-    };
-    submissions.sort(sortOldestFirst);
-    esignPending.sort(sortOldestFirst);
-    completed.sort((a, b) => {
-      const ta = a.reviewedAt ? new Date(a.reviewedAt).getTime() : 0;
-      const tb = b.reviewedAt ? new Date(b.reviewedAt).getTime() : 0;
-      return tb - ta; // newest reviewed first
+    // Anyone with something waiting first, longest wait at the top; then by name.
+    people.sort((a, b) => {
+      const aWaiting = a.toReview + a.unsigned > 0;
+      const bWaiting = b.toReview + b.unsigned > 0;
+      if (aWaiting !== bWaiting) return aWaiting ? -1 : 1;
+      const aTime = a.waitingSince?.getTime() ?? 0;
+      const bTime = b.waitingSince?.getTime() ?? 0;
+      if (aTime !== bTime) return aTime - bTime;
+      return a.userName.localeCompare(b.userName);
     });
 
-    return NextResponse.json({ submissions, esignPending, completed });
+    const submissions = people
+      .flatMap((person) => person.items)
+      .filter((item) => item.status === 'submitted' && !isEsignItem(item.itemId))
+      .sort((a, b) => (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0));
+
+    return NextResponse.json({ people, submissions });
   } catch (error) {
     console.error('Error fetching review queue:', error);
     return NextResponse.json(
