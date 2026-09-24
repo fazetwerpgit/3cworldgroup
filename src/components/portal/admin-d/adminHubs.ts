@@ -22,6 +22,9 @@ export interface HubConfig {
 const PLATFORM_ROLES: UserRole[] = ['admin', 'operations'];
 
 /** Invites (the recruiting page) is the one admin page managers can open. */
+// Who may use Invites: exactly the roles the invites API accepts (canManage in
+// api/portal/recruiting/invites). Directors and regional managers were offered
+// the tab but every call answered 403.
 export const RECRUITING_ROLES: UserRole[] = [
   'admin',
   'operations',
@@ -31,8 +34,6 @@ export const RECRUITING_ROLES: UserRole[] = [
   'ibo_level_2',
   'ibo_level_3',
   'ibo_level_4',
-  'regional_manager',
-  'director',
 ];
 
 export const PEOPLE_HUB = {
