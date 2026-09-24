@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// The placeholder-document hold is covered in lib/esign/autoSend.test.ts; the
+// role filtering here is checked over the full item set.
+vi.mock('./onboardingHold', () => ({ isHeldOnboardingItem: () => false }));
+
 import {
   BASE_VETTING_ROLES,
   ONBOARDING_ITEMS,

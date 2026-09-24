@@ -19,6 +19,8 @@ vi.mock('@/lib/firebase/admin', () => ({
   getOnboardingBucket: vi.fn(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: gateMock }));
+// Field rendering is checked for every document, placeholders on hold included.
+vi.mock('@/types/onboardingHold', () => ({ isHeldOnboardingItem: () => false }));
 
 import { GET } from './route';
 import { GET as GET_PDF } from './pdf/route';

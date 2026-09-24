@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type * as HoldModule from '@/types/onboardingHold';
 
 const {
   store,
@@ -175,9 +176,20 @@ vi.mock('@/lib/alerts/alertTasks', () => ({
   resolveAlertTasks: resolveAlertTasksMock,
 }));
 
+// The placeholder-document hold is lifted so dispatch is exercised over all
+// five documents; the one test that covers the hold turns it back on.
+const hold = vi.hoisted(() => ({ on: false }));
+vi.mock('@/types/onboardingHold', async (importOriginal) => {
+  const actual = await importOriginal<typeof HoldModule>();
+  return { isHeldOnboardingItem: (itemId: string) => hold.on && actual.isHeldOnboardingItem(itemId) };
+});
+
 import { sendPendingEsignDocs } from './autoSend';
+import { getOnboardingItemsForUser } from '@/types/onboarding';
+import { ONBOARDING_FIELD_ROLES } from '@/types/auth';
 
 beforeEach(() => {
+  hold.on = false;
   store.clear();
   writes.length = 0;
   setOptions.length = 0;
@@ -231,6 +243,28 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe('placeholder document hold', () => {
+  it('keeps the held documents off every checklist and never sends them', async () => {
+    hold.on = true;
+    for (const fieldRole of ONBOARDING_FIELD_ROLES) {
+      for (const isIBO of [false, true]) {
+        const ids = getOnboardingItemsForUser(fieldRole, isIBO).map((item) => item.id);
+        expect(ids).not.toContain('fcra_auth');
+        expect(ids).not.toContain('pay_structure');
+      }
+    }
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent.sort()).toEqual(['contract', 'direct_deposit', 'w9']);
+    const requested = createEnvelopeMock.mock.calls.map(([request]) => request.itemId);
+    expect(requested).not.toContain('fcra_auth');
+    expect(requested).not.toContain('pay_structure');
+    expect(store.has('userOnboarding/u1_fcra_auth')).toBe(false);
+    expect(store.has('userOnboarding/u1_pay_structure')).toBe(false);
+  });
 });
 
 describe('sendPendingEsignDocs', () => {

@@ -5,6 +5,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { appBaseUrl, esignSentEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
+import { isHeldOnboardingItem } from '@/types/onboardingHold';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 import { getEsignProvider } from './provider';
@@ -269,7 +270,10 @@ async function resolveDispatchAlert(userId: string): Promise<void> {
 async function hasFailedDispatch(userId: string): Promise<boolean> {
   try {
     const snapshot = await adminDb!.collection('userOnboarding').where('userId', '==', userId).get();
-    return snapshot.docs.some((doc) => dispatchState(doc).state === 'failed');
+    // A held placeholder is never retried, so its old failure must not keep the alert open.
+    return snapshot.docs.some(
+      (doc) => dispatchState(doc).state === 'failed' && !isHeldOnboardingItem(String(doc.get('itemId')))
+    );
   } catch (error) {
     console.error(`[esign] failed to inspect dispatch failures for ${userId}`, error);
     return true;

@@ -11,6 +11,7 @@ import {
 import { envelopeRef, loadEnvelope } from '@/lib/esign/inhouse';
 import { sha256Hex, stampDocument } from '@/lib/esign/stamp';
 import { completeEsignItem } from '@/lib/esign/complete';
+import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -91,6 +92,11 @@ export async function POST(request: NextRequest) {
   }
   if (envelope.status === 'completed') {
     return NextResponse.json({ error: 'already completed' }, { status: 409 });
+  }
+  // A placeholder document on hold is not signable, even from a link sent
+  // before the hold (see onboardingHold).
+  if (isHeldOnboardingItem(envelope.itemId)) {
+    return NextResponse.json({ error: 'document on hold' }, { status: 409 });
   }
   if (!DOCUMENTS[envelope.docKey]) {
     return NextResponse.json({ error: 'unknown document' }, { status: 404 });
