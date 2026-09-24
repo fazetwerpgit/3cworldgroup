@@ -91,6 +91,19 @@
   touch-action: pinch-zoom;
 }
 
+/* A drawn PDF: the full height of the stage, scrolling inside itself. */
+.doc {
+  align-self: stretch;
+  width: min(100%, 760px);
+  min-height: 0;
+  padding: 0 var(--s3) var(--s3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--r-control);
+  background: var(--c-panel);
+}
+
 .panel {
   display: grid;
   justify-items: center;

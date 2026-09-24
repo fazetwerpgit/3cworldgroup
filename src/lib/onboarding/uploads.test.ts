@@ -45,6 +45,17 @@ describe('validateUpload', () => {
     expect(r).toEqual({ ok: true, ext: 'jpg', fileBase: 'front' });
   });
 
+  it.each([
+    ['image/heic', 'heic'],
+    ['image/heif', 'heic'],
+  ])('accepts an iPhone %s license photo', (mime, ext) => {
+    expect(validateUpload({ itemId: 'dl_photos', slot: 'back', mime, size: 3_000_000 })).toEqual({
+      ok: true,
+      ext,
+      fileBase: 'back',
+    });
+  });
+
   it('accepts an insurance PDF with the default file base', () => {
     const r = validateUpload({ itemId: 'insurance', mime: 'application/pdf', size: 500_000 });
     expect(r).toEqual({ ok: true, ext: 'pdf', fileBase: 'file' });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { validateUpload, buildFolderPath } from '@/lib/onboarding/uploads';
+import { resolveUploadMime } from '@/lib/forms/formUploads';
 
 // POST /api/portal/onboarding/upload - An authenticated user uploads a file for
 // a storage-kind onboarding item. Writes via the Admin SDK and returns the
@@ -44,7 +45,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const check = validateUpload({ itemId, slot, mime: file.type, size: file.size });
+    // iOS can send a HEIC with an empty type: judge it by its extension then.
+    const mime = resolveUploadMime(file.type, file.name);
+    const check = validateUpload({ itemId, slot, mime, size: file.size });
     if (!check.ok) {
       return NextResponse.json({ error: check.error }, { status: 400 });
     }
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     const bucket = getOnboardingBucket();
     const buffer = Buffer.from(await file.arrayBuffer());
     await bucket.file(objectPath).save(buffer, {
-      contentType: file.type,
+      contentType: mime,
       resumable: false,
     });
 

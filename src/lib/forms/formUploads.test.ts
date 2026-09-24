@@ -8,6 +8,7 @@ import {
   newFormUploadId,
   buildSubmissionAttachmentFolder,
   resolveFormUploadFolder,
+  resolveUploadMime,
 } from './formUploads';
 
 describe('validateFormUpload', () => {
@@ -25,6 +26,39 @@ describe('validateFormUpload', () => {
   });
   it('rejects a zero-byte file', () => {
     expect(validateFormUpload({ mime: 'image/png', size: 0 }).ok).toBe(false);
+  });
+});
+
+describe('resolveUploadMime', () => {
+  it('keeps a real type the picker supplied', () => {
+    expect(resolveUploadMime('image/heic', 'IMG_0001.HEIC')).toBe('image/heic');
+    expect(resolveUploadMime('image/png', 'odd-name.jpg')).toBe('image/png');
+  });
+
+  it.each([
+    ['', 'IMG_0001.HEIC', 'image/heic'],
+    ['', 'IMG_0001.heif', 'image/heif'],
+    ['application/octet-stream', 'license.JPG', 'image/jpeg'],
+    ['', 'insurance.pdf', 'application/pdf'],
+  ])('falls back to the extension when the type is %j (%s)', (type, name, mime) => {
+    expect(resolveUploadMime(type, name)).toBe(mime);
+  });
+
+  it('normalises image/jpg and a type with parameters', () => {
+    expect(resolveUploadMime('image/jpg', 'a')).toBe('image/jpeg');
+    expect(resolveUploadMime('Image/HEIC; charset=binary', 'a')).toBe('image/heic');
+  });
+
+  it('never invents a type for an unknown extension', () => {
+    expect(resolveUploadMime('', 'notes.txt')).toBe('');
+    expect(validateFormUpload({ mime: resolveUploadMime('', 'notes.txt'), size: 10 }).ok).toBe(false);
+  });
+
+  it('lets an iPhone HEIC with no type through validation', () => {
+    expect(validateFormUpload({ mime: resolveUploadMime('', 'IMG_0001.HEIC'), size: 10 })).toEqual({
+      ok: true,
+      ext: 'heic',
+    });
   });
 });
 

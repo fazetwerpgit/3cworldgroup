@@ -143,6 +143,19 @@
   border-radius: var(--r-control);
   background: #f2f5f9;
   touch-action: none;
+  /* iOS: a long press must not open the callout or the text magnifier. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* The Draw tab's pad and its bar: a long press that starts a stroke must not
+   select the hint text next to it. (Not on the Type tab: iOS stops typing in an
+   input under user-select:none.) */
+.drawArea {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .padBar {
@@ -177,6 +190,7 @@
   border-radius: var(--r-control);
   background: var(--c-ground);
   font: 400 var(--t-body) / 1 var(--f-ui);
+  -webkit-appearance: none;
   appearance: none;
 }
 

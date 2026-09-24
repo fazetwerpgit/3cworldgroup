@@ -107,8 +107,14 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
   // Mirrors `hasInk` for code that runs outside render (resize, pointer
   // handlers) and must not read stale state.
   const hasInkRef = useRef(false);
-  const drawing = useRef(false);
+  // The finger (or mouse) drawing the current stroke; a second finger is ignored.
+  const activePointer = useRef<number | null>(null);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
+  // Every stroke on the pad, in the pad's CSS pixels at the size of the first
+  // stroke (`inkBox`). Resizing a canvas wipes its bitmap, so a rotation or a
+  // resize repaints these, scaled to fit, instead of losing the signature.
+  const strokes = useRef<{ x: number; y: number }[][]>([]);
+  const inkBox = useRef<{ width: number; height: number } | null>(null);
   // Typing is faster than rendering; only the newest render may report back.
   const typeRequest = useRef(0);
   // Set on the first keystroke so an empty Type tab never clears a signature
@@ -127,6 +133,14 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
     target.lineCap = 'round';
     target.lineJoin = 'round';
     target.strokeStyle = '#000000';
+  };
+
+  /** Pad CSS pixels per stored stroke unit: shrinks (never stretches) to fit the pad. */
+  const inkScale = (canvas: HTMLCanvasElement) => {
+    const box = inkBox.current;
+    if (!box) return 1;
+    const rect = canvas.getBoundingClientRect();
+    return Math.min(rect.width / box.width, rect.height / box.height, 1) || 1;
   };
 
   // Size the backing store to the device pixel ratio so strokes are not blurry
@@ -150,11 +164,19 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
       if (!target) return;
       target.scale(ratio, ratio);
       applyStrokeStyle(target);
-      // Resizing wipes the bitmap; say so rather than leaving a stale preview
-      // of a signature that is no longer on the pad.
-      if (hasInkRef.current) {
-        markInk(false);
-        onChange(null, 'draw');
+      // Resizing wiped the bitmap: paint the strokes back. The signature the
+      // page holds is unchanged, so nothing is reported.
+      const scale = inkScale(canvas);
+      target.fillStyle = '#000000';
+      for (const [first, ...rest] of strokes.current) {
+        target.beginPath();
+        target.arc(first.x * scale, first.y * scale, STROKE_WIDTH / 2, 0, Math.PI * 2);
+        target.fill();
+        if (rest.length === 0) continue;
+        target.beginPath();
+        target.moveTo(first.x * scale, first.y * scale);
+        for (const point of rest) target.lineTo(point.x * scale, point.y * scale);
+        target.stroke();
       }
     };
 
@@ -162,7 +184,7 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
     const observer = new ResizeObserver(fitToBox);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [tab, onChange]);
+  }, [tab]);
 
   // Re-render the typed signature whenever the name or the tab changes.
   useEffect(() => {
@@ -182,13 +204,28 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
 
+  const record = (canvas: HTMLCanvasElement, point: { x: number; y: number }, newStroke: boolean) => {
+    if (!inkBox.current) {
+      const rect = canvas.getBoundingClientRect();
+      inkBox.current = { width: rect.width, height: rect.height };
+    }
+    const scale = inkScale(canvas);
+    const stored = { x: point.x / scale, y: point.y / scale };
+    if (newStroke) strokes.current.push([stored]);
+    else strokes.current[strokes.current.length - 1]?.push(stored);
+  };
+
   const startStroke = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const target = context();
     if (!target) return;
+    // One finger signs; a second touch (a palm, a pinch) must not join the line.
+    if (activePointer.current !== null) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
     // Capture so a finger that slides off the pad still finishes its stroke.
     event.currentTarget.setPointerCapture(event.pointerId);
-    drawing.current = true;
+    activePointer.current = event.pointerId;
     lastPoint.current = pointIn(event);
+    record(event.currentTarget, lastPoint.current, true);
     // A tap with no movement should still leave a dot.
     applyStrokeStyle(target);
     target.beginPath();
@@ -199,7 +236,7 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
   };
 
   const extendStroke = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
+    if (event.pointerId !== activePointer.current) return;
     const target = context();
     const previous = lastPoint.current;
     if (!target || !previous) return;
@@ -208,12 +245,13 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
     target.moveTo(previous.x, previous.y);
     target.lineTo(next.x, next.y);
     target.stroke();
+    record(event.currentTarget, next, false);
     lastPoint.current = next;
   };
 
-  const endStroke = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
+  const endStroke = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     lastPoint.current = null;
     const canvas = canvasRef.current;
     if (canvas) onChange(toTrimmedPng(canvas), 'draw');
@@ -227,6 +265,8 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
       const ratio = window.devicePixelRatio || 1;
       target.clearRect(0, 0, canvas.width / ratio, canvas.height / ratio);
     }
+    strokes.current = [];
+    inkBox.current = null;
     markInk(false);
     onChange(null, 'draw');
   }, [onChange]);
@@ -241,7 +281,17 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             role="tab"
             aria-selected={tab === method}
             className={e.method}
-            onClick={() => setTab(method)}
+            onClick={() => {
+              // The pad unmounts on Type; its strokes go with it. The signature
+              // the page holds stays until a new one is drawn or typed.
+              if (method !== 'draw') {
+                strokes.current = [];
+                inkBox.current = null;
+                activePointer.current = null;
+                markInk(false);
+              }
+              setTab(method);
+            }}
           >
             {method === 'draw' ? 'Draw' : 'Type'}
           </button>
@@ -249,17 +299,20 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
       </div>
 
       {tab === 'draw' ? (
-        <div className={e.typed}>
+        <div className={`${e.typed} ${e.drawArea}`}>
           <canvas
             ref={canvasRef}
             aria-label="Signature pad"
-            // touch-action:none stops iOS from scrolling the page mid-stroke.
+            // touch-action:none (in the CSS) stops iOS from scrolling the page
+            // mid-stroke; no context menu or callout on a long press.
             className={e.canvas}
             onPointerDown={startStroke}
             onPointerMove={extendStroke}
             onPointerUp={endStroke}
             onPointerCancel={endStroke}
+            onLostPointerCapture={endStroke}
             onPointerLeave={endStroke}
+            onContextMenu={(event) => event.preventDefault()}
           />
           <div className={e.padBar}>
             <p className={e.padHint}>Sign with your finger or mouse.</p>
@@ -283,6 +336,7 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             placeholder="Your full name"
             autoComplete="name"
             autoCapitalize="words"
+            autoCorrect="off"
             spellCheck={false}
             // A dark D field: the typed text takes the portal's light
             // foreground (.portal-scope input). 16px keeps iOS from zooming.

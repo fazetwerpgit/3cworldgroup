@@ -60,3 +60,71 @@ describe('SignaturePad typed name field', () => {
     expect(input.getAttribute('spellcheck')).toBe('false');
   });
 });
+
+describe('SignaturePad drawing through a rotation', () => {
+  function pointer(type: string, x: number, y: number, pointerId = 1) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
+    Object.assign(event, { pointerId, pointerType: 'touch' });
+    return event;
+  }
+
+  it('repaints the stroke at the new size and keeps the signature', async () => {
+    let box = { width: 400, height: 160 };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ left: 0, top: 0, ...box }) as DOMRect
+    );
+    const drawn: [string, number, number][] = [];
+    const ctx = {
+      scale: vi.fn(),
+      beginPath: vi.fn(),
+      arc: (x: number, y: number) => drawn.push(['arc', x, y]),
+      fill: vi.fn(),
+      moveTo: (x: number, y: number) => drawn.push(['moveTo', x, y]),
+      lineTo: (x: number, y: number) => drawn.push(['lineTo', x, y]),
+      stroke: vi.fn(),
+      clearRect: vi.fn(),
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4).fill(255) }),
+      drawImage: vi.fn(),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,SIG');
+    HTMLCanvasElement.prototype.setPointerCapture = vi.fn();
+    let resized = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    const onChange = vi.fn();
+
+    await act(async () => {
+      root.render(<SignaturePad value={null} onChange={onChange} />);
+    });
+    const canvas = container.querySelector('canvas');
+    if (!canvas) throw new Error('pad did not render');
+    await act(async () => {
+      canvas.dispatchEvent(pointer('pointerdown', 100, 40));
+      canvas.dispatchEvent(pointer('pointermove', 300, 120));
+      canvas.dispatchEvent(pointer('pointerup', 300, 120));
+    });
+    expect(onChange).toHaveBeenLastCalledWith('data:image/png;base64,SIG', 'draw');
+
+    // Portrait again: the pad is half as wide. The bitmap is wiped by the resize.
+    box = { width: 200, height: 160 };
+    drawn.length = 0;
+    await act(async () => resized());
+
+    expect(drawn).toEqual([
+      ['arc', 50, 20],
+      ['moveTo', 50, 20],
+      ['lineTo', 150, 60],
+    ]);
+    expect(onChange).not.toHaveBeenCalledWith(null, 'draw');
+    vi.unstubAllGlobals();
+  });
+});

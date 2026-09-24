@@ -170,6 +170,9 @@
   color: var(--c-text);
   font: 400 var(--t-body) / 1 var(--f-ui);
   font-variant-numeric: tabular-nums;
+  /* Prefixed too: older iOS Safari still draws its grey select and inset
+     text fields without it. */
+  -webkit-appearance: none;
   appearance: none;
   transition:
     border-color 160ms ease,
@@ -184,6 +187,23 @@
   border-color: var(--c-lime);
   outline: none;
   box-shadow: 0 0 0 3px var(--c-lime-wash);
+}
+
+/* iOS Safari paints autofilled fields (name, phone, address) pale yellow with
+   dark text, which cannot be overridden with background-color. An inset
+   shadow repaints the ground and the fill colour keeps the text light. */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--c-text);
+  caret-color: var(--c-text);
+  box-shadow: inset 0 0 0 100px var(--c-ground);
+}
+
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--c-text);
+  box-shadow:
+    inset 0 0 0 100px var(--c-ground),
+    0 0 0 3px var(--c-lime-wash);
 }
 
 .input[type='date'] {
