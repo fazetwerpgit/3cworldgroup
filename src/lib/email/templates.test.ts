@@ -20,6 +20,17 @@ describe('email templates', () => {
     expect(e.textBody).toContain('https://portal.test/onboard/tok123');
   });
 
+  // Jacob 9/24: invited hires who land on Sign up were stuck without the team code.
+  it('invite email carries the team code when one is set, and nothing when not', () => {
+    const base = { candidateName: 'Sam', ownerName: 'Jacob', inviteUrl: 'https://portal.test/onboard/tok' };
+    const withCode = inviteEmail({ ...base, teamCode: ' 3CTEAM ' });
+    expect(withCode.textBody).toContain('Your team code is 3CTEAM.');
+    expect(withCode.htmlBody).toContain('<strong>3CTEAM</strong>');
+    const without = inviteEmail({ ...base, teamCode: undefined });
+    expect(without.textBody).not.toContain('team code');
+    expect(without.htmlBody).not.toContain('team code');
+  });
+
   it('nudge email escalates tone by tier', () => {
     const h24 = nudgeEmail({ name: 'Sam', tier: 'h24', portalUrl: 'https://portal.test/portal/onboarding' });
     const d7 = nudgeEmail({ name: 'Sam', tier: 'd7', portalUrl: 'https://portal.test/portal/onboarding' });

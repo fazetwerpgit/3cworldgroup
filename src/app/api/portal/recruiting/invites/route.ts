@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     await sendEmail({
       to: candidateEmail,
       from: onboardingFrom(),
-      ...inviteEmail({ candidateName, ownerName: requester.name, inviteUrl }),
+      ...inviteEmail({ candidateName, ownerName: requester.name, inviteUrl, teamCode: process.env.PORTAL_TEAM_CODE }),
     });
 
     return NextResponse.json({
