@@ -289,13 +289,13 @@ export interface ProblemRow {
 /** Display order: money at risk first, then people, then requests. */
 export const PROBLEM_HREFS: Record<ProblemKey, string> = {
   carrierCancellations: '/portal/sales',
-  payrollDisputes: '/portal/admin/payroll-disputes',
+  payrollDisputes: '/portal/admin/requests?type=payroll-disputes',
   stalledOnboarding: '/portal/admin/onboarding',
-  pendingSignups: '/portal/admin/users',
+  pendingSignups: '/portal/admin/people?tab=everyone',
   missingInstallDate: '/portal/sales',
-  expediteOrders: '/portal/admin/expedite-orders',
-  leadsRequests: '/portal/admin/leads-requests',
-  bugReports: '/portal/admin/bug-reports',
+  expediteOrders: '/portal/admin/requests?type=expedite-orders',
+  leadsRequests: '/portal/admin/requests?type=leads-requests',
+  bugReports: '/portal/admin/requests?type=bug-reports',
 };
 
 const DATE_KEY = new Intl.DateTimeFormat('en-CA', {

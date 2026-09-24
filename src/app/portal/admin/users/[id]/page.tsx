@@ -124,7 +124,7 @@ export default function EditUserPage() {
   const userRoleLabel = userRole ? RoleDisplayNames[userRole as UserRole] : 'Role not set';
   const userStatusLabel = user?.status ? user.status.replace(/^./, (c) => c.toUpperCase()) : 'Active';
 
-  const back = { href: '/portal/admin/users', label: 'Users' };
+  const back = { href: '/portal/admin/people?tab=everyone', label: 'People' };
   const showVault = isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4);
 
   return (

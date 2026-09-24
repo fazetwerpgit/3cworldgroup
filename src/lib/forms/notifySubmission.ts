@@ -14,12 +14,12 @@ export interface FormAlertMeta {
 }
 
 export const FORM_ALERTS: Record<string, FormAlertMeta> = {
-  'fiber-report': { key: 'fiber-report', label: 'Fiber Report', reviewLink: '/portal/admin/fiber-reports' },
-  'expedite-order': { key: 'expedite-order', label: 'Expedite Order', reviewLink: '/portal/admin/expedite-orders' },
-  'payroll-dispute': { key: 'payroll-dispute', label: 'Payroll Dispute', reviewLink: '/portal/admin/payroll-disputes' },
-  'leads-request': { key: 'leads-request', label: 'Leads Request', reviewLink: '/portal/admin/leads-requests' },
-  'manager-interview': { key: 'manager-interview', label: 'Manager Interview', reviewLink: '/portal/admin/manager-interviews' },
-  'application': { key: 'application', label: 'Job Application', reviewLink: '/portal/admin/recruiting' },
+  'fiber-report': { key: 'fiber-report', label: 'Fiber Report', reviewLink: '/portal/admin/requests?type=fiber-reports' },
+  'expedite-order': { key: 'expedite-order', label: 'Expedite Order', reviewLink: '/portal/admin/requests?type=expedite-orders' },
+  'payroll-dispute': { key: 'payroll-dispute', label: 'Payroll Dispute', reviewLink: '/portal/admin/requests?type=payroll-disputes' },
+  'leads-request': { key: 'leads-request', label: 'Leads Request', reviewLink: '/portal/admin/requests?type=leads-requests' },
+  'manager-interview': { key: 'manager-interview', label: 'Manager Interview', reviewLink: '/portal/admin/requests?type=manager-interviews' },
+  'application': { key: 'application', label: 'Job Application', reviewLink: '/portal/admin/people?tab=invites' },
 };
 
 // Whether alerts are enabled for a form. Stored in Firestore formAlerts/{key} with

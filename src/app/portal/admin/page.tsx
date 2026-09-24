@@ -6,6 +6,8 @@ import { ChevronRight, RotateCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { AdminFailed, AdminGate, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
+import { PEOPLE_HUB, REQUEST_TABS, REQUESTS_HUB, hubTabHref } from '@/components/portal/admin-d/adminHubs';
+import { fetchOpenRequests } from '@/components/portal/admin-d/openRequests';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import h from './admin-home.module.css';
@@ -69,14 +71,13 @@ export default function OpsHomePage() {
     if (!user) return;
     setLoading(true);
 
-    const formQueue = async (key: string, label: string, href: string, path: string): Promise<QueueCard> => {
+    const formQueue = async (key: string, label: string): Promise<QueueCard> => {
+      const href = hubTabHref(REQUESTS_HUB, key);
       try {
-        const res = await authedFetch(`/api/portal/forms/${path}/review`);
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'failed');
-        const rows: { status?: string; createdAt?: string | null }[] = Array.isArray(json.submissions) ? json.submissions : [];
+        const form = REQUEST_TABS.find((tab) => tab.key === key)?.form;
+        if (!form) throw new Error(`unknown queue ${key}`);
         // Same definition as the owner's Needs-attention count: status == 'new'.
-        const open = rows.filter((r) => r.status === 'new');
+        const open = await fetchOpenRequests(form);
         return {
           key,
           label,
@@ -115,7 +116,7 @@ export default function OpsHomePage() {
 
     const pipelineQueue = async (): Promise<QueueCard> => {
       const label = 'Recruiting Pipeline';
-      const href = '/portal/admin/pipeline';
+      const href = hubTabHref(PEOPLE_HUB, 'pipeline');
       try {
         const res = await authedFetch('/api/portal/pipeline');
         const json = await res.json();
@@ -131,7 +132,7 @@ export default function OpsHomePage() {
 
     const recruitingQueue = async (): Promise<QueueCard> => {
       const label = 'Recruiting';
-      const href = '/portal/admin/recruiting';
+      const href = hubTabHref(PEOPLE_HUB, 'invites');
       try {
         const res = await authedFetch('/api/portal/recruiting/invites');
         const json = await res.json();
@@ -157,12 +158,12 @@ export default function OpsHomePage() {
       onboardingQueue(),
       pipelineQueue(),
       recruitingQueue(),
-      formQueue('fiber-reports', 'Fiber Reports', '/portal/admin/fiber-reports', 'fiber-report'),
-      formQueue('expedite-orders', 'Expedite Orders', '/portal/admin/expedite-orders', 'expedite-order'),
-      formQueue('payroll-disputes', 'Payroll Disputes', '/portal/admin/payroll-disputes', 'payroll-dispute'),
-      formQueue('leads-requests', 'Leads Requests', '/portal/admin/leads-requests', 'leads-request'),
-      formQueue('manager-interviews', 'Manager Interviews', '/portal/admin/manager-interviews', 'manager-interview'),
-      formQueue('bug-reports', 'Bug Reports', '/portal/admin/bug-reports', 'bug-report'),
+      formQueue('fiber-reports', 'Fiber Reports'),
+      formQueue('expedite-orders', 'Expedite Orders'),
+      formQueue('payroll-disputes', 'Payroll Disputes'),
+      formQueue('leads-requests', 'Leads Requests'),
+      formQueue('manager-interviews', 'Manager Interviews'),
+      formQueue('bug-reports', 'Bug Reports'),
     ]);
 
     setCards(results);

@@ -91,7 +91,7 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-export default function EmailTemplatesPage() {
+export function EmailTemplates() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<TemplateEntry[]>([]);
   const [loading, setLoading] = useState(true);

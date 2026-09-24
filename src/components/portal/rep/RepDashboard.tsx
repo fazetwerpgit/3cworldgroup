@@ -769,7 +769,7 @@ export function RepDashboard() {
       key: 'signups',
       title: `Approve ${pendingSignups} new ${pendingSignups === 1 ? 'signup' : 'signups'}`,
       sub: 'Waiting on an admin',
-      href: '/portal/admin/users',
+      href: '/portal/admin/people?tab=everyone',
     });
   }
   if (data.leads?.status === 'ready' && data.leads.data > 0) {
@@ -778,7 +778,7 @@ export function RepDashboard() {
       key: 'leads',
       title: `${data.leads.data} open leads ${data.leads.data === 1 ? 'request' : 'requests'}`,
       sub: 'Reps waiting on leads',
-      href: '/portal/admin/leads-requests',
+      href: '/portal/admin/requests?type=leads-requests',
     });
   }
 

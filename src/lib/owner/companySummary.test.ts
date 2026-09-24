@@ -222,7 +222,7 @@ describe('buildOwnerSummary', () => {
       leadsRequests: 1,
       bugReports: 0,
     });
-    expect(summary.problems!.find((row) => row.key === 'payrollDisputes')!.href).toBe('/portal/admin/payroll-disputes');
+    expect(summary.problems!.find((row) => row.key === 'payrollDisputes')!.href).toBe('/portal/admin/requests?type=payroll-disputes');
   });
 
   it('counts recruiting this week against last week', async () => {

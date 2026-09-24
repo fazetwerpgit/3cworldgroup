@@ -17,7 +17,7 @@ import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { AdminHead, Banner, LoadFailed, SkeletonRows, cx } from '@/components/portal/admin-ops/AdminKit';
 import s from '@/components/portal/admin-ops/admin-ops.module.css';
 
-export default function AdminFormOptionsPage() {
+export function FormOptions() {
   const { user } = useAuth();
   const [options, setOptions] = useState<Record<OptionKey, string[]>>(FORM_OPTION_DEFAULTS);
   const [drafts, setDrafts] = useState<Record<OptionKey, string>>(() => {

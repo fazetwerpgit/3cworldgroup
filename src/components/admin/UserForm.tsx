@@ -214,7 +214,7 @@ export function UserForm({ user }: UserFormProps) {
       setSaved(true);
       setTimeout(() => setSaved(false), 1800);
 
-      router.push('/portal/admin/users');
+      router.push('/portal/admin/people?tab=everyone');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -255,7 +255,7 @@ export function UserForm({ user }: UserFormProps) {
       });
       const data = await readJsonIfPresent(response);
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to delete user');
-      router.push('/portal/admin/users');
+      router.push('/portal/admin/people?tab=everyone');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete user');
       setActionBusy(false);

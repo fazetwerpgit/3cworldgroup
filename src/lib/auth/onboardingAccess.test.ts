@@ -201,8 +201,8 @@ describe('isOnboardingUser', () => {
 const PAGE_API_DEPENDENCIES: Record<string, string[]> = {
   '/portal/onboarding': ['/api/portal/onboarding', '/api/portal/onboarding/submit', '/api/portal/onboarding/upload'],
   '/portal/chat': ['/api/portal/chat/channels', '/api/portal/chat/gifs', '/api/portal/chat/media', '/api/portal/chat/messages', '/api/portal/chat/messages/pin', '/api/portal/chat/reactions'],
+  '/portal/learn': ['/api/portal/training', '/api/portal/training/progress', '/api/portal/commission'],
   '/portal/training': ['/api/portal/training', '/api/portal/training/progress'],
-  '/portal/resources': ['/api/portal/commission'],
   '/portal/calls': ['/api/portal/calls'],
   '/portal/settings': ['/api/portal/profile'],
 };

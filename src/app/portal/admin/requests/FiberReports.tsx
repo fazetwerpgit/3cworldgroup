@@ -10,20 +10,18 @@ interface Row { id: string; status: string; [key: string]: unknown }
 
 const COLUMNS = [
   { key: 'repName', label: 'Rep' },
-  { key: 'customerName', label: 'Customer' },
-  { key: 'customerPhone', label: 'Phone' },
-  { key: 'customerEmail', label: 'Email' },
-  { key: 'address', label: 'Address' },
-  { key: 'city', label: 'City' },
-  { key: 'state', label: 'State' },
-  { key: 'zip', label: 'ZIP' },
+  { key: 'companySold', label: 'Company' },
+  { key: 'dateKnocked', label: 'Date Knocked' },
+  { key: 'packNumber', label: 'Pack #' },
+  { key: 'numberOfReps', label: 'Reps' },
+  { key: 'doorsKnocked', label: 'Doors' },
+  { key: 'customerContacts', label: 'Contacts' },
+  { key: 'numberOfSales', label: 'Sales' },
   { key: 'orderNumber', label: 'Order #' },
-  { key: 'reason', label: 'Reason' },
-  { key: 'expediteDates', label: 'Dates' },
   { key: 'createdAt', label: 'Submitted' },
 ];
 
-export default function ExpediteOrdersReviewPage() {
+export function FiberReports() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +32,7 @@ export default function ExpediteOrdersReviewPage() {
     try {
       const token = await auth?.currentUser?.getIdToken();
       if (!token) throw new Error('Not signed in');
-      const res = await fetch('/api/portal/forms/expedite-order/review', {
+      const res = await fetch('/api/portal/forms/fiber-report/review', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
@@ -58,7 +56,7 @@ export default function ExpediteOrdersReviewPage() {
   const markHandled = async (id: string) => {
     const token = await auth?.currentUser?.getIdToken();
     if (!token) throw new Error('Not signed in');
-    const res = await fetch('/api/portal/forms/expedite-order/review', {
+    const res = await fetch('/api/portal/forms/fiber-report/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ id }),
@@ -73,21 +71,21 @@ export default function ExpediteOrdersReviewPage() {
         id: row.id,
         status: row.status === 'handled' ? 'handled' : 'new',
         person: queueValue(row.repName),
-        personSub: queueValue(row.customerName),
-        subject: queueValue(row.customerName),
+        personSub: queueValue(row.companySold),
+        subject: queueValue(row.companySold),
         subjectSub: queueValue(row.orderNumber),
-        secondary: queueValue(row.createdAt),
-        secondarySub: queueValue(row.expediteDates),
+        secondary: queueValue(row.dateKnocked),
+        secondarySub: queueValue(row.createdAt),
         evidenceKind: 'none',
         detailFields: [
-          { label: 'Order #', value: queueValue(row.orderNumber) },
-          { label: 'Reason', value: queueValue(row.reason) },
-          { label: 'Phone', value: queueValue(row.customerPhone) },
-          { label: 'Email', value: queueValue(row.customerEmail) },
-          { label: 'Address', value: `${queueValue(row.address)}, ${queueValue(row.zip)}` },
-          { label: 'Expedite dates', value: queueValue(row.expediteDates) },
+          { label: 'Sales', value: queueValue(row.numberOfSales) },
+          { label: 'Pack #', value: queueValue(row.packNumber) },
+          { label: 'Reps', value: queueValue(row.numberOfReps) },
+          { label: 'Doors knocked', value: queueValue(row.doorsKnocked) },
+          { label: 'Contacts', value: queueValue(row.customerContacts) },
+          { label: 'Submitted', value: queueValue(row.createdAt) },
         ],
-        searchText: [row.repName, row.customerName, row.orderNumber].map(queueValue).join(' ').toLowerCase(),
+        searchText: [row.repName, row.companySold, row.orderNumber].map(queueValue).join(' ').toLowerCase(),
       })),
     [rows]
   );
@@ -95,20 +93,20 @@ export default function ExpediteOrdersReviewPage() {
   return (
     <ProtectedRoute roles={['admin', 'operations']}>
       <AdminQueue
-        title="Expedite Orders"
-        lede="Customer orders that need faster scheduling."
-        columns={['Rep', 'Customer', 'Submitted']}
-        itemNoun="Expedite order"
-        searchPlaceholder="Search by rep, customer or order #"
+        title="Fiber Reports"
+        lede="Daily knock reports submitted by reps."
+        columns={['Rep', 'Company', 'Date knocked']}
+        itemNoun="Fiber report"
+        searchPlaceholder="Search by rep, company or order #"
         rows={queueRows}
         loading={loading}
         error={error}
         onRetry={retry}
         onMarkHandled={markHandled}
-        downloadFilename="expedite-orders.csv"
+        downloadFilename="fiber-reports.csv"
         csvColumns={COLUMNS}
         csvRows={rows}
-        emptyBody="No expedite orders need review right now."
+        emptyBody="No fiber reports need review right now."
       />
     </ProtectedRoute>
   );

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       subjectName: name,
       title: `${name} self-registered and needs a position`,
       message: 'Assign their role to start onboarding.',
-      link: '/portal/admin/users',
+      link: '/portal/admin/people?tab=everyone',
     });
   } catch (error) {
     console.error('[signup-notify] Failed to notify pending signup:', error);

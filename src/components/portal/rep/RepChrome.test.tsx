@@ -137,17 +137,30 @@ describe('rep menu sheet', () => {
   it('lists the pages that are not tabs, then account actions last', () => {
     const html = renderToStaticMarkup(<RepMenu />);
     expect(html).toContain('>Calls<');
-    expect(html).toContain('>University<');
+    expect(html).toContain('>Forms<');
+    expect(html).toContain('>Learn<');
     expect(html).not.toContain('>Dashboard<');
     expect(html).not.toContain('>Team Chat<');
-    expect(html.indexOf('>Settings')).toBeGreaterThan(html.indexOf('>University<'));
+    expect(html.indexOf('>Settings')).toBeGreaterThan(html.indexOf('>Learn<'));
     expect(html.indexOf('>Sign out')).toBeGreaterThan(html.indexOf('>Settings'));
   });
 
-  it('keeps admin-only groups away from reps and shows them to admins', () => {
-    expect(renderToStaticMarkup(<RepMenu />)).not.toContain('User Management');
+  it('keeps admin pages away from reps and shows them to admins', () => {
+    expect(renderToStaticMarkup(<RepMenu />)).not.toContain('>People<');
     setUser({ status: 'active', role: 'admin', uid: 'a-1' }, [...REP_PERMISSIONS, 'users:read']);
-    expect(renderToStaticMarkup(<RepMenu />)).toContain('User Management');
+    const admin = renderToStaticMarkup(<RepMenu />);
+    for (const label of ['Ops Home', 'People', 'Onboarding', 'Requests', 'Admin settings']) {
+      expect(admin).toContain(`>${label}<`);
+    }
+    expect(admin).not.toContain('>Announcements<');
+  });
+
+  it('gives a manager People (for invites) and no other admin page', () => {
+    setUser({ status: 'active', fieldRole: 'l1_manager', uid: 'm-1' });
+    const html = renderToStaticMarkup(<RepMenu />);
+    expect(html).toContain('href="/portal/admin/people"');
+    expect(html).not.toContain('>Ops Home<');
+    expect(html).not.toContain('>Requests<');
   });
 });
 

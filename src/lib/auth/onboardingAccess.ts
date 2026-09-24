@@ -14,8 +14,8 @@ import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
 export const ONBOARDING_ALLOWED_PAGES = [
   '/portal/onboarding',
   '/portal/chat',
+  '/portal/learn',
   '/portal/training',
-  '/portal/resources',
   '/portal/calls',
   '/portal/settings',
 ] as const satisfies readonly string[];

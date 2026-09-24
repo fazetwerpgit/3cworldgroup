@@ -47,7 +47,7 @@ const audienceCopy: Record<ChatChannelAudience, string> = {
 
 const emptyDraft: ChannelDraft = { name: '', description: '', audience: 'all' };
 
-export default function AdminChatChannelsPage() {
+export function ChatChannels() {
   const { user } = useAuth();
   const [channels, setChannels] = useState<ManagedChannel[]>([]);
   const [draft, setDraft] = useState<ChannelDraft>(emptyDraft);

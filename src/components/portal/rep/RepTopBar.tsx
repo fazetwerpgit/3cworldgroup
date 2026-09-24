@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -42,8 +42,8 @@ export const repSheetClasses: NavSheetClasses = {
   action: s.navItem,
 };
 
-/** The desktop More panel: groups flow into columns instead of one long list. */
-const moreNavClasses: NavSheetClasses = { ...repSheetClasses, nav: s.moreNav, group: s.moreGroup };
+/** The desktop More panel: one short column, a divider before the admin pages. */
+const moreNavClasses: NavSheetClasses = { ...repSheetClasses, nav: s.moreNav };
 
 function initials(name?: string | null, email?: string | null) {
   const value = name?.trim() || email?.split('@')[0] || 'User';
@@ -188,9 +188,6 @@ export function RepTopBar({
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
   const backLink = back ?? { href: brandHref, label: 'dashboard' };
   const adminBadge = pendingSignupsCount;
-  // An owner's More holds every admin group: too tall for one column at 1440x900.
-  const moreCount = groups.reduce((sum, group) => sum + group.items.filter(canAccess).length, 0);
-  const moreCols = moreCount > 14 ? 3 : moreCount > 7 ? 2 : 1;
 
   return (
     <>
@@ -308,13 +305,7 @@ export function RepTopBar({
       {panel === 'more' ? (
         <BodyLayer>
           <button type="button" className={s.dropClear} aria-label="Close menu" tabIndex={-1} onClick={close} />
-          <div
-            ref={dropRef}
-            className={`${s.drop} ${s.moreDrop}`}
-            role="dialog"
-            aria-label="More pages"
-            style={{ '--more-cols': moreCols } as CSSProperties}
-          >
+          <div ref={dropRef} className={`${s.drop} ${s.moreDrop}`} role="dialog" aria-label="More pages">
             <NavGroupsList
               groups={groups}
               pathname={pathname}

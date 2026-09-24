@@ -75,7 +75,7 @@ function timeAgo(date: Date | string | number | undefined) {
   return `${days} days ago`;
 }
 
-export default function UsersPage() {
+export function Everyone() {
   const router = useRouter();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
