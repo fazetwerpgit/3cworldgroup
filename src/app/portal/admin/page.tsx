@@ -6,7 +6,7 @@ import { ChevronRight, RotateCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { AdminFailed, AdminGate, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
-import { PEOPLE_HUB, REQUEST_TABS, REQUESTS_HUB, hubTabHref } from '@/components/portal/admin-d/adminHubs';
+import { ONBOARDING_HUB, REQUEST_TABS, REQUESTS_HUB, hubTabHref } from '@/components/portal/admin-d/adminHubs';
 import { fetchOpenRequests } from '@/components/portal/admin-d/openRequests';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
@@ -71,11 +71,10 @@ export default function OpsHomePage() {
     if (!user) return;
     setLoading(true);
 
-    const formQueue = async (key: string, label: string): Promise<QueueCard> => {
+    // One row per Requests type, named and linked as in its switcher.
+    const formQueue = async ({ key, label, form }: (typeof REQUEST_TABS)[number]): Promise<QueueCard> => {
       const href = hubTabHref(REQUESTS_HUB, key);
       try {
-        const form = REQUEST_TABS.find((tab) => tab.key === key)?.form;
-        if (!form) throw new Error(`unknown queue ${key}`);
         // Same definition as the owner's Needs-attention count: status == 'new'.
         const open = await fetchOpenRequests(form);
         return {
@@ -93,8 +92,8 @@ export default function OpsHomePage() {
     };
 
     const onboardingQueue = async (): Promise<QueueCard> => {
-      const label = 'Onboarding Review';
-      const href = '/portal/admin/onboarding';
+      const label = 'Onboarding review';
+      const href = hubTabHref(ONBOARDING_HUB, 'review');
       try {
         const res = await authedFetch('/api/portal/onboarding/review');
         const json = await res.json();
@@ -115,8 +114,8 @@ export default function OpsHomePage() {
     };
 
     const pipelineQueue = async (): Promise<QueueCard> => {
-      const label = 'Recruiting Pipeline';
-      const href = hubTabHref(PEOPLE_HUB, 'pipeline');
+      const label = 'Onboarding pipeline';
+      const href = hubTabHref(ONBOARDING_HUB, 'pipeline');
       try {
         const res = await authedFetch('/api/portal/pipeline');
         const json = await res.json();
@@ -131,8 +130,8 @@ export default function OpsHomePage() {
     };
 
     const recruitingQueue = async (): Promise<QueueCard> => {
-      const label = 'Recruiting';
-      const href = hubTabHref(PEOPLE_HUB, 'invites');
+      const label = 'Onboarding invites';
+      const href = hubTabHref(ONBOARDING_HUB, 'invites');
       try {
         const res = await authedFetch('/api/portal/recruiting/invites');
         const json = await res.json();
@@ -153,17 +152,12 @@ export default function OpsHomePage() {
       }
     };
 
-    // Order fixed per the contract: Onboarding, Pipeline, Recruiting, Fiber, Expedite, Payroll, Leads, Manager, Bug.
+    // Same order as the menu: the Onboarding tabs, then the Requests types.
     const results = await Promise.all([
       onboardingQueue(),
-      pipelineQueue(),
       recruitingQueue(),
-      formQueue('fiber-reports', 'Fiber Reports'),
-      formQueue('expedite-orders', 'Expedite Orders'),
-      formQueue('payroll-disputes', 'Payroll Disputes'),
-      formQueue('leads-requests', 'Leads Requests'),
-      formQueue('manager-interviews', 'Manager Interviews'),
-      formQueue('bug-reports', 'Bug Reports'),
+      pipelineQueue(),
+      ...REQUEST_TABS.map(formQueue),
     ]);
 
     setCards(results);

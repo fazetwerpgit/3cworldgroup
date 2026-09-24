@@ -7,12 +7,9 @@ import { EmployeeDataManager } from '@/components/employee-data/EmployeeDataMana
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { Everyone } from './Everyone';
-import { Invites } from './Invites';
-import { Pipeline } from './Pipeline';
 
-// People: Everyone (user management), Invites (recruiting), Pipeline, and the
-// owner's Employee data. /portal/admin/users, /recruiting, /pipeline and
-// /employee-data redirect to their tab (next.config.ts).
+// People: Everyone (user management) and the owner's Employee data.
+// /portal/admin/users and /employee-data redirect to their tab (next.config.ts).
 export default function PeoplePage() {
   const { isRole } = useAuth();
   const pendingSignups = usePendingSignupsCount(isRole('admin'));
@@ -24,8 +21,6 @@ export default function PeoplePage() {
       counts={{ everyone: pendingSignups || undefined }}
       panels={{
         everyone: () => <Everyone />,
-        invites: () => <Invites />,
-        pipeline: () => <Pipeline />,
         // Owner only: exports every active user's info (full SSN and DL#) and
         // fills empty profile fields from the employee spreadsheet.
         'employee-data': () => (

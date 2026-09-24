@@ -155,10 +155,11 @@ describe('rep menu sheet', () => {
     expect(admin).not.toContain('>Announcements<');
   });
 
-  it('gives a manager People (for invites) and no other admin page', () => {
+  it('gives a manager Onboarding (for invites) and no other admin page', () => {
     setUser({ status: 'active', fieldRole: 'l1_manager', uid: 'm-1' });
     const html = renderToStaticMarkup(<RepMenu />);
-    expect(html).toContain('href="/portal/admin/people"');
+    expect(html).toContain('href="/portal/admin/onboarding"');
+    expect(html).not.toContain('>People<');
     expect(html).not.toContain('>Ops Home<');
     expect(html).not.toContain('>Requests<');
   });

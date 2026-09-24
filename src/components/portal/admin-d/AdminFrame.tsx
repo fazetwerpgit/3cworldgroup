@@ -140,7 +140,7 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
 /**
  * Admin section chrome inside RepShell. The six admin pages: desktop gets a
  * sticky rail, phones a one-tap switcher. Someone who can open only one admin
- * page (a manager on People) gets neither.
+ * page (a manager on Onboarding invites) gets neither.
  */
 export function AdminFrame({ children }: { children: ReactNode }) {
   const nav = useAdminNav();
