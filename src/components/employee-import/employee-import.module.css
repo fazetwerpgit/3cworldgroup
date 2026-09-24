@@ -1,0 +1,62 @@
+/* Owner employee import (direction D). Shared pieces are admin-ui.module.css. */
+
+.cols {
+  --cols: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 1.6fr);
+}
+
+.skipCols {
+  --cols: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.issues {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-amber);
+  font-size: var(--t-sm);
+}
+
+.none {
+  color: var(--c-text-3);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Import confirm: neutral, like the announcements send-now confirm. */
+.confirm {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1.35 var(--f-ui);
+}
+
+.confirmSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
