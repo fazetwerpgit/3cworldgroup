@@ -606,7 +606,7 @@ export interface RepHomeViewProps {
   callsFailed: boolean;
   /** The one-time screenshot-reader card (reads browser storage, so it is passed in). */
   scanIntro?: ReactNode;
-  /** Admin and operations: the work-queue panel, above everything else. */
+  /** Admin and operations: Needs attention (onboarding work), above everything else. */
   queues?: ReactNode;
   onHelp: () => void;
   onRetry: (key: RepSectionKey | 'pay') => void;
@@ -711,11 +711,11 @@ function useNow(intervalMs = 60_000) {
 
 /**
  * The rep dashboard. Everyone but the owner (rep, manager, admin) sees their
- * OWN numbers here; admin and operations also get the work-queue panel on top.
+ * OWN numbers here; admin and operations also get Needs attention on top.
  */
 export function RepDashboard() {
   const { user, isRole, hasPermission } = useAuth();
-  // Admin and operations get the work queues (what Ops Home listed) on top.
+  // Admin and operations get the onboarding work (Needs attention) on top.
   const showQueues = isRole('admin', 'operations');
   const data = useRepDashboard();
   const { retry } = data;

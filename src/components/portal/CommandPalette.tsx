@@ -68,9 +68,10 @@ type PaletteRow = { key: string; label: string; href: string; meta?: string };
 
 // This is the single portal navigation source of truth. The sidebar, mobile
 // sheet, and palette all consume these same labels, routes, and gates. The
-// admin side is five pages (Ops Home's queues are on Home); the old admin
-// pages live on as tabs inside People, Onboarding, Requests and Admin settings
-// (see admin-d/adminHubs.ts), each tab under its old gate.
+// admin side is five pages (Ops Home's queues are Home's Needs attention and
+// the nav badges); the old admin pages live on as tabs inside People,
+// Onboarding, Requests and Admin settings (see admin-d/adminHubs.ts), each tab
+// under its old gate.
 export const portalNavGroups: PortalNavGroup[] = [
   {
     items: [

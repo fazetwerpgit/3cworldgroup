@@ -16,7 +16,7 @@
 }
 
 /* Phone: one column in answer order. Desktop: money and needs attention (the
-   work-queue panel, which needs the width) on the left, recruiting on the right. */
+   onboarding queue rows, which need the width) on the left, recruiting on the right. */
 .colMain,
 .colSide {
   display: contents;

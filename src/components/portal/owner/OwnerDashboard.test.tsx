@@ -50,8 +50,8 @@ const problems = (counts: Partial<Record<ProblemRow['key'], number>>): ProblemRo
 const queue = (key: string, label: string, count: number, extra: Partial<QueueCard> = {}): QueueCard => ({
   key,
   label,
-  href: `/portal/admin/hub?tab=${key}`,
-  hub: '/portal/admin/hub',
+  href: `/portal/admin/onboarding?tab=${key}`,
+  hub: '/portal/admin/onboarding',
   count,
   oldestWaitMs: null,
   newToday: null,
@@ -63,12 +63,13 @@ const DAY = 1000 * 60 * 60 * 24;
 beforeEach(() => {
   state.role = 'owner';
   state.queues = [
-    queue('onboarding', 'Onboarding review', 0),
-    queue('payroll-disputes', 'Payroll disputes', 2, { newToday: 1, oldestWaitMs: 3 * DAY }),
+    queue('review', 'Onboarding review', 2, { newToday: 1, oldestWaitMs: 3 * DAY }),
+    queue('pipeline', 'Onboarding pipeline', 0),
+    queue('payroll-disputes', 'Payroll disputes', 4, { hub: '/portal/admin/requests' }),
   ];
   state.dash = {
     money: { status: 'ready', data: MONEY },
-    problems: { status: 'ready', data: problems({ stalledOnboarding: 3, payrollDisputes: 2 }) },
+    problems: { status: 'ready', data: problems({ stalledOnboarding: 3, carrierCancellations: 5 }) },
     recruiting: { status: 'ready', data: RECRUITING },
   };
 });
@@ -88,23 +89,32 @@ describe('OwnerDashboard', () => {
     expect(html).toContain('$44,750<span aria-hidden="true"> prior</span>');
   });
 
-  it('lists every work queue, empty ones included, each linking to its tab', () => {
+  it('lists the onboarding work with something waiting, each linking to its tab', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).toContain('Needs attention');
-    expect(html).toContain('Onboarding review');
-    expect(html).toContain('href="/portal/admin/hub?tab=onboarding"');
-    expect(html).toContain('href="/portal/admin/hub?tab=payroll-disputes"');
+    expect(html).toContain('href="/portal/admin/onboarding?tab=review"');
     expect(html).toContain('3d');
-    // 2 disputes + 3 stalled onboarding: the company checks count toward the total.
+    expect(html).toContain('Stuck in onboarding 3+ days');
+    expect(html).toContain('href="/portal/check/stalledOnboarding"');
+    // 2 to review + 3 stuck; nothing else counts toward the total.
     expect(html).toMatch(/<b>5<\/b> waiting · 1 new today · 1 over 2 days/);
   });
 
-  it('keeps the company checks under the queues, with zero ones listed', () => {
+  it('leaves out empty rows, the Requests queues and the sales checks', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
-    expect(html).toContain('Stuck in onboarding 3+ days');
-    expect(html).toContain('href="/portal/check/stalledOnboarding"');
-    expect(html).toContain('Carrier cancellations this week');
-    expect(html).toContain('Sales missing an install date');
+    expect(html).not.toContain('Onboarding pipeline');
+    expect(html).not.toContain('Payroll disputes');
+    expect(html).not.toContain('Carrier cancellations');
+    expect(html).not.toContain('install date');
+    expect(html).not.toContain('Nothing waiting');
+  });
+
+  it('says Nothing waiting once every onboarding row is zero', () => {
+    state.queues = [queue('review', 'Onboarding review', 0), queue('payroll-disputes', 'Payroll disputes', 4, { hub: '/portal/admin/requests' })];
+    state.dash.problems = { status: 'ready', data: problems({}) };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html.match(/Nothing waiting/g)).toHaveLength(1);
+    expect(html).not.toContain('waiting ·');
   });
 
   it('shows Couldn’t load · Retry for a failed section, never zeros', () => {
@@ -112,8 +122,8 @@ describe('OwnerDashboard', () => {
     state.dash.problems = { status: 'error' };
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).toContain('Couldn&#x27;t load company money');
-    expect(html.match(/Couldn&#x27;t load this queue/g)).toHaveLength(3);
-    expect(html).toContain('Payroll disputes');
+    expect(html).toContain('Couldn&#x27;t load this queue');
+    expect(html).toContain('Stuck in onboarding 3+ days');
     expect(html).not.toContain('$0');
     expect(html).toContain('Applications');
   });

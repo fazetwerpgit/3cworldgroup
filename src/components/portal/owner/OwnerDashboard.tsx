@@ -227,12 +227,10 @@ function MoneySkeleton() {
 
 // ---------------------------------------------------------------- needs attention
 
-// Needs attention is the admin work-queue panel (every queue, zero rows kept)
-// plus the company checks that are not a queue anywhere else.
+// Needs attention is the onboarding work (the shared queue panel) plus the
+// owner's stuck-onboarding check.
 const COMPANY_CHECKS: Array<{ key: ProblemKey; label: string; href: string }> = [
-  { key: 'carrierCancellations', label: 'Carrier cancellations this week', href: '/portal/sales' },
   { key: 'stalledOnboarding', label: 'Stuck in onboarding 3+ days', href: '/portal/admin/onboarding' },
-  { key: 'missingInstallDate', label: 'Sales missing an install date', href: '/portal/sales' },
 ];
 
 function companyRows(problems: Section<ProblemRow[]>): QueueCard[] {

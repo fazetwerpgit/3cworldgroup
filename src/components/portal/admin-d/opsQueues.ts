@@ -16,9 +16,10 @@ import {
 import { fetchOpenRequests } from './openRequests';
 
 // The admin work queues (what Ops Home used to list): the Onboarding tabs, the
-// Requests types and new signups. One loader and one cache feed the dashboard's
-// queue panel, the Requests switcher counts and the nav badges, so a page and
-// its badges never disagree and a page change does not refetch everything.
+// Requests types and new signups. One loader and one cache feed Home's Needs
+// attention (the onboarding rows), the Requests switcher counts and the nav
+// badges, so a page and its badges never disagree and a page change does not
+// refetch everything.
 
 export interface QueueCard {
   key: string;
