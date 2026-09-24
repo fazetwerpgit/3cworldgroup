@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { ChevronRight, RotateCw } from 'lucide-react';
-import { AdminFailed } from './AdminUi';
+import { AdminEmpty, AdminFailed } from './AdminUi';
+import { ONBOARDING_HUB, PEOPLE_HUB } from './adminHubs';
 import { useOpsQueues, type QueueCard } from './opsQueues';
 import s from '@/components/portal/rep/rep.module.css';
 import u from './admin-ui.module.css';
@@ -23,11 +24,16 @@ function isBacked(card: QueueCard): boolean {
   return !card.error && card.oldestWaitMs !== null && card.oldestWaitMs > BACKED_UP_THRESHOLD_MS;
 }
 
+/** Home's Needs attention is the onboarding work: its three tabs and new signups. */
+const HOME_HUBS: string[] = [ONBOARDING_HUB.href, PEOPLE_HUB.href];
+
 /**
- * Every work queue the viewer can open (what Ops Home listed), with open count,
- * new today and oldest wait, each row linking to its hub tab. Zero rows stay
- * listed. `extra` rows (the owner's company checks) sit under the queues and
- * `onRefresh` reloads them with the queues.
+ * Home's Needs attention: the onboarding queues the viewer can open (review,
+ * invites, pipeline, new signups for admins) with open count, new today and
+ * oldest wait, each row linking to its tab. Only rows with something waiting
+ * (or that failed to load) show. `extra` rows (the owner's stuck-onboarding
+ * check) join them and `onRefresh` reloads them with the queues. The Requests
+ * queues are counted on their own nav badge and tabs instead.
  */
 export function OpsQueuesPanel({
   title,
@@ -43,7 +49,10 @@ export function OpsQueuesPanel({
   onRefresh?: () => void;
 }) {
   const queues = useOpsQueues();
-  const cards = queues.cards ? [...queues.cards, ...extra] : null;
+  const cards = queues.cards
+    ? [...queues.cards.filter((card) => HOME_HUBS.includes(card.hub)), ...extra]
+    : null;
+  const shown = cards?.filter((card) => card.error || card.count > 0) ?? [];
   const loading = queues.loading || extraLoading;
 
   const failedCount = cards?.filter((card) => card.error).length ?? 0;
@@ -74,7 +83,7 @@ export function OpsQueuesPanel({
         </span>
       </div>
 
-      {showStats ? (
+      {showStats && totalOpen > 0 ? (
         <p className={`${u.meta} ${h.summary}`}>
           <b>{totalOpen}</b> waiting
           {newToday ? ` · ${newToday} new today` : null}
@@ -94,6 +103,8 @@ export function OpsQueuesPanel({
         <QueueSkeleton />
       ) : allFailed ? (
         <AdminFailed what="the queues" onRetry={refresh} />
+      ) : shown.length === 0 ? (
+        <AdminEmpty title="Nothing waiting" />
       ) : (
         <ul className={`${u.rows} ${h.cols}`}>
           <li className={u.tHead} aria-hidden="true">
@@ -103,7 +114,7 @@ export function OpsQueuesPanel({
             <span className={u.alignEnd}>Oldest</span>
             <span />
           </li>
-          {cards.map((card) => (
+          {shown.map((card) => (
             <li key={card.key}>
               {card.error ? (
                 <div className={`${u.row} ${h.queue}`}>

@@ -1,4 +1,4 @@
-/* The work-queue panel (was Ops Home): Home for owner, admin and operations. Shared pieces are admin-ui.module.css. */
+/* Needs attention on Home (owner, admin, operations): the onboarding queue rows. Shared pieces are admin-ui.module.css. */
 
 .headRight {
   display: flex;
