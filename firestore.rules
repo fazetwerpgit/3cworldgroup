@@ -143,6 +143,9 @@ service cloud.firestore {
     match /sensitiveAccessLog/{logId} {
       allow read, write: if false;
     }
+    match /adminImports/{importId} {
+      allow read, write: if false;
+    }
     match /fiberReports/{id} {
       allow read, write: if false;
     }
