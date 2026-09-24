@@ -1,27 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
-import { hashInviteToken } from '@/lib/recruiting/tokens';
+import { getInviteByToken, isInviteExpired, SUBMITTED_INVITE_STATUSES } from '@/lib/recruiting/inviteLookup';
 import { validateUpload, buildFolderPath, replacedSlotFiles } from '@/lib/onboarding/uploads';
 import { resolveUploadMime } from '@/lib/forms/formUploads';
-
-const LOCKED_STATUSES = ['submitted', 'approved', 'converted'];
-
-async function getInviteByToken(token: string) {
-  if (!adminDb) return null;
-  const tokenHash = hashInviteToken(token);
-  const snapshot = await adminDb
-    .collection('onboardingInvites')
-    .where('tokenHash', '==', tokenHash)
-    .limit(1)
-    .get();
-  if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return { id: doc.id, data: doc.data() };
-}
-
-function isExpired(expiresAt: FirebaseFirestore.Timestamp | undefined) {
-  return !!expiresAt?.toDate && expiresAt.toDate().getTime() < Date.now();
-}
 
 // POST /api/public/onboarding/[token]/upload - A candidate holding a valid
 // invite token uploads a file for a storage-kind item before account creation.
@@ -41,10 +22,10 @@ export async function POST(
     if (!invite) {
       return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     }
-    if (isExpired(invite.data.expiresAt) || invite.data.status === 'expired') {
+    if (isInviteExpired(invite.data.expiresAt) || invite.data.status === 'expired') {
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
-    if (LOCKED_STATUSES.includes(invite.data.status)) {
+    if (SUBMITTED_INVITE_STATUSES.includes(invite.data.status)) {
       return NextResponse.json(
         { error: 'This onboarding packet was already submitted' },
         { status: 400 }

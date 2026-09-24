@@ -7,6 +7,7 @@ import { GoogleAuthProvider, browserLocalPersistence, setPersistence, signInWith
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
+import { useSignupInvite } from '@/lib/onboarding/rememberedInvite';
 import s from '@/components/portal/rep/rep.module.css';
 import { AuthShell } from './AuthShell';
 import a from './auth.module.css';
@@ -53,6 +54,9 @@ export function LoginForm() {
   const [error, setError] = useState('');
   const [formMode, setFormMode] = useState<FormMode>('login');
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  // An invite opened on this device: still open -> back to the packet; sent ->
+  // the hire already has an account and just signs in.
+  const invite = useSignupInvite();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,6 +182,12 @@ export function LoginForm() {
 
           <div className={a.stack}>
             {error || authError ? <AuthAlert message={error || authError || ''} /> : null}
+            {invite?.state === 'submitted' ? (
+              <div className={a.ok} role="status">
+                <CircleCheck size={18} aria-hidden="true" />
+                <p>Your onboarding is in. Sign in with the email and password you set during onboarding.</p>
+              </div>
+            ) : null}
 
             <button
               type="button"
@@ -267,12 +277,22 @@ export function LoginForm() {
             </button>
           </form>
 
-          <p className={a.linkRow}>
-            Have a team code?{' '}
-            <Link href="/portal/signup" className={`${a.link} ${a.linkLime}`}>
-              Create your account
-            </Link>
-          </p>
+          {invite?.state === 'open' ? (
+            <p className={a.linkRow}>
+              Got an invite from 3C?{' '}
+              <Link href={`/onboard/${invite.token}`} className={`${a.link} ${a.linkLime}`}>
+                Finish your onboarding
+              </Link>
+            </p>
+          ) : null}
+          {invite?.state !== 'submitted' ? (
+            <p className={a.linkRow}>
+              Have a team code?{' '}
+              <Link href="/portal/signup" className={`${a.link} ${a.linkLime}`}>
+                Create your account
+              </Link>
+            </p>
+          ) : null}
         </>
       )}
     </AuthShell>

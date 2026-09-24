@@ -9,6 +9,7 @@ import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads'
 import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 import { US_STATES, isValidZip } from '@/lib/validation/address';
+import { forgetInvite, rememberInvite } from '@/lib/onboarding/rememberedInvite';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { Attachment, Field, FormAlert, FormSection, describe } from '@/components/portal/rep/RepForm';
 import s from '@/components/portal/rep/rep.module.css';
@@ -110,8 +111,17 @@ export default function PublicOnboardingPage() {
       try {
         const response = await fetch(`/api/public/onboarding/${token}`);
         const json = await response.json();
-        if (!response.ok) throw new Error(json.error || 'Could not load onboarding link');
+        if (!response.ok) {
+          // Unknown or expired: nothing for Sign in / Sign up to send them back to.
+          if (response.status === 404 || response.status === 410) forgetInvite(token);
+          throw new Error(json.error || 'Could not load onboarding link');
+        }
         setData(json);
+        // Open or already sent, Sign in / Sign up on this device point back
+        // here (or to signing in) instead of asking for a team code. An
+        // existing account signs in as usual.
+        if (json.existingAccount) forgetInvite(token);
+        else rememberInvite(token, json.invite.expiresAt);
         setProfile({
           displayName: json.invite.candidateName || '',
           phone: json.invite.candidatePhone || '',
