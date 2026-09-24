@@ -32,6 +32,11 @@ export interface EsignBox {
 export interface EsignExtraField extends EsignBox {
   key: string;
   type: EsignFieldType;
+  /**
+   * Boxed digits (the W-9 SSN/EIN): runs of equal cells on the box's row, one
+   * digit per cell, filled left to right. Same px units as the box.
+   */
+  comb?: Array<{ x: number; width: number; count: number }>;
 }
 
 export interface EsignDocumentConfig {
@@ -97,17 +102,32 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
     signature: { x: 200, y: 770, page: 1, required: true, width: 304, height: 32 },
     date: { x: 552, y: 770, page: 1, required: true, width: 208, height: 32, date_format: 'MM/DD/YYYY', lock_sign_date: true },
     extra: [
-      { key: 'name', type: 'text', x: 98, y: 152, page: 1, required: true, width: 640, height: 18 },
-      { key: 'business_name', type: 'text', x: 98, y: 187, page: 1, required: false, width: 640, height: 18 },
+      // Text and TIN boxes are the IRS form's own field rectangles (Rev. 3-2024
+      // AcroForm), converted to px: x = pt / 0.75, y = (792 - top pt) / 0.75.
+      { key: 'name', type: 'text', x: 78, y: 157, page: 1, required: true, width: 690, height: 19 },
+      { key: 'business_name', type: 'text', x: 78, y: 189, page: 1, required: false, width: 690, height: 19 },
       { key: 'individual_sole_prop', type: 'checkbox', x: 93, y: 236, page: 1, required: false, width: 22, height: 22 },
       { key: 'llc', type: 'checkbox', x: 93, y: 255, page: 1, required: false, width: 22, height: 22 },
-      { key: 'llc_classification', type: 'text', x: 512, y: 254, page: 1, required: false, width: 80, height: 16 },
-      { key: 'address', type: 'text', x: 84, y: 383, page: 1, required: true, width: 424, height: 20 },
-      { key: 'city_state_zip', type: 'text', x: 84, y: 417, page: 1, required: true, width: 424, height: 20 },
+      { key: 'llc_classification', type: 'text', x: 557, y: 256, page: 1, required: false, width: 38, height: 15 },
+      { key: 'address', type: 'text', x: 78, y: 381, page: 1, required: true, width: 439, height: 19 },
+      { key: 'city_state_zip', type: 'text', x: 78, y: 413, page: 1, required: true, width: 439, height: 19 },
       // TIN is one-of SSN/EIN — SignWell cannot express either/or, so both stay
       // optional here and `validateFields` enforces the choice instead.
-      { key: 'ssn', type: 'text', x: 560, y: 498, page: 1, required: false, width: 200, height: 24 },
-      { key: 'ein', type: 'text', x: 560, y: 562, page: 1, required: false, width: 200, height: 24 },
+      {
+        key: 'ssn', type: 'text', x: 556.8, y: 496, page: 1, required: false, width: 211.2, height: 32,
+        comb: [
+          { x: 556.8, width: 57.6, count: 3 },
+          { x: 633.6, width: 38.4, count: 2 },
+          { x: 691.2, width: 76.8, count: 4 },
+        ],
+      },
+      {
+        key: 'ein', type: 'text', x: 556.8, y: 560, page: 1, required: false, width: 192, height: 32,
+        comb: [
+          { x: 556.8, width: 38.4, count: 2 },
+          { x: 614.4, width: 134.4, count: 7 },
+        ],
+      },
     ],
   },
   fcra_auth: {

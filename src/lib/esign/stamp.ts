@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { LineCapStyle, PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { DOCUMENTS, boxToPdfRect, type EsignFieldValues, type PdfRect } from './documents';
+import { DOCUMENTS, boxToPdfRect, type EsignExtraField, type EsignFieldValues, type PdfRect } from './documents';
 import type { EsignDocKey } from './provider';
 
 /**
@@ -142,6 +142,32 @@ function drawFieldText(page: PDFPage, font: PDFFont, value: string, rect: PdfRec
   });
 }
 
+/** One digit per printed cell (W-9 SSN/EIN), centred; separators are the form's. */
+function drawCombDigits(
+  page: PDFPage,
+  font: PDFFont,
+  value: string,
+  runs: NonNullable<EsignExtraField['comb']>,
+  rect: PdfRect
+): void {
+  const digits = value.replace(/\D/g, '');
+  const size = Math.min(MAX_FIELD_FONT_SIZE, rect.height * 0.55);
+  let next = 0;
+  for (const run of runs) {
+    const cell = (run.width * 0.75) / run.count;
+    for (let i = 0; i < run.count && next < digits.length; i += 1, next += 1) {
+      const digit = digits[next];
+      page.drawText(digit, {
+        x: run.x * 0.75 + cell * i + (cell - font.widthOfTextAtSize(digit, size)) / 2,
+        y: rect.y + (rect.height - size) / 2,
+        size,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+  }
+}
+
 // The tick is drawn as vector geometry rather than a ZapfDingbats glyph:
 // U+2714 in a non-embedded standard font renders blank in viewers that do not
 // ship that font (Poppler, and therefore most Linux previewers), so a signed
@@ -251,6 +277,8 @@ export async function stampDocument(input: StampInput): Promise<StampResult> {
     const rect = boxToPdfRect(field, page.getHeight());
     if (field.type === 'checkbox') {
       drawCheckMark(page, rect);
+    } else if (field.comb) {
+      drawCombDigits(page, helvetica, String(value), field.comb, rect);
     } else {
       drawFieldText(page, helvetica, String(value), rect);
     }
