@@ -764,7 +764,8 @@
     gap: var(--s5);
   }
 
-  .banners {
+  .banners,
+  .queues {
     grid-column: 1 / -1;
   }
 

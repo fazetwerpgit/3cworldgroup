@@ -19,7 +19,7 @@ export const FORM_ALERTS: Record<string, FormAlertMeta> = {
   'payroll-dispute': { key: 'payroll-dispute', label: 'Payroll Dispute', reviewLink: '/portal/admin/requests?type=payroll-disputes' },
   'leads-request': { key: 'leads-request', label: 'Leads Request', reviewLink: '/portal/admin/requests?type=leads-requests' },
   'manager-interview': { key: 'manager-interview', label: 'Manager Interview', reviewLink: '/portal/admin/requests?type=manager-interviews' },
-  'application': { key: 'application', label: 'Job Application', reviewLink: '/portal/admin/people?tab=invites' },
+  'application': { key: 'application', label: 'Job Application', reviewLink: '/portal/admin/onboarding?tab=invites' },
 };
 
 // Whether alerts are enabled for a form. Stored in Firestore formAlerts/{key} with

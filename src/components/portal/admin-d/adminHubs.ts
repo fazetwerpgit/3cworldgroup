@@ -40,9 +40,17 @@ export const PEOPLE_HUB = {
   param: 'tab',
   tabs: [
     { key: 'everyone', label: 'Everyone', roles: PLATFORM_ROLES, permissions: ['users:read'] },
+    { key: 'employee-data', label: 'Employee data', roles: ['owner'] },
+  ],
+} as const satisfies HubConfig;
+
+export const ONBOARDING_HUB = {
+  href: '/portal/admin/onboarding',
+  param: 'tab',
+  tabs: [
+    { key: 'review', label: 'Review', roles: PLATFORM_ROLES },
     { key: 'invites', label: 'Invites', roles: RECRUITING_ROLES },
     { key: 'pipeline', label: 'Pipeline', roles: PLATFORM_ROLES },
-    { key: 'employee-data', label: 'Employee data', roles: ['owner'] },
   ],
 } as const satisfies HubConfig;
 

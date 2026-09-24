@@ -6,8 +6,8 @@ export interface OpenRequest {
 
 /**
  * A request queue's open items: status 'new', the same definition as the
- * owner's Needs-attention count. Ops Home and the Requests tabs both count
- * with it. Throws when the queue fails to load.
+ * owner's Needs-attention count. The work-queue panel, nav badges and Requests
+ * tabs all count with it (via opsQueues). Throws when the queue fails to load.
  */
 export async function fetchOpenRequests(form: string): Promise<OpenRequest[]> {
   const token = await auth?.currentUser?.getIdToken();

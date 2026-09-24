@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Rea
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, TrendingDown, TrendingUp, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
+import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
 import {
@@ -606,6 +606,8 @@ export interface RepHomeViewProps {
   callsFailed: boolean;
   /** The one-time screenshot-reader card (reads browser storage, so it is passed in). */
   scanIntro?: ReactNode;
+  /** Admin and operations: the work-queue panel, above everything else. */
+  queues?: ReactNode;
   onHelp: () => void;
   onRetry: (key: RepSectionKey | 'pay') => void;
   onSetDate: (row: NeedsDateRow) => void;
@@ -627,6 +629,7 @@ export function RepHomeView(p: RepHomeViewProps) {
 
       <div className={d.grid}>
         {p.banners ? <div className={d.banners}>{p.banners}</div> : null}
+        {p.queues ? <div className={d.queues}>{p.queues}</div> : null}
 
         <div className={d.colMain}>
           {p.carrierFailed && p.pay ? (
@@ -707,17 +710,15 @@ function useNow(intervalMs = 60_000) {
 }
 
 /**
- * The rep dashboard. Everyone (rep, manager, admin, owner) sees their OWN
- * numbers here; management queues only appear as rows under Today, and only
- * when they have something in them.
+ * The rep dashboard. Everyone but the owner (rep, manager, admin) sees their
+ * OWN numbers here; admin and operations also get the work-queue panel on top.
  */
 export function RepDashboard() {
   const { user, isRole, hasPermission } = useAuth();
-  const isAdmin = isRole('admin');
-  const withLeads = isRole('admin', 'operations');
-  const data = useRepDashboard({ withLeads });
+  // Admin and operations get the work queues (what Ops Home listed) on top.
+  const showQueues = isRole('admin', 'operations');
+  const data = useRepDashboard();
   const { retry } = data;
-  const pendingSignups = usePendingSignupsCount(isAdmin);
   const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
   const [helpOpen, setHelpOpen] = useState(false);
   const closeHelp = useCallback(() => setHelpOpen(false), []);
@@ -763,24 +764,6 @@ export function RepDashboard() {
       href: '/portal/onboarding',
     });
   }
-  if (isAdmin && pendingSignups > 0) {
-    todayItems.push({
-      kind: 'queue',
-      key: 'signups',
-      title: `Approve ${pendingSignups} new ${pendingSignups === 1 ? 'signup' : 'signups'}`,
-      sub: 'Waiting on an admin',
-      href: '/portal/admin/people?tab=everyone',
-    });
-  }
-  if (data.leads?.status === 'ready' && data.leads.data > 0) {
-    todayItems.push({
-      kind: 'queue',
-      key: 'leads',
-      title: `${data.leads.data} open leads ${data.leads.data === 1 ? 'request' : 'requests'}`,
-      sub: 'Reps waiting on leads',
-      href: '/portal/admin/requests?type=leads-requests',
-    });
-  }
 
   const payStatus =
     data.book.status === 'loading' || data.plan.status === 'loading'
@@ -821,6 +804,7 @@ export function RepDashboard() {
         extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
         callsFailed={data.calls.status === 'error'}
         scanIntro={canLog ? <ScanIntroCard now={now} /> : null}
+        queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}
         onSetDate={setDateRow}

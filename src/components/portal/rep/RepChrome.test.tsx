@@ -41,7 +41,7 @@ function setUser(user: TestUser, permissions: string[] = REP_PERMISSIONS) {
   state.allowed = new Set(permissions);
 }
 
-function RepMenu() {
+function RepMenu({ counts }: { counts?: Record<string, number> }) {
   const { canAccess, sheetGroups } = useNavAccess();
   return (
     <NavSheet
@@ -50,6 +50,7 @@ function RepMenu() {
       groups={sheetGroups(REP_PRIMARY_HREFS)}
       pathname={state.pathname}
       canAccess={canAccess}
+      counts={counts}
       onClose={vi.fn()}
       onSignOut={vi.fn()}
       classes={repSheetClasses}
@@ -149,25 +150,36 @@ describe('rep menu sheet', () => {
     expect(renderToStaticMarkup(<RepMenu />)).not.toContain('>People<');
     setUser({ status: 'active', role: 'admin', uid: 'a-1' }, [...REP_PERMISSIONS, 'users:read']);
     const admin = renderToStaticMarkup(<RepMenu />);
-    for (const label of ['Ops Home', 'People', 'Onboarding', 'Requests', 'Admin settings']) {
+    for (const label of ['People', 'Onboarding', 'Requests', 'Admin settings']) {
       expect(admin).toContain(`>${label}<`);
     }
+    expect(admin).not.toContain('>Ops Home<');
     expect(admin).not.toContain('>Announcements<');
   });
 
-  it('gives a manager People (for invites) and no other admin page', () => {
+  it('badges each admin page with its open items', () => {
+    setUser({ status: 'active', role: 'admin', uid: 'a-1' }, [...REP_PERMISSIONS, 'users:read']);
+    const html = renderToStaticMarkup(
+      <RepMenu counts={{ '/portal/admin/onboarding': 3, '/portal/admin/requests': 120, '/portal/admin/people': 0 }} />
+    );
+    expect(html).toMatch(/>Onboarding<\/span><b[^>]*>3<\/b>/);
+    expect(html).toMatch(/>Requests<\/span><b[^>]*>99\+<\/b>/);
+    expect(html).not.toMatch(/>People<\/span><b/);
+  });
+
+  it('gives a manager Onboarding (for invites) and no other admin page', () => {
     setUser({ status: 'active', fieldRole: 'l1_manager', uid: 'm-1' });
     const html = renderToStaticMarkup(<RepMenu />);
-    expect(html).toContain('href="/portal/admin/people"');
+    expect(html).toContain('href="/portal/admin/onboarding"');
+    expect(html).not.toContain('>People<');
     expect(html).not.toContain('>Ops Home<');
     expect(html).not.toContain('>Requests<');
   });
 });
 
 describe('isNavItemActive', () => {
-  it('matches Dashboard and Ops Home only on their own page', () => {
-    expect(isNavItemActive('/portal/admin', '/portal/admin')).toBe(true);
-    expect(isNavItemActive('/portal/admin/users', '/portal/admin')).toBe(false);
+  it('matches Dashboard only on its own page', () => {
+    expect(isNavItemActive('/portal/dashboard', '/portal/dashboard')).toBe(true);
     expect(isNavItemActive('/portal/dashboard/x', '/portal/dashboard')).toBe(false);
   });
 

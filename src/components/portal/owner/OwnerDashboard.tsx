@@ -1,10 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { ChevronRight, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
+import type { Section } from '@/hooks/useRepDashboard';
 import { useMinuteClock } from '@/components/leaderboard/belowPodium';
 import type {
   MoneyComparison,
@@ -16,6 +16,8 @@ import type {
   WeekCount,
 } from '@/lib/owner/companySummary';
 import { carrierReportStamp } from '@/lib/owner/reportFreshness';
+import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
+import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
 import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import s from '../rep/rep.module.css';
@@ -225,48 +227,29 @@ function MoneySkeleton() {
 
 // ---------------------------------------------------------------- needs attention
 
-const PROBLEM_COPY: Record<ProblemKey, { one: string; many: string; page: string }> = {
-  carrierCancellations: { one: 'Carrier cancellation this week', many: 'Carrier cancellations this week', page: 'Sales · Cancelled' },
-  payrollDisputes: { one: 'Open pay dispute', many: 'Open pay disputes', page: 'Payroll disputes' },
-  stalledOnboarding: { one: 'Stuck in onboarding 3+ days', many: 'Stuck in onboarding 3+ days', page: 'Onboarding' },
-  pendingSignups: { one: 'Signup waiting for approval', many: 'Signups waiting for approval', page: 'Users' },
-  missingInstallDate: { one: 'Sale missing an install date', many: 'Sales missing an install date', page: 'Sales' },
-  expediteOrders: { one: 'Open expedite request', many: 'Open expedite requests', page: 'Expedite orders' },
-  leadsRequests: { one: 'Open leads request', many: 'Open leads requests', page: 'Leads requests' },
-  bugReports: { one: 'New bug report', many: 'New bug reports', page: 'Bug reports' },
-};
+// Needs attention is the admin work-queue panel (every queue, zero rows kept)
+// plus the company checks that are not a queue anywhere else.
+const COMPANY_CHECKS: Array<{ key: ProblemKey; label: string; href: string }> = [
+  { key: 'carrierCancellations', label: 'Carrier cancellations this week', href: '/portal/sales' },
+  { key: 'stalledOnboarding', label: 'Stuck in onboarding 3+ days', href: '/portal/admin/onboarding' },
+  { key: 'missingInstallDate', label: 'Sales missing an install date', href: '/portal/sales' },
+];
 
-/** Money at risk reads amber; queues read plain. */
-const MONEY_RISK: ReadonlySet<ProblemKey> = new Set(['carrierCancellations', 'payrollDisputes', 'missingInstallDate']);
-
-function Attention({ rows }: { rows: ProblemRow[] }) {
-  const open = rows.filter((row) => row.count > 0);
-  return (
-    <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
-      <PanelHead id="attn-h" title="Needs attention" />
-      {open.length === 0 ? (
-        <p className={o.clear}>All clear</p>
-      ) : (
-        <ul className={o.attnList}>
-          {open.map((row) => {
-            const copy = PROBLEM_COPY[row.key];
-            return (
-              <li key={row.key}>
-                <Link href={row.href} className={o.attnRow}>
-                  <span className={`${o.attnCount} ${MONEY_RISK.has(row.key) ? o.attnRisk : ''}`}>{count(row.count)}</span>
-                  <span className={o.tText}>
-                    <span className={o.tTitle}>{row.count === 1 ? copy.one : copy.many}</span>
-                    <span className={o.tSub}>{copy.page}</span>
-                  </span>
-                  <ChevronRight size={20} className={o.chev} aria-hidden="true" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
+function companyRows(problems: Section<ProblemRow[]>): QueueCard[] {
+  if (problems.status === 'loading') return [];
+  return COMPANY_CHECKS.map((check) => {
+    const row = problems.status === 'ready' ? problems.data.find((p) => p.key === check.key) : undefined;
+    return {
+      key: check.key,
+      label: check.label,
+      href: row?.href ?? check.href,
+      hub: '',
+      count: row?.count ?? 0,
+      oldestWaitMs: null,
+      newToday: null,
+      error: problems.status === 'error',
+    };
+  });
 }
 
 // ---------------------------------------------------------------- recruiting
@@ -347,20 +330,16 @@ export function OwnerDashboard() {
             <MoneyBoard data={data.money.data} />
           )}
 
+          <OpsQueuesPanel
+            title="Needs attention"
+            className={o.attention}
+            extra={companyRows(data.problems)}
+            extraLoading={data.problems.status === 'loading'}
+            onRefresh={() => retry('problems')}
+          />
         </div>
 
         <div className={o.colSide}>
-          {data.problems.status === 'loading' ? (
-            <SkeletonPanel label="Loading needs attention" title="Needs attention" rows={4} className={o.attention} />
-          ) : data.problems.status === 'error' ? (
-            <section className={`${s.panel} ${o.attention}`} aria-labelledby="attn-h">
-              <PanelHead id="attn-h" title="Needs attention" />
-              <Failed what="what needs attention" onRetry={() => retry('problems')} />
-            </section>
-          ) : (
-            <Attention rows={data.problems.data} />
-          )}
-
           {data.recruiting.status === 'loading' ? (
             <SkeletonPanel label="Loading recruiting" title="Recruiting · this week" rows={2} className={o.recruiting} />
           ) : data.recruiting.status === 'error' ? (

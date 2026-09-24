@@ -9,7 +9,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import u from './admin-ui.module.css';
 
 /**
- * True inside a hub tab (People, Requests, Admin settings): the hub owns the page
+ * True inside a hub tab (People, Onboarding, Requests, Admin settings): the hub owns the page
  * title and tabs, so a hosted page's head keeps only its figure, sentence and
  * actions, and its title steps down to a hidden h2.
  */

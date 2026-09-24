@@ -29,13 +29,7 @@ const mobileSlotItems: PortalNavItem[] = [
  * The mobile shell: five-slot quick nav plus the full grouped navigation sheet.
  * The existing MobileMenuContext remains the source of truth for open state.
  */
-export function MobileBottomNav({
-  pendingSignupsCount = 0,
-  showAdminSection = false,
-}: {
-  pendingSignupsCount?: number;
-  showAdminSection?: boolean;
-}) {
+export function MobileBottomNav({ navCounts }: { navCounts?: Record<string, number> }) {
   const pathname = usePathname();
   const { signOut, user } = useAuth();
   const { canAccess, sheetGroups } = useNavAccess();
@@ -146,7 +140,7 @@ export function MobileBottomNav({
           groups={visibleGroups}
           pathname={pathname}
           canAccess={canAccess}
-          pendingSignupsCount={showAdminSection ? pendingSignupsCount : 0}
+          counts={navCounts}
           onClose={close}
           onSignOut={handleSignOut}
         />
