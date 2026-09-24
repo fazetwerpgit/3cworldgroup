@@ -335,6 +335,15 @@ export function getEffectiveRole(
   return user?.role ?? user?.fieldRole;
 }
 
+// Company shirt sizes. New hires pick one during onboarding; anyone can change
+// it in Settings.
+export const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'] as const;
+export type ShirtSize = (typeof SHIRT_SIZES)[number];
+
+export function isShirtSize(value: unknown): value is ShirtSize {
+  return typeof value === 'string' && (SHIRT_SIZES as readonly string[]).includes(value);
+}
+
 // User document type
 export interface User {
   uid: string;
@@ -356,12 +365,13 @@ export interface User {
   iboName?: string;
   territoryId?: string;
   phone?: string;
-  // Non-sensitive contact address. DL# / SSN are NEVER stored here - they flow
-  // through the background-check vendor as a reference (see types/onboarding.ts).
+  // Non-sensitive contact address. DL# / SSN are NEVER stored here - they are
+  // encrypted in userSensitive/{uid} (see lib/onboarding/sensitiveFields.ts).
   address?: string;
   city?: string;
   state?: string;
   zip?: string;
+  shirtSize?: ShirtSize;
   avatarUrl?: string;
   status: 'active' | 'inactive' | 'pending';
   hireDate: Date;

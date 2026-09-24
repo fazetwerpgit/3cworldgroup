@@ -127,10 +127,20 @@ export async function GET(request: NextRequest) {
 
     const approvedCount = items.filter((i) => i.status === 'approved').length;
 
+    // The license item asks for the number only when none is on file. Only the
+    // last 4 ever leaves the server; the number is revealed via the admin vault.
+    let dlLast4: string | null = null;
+    if (items.some((item) => item.id === 'dl_photos')) {
+      const sensitive = await adminDb.collection('userSensitive').doc(userId).get();
+      const data = sensitive.exists ? sensitive.data() : undefined;
+      dlLast4 = data?.dlNumberEncrypted && typeof data.dlLast4 === 'string' ? data.dlLast4 : null;
+    }
+
     return NextResponse.json({
       items,
       fieldRole,
       isIBO,
+      dlLast4,
       progress: {
         approved: approvedCount,
         total: items.length,

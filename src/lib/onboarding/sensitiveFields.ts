@@ -2,9 +2,12 @@ import { encryptField, decryptField, last4 } from '@/lib/security/fieldEncryptio
 import type { SensitiveDoc } from '@/types/sensitive';
 
 const SSN_DIGITS = /^\d{9}$/;
+// US license numbers are 1-19 letters/digits; people type them with spaces or dashes.
+const DL_CHARS = /^[A-Za-z0-9 -]+$/;
 
 // Validates and encrypts the sensitive onboarding fields. SSN is stored stripped
-// of separators (9 digits); DL# stored as entered (trimmed, capped). All optional.
+// of separators (9 digits); DL# stored as entered (trimmed). All optional here -
+// callers decide which ones are required.
 export function buildSensitiveDoc(input: {
   ssn?: string;
   dlNumber?: string;
@@ -21,8 +24,12 @@ export function buildSensitiveDoc(input: {
     doc.ssnLast4 = last4(ssn);
   }
 
-  const dl = (input.dlNumber ?? '').trim().slice(0, 40);
+  const dl = (input.dlNumber ?? '').trim();
   if (dl) {
+    const alnum = dl.replace(/[^A-Za-z0-9]/g, '').length;
+    if (!DL_CHARS.test(dl) || alnum < 4 || alnum > 20 || dl.length > 40) {
+      return { ok: false, error: "Enter a valid driver's license number" };
+    }
     doc.dlNumberEncrypted = encryptField(dl);
     doc.dlLast4 = last4(dl);
   }

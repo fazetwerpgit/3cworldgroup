@@ -120,10 +120,13 @@ vi.mock('@/lib/validation/address', () => ({
     clean: { address: '1 Main St', city: 'Dallas', state: 'TX', zip: '75001' },
   })),
 }));
-vi.mock('@/lib/onboarding/sensitiveFields', () => ({ buildSensitiveDoc: vi.fn() }));
+vi.mock('@/lib/onboarding/sensitiveFields', () => ({
+  buildSensitiveDoc: vi.fn(() => ({ ok: true, doc: { dlNumberEncrypted: 'enc', dlLast4: '4567' } })),
+}));
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignDocsMock }));
 
 import { NextRequest } from 'next/server';
+import { getOnboardingItemsForUser } from '@/types';
 import { GET, POST } from './route';
 
 function request(references: Record<string, string>, password = 'password', extra: Record<string, unknown> = {}) {
@@ -137,6 +140,7 @@ function request(references: Record<string, string>, password = 'password', extr
       state: 'TX',
       zip: '75001',
       password,
+      shirtSize: 'L',
       references,
       ...extra,
     }),
@@ -306,5 +310,64 @@ describe('POST /api/public/onboarding/[token]', () => {
     expect(response.status).toBe(200);
     expect(batchSetMock.mock.calls.some(([ref, data]) => ref?.id === 'user-1_direct_deposit' && data.prefill.accountType === 'checking')).toBe(true);
     expect(batchSetMock.mock.calls.some(([ref, data]) => ref?.id === 'user-1_w9' && data.prefill.taxClassification === 'llc')).toBe(true);
+  });
+
+  it('rejects a missing or unknown shirt size', async () => {
+    for (const shirtSize of [undefined, 'XXL', 'l']) {
+      const response = await POST(
+        request({ onboarding_submission: 'completed' }, 'password', { shirtSize }),
+        params()
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Pick a shirt size' });
+    }
+    expect(batchSetMock).not.toHaveBeenCalled();
+  });
+
+  it('stores the shirt size on the new user', async () => {
+    const response = await POST(request({ onboarding_submission: 'completed' }, 'password', { shirtSize: '2XL' }), params());
+    expect(response.status).toBe(200);
+    const userWrite = batchSetMock.mock.calls.find(([ref, data]) => ref?.id === 'user-1' && data.fieldRole);
+    expect(userWrite?.[1].shirtSize).toBe('2XL');
+  });
+
+  describe('driver license item', () => {
+    const licenseItems = [
+      { id: 'dl_photos', label: "Driver's License", sensitive: true, referenceKind: 'storage' },
+    ];
+
+    // One POST reads the checklist once; Once keeps the override out of other tests.
+    beforeEach(() => {
+      vi.mocked(getOnboardingItemsForUser).mockReturnValueOnce(licenseItems as never);
+    });
+
+    it('rejects the packet without a license number even with photos', async () => {
+      const response = await POST(request({ dl_photos: 'onboarding/invites/invite-1/dl_photos/' }), params());
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "Enter your driver's license number" });
+      expect(batchSetMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects the packet without the photos even with a number', async () => {
+      const response = await POST(request({}, 'password', { dlNumber: 'D1234567' }), params());
+
+      expect(response.status).toBe(400);
+      expect(batchSetMock).not.toHaveBeenCalled();
+    });
+
+    it('writes the number only to userSensitive, encrypted', async () => {
+      const response = await POST(
+        request({ dl_photos: 'onboarding/invites/invite-1/dl_photos/' }, 'password', { dlNumber: 'D1234567' }),
+        params()
+      );
+
+      expect(response.status).toBe(200);
+      const sensitiveWrite = batchSetMock.mock.calls.find(([, data]) => 'dlNumberEncrypted' in data);
+      expect(sensitiveWrite?.[1]).toMatchObject({ dlNumberEncrypted: 'enc', dlLast4: '4567' });
+      for (const [, data] of batchSetMock.mock.calls) {
+        expect(JSON.stringify(data)).not.toContain('D1234567');
+      }
+    });
   });
 });

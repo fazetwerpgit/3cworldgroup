@@ -53,7 +53,9 @@ export const ONBOARDING_ITEMS: OnboardingItem[] = [
   // Background / drug screen carries DL# + SSN through the vendor - stored as a
   // vendor reference only, never the raw numbers.
   { id: 'background_check', label: 'Background / Drug Screen Authorization', category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'vendor', order: 3 },
-  { id: 'dl_photos', label: "Driver's License Photos (Front & Back)", category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 4 },
+  // Driver's license: the typed number (encrypted into userSensitive, never on
+  // this item) plus front and back photos (storage). Both are required.
+  { id: 'dl_photos', label: "Driver's License", category: 'paperwork', appliesToRoles: [...BASE_VETTING_ROLES], iboOnly: false, sensitive: true, referenceKind: 'storage', order: 4 },
   { id: 'contract', label: 'Contract', category: 'paperwork', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', order: 5 },
   { id: 'direct_deposit', label: 'Direct Deposit', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: true, referenceKind: 'esign', order: 6 },
   { id: 'pay_structure', label: 'Compensation', category: 'financial', appliesToRoles: [], iboOnly: false, sensitive: false, referenceKind: 'esign', order: 7 },

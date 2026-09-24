@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             city: userData.city,
             state: userData.state,
             zip: userData.zip,
+            shirtSize: userData.shirtSize,
             avatarUrl: userData.avatarUrl,
             status: userData.status,
             hireDate: userData.hireDate?.toDate(),

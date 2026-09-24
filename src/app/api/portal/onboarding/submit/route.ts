@@ -10,11 +10,16 @@ import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 import { isEsignItem } from '@/lib/onboarding/esign';
+import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
+import type { SensitiveDoc } from '@/types/sensitive';
 
 // POST /api/portal/onboarding/submit - Rep submits an onboarding item for review.
 // Sensitive items (W-9, direct deposit, chargeback card) accept a reference
 // string only (storage path or vendor ref) - raw card numbers / SSNs are
 // never persisted. Doc id: userId_itemId in `userOnboarding`.
+// dl_photos also takes the typed license number as its own `dlNumber` key: it
+// is encrypted into userSensitive/{userId} and never written to the item,
+// logged, or sent back. It may be omitted only when a number is already on file.
 export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -29,7 +34,7 @@ export async function POST(request: NextRequest) {
     // doc id below and scopes the storage-reference check. The gate runs after
     // the body read only because the target lives in it — identity still comes
     // solely from the Authorization header.
-    const { userId, itemId, reference } = body;
+    const { userId, itemId, reference, dlNumber } = body;
 
     if (!userId || !itemId) {
       return NextResponse.json(
@@ -125,6 +130,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // The license item needs the typed number too. A number already on file
+    // (from the website onboarding form or an earlier submission) counts;
+    // a new one replaces it. Only the dl fields are merged - SSN is untouched.
+    let dlDoc: Partial<SensitiveDoc> | null = null;
+    const sensitiveRef = adminDb.collection('userSensitive').doc(userId);
+    if (itemId === 'dl_photos') {
+      const typed = typeof dlNumber === 'string' ? dlNumber : '';
+      if (typed.trim()) {
+        const built = buildSensitiveDoc({ dlNumber: typed });
+        if (!built.ok) {
+          return NextResponse.json({ error: built.error }, { status: 400 });
+        }
+        dlDoc = built.doc;
+      } else {
+        const onFile = await sensitiveRef.get();
+        if (!onFile.exists || !onFile.data()?.dlNumberEncrypted) {
+          return NextResponse.json(
+            { error: "Enter your driver's license number" },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const docRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);
     const existing = await docRef.get();
     const currentStatus = existing.exists ? existing.data()?.status : 'not_started';
@@ -138,7 +167,9 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
-    await docRef.set(
+    const batch = adminDb.batch();
+    batch.set(
+      docRef,
       {
         userId,
         itemId,
@@ -151,6 +182,10 @@ export async function POST(request: NextRequest) {
       },
       { merge: true }
     );
+    if (dlDoc) {
+      batch.set(sensitiveRef, { ...dlDoc, updatedAt: now, updatedBy: gate.uid }, { merge: true });
+    }
+    await batch.commit();
 
     return NextResponse.json({
       success: true,

@@ -9,9 +9,10 @@ import ReportBugCard from '@/components/portal/ReportBugCard';
 import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
-import { getEffectiveRole, repFacingRoleLabel } from '@/types';
+import { getEffectiveRole, repFacingRoleLabel, SHIRT_SIZES } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
+import f from '@/components/portal/rep/rep-forms.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
 
 // The chrome (top bar, tab bar, auth gate) comes from ./layout.tsx: RepShell.
@@ -38,6 +39,7 @@ export default function SettingsPage() {
 
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
+  const [shirtSize, setShirtSize] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Put the rep on the field that needs fixing.
@@ -49,6 +51,7 @@ export default function SettingsPage() {
     if (user) {
       setDisplayName(user.displayName || '');
       setPhone(user.phone || '');
+      setShirtSize(user.shirtSize || '');
     }
   }, [user]);
 
@@ -121,7 +124,8 @@ export default function SettingsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token ?? ''}`,
         },
-        body: JSON.stringify({ displayName, phone }),
+        // Empty means never picked: leave it unset rather than send a blank.
+        body: JSON.stringify({ displayName, phone, ...(shirtSize ? { shirtSize } : {}) }),
       });
       if (!response.ok) throw new Error('Failed to update profile');
       await refreshUser();
@@ -233,6 +237,20 @@ export default function SettingsPage() {
                     placeholder="(555) 123-4567"
                     autoComplete="tel"
                   />
+                </label>
+                <label className={p.field}>
+                  <span className={p.label}>Shirt size</span>
+                  <span className={f.selectWrap}>
+                    <select id="line-shirt" className={f.input} value={shirtSize} onChange={(e) => setShirtSize(e.target.value)}>
+                      {shirtSize ? null : <option value="">Not set</option>}
+                      {SHIRT_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={18} aria-hidden="true" />
+                  </span>
                 </label>
               </div>
               <div className={st.saveRow}>

@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { hashInviteToken } from '@/lib/recruiting/tokens';
 import { getOnboardingItemsForUser, looksLikeRawSensitiveData, requiresHeavyVetting } from '@/types';
+import { isShirtSize } from '@/types/auth';
 import type { SensitiveDoc } from '@/types/sensitive';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
@@ -179,8 +180,18 @@ export async function POST(
       );
     }
 
+    if (!isShirtSize(body.shirtSize)) {
+      return NextResponse.json({ error: 'Pick a shirt size' }, { status: 400 });
+    }
+    const shirtSize = body.shirtSize;
+
     const heavyVetting = requiresHeavyVetting(data.intendedFieldRole);
     const items = getOnboardingItemsForUser(data.intendedFieldRole, data.isIBO ?? false);
+    // The license item needs the typed number as well as both photos.
+    const needsDlNumber = items.some((item) => item.id === 'dl_photos');
+    if (needsDlNumber && !clean(body.dlNumber, 40)) {
+      return NextResponse.json({ error: "Enter your driver's license number" }, { status: 400 });
+    }
     const missing = items.filter(
       (item) => !isEsignItem(item.id) && !clean(references[item.id], 500)
     );
@@ -231,7 +242,7 @@ export async function POST(
     // keys, NEVER inside the references map, so the looksLikeRawSensitiveData
     // guardrail on references is not triggered. They are encrypted before storage.
     let sensitiveDoc: Partial<SensitiveDoc> = {};
-    if (heavyVetting) {
+    if (heavyVetting || needsDlNumber) {
       const sensitive = buildSensitiveDoc({
         ssn: typeof body.ssn === 'string' ? body.ssn : undefined,
         dlNumber: typeof body.dlNumber === 'string' ? body.dlNumber : undefined,
@@ -272,6 +283,7 @@ export async function POST(
       managerId: data.ownerId,
       phone,
       ...addressFields,
+      shirtSize,
       status: 'pending',
       onboardingInviteId: invite.id,
       hireDate: now,
@@ -283,7 +295,7 @@ export async function POST(
     batch.set(adminDb.collection('users').doc(userRecord.uid), userProfile);
 
     // Write the encrypted sensitive doc only when there is something to store.
-    if (heavyVetting && Object.keys(sensitiveDoc).length > 0) {
+    if (Object.keys(sensitiveDoc).length > 0) {
       batch.set(adminDb.collection('userSensitive').doc(userRecord.uid), {
         ...sensitiveDoc,
         updatedAt: now,

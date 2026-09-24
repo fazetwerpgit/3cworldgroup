@@ -381,6 +381,12 @@ export function UserForm({ user }: UserFormProps) {
               placeholder="123 Main St"
             />
           </div>
+          <div className={u.field}>
+            <label className={u.label} htmlFor="person-shirt">
+              Shirt size <Lock size={14} aria-label="Locked" />
+            </label>
+            <input id="person-shirt" className={u.input} readOnly disabled value={user.shirtSize || 'Not set'} />
+          </div>
         </div>
       </section>
 
