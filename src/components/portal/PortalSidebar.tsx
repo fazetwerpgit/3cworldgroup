@@ -15,7 +15,7 @@ import {
 import { PEOPLE_HUB } from '@/components/portal/admin-d/adminHubs';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 
-const EXACT_MATCH_ROUTES = new Set(['/portal/dashboard', '/portal/admin']);
+const EXACT_MATCH_ROUTES = new Set(['/portal/dashboard']);
 const GROUPS_OPEN_KEY = 'portal-rail-groups-open';
 
 function isItemActive(pathname: string, href: string) {
@@ -188,10 +188,9 @@ export function PortalSidebar() {
     () => portalNavGroups.filter((group) => !group.roles || isRole(...group.roles)),
     [isRole]
   );
-  const showAdminSection = isRole('admin');
-  const pendingSignupsCount = usePendingSignupsCount(showAdminSection);
-  const getBadgeCount = (item: PortalNavItem) =>
-    item.href === PEOPLE_HUB.href ? pendingSignupsCount : undefined;
+  const pendingSignupsCount = usePendingSignupsCount(isRole('admin'));
+  const navCounts: Record<string, number> = { [PEOPLE_HUB.href]: pendingSignupsCount };
+  const getBadgeCount = (item: PortalNavItem) => navCounts[item.href];
   const railWidth = collapsed ? '66px' : '240px';
 
   return (
@@ -240,10 +239,7 @@ export function PortalSidebar() {
         style={{ '--portal-rail-width': railWidth } as React.CSSProperties}
       />
 
-      <MobileBottomNav
-        pendingSignupsCount={pendingSignupsCount}
-        showAdminSection={showAdminSection}
-      />
+      <MobileBottomNav navCounts={navCounts} />
     </>
   );
 }

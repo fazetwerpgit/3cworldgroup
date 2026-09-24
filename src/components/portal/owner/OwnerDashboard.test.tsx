@@ -2,10 +2,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OwnerDashboardState } from '@/hooks/useOwnerDashboard';
 import type { ProblemRow } from '@/lib/owner/companySummary';
+import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
 
 const state = vi.hoisted(() => ({
   dash: null as unknown as OwnerDashboardState,
   role: 'owner' as string,
+  queues: null as QueueCard[] | null,
 }));
 
 vi.mock('@/hooks/useOwnerDashboard', () => ({ useOwnerDashboard: () => ({ ...state.dash, retry: vi.fn() }) }));
@@ -13,6 +15,9 @@ vi.mock('@/components/portal/PushPromptBanner', () => ({ default: () => null, us
 vi.mock('@/components/portal/AddToHomeScreenBanner', () => ({ default: () => null }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ isRole: (...roles: string[]) => roles.includes(state.role) }) }));
 vi.mock('@/components/portal/rep/RepDashboard', () => ({ RepDashboard: () => <p>rep-dashboard</p> }));
+vi.mock('@/components/portal/admin-d/opsQueues', () => ({
+  useOpsQueues: () => ({ cards: state.queues, loading: false, refreshedAt: null, refresh: vi.fn() }),
+}));
 
 import { OwnerDashboard } from './OwnerDashboard';
 import DashboardPage from '@/app/portal/dashboard/page';
@@ -37,17 +42,33 @@ const RECRUITING = {
   firstInstalls: { thisWeek: 1, lastWeek: 2 },
 };
 const problems = (counts: Partial<Record<ProblemRow['key'], number>>): ProblemRow[] =>
-  (['payrollDisputes', 'bugReports', 'pendingSignups'] as const).map((key) => ({
+  (['carrierCancellations', 'stalledOnboarding', 'missingInstallDate', 'payrollDisputes'] as const).map((key) => ({
     key,
     count: counts[key] ?? 0,
-    href: `/portal/admin/${key}`,
+    href: `/portal/check/${key}`,
   }));
+const queue = (key: string, label: string, count: number, extra: Partial<QueueCard> = {}): QueueCard => ({
+  key,
+  label,
+  href: `/portal/admin/hub?tab=${key}`,
+  hub: '/portal/admin/hub',
+  count,
+  oldestWaitMs: null,
+  newToday: null,
+  error: false,
+  ...extra,
+});
+const DAY = 1000 * 60 * 60 * 24;
 
 beforeEach(() => {
   state.role = 'owner';
+  state.queues = [
+    queue('onboarding', 'Onboarding review', 0),
+    queue('payroll-disputes', 'Payroll disputes', 2, { newToday: 1, oldestWaitMs: 3 * DAY }),
+  ];
   state.dash = {
     money: { status: 'ready', data: MONEY },
-    problems: { status: 'ready', data: problems({ payrollDisputes: 2 }) },
+    problems: { status: 'ready', data: problems({ stalledOnboarding: 3, payrollDisputes: 2 }) },
     recruiting: { status: 'ready', data: RECRUITING },
   };
 });
@@ -67,18 +88,23 @@ describe('OwnerDashboard', () => {
     expect(html).toContain('$44,750<span aria-hidden="true"> prior</span>');
   });
 
-  it('lists only non-zero problems, each linking to its page', () => {
+  it('lists every work queue, empty ones included, each linking to its tab', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
-    expect(html).toContain('Open pay disputes');
-    expect(html).toContain('href="/portal/admin/payrollDisputes"');
-    expect(html).not.toContain('bug report');
-    expect(html).not.toContain('All clear');
+    expect(html).toContain('Needs attention');
+    expect(html).toContain('Onboarding review');
+    expect(html).toContain('href="/portal/admin/hub?tab=onboarding"');
+    expect(html).toContain('href="/portal/admin/hub?tab=payroll-disputes"');
+    expect(html).toContain('3d');
+    // 2 disputes + 3 stalled onboarding: the company checks count toward the total.
+    expect(html).toMatch(/<b>5<\/b> waiting · 1 new today · 1 over 2 days/);
   });
 
-  it('says All clear once when every count is zero', () => {
-    state.dash.problems = { status: 'ready', data: problems({}) };
+  it('keeps the company checks under the queues, with zero ones listed', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
-    expect(html.match(/All clear/g)).toHaveLength(1);
+    expect(html).toContain('Stuck in onboarding 3+ days');
+    expect(html).toContain('href="/portal/check/stalledOnboarding"');
+    expect(html).toContain('Carrier cancellations this week');
+    expect(html).toContain('Sales missing an install date');
   });
 
   it('shows Couldn’t load · Retry for a failed section, never zeros', () => {
@@ -86,7 +112,8 @@ describe('OwnerDashboard', () => {
     state.dash.problems = { status: 'error' };
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).toContain('Couldn&#x27;t load company money');
-    expect(html).toContain('Couldn&#x27;t load what needs attention');
+    expect(html.match(/Couldn&#x27;t load this queue/g)).toHaveLength(3);
+    expect(html).toContain('Payroll disputes');
     expect(html).not.toContain('$0');
     expect(html).toContain('Applications');
   });

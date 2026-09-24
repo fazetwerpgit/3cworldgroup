@@ -4,48 +4,43 @@ import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronsUpDown, Shield } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { portalNavGroups, type PortalNavItem } from '@/components/portal/CommandPalette';
 import { useNavAccess } from '@/components/portal/NavSheet';
 import s from '@/components/portal/rep/rep.module.css';
 import { AdminSheet } from './AdminSheet';
-import { PEOPLE_HUB } from './adminHubs';
+import { useAdminNavCounts } from './opsQueues';
 import f from './admin-frame.module.css';
 
-const ADMIN_ROOT = '/portal/admin';
-
-/** Ops Home is the admin root: only an exact match. Every other page owns its sub-paths. */
-export function isAdminItemActive(pathname: string, href: string) {
-  if (href === ADMIN_ROOT) return pathname === ADMIN_ROOT;
+/** Each admin page owns its sub-paths (People owns /portal/admin/users/<id>… via its tab). */
+function isAdminItemActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 /** The admin pages from the portal's one nav config (portalNavGroups), under the same gates. */
 const ADMIN_ITEMS = portalNavGroups.flatMap((group) =>
-  group.items.filter((item) => item.href === ADMIN_ROOT || item.href.startsWith(`${ADMIN_ROOT}/`))
+  group.items.filter((item) => item.href.startsWith('/portal/admin/'))
 );
 
 interface AdminNav {
   pathname: string;
   items: PortalNavItem[];
   current: PortalNavItem | null;
-  pendingSignups: number;
+  /** Open items per page href. */
+  counts: Record<string, number>;
 }
 
 function useAdminNav(): AdminNav {
   const pathname = usePathname();
-  const { isRole } = useAuth();
   const { canAccess } = useNavAccess();
-  const pendingSignups = usePendingSignupsCount(isRole('admin'));
+  const counts = useAdminNavCounts();
 
   const items = useMemo(() => ADMIN_ITEMS.filter(canAccess), [canAccess]);
   const current = items.find((item) => isAdminItemActive(pathname, item.href)) ?? null;
-  return { pathname, items, current, pendingSignups };
+  return { pathname, items, current, counts };
 }
 
-function countFor(href: string, pendingSignups: number) {
-  return href === PEOPLE_HUB.href && pendingSignups > 0 ? (pendingSignups > 99 ? '99+' : String(pendingSignups)) : null;
+function badge(count: number | undefined) {
+  return count ? (count > 99 ? '99+' : String(count)) : null;
 }
 
 function AdminRail({ nav }: { nav: AdminNav }) {
@@ -55,7 +50,7 @@ function AdminRail({ nav }: { nav: AdminNav }) {
         {nav.items.map((item) => {
           const Icon = item.icon;
           const active = isAdminItemActive(nav.pathname, item.href);
-          const count = countFor(item.href, nav.pendingSignups);
+          const count = badge(nav.counts[item.href]);
           return (
             <li key={item.href}>
               <Link href={item.href} className={f.railLink} aria-current={active ? 'page' : undefined}>
@@ -85,7 +80,10 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
   }
 
   const CurrentIcon = nav.current?.icon ?? Shield;
-  const usersCount = countFor(PEOPLE_HUB.href, nav.pendingSignups);
+  // Waiting on the other admin pages, so the switcher says there is more to do.
+  const elsewhere = badge(
+    nav.items.reduce((sum, item) => sum + (item.href === nav.current?.href ? 0 : nav.counts[item.href] ?? 0), 0)
+  );
 
   return (
     <>
@@ -101,9 +99,9 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
           <span className={f.switcherKicker}>Admin</span>
           <span className={f.switcherLabel}>{nav.current?.label ?? 'All admin pages'}</span>
         </span>
-        {usersCount && nav.current?.href !== PEOPLE_HUB.href ? (
-          <b className={f.switcherCount} aria-label={`${usersCount} signups waiting`}>
-            {usersCount}
+        {elsewhere ? (
+          <b className={f.switcherCount} aria-label={`${elsewhere} waiting on other admin pages`}>
+            {elsewhere}
           </b>
         ) : null}
         <ChevronsUpDown size={18} className={f.switcherChevron} aria-hidden="true" />
@@ -115,7 +113,7 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
             {nav.items.map((item) => {
               const Icon = item.icon;
               const active = isAdminItemActive(nav.pathname, item.href);
-              const count = countFor(item.href, nav.pendingSignups);
+              const count = badge(nav.counts[item.href]);
               return (
                 <Link
                   key={item.href}
@@ -138,7 +136,7 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
 }
 
 /**
- * Admin section chrome inside RepShell. The six admin pages: desktop gets a
+ * Admin section chrome inside RepShell. The five admin pages: desktop gets a
  * sticky rail, phones a one-tap switcher. Someone who can open only one admin
  * page (a manager on Onboarding invites) gets neither.
  */

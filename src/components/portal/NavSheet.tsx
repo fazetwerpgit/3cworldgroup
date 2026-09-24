@@ -10,14 +10,13 @@ import {
   type PortalNavGroup,
   type PortalNavItem,
 } from '@/components/portal/CommandPalette';
-import { PEOPLE_HUB } from '@/components/portal/admin-d/adminHubs';
 
 // The full grouped portal navigation, shared by the old chrome's mobile "More"
 // sheet (MobileBottomNav) and the direction D shell's menu button. Both render
 // the same items behind the same gates; only the class names differ.
 
-/** Root pages (Dashboard, Ops Home) match only themselves; every other page owns its sub-paths. */
-const EXACT_MATCH_HREFS = new Set(['/portal/dashboard', '/portal/admin']);
+/** Dashboard matches only itself; every other page owns its sub-paths. */
+const EXACT_MATCH_HREFS = new Set(['/portal/dashboard']);
 
 export function isNavItemActive(pathname: string, href: string) {
   if (EXACT_MATCH_HREFS.has(href)) return pathname === href;
@@ -95,14 +94,15 @@ export function NavGroupsList({
   groups,
   pathname,
   canAccess,
-  pendingSignupsCount = 0,
+  counts = {},
   onLinkClick,
   classes = legacyNavSheetClasses,
 }: {
   groups: PortalNavGroup[];
   pathname: string;
   canAccess: (item: PortalNavItem) => boolean;
-  pendingSignupsCount?: number;
+  /** Open items per page href (People signups, Onboarding and Requests queues). */
+  counts?: Record<string, number>;
   onLinkClick: () => void;
   classes?: NavSheetClasses;
 }) {
@@ -119,7 +119,7 @@ export function NavGroupsList({
               {visibleItems.map((item) => {
                 const Icon = item.icon;
                 const active = isNavItemActive(pathname, item.href);
-                const badgeCount = item.href === PEOPLE_HUB.href ? pendingSignupsCount : 0;
+                const badgeCount = counts[item.href] ?? 0;
                 return (
                   <Link
                     key={item.href}
@@ -183,7 +183,7 @@ export function NavSheet({
   groups,
   pathname,
   canAccess,
-  pendingSignupsCount = 0,
+  counts,
   onClose,
   onSignOut,
   classes = legacyNavSheetClasses,
@@ -193,7 +193,7 @@ export function NavSheet({
   groups: PortalNavGroup[];
   pathname: string;
   canAccess: (item: PortalNavItem) => boolean;
-  pendingSignupsCount?: number;
+  counts?: Record<string, number>;
   onClose: () => void;
   onSignOut: () => void;
   classes?: NavSheetClasses;
@@ -204,7 +204,7 @@ export function NavSheet({
         groups={groups}
         pathname={pathname}
         canAccess={canAccess}
-        pendingSignupsCount={pendingSignupsCount}
+        counts={counts}
         onLinkClick={onClose}
         classes={classes}
       />

@@ -240,9 +240,11 @@
   box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
+/* Hover lifts the label one step only: full white is the selected tab's, so a
+   hovered tab never reads as the current one. */
 @media (hover: hover) {
   .segBtn:hover:not([aria-pressed='true']) {
-    color: var(--c-text);
+    color: var(--c-text-2);
   }
 }
 

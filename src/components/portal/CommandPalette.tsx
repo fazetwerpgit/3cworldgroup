@@ -6,7 +6,6 @@ import {
   BadgeDollarSign,
   CalendarClock,
   ClipboardCheck,
-  Gauge,
   GraduationCap,
   Inbox,
   LayoutDashboard,
@@ -67,12 +66,11 @@ interface ActionDestination {
 
 type PaletteRow = { key: string; label: string; href: string; meta?: string };
 
-const platformRoles: UserRole[] = ['admin', 'operations'];
-
 // This is the single portal navigation source of truth. The sidebar, mobile
 // sheet, and palette all consume these same labels, routes, and gates. The
-// admin side is six pages; the old admin pages live on as tabs inside People,
-// Onboarding, Requests and Admin settings (see admin-d/adminHubs.ts), each tab under its old gate.
+// admin side is five pages (Ops Home's queues are on Home); the old admin
+// pages live on as tabs inside People, Onboarding, Requests and Admin settings
+// (see admin-d/adminHubs.ts), each tab under its old gate.
 export const portalNavGroups: PortalNavGroup[] = [
   {
     items: [
@@ -90,7 +88,6 @@ export const portalNavGroups: PortalNavGroup[] = [
     label: 'Admin',
     collapsible: true,
     items: [
-      { label: 'Ops Home', href: '/portal/admin', icon: Gauge, roles: platformRoles },
       { label: 'People', href: PEOPLE_HUB.href, icon: Users, roles: hubRoles(PEOPLE_HUB), hub: PEOPLE_HUB },
       { label: 'Onboarding', href: ONBOARDING_HUB.href, icon: ClipboardCheck, roles: hubRoles(ONBOARDING_HUB), hub: ONBOARDING_HUB },
       { label: 'Requests', href: REQUESTS_HUB.href, icon: Inbox, roles: hubRoles(REQUESTS_HUB), hub: REQUESTS_HUB },

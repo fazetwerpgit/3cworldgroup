@@ -75,12 +75,13 @@ function timeAgo(date: Date | string) {
  */
 export function RepTopBar({
   chatUnread = false,
-  pendingSignupsCount = 0,
+  navCounts = {},
   task,
   back,
 }: {
   chatUnread?: boolean;
-  pendingSignupsCount?: number;
+  /** Open items per page href (People signups, Onboarding and Requests queues). */
+  navCounts?: Record<string, number>;
   /** Task page title (Log a sale): phones get a back link and this in place of the brand. */
   task?: string;
   /** Where a task page's back link goes (default: the dashboard), and its name for screen readers. */
@@ -187,7 +188,7 @@ export function RepTopBar({
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'You';
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
   const backLink = back ?? { href: brandHref, label: 'dashboard' };
-  const adminBadge = pendingSignupsCount;
+  const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
 
   return (
     <>
@@ -256,11 +257,11 @@ export function RepTopBar({
             className={`${s.iconBtn} ${s.phoneOnly}`}
             aria-expanded={panel === 'menu'}
             aria-controls="rep-nav-sheet"
-            aria-label={adminBadge > 0 ? `Menu, ${adminBadge} signups waiting` : 'Menu'}
+            aria-label={waiting > 0 ? `Menu, ${waiting} waiting` : 'Menu'}
             onClick={toggle('menu')}
           >
             <Menu size={22} strokeWidth={1.75} aria-hidden="true" />
-            {adminBadge > 0 ? <i className={s.dot} aria-hidden="true" /> : null}
+            {waiting > 0 ? <i className={s.dot} aria-hidden="true" /> : null}
           </button>
 
           <button
@@ -294,7 +295,7 @@ export function RepTopBar({
             groups={groups}
             pathname={pathname}
             canAccess={canAccess}
-            pendingSignupsCount={pendingSignupsCount}
+            counts={navCounts}
             onClose={close}
             onSignOut={handleSignOut}
             classes={repSheetClasses}
@@ -310,7 +311,7 @@ export function RepTopBar({
               groups={groups}
               pathname={pathname}
               canAccess={canAccess}
-              pendingSignupsCount={pendingSignupsCount}
+              counts={navCounts}
               onLinkClick={() => setPanel(null)}
               classes={moreNavClasses}
             />

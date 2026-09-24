@@ -1,12 +1,11 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AdminHub } from '@/components/portal/admin-d/AdminHub';
 import { AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
-import { REQUEST_TABS, REQUESTS_HUB } from '@/components/portal/admin-d/adminHubs';
-import { fetchOpenRequests } from '@/components/portal/admin-d/openRequests';
-import { useAuth } from '@/contexts/AuthContext';
+import { REQUESTS_HUB } from '@/components/portal/admin-d/adminHubs';
+import { useOpsQueues } from '@/components/portal/admin-d/opsQueues';
 import { BugReports } from './BugReports';
 import { ExpediteOrders } from './ExpediteOrders';
 import { FiberReports } from './FiberReports';
@@ -18,30 +17,23 @@ import { PayrollDisputes } from './PayrollDisputes';
 // type renders its old review page unchanged; /portal/admin/payroll-disputes
 // and the other old queue URLs redirect here (next.config.ts).
 function Requests() {
-  const { user, isRole } = useAuth();
   const type = useSearchParams().get('type');
-  const canReview = isRole('admin', 'operations');
-  const [counts, setCounts] = useState<Record<string, number | undefined>>({});
+  const { cards, refresh } = useOpsQueues();
 
-  // Open items per type, refreshed on each switch so a handled item drops off.
+  // Open items per type (the nav badge's figures), reloaded on each switch so
+  // a handled item drops off. The first render uses whatever is cached.
+  const shownType = useRef(type);
   useEffect(() => {
-    if (!user || !canReview) return;
-    let cancelled = false;
-    void Promise.all(
-      REQUEST_TABS.map(async (tab) => {
-        try {
-          return [tab.key, (await fetchOpenRequests(tab.form)).length] as const;
-        } catch {
-          return [tab.key, undefined] as const;
-        }
-      })
-    ).then((entries) => {
-      if (!cancelled) setCounts(Object.fromEntries(entries));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user, canReview, type]);
+    if (shownType.current === type) return;
+    shownType.current = type;
+    refresh();
+  }, [type, refresh]);
+
+  const counts = Object.fromEntries(
+    (cards ?? [])
+      .filter((card) => card.hub === REQUESTS_HUB.href && !card.error)
+      .map((card) => [card.key, card.count])
+  );
 
   return (
     <AdminHub

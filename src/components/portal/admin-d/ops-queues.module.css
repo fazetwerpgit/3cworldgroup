@@ -1,10 +1,16 @@
-/* Ops Home (direction D): the queue board. Shared pieces are admin-ui.module.css. */
+/* The work-queue panel (was Ops Home): Home for owner, admin and operations. Shared pieces are admin-ui.module.css. */
 
 .headRight {
   display: flex;
   align-items: center;
   gap: var(--s2);
   margin-right: calc(var(--s2) * -1);
+}
+
+/* "N waiting · N new today · N over 2 days" under the panel head. */
+.summary {
+  margin: 0;
+  padding: var(--s3) var(--s4) 0;
 }
 
 .cols {
@@ -97,6 +103,10 @@
 
   .queuePhoneMeta {
     display: none;
+  }
+
+  .summary {
+    padding: var(--s3) var(--s5) 0;
   }
 
   .skelRow {

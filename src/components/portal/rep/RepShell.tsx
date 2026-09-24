@@ -6,7 +6,7 @@ import { CommandPalette } from '@/components/portal/CommandPalette';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
-import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
+import { useAdminNavCounts } from '@/components/portal/admin-d/opsQueues';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
@@ -29,18 +29,18 @@ export function useHideRepTabBar(hidden: boolean) {
 }
 
 function RepChrome({ children, task, back }: { children: ReactNode; task?: string; back?: RepBackLink }) {
-  const { user, isRole } = useAuth();
+  const { user } = useAuth();
   usePresenceHeartbeat();
   const { channels } = useChatChannels();
   const { anyUnread } = useChatUnread(channels, user?.uid);
-  const pendingSignupsCount = usePendingSignupsCount(isRole('admin'));
+  const navCounts = useAdminNavCounts();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tabBarHidden, setTabBarHidden] = useState(false);
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
       <div className={s.root} data-shell="rep">
-        <RepTopBar chatUnread={anyUnread} pendingSignupsCount={pendingSignupsCount} task={task} back={back} />
+        <RepTopBar chatUnread={anyUnread} navCounts={navCounts} task={task} back={back} />
         <main className={s.scroller} id="rep-main">
           <div className={s.main}>{children}</div>
         </main>

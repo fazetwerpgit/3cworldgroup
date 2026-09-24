@@ -8,6 +8,8 @@ const LOGIN_ALIASES = ['/login', '/signin', '/employee'];
 // keep their old URLs: bookmarks, and links already stored in notifications and
 // emails, land on the right tab. A request's own query string passes through.
 const MOVED_PAGES: [source: string, destination: string][] = [
+  // Ops Home's queues are on Home now (owner, admin and operations).
+  ['/portal/admin', '/portal/dashboard'],
   ['/portal/resources', '/portal/learn?tab=pay'],
   ['/portal/training', '/portal/learn?tab=training'],
   ['/portal/admin/users', '/portal/admin/people?tab=everyone'],

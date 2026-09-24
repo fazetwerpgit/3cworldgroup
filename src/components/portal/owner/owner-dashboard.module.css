@@ -15,8 +15,8 @@
   gap: var(--s3);
 }
 
-/* Phone: one column in answer order. Desktop: money + recruiting on the left,
-   needs attention on the right. */
+/* Phone: one column in answer order. Desktop: money and needs attention (the
+   work-queue panel, which needs the width) on the left, recruiting on the right. */
 .colMain,
 .colSide {
   display: contents;
@@ -236,86 +236,6 @@
   margin-top: var(--s3);
 }
 
-/* ---------- needs attention ---------- */
-.attnList {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.attnList > li + li {
-  border-top: 1px solid var(--c-line);
-}
-
-.attnRow {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s3);
-  min-height: 64px;
-  padding: 10px var(--s3) 10px var(--s4);
-  color: var(--c-text);
-  text-decoration: none;
-  transition: transform 120ms ease-out;
-}
-
-/* Press: the row gives a little under the thumb, like every other portal row. */
-.attnRow:active {
-  transform: scale(0.97);
-}
-
-.attnRow:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
-}
-
-@media (hover: hover) {
-  .attnRow:hover {
-    background: rgba(163, 184, 214, 0.04);
-  }
-}
-
-.attnCount {
-  font-family: var(--f-display);
-  font-size: var(--t-d2);
-  line-height: 1;
-  padding-top: 3px;
-  font-variant-numeric: tabular-nums;
-}
-
-.attnRisk {
-  color: var(--c-amber);
-}
-
-.tText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.tTitle {
-  font-size: var(--t-ui);
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.tSub {
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-.chev {
-  color: var(--c-text-3);
-}
-
-.clear {
-  margin: 0;
-  padding: var(--s4);
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-}
-
 /* ---------- recruiting ---------- */
 .stats {
   display: grid;
@@ -493,10 +413,6 @@
 
   .table {
     height: 100%;
-  }
-
-  .attnRow {
-    min-height: 60px;
   }
 
   /* When the column stretches, a tile keeps its label on top and its figures

@@ -56,8 +56,6 @@ export interface RepDashboardState {
   standing: Section<RepStanding>;
   challenge: Section<RepChallenge>;
   calls: Section<DashboardCall[]>;
-  /** Open leads requests (platform roles only; null when not asked for). */
-  leads: Section<number> | null;
   /** Onboarding documents the rep still has to sign (0 once all are signed). */
   paperwork: Section<number>;
 }
@@ -110,7 +108,7 @@ export function withSaleInstallDate(book: RepBook, saleId: string, installDate: 
 
 type Loaders = { [K in RepSectionKey]: (token: string | null, signal: AbortSignal) => Promise<unknown> };
 
-export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } = {}) {
+export function useRepDashboard() {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
   const active = user?.status === 'active';
@@ -121,7 +119,6 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
     standing: LOADING,
     challenge: LOADING,
     calls: LOADING,
-    leads: withLeads ? LOADING : null,
     paperwork: LOADING,
   }));
   const controllers = useRef(new Map<RepSectionKey, AbortController>());
@@ -182,18 +179,8 @@ export function useRepDashboard({ withLeads = false }: { withLeads?: boolean } =
         return data.items?.length ?? 0;
       },
     };
-    if (withLeads) {
-      loaders.leads = async (token, signal) => {
-        const data = await getJson<{ submissions?: Array<{ status?: string }> }>(
-          '/api/portal/forms/leads-request/review',
-          token,
-          signal
-        );
-        return (data.submissions ?? []).filter((row) => row.status !== 'handled').length;
-      };
-    }
     return loaders;
-  }, [active, uid, withLeads]);
+  }, [active, uid]);
 
   const run = useCallback(
     async (keys?: RepSectionKey[], { quiet = false }: { quiet?: boolean } = {}) => {
