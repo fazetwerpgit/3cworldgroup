@@ -9,6 +9,7 @@ import {
 } from '@/lib/esign/documents';
 import { loadEnvelope } from '@/lib/esign/inhouse';
 import type { EsignDocKey } from '@/lib/esign/provider';
+import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 export interface EnvelopeFieldView {
   key: string;
@@ -96,6 +97,11 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   if (!envelope) return NextResponse.json({ error: 'envelope not found' }, { status: 404 });
   if (envelope.userId !== gate.uid) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
+  // An unsigned placeholder on hold reads as withdrawn: the sign page sends the
+  // rep back to the checklist, which no longer lists it.
+  if (envelope.status === 'sent' && isHeldOnboardingItem(envelope.itemId)) {
+    return NextResponse.json({ error: 'document on hold' }, { status: 404 });
   }
 
   const config = DOCUMENTS[envelope.docKey];

@@ -1,5 +1,6 @@
 import type { FieldRole } from './auth';
 import { roleRequiresOnboarding } from './auth';
+import { isHeldOnboardingItem } from './onboardingHold';
 
 export type OnboardingCategory = 'paperwork' | 'financial' | 'business' | 'credential';
 export type OnboardingStatus = 'not_started' | 'submitted' | 'approved' | 'rejected';
@@ -131,6 +132,7 @@ export function getOnboardingItemsForUser(fieldRole: FieldRole, isIBO: boolean):
   return ONBOARDING_ITEMS
     .filter(
       (item) =>
+        !isHeldOnboardingItem(item.id) &&
         (item.appliesToRoles.length === 0 || item.appliesToRoles.includes(fieldRole)) &&
         (item.iboOnly === false || isIBO === true)
     )

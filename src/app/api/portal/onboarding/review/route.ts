@@ -18,6 +18,7 @@ import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
+import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -153,6 +154,9 @@ export async function GET(request: NextRequest) {
         // are looked at, and each sensitive signing is an audited reveal.
         files: status === 'submitted' ? await filesFor(userId, item.id, reference, item.sensitive) : [],
         status,
+        // A placeholder on hold that the hire has not signed: shown so owners
+        // see what went out before the hold, but nothing anyone is waiting on.
+        onHold: status !== 'approved' && isHeldOnboardingItem(item.id),
         submittedAt: (data?.submittedAt?.toDate?.() as Date | undefined) ?? null,
         reviewedAt: (data?.reviewedAt?.toDate?.() as Date | undefined) ?? null,
         reviewerName: (data?.reviewerName as string | undefined) ?? null,
@@ -188,7 +192,9 @@ export async function GET(request: NextRequest) {
         const items = await Promise.all(
           checklist.map((item) => toRow(userId, item, progress.get(item.id) ?? null))
         );
-        const waitingItems = items.filter((item) => item.status === 'submitted');
+        // Held placeholders are not owed by anyone, so they neither wait nor count.
+        const owed = items.filter((item) => !item.onHold);
+        const waitingItems = owed.filter((item) => item.status === 'submitted');
         const waitingSince = waitingItems.reduce(
           (min, item) => Math.min(min, item.submittedAt?.getTime() ?? Infinity),
           Infinity
@@ -202,7 +208,7 @@ export async function GET(request: NextRequest) {
           atRisk: user?.atRisk === true,
           items,
           done: items.filter((item) => item.status === 'approved').length,
-          total: items.length,
+          total: owed.length,
           // Submitted and waiting on management.
           toReview: waitingItems.filter((item) => !isEsignItem(item.itemId)).length,
           // Out for signature and waiting on the rep.

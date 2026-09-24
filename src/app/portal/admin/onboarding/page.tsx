@@ -49,6 +49,8 @@ interface ChecklistItem {
   reference: string | null;
   files: { name: string; url: string; contentType: string }[];
   status: OnboardingStatus;
+  /** Unsigned placeholder document on hold: shown, but nobody is waiting on it. */
+  onHold: boolean;
   submittedAt: string | null;
   reviewedAt: string | null;
   reviewerName: string | null;
@@ -105,6 +107,7 @@ function personStatus(person: Person): { tone: Tone; label: string } {
 }
 
 function itemStatus(item: ChecklistItem): { tone: Tone; label: string } {
+  if (item.onHold) return { tone: 'muted', label: 'On hold' };
   switch (item.status) {
     case 'approved':
       return { tone: 'lime', label: 'Approved' };
@@ -119,6 +122,7 @@ function itemStatus(item: ChecklistItem): { tone: Tone; label: string } {
 }
 
 function itemDetail(item: ChecklistItem): string | null {
+  if (item.onHold) return "Placeholder on hold until 3C sends the real document. The rep isn't asked to sign it.";
   switch (item.status) {
     case 'approved':
       if (item.manualCompletion) {
@@ -294,7 +298,8 @@ export default function OnboardingReviewPage() {
     const underReview = item.status === 'submitted' && !esign;
     const showPdf = esign && item.status === 'approved' && item.hasSignedPdf;
     const markable = canMarkComplete && item.status !== 'approved';
-    const hasActions = item.status === 'submitted' || showPdf || markable;
+    const pending = item.status === 'submitted' && !item.onHold;
+    const hasActions = pending || showPdf || markable;
     return (
       <li key={item.id} className={o.item}>
         <div className={o.itemHead}>
@@ -370,7 +375,7 @@ export default function OnboardingReviewPage() {
                 {working ? 'Working…' : 'Approve'}
               </button>
             ) : null}
-            {item.status === 'submitted' ? (
+            {pending ? (
               <button
                 type="button"
                 className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
@@ -383,7 +388,7 @@ export default function OnboardingReviewPage() {
                 Reject
               </button>
             ) : null}
-            {esign && item.status === 'submitted' && !item.esignEnvelopeId ? (
+            {esign && pending && !item.esignEnvelopeId ? (
               <button
                 type="button"
                 className={`${s.btnSecondary} ${u.sm}`}
