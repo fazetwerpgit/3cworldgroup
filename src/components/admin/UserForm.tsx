@@ -128,6 +128,10 @@ export function UserForm({ user }: UserFormProps) {
   const [managerSearch, setManagerSearch] = useState('');
   const [managerCandidates, setManagerCandidates] = useState<ManagerCandidate[]>([]);
   const [selectedManagerLabel, setSelectedManagerLabel] = useState('');
+  // Candidates show only while picking; at rest the list looked like the
+  // user's assigned managers (Jacob 9/23: "Braeden and Jeremy are under my
+  // managers" when none was set).
+  const [pickingManager, setPickingManager] = useState(false);
 
   // Real name-search picker, backed by the EXISTING GET /api/portal/auth/users
   // endpoint — no new route. Filtered client-side to manager-eligible roles.
@@ -457,15 +461,18 @@ export function UserForm({ user }: UserFormProps) {
                 placeholder="Search managers"
                 autoComplete="off"
                 value={managerSearch || selectedManagerLabel}
+                onFocus={() => setPickingManager(true)}
                 onChange={(e) => {
+                  setPickingManager(true);
                   setSelectedManagerLabel('');
                   setManagerSearch(e.target.value);
                 }}
               />
             </label>
-            {managerResults.length || formData.managerId ? (
+            {!formData.managerId && !pickingManager ? <p className={u.personSub}>No manager</p> : null}
+            {(pickingManager && managerResults.length) || formData.managerId ? (
               <ul className={f.managerList} aria-label="Managers">
-                {managerResults.map((m) => {
+                {(pickingManager ? managerResults : []).map((m) => {
                   const selected = formData.managerId === m.uid;
                   return (
                     <li key={m.uid}>
@@ -477,6 +484,7 @@ export function UserForm({ user }: UserFormProps) {
                           handleChange('managerId', m.uid);
                           setSelectedManagerLabel(m.displayName || m.email || m.uid);
                           setManagerSearch('');
+                          setPickingManager(false);
                         }}
                       >
                         <span className={u.personText}>
@@ -498,6 +506,7 @@ export function UserForm({ user }: UserFormProps) {
                       onClick={() => {
                         handleChange('managerId', '');
                         setSelectedManagerLabel('');
+                        setPickingManager(false);
                       }}
                     >
                       <X size={18} aria-hidden="true" />
