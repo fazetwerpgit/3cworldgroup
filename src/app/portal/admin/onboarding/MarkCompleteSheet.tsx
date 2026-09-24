@@ -34,6 +34,8 @@ export function MarkCompleteSheet({
   const [working, setWorking] = useState(false);
   const trimmed = note.trim();
   const valid = trimmed.length >= MANUAL_NOTE_MIN && trimmed.length <= MANUAL_NOTE_MAX;
+  // Shown once they start typing, not on an empty box.
+  const tooShort = trimmed.length > 0 && trimmed.length < MANUAL_NOTE_MIN;
 
   const confirm = async () => {
     setWorking(true);
@@ -94,7 +96,13 @@ export function MarkCompleteSheet({
             placeholder="Signed on paper 9/20"
             maxLength={MANUAL_NOTE_MAX}
             rows={3}
+            aria-describedby={tooShort ? 'onb-mark-complete-note-hint' : undefined}
           />
+          {tooShort ? (
+            <p id="onb-mark-complete-note-hint" className={u.hint}>
+              At least {MANUAL_NOTE_MIN} characters
+            </p>
+          ) : null}
         </div>
       </div>
     </AdminSheet>

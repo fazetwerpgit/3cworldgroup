@@ -25,17 +25,18 @@ export function cleanDlNumber(raw: string | undefined): string | null {
 
 // Validates and encrypts the sensitive onboarding fields. SSN is stored stripped
 // of separators (9 digits); DL# stored as entered (trimmed). All optional here -
-// callers decide which ones are required.
+// callers decide which ones are required. A failure names the bad field so the
+// form can mark it.
 export function buildSensitiveDoc(input: {
   ssn?: string;
   dlNumber?: string;
   backgroundCheckAuth?: boolean;
-}): { ok: true; doc: Partial<SensitiveDoc> } | { ok: false; error: string } {
+}): { ok: true; doc: Partial<SensitiveDoc> } | { ok: false; error: string; field: 'ssn' | 'dlNumber' } {
   const doc: Partial<SensitiveDoc> = {};
 
   const ssn = cleanSsn(input.ssn);
   if (ssn === null) {
-    return { ok: false, error: 'Enter a valid 9-digit Social Security Number' };
+    return { ok: false, error: 'Enter a valid 9-digit Social Security Number', field: 'ssn' };
   }
   if (ssn) {
     doc.ssnEncrypted = encryptField(ssn);
@@ -44,7 +45,7 @@ export function buildSensitiveDoc(input: {
 
   const dl = cleanDlNumber(input.dlNumber);
   if (dl === null) {
-    return { ok: false, error: "Enter a valid driver's license number" };
+    return { ok: false, error: "Enter a valid driver's license number", field: 'dlNumber' };
   }
   if (dl) {
     doc.dlNumberEncrypted = encryptField(dl);

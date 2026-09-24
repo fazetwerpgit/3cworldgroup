@@ -358,7 +358,7 @@ export async function POST(request: NextRequest) {
           userId,
           type: 'onboarding_approved',
           title: `${item.label} Approved`,
-          message: `Your ${item.label} submission has been approved.`,
+          message: `Your ${item.label} has been approved.`,
           link: '/portal/onboarding',
           metadata: { itemId },
         });

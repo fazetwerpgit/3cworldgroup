@@ -262,7 +262,7 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
             onPointerLeave={endStroke}
           />
           <div className={e.padBar}>
-            <p className={e.padHint}>Sign with your finger.</p>
+            <p className={e.padHint}>Sign with your finger or mouse.</p>
             <button type="button" className={e.smallBtn} onClick={clearDrawing} disabled={!hasInk}>
               Clear
             </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -30,6 +30,7 @@ import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { saleScanEnabled } from '@/lib/sales/scan/flag';
 import { BodyLayer } from './BodyLayer';
 import { PROOF_ACCEPT, ProofCapture, useProofUploads } from './ProofCapture';
+import { useSoftKeyboardOpen } from './RepForm';
 import { useHideRepTabBar } from './RepShell';
 import { useSaleScan, type ScanFill, type ScanTarget } from './useSaleScan';
 import s from './rep.module.css';
@@ -60,36 +61,6 @@ const PROVIDER_SHORT: Record<string, string> = {
   frontier: 'Frontier',
   xfinity: 'Xfinity',
 };
-
-// The soft keyboard is up: a text field has focus on a touch device, or the
-// visual viewport has shrunk well below the layout viewport. While it is, the
-// submit bar leaves the fixed layer and sits at the end of the form, so it
-// never rides the keyboard or covers the field being typed in.
-function subscribeKeyboard(onChange: () => void) {
-  const vv = window.visualViewport;
-  vv?.addEventListener('resize', onChange);
-  document.addEventListener('focusin', onChange);
-  document.addEventListener('focusout', onChange);
-  return () => {
-    vv?.removeEventListener('resize', onChange);
-    document.removeEventListener('focusin', onChange);
-    document.removeEventListener('focusout', onChange);
-  };
-}
-
-function keyboardOpenNow(): boolean {
-  const vv = window.visualViewport;
-  if (vv && window.innerHeight - vv.height > 150) return true;
-  const el = document.activeElement;
-  const typing =
-    el instanceof HTMLTextAreaElement ||
-    (el instanceof HTMLInputElement && !['checkbox', 'radio', 'file', 'button', 'submit'].includes(el.type));
-  return typing && window.matchMedia('(pointer: coarse)').matches;
-}
-
-function useSoftKeyboardOpen(): boolean {
-  return useSyncExternalStore(subscribeKeyboard, keyboardOpenNow, () => false);
-}
 
 function Steps({ onDetails }: { onDetails: boolean }) {
   return <p className={l.steps}>{onDetails ? 'Step 2 of 2 · Details' : 'Step 1 of 2 · Proof'}</p>;

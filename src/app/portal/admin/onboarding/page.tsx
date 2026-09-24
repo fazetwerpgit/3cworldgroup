@@ -85,7 +85,8 @@ function waitLabel(submittedAt: string | null): string {
   const ms = Date.now() - new Date(submittedAt).getTime();
   if (Number.isNaN(ms) || ms < 0) return 'unknown wait';
   const hours = Math.floor(ms / (1000 * 60 * 60));
-  if (hours < 24) return `${hours || 1} hour${hours === 1 ? '' : 's'}`;
+  if (hours < 1) return 'under an hour';
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? '' : 's'}`;
 }

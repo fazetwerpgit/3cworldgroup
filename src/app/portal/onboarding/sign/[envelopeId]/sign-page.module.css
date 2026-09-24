@@ -139,10 +139,18 @@
   max-width: 360px;
 }
 
-/* Sign bar (phone) / side panel (desktop). */
+/* Sign bar: fixed on phones, under the form on desktop (and on phones with
+   the keyboard up). */
 .bar .signButton {
   flex: none;
   min-width: 128px;
+}
+
+.barText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
 }
 
 .status {
@@ -164,19 +172,6 @@
   cursor: not-allowed;
 }
 
-.asideStatus {
-  margin: 0;
-  padding-top: var(--s4);
-  border-top: 1px solid var(--c-line);
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  line-height: 1.4;
-}
-
-.asideStatus[data-ready] {
-  color: var(--c-lime-hi);
-}
-
 @media (min-width: 1024px) {
   .title {
     font-size: 56px;
@@ -188,8 +183,7 @@
 }
 
 /* The last Sign attempt failed: the bar's status line says why. */
-.status[data-state='error'],
-.asideStatus[data-state='error'] {
+.status[data-state='error'] {
   color: var(--c-red);
 }
 

@@ -21,13 +21,16 @@ describe('buildSensitiveDoc', () => {
 
   it('rejects an SSN that is not 9 digits', async () => {
     const { buildSensitiveDoc } = await import('./sensitiveFields');
-    expect(buildSensitiveDoc({ ssn: '12345' }).ok).toBe(false);
+    expect(buildSensitiveDoc({ ssn: '12345', dlNumber: 'D1234567' })).toMatchObject({ ok: false, field: 'ssn' });
   });
 
   it('rejects a license number that is too short or has stray characters', async () => {
     const { buildSensitiveDoc } = await import('./sensitiveFields');
-    expect(buildSensitiveDoc({ dlNumber: 'D12' }).ok).toBe(false);
-    expect(buildSensitiveDoc({ dlNumber: 'D1234567; drop' }).ok).toBe(false);
+    expect(buildSensitiveDoc({ dlNumber: 'D12' })).toMatchObject({ ok: false, field: 'dlNumber' });
+    expect(buildSensitiveDoc({ ssn: '123-45-6789', dlNumber: 'D1234567; drop' })).toMatchObject({
+      ok: false,
+      field: 'dlNumber',
+    });
     expect(buildSensitiveDoc({ dlNumber: 'D123 456-78' }).ok).toBe(true);
   });
 
