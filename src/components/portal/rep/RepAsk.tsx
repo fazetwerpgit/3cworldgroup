@@ -352,7 +352,7 @@ export function RepAsk() {
                 </div>
               ) : (
                 <p className={`${a.answer} ${a.pending}`} role="status">
-                  Looking in the notes…
+                  Thinking…
                 </p>
               )}
             </li>
