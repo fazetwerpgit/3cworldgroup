@@ -6,10 +6,15 @@ import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 //   knowledgeNotes/{id}        the owner's notes
 //   askLog/{id}                one doc per exchange (never the photo)
 //   askUsage/{uid}_{day}       questions a rep asked on a Chicago day
+//   askUsage/{uid}_{day}_practice   Practice model calls that day (its own count)
+//   practiceLog/{id}           one doc per finished Practice (with its feedback)
 
 export const ASK_LOG = 'askLog';
 export const ASK_USAGE = 'askUsage';
 export const ASK_DAILY_LIMIT = 60;
+export const PRACTICE_LOG = 'practiceLog';
+/** Homeowner replies and feedback both count: each is a model call. */
+export const PRACTICE_DAILY_LIMIT = 150;
 
 export type AskRating = 'up' | 'down';
 
@@ -42,13 +47,28 @@ export async function loadNotes(db: FirebaseFirestore.Firestore): Promise<Knowle
  * whether it is within ASK_DAILY_LIMIT. A transaction, so two phones racing
  * cannot both take the last one.
  */
-export async function takeDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
+export function takeDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
+  return takeDaily(db, uid, now, '', ASK_DAILY_LIMIT);
+}
+
+/** Same for Practice, on its own counter: practicing never uses up Ask questions. */
+export function takeDailyPractice(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
+  return takeDaily(db, uid, now, '_practice', PRACTICE_DAILY_LIMIT);
+}
+
+async function takeDaily(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  now: Date,
+  suffix: string,
+  limit: number
+): Promise<boolean> {
   const day = chicagoDayKey(now);
-  const ref = db.collection(ASK_USAGE).doc(`${uid}_${day}`);
+  const ref = db.collection(ASK_USAGE).doc(`${uid}_${day}${suffix}`);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const used = snap.exists ? Number(snap.get('count')) || 0 : 0;
-    if (used >= ASK_DAILY_LIMIT) return false;
+    if (used >= limit) return false;
     tx.set(ref, { uid, day, count: used + 1, updatedAt: now });
     return true;
   });

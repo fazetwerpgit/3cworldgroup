@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { Camera, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { AskLogView } from '@/lib/ask/chat';
+import type { PracticeLogView } from '@/lib/ask/practice';
 import {
   MAX_NOTE_FILE_BYTES,
   NOTE_FILE_ACCEPT,
@@ -24,13 +25,13 @@ import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import k from './knowledge.module.css';
 
-// The owner's Knowledge tab (People hub): the notes Ask 3C answers from, and
-// what reps asked it. Notes are restricted carrier material, entered here and
-// stored only in Firestore through /api/portal/knowledge.
+// The owner's Knowledge tab (People hub): the notes Ask 3C answers from, what
+// reps asked it, and their Practice sessions. Notes are restricted carrier
+// material, entered here and stored only in Firestore through /api/portal/knowledge.
 
 type Load<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 type Editor = { id: string | null } & NoteDraft;
-type View = 'notes' | 'questions';
+type View = 'notes' | 'questions' | 'practice';
 
 const WHEN = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/Chicago',
@@ -166,7 +167,7 @@ export function KnowledgeManager() {
             </>
           ) : null
         }
-        sub="Ask 3C answers reps only from these notes. Keep them short and exact. What reps asked is under Questions."
+        sub="Ask 3C answers reps only from these notes. Keep them short and exact. What reps asked is under Questions, their practice pitches under Practice."
         actions={
           view === 'notes' ? (
             <>
@@ -201,6 +202,7 @@ export function KnowledgeManager() {
         options={[
           { value: 'notes', label: 'Notes' },
           { value: 'questions', label: 'Questions' },
+          { value: 'practice', label: 'Practice' },
         ]}
         onChange={setView}
       />
@@ -216,7 +218,9 @@ export function KnowledgeManager() {
         </AdminNotice>
       ) : null}
 
-      {view === 'questions' ? (
+      {view === 'practice' ? (
+        <PracticeSessions />
+      ) : view === 'questions' ? (
         <Questions
           onAddToKnowledge={(row) =>
             openEditor({
@@ -454,6 +458,73 @@ function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) =
                   Add to knowledge
                 </button>
               </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function PracticeSessions() {
+  const [rows, setRows] = useState<Load<PracticeLogView[]>>({ status: 'loading' });
+
+  const load = useCallback(async () => {
+    setRows({ status: 'loading' });
+    try {
+      const { sessions } = await api<{ sessions: PracticeLogView[] }>('/api/portal/knowledge/practice');
+      setRows({ status: 'ready', data: sessions });
+    } catch {
+      setRows({ status: 'error' });
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load once on open
+    void load();
+  }, [load]);
+
+  return (
+    <section className={s.panel} aria-labelledby="practice-h">
+      <div className={`${s.panelHead} ${u.band}`}>
+        <h2 id="practice-h" className={s.kicker}>
+          Latest 100
+        </h2>
+        <span className={u.panelMeta}>Finished practice pitches, newest first</span>
+      </div>
+      {rows.status === 'loading' ? (
+        <AdminSkeletonRows rows={3} label="Loading practice sessions" />
+      ) : rows.status === 'error' ? (
+        <div className={u.panelBody}>
+          <AdminFailed what="the practice sessions" onRetry={() => void load()} />
+        </div>
+      ) : rows.data.length === 0 ? (
+        <div className={u.panelBody}>
+          <AdminEmpty title="No practice yet">
+            When a rep finishes a practice pitch in Ask 3C, it shows here with the coach&apos;s feedback.
+          </AdminEmpty>
+        </div>
+      ) : (
+        <ul className={k.questions}>
+          {rows.data.map((row) => (
+            <li key={row.id} className={k.question}>
+              <p className={k.qMeta}>
+                <b>{row.repName || 'Unknown rep'}</b>
+                <span>{row.persona || 'Homeowner'}</span>
+                {row.score !== null ? <span className={`${k.rating} ${u.toneLime}`}>{row.score}/10</span> : null}
+                <span>{when(row.createdAt)}</span>
+              </p>
+              <p className={k.aText}>{row.feedback}</p>
+              <details className={k.transcript}>
+                <summary>Transcript ({plural(row.turns.length, 'line')})</summary>
+                <ol>
+                  {row.turns.map((turn, index) => (
+                    <li key={index}>
+                      <b>{turn.role === 'rep' ? 'Rep' : 'Homeowner'}:</b> {turn.text}
+                    </li>
+                  ))}
+                </ol>
+              </details>
             </li>
           ))}
         </ul>

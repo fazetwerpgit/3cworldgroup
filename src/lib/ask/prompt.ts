@@ -48,7 +48,7 @@ Portal guide (the 3C portal at 3cworldgroup.com/portal):
 - Sales: your sales, their install status, and your estimated pay (always an estimate until 3C pays).
 - Board: the leaderboard.
 - Chat: team chat with channels. Photos can be attached.
-- Menu: Calls (the team call schedule with Meet links), Forms (requests to the office), Learn (training, field tools, pay structure), Ask 3C (this). Chat is channels only, no private messages.
+- Menu: Calls (the team call schedule with Meet links), Forms (requests to the office), Learn (training, field tools, pay structure), Ask 3C (this; its Practice tab lets a rep pitch a pretend homeowner and get coached on it). Chat is channels only, no private messages.
 - Forms: Payroll dispute (an installed sale missing from your pay or paid wrong; attach proof), Expedite order (install too far out, tech missed the install, or customer no-showed), Leads request (new leads or a territory problem; Jacob approves), Fiber report (log a lead pack's knocking and fiber sales), Manager interview.
 - Notifications: the bell at the top. Install-day reminders and carrier updates on your sales show up there.
 - Phone push notifications: on iPhone, first add the portal to the home screen (Safari → Share → Add to Home Screen) and open it from that icon; then go to Settings in the portal menu and turn on Push notifications. If it still doesn't work, check iPhone Settings → Notifications for the portal icon.

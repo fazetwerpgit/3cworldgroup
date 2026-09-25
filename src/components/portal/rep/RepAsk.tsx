@@ -8,6 +8,7 @@ import { askOpenTo } from '@/lib/ask/flag';
 import {
   ASK_CONVERSATION_KEY,
   ASK_HISTORY_TURNS,
+  ASK_IDLE_RESET_MS,
   MAX_QUESTION_CHARS,
   answerLines,
   type AskReply,
@@ -17,12 +18,15 @@ import { FormUploadError, prepareFormFile } from '@/lib/forms/uploadFormAttachme
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
+import { RepPractice } from './RepPractice';
 
 // Ask 3C: a rep at a customer's door asks what to do; the answer comes from
 // the owner's knowledge notes only (POST /api/portal/ask). One conversation per
 // browser session: the last turns live in sessionStorage, tagged with the rep's
 // uid (sign-out clears it; another uid's conversation is dropped), and go back
 // with each question so a follow-up has context. Photos are never kept.
+// The Practice tab (RepPractice) sits beside it; both stay mounted so a reply
+// in flight lands even if the rep switches tabs.
 
 interface Turn {
   key: string;
@@ -45,9 +49,6 @@ interface StoredConversation {
   lastAt: number;
 }
 
-/** After this long with no questions, Ask 3C opens a fresh chat (the next door). */
-const IDLE_RESET_MS = 30 * 60_000;
-
 const REQUEST_TIMEOUT_MS = 45_000;
 // HEIC is taken and turned into a JPEG on the phone (Safari decodes it); the
 // model reads JPEG, PNG and WebP.
@@ -69,7 +70,7 @@ function readStored(uid: string): Turn[] {
       raw.uid !== uid ||
       !Array.isArray(raw.turns) ||
       typeof raw.lastAt !== 'number' ||
-      Date.now() - raw.lastAt > IDLE_RESET_MS
+      Date.now() - raw.lastAt > ASK_IDLE_RESET_MS
     ) {
       window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
       return [];
@@ -130,9 +131,62 @@ function Answer({ text }: { text: string }) {
   );
 }
 
+type Mode = 'ask' | 'practice';
+
 export function RepAsk() {
   const { user } = useAuth();
   const uid = user?.uid ?? '';
+  const [mode, setMode] = useState<Mode>('ask');
+  const showPractice = useCallback(() => setMode('practice'), []);
+
+  if (!askOpenTo(user?.role)) {
+    return (
+      <div className={p.page}>
+        <header className={p.head}>
+          <h1 className={p.title}>Ask 3C</h1>
+        </header>
+        <section className={s.panel}>
+          <div className={p.empty}>
+            <div>
+              <strong>Ask 3C is not turned on yet.</strong>
+              <p>Until it is, call Jeremy or Jacob when an order gets stuck.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${p.page} ${a.page}`}>
+      <header className={p.head}>
+        <h1 className={p.title}>Ask 3C</h1>
+        <p className={p.lede}>
+          {mode === 'ask'
+            ? 'Stuck on an order? Ask here. Prices and promos are always on the order screen.'
+            : 'Pitch a homeowner at the door, then get coached on it.'}
+        </p>
+      </header>
+      <div className={p.tabs} role="group" aria-label="Ask 3C mode">
+        <button type="button" className={p.tab} aria-pressed={mode === 'ask'} onClick={() => setMode('ask')}>
+          Ask
+        </button>
+        <button type="button" className={p.tab} aria-pressed={mode === 'practice'} onClick={() => setMode('practice')}>
+          Practice
+        </button>
+      </div>
+      <div className={a.mode} hidden={mode !== 'ask'}>
+        <AskChat uid={uid} />
+      </div>
+      <div className={a.mode} hidden={mode !== 'practice'}>
+        {/* A practice in progress (a reload mid-pitch) opens on Practice. */}
+        <RepPractice uid={uid} active={mode === 'practice'} onResume={showPractice} />
+      </div>
+    </div>
+  );
+}
+
+function AskChat({ uid }: { uid: string }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState('');
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
@@ -176,24 +230,6 @@ export function RepAsk() {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [uid]);
-
-  if (!askOpenTo(user?.role)) {
-    return (
-      <div className={p.page}>
-        <header className={p.head}>
-          <h1 className={p.title}>Ask 3C</h1>
-        </header>
-        <section className={s.panel}>
-          <div className={p.empty}>
-            <div>
-              <strong>Ask 3C is not turned on yet.</strong>
-              <p>Until it is, call Jeremy or Jacob when an order gets stuck.</p>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   const update = (next: (current: Turn[]) => Turn[]) => {
     setTurns((current) => {
@@ -304,12 +340,7 @@ export function RepAsk() {
   const answered = turns.some((turn) => turn.answer);
 
   return (
-    <div className={`${p.page} ${a.page}`}>
-      <header className={p.head}>
-        <h1 className={p.title}>Ask 3C</h1>
-        <p className={p.lede}>Stuck on an order? Ask here. Prices and promos are always on the order screen.</p>
-      </header>
-
+    <>
       {turns.length === 0 ? (
         <section className={s.panel} aria-labelledby="ask-examples-h">
           <div className={a.examples}>
@@ -467,6 +498,6 @@ export function RepAsk() {
           </button>
         </div>
       </form>
-    </div>
+    </>
   );
 }

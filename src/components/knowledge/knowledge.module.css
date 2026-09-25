@@ -109,3 +109,31 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+/* ---------- practice: the transcript under a session's feedback ---------- */
+.transcript summary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.transcript ol {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.transcript b {
+  color: var(--c-text);
+  font-weight: 600;
+}

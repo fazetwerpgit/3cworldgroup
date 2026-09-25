@@ -7,6 +7,16 @@
   max-width: 720px;
 }
 
+/* Ask and Practice, each a column of the page; the one not shown stays mounted. */
+.mode {
+  display: grid;
+  gap: var(--s3);
+}
+
+.mode[hidden] {
+  display: none;
+}
+
 /* ---------- empty state: example questions ---------- */
 .examples {
   display: grid;

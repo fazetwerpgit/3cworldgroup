@@ -9,6 +9,17 @@ export const DEFAULT_ASK_MODEL = 'deepseek-flash';
 export const ASK_TIMEOUT_MS = 30_000;
 /** The answer is a few lines; thinking tokens count here too, so this leaves room for both. */
 const MAX_ANSWER_TOKENS = 3000;
+const DEFAULT_TEMPERATURE = 0.5;
+
+/** How one call runs. Defaults are Ask 3C's: short thinking, 0.5 without it, 3000 tokens, 30 s. */
+export interface AskCallOptions {
+  /** Thinking on (DeepSeek, low effort). Off skips the empty-answer retry: there's nothing to fall back to. */
+  think?: boolean;
+  /** Used whenever thinking is off (DeepSeek ignores it while thinking). */
+  temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
+}
 
 export type AskContentPart =
   | { type: 'text'; text: string }
@@ -66,15 +77,16 @@ const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(
 export async function callAskModel(
   config: AskProviderConfig,
   messages: AskMessage[],
-  timeoutMs = ASK_TIMEOUT_MS
+  options: AskCallOptions = {}
 ): Promise<{ answer: string; usage: AskUsage }> {
+  const { think = true, timeoutMs = ASK_TIMEOUT_MS } = options;
   const started = Date.now();
   try {
-    return await requestAnswer(config, messages, timeoutMs, true);
+    return await requestAnswer(config, messages, timeoutMs, think, options);
   } catch (error) {
     const left = timeoutMs - (Date.now() - started);
-    if (!(error instanceof AskProviderError) || error.kind !== 'bad_response' || left < 5_000) throw error;
-    return requestAnswer(config, messages, left, false);
+    if (!think || !(error instanceof AskProviderError) || error.kind !== 'bad_response' || left < 5_000) throw error;
+    return requestAnswer(config, messages, left, false, options);
   }
 }
 
@@ -82,12 +94,14 @@ async function requestAnswer(
   config: AskProviderConfig,
   messages: AskMessage[],
   timeoutMs: number,
-  think: boolean
+  think: boolean,
+  options: AskCallOptions
 ): Promise<{ answer: string; usage: AskUsage }> {
+  const temperature = options.temperature ?? DEFAULT_TEMPERATURE;
   const body: Record<string, unknown> = {
     model: config.model,
     messages,
-    max_tokens: MAX_ANSWER_TOKENS,
+    max_tokens: options.maxTokens ?? MAX_ANSWER_TOKENS,
     stream: false,
   };
   // Field tests (9/25): with short thinking the model stopped guessing where the
@@ -97,9 +111,9 @@ async function requestAnswer(
   if (isDeepSeek(config.baseUrl)) {
     body.thinking = { type: think ? 'enabled' : 'disabled' };
     if (think) body.reasoning_effort = 'low';
-    else body.temperature = 0.5;
+    else body.temperature = temperature;
   } else {
-    body.temperature = 0.5;
+    body.temperature = temperature;
   }
 
   let res: Response;
