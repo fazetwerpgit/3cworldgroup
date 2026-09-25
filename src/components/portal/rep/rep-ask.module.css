@@ -253,6 +253,22 @@
   flex: none;
 }
 
+/* Photo, New chat and Ask share one row on a phone: the two side buttons
+   stack icon over label so Ask keeps its width. */
+.actions > .photoBtn,
+.actions > .newBtn {
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+  padding-inline: var(--s2);
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.sendBtn {
+  min-width: 0;
+}
+
 .photoBtn[aria-disabled='true'] {
   opacity: 0.5;
   pointer-events: none;
