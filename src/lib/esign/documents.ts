@@ -75,13 +75,15 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
     file: 'direct_deposit.pdf',
     name: 'Direct Deposit Authorization',
     pages: 2,
-    signature: { x: 112, y: 576, page: 1, required: true, width: 500, height: 34 },
-    date: { x: 676, y: 576, page: 1, required: true, width: 100, height: 34, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    // Jacob 9/25: the signature ran up into the "(Last Name, First Name…)" label
+    // and the typed lines floated above their rules. Boxes now sit on the lines.
+    signature: { x: 112, y: 586, page: 1, required: true, width: 500, height: 30 },
+    date: { x: 676, y: 590, page: 1, required: true, width: 100, height: 22, date_format: 'MM/DD/YYYY', lock_sign_date: true },
     extra: [
-      { key: 'legal_name', type: 'text', x: 132, y: 536, page: 1, required: true, width: 644, height: 34 },
-      { key: 'bank_name', type: 'text', x: 128, y: 164, page: 2, required: true, width: 644, height: 26 },
-      { key: 'routing_number', type: 'text', x: 124, y: 192, page: 2, required: true, width: 252, height: 26 },
-      { key: 'account_number', type: 'text', x: 468, y: 192, page: 2, required: true, width: 304, height: 26 },
+      { key: 'legal_name', type: 'text', x: 132, y: 540, page: 1, required: true, width: 644, height: 34 },
+      { key: 'bank_name', type: 'text', x: 128, y: 169, page: 2, required: true, width: 644, height: 26 },
+      { key: 'routing_number', type: 'text', x: 124, y: 197, page: 2, required: true, width: 252, height: 26 },
+      { key: 'account_number', type: 'text', x: 468, y: 197, page: 2, required: true, width: 304, height: 26 },
       { key: 'checking', type: 'checkbox', x: 43, y: 259, page: 2, required: false, width: 22, height: 22 },
       { key: 'savings', type: 'checkbox', x: 197, y: 259, page: 2, required: false, width: 22, height: 22 },
       { key: 'deposit_amount', type: 'text', x: 404, y: 258, page: 2, required: false, width: 120, height: 20 },
