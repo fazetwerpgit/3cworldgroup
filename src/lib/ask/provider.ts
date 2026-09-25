@@ -68,7 +68,8 @@ export async function callAskModel(
     model: config.model,
     messages,
     max_tokens: MAX_ANSWER_TOKENS,
-    temperature: 0.3,
+    // 0.7: banter and coaching need variety; facts stay pinned by the notes rule.
+    temperature: 0.7,
     stream: false,
   };
   // DeepSeek thinks by default; non-thinking mode answers far faster and a
