@@ -249,6 +249,10 @@
   cursor: pointer;
 }
 
+.newBtn {
+  flex: none;
+}
+
 .photoBtn[aria-disabled='true'] {
   opacity: 0.5;
   pointer-events: none;

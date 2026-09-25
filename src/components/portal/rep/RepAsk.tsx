@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Camera, MessageCircleQuestion, RotateCw, SendHorizontal, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Camera, MessageCircleQuestion, RotateCw, SendHorizontal, SquarePen, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { askOpenTo } from '@/lib/ask/flag';
@@ -38,11 +38,15 @@ interface Turn {
   rateFailed?: boolean;
 }
 
-/** What sessionStorage holds: one rep's conversation. */
+/** What sessionStorage holds: one rep's conversation and when it was last used. */
 interface StoredConversation {
   uid: string;
   turns: Turn[];
+  lastAt: number;
 }
+
+/** After this long with no questions, Ask 3C opens a fresh chat (the next door). */
+const IDLE_RESET_MS = 30 * 60_000;
 
 const REQUEST_TIMEOUT_MS = 45_000;
 // HEIC is taken and turned into a JPEG on the phone (Safari decodes it); the
@@ -56,11 +60,17 @@ const EXAMPLES = [
   'How do I call Sales Support?',
 ];
 
-/** This rep's stored conversation. Anyone else's (a shared phone) is thrown away. */
+/** This rep's stored conversation, unless it went idle. Anyone else's (a shared phone) is thrown away. */
 function readStored(uid: string): Turn[] {
   try {
     const raw = JSON.parse(window.sessionStorage.getItem(ASK_CONVERSATION_KEY) ?? 'null') as StoredConversation | null;
-    if (!raw || raw.uid !== uid || !Array.isArray(raw.turns)) {
+    if (
+      !raw ||
+      raw.uid !== uid ||
+      !Array.isArray(raw.turns) ||
+      typeof raw.lastAt !== 'number' ||
+      Date.now() - raw.lastAt > IDLE_RESET_MS
+    ) {
       window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
       return [];
     }
@@ -76,7 +86,10 @@ function store(uid: string, turns: Turn[]) {
       .filter((turn) => turn.answer)
       .slice(-ASK_HISTORY_TURNS)
       .map((turn) => ({ ...turn, photoUrl: undefined, rateFailed: undefined }));
-    window.sessionStorage.setItem(ASK_CONVERSATION_KEY, JSON.stringify({ uid, turns: kept } satisfies StoredConversation));
+    window.sessionStorage.setItem(
+      ASK_CONVERSATION_KEY,
+      JSON.stringify({ uid, turns: kept, lastAt: Date.now() } satisfies StoredConversation)
+    );
   } catch {
     // Private mode or a full quota: the conversation just won't survive a reload.
   }
@@ -145,6 +158,24 @@ export function RepAsk() {
     setTurns(restored);
     if (restored.length > 0) showComposer('instant');
   }, [uid, showComposer]);
+
+  useEffect(() => {
+    // The app left open in the background: coming back after the idle window
+    // starts a fresh chat, the same as reopening it.
+    if (!uid) return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      setTurns((current) => {
+        if (current.length === 0 || current.some((turn) => !turn.answer)) return current;
+        const restored = readStored(uid);
+        if (restored.length > 0) return current;
+        for (const turn of current) if (turn.photoUrl) URL.revokeObjectURL(turn.photoUrl);
+        return [];
+      });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [uid]);
 
   if (!askOpenTo(user?.role)) {
     return (
@@ -276,11 +307,6 @@ export function RepAsk() {
     <div className={`${p.page} ${a.page}`}>
       <header className={p.head}>
         <h1 className={p.title}>Ask 3C</h1>
-        {turns.length > 0 && !sending ? (
-          <button type="button" className={s.textBtn} onClick={startOver}>
-            Start over
-          </button>
-        ) : null}
         <p className={p.lede}>Stuck on an order? Ask here. Prices and promos are always on the order screen.</p>
       </header>
 
@@ -425,6 +451,12 @@ export function RepAsk() {
               onChange={(event) => void pickPhoto(event.target.files?.[0])}
             />
           </label>
+          {turns.length > 0 && !sending ? (
+            <button type="button" className={`${s.btnSecondary} ${a.newBtn}`} onClick={startOver}>
+              <SquarePen size={20} aria-hidden="true" />
+              New chat
+            </button>
+          ) : null}
           <button
             type="submit"
             className={`${s.btnPrimary} ${a.sendBtn}`}
