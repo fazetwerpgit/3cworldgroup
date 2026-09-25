@@ -1,0 +1,234 @@
+/* Ask 3C (rep page on the D shell). Tokens come from .root in rep.module.css;
+   the head, fields and empty state are rep-page.module.css. Phone first: a
+   one-column thread with the composer after it in the page flow, so the iOS
+   keyboard just scrolls it into view (no fixed bar to fight the keyboard). */
+
+.page {
+  max-width: 720px;
+}
+
+/* ---------- empty state: example questions ---------- */
+.examples {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+}
+
+.example {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text);
+  font: 500 var(--t-ui) / 1.4 var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 120ms ease-out;
+}
+
+.example svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--c-lime);
+}
+
+.example:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) {
+  .example:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+/* ---------- thread ---------- */
+.thread {
+  display: grid;
+  gap: var(--s5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.turn {
+  display: grid;
+  gap: var(--s2);
+}
+
+.question {
+  display: grid;
+  justify-items: end;
+  gap: var(--s2);
+  margin-left: var(--s7);
+}
+
+.questionText {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-card) var(--r-card) var(--r-control) var(--r-card);
+  background: var(--c-panel-hi);
+  box-shadow: var(--c-edge);
+  font-size: var(--t-body);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.questionPhoto {
+  display: block;
+  max-width: min(220px, 100%);
+  max-height: 220px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  object-fit: cover;
+}
+
+.photoNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.answer {
+  margin: 0;
+  margin-right: var(--s5);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card) var(--r-card) var(--r-card) var(--r-control);
+  background: var(--c-panel);
+}
+
+.answerText {
+  margin: 0;
+  font-size: var(--t-body);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* One line of the answer; an empty one keeps its height as a paragraph gap. */
+.line {
+  display: block;
+  min-height: 1.5em;
+}
+
+.tel {
+  color: var(--c-lime-hi);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rate {
+  display: flex;
+  gap: var(--s1);
+  margin: var(--s2) calc(var(--s2) * -1) calc(var(--s2) * -1) 0;
+  justify-content: flex-end;
+}
+
+.thumb {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-3);
+  cursor: pointer;
+}
+
+.thumb[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.pending {
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+.failed {
+  border-color: rgba(255, 138, 128, 0.35);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.stuck {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: center;
+}
+
+/* ---------- composer ---------- */
+.composer {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3);
+}
+
+.input {
+  min-height: 88px;
+  resize: none;
+}
+
+.attached {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+}
+
+.attachedPhoto {
+  display: block;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  object-fit: cover;
+}
+
+.actions {
+  display: flex;
+  gap: var(--s2);
+}
+
+.photoBtn {
+  flex: none;
+  cursor: pointer;
+}
+
+.photoBtn[aria-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.photoBtn:focus-within {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.sendBtn {
+  flex: 1 1 auto;
+  min-height: 48px;
+}
+
+.sendBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

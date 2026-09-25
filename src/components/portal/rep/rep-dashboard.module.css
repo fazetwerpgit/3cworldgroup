@@ -985,6 +985,12 @@
   right: var(--s1);
 }
 
+/* ---------- Ask 3C entry (one row) ---------- */
+.askEntry {
+  overflow: hidden;
+  border-radius: var(--r-card);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .moneyBlock,
   .card,

@@ -42,6 +42,7 @@ export const PEOPLE_HUB = {
   tabs: [
     { key: 'everyone', label: 'Everyone', roles: PLATFORM_ROLES, permissions: ['users:read'] },
     { key: 'employee-data', label: 'Employee data', roles: ['owner'] },
+    { key: 'knowledge', label: 'Knowledge', roles: ['owner'] },
   ],
 } as const satisfies HubConfig;
 

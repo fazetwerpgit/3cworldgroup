@@ -180,6 +180,18 @@ service cloud.firestore {
     match /announcements/{announcementId} {
       allow read, write: if false;
     }
+    // Ask 3C: the owner's knowledge notes (restricted carrier material), the
+    // exchange log and the per-rep daily counters. Server-only (Admin SDK via
+    // /api/portal/ask and the owner's /api/portal/knowledge routes).
+    match /knowledgeNotes/{noteId} {
+      allow read, write: if false;
+    }
+    match /askLog/{logId} {
+      allow read, write: if false;
+    }
+    match /askUsage/{usageId} {
+      allow read, write: if false;
+    }
 
     match /chatChannels/{channelId} {
       allow read: if (isApproved() || isOnboardingMember()) && request.auth.uid in resource.data.memberIds;

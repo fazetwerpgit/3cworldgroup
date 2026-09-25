@@ -4,11 +4,13 @@ import { AdminHub } from '@/components/portal/admin-d/AdminHub';
 import { AdminGate } from '@/components/portal/admin-d/AdminUi';
 import { PEOPLE_HUB } from '@/components/portal/admin-d/adminHubs';
 import { EmployeeDataManager } from '@/components/employee-data/EmployeeDataManager';
+import { KnowledgeManager } from '@/components/knowledge/KnowledgeManager';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { Everyone } from './Everyone';
 
-// People: Everyone (user management) and the owner's Employee data.
+// People: Everyone (user management), the owner's Employee data, and the
+// owner's Knowledge (the notes Ask 3C answers from, and what reps asked).
 // /portal/admin/users and /employee-data redirect to their tab (next.config.ts).
 export default function PeoplePage() {
   const { isRole } = useAuth();
@@ -26,6 +28,11 @@ export default function PeoplePage() {
         'employee-data': () => (
           <AdminGate roles={['owner']}>
             <EmployeeDataManager />
+          </AdminGate>
+        ),
+        knowledge: () => (
+          <AdminGate roles={['owner']}>
+            <KnowledgeManager />
           </AdminGate>
         ),
       }}

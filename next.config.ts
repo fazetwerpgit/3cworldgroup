@@ -17,6 +17,7 @@ const MOVED_PAGES: [source: string, destination: string][] = [
   ['/portal/admin/pipeline', '/portal/admin/onboarding?tab=pipeline'],
   ['/portal/admin/employee-data', '/portal/admin/people?tab=employee-data'],
   ['/portal/admin/employee-import', '/portal/admin/people?tab=employee-data'],
+  ['/portal/admin/knowledge', '/portal/admin/people?tab=knowledge'],
   ['/portal/admin/payroll-disputes', '/portal/admin/requests?type=payroll-disputes'],
   ['/portal/admin/expedite-orders', '/portal/admin/requests?type=expedite-orders'],
   ['/portal/admin/leads-requests', '/portal/admin/requests?type=leads-requests'],
@@ -30,12 +31,13 @@ const MOVED_PAGES: [source: string, destination: string][] = [
 ];
 
 const nextConfig: NextConfig = {
-  // The Log Sale screenshot reader's kill switch, ONE variable for both sides:
-  // the scan route reads it, and this inlines it into the client bundle so the
-  // page never shows the reader when it is off. Set at build time, so flipping
-  // it needs a redeploy (as any Vercel env change does). See src/lib/sales/scan/flag.ts.
+  // Kill switches, ONE variable each for both sides: the route reads it, and
+  // this inlines it into the client bundle so the page never shows the feature
+  // when it is off. Set at build time, so flipping one needs a redeploy (as any
+  // Vercel env change does). See src/lib/sales/scan/flag.ts and src/lib/ask/flag.ts.
   env: {
     SALE_SCAN_ENABLED: process.env.SALE_SCAN_ENABLED ?? '',
+    ASK_3C_ENABLED: process.env.ASK_3C_ENABLED ?? '',
   },
   // Dev only: lets a phone on the LAN load the dev server through the
   // firewall-forwarded port without Next blocking /_next/* as cross-origin.

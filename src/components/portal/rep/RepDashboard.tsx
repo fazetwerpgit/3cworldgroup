@@ -27,6 +27,7 @@ import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
 import { PayHelpSheet } from './PayHelpSheet';
+import { AskEntryCard } from './AskEntryCard';
 import { InstallDateSheet } from './InstallDateSheet';
 import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
@@ -606,6 +607,8 @@ export interface RepHomeViewProps {
   callsFailed: boolean;
   /** The one-time screenshot-reader card (reads browser storage, so it is passed in). */
   scanIntro?: ReactNode;
+  /** Ask 3C's compact entry (hidden while the feature is off). */
+  askEntry?: ReactNode;
   /** Admin and operations: Needs attention (onboarding work), above everything else. */
   queues?: ReactNode;
   onHelp: () => void;
@@ -690,6 +693,7 @@ export function RepHomeView(p: RepHomeViewProps) {
           ) : null}
 
           {p.scanIntro ? <div className={d.scanSlot}>{p.scanIntro}</div> : null}
+          {p.askEntry}
 
           {p.payStatus === 'ready' && p.rows.length > 0 ? <RecentSales rows={p.rows} /> : null}
         </div>
@@ -804,6 +808,7 @@ export function RepDashboard() {
         extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
         callsFailed={data.calls.status === 'error'}
         scanIntro={canLog ? <ScanIntroCard now={now} /> : null}
+        askEntry={<AskEntryCard />}
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}

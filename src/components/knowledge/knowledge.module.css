@@ -1,0 +1,95 @@
+/* Owner Knowledge tab (direction D). Shared pieces are admin-ui.module.css. */
+
+.body {
+  min-height: 50vh;
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1.35 var(--f-ui);
+}
+
+/* Delete sits apart from Save / Cancel. */
+.push {
+  margin-left: auto;
+}
+
+.noteCols {
+  --cols: minmax(0, 1fr) auto;
+}
+
+.noteTitle {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit {
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+/* ---------- questions ---------- */
+.questions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.question {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+}
+
+.question + .question {
+  border-top: 1px solid var(--c-line);
+}
+
+.qMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.qMeta b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
+.qText {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.aText {
+  margin: 0;
+  padding: var(--s3);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
