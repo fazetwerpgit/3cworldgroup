@@ -77,10 +77,13 @@ async function verifyCaller(
 
 // Verifies a real token and confirms the caller is any active user (for rep
 // self-submit). Returns the verified uid + name/email — the route stamps from this,
-// never from client input.
+// never from client input. `isOwner` lets a route open a feature to the owner first.
 export async function requireVerifiedUser(
   request: NextRequest
-): Promise<{ ok: true; uid: string; name: string; email: string } | { ok: false; error: string; status: number }> {
+): Promise<
+  | { ok: true; uid: string; name: string; email: string; isOwner: boolean }
+  | { ok: false; error: string; status: number }
+> {
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   return {
@@ -88,6 +91,7 @@ export async function requireVerifiedUser(
     uid: c.uid,
     name: c.data.displayName || c.data.email || c.uid,
     email: c.data.email || '',
+    isOwner: isOwner(resolveRoles(c.data.role, c.data.fieldRole).role),
   };
 }
 

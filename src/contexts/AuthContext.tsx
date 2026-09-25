@@ -19,6 +19,7 @@ import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
 import { clearSignature } from '@/components/esign/signatureStore';
+import { ASK_CONVERSATION_KEY } from '@/lib/ask/chat';
 import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
@@ -350,6 +351,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // onboarding documents. Drop it here so a shared phone never hands one
       // rep's signature to whoever signs in next.
       clearSignature();
+      // Same for the Ask 3C conversation: the next rep must not see or send it.
+      try {
+        window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
+      } catch {
+        // Storage blocked: the page's uid check still keeps it from the next rep.
+      }
       await firebaseSignOut(auth);
       setProfileLoadFailed(false);
       setState({ user: null, loading: false, error: null, pendingApproval: false });

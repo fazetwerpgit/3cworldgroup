@@ -222,7 +222,7 @@ export function KnowledgeManager() {
             openEditor({
               id: null,
               title: (row.question || 'Question with a photo').slice(0, 120),
-              body: `Question: ${row.question || '(photo only)'}\n\nAsk 3C answered:\n${row.answer}\n\nThe right answer:\n`,
+              body: `${row.prevQuestion ? `Follow-up to: ${row.prevQuestion}\n` : ''}Question: ${row.question || '(photo only)'}\n\nAsk 3C answered:\n${row.answer}\n\nThe right answer:\n`,
             })
           }
         />
@@ -442,6 +442,11 @@ function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) =
                   </span>
                 ) : null}
               </p>
+              {row.prevQuestion ? (
+                <p className={k.prevText}>
+                  <span>Follow-up to</span> {row.prevQuestion}
+                </p>
+              ) : null}
               <p className={k.qText}>{row.question || '(photo only)'}</p>
               <p className={k.aText}>{row.answer}</p>
               <div className={u.btnRow}>

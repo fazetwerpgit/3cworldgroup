@@ -121,11 +121,17 @@
   min-height: 1.5em;
 }
 
-.tel {
+/* Tap-to-call numbers and https links in an answer. */
+.link {
   color: var(--c-lime-hi);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
 }
 
 .rate {
@@ -157,16 +163,38 @@
   outline-offset: 2px;
 }
 
+.rateError {
+  margin: var(--s1) 0 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  text-align: right;
+}
+
 .pending {
   color: var(--c-text-2);
   font-size: var(--t-ui);
 }
 
+/* A question that got no answer: the message, then Try again. It is back in the composer below. */
 .failed {
-  border-color: rgba(255, 138, 128, 0.35);
+  display: grid;
+  justify-items: start;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px solid rgba(255, 138, 128, 0.35);
+  border-radius: var(--r-control);
+  background: rgba(255, 138, 128, 0.08);
+}
+
+.failed p {
+  margin: 0;
   color: var(--c-text);
   font-size: var(--t-ui);
   line-height: 1.45;
+}
+
+.retry {
+  min-height: var(--tap);
 }
 
 .stuck {
@@ -181,6 +209,14 @@
   display: grid;
   gap: var(--s3);
   padding: var(--s3);
+}
+
+/* Phones: scrolling the composer into view stops it above the fixed tab bar
+   (same height the scroller pads by in rep.module.css). */
+@media (max-width: 1023px) {
+  .composer {
+    scroll-margin-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--s3) - var(--pwa-bottom-gap, 0px));
+  }
 }
 
 .input {

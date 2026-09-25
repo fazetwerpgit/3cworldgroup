@@ -4,7 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isAllowedImageMime } from '@/lib/chat/media';
 import { MAX_FORM_FILE_BYTES, resolveUploadMime } from '@/lib/forms/formUploads';
 import { MAX_QUESTION_CHARS, parseHistory, type AskReply, type AskTurnMessage } from '@/lib/ask/chat';
-import { askEnabled } from '@/lib/ask/flag';
+import { askAudience } from '@/lib/ask/flag';
 import { buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
@@ -23,6 +23,7 @@ export const maxDuration = 45;
 const STUB_MODEL = 'sandbox-stub';
 const PHOTO_ONLY_QUESTION = 'Here is a photo. What should I do?';
 const CALL_FOR_HELP = 'Try again, or call Jeremy or your manager.';
+const PREV_QUESTION_CHARS = 200;
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
 
@@ -31,11 +32,13 @@ function log(event: Record<string, string | number | boolean>) {
 }
 
 export async function POST(request: NextRequest) {
-  // Kill switch: off unless explicitly on.
-  if (!askEnabled()) return fail('Ask 3C is not turned on yet.', 404);
+  // Kill switch: off unless 'true' (everyone) or 'owners' (the owner only).
+  const audience = askAudience();
+  if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
 
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);
+  if (audience === 'owners' && !gate.isOwner) return fail('Ask 3C is not turned on yet.', 404);
   if (!adminDb) return fail('Database not configured', 500);
   const db = adminDb;
 
@@ -81,6 +84,9 @@ export async function POST(request: NextRequest) {
   const [notes, dealerCodes] = await Promise.all([loadNotes(db), ownDealerCodes(db, gate.uid)]);
   const firstName = gate.name.includes('@') || gate.name === gate.uid ? '' : gate.name.split(/\s+/)[0];
   const redacted = redactContact(question);
+  // A follow-up's log row shows what it followed, so the owner can read it in context.
+  const previous = history.findLast((turn) => turn.role === 'user');
+  const prevQuestion = previous ? redactContact(previous.text).slice(0, PREV_QUESTION_CHARS) : null;
 
   let answer: string;
   let usage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
@@ -118,6 +124,7 @@ export async function POST(request: NextRequest) {
     uid: gate.uid,
     repName: gate.name,
     question: redacted,
+    prevQuestion,
     hadPhoto: image !== null,
     answer,
     model: stub ? STUB_MODEL : config.model,

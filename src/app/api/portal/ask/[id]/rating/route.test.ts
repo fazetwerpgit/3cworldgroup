@@ -31,7 +31,7 @@ const rate = (id: string, rating: unknown) =>
 beforeEach(() => {
   vi.stubEnv('ASK_3C_ENABLED', 'true');
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '' });
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false });
   fake = createFakeAskDb({ askLog: { abc123: { uid: 'r1', answer: 'A', rating: null } } });
   state.db = fake.db;
 });
@@ -48,9 +48,15 @@ describe('PATCH /api/portal/ask/{id}/rating', () => {
     expect(fake.docs('askLog').get('abc123')?.rating).toBeNull();
   });
 
-  it("403s another rep and leaves the rating alone", async () => {
-    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other', email: '' });
+  it('403s another rep and leaves the rating alone', async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other', email: '', isOwner: false });
     expect((await rate('abc123', 'up')).status).toBe(403);
+    expect(fake.docs('askLog').get('abc123')?.rating).toBeNull();
+  });
+
+  it('404s a non-owner in "owners" mode, even on their own answer', async () => {
+    vi.stubEnv('ASK_3C_ENABLED', 'owners');
+    expect((await rate('abc123', 'up')).status).toBe(404);
     expect(fake.docs('askLog').get('abc123')?.rating).toBeNull();
   });
 

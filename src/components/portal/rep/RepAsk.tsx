@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Camera, MessageCircleQuestion, SendHorizontal, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Camera, MessageCircleQuestion, RotateCw, SendHorizontal, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { askEnabled } from '@/lib/ask/flag';
+import { askOpenTo } from '@/lib/ask/flag';
 import {
+  ASK_CONVERSATION_KEY,
   ASK_HISTORY_TURNS,
   MAX_QUESTION_CHARS,
   answerLines,
@@ -18,8 +20,9 @@ import a from './rep-ask.module.css';
 
 // Ask 3C: a rep at a customer's door asks what to do; the answer comes from
 // the owner's knowledge notes only (POST /api/portal/ask). One conversation per
-// browser session: the last turns live in sessionStorage and go back with each
-// question so a follow-up has context. Photos are never kept.
+// browser session: the last turns live in sessionStorage, tagged with the rep's
+// uid (sign-out clears it; another uid's conversation is dropped), and go back
+// with each question so a follow-up has context. Photos are never kept.
 
 interface Turn {
   key: string;
@@ -30,11 +33,17 @@ interface Turn {
   /** The askLog id, for the thumbs. */
   id?: string;
   answer?: string;
-  error?: string;
   rating?: 'up' | 'down' | null;
+  /** The last thumbs did not save. */
+  rateFailed?: boolean;
 }
 
-const STORE_KEY = 'ask3c-conversation';
+/** What sessionStorage holds: one rep's conversation. */
+interface StoredConversation {
+  uid: string;
+  turns: Turn[];
+}
+
 const REQUEST_TIMEOUT_MS = 45_000;
 // HEIC is taken and turned into a JPEG on the phone (Safari decodes it); the
 // model reads JPEG, PNG and WebP.
@@ -42,27 +51,32 @@ const PHOTO_PICK_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic',
 const PHOTO_SEND_TYPES: Record<string, true> = { 'image/jpeg': true, 'image/png': true, 'image/webp': true };
 
 const EXAMPLES = [
-  "The order screen won't take the customer's address. What do I do?",
-  'The credit check came back with an error. What are my options?',
-  "The install dates won't load. How do I finish the order?",
+  'The screen says the customer has reached the max number of lines. What do I do?',
+  'A $100 deposit came up. What do I tell the customer?',
+  'How do I call Sales Support?',
 ];
 
-function readStored(): Turn[] {
+/** This rep's stored conversation. Anyone else's (a shared phone) is thrown away. */
+function readStored(uid: string): Turn[] {
   try {
-    const raw = JSON.parse(window.sessionStorage.getItem(STORE_KEY) ?? '[]');
-    return Array.isArray(raw) ? (raw as Turn[]).filter((turn) => turn && typeof turn.question === 'string') : [];
+    const raw = JSON.parse(window.sessionStorage.getItem(ASK_CONVERSATION_KEY) ?? 'null') as StoredConversation | null;
+    if (!raw || raw.uid !== uid || !Array.isArray(raw.turns)) {
+      window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
+      return [];
+    }
+    return raw.turns.filter((turn) => turn && typeof turn.question === 'string' && typeof turn.answer === 'string');
   } catch {
     return [];
   }
 }
 
-function store(turns: Turn[]) {
+function store(uid: string, turns: Turn[]) {
   try {
     const kept = turns
       .filter((turn) => turn.answer)
       .slice(-ASK_HISTORY_TURNS)
-      .map((turn) => ({ ...turn, photoUrl: undefined }));
-    window.sessionStorage.setItem(STORE_KEY, JSON.stringify(kept));
+      .map((turn) => ({ ...turn, photoUrl: undefined, rateFailed: undefined }));
+    window.sessionStorage.setItem(ASK_CONVERSATION_KEY, JSON.stringify({ uid, turns: kept } satisfies StoredConversation));
   } catch {
     // Private mode or a full quota: the conversation just won't survive a reload.
   }
@@ -86,7 +100,11 @@ function Answer({ text }: { text: string }) {
         <span key={line} className={a.line}>
           {parts.map((part, index) =>
             part.kind === 'phone' ? (
-              <a key={index} href={`tel:${part.tel}`} className={a.tel}>
+              <a key={index} href={`tel:${part.tel}`} className={a.link}>
+                {part.text}
+              </a>
+            ) : part.kind === 'link' ? (
+              <a key={index} href={part.href} target="_blank" rel="noopener noreferrer" className={a.link}>
                 {part.text}
               </a>
             ) : (
@@ -100,23 +118,35 @@ function Answer({ text }: { text: string }) {
 }
 
 export function RepAsk() {
+  const { user } = useAuth();
+  const uid = user?.uid ?? '';
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState('');
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
+  /** The last question got no answer; it is back in the composer. */
+  const [failed, setFailed] = useState('');
   const [fileKey, setFileKey] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    // Restored after mount: the server render has no sessionStorage.
-    setTurns(readStored());
+  /** Bring the whole composer into view; its scroll margin keeps it above the phone tab bar. */
+  const showComposer = useCallback((behavior: ScrollBehavior) => {
+    window.requestAnimationFrame(() => composerRef.current?.scrollIntoView({ block: 'end', behavior }));
   }, []);
 
-  const enabled = askEnabled();
-  if (!enabled) {
+  useEffect(() => {
+    // Restored after mount (the server render has no sessionStorage), and
+    // again if a different rep signs in on this phone.
+    if (!uid) return;
+    const restored = readStored(uid);
+    setTurns(restored);
+    if (restored.length > 0) showComposer('instant');
+  }, [uid, showComposer]);
+
+  if (!askOpenTo(user?.role)) {
     return (
       <div className={p.page}>
         <header className={p.head}>
@@ -137,7 +167,7 @@ export function RepAsk() {
   const update = (next: (current: Turn[]) => Turn[]) => {
     setTurns((current) => {
       const updated = next(current);
-      store(updated);
+      store(uid, updated);
       return updated;
     });
   };
@@ -176,10 +206,12 @@ export function RepAsk() {
     setQuestion('');
     setPhoto(null);
     setNotice('');
+    setFailed('');
     setSending(true);
-    window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }));
+    showComposer('smooth');
 
-    let patch: Partial<Turn>;
+    let reply: AskReply | null = null;
+    let error = 'No answer came back. Check your signal and try again, or call Jeremy or your manager.';
     try {
       const form = new FormData();
       form.set('question', text);
@@ -193,23 +225,31 @@ export function RepAsk() {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       const json = (await res.json().catch(() => ({}))) as Partial<AskReply> & { error?: string };
-      patch =
-        res.ok && json.answer && json.id
-          ? { id: json.id, answer: json.answer, rating: null }
-          : { error: json.error || "Ask 3C couldn't answer right now. Try again, or call Jeremy or your manager." };
+      if (res.ok && json.answer && json.id) reply = { id: json.id, answer: json.answer };
+      else error = json.error || "Ask 3C couldn't answer right now. Try again, or call Jeremy or your manager.";
     } catch {
-      patch = { error: 'No answer came back. Check your signal and try again, or call Jeremy or your manager.' };
+      // The default message above: nothing came back.
     }
-    update((current) => current.map((turn) => (turn.key === key ? { ...turn, ...patch } : turn)));
+    if (reply) {
+      const { id, answer } = reply;
+      update((current) => current.map((turn) => (turn.key === key ? { ...turn, id, answer, rating: null } : turn)));
+    } else {
+      // Nothing to show for it: the question (and photo) go back in the
+      // composer, ready for Try again. The composer was read-only meanwhile.
+      update((current) => current.filter((turn) => turn.key !== key));
+      setQuestion(text);
+      setPhoto(sentPhoto);
+      setFailed(error);
+    }
     setSending(false);
-    window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }));
+    showComposer('smooth');
   };
 
   const rate = async (turn: Turn, rating: 'up' | 'down') => {
     if (!turn.id) return;
     const next = turn.rating === rating ? null : rating;
     const previous = turn.rating ?? null;
-    update((current) => current.map((t) => (t.key === turn.key ? { ...t, rating: next } : t)));
+    update((current) => current.map((t) => (t.key === turn.key ? { ...t, rating: next, rateFailed: false } : t)));
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/portal/ask/${turn.id}/rating`, {
@@ -219,7 +259,7 @@ export function RepAsk() {
       });
       if (!res.ok) throw new Error('rating failed');
     } catch {
-      update((current) => current.map((t) => (t.key === turn.key ? { ...t, rating: previous } : t)));
+      update((current) => current.map((t) => (t.key === turn.key ? { ...t, rating: previous, rateFailed: true } : t)));
     }
   };
 
@@ -227,9 +267,10 @@ export function RepAsk() {
     for (const turn of turns) if (turn.photoUrl) URL.revokeObjectURL(turn.photoUrl);
     update(() => []);
     setNotice('');
+    setFailed('');
   };
 
-  const answered = turns.some((turn) => turn.answer || turn.error);
+  const answered = turns.some((turn) => turn.answer);
 
   return (
     <div className={`${p.page} ${a.page}`}>
@@ -303,11 +344,12 @@ export function RepAsk() {
                       <ThumbsDown size={18} aria-hidden="true" />
                     </button>
                   </div>
+                  {turn.rateFailed ? (
+                    <p className={a.rateError} role="alert">
+                      That didn&apos;t save. Tap it again.
+                    </p>
+                  ) : null}
                 </div>
-              ) : turn.error ? (
-                <p className={`${a.answer} ${a.failed}`} role="alert">
-                  {turn.error}
-                </p>
               ) : (
                 <p className={`${a.answer} ${a.pending}`} role="status">
                   Looking in the notes…
@@ -320,7 +362,16 @@ export function RepAsk() {
 
       {answered ? <p className={a.stuck}>Still stuck? Call Jeremy or your manager.</p> : null}
 
-      <form className={`${s.panel} ${a.composer}`} onSubmit={send}>
+      <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>
+        {failed ? (
+          <div className={a.failed} role="alert">
+            <p>{failed}</p>
+            <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void send()}>
+              <RotateCw size={18} aria-hidden="true" />
+              Try again
+            </button>
+          </div>
+        ) : null}
         <label htmlFor="ask-question" className={s.srOnly}>
           Your question
         </label>
@@ -333,6 +384,7 @@ export function RepAsk() {
           maxLength={MAX_QUESTION_CHARS}
           rows={3}
           enterKeyHint="send"
+          readOnly={sending}
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void send();
@@ -383,7 +435,6 @@ export function RepAsk() {
           </button>
         </div>
       </form>
-      <div ref={endRef} />
     </div>
   );
 }

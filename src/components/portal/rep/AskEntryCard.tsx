@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
-import { askEnabled } from '@/lib/ask/flag';
+import { useAuth } from '@/contexts/AuthContext';
+import { askOpenTo } from '@/lib/ask/flag';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import d from './rep-dashboard.module.css';
 
-/** Home's compact way into Ask 3C. Hidden while the feature is switched off. */
+/** Home's compact way into Ask 3C. Hidden while the feature is off, or not yet open to this user. */
 export function AskEntryCard() {
-  if (!askEnabled()) return null;
+  const { user } = useAuth();
+  if (!askOpenTo(user?.role)) return null;
   return (
     <section className={`${s.panel} ${d.askEntry}`} aria-label="Ask 3C">
       <Link href="/portal/ask" className={p.row}>

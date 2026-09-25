@@ -70,7 +70,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: 'dana@x.test' });
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: 'dana@x.test', isOwner: false });
   vi.spyOn(console, 'info').mockImplementation(() => {});
   seed();
 });
@@ -82,12 +82,25 @@ afterEach(() => {
 });
 
 describe('POST /api/portal/ask', () => {
-  it('404s unless ASK_3C_ENABLED is exactly "true", before auth or any call', async () => {
-    vi.stubEnv('ASK_3C_ENABLED', '1');
-    const res = await POST(req({ question: 'Hi' }));
-    expect(res.status).toBe(404);
+  it('404s unless ASK_3C_ENABLED is "true" or "owners", before auth or any call', async () => {
+    for (const value of ['1', 'TRUE', 'owner', '']) {
+      vi.stubEnv('ASK_3C_ENABLED', value);
+      expect((await POST(req({ question: 'Hi' }))).status).toBe(404);
+    }
     expect(mockUser).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('in "owners" mode answers the owner and 404s everyone else without using a question', async () => {
+    vi.stubEnv('ASK_3C_ENABLED', 'owners');
+    const res = await POST(req({ question: 'Hi' }));
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fake.docs('askUsage').size).toBe(0);
+
+    mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true });
+    modelAnswers();
+    expect((await POST(req({ question: 'Hi' }))).status).toBe(200);
   });
 
   it('passes on the auth failure', async () => {
@@ -119,7 +132,7 @@ describe('POST /api/portal/ask', () => {
   });
 
   it("tells the model the code is unknown when the rep isn't mapped", async () => {
-    mockUser.mockResolvedValue({ ok: true, uid: 'r9', name: 'Pat New', email: '' });
+    mockUser.mockResolvedValue({ ok: true, uid: 'r9', name: 'Pat New', email: '', isOwner: false });
     modelAnswers();
     await POST(req({ question: 'What is my dealer code?' }));
     const system: string = sentBody().messages[0].content;
@@ -153,6 +166,8 @@ describe('POST /api/portal/ask', () => {
       uid: 'r1',
       repName: 'Dana Rep',
       question: expected,
+      // The follow-up's row carries the earlier question, redacted too.
+      prevQuestion: 'Earlier: [phone] and [email]',
       hadPhoto: false,
       answer,
       model: 'deepseek-flash',
@@ -174,6 +189,7 @@ describe('POST /api/portal/ask', () => {
     });
     const [logged] = logs();
     expect(logged.hadPhoto).toBe(true);
+    expect(logged.prevQuestion).toBeNull();
     expect(JSON.stringify(logged)).not.toContain(Buffer.from('fake-jpeg').toString('base64'));
   });
 
@@ -196,7 +212,7 @@ describe('POST /api/portal/ask', () => {
     expect((await res.json()).error).toMatch(/Call Jeremy or your manager/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     // Another rep's count is their own.
-    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '' });
+    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false });
     modelAnswers();
     expect((await POST(req({ question: 'Mine' }))).status).toBe(200);
   });

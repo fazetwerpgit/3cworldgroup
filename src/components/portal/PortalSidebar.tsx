@@ -177,7 +177,7 @@ export function PortalSidebar() {
   }, [collapsed]);
 
   const canAccess = (item: PortalNavItem) => {
-    if (item.enabled && !item.enabled()) return false;
+    if (item.openTo && !item.openTo(user?.role)) return false;
     if (item.onboardingOnly && !isOnboardingUser(user)) return false;
     if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
     if (isOnboardingUser(user) && !isOnboardingAllowedPage(item.href)) return false;

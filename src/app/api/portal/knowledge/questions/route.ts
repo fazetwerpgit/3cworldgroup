@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         id: doc.id,
         repName: typeof data.repName === 'string' ? data.repName : '',
         question: typeof data.question === 'string' ? data.question : '',
+        prevQuestion: typeof data.prevQuestion === 'string' && data.prevQuestion ? data.prevQuestion : null,
         hadPhoto: data.hadPhoto === true,
         answer: typeof data.answer === 'string' ? data.answer : '',
         rating: data.rating === 'up' || data.rating === 'down' ? data.rating : null,

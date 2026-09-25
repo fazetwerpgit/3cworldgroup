@@ -22,8 +22,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
-import { askEnabled } from '@/lib/ask/flag';
-import { Sale, UserRole } from '@/types';
+import { askOpenTo } from '@/lib/ask/flag';
+import { PlatformRole, Sale, UserRole } from '@/types';
 import {
   ONBOARDING_HUB,
   PEOPLE_HUB,
@@ -49,8 +49,8 @@ export interface PortalNavItem {
   onboardingOnly?: boolean;
   /** A hub page: its tabs are searchable in the palette under their own names. */
   hub?: HubConfig;
-  /** A feature behind a kill switch: the item shows only while this answers true. */
-  enabled?: () => boolean;
+  /** A feature behind a kill switch or a rollout: the item shows only while this answers true for the viewer's platform role. */
+  openTo?: (role: PlatformRole | undefined) => boolean;
 }
 
 export interface PortalNavGroup {
@@ -86,7 +86,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
       { label: 'Forms', href: '/portal/forms', icon: ReceiptText },
       { label: 'Learn', href: '/portal/learn', icon: GraduationCap },
-      { label: 'Ask 3C', href: '/portal/ask', icon: MessageCircleQuestion, enabled: askEnabled },
+      { label: 'Ask 3C', href: '/portal/ask', icon: MessageCircleQuestion, openTo: askOpenTo },
       { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, onboardingOnly: true },
     ],
   },
@@ -128,7 +128,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Same gate PortalSidebar uses: role restriction wins, then permissions.
   const canAccess = useCallback(
     (item: PortalNavItem) => {
-      if (item.enabled && !item.enabled()) return false;
+      if (item.openTo && !item.openTo(user?.role)) return false;
       if (item.onboardingOnly && !isOnboardingUser(user)) return false;
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
       if (onboardingUser && !isOnboardingAllowedPage(item.href)) return false;

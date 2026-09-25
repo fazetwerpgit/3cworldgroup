@@ -72,6 +72,22 @@
   font-weight: 600;
 }
 
+/* A follow-up's earlier question, quiet, above the question itself. */
+.prevText {
+  margin: 0;
+  padding-left: var(--s3);
+  border-left: 2px solid var(--c-line-strong);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.prevText span {
+  color: var(--c-text-3);
+  font-weight: 600;
+}
+
 .qText {
   margin: 0;
   color: var(--c-text);
