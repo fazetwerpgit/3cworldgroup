@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       content.push({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.bytes.toString('base64')}` } });
     }
     const messages: AskMessage[] = [
-      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes }) },
+      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now }) },
       ...history.map((turn) => ({
         role: turn.role,
         content: turn.role === 'user' ? redactContact(turn.text) : turn.text,

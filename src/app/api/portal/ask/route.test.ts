@@ -111,7 +111,7 @@ describe('POST /api/portal/ask', () => {
     expect(logs()).toHaveLength(0);
   });
 
-  it('sends the notes in stable order, then only the asking rep’s own dealer code, non-thinking', async () => {
+  it('sends the notes in stable order, then only the asking rep’s own dealer code', async () => {
     modelAnswers();
     const res = await POST(req({ question: 'Where do I start?' }));
     expect(res.status).toBe(200);
@@ -120,7 +120,6 @@ describe('POST /api/portal/ask', () => {
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer test-key');
     const body = sentBody();
     expect(body.model).toBe('deepseek-flash');
-    expect(body.thinking).toEqual({ type: 'disabled' });
     const system: string = body.messages[0].content;
     expect(body.messages[0].role).toBe('system');
     expect(system.indexOf('First thing')).toBeLessThan(system.indexOf('Second thing'));

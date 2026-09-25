@@ -7,8 +7,8 @@
 export const DEFAULT_ASK_BASE_URL = 'https://api.deepseek.com';
 export const DEFAULT_ASK_MODEL = 'deepseek-flash';
 export const ASK_TIMEOUT_MS = 30_000;
-/** Answers are a few lines; this only stops a runaway reply. */
-const MAX_ANSWER_TOKENS = 800;
+/** The answer is a few lines; thinking tokens count here too, so this leaves room for both. */
+const MAX_ANSWER_TOKENS = 3000;
 
 export type AskContentPart =
   | { type: 'text'; text: string }
@@ -68,14 +68,18 @@ export async function callAskModel(
     model: config.model,
     messages,
     max_tokens: MAX_ANSWER_TOKENS,
-    // 0.5: enough variety for banter and coaching; facts stay pinned by the notes rule.
-    temperature: 0.5,
     stream: false,
   };
-  // DeepSeek thinks by default; non-thinking mode answers far faster and a
-  // lookup in the notes needs no reasoning. Only DeepSeek knows this field,
-  // so another provider behind ASK_BASE_URL never sees it.
-  if (isDeepSeek(config.baseUrl)) body.thinking = { type: 'disabled' };
+  // Field tests (9/25): with short thinking the model stopped guessing where the
+  // notes are silent, did the Central/Eastern hours math and led with the
+  // decision; median answer 2.8s vs 2.4s. Only DeepSeek knows these fields, so
+  // another provider behind ASK_BASE_URL never sees them.
+  if (isDeepSeek(config.baseUrl)) {
+    body.thinking = { type: 'enabled' };
+    body.reasoning_effort = 'low';
+  } else {
+    body.temperature = 0.5;
+  }
 
   let res: Response;
   try {
