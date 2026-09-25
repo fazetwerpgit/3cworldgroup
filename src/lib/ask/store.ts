@@ -64,3 +64,11 @@ export async function ownDealerCodes(db: FirebaseFirestore.Firestore, uid: strin
     .map(([code]) => code)
     .sort();
 }
+
+/** "City, ST" from the rep's profile, or '' when neither is set. */
+export async function repHome(db: FirebaseFirestore.Firestore, uid: string): Promise<string> {
+  const data = (await db.collection('users').doc(uid).get()).data() ?? {};
+  const city = typeof data.city === 'string' ? data.city.trim() : '';
+  const state = typeof data.state === 'string' ? data.state.trim() : '';
+  return [city, state].filter(Boolean).join(', ');
+}

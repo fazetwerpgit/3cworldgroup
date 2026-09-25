@@ -8,7 +8,7 @@ import { askAudience } from '@/lib/ask/flag';
 import { buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
-import { ASK_DAILY_LIMIT, ASK_LOG, loadNotes, ownDealerCodes, takeDailyAsk } from '@/lib/ask/store';
+import { ASK_DAILY_LIMIT, ASK_LOG, loadNotes, ownDealerCodes, repHome, takeDailyAsk } from '@/lib/ask/store';
 
 // POST /api/portal/ask (multipart: question, history JSON, optional photo) —
 // Ask 3C: answers a rep's question from the owner's knowledge notes only.
@@ -81,7 +81,11 @@ export async function POST(request: NextRequest) {
     return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit. Call Jeremy or Jacob.`, 429);
   }
 
-  const [notes, dealerCodes] = await Promise.all([loadNotes(db), ownDealerCodes(db, gate.uid)]);
+  const [notes, dealerCodes, home] = await Promise.all([
+    loadNotes(db),
+    ownDealerCodes(db, gate.uid),
+    repHome(db, gate.uid).catch(() => ''),
+  ]);
   const firstName = gate.name.includes('@') || gate.name === gate.uid ? '' : gate.name.split(/\s+/)[0];
   const redacted = redactContact(question);
   // A follow-up's log row shows what it followed, so the owner can read it in context.
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
       content.push({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.bytes.toString('base64')}` } });
     }
     const messages: AskMessage[] = [
-      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now }) },
+      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now, home }) },
       ...history.map((turn) => ({
         role: turn.role,
         content: turn.role === 'user' ? redactContact(turn.text) : turn.text,

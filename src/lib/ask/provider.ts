@@ -58,11 +58,31 @@ function isDeepSeek(baseUrl: string): boolean {
 
 const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
-/** One non-streamed completion. Throws AskProviderError on a timeout, a non-2xx, or an empty answer. */
+/**
+ * One completion. Field tests saw thinking mode occasionally return an empty
+ * answer, so an empty reply is retried once with thinking off before failing.
+ * Throws AskProviderError on a timeout, a non-2xx, or an empty answer.
+ */
 export async function callAskModel(
   config: AskProviderConfig,
   messages: AskMessage[],
   timeoutMs = ASK_TIMEOUT_MS
+): Promise<{ answer: string; usage: AskUsage }> {
+  const started = Date.now();
+  try {
+    return await requestAnswer(config, messages, timeoutMs, true);
+  } catch (error) {
+    const left = timeoutMs - (Date.now() - started);
+    if (!(error instanceof AskProviderError) || error.kind !== 'bad_response' || left < 5_000) throw error;
+    return requestAnswer(config, messages, left, false);
+  }
+}
+
+async function requestAnswer(
+  config: AskProviderConfig,
+  messages: AskMessage[],
+  timeoutMs: number,
+  think: boolean
 ): Promise<{ answer: string; usage: AskUsage }> {
   const body: Record<string, unknown> = {
     model: config.model,
@@ -75,8 +95,9 @@ export async function callAskModel(
   // decision; median answer 2.8s vs 2.4s. Only DeepSeek knows these fields, so
   // another provider behind ASK_BASE_URL never sees them.
   if (isDeepSeek(config.baseUrl)) {
-    body.thinking = { type: 'enabled' };
-    body.reasoning_effort = 'low';
+    body.thinking = { type: think ? 'enabled' : 'disabled' };
+    if (think) body.reasoning_effort = 'low';
+    else body.temperature = 0.5;
   } else {
     body.temperature = 0.5;
   }
