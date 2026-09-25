@@ -117,7 +117,10 @@ const STATE_ZONE: Record<string, [string, string]> = {
 
 /** "It's 4:30 PM Sunday where they are (Central time)." from a "City, ST" home, or '' if unknown. */
 export function localTimeLine(now: Date, home: string): string {
-  const state = home.trim().slice(-2).toUpperCase();
+  const match = home.trim().match(/(?:^|,\s*)([A-Za-z]{2})$/);
+  const state = match ? match[1].toUpperCase() : '';
+  const eastern = /^(CT|DE|FL|GA|IN|KY|MA|MD|ME|MI|NC|NH|NJ|NY|OH|PA|RI|SC|TN|VA|VT|WV|DC)$/.test(state);
+  if (!STATE_ZONE[state] && !eastern) return '';
   const [zone, label] = STATE_ZONE[state] ?? ['America/New_York', 'Eastern'];
   const time = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long', hour: 'numeric', minute: '2-digit' }).format(now);
   return `For them it's ${time} (${label} time). Say times in ${label} time.`;

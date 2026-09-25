@@ -41,4 +41,8 @@ describe('localTimeLine', () => {
     );
     expect(localTimeLine(et('2026-09-27T17:30'), 'Lansing, MI')).toContain('5:30 PM (Eastern time)');
   });
+
+  it('says nothing when the state is unknown rather than guessing Eastern', () => {
+    expect(localTimeLine(et('2026-09-27T17:30'), 'Iowa City')).toBe('');
+  });
 });
