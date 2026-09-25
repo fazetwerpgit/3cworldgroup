@@ -3,7 +3,9 @@ import {
   MAX_PRACTICE_TURNS,
   MAX_REP_CHARS,
   PERSONAS,
+  buildCustomerPrompt,
   buildFeedbackPrompt,
+  enforceResult,
   parsePracticeHistory,
   parseScore,
   practiceCustomer,
@@ -34,9 +36,19 @@ describe('practiceCustomer', () => {
     expect(new Set(seeds.map((seed) => practiceCustomer('surprise', seed).persona.id)).size).toBe(PERSONAS.length);
   });
 
-  it('tells the coach the AT&T Fiber homeowner should not buy', () => {
-    expect(buildFeedbackPrompt([], practiceCustomer('att-fiber', 1))).toContain('should NOT buy');
-    expect(buildFeedbackPrompt([], practiceCustomer('renter', 1))).not.toContain('should NOT buy');
+  it('tells the coach whether the homeowner should buy and who ended it', () => {
+    const att = buildFeedbackPrompt([], practiceCustomer('att-fiber', 1), 'rep');
+    expect(att).toContain('should NOT buy');
+    expect(att).toContain('The rep ended it');
+    const renter = buildFeedbackPrompt([], practiceCustomer('renter', 1), 'homeowner');
+    expect(renter).not.toContain('should NOT buy');
+    expect(renter).toContain('Never "Walked away the right way" for this homeowner');
+    expect(renter).toContain("The homeowner's last line ended it");
+  });
+
+  it('gives the busy parent less patience than the others', () => {
+    expect(buildCustomerPrompt(practiceCustomer('busy-parent', 1))).toContain('about 3 weak turns');
+    expect(buildCustomerPrompt(practiceCustomer('elderly', 1))).toContain('about 5 weak turns');
   });
 });
 
@@ -50,6 +62,19 @@ describe('splitEnd', () => {
   it('leaves a normal line alone and never returns an empty line', () => {
     expect(splitEnd('Who are you with?')).toEqual({ text: 'Who are you with?', ended: false });
     expect(splitEnd('[END]')).toEqual({ text: '(closes the door)', ended: true });
+  });
+});
+
+describe('enforceResult', () => {
+  const feedback = 'Score: 3/10\nResult: Walked away the right way\nWhat worked:\n- "Hi"';
+
+  it('turns "walked away" into No sale for a homeowner who could be sold', () => {
+    expect(enforceResult(feedback, true)).toBe('Score: 3/10\nResult: No sale\nWhat worked:\n- "Hi"');
+    expect(enforceResult('Score: 8/10\nResult: Sale', true)).toBe('Score: 8/10\nResult: Sale');
+  });
+
+  it('keeps it for the homeowner who should not buy', () => {
+    expect(enforceResult(feedback, false)).toBe(feedback);
   });
 });
 

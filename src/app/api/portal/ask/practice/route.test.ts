@@ -122,13 +122,14 @@ describe('POST /api/portal/ask/practice', () => {
     expect((await POST(req({ action: 'turn', ...SESSION, history: [{ role: 'user', text: 'hi' }] }))).status).toBe(400);
     expect((await POST(req({ action: 'turn', persona: 'ceo', seed: 1, history: [] }))).status).toBe(400);
     expect((await POST(req({ action: 'turn', persona: 'renter', seed: -1, history: [] }))).status).toBe(400);
-    expect((await POST(req({ action: 'feedback', ...SESSION, history: PITCH.slice(0, 1) }))).status).toBe(400);
+    expect((await POST(req({ action: 'feedback', ...SESSION, history: PITCH.slice(0, 1), endedBy: 'rep' }))).status).toBe(400);
+    expect((await POST(req({ action: 'feedback', ...SESSION, history: PITCH }))).status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('grades against the notes and logs the session with its parsed score', async () => {
     modelAnswers('Score: 6/10\nResult: no sale\nWhat worked:\n- "Hi, I\'m with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"');
-    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH }));
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     expect(res.status).toBe(200);
     const { id, score, feedback } = await res.json();
     expect(score).toBe(6);
@@ -138,6 +139,7 @@ describe('POST /api/portal/ask/practice', () => {
     expect(body.thinking).toEqual({ type: 'enabled' });
     expect(body.messages[0].content).toContain('Open with the three things.');
     expect(body.messages[0].content).toContain('Type: Price shopper');
+    expect(body.messages[0].content).toContain('The rep ended it');
     expect(body.messages[1].content).toContain('Rep: Hi, I\'m with 3C. Text me at [phone] or [email].');
 
     expect(fake.docs('practiceLog').get(id)).toMatchObject({
@@ -146,15 +148,25 @@ describe('POST /api/portal/ask/practice', () => {
       persona: 'price-shopper',
       personaLabel: 'Price shopper',
       score: 6,
+      endedBy: 'rep',
       feedback,
       turns: [PITCH[0], { role: 'rep', text: "Hi, I'm with 3C. Text me at [phone] or [email]." }],
     });
     expect(fake.docs('askLog').size).toBe(0);
   });
 
+  it('never lets a sellable homeowner end as "walked away the right way"', async () => {
+    modelAnswers('Score: 2/10\nResult: Walked away the right way\nFix next time: Ask questions.');
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'homeowner' }));
+    const { feedback } = await res.json();
+    expect(feedback).toBe('Score: 2/10\nResult: No sale\nFix next time: Ask questions.');
+    expect(sentBody().messages[0].content).toContain("The homeowner's last line ended it");
+    expect(practiceLogs()[0]).toMatchObject({ feedback, endedBy: 'homeowner' });
+  });
+
   it('logs a null score when the coach skips the Score line', async () => {
     modelAnswers('Good energy. Ask more questions.');
-    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH }));
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     expect((await res.json()).score).toBeNull();
     expect(practiceLogs()[0].score).toBeNull();
   });
@@ -176,7 +188,7 @@ describe('POST /api/portal/ask/practice', () => {
 
   it('answers a friendly 502 when the coach call fails, and logs nothing', async () => {
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
-    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH }));
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("The coach couldn't answer right now. Try again in a minute.");
     expect(practiceLogs()).toHaveLength(0);

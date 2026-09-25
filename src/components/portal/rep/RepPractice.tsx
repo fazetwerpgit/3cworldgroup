@@ -13,6 +13,7 @@ import {
   isPracticeSeed,
   practiceCustomer,
   type PersonaChoice,
+  type PracticeEndedBy,
   type PracticeFeedbackReply,
   type PracticeTurn,
   type PracticeTurnReply,
@@ -37,6 +38,8 @@ interface Session {
   turns: PracticeTurn[];
   /** The homeowner closed the door or signed up, or the rep ended it. */
   ended: boolean;
+  /** Who ended it; the coach grades the Result by it. */
+  endedBy?: PracticeEndedBy;
   feedback: { text: string; score: number | null } | null;
 }
 
@@ -75,6 +78,7 @@ export function readStoredPractice(uid: string): Session | null {
       seed: raw.seed,
       turns: raw.turns.filter((turn) => turn && (turn.role === 'rep' || turn.role === 'customer') && typeof turn.text === 'string'),
       ended: raw.ended === true,
+      endedBy: raw.endedBy === 'homeowner' || raw.endedBy === 'rep' ? raw.endedBy : undefined,
       feedback: raw.feedback && typeof raw.feedback.text === 'string' ? raw.feedback : null,
     };
   } catch {
@@ -254,6 +258,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
       persona: current.persona,
       seed: current.seed,
       history: current.turns,
+      endedBy: current.endedBy ?? 'rep',
     });
     setBusy(null);
     if (result.ok && result.data.feedback) {
@@ -278,7 +283,12 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
     setBusy(null);
     if (result.ok && result.data.reply) {
       const { reply, ended } = result.data;
-      const next: Session = { ...current, turns: [...current.turns, { role: 'customer', text: reply }], ended };
+      const next: Session = {
+        ...current,
+        turns: [...current.turns, { role: 'customer', text: reply }],
+        ended,
+        endedBy: ended ? 'homeowner' : undefined,
+      };
       save(next);
       speak(reply, next);
       scrollDown('smooth');
@@ -339,7 +349,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
       reset();
       return;
     }
-    const next = { ...session, ended: true };
+    const next: Session = { ...session, ended: true, endedBy: 'rep' };
     save(next);
     void requestFeedback(next);
   };
@@ -389,7 +399,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
         setMicBroken(true);
         setNotice("The mic isn't available here. Type instead, or use the keyboard's mic.");
       } else if (event.error === 'no-speech') {
-        setNotice("Didn't catch that. Tap the mic and try again.");
+        setNotice("Didn't catch that — tap to try again.");
       } else if (event.error !== 'aborted') {
         setNotice('Voice stopped. Check what was heard, then tap Send.');
       }
@@ -398,7 +408,9 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
       clearSilence();
       recognitionRef.current = null;
       setListening(false);
-      if (!skipSendRef.current && heardRef.current) sendRef.current(heardRef.current);
+      if (skipSendRef.current) return;
+      if (heardRef.current) sendRef.current(heardRef.current);
+      else setNotice("Didn't catch that — tap to try again.");
     };
     recognitionRef.current = recognition;
     try {
@@ -540,7 +552,11 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
             <p className={`${a.answer} ${a.pending}`} role="status">
               Thinking…
             </p>
-          ) : null}
+          ) : failed ? null : (
+            <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void requestFeedback(session)}>
+              Get feedback
+            </button>
+          )}
           {failed ? (
             <div className={a.failed} role="alert">
               <p>{failed.message}</p>

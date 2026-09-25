@@ -7,6 +7,7 @@ import {
   MAX_PRACTICE_TURNS,
   buildCustomerPrompt,
   buildFeedbackPrompt,
+  enforceResult,
   isPersonaChoice,
   isPracticeSeed,
   parsePracticeHistory,
@@ -14,6 +15,7 @@ import {
   practiceCustomer,
   splitEnd,
   transcriptText,
+  type PracticeEndedBy,
   type PracticeFeedbackReply,
   type PracticeTurn,
   type PracticeTurnReply,
@@ -24,7 +26,8 @@ import { PRACTICE_DAILY_LIMIT, PRACTICE_LOG, loadNotes, takeDailyPractice } from
 
 // POST /api/portal/ask/practice
 //   { action: 'turn', persona, seed, history }      the homeowner's next line
-//   { action: 'feedback', persona, seed, history }  the coach's grade; logs the session
+//   { action: 'feedback', persona, seed, history, endedBy: 'homeowner'|'rep' }
+//                                                   the coach's grade; logs the session
 // Ask 3C Practice: the rep pitches, the model plays a homeowner (persona +
 // seed, so every call plays the same one), then grades the pitch against the
 // owner's notes. Same gate as Ask 3C, its own daily count and its own log
@@ -70,6 +73,8 @@ export async function POST(request: NextRequest) {
   } else if (!history.some((turn) => turn.role === 'rep')) {
     return fail('Say something to the homeowner first', 400);
   }
+  const endedBy: PracticeEndedBy = body?.endedBy === 'homeowner' ? 'homeowner' : 'rep';
+  if (action === 'feedback' && body?.endedBy !== endedBy) return fail('Bad practice ending', 400);
 
   const config = askProviderConfig();
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
@@ -116,11 +121,12 @@ export async function POST(request: NextRequest) {
   } else {
     const notes = await loadNotes(db);
     const messages: AskMessage[] = [
-      { role: 'system', content: buildFeedbackPrompt(notes, customer) },
+      { role: 'system', content: buildFeedbackPrompt(notes, customer, endedBy) },
       { role: 'user', content: `Grade this practice.\n\nTranscript:\n${transcriptText(turns)}` },
     ];
     try {
       ({ answer: feedback, usage } = await callAskModel(config, messages));
+      feedback = enforceResult(feedback, customer.persona.shouldBuy);
     } catch (error) {
       return providerFailure(error, action, started);
     }
@@ -132,6 +138,7 @@ export async function POST(request: NextRequest) {
     persona: customer.persona.id,
     personaLabel: customer.persona.label,
     turns,
+    endedBy,
     score,
     feedback,
     model: stub ? STUB_MODEL : config.model,

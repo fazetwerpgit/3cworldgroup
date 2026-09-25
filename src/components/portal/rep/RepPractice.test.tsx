@@ -93,7 +93,7 @@ describe('RepPractice', () => {
       { role: 'customer', text: '(opens the door) Yeah?' },
       { role: 'rep', text: 'Hi, I am with 3C.' },
     ]);
-    expect(sent(2)).toMatchObject({ action: 'feedback', persona: 'price-shopper', seed: sent(0).seed });
+    expect(sent(2)).toMatchObject({ action: 'feedback', persona: 'price-shopper', seed: sent(0).seed, endedBy: 'homeowner' });
     expect(sent(2).history).toHaveLength(3);
     expect(text()).toContain('Session over');
     expect(text()).toContain('8/10');
@@ -183,5 +183,24 @@ describe('RepPractice', () => {
     await click('Listening');
     expect(sent(1).history.at(-1)).toEqual({ role: 'rep', text: 'Hi, I am with 3C.' });
     expect(spoken.at(-1)?.text).toBe('Oh?');
+
+    // Nothing heard: nothing sent, and a note to try again.
+    await click('Tap to talk');
+    await click('Listening');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(text()).toContain("Didn't catch that — tap to try again.");
+  });
+
+  it('tells the coach the rep ended it when they tap End', async () => {
+    await render();
+    await click('Renter');
+    replies({ reply: 'Hi?', ended: false });
+    await click('Knock');
+    replies({ reply: 'Okay.', ended: false }, { id: 'p2', feedback: 'Score: 4/10\nResult: No sale', score: 4 });
+    await type('Hi there.');
+    await click('Send');
+    await click('End & get feedback');
+    expect(sent(2)).toMatchObject({ action: 'feedback', endedBy: 'rep' });
+    expect(text()).toContain('4/10');
   });
 });
