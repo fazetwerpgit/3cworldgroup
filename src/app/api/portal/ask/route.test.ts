@@ -136,7 +136,7 @@ describe('POST /api/portal/ask', () => {
     modelAnswers();
     await POST(req({ question: 'What is my dealer code?' }));
     const system: string = sentBody().messages[0].content;
-    expect(system).toContain('Their dealer code: unknown — tell them to ask their manager');
+    expect(system).toContain('Their dealer code: unknown — tell them to ask Jeremy or Jacob');
     expect(system).not.toMatch(/DLR-/);
   });
 
@@ -209,7 +209,7 @@ describe('POST /api/portal/ask', () => {
 
     const res = await POST(req({ question: 'Number 61' }));
     expect(res.status).toBe(429);
-    expect((await res.json()).error).toMatch(/Call Jeremy or your manager/);
+    expect((await res.json()).error).toMatch(/Call Jeremy or Jacob/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     // Another rep's count is their own.
     mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false });
@@ -240,7 +240,7 @@ describe('POST /api/portal/ask', () => {
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     const res = await POST(req({ question: 'Help' }));
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toBe("Ask 3C couldn't answer right now. Try again, or call Jeremy or your manager.");
+    expect((await res.json()).error).toBe("Ask 3C couldn't answer right now. Try again, or call Jeremy or Jacob.");
     expect(logs()).toHaveLength(0);
   });
 

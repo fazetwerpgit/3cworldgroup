@@ -156,7 +156,7 @@ export function RepAsk() {
           <div className={p.empty}>
             <div>
               <strong>Ask 3C is not turned on yet.</strong>
-              <p>Until it is, call Jeremy or your manager when an order gets stuck.</p>
+              <p>Until it is, call Jeremy or Jacob when an order gets stuck.</p>
             </div>
           </div>
         </section>
@@ -211,7 +211,7 @@ export function RepAsk() {
     showComposer('smooth');
 
     let reply: AskReply | null = null;
-    let error = 'No answer came back. Check your signal and try again, or call Jeremy or your manager.';
+    let error = 'No answer came back. Check your signal and try again, or call Jeremy or Jacob.';
     try {
       const form = new FormData();
       form.set('question', text);
@@ -226,7 +226,7 @@ export function RepAsk() {
       });
       const json = (await res.json().catch(() => ({}))) as Partial<AskReply> & { error?: string };
       if (res.ok && json.answer && json.id) reply = { id: json.id, answer: json.answer };
-      else error = json.error || "Ask 3C couldn't answer right now. Try again, or call Jeremy or your manager.";
+      else error = json.error || "Ask 3C couldn't answer right now. Try again, or call Jeremy or Jacob.";
     } catch {
       // The default message above: nothing came back.
     }
@@ -360,7 +360,7 @@ export function RepAsk() {
         </ol>
       )}
 
-      {answered ? <p className={a.stuck}>Still stuck? Call Jeremy or your manager.</p> : null}
+      {answered ? <p className={a.stuck}>Still stuck? Call Jeremy or Jacob.</p> : null}
 
       <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>
         {failed ? (

@@ -22,7 +22,7 @@ export const maxDuration = 45;
 
 const STUB_MODEL = 'sandbox-stub';
 const PHOTO_ONLY_QUESTION = 'Here is a photo. What should I do?';
-const CALL_FOR_HELP = 'Try again, or call Jeremy or your manager.';
+const CALL_FOR_HELP = 'Try again, or call Jeremy or Jacob.';
 const PREV_QUESTION_CHARS = 200;
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
@@ -74,11 +74,11 @@ export async function POST(request: NextRequest) {
   const config = askProviderConfig();
   // The E2E sandbox answers without a key so the page can be tested; it never calls out.
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
-  if (!config.apiKey && !stub) return fail('Ask 3C is not set up yet. Call Jeremy or your manager.', 503);
+  if (!config.apiKey && !stub) return fail('Ask 3C is not set up yet. Call Jeremy or Jacob.', 503);
 
   const now = new Date();
   if (!(await takeDailyAsk(db, gate.uid, now))) {
-    return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit. Call Jeremy or your manager.`, 429);
+    return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit. Call Jeremy or Jacob.`, 429);
   }
 
   const [notes, dealerCodes] = await Promise.all([loadNotes(db), ownDealerCodes(db, gate.uid)]);
