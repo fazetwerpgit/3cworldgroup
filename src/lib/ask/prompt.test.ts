@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { supportStatus } from './prompt';
+import { localTimeLine, supportStatus } from './prompt';
 
 // Instants in September (EDT, UTC-4).
 const et = (iso: string) => new Date(`${iso}-04:00`);
@@ -30,5 +30,15 @@ describe('supportStatus', () => {
     expect(supportStatus(et('2026-09-28T08:50'))).toBe(
       'Sales Support is CLOSED right now; it opens today at 9am Eastern (8am Central).'
     );
+  });
+});
+
+
+describe('localTimeLine', () => {
+  it('gives an Iowa rep Central time and a Michigan rep Eastern', () => {
+    expect(localTimeLine(et('2026-09-27T17:30'), 'Des Moines, IA')).toBe(
+      "For them it's Sunday 4:30 PM (Central time). Say times in Central time."
+    );
+    expect(localTimeLine(et('2026-09-27T17:30'), 'Lansing, MI')).toContain('5:30 PM (Eastern time)');
   });
 });
