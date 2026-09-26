@@ -10,6 +10,7 @@ import {
   parsePracticeHistory,
   parseScore,
   practiceCustomer,
+  practiceScreenCard,
   readCustomerReply,
 } from './practice';
 
@@ -47,9 +48,13 @@ describe('practiceCustomer', () => {
     expect(renter).toContain("The homeowner's last line ended it");
   });
 
-  it('has the homeowner go along with the rep pulling up the price, and the coach accept it', () => {
-    expect(buildCustomerPrompt(practiceCustomer('happy-spectrum', 1), 4)).toContain('Offering to pull up the price is never dodging');
-    expect(buildFeedbackPrompt([], practiceCustomer('happy-spectrum', 1), 'rep')).toContain('never dock the number itself');
+  it('gives each door a fixed screen price: some beat the bill, the AT&T Fiber one does not', () => {
+    const beats = PERSONAS.map((p) => p.screen.price < p.bill[0]);
+    expect(beats.some(Boolean)).toBe(true);
+    expect(PERSONAS.find((p) => p.id === 'att-fiber')!.screen.price).toBeGreaterThan(PERSONAS.find((p) => p.id === 'att-fiber')!.bill[1]);
+    expect(practiceScreenCard(PERSONAS.find((p) => p.id === 'happy-spectrum')!)).toBe(
+      'Order screen (practice): Fiber 500 — $65/mo with AutoPay. Real prices come from your order screen.'
+    );
   });
 
   it('tells the homeowner their starting and current patience', () => {

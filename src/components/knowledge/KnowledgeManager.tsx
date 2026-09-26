@@ -523,7 +523,7 @@ function PracticeSessions() {
                 <ol>
                   {row.turns.map((turn, index) => (
                     <li key={index}>
-                      <b>{turn.role === 'rep' ? 'Rep' : 'Homeowner'}:</b> {turn.text}
+                      <b>{turn.role === 'rep' ? 'Rep' : turn.role === 'screen' ? 'Screen' : 'Homeowner'}:</b> {turn.text}
                     </li>
                   ))}
                 </ol>

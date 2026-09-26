@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { DoorOpen, Mic, RotateCw, SendHorizontal, Shuffle, Volume2, VolumeX } from 'lucide-react';
+import { DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Volume2, VolumeX } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ASK_IDLE_RESET_MS } from '@/lib/ask/chat';
 import {
@@ -12,6 +12,7 @@ import {
   isPersonaChoice,
   isPracticeSeed,
   practiceCustomer,
+  practiceScreenCard,
   type PersonaChoice,
   type PracticeEndedBy,
   type PracticeFeedbackReply,
@@ -79,7 +80,10 @@ export function readStoredPractice(uid: string): Session | null {
     return {
       persona: raw.persona,
       seed: raw.seed,
-      turns: raw.turns.filter((turn) => turn && (turn.role === 'rep' || turn.role === 'customer') && typeof turn.text === 'string'),
+      turns: raw.turns.filter(
+        (turn) =>
+          turn && (turn.role === 'rep' || turn.role === 'customer' || turn.role === 'screen') && typeof turn.text === 'string'
+      ),
       ended: raw.ended === true,
       endedBy: raw.endedBy === 'homeowner' || raw.endedBy === 'rep' ? raw.endedBy : undefined,
       patience: Number.isInteger(raw.patience) ? raw.patience : undefined,
@@ -372,6 +376,13 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
     void requestFeedback(next);
   };
 
+  /** The practice order screen: this door's price card goes into the conversation for the homeowner and the coach. */
+  const pullUpPrice = () => {
+    if (!session || session.ended || busy) return;
+    save({ ...session, turns: [...session.turns, { role: 'screen', text: practiceScreenCard(practiceCustomer(session.persona, session.seed).persona) }] });
+    scrollDown('smooth');
+  };
+
   const reset = () => {
     stopSpeaking();
     stopListening(false);
@@ -523,6 +534,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
   }
 
   const repSpoke = session.turns.some((turn) => turn.role === 'rep');
+  const pricePulled = session.turns.some((turn) => turn.role === 'screen');
   const atCap = session.turns.length >= MAX_PRACTICE_TURNS - 1;
   const micShown = talk && canListen && !micBroken && !session.ended && !atCap;
 
@@ -531,7 +543,12 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
       {talkToggle}
       <ol className={a.thread} aria-live="polite" aria-label="Practice conversation">
         {session.turns.map((turn, index) =>
-          turn.role === 'rep' ? (
+          turn.role === 'screen' ? (
+            <li key={index} className={pr.screen}>
+              <MonitorSmartphone size={18} aria-hidden="true" />
+              <p>{turn.text}</p>
+            </li>
+          ) : turn.role === 'rep' ? (
             <li key={index} className={a.question}>
               <p className={a.questionText}>{turn.text}</p>
             </li>
@@ -655,6 +672,17 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
             <button type="button" className={`${s.btnSecondary} ${pr.endBtn}`} onClick={end} disabled={busy !== null}>
               {repSpoke ? 'End & get feedback' : 'Leave'}
             </button>
+            {atCap ? null : (
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${pr.priceBtn}`}
+                onClick={pullUpPrice}
+                disabled={busy !== null || pricePulled || session.turns.length === 0}
+              >
+                <MonitorSmartphone size={20} aria-hidden="true" />
+                {pricePulled ? 'Price up' : 'Pull up price'}
+              </button>
+            )}
             {atCap ? null : (
               <button
                 type="submit"

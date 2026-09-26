@@ -186,6 +186,48 @@
   font-size: var(--t-sm);
 }
 
+/* Pull up price: icon over label, like Ask's side buttons, so Send keeps its width. */
+.priceBtn {
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+  padding-inline: var(--s2);
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.priceBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The practice order screen card, centered in the thread. */
+.screen {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  margin-inline: var(--s4);
+  padding: var(--s3);
+  border: 1px dashed var(--c-lime);
+  border-radius: var(--r-control);
+  background: var(--c-lime-wash);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.screen svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--c-lime-hi);
+}
+
+.screen p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- after the door closes ---------- */
 .after {
   display: grid;

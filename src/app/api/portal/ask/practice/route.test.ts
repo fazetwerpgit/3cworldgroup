@@ -117,6 +117,22 @@ describe('POST /api/portal/ask/practice', () => {
     expect(practiceLogs()).toHaveLength(0);
   });
 
+  it('shows the homeowner this door\'s own screen card, whatever the page sent, and the coach sees it too', async () => {
+    const card = 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.';
+    const history = [...PITCH, { role: 'screen', text: 'Order screen: $1/mo' }, { role: 'rep', text: 'It says $75 with AutoPay.' }];
+    modelAnswers('Hm, that is more than I pay now. [P=5]');
+    await POST(req({ action: 'turn', ...SESSION, history, patience: 5 }));
+    expect(sentBody().messages.at(-1)).toEqual({
+      role: 'user',
+      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep shows you their phone. ${card})\nIt says $75 with AutoPay.`,
+    });
+
+    modelAnswers('Score: 7/10\nResult: No sale');
+    const res = await POST(req({ action: 'feedback', ...SESSION, history, endedBy: 'rep' }));
+    expect(sentBody(1).messages[1].content).toContain(`Screen: ${card}\nRep: It says $75 with AutoPay.`);
+    expect(fake.docs('practiceLog').get((await res.json()).id)?.turns).toContainEqual({ role: 'screen', text: card });
+  });
+
   it('keeps patience going down only, and closes the door itself at 0', async () => {
     modelAnswers('Hmm, maybe. [P=4]');
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH, patience: 2 }));

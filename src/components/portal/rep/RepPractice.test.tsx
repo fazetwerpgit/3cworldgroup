@@ -113,6 +113,21 @@ describe('RepPractice', () => {
     expect(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)).toBeNull();
   });
 
+  it('pulls up the practice price card once, and sends it with the next line', async () => {
+    await render();
+    await click('Price shopper');
+    expect(button('Pull up price')).toBeUndefined();
+    replies({ reply: 'Yeah?', ended: false, patience: 5 });
+    await click('Knock');
+    await click('Pull up price');
+    expect(text()).toContain('Order screen (practice): Fiber 500 — $75/mo with AutoPay.');
+    expect(button('Price up')?.disabled).toBe(true);
+    replies({ reply: 'Huh.', ended: false, patience: 5 });
+    await type('It says 75 with AutoPay.');
+    await click('Send');
+    expect(sent(1).history.map((turn: { role: string }) => turn.role)).toEqual(['customer', 'screen', 'rep']);
+  });
+
   it('puts a line that got no answer back in the composer', async () => {
     await render();
     await click('Renter');

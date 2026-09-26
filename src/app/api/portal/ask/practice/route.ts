@@ -13,6 +13,7 @@ import {
   parsePracticeHistory,
   parseScore,
   practiceCustomer,
+  practiceScreenCard,
   readCustomerReply,
   transcriptText,
   type PracticeEndedBy,
@@ -100,8 +101,14 @@ export async function POST(request: NextRequest) {
   }
 
   // The rep's lines lose typed contacts before the model or the log; the homeowner's are the model's own.
+  // A screen card is always this door's own card, whatever the page sent.
+  const card = practiceScreenCard(customer.persona);
   const turns: PracticeTurn[] = history.map((turn) =>
-    turn.role === 'rep' ? { role: 'rep', text: redactContact(turn.text) } : turn
+    turn.role === 'rep'
+      ? { role: 'rep', text: redactContact(turn.text) }
+      : turn.role === 'screen'
+        ? { role: 'screen', text: card }
+        : turn
   );
   const started = Date.now();
 
@@ -111,11 +118,20 @@ export async function POST(request: NextRequest) {
     if (stub) {
       reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
     } else {
-      const messages: AskMessage[] = [
-        { role: 'system', content: buildCustomerPrompt(customer, patienceBefore) },
-        { role: 'user', content: KNOCK },
-        ...turns.map((turn) => ({ role: turn.role === 'rep' ? ('user' as const) : ('assistant' as const), content: turn.text })),
-      ];
+      const messages: AskMessage[] = [{ role: 'system', content: buildCustomerPrompt(customer, patienceBefore) }];
+      // The homeowner's side: the knock, the rep's lines and the screen they were shown, one user message
+      // per stretch between the homeowner's own lines.
+      let heard = KNOCK;
+      for (const turn of turns) {
+        if (turn.role === 'customer') {
+          messages.push({ role: 'user', content: heard }, { role: 'assistant', content: turn.text });
+          heard = '';
+          continue;
+        }
+        const line = turn.role === 'screen' ? `(The rep shows you their phone. ${turn.text})` : turn.text;
+        heard = heard ? `${heard}\n${line}` : line;
+      }
+      messages.push({ role: 'user', content: heard });
       try {
         ({ answer: reply, usage } = await callAskModel(config, messages, CUSTOMER_CALL));
       } catch (error) {
