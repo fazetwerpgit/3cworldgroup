@@ -47,6 +47,11 @@ describe('practiceCustomer', () => {
     expect(renter).toContain("The homeowner's last line ended it");
   });
 
+  it('has the homeowner go along with the rep pulling up the price, and the coach accept it', () => {
+    expect(buildCustomerPrompt(practiceCustomer('happy-spectrum', 1), 4)).toContain('Offering to pull up the price is never dodging');
+    expect(buildFeedbackPrompt([], practiceCustomer('happy-spectrum', 1), 'rep')).toContain('never dock the number itself');
+  });
+
   it('tells the homeowner their starting and current patience', () => {
     expect(buildCustomerPrompt(practiceCustomer('busy-parent', 1), 2)).toContain('you started at 3 and have 2 left');
     expect(buildCustomerPrompt(practiceCustomer('elderly', 1), 5)).toContain('you started at 5 and have 5 left');
