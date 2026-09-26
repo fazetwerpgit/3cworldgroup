@@ -33,3 +33,25 @@ describe('callAskModel self-check', () => {
     expect((await callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it')).answer).toBe('Draft.');
   });
 });
+
+describe('callAskModel self-check guards', () => {
+  const ask = () => callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it');
+  const draft = 'Step 1: close everything. Step 2: clear cache and cookies. Step 3: start over in a new private window.';
+
+  it('keeps the draft when the check answers with a comment or guts the reply', async () => {
+    for (const bad of ['Looks clean, no changes needed.', 'Step 1.']) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(bad)));
+      const out = await ask();
+      expect(out.answer).toBe(draft);
+      expect(out.draft).toBeUndefined();
+    }
+  });
+
+  it('reports the draft only when the check changed the answer', async () => {
+    const trimmed = draft.replace(' Step 3: start over in a new private window.', '');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(trimmed)));
+    expect(await ask()).toMatchObject({ answer: trimmed, draft });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(draft)));
+    expect((await ask()).draft).toBeUndefined();
+  });
+});
