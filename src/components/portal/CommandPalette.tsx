@@ -50,7 +50,7 @@ export interface PortalNavItem {
   /** A hub page: its tabs are searchable in the palette under their own names. */
   hub?: HubConfig;
   /** A feature behind a kill switch or a rollout: the item shows only while this answers true for the viewer's platform role. */
-  openTo?: (role: PlatformRole | undefined) => boolean;
+  openTo?: (role: PlatformRole | undefined, uid?: string) => boolean;
 }
 
 export interface PortalNavGroup {
@@ -128,7 +128,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Same gate PortalSidebar uses: role restriction wins, then permissions.
   const canAccess = useCallback(
     (item: PortalNavItem) => {
-      if (item.openTo && !item.openTo(user?.role)) return false;
+      if (item.openTo && !item.openTo(user?.role, user?.uid)) return false;
       if (item.onboardingOnly && !isOnboardingUser(user)) return false;
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
       if (onboardingUser && !isOnboardingAllowedPage(item.href)) return false;

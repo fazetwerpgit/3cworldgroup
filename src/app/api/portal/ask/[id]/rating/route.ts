@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { askAudience } from '@/lib/ask/flag';
+import { askAudience, askEarlyUids } from '@/lib/ask/flag';
 import { ASK_LOG } from '@/lib/ask/store';
 
 // PATCH /api/portal/ask/{id}/rating { rating: 'up' | 'down' | null } — the rep's
@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);
-  if (audience === 'owners' && !gate.isOwner) return fail('Ask 3C is not turned on yet.', 404);
+  if (audience === 'owners' && !gate.isOwner && !askEarlyUids().includes(gate.uid)) return fail('Ask 3C is not turned on yet.', 404);
   if (!adminDb) return fail('Database not configured', 500);
 
   const { id } = await params;

@@ -4,7 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isAllowedImageMime } from '@/lib/chat/media';
 import { MAX_FORM_FILE_BYTES, resolveUploadMime } from '@/lib/forms/formUploads';
 import { MAX_QUESTION_CHARS, parseHistory, type AskReply, type AskTurnMessage } from '@/lib/ask/chat';
-import { askAudience } from '@/lib/ask/flag';
+import { askAudience, askEarlyUids } from '@/lib/ask/flag';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);
-  if (audience === 'owners' && !gate.isOwner) return fail('Ask 3C is not turned on yet.', 404);
+  if (audience === 'owners' && !gate.isOwner && !askEarlyUids().includes(gate.uid)) return fail('Ask 3C is not turned on yet.', 404);
   if (!adminDb) return fail('Database not configured', 500);
   const db = adminDb;
 

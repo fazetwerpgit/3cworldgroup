@@ -177,7 +177,7 @@ export function RepAsk() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [uid]);
 
-  if (!askOpenTo(user?.role)) {
+  if (!askOpenTo(user?.role, user?.uid)) {
     return (
       <div className={p.page}>
         <header className={p.head}>
