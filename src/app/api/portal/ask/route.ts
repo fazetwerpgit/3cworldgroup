@@ -5,7 +5,7 @@ import { isAllowedImageMime } from '@/lib/chat/media';
 import { MAX_FORM_FILE_BYTES, resolveUploadMime } from '@/lib/forms/formUploads';
 import { MAX_QUESTION_CHARS, parseHistory, type AskReply, type AskTurnMessage } from '@/lib/ask/chat';
 import { askAudience } from '@/lib/ask/flag';
-import { buildSystemPrompt } from '@/lib/ask/prompt';
+import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
 import { ASK_DAILY_LIMIT, ASK_LOG, loadNotes, ownDealerCodes, repHome, takeDailyAsk } from '@/lib/ask/store';
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       { role: 'user', content },
     ];
     try {
-      ({ answer, usage } = await callAskModel(config, messages));
+      ({ answer, usage } = await callAskModel(config, messages, undefined, SELF_CHECK));
     } catch (error) {
       const kind = error instanceof AskProviderError ? error.kind : 'unknown';
       const status = error instanceof AskProviderError ? error.status ?? 0 : 0;

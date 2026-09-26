@@ -206,10 +206,11 @@ describe('POST /api/portal/ask', () => {
     expect((await POST(req({ question: 'Number 60' }))).status).toBe(200);
     expect(fake.docs('askUsage').get(usageId)?.count).toBe(60);
 
+    const callsBefore = fetchMock.mock.calls.length;
     const res = await POST(req({ question: 'Number 61' }));
     expect(res.status).toBe(429);
     expect((await res.json()).error).toMatch(/Call Jeremy or Jacob/);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(callsBefore);
     // Another rep's count is their own.
     mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false });
     modelAnswers();

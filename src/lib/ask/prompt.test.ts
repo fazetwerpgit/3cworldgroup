@@ -7,7 +7,7 @@ const et = (iso: string) => new Date(`${iso}-04:00`);
 describe('supportStatus', () => {
   it('is open inside the day window and names the close in both zones', () => {
     expect(supportStatus(et('2026-09-25T21:59'))).toBe(
-      'Sales Support is OPEN right now, until 10pm Eastern (9pm Central) today.'
+      'Sales Support is OPEN right now, until 10pm Eastern (9pm Central) today. After that it opens Saturday at 9am Eastern (8am Central).'
     );
   });
 

@@ -59,16 +59,56 @@ function isDeepSeek(baseUrl: string): boolean {
 const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
 /**
- * One completion. Field tests saw thinking mode occasionally return an empty
+ * One answer. With `selfCheck`, the draft is sent back in the same conversation
+ * with that instruction (thinking off, so it rides the cached prompt and adds
+ * ~1.5s) and the model returns a cleaned copy: in an A/B on 21 cases that kept
+ * slipping (10/1), this cut answers with an invented claim from 5 of 21 to 1.
+ * Any failure of the check keeps the draft.
+ */
+export async function callAskModel(
+  config: AskProviderConfig,
+  messages: AskMessage[],
+  timeoutMs = ASK_TIMEOUT_MS,
+  selfCheck?: string
+): Promise<{ answer: string; usage: AskUsage }> {
+  const started = Date.now();
+  const draft = await draftAnswer(config, messages, timeoutMs);
+  const left = timeoutMs - (Date.now() - started);
+  if (!selfCheck || left < 4_000) return draft;
+  try {
+    const checked = await requestAnswer(
+      config,
+      [...messages, { role: 'assistant', content: draft.answer }, { role: 'user', content: selfCheck }],
+      Math.min(left, 12_000),
+      false
+    );
+    if (checked.truncated) return draft;
+    const u = draft.usage;
+    const c = checked.usage;
+    return {
+      answer: checked.answer,
+      usage: {
+        promptTokens: u.promptTokens + c.promptTokens,
+        cachedTokens: u.cachedTokens + c.cachedTokens,
+        completionTokens: u.completionTokens + c.completionTokens,
+      },
+    };
+  } catch {
+    return draft;
+  }
+}
+
+/**
+ * The draft. Field tests saw thinking mode occasionally return an empty
  * answer, or run out of tokens mid-sentence; either is retried once with
  * thinking off. A cut-off answer is still returned if that retry fails, since a
  * trimmed reply beats an error at the door.
  * Throws AskProviderError on a timeout, a non-2xx, or an empty answer.
  */
-export async function callAskModel(
+async function draftAnswer(
   config: AskProviderConfig,
   messages: AskMessage[],
-  timeoutMs = ASK_TIMEOUT_MS
+  timeoutMs: number
 ): Promise<{ answer: string; usage: AskUsage }> {
   const started = Date.now();
   let cutOff: { answer: string; usage: AskUsage } | null = null;
