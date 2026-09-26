@@ -449,6 +449,12 @@ function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) =
               ) : null}
               <p className={k.qText}>{row.question || '(photo only)'}</p>
               <p className={k.aText}>{row.answer}</p>
+              {row.draft ? (
+                <details className={k.prevText}>
+                  <summary>Before the fact check</summary>
+                  <p className={k.aText}>{row.draft}</p>
+                </details>
+              ) : null}
               <div className={u.btnRow}>
                 <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => onAddToKnowledge(row)}>
                   Add to knowledge

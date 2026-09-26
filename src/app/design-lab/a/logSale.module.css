@@ -1,0 +1,494 @@
+/* Log Sale — composition only. Tokens and controls live in night.module.css. */
+
+.topBar {
+  align-items: center;
+  display: flex;
+  min-height: var(--tap);
+  padding-top: calc(var(--safe-top) + var(--s-1));
+}
+
+.back {
+  align-items: center;
+  color: var(--text-2);
+  display: inline-flex;
+  font-size: var(--t-small);
+  font-weight: 500;
+  gap: 2px;
+  margin-left: -6px;
+  min-height: var(--tap);
+  padding-right: var(--s-3);
+  text-decoration: none;
+}
+
+.layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.intro {
+  padding-top: var(--s-5);
+}
+
+.title {
+  margin-top: var(--s-3);
+}
+
+.lede {
+  margin-top: var(--s-4);
+}
+
+.work {
+  margin-top: var(--s-7);
+}
+
+/* ---- default: scan entry ------------------------------------------------ */
+
+/* The buttons sit closer to the lede than a new section would (32 not 48). */
+.scan {
+  margin-top: calc(var(--s-6) - var(--s-7));
+}
+
+/* Desktop only: a drop target is a real affordance there, not decoration. */
+.dropIcon,
+.dropHint {
+  display: none;
+}
+
+.scanActions {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.scanActions label:has(input:focus-visible) {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+.reads {
+  color: var(--text-3);
+  font-size: var(--t-label);
+  margin-top: var(--s-4);
+  max-width: 44ch;
+}
+
+/* Opening the manual form hands the one lime to its Submit button. */
+.work:has(.manual[open]) .scanPrimary {
+  background: transparent;
+  border-color: var(--rule-2);
+  color: var(--text);
+}
+
+.manual {
+  border-bottom: 1px solid var(--rule);
+  border-top: 1px solid var(--rule);
+  margin-top: var(--s-7);
+}
+
+.manualSummary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--s-4);
+  justify-content: space-between;
+  list-style: none;
+  min-height: 76px;
+  padding-block: var(--s-3);
+}
+
+.manualSummary::-webkit-details-marker {
+  display: none;
+}
+
+.manualTitle {
+  display: block;
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.manualNote {
+  color: var(--text-3);
+  display: block;
+  font-size: var(--t-small);
+  margin-top: 2px;
+}
+
+.manualChev {
+  color: var(--text-2);
+  flex: none;
+  transition: transform 0.2s var(--ease);
+}
+
+.manual[open] .manualChev {
+  transform: rotate(180deg);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-bottom: var(--s-6);
+}
+
+.formSubmit {
+  margin-top: var(--s-6);
+}
+
+.choice {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: var(--s-3) 0 var(--s-2);
+}
+
+.choice legend {
+  float: left;
+  margin-bottom: var(--s-3);
+  padding: 0;
+  width: 100%;
+}
+
+.choice legend + div {
+  clear: both;
+}
+
+/* ---- screenshot thumbnail ---------------------------------------------- */
+
+.aside {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--s-4);
+  margin-top: var(--s-6);
+}
+
+.thumb {
+  border: 1px solid var(--rule-2);
+  flex: none;
+  margin: 0;
+  width: 96px;
+}
+
+.thumbImg {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+
+.thumb[data-dim] .thumbImg {
+  opacity: 0.4;
+}
+
+/* ---- scan: progress ----------------------------------------------------- */
+
+.progressBlock {
+  align-self: stretch;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.progressCount {
+  font-family: var(--display);
+  font-size: 4rem;
+  line-height: 0.85;
+}
+
+.progressCount span {
+  color: var(--text-3);
+  font-size: var(--t-display-s);
+}
+
+.progressNow {
+  color: var(--text-2);
+  font-size: var(--t-small);
+  margin-top: var(--s-2);
+}
+
+/* The one lime on this screen: the reading itself. */
+.progress {
+  background: var(--rule);
+  height: 4px;
+  margin-top: var(--s-3);
+}
+
+.progress span {
+  background: var(--lime);
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  transition: transform 0.4s var(--ease);
+}
+
+.readList {
+  margin: 0;
+}
+
+.readRow {
+  align-items: center;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: 104px minmax(0, 1fr);
+  min-height: 56px;
+  padding-block: var(--s-3);
+}
+
+.readRow:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.readLabel {
+  color: var(--text-2);
+  font-size: var(--t-small);
+}
+
+.readValue {
+  font-size: var(--t-body);
+  font-weight: 500;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.readTick {
+  color: var(--text-3);
+  display: inline-block;
+  margin-left: var(--s-2);
+  vertical-align: -3px;
+}
+
+.skeleton {
+  background: rgba(255, 255, 255, 0.09);
+  display: block;
+  height: 14px;
+  width: 58%;
+}
+
+.readRow:nth-child(6) .skeleton {
+  width: 36%;
+}
+
+.readRow:nth-child(7) .skeleton {
+  width: 24%;
+}
+
+.readRow[data-state="now"] .readLabel {
+  color: var(--text);
+}
+
+.readRow[data-state="now"] .skeleton {
+  animation: reading 1.4s ease-in-out infinite;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@keyframes reading {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .readRow[data-state="now"] .skeleton {
+    animation: none;
+  }
+}
+
+.cancel {
+  margin-top: var(--s-6);
+}
+
+/* ---- review ------------------------------------------------------------- */
+
+.flagLink {
+  color: var(--flag);
+  text-decoration: underline;
+  text-decoration-color: rgba(242, 181, 75, 0.5);
+  text-underline-offset: 0.2em;
+}
+
+.reviewAside .thumb {
+  width: 72px;
+}
+
+.proofText {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.proofTitle {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.proofNote {
+  color: var(--text-2);
+  font-size: var(--t-small);
+  margin: 2px 0 var(--s-2);
+}
+
+.reviewForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+/* Phone: fields first, the proof after them, then room for the fixed bar. */
+.reviewLayout {
+  padding-bottom: calc(var(--safe-bottom) + 132px);
+}
+
+.reviewLayout .work {
+  margin-top: var(--s-5);
+}
+
+.reviewLayout .aside {
+  border-top: 1px solid var(--rule);
+  margin-top: var(--s-6);
+  order: 3;
+  padding-top: var(--s-5);
+}
+
+.reviewForm > label {
+  scroll-margin-top: calc(var(--safe-top) + var(--s-5));
+}
+
+.checkTag {
+  align-items: center;
+  color: var(--flag);
+  display: inline-flex;
+  font-size: var(--t-label);
+  font-weight: 600;
+  gap: 5px;
+}
+
+.inputCheck {
+  border-bottom-color: var(--flag);
+}
+
+.checkNote {
+  color: var(--text-2);
+  display: block;
+  font-size: var(--t-small);
+  line-height: 1.4;
+  margin-top: var(--s-2);
+}
+
+.payLine {
+  color: var(--text-2);
+  font-size: var(--t-label);
+  margin-bottom: var(--s-3);
+  text-align: center;
+}
+
+.payLine b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---- desktop ------------------------------------------------------------ */
+
+@media (min-width: 1024px) {
+  .topBar {
+    display: none;
+  }
+
+  .layout {
+    column-gap: var(--s-8);
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .intro {
+    grid-column: 1;
+    grid-row: 1;
+    padding-top: 0;
+  }
+
+  .title {
+    font-size: 5.75rem;
+  }
+
+  .aside {
+    align-self: start;
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: var(--s-7);
+  }
+
+  .thumb {
+    width: 176px;
+  }
+
+  .work {
+    border-left: 1px solid var(--rule);
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin-top: 0;
+    max-width: 44rem;
+    padding-left: var(--s-8);
+  }
+
+  .scan {
+    margin-top: 0;
+  }
+
+  .drop {
+    align-items: center;
+    border: 1px dashed var(--rule-2);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: max(22rem, calc(100dvh - 21rem));
+    padding: var(--s-7) var(--s-6);
+  }
+
+  .dropIcon {
+    color: var(--text-3);
+    display: block;
+  }
+
+  .dropHint {
+    color: var(--text-2);
+    display: block;
+    font-size: var(--t-body);
+    margin: var(--s-3) 0 var(--s-5);
+  }
+
+  .scanActions {
+    grid-template-columns: 1fr 1fr;
+    max-width: 36rem;
+    width: 100%;
+  }
+
+  .reviewAside .thumb {
+    width: 176px;
+  }
+
+  .reviewLayout {
+    padding-bottom: 0;
+  }
+
+  .reviewLayout .work {
+    margin-top: 0;
+  }
+
+  .reviewLayout .aside {
+    border-top: 0;
+    margin-top: var(--s-7);
+    padding-top: 0;
+  }
+
+  .reviewForm {
+    padding-bottom: 0;
+  }
+
+  .payLine {
+    margin: 0 0 var(--s-3);
+    text-align: left;
+  }
+
+  .cancel {
+    max-width: 16rem;
+  }
+}

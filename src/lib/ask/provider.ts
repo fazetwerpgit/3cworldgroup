@@ -70,7 +70,7 @@ export async function callAskModel(
   messages: AskMessage[],
   timeoutMs = ASK_TIMEOUT_MS,
   selfCheck?: string
-): Promise<{ answer: string; usage: AskUsage }> {
+): Promise<{ answer: string; usage: AskUsage; draft?: string }> {
   const started = Date.now();
   const draft = await draftAnswer(config, messages, timeoutMs);
   const left = timeoutMs - (Date.now() - started);
@@ -82,11 +82,15 @@ export async function callAskModel(
       Math.min(left, 12_000),
       false
     );
-    if (checked.truncated) return draft;
+    // A cut-off, a comment about the check, or a gutted reply keeps the draft.
+    if (checked.truncated || /^(looks|no changes|the reply|this reply|checked|all good)/i.test(checked.answer) || checked.answer.length < draft.answer.length * 0.4) {
+      return draft;
+    }
     const u = draft.usage;
     const c = checked.usage;
     return {
       answer: checked.answer,
+      ...(checked.answer !== draft.answer ? { draft: draft.answer } : {}),
       usage: {
         promptTokens: u.promptTokens + c.promptTokens,
         cachedTokens: u.cachedTokens + c.cachedTokens,

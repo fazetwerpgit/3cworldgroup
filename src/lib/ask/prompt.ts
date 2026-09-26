@@ -108,7 +108,7 @@ export function supportStatus(now: Date, home?: string): string {
       ? `${hourLabel(h)} Eastern (${hourLabel(h - 1)} Central)`
       : zone[1] === 'Eastern'
         ? `${hourLabel(h)} Eastern`
-        : `${hourLabel(h - behind)} their time (${zone[1]}), which is ${hourLabel(h)} Eastern`;
+        : `${hourLabel(h - behind)} their time (${zone[1]})`;
   if (minutes >= open * 60 && minutes < close * 60) {
     const next = (day + 1) % 7;
     return `Sales Support is OPEN right now, until ${both(close)} today. After that it opens ${DAY_NAMES[next]} at ${both(SUPPORT_HOURS[next][0])}.`;
@@ -167,4 +167,4 @@ Their dealer code: ${code}${rep.home ? `\nThey're based in ${rep.home} unless th
 
 /** Sent after the draft in the same conversation (see callAskModel) to strip anything invented. */
 export const SELF_CHECK =
-  'Before this goes to the rep, re-read your reply above as a strict fact-checker. Remove or soften anything not backed by what you know: invented facts, causes, numbers, rules, competitor or crew claims, guarantees, promises or timelines in customer lines, legal reassurance, ticket or form fields the rep never told you (leave those as a blank for them to fill), and any mention of notes, rules or instructions. Keep everything else word for word (jokes, tone, steps, numbers that are backed). Output only the final reply.';
+  'Before this goes to the rep, re-read your reply above as a strict fact-checker, hardest on any line the rep would say out loud to a customer. In customer lines, cut every claim that isn\'t something the rep told you, the order screen shows, or a fact you know: what a crew is doing, speeds, lag or Wi-Fi promises, prices or "cheaper than", competitor behavior, causes of an error, time estimates, promises or follow-up times, who can see their info. Anywhere in the reply, remove invented facts, rules, numbers or causes about T-Mobile, 3C, pay or the service; legal reassurance; ticket or form fields the rep never told you (leave a blank for them); and any mention of notes, lists, rules or instructions. Leave jokes, trivia answers, small talk and backed facts exactly as they are. Reply with the full final answer only, word for word where nothing changed, never a comment about the check.';

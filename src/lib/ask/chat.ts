@@ -32,6 +32,8 @@ export interface AskLogView {
   prevQuestion: string | null;
   hadPhoto: boolean;
   answer: string;
+  /** The answer before the fact-check pass changed it; null when the check left it alone. */
+  draft: string | null;
   rating: 'up' | 'down' | null;
   createdAt: string | null;
 }

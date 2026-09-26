@@ -1,0 +1,602 @@
+/* ==========================================================================
+   A — Night Editorial. The system: tokens, frame, chrome, and the only three
+   controls the portal gets (primary button, secondary button, chip) plus the
+   one field. Page modules compose from these and never restyle them.
+   ========================================================================== */
+
+/* Bebas has no lowercase and is ~57% the width of a sans. The stand-in is
+   scaled to its advance widths so a display line wraps the same way before
+   and after the face lands (same fix the marketing kit ships). */
+@font-face {
+  font-family: "Night Display Fallback";
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Roboto");
+  size-adjust: 57%;
+  ascent-override: 90%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
+.page {
+  /* ---- Color ----------------------------------------------------------- */
+  --bg: #000000;
+  --text: #f4f4f1; /* 19.6:1 on --bg */
+  --text-2: #a9adb4; /* 9.0:1 — secondary copy, labels */
+  --text-3: #868b93; /* 5.9:1 — tertiary meta, never body */
+  --rule: rgba(255, 255, 255, 0.14); /* hairline */
+  --rule-2: rgba(255, 255, 255, 0.32); /* control outline */
+  --lime: #8dc63f; /* ONE thing per screen: the action that moves money */
+  --lime-hi: #a6e052;
+  --on-lime: #000000; /* 11.4:1 on --lime */
+  --flag: #f2b54b; /* "check this" / needs you — 11.2:1 on --bg */
+
+  /* ---- Type ------------------------------------------------------------ */
+  --display: "Bebas Neue", "Night Display Fallback", var(--font-geist-sans), sans-serif;
+  --sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --t-numeral: clamp(8.25rem, 36vw, 14.5rem); /* the pay figure, once */
+  --t-display-l: clamp(3.5rem, 13vw, 6.5rem); /* page titles, rank */
+  --t-display-m: 2.5rem; /* 40 — secondary figures */
+  --t-display-s: 1.75rem; /* 28 — sub-heads */
+  --t-title: 1.1875rem; /* 19 */
+  --t-body: 1.0625rem; /* 17 — rows, inputs */
+  --t-small: 0.9375rem; /* 15 */
+  --t-label: 0.8125rem; /* 13 — kickers, field labels */
+  --t-min: 0.75rem; /* 12 — floor; nav labels only */
+
+  /* ---- Space, shape, size --------------------------------------------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+  --gutter: 20px;
+  --radius: 0; /* square, like the marketing buttons */
+  --tap: 44px;
+  --control-h: 56px;
+  --nav-h: 60px;
+  --rail-w: 264px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Safe areas. `--lab-safe-*` only exists so screenshots can emulate a
+     notched iPhone; on a device env() answers. */
+  --safe-top: var(--lab-safe-top, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--lab-safe-bottom, env(safe-area-inset-bottom, 0px));
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: var(--t-body);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* iOS overscroll shows the root, not the page. */
+:global(html):has(.page) {
+  background: #000000;
+}
+
+.page ::selection {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.page :focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+.page input {
+  caret-color: var(--text);
+}
+
+.srOnly {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* ---- Frame ------------------------------------------------------------- */
+
+.main {
+  padding: 0 var(--gutter) calc(var(--nav-h) + var(--safe-bottom) + var(--s-7));
+}
+
+.mainNoNav {
+  composes: main;
+  padding-bottom: calc(var(--safe-bottom) + var(--s-7));
+}
+
+@media (min-width: 1024px) {
+  .page {
+    --gutter: 64px;
+    display: grid;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  }
+
+  .main,
+  .mainNoNav {
+    padding: var(--s-7) var(--gutter) var(--s-9);
+  }
+}
+
+/* ---- Shared type ------------------------------------------------------- */
+
+.kicker {
+  color: var(--text-2);
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.displayTitle {
+  font-family: var(--display);
+  font-size: var(--t-display-l);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.88;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.lede {
+  color: var(--text-2);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  max-width: 34ch;
+  text-wrap: pretty;
+}
+
+/* A section is a hairline and a head, never a box. */
+.section {
+  border-top: 1px solid var(--rule);
+  margin-top: var(--s-7);
+  padding-top: var(--s-4);
+}
+
+.sectionHead {
+  align-items: baseline;
+  display: flex;
+  gap: var(--s-4);
+  justify-content: space-between;
+  margin-bottom: var(--s-4);
+}
+
+.sectionMeta {
+  color: var(--text-3);
+  font-size: var(--t-label);
+}
+
+.quietLink {
+  align-items: center;
+  color: var(--text);
+  display: inline-flex;
+  font-size: var(--t-small);
+  font-weight: 500;
+  gap: var(--s-1);
+  margin-block: calc((var(--tap) - 1.3em) / -2);
+  min-height: var(--tap);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+}
+
+@media (hover: hover) {
+  .quietLink:hover {
+    text-decoration-color: var(--text);
+  }
+}
+
+/* ---- Controls: exactly three ------------------------------------------ */
+
+/* 1. Primary — lime fill. One per screen. */
+.btnPrimary,
+.btnSecondary {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  font-family: var(--display);
+  font-size: 1.375rem;
+  font-weight: 400;
+  gap: 10px;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  min-height: var(--control-h);
+  padding: 4px var(--s-5) 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.2s var(--ease);
+  user-select: none;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.btnPrimary svg,
+.btnSecondary svg {
+  flex: none;
+  margin-top: -4px;
+}
+
+.btnPrimary:active,
+.btnSecondary:active {
+  transform: scale(0.98);
+}
+
+.btnPrimary {
+  background: var(--lime);
+  color: var(--on-lime);
+}
+
+.btnPrimary:focus-visible {
+  outline-color: var(--on-lime);
+  outline-offset: -5px;
+}
+
+/* 2. Secondary — hairline outline, white label. */
+.btnSecondary {
+  background: transparent;
+  border-color: var(--rule-2);
+  color: var(--text);
+}
+
+@media (hover: hover) {
+  .btnPrimary:hover {
+    background: var(--lime-hi);
+  }
+
+  .btnSecondary:hover {
+    border-color: var(--text);
+  }
+}
+
+/* 3. Chip — single choice from a short set. Selected is white, not lime:
+      lime is spent on the primary action. */
+.chipSet {
+  border: 0;
+  display: grid;
+  gap: var(--s-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 1024px) {
+  .chipSet {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+.chip {
+  align-items: center;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--t-small);
+  font-weight: 500;
+  gap: 6px;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
+  position: relative;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.chip input {
+  appearance: none;
+  inset: 0;
+  margin: 0;
+  position: absolute;
+}
+
+.chip:has(input:checked) {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.chip:has(input:focus-visible) {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+/* The one field: label above, underline input, no box. */
+.field {
+  display: block;
+  padding-top: var(--s-4);
+}
+
+.fieldTop {
+  align-items: center;
+  display: flex;
+  gap: var(--s-3);
+  justify-content: space-between;
+}
+
+.fieldLabel {
+  color: var(--text-2);
+  font-size: var(--t-label);
+  font-weight: 500;
+}
+
+.input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-2);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: block;
+  font: 500 var(--t-body) / 1.2 var(--sans);
+  font-variant-numeric: tabular-nums;
+  height: 48px;
+  padding: 0;
+  transition: border-color 0.18s ease;
+  width: 100%;
+}
+
+.input::placeholder {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.input:focus-visible {
+  border-bottom-color: var(--text);
+  box-shadow: 0 1px 0 0 var(--text);
+  outline: none;
+}
+
+/* ---- Phone masthead ------------------------------------------------------ */
+
+.masthead {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: var(--tap);
+  padding-top: calc(var(--safe-top) + var(--s-2));
+}
+
+.wordmark {
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 1.375rem;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  padding-top: 3px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.avatarLink {
+  align-items: center;
+  display: flex;
+  height: var(--tap);
+  justify-content: flex-end;
+  margin-right: -2px;
+  text-decoration: none;
+  width: var(--tap);
+}
+
+.avatar {
+  align-items: center;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  color: var(--text);
+  display: flex;
+  flex: none;
+  font-size: var(--t-label);
+  font-weight: 600;
+  height: 38px;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  width: 38px;
+}
+
+@media (min-width: 1024px) {
+  .masthead {
+    display: none;
+  }
+}
+
+/* ---- Phone bottom nav ---------------------------------------------------- */
+
+.bottomNav {
+  background: var(--bg);
+  border-top: 1px solid var(--rule);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  left: 0;
+  padding-bottom: var(--safe-bottom);
+  position: fixed;
+  right: 0;
+  z-index: 20;
+}
+
+.navItem {
+  align-items: center;
+  color: var(--text-3);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--t-min);
+  font-weight: 500;
+  gap: 5px;
+  height: var(--nav-h);
+  justify-content: center;
+  letter-spacing: 0;
+  position: relative;
+  text-decoration: none;
+}
+
+.navItem[aria-current="page"] {
+  color: var(--text);
+}
+
+.navItem[aria-current="page"]::before {
+  background: var(--text);
+  content: "";
+  height: 2px;
+  left: 50%;
+  position: absolute;
+  top: -1px;
+  transform: translateX(-50%);
+  width: 24px;
+}
+
+.navLog {
+  composes: navItem;
+  background: var(--lime);
+  color: var(--on-lime);
+  font-weight: 600;
+}
+
+.navLog:active {
+  background: var(--lime-hi);
+}
+
+@media (min-width: 1024px) {
+  .bottomNav {
+    display: none;
+  }
+}
+
+/* ---- Desktop rail -------------------------------------------------------- */
+
+.rail {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .rail {
+    border-right: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: var(--s-7) var(--s-6) var(--s-6);
+    position: sticky;
+    top: 0;
+  }
+
+  .railBrand {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: var(--s-7);
+  }
+
+  .railTag {
+    color: var(--text-3);
+    font-size: var(--t-label);
+  }
+
+  .railNav {
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--s-6);
+  }
+
+  .railLink {
+    align-items: center;
+    border-top: 1px solid var(--rule);
+    color: var(--text-2);
+    display: flex;
+    font-size: var(--t-small);
+    font-weight: 500;
+    gap: var(--s-3);
+    min-height: 52px;
+    position: relative;
+    text-decoration: none;
+    transition: color 0.18s ease;
+  }
+
+  .railLink:last-child {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .railLink[aria-current="page"] {
+    color: var(--text);
+  }
+
+  .railLink[aria-current="page"]::before {
+    background: var(--text);
+    bottom: -1px;
+    content: "";
+    left: calc(var(--s-6) * -1);
+    position: absolute;
+    top: -1px;
+    width: 2px;
+  }
+
+  @media (hover: hover) {
+    .railLink:hover {
+      color: var(--text);
+    }
+  }
+
+  .railUser {
+    align-items: center;
+    color: inherit;
+    display: flex;
+    min-height: var(--tap);
+    text-decoration: none;
+    gap: var(--s-3);
+    margin-top: auto;
+  }
+
+  .railUserName {
+    display: block;
+    font-size: var(--t-small);
+    font-weight: 500;
+    line-height: 1.25;
+  }
+
+  .railUserTitle {
+    color: var(--text-3);
+    font-size: var(--t-label);
+  }
+}
+
+/* ---- Fixed action bar (phone) ------------------------------------------- */
+
+.actionBar {
+  background: var(--bg);
+  border-top: 1px solid var(--rule);
+  bottom: 0;
+  left: 0;
+  padding: var(--s-3) var(--gutter) calc(var(--safe-bottom) + var(--s-3));
+  position: fixed;
+  right: 0;
+  z-index: 20;
+}
+
+@media (min-width: 1024px) {
+  .actionBar {
+    bottom: 0;
+    left: auto;
+    margin-top: var(--s-5);
+    padding: var(--s-4) 0 var(--s-5);
+    position: sticky;
+    right: auto;
+  }
+}

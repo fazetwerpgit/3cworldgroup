@@ -1,0 +1,6 @@
+# D — Scoreboard on portal navy (C base + B's lower half)
+1. Palette is the live portal's: navy ground #050d1e, panels #0b1a35 / #10244a, blue-tinted hairlines, lime #8dc63f for "yours / earned", amber #f2b544 only for "needs you", blue #6aa6ff only for "scheduled". Glow stays on the rank numeral alone.
+2. Desktop home is C's layout re-paletted. Payday moved to the top of the right column and Today stretches, so both columns end level with the sales table (no dead zone).
+3. Phone home keeps C's top (score panel, 10-segment period bar, payday), then B's "Where you stand" (rank and points tiles, "3 pts behind" line) rendered in C's panel language, then B's challenge ring card, Today rows with icon tiles, and recent sales as a grouped list with coloured status dots, plus the footnote "Estimates. Pay lands about 14 days after install."
+4. Nav: the default is C's docked bar with a labelled centre "Log sale" slot. `?nav=b` gives B's floating pill bar with a round lime button. The variant carries across links. On the log-sale pages the docked slot shows as the current tab and the round button is hidden.
+5. Log sale is C's screenshot-first flow in navy. The viewfinder corners are gone because the scan icon and the headline already anchor the panel. Branding uses the real /logo.webp and "3C World Group".

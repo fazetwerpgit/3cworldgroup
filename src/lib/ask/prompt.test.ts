@@ -35,7 +35,7 @@ describe('supportStatus', () => {
   it("leads with the rep's own time when their home is known", () => {
     // Sunday 5:30 PM Eastern: closed, opens Monday 9am Eastern.
     expect(supportStatus(et('2026-09-27T17:30'), 'Des Moines, IA')).toBe(
-      'Sales Support is CLOSED right now; it opens Monday at 8am their time (Central), which is 9am Eastern.'
+      'Sales Support is CLOSED right now; it opens Monday at 8am their time (Central).'
     );
     expect(supportStatus(et('2026-09-27T12:00'), 'Fresno, CA')).toContain('until 2pm their time (Pacific)');
     expect(supportStatus(et('2026-09-27T12:00'), 'Lansing, MI')).toContain('until 5pm Eastern today.');

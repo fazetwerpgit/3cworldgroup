@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
   const prevQuestion = previous ? redactContact(previous.text).slice(0, PREV_QUESTION_CHARS) : null;
 
   let answer: string;
+  let draft: string | undefined;
   let usage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
   const started = Date.now();
   if (stub) {
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
       { role: 'user', content },
     ];
     try {
-      ({ answer, usage } = await callAskModel(config, messages, undefined, SELF_CHECK));
+      ({ answer, usage, draft } = await callAskModel(config, messages, undefined, SELF_CHECK));
     } catch (error) {
       const kind = error instanceof AskProviderError ? error.kind : 'unknown';
       const status = error instanceof AskProviderError ? error.status ?? 0 : 0;
@@ -131,6 +132,7 @@ export async function POST(request: NextRequest) {
     prevQuestion,
     hadPhoto: image !== null,
     answer,
+    ...(draft ? { draft } : {}),
     model: stub ? STUB_MODEL : config.model,
     promptTokens: usage.promptTokens,
     cachedTokens: usage.cachedTokens,

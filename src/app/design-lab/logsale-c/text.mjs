@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const pg = await b.newPage({ viewport: { width: 390, height: 844 } });
+await pg.goto('http://localhost:3120/design-lab/logsale-c', { waitUntil: 'networkidle' });
+await pg.waitForTimeout(600);
+console.log('STEP1:', (await pg.evaluate(() => document.querySelector('section').innerText)).replace(/\n+/g, ' | '));
+await pg.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Enter manually/.test(b.textContent)).click());
+await pg.waitForTimeout(400);
+console.log('PROOF:', (await pg.evaluate(() => document.querySelector('[aria-labelledby=proof-h]').innerText)).replace(/\n+/g, ' | '));
+await b.close();
