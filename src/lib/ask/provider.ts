@@ -60,7 +60,9 @@ const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(
 
 /**
  * One completion. Field tests saw thinking mode occasionally return an empty
- * answer, so an empty reply is retried once with thinking off before failing.
+ * answer, or run out of tokens mid-sentence; either is retried once with
+ * thinking off. A cut-off answer is still returned if that retry fails, since a
+ * trimmed reply beats an error at the door.
  * Throws AskProviderError on a timeout, a non-2xx, or an empty answer.
  */
 export async function callAskModel(
@@ -69,12 +71,25 @@ export async function callAskModel(
   timeoutMs = ASK_TIMEOUT_MS
 ): Promise<{ answer: string; usage: AskUsage }> {
   const started = Date.now();
+  let cutOff: { answer: string; usage: AskUsage } | null = null;
   try {
-    return await requestAnswer(config, messages, timeoutMs, true);
+    const first = await requestAnswer(config, messages, timeoutMs, true);
+    if (!first.truncated) return first;
+    cutOff = first;
   } catch (error) {
-    const left = timeoutMs - (Date.now() - started);
-    if (!(error instanceof AskProviderError) || error.kind !== 'bad_response' || left < 5_000) throw error;
-    return requestAnswer(config, messages, left, false);
+    if (!(error instanceof AskProviderError) || error.kind !== 'bad_response') throw error;
+  }
+  const left = timeoutMs - (Date.now() - started);
+  if (left < 5_000) {
+    if (cutOff) return cutOff;
+    throw new AskProviderError('bad_response');
+  }
+  try {
+    const retry = await requestAnswer(config, messages, left, false);
+    return retry.truncated && cutOff ? cutOff : retry;
+  } catch (error) {
+    if (cutOff) return cutOff;
+    throw error;
   }
 }
 
@@ -83,7 +98,7 @@ async function requestAnswer(
   messages: AskMessage[],
   timeoutMs: number,
   think: boolean
-): Promise<{ answer: string; usage: AskUsage }> {
+): Promise<{ answer: string; usage: AskUsage; truncated: boolean }> {
   const body: Record<string, unknown> = {
     model: config.model,
     messages,
@@ -117,7 +132,7 @@ async function requestAnswer(
   if (!res.ok) throw new AskProviderError('http', res.status);
 
   const json = (await res.json().catch(() => null)) as {
-    choices?: { message?: { content?: unknown } }[];
+    choices?: { message?: { content?: unknown }; finish_reason?: unknown }[];
     usage?: {
       prompt_tokens?: unknown;
       completion_tokens?: unknown;
@@ -130,6 +145,7 @@ async function requestAnswer(
   const usage = json?.usage;
   return {
     answer: answer.trim(),
+    truncated: json?.choices?.[0]?.finish_reason === 'length',
     usage: {
       promptTokens: count(usage?.prompt_tokens),
       // DeepSeek names it prompt_cache_hit_tokens; OpenAI-style APIs nest it.
