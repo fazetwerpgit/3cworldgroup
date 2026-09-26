@@ -33,8 +33,23 @@ export interface PracticeTurnReply {
   reply: string;
   /** The homeowner closed the door or agreed to sign up. */
   ended: boolean;
-  /** The homeowner's patience left; the page sends it back with the next line. */
-  patience: number;
+}
+
+/** How the page reads the homeowner aloud; says nothing about which persona it is beyond what a voice would. */
+export interface PracticeVoice {
+  gender: 'f' | 'm';
+  pitch: number;
+  rate: number;
+  /** Picks among equally good phone voices, the same one all session. */
+  variant: number;
+}
+
+/** The knock (a turn with no lines yet) also starts the session: the page keeps these, never the persona. */
+export interface PracticeKnockReply extends PracticeTurnReply {
+  sessionId: string;
+  voice: PracticeVoice;
+  /** This door's practice order screen card, for Pull up price. */
+  card: string;
 }
 
 /** POST /api/portal/ask/practice {action:'feedback'} answers 200 with this. */
@@ -298,7 +313,7 @@ export interface PracticeCustomer {
 }
 
 export function isPersonaChoice(value: unknown): value is PersonaChoice {
-  return value === 'surprise' || PERSONA_IDS.includes(value as PersonaId);
+  return value === 'surprise' || isPersonaId(value);
 }
 
 export function isPracticeSeed(value: unknown): value is number {
@@ -317,11 +332,42 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-/** The homeowner for a persona and seed. Same inputs, same homeowner; "surprise" picks the persona from the seed too. */
-export function practiceCustomer(choice: PersonaChoice, seed: number): PracticeCustomer {
+/**
+ * The persona behind the next door. A surprise (every rep's knock) comes out
+ * of the rep's shuffle bag: all nine in random order before any repeats, so
+ * every rep meets the walk-away ones too, and a fresh bag never starts with
+ * the persona just played. An owner's pick stands and leaves the bag alone.
+ * `random` returns [0, 1).
+ */
+export function drawPersona(
+  choice: PersonaChoice,
+  bag: unknown,
+  previous: string | null,
+  random: () => number
+): { persona: PersonaId; bag: PersonaId[] } {
+  const left = Array.isArray(bag) ? bag.filter(isPersonaId) : [];
+  if (choice !== 'surprise') return { persona: choice, bag: left };
+  let pool = left;
+  if (pool.length === 0) {
+    pool = [...PERSONA_IDS];
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    if (pool[0] === previous) [pool[0], pool[pool.length - 1]] = [pool[pool.length - 1], pool[0]];
+  }
+  return { persona: pool[0], bag: pool.slice(1) };
+}
+
+export function isPersonaId(value: unknown): value is PersonaId {
+  return PERSONA_IDS.includes(value as PersonaId);
+}
+
+/** The homeowner for a persona and seed. Same inputs, same homeowner. */
+export function practiceCustomer(personaId: PersonaId, seed: number): PracticeCustomer {
   const random = seededRandom(seed);
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)];
-  const persona = choice === 'surprise' ? pick(PERSONAS) : PERSONAS.find((p) => p.id === choice)!;
+  const persona = PERSONAS.find((p) => p.id === personaId)!;
   const gender: Gender = random() < 0.5 ? 'f' : 'm';
   const name = `${pick((persona.names ?? NAMES)[gender])} ${pick(LAST_NAMES)}`;
   const [low, high] = persona.bill;
@@ -410,11 +456,17 @@ export interface FeedbackSection {
 }
 
 const FEEDBACK_HEADINGS: Record<string, string> = {
+  'this was': 'This was',
   result: 'Result',
   'what worked': 'What worked',
   'fix next time': 'Fix next time',
   'try this line': 'Try this line',
 };
+
+/** The feedback as the rep gets it: who the homeowner was comes first (the rep didn't know until now). */
+export function revealFeedback(feedback: string, persona: Persona): string {
+  return `This was: ${persona.label}\n${feedback}`;
+}
 
 /**
  * The coach's plain-text feedback as sections for the page. The Score line is
@@ -426,7 +478,7 @@ export function feedbackSections(feedback: string): FeedbackSection[] {
   for (const rawLine of feedback.split('\n')) {
     const line = rawLine.replace(/\*\*|__/g, '').replace(/^\s*#+\s*/, '').trim();
     if (!line || /^score\s*:/i.test(line)) continue;
-    const head = /^(result|what worked|fix next time|try this line)\s*:\s*(.*)$/i.exec(line);
+    const head = /^(this was|result|what worked|fix next time|try this line)\s*:\s*(.*)$/i.exec(line);
     if (head) {
       sections.push({ heading: FEEDBACK_HEADINGS[head[1].toLowerCase()], text: head[2], bullets: [] });
       continue;

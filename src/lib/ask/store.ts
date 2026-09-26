@@ -8,11 +8,13 @@ import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 //   askUsage/{uid}_{day}       questions a rep asked on a Chicago day
 //   askUsage/{uid}_{day}_practice   Practice model calls that day (its own count)
 //   practiceLog/{id}           one doc per finished Practice (with its feedback)
+//   practiceSessions/{uid}     the rep's current Practice: who is behind the door (hidden from the rep)
 
 export const ASK_LOG = 'askLog';
 export const ASK_USAGE = 'askUsage';
 export const ASK_DAILY_LIMIT = 60;
 export const PRACTICE_LOG = 'practiceLog';
+export const PRACTICE_SESSIONS = 'practiceSessions';
 /** Homeowner replies and feedback both count: each is a model call. */
 export const PRACTICE_DAILY_LIMIT = 150;
 

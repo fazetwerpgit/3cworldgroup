@@ -180,24 +180,17 @@
   resize: none;
 }
 
-.endBtn {
-  flex: none;
-  padding-inline: var(--s3);
-  font-size: var(--t-sm);
-}
-
-/* Pull up price: icon over label, like Ask's side buttons, so Send keeps its width. */
-.priceBtn {
+.sideBtn {
   flex: none;
   flex-direction: column;
   gap: 2px;
-  min-width: 72px;
+  min-width: 64px;
   padding-inline: var(--s2);
   font-size: 12px;
   line-height: 1.1;
 }
 
-.priceBtn:disabled {
+.sideBtn:disabled {
   opacity: 0.5;
   cursor: default;
 }

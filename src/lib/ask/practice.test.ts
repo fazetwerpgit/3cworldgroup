@@ -5,6 +5,7 @@ import {
   PERSONAS,
   buildCustomerPrompt,
   buildFeedbackPrompt,
+  drawPersona,
   enforceResult,
   feedbackSections,
   parsePracticeHistory,
@@ -32,10 +33,24 @@ describe('practiceCustomer', () => {
     }
   });
 
-  it('"surprise" draws the persona from the seed: fixed per seed, spread across seeds', () => {
-    const seeds = Array.from({ length: 200 }, (_, i) => i * 104729 + 3);
-    for (const seed of seeds) expect(practiceCustomer('surprise', seed).persona.id).toBe(practiceCustomer('surprise', seed).persona.id);
-    expect(new Set(seeds.map((seed) => practiceCustomer('surprise', seed).persona.id)).size).toBe(PERSONAS.length);
+  it('draws a surprise from a shuffle bag, never starting a new bag with the one just played', () => {
+    let bag: unknown = [];
+    let previous: string | null = null;
+    let random = 0;
+    const drawn: string[] = [];
+    for (let i = 0; i < 90; i += 1) {
+      const next = drawPersona('surprise', bag, previous, () => (random = (random * 9301 + 49297) % 233280) / 233280);
+      drawn.push(next.persona);
+      ({ bag } = next);
+      previous = next.persona;
+    }
+    for (let round = 0; round < 10; round += 1) expect(new Set(drawn.slice(round * 9, round * 9 + 9)).size).toBe(9);
+    for (let i = 1; i < drawn.length; i += 1) expect(drawn[i]).not.toBe(drawn[i - 1]);
+  });
+
+  it("takes an owner's pick and leaves the bag; drops junk from a stored bag", () => {
+    expect(drawPersona('renter', ['elderly', 'skeptic'], null, Math.random)).toEqual({ persona: 'renter', bag: ['elderly', 'skeptic'] });
+    expect(drawPersona('surprise', ['nope', 'elderly', 3], null, Math.random)).toEqual({ persona: 'elderly', bag: [] });
   });
 
   it('tells the coach whether the homeowner should buy and who ended it', () => {
@@ -99,6 +114,13 @@ describe('readCustomerReply', () => {
 });
 
 describe('feedbackSections', () => {
+  it('shows who it was as its own section', () => {
+    expect(feedbackSections('This was: Renter\nScore: 5/10\nResult: No sale')).toEqual([
+      { heading: 'This was', text: 'Renter', bullets: [] },
+      { heading: 'Result', text: 'No sale', bullets: [] },
+    ]);
+  });
+
   it('drops the Score line and splits headings, inline text and bullets', () => {
     const text =
       'Score: 7/10\nResult: No sale\nWhat worked:\n- "Hi, I\'m with 3C."\n- **"What do you pay now?"**\nFix next time: Ask about the bill\nsooner.\nTry this line: "What\'s bugging you about it?"';

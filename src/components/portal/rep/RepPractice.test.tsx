@@ -46,9 +46,19 @@ async function type(value: string) {
   });
 }
 
-async function render() {
-  await act(async () => root.render(<RepPractice uid="r1" active onResume={() => {}} />));
+async function render(canPick = false) {
+  await act(async () => root.render(<RepPractice uid="r1" active canPick={canPick} onResume={() => {}} />));
 }
+
+const CARD = 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.';
+/** The knock's answer: the door opens and the session starts; the page never learns the persona. */
+const door = (reply: string) => ({
+  reply,
+  ended: false,
+  sessionId: 's1',
+  voice: { gender: 'f', pitch: 0.85, rate: 0.88, variant: 0 },
+  card: CARD,
+});
 
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
@@ -72,20 +82,20 @@ afterEach(() => {
 describe('RepPractice', () => {
   it('runs a typed practice from the knock to the feedback, then starts over', async () => {
     await render();
-    // Without speech APIs there's no Talk toggle, and nothing to knock on until a homeowner is picked.
+    // Without speech APIs there's no Talk toggle; a rep gets no picker, just the door.
     expect(button('Talk')).toBeUndefined();
-    expect(button('Knock')?.disabled).toBe(true);
-    await click('Price shopper');
-    replies({ reply: 'Yeah?', ended: false, patience: 5 });
+    expect(button('Surprise me')).toBeUndefined();
+    expect(button('Price shopper')).toBeUndefined();
+    replies(door('Yeah?'));
     await click('Knock');
-    expect(sent(0)).toMatchObject({ action: 'turn', persona: 'price-shopper', history: [] });
+    expect(sent(0)).toEqual({ action: 'turn', history: [] });
     expect(text()).toContain('HomeownerYeah?');
     expect(button('Leave')).toBeDefined();
     expect(container.querySelector('textarea')).not.toBeNull();
 
     replies(
-      { reply: 'Deal, Thursday works.', ended: true, patience: 4 },
-      { id: 'p1', feedback: 'Score: 8/10\nResult: Sale\nWhat worked:\n- "Hi, I am with 3C."', score: 8 }
+      { reply: 'Deal, Thursday works.', ended: true },
+      { id: 'p1', feedback: 'This was: Price shopper\nScore: 8/10\nResult: Sale\nWhat worked:\n- "Hi, I am with 3C."', score: 8 }
     );
     await type('Hi, I am with 3C.');
     await click('Send');
@@ -94,35 +104,34 @@ describe('RepPractice', () => {
       { role: 'customer', text: 'Yeah?' },
       { role: 'rep', text: 'Hi, I am with 3C.' },
     ]);
-    // The patience the route gave back goes with the next line.
-    expect(sent(1).patience).toBe(5);
-    expect(sent(2)).toMatchObject({ action: 'feedback', persona: 'price-shopper', seed: sent(0).seed, endedBy: 'homeowner' });
+    expect(sent(1)).toMatchObject({ action: 'turn', sessionId: 's1' });
+    expect(sent(1).persona).toBeUndefined();
+    expect(sent(2)).toMatchObject({ action: 'feedback', sessionId: 's1', endedBy: 'homeowner' });
     expect(sent(2).history).toHaveLength(3);
     expect(text()).toContain('Session over');
     expect(text()).toContain('8/10');
     // The Score line isn't repeated under the badge; the headings and bullets render as such.
     expect(text()).not.toContain('Score:');
-    expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['Result', 'What worked']);
+    expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['This was', 'Result', 'What worked']);
     expect(container.querySelector('ul li')?.textContent).toBe('"Hi, I am with 3C."');
-    expect(text()).toContain('You were talking to: Price shopper');
+    expect(text()).toContain('This wasPrice shopper');
     expect(container.querySelector('textarea')).toBeNull();
     expect(JSON.parse(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)!).feedback.score).toBe(8);
 
     await click('Practice again');
-    expect(button('Knock')?.disabled).toBe(true);
+    expect(button('Knock')).toBeDefined();
     expect(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)).toBeNull();
   });
 
   it('pulls up the practice price card once, and sends it with the next line', async () => {
     await render();
-    await click('Price shopper');
-    expect(button('Pull up price')).toBeUndefined();
-    replies({ reply: 'Yeah?', ended: false, patience: 5 });
+    expect(button('Price')).toBeUndefined();
+    replies(door('Yeah?'));
     await click('Knock');
-    await click('Pull up price');
-    expect(text()).toContain('Order screen (practice): Fiber 500 — $75/mo with AutoPay.');
-    expect(button('Price up')?.disabled).toBe(true);
-    replies({ reply: 'Huh.', ended: false, patience: 5 });
+    await click('Price');
+    expect(text()).toContain(CARD);
+    expect(button('Price')?.disabled).toBe(true);
+    replies({ reply: 'Huh.', ended: false });
     await type('It says 75 with AutoPay.');
     await click('Send');
     expect(sent(1).history.map((turn: { role: string }) => turn.role)).toEqual(['customer', 'screen', 'rep']);
@@ -130,8 +139,7 @@ describe('RepPractice', () => {
 
   it('puts a line that got no answer back in the composer', async () => {
     await render();
-    await click('Renter');
-    replies({ reply: 'Hi?', ended: false });
+    replies(door('Hi?'));
     await click('Knock');
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'The homeowner took too long.' }), { status: 504 }));
     await type('Do you pay for internet yourself?');
@@ -189,8 +197,7 @@ describe('RepPractice', () => {
 
     await render();
     expect(button('Talk on')?.getAttribute('aria-pressed')).toBe('true');
-    await click('Elderly homeowner');
-    replies({ reply: '(opens the door) Hello, dear?', ended: false });
+    replies(door('Hello, dear?'));
     await click('Knock');
     expect(spoken[0]).toEqual({ text: ' ', volume: 0 });
     expect(spoken[1]).toEqual({ text: 'Hello, dear?', volume: 1 });
@@ -222,14 +229,27 @@ describe('RepPractice', () => {
 
   it('tells the coach the rep ended it when they tap End', async () => {
     await render();
-    await click('Renter');
-    replies({ reply: 'Hi?', ended: false });
+    replies(door('Hi?'));
     await click('Knock');
     replies({ reply: 'Okay.', ended: false }, { id: 'p2', feedback: 'Score: 4/10\nResult: No sale', score: 4 });
     await type('Hi there.');
     await click('Send');
-    await click('End & get feedback');
+    await click('End');
     expect(sent(2)).toMatchObject({ action: 'feedback', endedBy: 'rep' });
     expect(text()).toContain('4/10');
+  });
+
+  it('lets an owner pick who answers, Surprise me by default', async () => {
+    await render(true);
+    expect(button('Surprise me')?.getAttribute('aria-pressed')).toBe('true');
+    replies(door('Hi?'));
+    await click('Knock');
+    expect(sent(0)).toEqual({ action: 'turn', history: [], persona: 'surprise' });
+
+    await click('Leave');
+    await click('Already has AT&T Fiber');
+    replies(door('Hi?'));
+    await click('Knock');
+    expect(sent(1)).toEqual({ action: 'turn', history: [], persona: 'att-fiber' });
   });
 });

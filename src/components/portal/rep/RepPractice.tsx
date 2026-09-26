@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Volume2, VolumeX } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { DoorClosed, DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Volume2, VolumeX } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ASK_IDLE_RESET_MS } from '@/lib/ask/chat';
 import {
@@ -10,14 +10,13 @@ import {
   PERSONAS,
   PRACTICE_SESSION_KEY,
   isPersonaChoice,
-  isPracticeSeed,
-  practiceCustomer,
-  practiceScreenCard,
   type PersonaChoice,
   type PracticeEndedBy,
   type PracticeFeedbackReply,
+  type PracticeKnockReply,
   type PracticeTurn,
   type PracticeTurnReply,
+  type PracticeVoice,
 } from '@/lib/ask/practice';
 import { pickVoice, spokenText } from '@/lib/ask/practiceVoice';
 import s from './rep.module.css';
@@ -26,24 +25,30 @@ import a from './rep-ask.module.css';
 import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
 
-// Ask 3C Practice: the rep picks who is behind the door, knocks, and pitches;
-// the homeowner (the model) answers until the door closes, they sign up, or
-// the rep ends it, then a coach grades the pitch (POST /api/portal/ask/practice).
+// Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
+// answers until the door closes, they sign up, or the rep ends it, then a
+// coach grades the pitch (POST /api/portal/ask/practice). Who is behind the
+// door is drawn by the server and stays there: the page holds only the session
+// id, and the rep learns who it was from the feedback. Owners can pick one to
+// demo it ("Surprise me" by default).
 // Talk mode reads the homeowner aloud (speechSynthesis) and takes the rep's
 // lines by voice (SpeechRecognition), all on the phone; typing always works.
 // The session lives in sessionStorage under its own key, tagged with the uid,
 // with the same idle reset as Ask.
 
 interface Session {
-  persona: PersonaChoice;
-  seed: number;
+  /** Set when the door opens (the knock's reply); null while the knock is in flight or failed. */
+  sessionId: string | null;
+  /** An owner's pick for the knock; reps always get a surprise. */
+  pick: PersonaChoice;
+  voice: PracticeVoice | null;
+  /** This door's practice order screen card, for Pull up price. */
+  card: string | null;
   turns: PracticeTurn[];
   /** The homeowner closed the door or signed up, or the rep ended it. */
   ended: boolean;
   /** Who ended it; the coach grades the Result by it. */
   endedBy?: PracticeEndedBy;
-  /** The homeowner's patience left, as the route last said; sent back with each line. */
-  patience?: number;
   feedback: { text: string; score: number | null } | null;
 }
 
@@ -68,8 +73,7 @@ export function readStoredPractice(uid: string): Session | null {
     if (
       !raw ||
       raw.uid !== uid ||
-      !isPersonaChoice(raw.persona) ||
-      !isPracticeSeed(raw.seed) ||
+      typeof raw.sessionId !== 'string' ||
       !Array.isArray(raw.turns) ||
       typeof raw.lastAt !== 'number' ||
       Date.now() - raw.lastAt > ASK_IDLE_RESET_MS
@@ -78,15 +82,16 @@ export function readStoredPractice(uid: string): Session | null {
       return null;
     }
     return {
-      persona: raw.persona,
-      seed: raw.seed,
+      sessionId: raw.sessionId,
+      pick: isPersonaChoice(raw.pick) ? raw.pick : 'surprise',
+      voice: raw.voice && (raw.voice.gender === 'f' || raw.voice.gender === 'm') ? raw.voice : null,
+      card: typeof raw.card === 'string' ? raw.card : null,
       turns: raw.turns.filter(
         (turn) =>
           turn && (turn.role === 'rep' || turn.role === 'customer' || turn.role === 'screen') && typeof turn.text === 'string'
       ),
       ended: raw.ended === true,
       endedBy: raw.endedBy === 'homeowner' || raw.endedBy === 'rep' ? raw.endedBy : undefined,
-      patience: Number.isInteger(raw.patience) ? raw.patience : undefined,
       feedback: raw.feedback && typeof raw.feedback.text === 'string' ? raw.feedback : null,
     };
   } catch {
@@ -165,9 +170,20 @@ function stopSpeaking() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
-export function RepPractice({ uid, active, onResume }: { uid: string; active: boolean; onResume: () => void }) {
+export function RepPractice({
+  uid,
+  active,
+  canPick,
+  onResume,
+}: {
+  uid: string;
+  active: boolean;
+  /** Owners pick who is behind the door (to demo one); reps never do. */
+  canPick: boolean;
+  onResume: () => void;
+}) {
   const [session, setSession] = useState<Session | null>(null);
-  const [choice, setChoice] = useState<PersonaChoice | null>(null);
+  const [choice, setChoice] = useState<PersonaChoice>('surprise');
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState<Busy>(null);
   const [failed, setFailed] = useState<{ message: string; retry: Retry } | null>(null);
@@ -186,7 +202,6 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
   const canSpeak = useSyncExternalStore(noSubscribe, () => 'speechSynthesis' in window, () => false);
   const canListen = useSyncExternalStore(noSubscribe, () => recognitionClass() !== undefined, () => false);
   const talk = canSpeak && !talkOff;
-  const customer = useMemo(() => (session ? practiceCustomer(session.persona, session.seed) : null), [session]);
 
   const scrollDown = useCallback((behavior: ScrollBehavior) => {
     window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end', behavior }));
@@ -256,16 +271,16 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
   /** Reads a homeowner line aloud in this session's voice (Talk on only). */
   const speak = (line: string, current: Session) => {
     const text = spokenText(line);
-    if (!talk || !text) return;
-    const speaker = practiceCustomer(current.persona, current.seed);
+    const speaker = current.voice;
+    if (!talk || !text || !speaker) return;
     const synth = window.speechSynthesis;
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
-    const voice = pickVoice(synth.getVoices(), speaker.gender, current.seed);
+    const voice = pickVoice(synth.getVoices(), speaker.gender, speaker.variant);
     if (voice) utterance.voice = voice;
-    utterance.pitch = speaker.voice.pitch;
-    utterance.rate = speaker.voice.rate;
+    utterance.pitch = speaker.pitch;
+    utterance.rate = speaker.rate;
     synth.speak(utterance);
   };
 
@@ -275,8 +290,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
     scrollDown('smooth');
     const result = await post<PracticeFeedbackReply>({
       action: 'feedback',
-      persona: current.persona,
-      seed: current.seed,
+      sessionId: current.sessionId,
       history: current.turns,
       endedBy: current.endedBy ?? 'rep',
     });
@@ -294,22 +308,23 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
     setBusy('turn');
     setFailed(null);
     scrollDown('smooth');
-    const result = await post<PracticeTurnReply>({
-      action: 'turn',
-      persona: current.persona,
-      seed: current.seed,
-      history: current.turns,
-      patience: current.patience,
-    });
+    const knocked = current.turns.length === 0;
+    const result = await post<PracticeTurnReply & Partial<PracticeKnockReply>>(
+      knocked
+        ? { action: 'turn', history: [], ...(canPick ? { persona: current.pick } : {}) }
+        : { action: 'turn', sessionId: current.sessionId, history: current.turns }
+    );
     setBusy(null);
-    if (result.ok && result.data.reply) {
-      const { reply, ended, patience } = result.data;
+    if (result.ok && result.data.reply && (!knocked || result.data.sessionId)) {
+      const { reply, ended } = result.data;
       const next: Session = {
         ...current,
+        ...(knocked
+          ? { sessionId: result.data.sessionId ?? null, voice: result.data.voice ?? null, card: result.data.card ?? null }
+          : {}),
         turns: [...current.turns, { role: 'customer', text: reply }],
         ended,
         endedBy: ended ? 'homeowner' : undefined,
-        patience,
       };
       save(next);
       speak(reply, next);
@@ -350,15 +365,22 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
   });
 
   const knock = () => {
-    if (!choice || busy) return;
+    if (busy) return;
     // iOS only lets a page speak after a tap has spoken once: this silent line is that.
     if (talk) {
       const unlock = new SpeechSynthesisUtterance(' ');
       unlock.volume = 0;
       window.speechSynthesis.speak(unlock);
     }
-    const seed = window.crypto.getRandomValues(new Uint32Array(1))[0];
-    const next: Session = { persona: choice, seed, turns: [], ended: false, feedback: null };
+    const next: Session = {
+      sessionId: null,
+      pick: canPick ? choice : 'surprise',
+      voice: null,
+      card: null,
+      turns: [],
+      ended: false,
+      feedback: null,
+    };
     save(next);
     void requestTurn(next);
   };
@@ -378,8 +400,8 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
 
   /** The practice order screen: this door's price card goes into the conversation for the homeowner and the coach. */
   const pullUpPrice = () => {
-    if (!session || session.ended || busy) return;
-    save({ ...session, turns: [...session.turns, { role: 'screen', text: practiceScreenCard(practiceCustomer(session.persona, session.seed).persona) }] });
+    if (!session?.card || session.ended || busy) return;
+    save({ ...session, turns: [...session.turns, { role: 'screen', text: session.card }] });
     scrollDown('smooth');
   };
 
@@ -387,7 +409,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
     stopSpeaking();
     stopListening(false);
     save(null);
-    setChoice(null);
+    setChoice('surprise');
     setDraft('');
     setNotice('');
     setFailed(null);
@@ -487,45 +509,48 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
     return (
       <>
         {talkToggle}
-        <section className={s.panel} aria-labelledby="practice-pick-h">
-          <div className={pr.picker}>
-            <h2 id="practice-pick-h" className={s.kicker}>
-              Who&apos;s behind the door?
-            </h2>
-            <div className={pr.personas} role="group" aria-label="Homeowner">
-              {PERSONAS.map((persona) => (
+        {canPick ? (
+          <section className={s.panel} aria-labelledby="practice-pick-h">
+            <div className={pr.picker}>
+              <h2 id="practice-pick-h" className={s.kicker}>
+                Who&apos;s behind the door?
+              </h2>
+              <p className={p.hint}>Owners only: pick one to demo it. Reps always get a surprise.</p>
+              <div className={pr.personas} role="group" aria-label="Homeowner">
                 <button
-                  key={persona.id}
                   type="button"
                   className={pr.persona}
-                  aria-pressed={choice === persona.id}
-                  onClick={() => setChoice(persona.id)}
+                  aria-pressed={choice === 'surprise'}
+                  onClick={() => setChoice('surprise')}
                 >
-                  <strong>{persona.label}</strong>
-                  <span>{persona.blurb}</span>
+                  <strong>
+                    <Shuffle size={16} aria-hidden="true" /> Surprise me
+                  </strong>
+                  <span>What reps get. You find out who at the end.</span>
                 </button>
-              ))}
-              <button
-                type="button"
-                className={pr.persona}
-                aria-pressed={choice === 'surprise'}
-                onClick={() => setChoice('surprise')}
-              >
-                <strong>
-                  <Shuffle size={16} aria-hidden="true" /> Surprise me
-                </strong>
-                <span>Any of them. You find out who at the end.</span>
-              </button>
+                {PERSONAS.map((persona) => (
+                  <button
+                    key={persona.id}
+                    type="button"
+                    className={pr.persona}
+                    aria-pressed={choice === persona.id}
+                    onClick={() => setChoice(persona.id)}
+                  >
+                    <strong>{persona.label}</strong>
+                    <span>{persona.blurb}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
         <div className={`${s.panel} ${a.composer}`}>
-          <button type="button" className={`${s.btnPrimary} ${pr.knock}`} disabled={!choice} onClick={knock}>
+          <button type="button" className={`${s.btnPrimary} ${pr.knock}`} onClick={knock}>
             <DoorOpen size={22} aria-hidden="true" />
             Knock
           </button>
           <p className={`${p.hint} ${pr.center}`}>
-            {choice ? 'Pitch it like a real door. End it anytime for feedback.' : 'Pick a homeowner first.'}
+            Someone different answers each time. Pitch it like a real door; you find out who it was in your feedback.
           </p>
         </div>
         <div ref={bottomRef} className={pr.anchor} aria-hidden="true" />
@@ -583,11 +608,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
                 ) : null}
               </div>
               <PracticeFeedback text={session.feedback.text} />
-              {customer ? (
-                <p className={p.hint}>
-                  You were talking to: {customer.persona.label} ({customer.name}).
-                </p>
-              ) : null}
+
             </section>
           ) : busy === 'feedback' ? (
             <p className={`${a.answer} ${a.pending}`} role="status">
@@ -669,19 +690,34 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
             </p>
           ) : null}
           <div className={a.actions}>
-            <button type="button" className={`${s.btnSecondary} ${pr.endBtn}`} onClick={end} disabled={busy !== null}>
-              {repSpoke ? 'End & get feedback' : 'Leave'}
-            </button>
-            {atCap ? null : (
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${pr.priceBtn}`}
-                onClick={pullUpPrice}
-                disabled={busy !== null || pricePulled || session.turns.length === 0}
-              >
-                <MonitorSmartphone size={20} aria-hidden="true" />
-                {pricePulled ? 'Price up' : 'Pull up price'}
+            {atCap ? (
+              <button type="button" className={`${s.btnPrimary} ${pr.knock}`} onClick={end} disabled={busy !== null}>
+                End &amp; get feedback
               </button>
+            ) : (
+              <>
+                {/* Icon over a one-word label, so End, Price and Send fit a 360px phone. */}
+                <button
+                  type="button"
+                  className={`${s.btnSecondary} ${pr.sideBtn}`}
+                  aria-label={repSpoke ? 'End and get feedback' : 'Leave'}
+                  onClick={end}
+                  disabled={busy !== null}
+                >
+                  <DoorClosed size={20} aria-hidden="true" />
+                  {repSpoke ? 'End' : 'Leave'}
+                </button>
+                <button
+                  type="button"
+                  className={`${s.btnSecondary} ${pr.sideBtn}`}
+                  aria-label={pricePulled ? 'Price is up' : 'Pull up price'}
+                  onClick={pullUpPrice}
+                  disabled={busy !== null || pricePulled || !session.card}
+                >
+                  <MonitorSmartphone size={20} aria-hidden="true" />
+                  Price
+                </button>
+              </>
             )}
             {atCap ? null : (
               <button

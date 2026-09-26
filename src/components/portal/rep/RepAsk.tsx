@@ -5,6 +5,7 @@ import { Camera, MessageCircleQuestion, RotateCw, SendHorizontal, SquarePen, Thu
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { askOpenTo } from '@/lib/ask/flag';
+import { isOwner } from '@/types';
 import {
   ASK_CONVERSATION_KEY,
   ASK_HISTORY_TURNS,
@@ -180,7 +181,7 @@ export function RepAsk() {
       </div>
       <div className={a.mode} hidden={mode !== 'practice'}>
         {/* A practice in progress (a reload mid-pitch) opens on Practice. */}
-        <RepPractice uid={uid} active={mode === 'practice'} onResume={showPractice} />
+        <RepPractice uid={uid} active={mode === 'practice'} canPick={isOwner(user?.role ?? undefined)} onResume={showPractice} />
       </div>
     </div>
   );
