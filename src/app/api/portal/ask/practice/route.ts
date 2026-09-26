@@ -13,7 +13,7 @@ import {
   parsePracticeHistory,
   parseScore,
   practiceCustomer,
-  splitEnd,
+  readCustomerReply,
   transcriptText,
   type PracticeEndedBy,
   type PracticeFeedbackReply,
@@ -25,7 +25,8 @@ import { redactContact } from '@/lib/ask/redact';
 import { PRACTICE_DAILY_LIMIT, PRACTICE_LOG, loadNotes, takeDailyPractice } from '@/lib/ask/store';
 
 // POST /api/portal/ask/practice
-//   { action: 'turn', persona, seed, history }      the homeowner's next line
+//   { action: 'turn', persona, seed, history, patience }
+//                                                   the homeowner's next line and patience left
 //   { action: 'feedback', persona, seed, history, endedBy: 'homeowner'|'rep' }
 //                                                   the coach's grade; logs the session
 // Ask 3C Practice: the rep pitches, the model plays a homeowner (persona +
@@ -76,6 +77,19 @@ export async function POST(request: NextRequest) {
   const endedBy: PracticeEndedBy = body?.endedBy === 'homeowner' ? 'homeowner' : 'rep';
   if (action === 'feedback' && body?.endedBy !== endedBy) return fail('Bad practice ending', 400);
 
+  const customer = practiceCustomer(persona, seed);
+  // Patience lives in the page's session: the knock starts it at the persona's
+  // own, each reply can only lower it, and at 0 the door closes (readCustomerReply).
+  const start = customer.persona.patience;
+  const sentPatience = body?.patience;
+  let patienceBefore = start;
+  if (action === 'turn' && history.length > 0 && sentPatience !== undefined) {
+    if (typeof sentPatience !== 'number' || !Number.isInteger(sentPatience) || sentPatience < 0 || sentPatience > start) {
+      return fail('Bad practice conversation', 400);
+    }
+    patienceBefore = sentPatience;
+  }
+
   const config = askProviderConfig();
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
   if (!config.apiKey && !stub) return fail('Practice is not set up yet. Call Jeremy or Jacob.', 503);
@@ -85,7 +99,6 @@ export async function POST(request: NextRequest) {
     return fail(`That's ${PRACTICE_DAILY_LIMIT} practice replies today, the daily limit. Back at it tomorrow.`, 429);
   }
 
-  const customer = practiceCustomer(persona, seed);
   // The rep's lines lose typed contacts before the model or the log; the homeowner's are the model's own.
   const turns: PracticeTurn[] = history.map((turn) =>
     turn.role === 'rep' ? { role: 'rep', text: redactContact(turn.text) } : turn
@@ -96,10 +109,10 @@ export async function POST(request: NextRequest) {
     let reply: string;
     let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
     if (stub) {
-      reply = turns.length === 0 ? '(opens the door) Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
+      reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
     } else {
       const messages: AskMessage[] = [
-        { role: 'system', content: buildCustomerPrompt(customer) },
+        { role: 'system', content: buildCustomerPrompt(customer, patienceBefore) },
         { role: 'user', content: KNOCK },
         ...turns.map((turn) => ({ role: turn.role === 'rep' ? ('user' as const) : ('assistant' as const), content: turn.text })),
       ];
@@ -109,9 +122,9 @@ export async function POST(request: NextRequest) {
         return providerFailure(error, action, started);
       }
     }
-    const { text, ended } = splitEnd(reply);
-    log({ outcome: 'ok', action, stub, turns: turns.length, ended, ms: Date.now() - started, ...usage });
-    return NextResponse.json<PracticeTurnReply>({ reply: text, ended });
+    const { text, ended, patience } = readCustomerReply(reply, patienceBefore);
+    log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, ms: Date.now() - started, ...usage });
+    return NextResponse.json<PracticeTurnReply>({ reply: text, ended, patience });
   }
 
   let feedback: string;

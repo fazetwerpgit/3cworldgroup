@@ -23,6 +23,7 @@ import s from './rep.module.css';
 import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
 import pr from './rep-practice.module.css';
+import { PracticeFeedback } from './PracticeFeedback';
 
 // Ask 3C Practice: the rep picks who is behind the door, knocks, and pitches;
 // the homeowner (the model) answers until the door closes, they sign up, or
@@ -40,6 +41,8 @@ interface Session {
   ended: boolean;
   /** Who ended it; the coach grades the Result by it. */
   endedBy?: PracticeEndedBy;
+  /** The homeowner's patience left, as the route last said; sent back with each line. */
+  patience?: number;
   feedback: { text: string; score: number | null } | null;
 }
 
@@ -79,6 +82,7 @@ export function readStoredPractice(uid: string): Session | null {
       turns: raw.turns.filter((turn) => turn && (turn.role === 'rep' || turn.role === 'customer') && typeof turn.text === 'string'),
       ended: raw.ended === true,
       endedBy: raw.endedBy === 'homeowner' || raw.endedBy === 'rep' ? raw.endedBy : undefined,
+      patience: Number.isInteger(raw.patience) ? raw.patience : undefined,
       feedback: raw.feedback && typeof raw.feedback.text === 'string' ? raw.feedback : null,
     };
   } catch {
@@ -142,6 +146,17 @@ function recognitionClass(): (new () => Recognition) | undefined {
 
 const noSubscribe = () => () => {};
 
+/** Talk on/off is this phone's preference, kept across visits (not rep data, so sign-out leaves it). */
+const TALK_PREF_KEY = 'ask3c-practice-talk';
+
+function readTalkOff(): boolean {
+  try {
+    return window.localStorage.getItem(TALK_PREF_KEY) === 'off';
+  } catch {
+    return false;
+  }
+}
+
 function stopSpeaking() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
@@ -153,7 +168,8 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
   const [busy, setBusy] = useState<Busy>(null);
   const [failed, setFailed] = useState<{ message: string; retry: Retry } | null>(null);
   const [notice, setNotice] = useState('');
-  const [talkOff, setTalkOff] = useState(false);
+  // Read on the first client render; the server renders no Talk button (canSpeak is false there).
+  const [talkOff, setTalkOff] = useState(() => typeof window !== 'undefined' && readTalkOff());
   const [listening, setListening] = useState(false);
   const [micBroken, setMicBroken] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -279,15 +295,17 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
       persona: current.persona,
       seed: current.seed,
       history: current.turns,
+      patience: current.patience,
     });
     setBusy(null);
     if (result.ok && result.data.reply) {
-      const { reply, ended } = result.data;
+      const { reply, ended, patience } = result.data;
       const next: Session = {
         ...current,
         turns: [...current.turns, { role: 'customer', text: reply }],
         ended,
         endedBy: ended ? 'homeowner' : undefined,
+        patience,
       };
       save(next);
       speak(reply, next);
@@ -440,6 +458,12 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
             stopListening(false);
           }
           setTalkOff(talk);
+          try {
+            if (talk) window.localStorage.setItem(TALK_PREF_KEY, 'off');
+            else window.localStorage.removeItem(TALK_PREF_KEY);
+          } catch {
+            // Storage blocked: the choice holds for this visit only.
+          }
         }}
       >
         {talk ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
@@ -541,7 +565,7 @@ export function RepPractice({ uid, active, onResume }: { uid: string; active: bo
                   <span className={pr.score}>{session.feedback.score}/10</span>
                 ) : null}
               </div>
-              <p className={pr.feedbackText}>{session.feedback.text}</p>
+              <PracticeFeedback text={session.feedback.text} />
               {customer ? (
                 <p className={p.hint}>
                   You were talking to: {customer.persona.label} ({customer.name}).

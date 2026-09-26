@@ -6,10 +6,11 @@ import {
   buildCustomerPrompt,
   buildFeedbackPrompt,
   enforceResult,
+  feedbackSections,
   parsePracticeHistory,
   parseScore,
   practiceCustomer,
-  splitEnd,
+  readCustomerReply,
 } from './practice';
 
 // Practice's pure pieces: one seed is one homeowner (page and server agree),
@@ -46,22 +47,64 @@ describe('practiceCustomer', () => {
     expect(renter).toContain("The homeowner's last line ended it");
   });
 
-  it('gives the busy parent less patience than the others', () => {
-    expect(buildCustomerPrompt(practiceCustomer('busy-parent', 1))).toContain('about 3 weak turns');
-    expect(buildCustomerPrompt(practiceCustomer('elderly', 1))).toContain('about 5 weak turns');
+  it('tells the homeowner their starting and current patience', () => {
+    expect(buildCustomerPrompt(practiceCustomer('busy-parent', 1), 2)).toContain('you started at 3 and have 2 left');
+    expect(buildCustomerPrompt(practiceCustomer('elderly', 1), 5)).toContain('you started at 5 and have 5 left');
   });
 });
 
-describe('splitEnd', () => {
-  it('strips the marker wherever it lands and reports the end', () => {
-    expect(splitEnd("Fine, let's do Thursday. [END]")).toEqual({ text: "Fine, let's do Thursday.", ended: true });
-    expect(splitEnd('Not interested.[end]\n')).toEqual({ text: 'Not interested.', ended: true });
-    expect(splitEnd('[ END ] Bye.')).toEqual({ text: 'Bye.', ended: true });
+describe('readCustomerReply', () => {
+  it('strips the patience tag, the end marker and stage directions', () => {
+    expect(readCustomerReply("(wipes hands) Fine, let's do Thursday. [END] [P=2]", 3)).toEqual({
+      text: "Fine, let's do Thursday.",
+      ended: true,
+      patience: 2,
+    });
+    expect(readCustomerReply('*sighs* Who are you with? (kids yelling behind you)[P=4]', 4)).toEqual({
+      text: 'Who are you with?',
+      ended: false,
+      patience: 4,
+    });
   });
 
-  it('leaves a normal line alone and never returns an empty line', () => {
-    expect(splitEnd('Who are you with?')).toEqual({ text: 'Who are you with?', ended: false });
-    expect(splitEnd('[END]')).toEqual({ text: '(closes the door)', ended: true });
+  it('only lets patience go down: a missing or higher tag keeps it', () => {
+    expect(readCustomerReply('Okay.', 3).patience).toBe(3);
+    expect(readCustomerReply('Okay. [P=5]', 3).patience).toBe(3);
+    expect(readCustomerReply('Okay. [P=1]', 3).patience).toBe(1);
+  });
+
+  it('closes the door at 0 even when the model kept talking', () => {
+    expect(readCustomerReply('Yeah, probably. [P=0]', 1)).toEqual({
+      text: "Look, I'm not interested. I've got to go.",
+      ended: true,
+      patience: 0,
+    });
+    // The model's own goodbye stands.
+    expect(readCustomerReply('Not today, thanks. [END] [P=0]', 1).text).toBe('Not today, thanks.');
+  });
+
+  it('never shows an empty line', () => {
+    expect(readCustomerReply('(closes the door) [END]', 2).text).toBe('No thanks. Have a good one.');
+  });
+});
+
+describe('feedbackSections', () => {
+  it('drops the Score line and splits headings, inline text and bullets', () => {
+    const text =
+      'Score: 7/10\nResult: No sale\nWhat worked:\n- "Hi, I\'m with 3C."\n- **"What do you pay now?"**\nFix next time: Ask about the bill\nsooner.\nTry this line: "What\'s bugging you about it?"';
+    expect(feedbackSections(text)).toEqual([
+      { heading: 'Result', text: 'No sale', bullets: [] },
+      { heading: 'What worked', text: '', bullets: ['"Hi, I\'m with 3C."', '"What do you pay now?"'] },
+      { heading: 'Fix next time', text: 'Ask about the bill sooner.', bullets: [] },
+      { heading: 'Try this line', text: '"What\'s bugging you about it?"', bullets: [] },
+    ]);
+  });
+
+  it('keeps a stray line before the first heading', () => {
+    expect(feedbackSections('Good energy.\n## what worked: the open')).toEqual([
+      { heading: null, text: 'Good energy.', bullets: [] },
+      { heading: 'What worked', text: 'the open', bullets: [] },
+    ]);
   });
 });
 

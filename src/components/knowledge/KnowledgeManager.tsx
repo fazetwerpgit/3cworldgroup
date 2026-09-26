@@ -14,6 +14,7 @@ import {
   type NoteDraft,
 } from '@/lib/ask/notes';
 import { Seg } from '@/components/portal/admin-ops/AdminKit';
+import { PracticeFeedback } from '@/components/portal/rep/PracticeFeedback';
 import {
   AdminEmpty,
   AdminFailed,
@@ -514,7 +515,9 @@ function PracticeSessions() {
                 {row.score !== null ? <span className={`${k.rating} ${u.toneLime}`}>{row.score}/10</span> : null}
                 <span>{when(row.createdAt)}</span>
               </p>
-              <p className={k.aText}>{row.feedback}</p>
+              <div className={k.aText}>
+                <PracticeFeedback text={row.feedback} />
+              </div>
               <details className={k.transcript}>
                 <summary>Transcript ({plural(row.turns.length, 'line')})</summary>
                 <ol>

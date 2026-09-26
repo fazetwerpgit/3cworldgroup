@@ -206,6 +206,8 @@
   display: grid;
   gap: var(--s3);
   padding: var(--s4);
+  color: var(--c-text);
+  font-size: var(--t-body);
 }
 
 .feedbackHead {
@@ -222,12 +224,46 @@
   line-height: 1;
 }
 
-.feedbackText {
+/* The coach's feedback (PracticeFeedback): headed sections, bullets, the better line. */
+.fb {
+  display: grid;
+  gap: var(--s3);
+  white-space: normal;
+}
+
+.fbSection {
+  display: grid;
+  gap: 4px;
+}
+
+.fbHead {
   margin: 0;
-  font-size: var(--t-body);
+  color: var(--c-text-3);
+  font: 600 var(--t-sm) / 1.3 var(--f-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fbText,
+.fbLine {
+  margin: 0;
   line-height: 1.5;
   overflow-wrap: anywhere;
-  white-space: pre-wrap;
+}
+
+.fbLine {
+  padding-left: var(--s3);
+  border-left: 2px solid var(--c-lime);
+  color: var(--c-lime-hi);
+}
+
+.fbList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 1.2em;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 /* Scrolled into view after each line; on phones it stops above the fixed tab bar.

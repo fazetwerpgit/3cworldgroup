@@ -100,7 +100,7 @@ describe('POST /api/portal/ask/practice', () => {
     modelAnswers("Fine, Thursday works. I'm in. [END]");
     const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reply: "Fine, Thursday works. I'm in.", ended: true });
+    expect(await res.json()).toEqual({ reply: "Fine, Thursday works. I'm in.", ended: true, patience: 5 });
 
     const body = sentBody();
     expect(body.thinking).toEqual({ type: 'disabled' });
@@ -117,11 +117,30 @@ describe('POST /api/portal/ask/practice', () => {
     expect(practiceLogs()).toHaveLength(0);
   });
 
+  it('keeps patience going down only, and closes the door itself at 0', async () => {
+    modelAnswers('Hmm, maybe. [P=4]');
+    let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH, patience: 2 }));
+    // A higher tag than the page sent is ignored.
+    expect(await res.json()).toEqual({ reply: 'Hmm, maybe.', ended: false, patience: 2 });
+    expect(sentBody().messages[0].content).toContain('you started at 5 and have 2 left');
+
+    modelAnswers('(nods) Yeah, probably. [P=0]');
+    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH, patience: 1 }));
+    expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true, patience: 0 });
+
+    // The knock always starts at the persona's own patience.
+    modelAnswers('Yeah? [P=5]');
+    res = await POST(req({ action: 'turn', ...SESSION, history: [], patience: 0 }));
+    expect(await res.json()).toEqual({ reply: 'Yeah?', ended: false, patience: 5 });
+  });
+
   it('refuses a turn that is not an answer to the rep, or a bad transcript', async () => {
     expect((await POST(req({ action: 'turn', ...SESSION, history: PITCH.slice(0, 1) }))).status).toBe(400);
     expect((await POST(req({ action: 'turn', ...SESSION, history: [{ role: 'user', text: 'hi' }] }))).status).toBe(400);
     expect((await POST(req({ action: 'turn', persona: 'ceo', seed: 1, history: [] }))).status).toBe(400);
     expect((await POST(req({ action: 'turn', persona: 'renter', seed: -1, history: [] }))).status).toBe(400);
+    expect((await POST(req({ action: 'turn', ...SESSION, history: PITCH, patience: 6 }))).status).toBe(400);
+    expect((await POST(req({ action: 'turn', ...SESSION, history: PITCH, patience: '2' }))).status).toBe(400);
     expect((await POST(req({ action: 'feedback', ...SESSION, history: PITCH.slice(0, 1), endedBy: 'rep' }))).status).toBe(400);
     expect((await POST(req({ action: 'feedback', ...SESSION, history: PITCH }))).status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();

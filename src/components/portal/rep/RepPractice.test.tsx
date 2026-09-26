@@ -55,6 +55,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   Element.prototype.scrollIntoView = () => {};
   window.sessionStorage.clear();
+  window.localStorage.clear();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -75,28 +76,34 @@ describe('RepPractice', () => {
     expect(button('Talk')).toBeUndefined();
     expect(button('Knock')?.disabled).toBe(true);
     await click('Price shopper');
-    replies({ reply: '(opens the door) Yeah?', ended: false });
+    replies({ reply: 'Yeah?', ended: false, patience: 5 });
     await click('Knock');
     expect(sent(0)).toMatchObject({ action: 'turn', persona: 'price-shopper', history: [] });
-    expect(text()).toContain('Homeowner(opens the door) Yeah?');
+    expect(text()).toContain('HomeownerYeah?');
     expect(button('Leave')).toBeDefined();
     expect(container.querySelector('textarea')).not.toBeNull();
 
     replies(
-      { reply: 'Deal, Thursday works.', ended: true },
-      { id: 'p1', feedback: 'Score: 8/10\nResult: sale', score: 8 }
+      { reply: 'Deal, Thursday works.', ended: true, patience: 4 },
+      { id: 'p1', feedback: 'Score: 8/10\nResult: Sale\nWhat worked:\n- "Hi, I am with 3C."', score: 8 }
     );
     await type('Hi, I am with 3C.');
     await click('Send');
     // [END] arrived: the feedback is asked for on its own.
     expect(sent(1).history).toEqual([
-      { role: 'customer', text: '(opens the door) Yeah?' },
+      { role: 'customer', text: 'Yeah?' },
       { role: 'rep', text: 'Hi, I am with 3C.' },
     ]);
+    // The patience the route gave back goes with the next line.
+    expect(sent(1).patience).toBe(5);
     expect(sent(2)).toMatchObject({ action: 'feedback', persona: 'price-shopper', seed: sent(0).seed, endedBy: 'homeowner' });
     expect(sent(2).history).toHaveLength(3);
     expect(text()).toContain('Session over');
     expect(text()).toContain('8/10');
+    // The Score line isn't repeated under the badge; the headings and bullets render as such.
+    expect(text()).not.toContain('Score:');
+    expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['Result', 'What worked']);
+    expect(container.querySelector('ul li')?.textContent).toBe('"Hi, I am with 3C."');
     expect(text()).toContain('You were talking to: Price shopper');
     expect(container.querySelector('textarea')).toBeNull();
     expect(JSON.parse(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)!).feedback.score).toBe(8);
@@ -189,6 +196,13 @@ describe('RepPractice', () => {
     await click('Listening');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(text()).toContain("Didn't catch that — tap to try again.");
+
+    // Talk off sticks on this phone across visits.
+    await click('Talk on');
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render();
+    expect(button('Talk off')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('tells the coach the rep ended it when they tap End', async () => {
