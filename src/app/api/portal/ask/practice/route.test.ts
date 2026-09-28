@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
-import { PERSONAS, TAG_REMINDER, practiceCustomer } from '@/lib/ask/practice';
+import { LINE_JUDGE_PROMPT, PERSONAS, practiceCustomer } from '@/lib/ask/practice';
 
 // POST /api/portal/ask/practice: the Ask 3C gate, its own daily count, the
 // homeowner call (fast settings, [END] stripped) and the graded, logged
@@ -39,20 +39,31 @@ function req(body: unknown) {
   });
 }
 
+const modelResponse = (content: string) =>
+  new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+
+/** Homeowner and coach answers, in order (the line judge has its own queue). */
+let answers: Array<Response | Promise<Response>> = [];
+/** The line judge's verdicts; an empty queue judges every line OK. */
+let verdicts: string[] = [];
+
 function modelAnswers(content: string) {
-  fetchMock.mockResolvedValueOnce(
-    new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
-  );
+  answers.push(modelResponse(content));
 }
+
+const isJudge = (call: unknown[]) =>
+  JSON.parse((call[1] as { body: string }).body).messages[0].content === LINE_JUDGE_PROMPT;
+const judgeCalls = () => fetchMock.mock.calls.filter(isJudge);
 
 /** A coach answer in the exact shape (no format retry). */
 const coach = (score: number, result = 'No sale') =>
   `Score: ${score}/10\nResult: ${result}\nWhat worked:\n- "Hi, I'm with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"`;
 
-const sentBody = (call = 0) => JSON.parse(fetchMock.mock.calls[call][1].body as string);
+/** The n-th homeowner or coach request (judge calls left out). */
+const sentBody = (call = 0) => JSON.parse(fetchMock.mock.calls.filter((c) => !isJudge(c))[call][1].body as string);
 const practiceLogs = () => [...fake.docs('practiceLog').values()];
 
 beforeEach(() => {
@@ -63,6 +74,12 @@ beforeEach(() => {
   vi.stubEnv('E2E_SANDBOX', '');
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
+  answers = [];
+  verdicts = [];
+  fetchMock.mockImplementation(async (_url: string, init: { body: string }) => {
+    if (JSON.parse(init.body).messages[0].content === LINE_JUDGE_PROMPT) return modelResponse(verdicts.shift() ?? 'OK');
+    return answers.shift() ?? new Response('no answer queued', { status: 500 });
+  });
   mockUser.mockReset();
   mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: 'dana@x.test', isOwner: false });
   vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -105,7 +122,7 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it('plays the homeowner fast and loose, redacts the rep, and strips [END]', async () => {
-    modelAnswers("Fine, Thursday works. I'm in. [OK] [END]");
+    modelAnswers("Fine, Thursday works. I'm in. [END]");
     const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reply: "Fine, Thursday works. I'm in.", ended: true });
@@ -119,21 +136,36 @@ describe('POST /api/portal/ask/practice', () => {
     expect(body.messages[0].content).not.toContain('Open with the three things.');
     expect(body.messages.slice(2)).toEqual([
       { role: 'assistant', content: '(opens the door) Yeah?' },
-      // The tag reminder rides on the rep's words, so the model never drops it.
-      { role: 'user', content: `Hi, I'm with 3C. Text me at [phone] or [email].\n${TAG_REMINDER}` },
+      { role: 'user', content: "Hi, I'm with 3C. Text me at [phone] or [email]." },
     ]);
     // A turn is not a finished session.
     expect(practiceLogs()).toHaveLength(0);
   });
 
+  it('asks a separate judge, beside the homeowner, how the rep\'s line landed', async () => {
+    modelAnswers('Uh, who are you with?');
+    await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    const [call] = judgeCalls();
+    const judge = JSON.parse(call[1].body);
+    expect(judge.temperature).toBe(0);
+    expect(judge.max_tokens).toBe(5);
+    expect(judge.messages[1].content).toContain('The homeowner just said: "(opens the door) Yeah?"');
+    expect(judge.messages[1].content).toContain('"Hi, I\'m with 3C. Text me at [phone] or [email]."');
+    // The knock answers no rep line: nothing to judge.
+    fetchMock.mockClear();
+    modelAnswers('Hello?');
+    await POST(req({ action: 'turn', history: [] }));
+    expect(judgeCalls()).toHaveLength(0);
+  });
+
   it('shows the homeowner this door\'s own screen card, whatever the page sent, and the coach sees it too', async () => {
     const card = 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.';
     const history = [...PITCH, { role: 'screen', text: 'Order screen: $1/mo' }, { role: 'rep', text: 'It says $75 with AutoPay.' }];
-    modelAnswers('Hm, that is more than I pay now. [OK]');
+    modelAnswers('Hm, that is about what I pay now.');
     await POST(req({ action: 'turn', ...SESSION, history }));
     expect(sentBody().messages.at(-1)).toEqual({
       role: 'user',
-      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep shows you their phone. ${card})\nIt says $75 with AutoPay.\n${TAG_REMINDER}`,
+      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep holds up their phone and you read the screen yourself: ${card})\nIt says $75 with AutoPay.`,
     });
 
     modelAnswers(coach(7));
@@ -142,56 +174,79 @@ describe('POST /api/portal/ask/practice', () => {
     expect(fake.docs('practiceLog').get((await res.json()).id)?.turns).toContainEqual({ role: 'screen', text: card });
   });
 
-  it('owns patience: the model reports events, the server counts, and closes the door at 0', async () => {
-    modelAnswers('Hmm. [WEAK]');
+  it('owns patience: the judge reports, the server counts, and closes the door at 0', async () => {
+    verdicts.push('WEAK');
+    modelAnswers('Hmm.');
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: 'Hmm.', ended: false });
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(4);
 
-    // No tag counts as weak.
+    // An answer that isn't one of the four words counts as weak.
+    verdicts.push('Not sure.');
     modelAnswers('Uh huh.');
     await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(3);
 
     // A caught lie halves what is left and takes one more: 3 -> 0, and the server shuts the door.
-    modelAnswers('Free? Nothing is free. [LIE]');
+    verdicts.push('LIE');
+    modelAnswers('Free? Nothing is free.');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
-    // At 0 the door is shut whatever the model says next.
-    modelAnswers('Yeah, probably. [OK]');
+    // At 0 the door is shut whatever the homeowner says next.
+    modelAnswers('Yeah, probably.');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
   });
 
+  it('counts a line as fair when the judge itself fails', async () => {
+    fetchMock.mockImplementation(async (_url: string, init: { body: string }) =>
+      JSON.parse(init.body).messages[0].content === LINE_JUDGE_PROMPT
+        ? new Response('down', { status: 503 })
+        : modelResponse('Okay, go on.')
+    );
+    expect(await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json()).toEqual({
+      reply: 'Okay, go on.',
+      ended: false,
+    });
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(5);
+  });
+
   it('shuts the door on abuse at once, and on a goodbye without [END]', async () => {
-    modelAnswers('Excuse me? No. [ABUSE]');
+    verdicts.push('ABUSE');
+    modelAnswers('Excuse me? No.');
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: "Excuse me? No. We're done here.", ended: true });
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
     fake.docs('practiceSessions').set('r1', SAVED);
-    modelAnswers("I'm good, thanks. Have a nice day. [WEAK]");
+    verdicts.push('WEAK');
+    modelAnswers("I'm good, thanks. Have a nice day.");
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: "I'm good, thanks. Have a nice day.", ended: true });
   });
 
-  it('tells the homeowner, hidden, when the rep quotes a price the screen did not show', async () => {
+  it('tells the homeowner, hidden, when the rep quotes a price the screen did not show, and counts it a lie', async () => {
     const card = { role: 'screen', text: 'card' };
-    modelAnswers('Wait, the screen said 75. [LIE]');
+    modelAnswers('Wait, the screen said 75.');
     await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, card, { role: 'rep', text: 'So $45 a month with AutoPay.' }] }));
     expect(sentBody().messages.at(-1).content).toContain(
       '[Note only you know: the rep just said $45, but the screen they showed you said $75.]'
     );
+    // The judge said OK (the default), but a wrong price is a lie in code: 5 -> 1.
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(1);
 
-    modelAnswers('Where is that from? [LIE]');
+    fake.docs('practiceSessions').set('r1', SAVED);
+    modelAnswers('Where is that from?');
     await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, { role: 'rep', text: "It's 45 dollars." }] }));
     expect(sentBody(1).messages.at(-1).content).toContain('the rep just quoted $45 without showing you any screen');
 
-    modelAnswers('Okay. [OK]');
+    fake.docs('practiceSessions').set('r1', SAVED);
+    modelAnswers('Okay.');
     await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, card, { role: 'rep', text: '$75 with AutoPay.' }] }));
     expect(sentBody(2).messages.at(-1).content).not.toContain('Note only you know');
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(5);
   });
 
   it('hands over the price card only on Pull up price, and the homeowner then answers the card', async () => {
@@ -202,10 +257,10 @@ describe('POST /api/portal/ask/practice', () => {
     expect((await POST(req({ action: 'price', sessionId: 'old' }))).status).toBe(409);
     expect(fetchMock).not.toHaveBeenCalled();
 
-    modelAnswers('Seventy-five, huh. [OK]');
+    modelAnswers('Seventy-five, huh.');
     const turn = await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, { role: 'screen', text: 'card' }] }));
     expect(turn.status).toBe(200);
-    expect(sentBody().messages.at(-1).content).toContain('(The rep shows you their phone. Order screen (practice)');
+    expect(sentBody().messages.at(-1).content).toContain('(The rep holds up their phone and you read the screen yourself: Order screen (practice)');
   });
 
   it("draws a rep's homeowner server side from a shuffle bag: all nine before a repeat, never twice in a row", async () => {
@@ -335,7 +390,7 @@ describe('POST /api/portal/ask/practice', () => {
 
   it('a feedback request while another is grading waits for that result instead of grading again', async () => {
     const { promise: answer, resolve } = Promise.withResolvers<Response>();
-    fetchMock.mockReturnValueOnce(answer);
+    answers.push(answer);
     const first = POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const second = POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
@@ -367,7 +422,7 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it('answers a friendly 502 when the coach call fails, and logs nothing', async () => {
-    fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
+    answers.push(new Response('overloaded', { status: 503 }));
     const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("The coach couldn't answer right now. Try again in a minute.");

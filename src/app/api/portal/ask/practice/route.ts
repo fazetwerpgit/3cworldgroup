@@ -6,7 +6,7 @@ import { askAudience } from '@/lib/ask/flag';
 import {
   KNOCK,
   MAX_PRACTICE_TURNS,
-  TAG_REMINDER,
+  LINE_JUDGE_PROMPT,
   buildCustomerPrompt,
   buildFeedbackPrompt,
   drawPersona,
@@ -16,6 +16,8 @@ import {
   isPersonaChoice,
   isPersonaId,
   isPracticeSeed,
+  judgedEvent,
+  lineToJudge,
   parsePracticeHistory,
   parseScore,
   practiceCustomer,
@@ -26,6 +28,7 @@ import {
   transcriptText,
   type PersonaId,
   type PracticeEndedBy,
+  type PracticeEvent,
   type PracticeFeedbackReply,
   type PracticeKnockReply,
   type PracticePriceReply,
@@ -50,8 +53,8 @@ import { PRACTICE_DAILY_LIMIT, PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeD
 // and keeps it server side in practiceSessions/{uid} with its seed, the picks
 // drawn from it, the homeowner's patience and the bag. The page holds only the
 // session id until the feedback reveals who it was. Owners may pick a persona
-// (persona, default 'surprise') to demo one. The server owns patience: the
-// model only tags how each rep line landed. Same gate as Ask 3C, its own daily
+// (persona, default 'surprise') to demo one. The server owns patience: a line
+// judge, called beside the homeowner, says how each rep line landed. Same gate as Ask 3C, its own daily
 // count and its own log (practiceLog). Typed emails and phone numbers are
 // redacted before the model or the log sees them.
 
@@ -62,6 +65,8 @@ const STUB_MODEL = 'sandbox-stub';
 const TRY_AGAIN = 'Try again in a minute.';
 /** Homeowner lines: quick, and different each time. */
 const CUSTOMER_CALL = { think: false, temperature: 0.8, maxTokens: 400 } as const;
+/** The line judge: one word, the same answer every time. */
+const JUDGE_CALL = { think: false, temperature: 0, maxTokens: 5 } as const;
 /** The coach gets one retry when its answer breaks the format; both fit in maxDuration. */
 const COACH_TIMEOUT_MS = 25_000;
 const COACH_RETRY_MIN_MS = 8_000;
@@ -203,9 +208,13 @@ export async function POST(request: NextRequest) {
 
   if (action === 'turn') {
     let reply: string;
+    let event: PracticeEvent | null = null;
     let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
+    // A price that isn't on the screen the homeowner saw: the homeowner hears about it, and it's a lie.
+    const note = knock ? null : priceNote(turns, customer);
     if (stub) {
-      reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called. [OK]';
+      reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
+      event = knock ? null : note ? 'lie' : 'ok';
     } else {
       const messages: AskMessage[] = [{ role: 'system', content: buildCustomerPrompt(customer, patienceBefore) }];
       // The homeowner's side: the knock, the rep's lines and the screen they were shown, one user message
@@ -217,19 +226,33 @@ export async function POST(request: NextRequest) {
           heard = '';
           continue;
         }
-        const line = turn.role === 'screen' ? `(The rep shows you their phone. ${turn.text})` : turn.text;
+        const line = turn.role === 'screen' ? `(The rep holds up their phone and you read the screen yourself: ${turn.text})` : turn.text;
         heard = heard ? `${heard}\n${line}` : line;
       }
-      // Hidden from the rep: a price that doesn't match the screen, and the tag the reply must carry.
-      const note = knock ? null : priceNote(turns, customer);
-      messages.push({ role: 'user', content: [heard, note, knock ? null : TAG_REMINDER].filter(Boolean).join('\n') });
+      messages.push({ role: 'user', content: note ? `${heard}\n${note}` : heard });
+      // The judge runs beside the homeowner, so it costs no time. If it fails, the line counts as fair:
+      // a network blip isn't the rep's fault.
+      const judged = knock
+        ? Promise.resolve(null)
+        : callAskModel(
+            config,
+            [
+              { role: 'system', content: LINE_JUDGE_PROMPT },
+              { role: 'user', content: lineToJudge(turns, customer) },
+            ],
+            JUDGE_CALL
+          )
+            .then(({ answer }) => judgedEvent(answer))
+            .catch(() => 'ok' as const);
       try {
-        ({ answer: reply, usage } = await callAskModel(config, messages, CUSTOMER_CALL));
+        const [homeowner, verdict] = await Promise.all([callAskModel(config, messages, CUSTOMER_CALL), judged]);
+        ({ answer: reply, usage } = homeowner);
+        event = verdict && note && verdict !== 'abuse' ? 'lie' : verdict;
       } catch (error) {
         return providerFailure(error, action, started);
       }
     }
-    const { text, ended, patience, event } = readCustomerReply(reply, patienceBefore, !knock);
+    const { text, ended, patience } = readCustomerReply(reply, patienceBefore, event);
     log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', ms: Date.now() - started, ...usage });
     if (!knock) {
       // lastLine: the one line POST .../practice/voice will speak.

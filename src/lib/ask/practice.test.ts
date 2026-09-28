@@ -14,6 +14,8 @@ import {
   practiceScreenCard,
   readCustomerReply,
   nextPatience,
+  judgedEvent,
+  lineToJudge,
   priceNote,
   feedbackProblem,
   voicePool,
@@ -115,48 +117,68 @@ describe('buildCustomerPrompt', () => {
 });
 
 describe('readCustomerReply', () => {
-  it('moves patience by the reported event: OK keeps, WEAK takes 1, LIE halves then takes 1, ABUSE empties', () => {
-    expect(readCustomerReply('Sure, go on. [OK]', 5).patience).toBe(5);
-    expect(readCustomerReply('I said no. [WEAK]', 5).patience).toBe(4);
-    expect(readCustomerReply('Free? Come on. [LIE]', 5).patience).toBe(1);
-    expect(readCustomerReply('Free? Come on. [LIE]', 3).patience).toBe(0);
+  it('moves patience by the judged event: OK keeps, WEAK takes 1, LIE halves then takes 1, ABUSE empties', () => {
+    expect(readCustomerReply('Sure, go on.', 5, 'ok').patience).toBe(5);
+    expect(readCustomerReply('I said no.', 5, 'weak').patience).toBe(4);
+    expect(readCustomerReply('Free? Come on.', 5, 'lie').patience).toBe(1);
+    expect(nextPatience(3, 'lie')).toBe(0);
     expect(nextPatience(1, 'weak')).toBe(0);
     expect(nextPatience(0, 'weak')).toBe(0);
   });
 
-  it('counts a missing or unknown tag as weak, and never scores the knock', () => {
-    expect(readCustomerReply('Okay.', 3)).toMatchObject({ patience: 2, event: 'weak' });
-    expect(readCustomerReply('Okay. [MAYBE]', 3).patience).toBe(2);
-    expect(readCustomerReply('Old tag. [P=5]', 3).patience).toBe(2);
-    expect(readCustomerReply('Hi, can I help you?', 3, false)).toMatchObject({ patience: 3, event: null, ended: false });
+  it('never scores the knock', () => {
+    expect(readCustomerReply('Hi, can I help you?', 3, null)).toEqual({ text: 'Hi, can I help you?', ended: false, patience: 3 });
   });
 
   it('closes the door on abuse, keeping what the homeowner said', () => {
-    expect(readCustomerReply('Excuse me? No. [ABUSE]', 4)).toEqual({
-      text: "Excuse me? No. We're done here.",
-      ended: true,
-      patience: 0,
-      event: 'abuse',
-    });
+    expect(readCustomerReply('Excuse me? No.', 4, 'abuse')).toEqual({ text: "Excuse me? No. We're done here.", ended: true, patience: 0 });
   });
 
   it('ends on a plain goodbye even without [END]', () => {
-    expect(readCustomerReply("I'm good, thanks. Have a nice day. [WEAK]", 3)).toMatchObject({ ended: true, patience: 2 });
-    expect(readCustomerReply("I'm gonna shut the door now. [WEAK]", 3).ended).toBe(true);
-    expect(readCustomerReply('Goodnight.', 3).ended).toBe(true);
-    expect(readCustomerReply('Who are you with? [OK]', 3).ended).toBe(false);
-    expect(readCustomerReply('Alright, Saturday works. Let\'s do it. [OK] [END]', 3).ended).toBe(true);
+    expect(readCustomerReply("I'm good, thanks. Have a nice day.", 3, 'weak')).toMatchObject({ ended: true, patience: 2 });
+    expect(readCustomerReply("I'm gonna shut the door now.", 3, 'weak').ended).toBe(true);
+    expect(readCustomerReply('Goodnight.', 3, 'ok').ended).toBe(true);
+    expect(readCustomerReply('Bye.', 3, 'ok').ended).toBe(true);
+    expect(readCustomerReply('Who are you with?', 3, 'ok').ended).toBe(false);
+    expect(readCustomerReply("Alright, Saturday works. Let's do it. [END]", 3, 'ok').ended).toBe(true);
   });
 
   it('at 0 keeps a goodbye but turns anything else, even a yes, into the out-of-patience line', () => {
-    expect(readCustomerReply('Yeah, probably. [WEAK]', 1)).toMatchObject({ text: OUT_OF_PATIENCE, ended: true, patience: 0 });
-    expect(readCustomerReply('Sure, sign me up. [WEAK] [END]', 1).text).toBe(OUT_OF_PATIENCE);
-    expect(readCustomerReply('Not today. Have a good one. [WEAK]', 1).text).toBe('Not today. Have a good one.');
+    expect(readCustomerReply('Yeah, probably.', 1, 'weak')).toEqual({ text: OUT_OF_PATIENCE, ended: true, patience: 0 });
+    expect(readCustomerReply('Sure, sign me up. [END]', 1, 'weak').text).toBe(OUT_OF_PATIENCE);
+    expect(readCustomerReply('Not today. Have a good one.', 1, 'weak').text).toBe('Not today. Have a good one.');
   });
 
   it('strips tags and stage directions, and never shows an empty line', () => {
-    expect(readCustomerReply('(wipes hands) Who are you with? *sighs* [OK]', 3).text).toBe('Who are you with?');
-    expect(readCustomerReply('(closes the door) [END] [OK]', 2).text).toBe('No thanks. Have a good one.');
+    expect(readCustomerReply('(wipes hands) Who are you with? *sighs* [OK] [P=3]', 3, 'ok').text).toBe('Who are you with?');
+    expect(readCustomerReply('(closes the door) [END]', 2, 'ok').text).toBe('No thanks. Have a good one.');
+  });
+});
+
+describe('the line judge', () => {
+  it('reads one word; anything else counts as weak', () => {
+    expect(judgedEvent('OK')).toBe('ok');
+    expect(judgedEvent('lie.')).toBe('lie');
+    expect(judgedEvent(' ABUSE\n')).toBe('abuse');
+    expect(judgedEvent('Hmm, hard to say')).toBe('weak');
+  });
+
+  it('sees the homeowner\'s last words, the screen so far and only the rep\'s latest lines', () => {
+    const customer = practiceCustomer('price-shopper', 42);
+    const text = lineToJudge(
+      [
+        { role: 'customer', text: 'Hi.' },
+        { role: 'rep', text: 'Old line.' },
+        { role: 'customer', text: 'What does it cost?' },
+        { role: 'screen', text: 'card' },
+        { role: 'rep', text: "It's $45." },
+      ],
+      customer
+    );
+    expect(text).toContain('The homeowner just said: "What does it cost?"');
+    expect(text).toContain('The price screen shown to the homeowner says $75 a month.');
+    expect(text).toContain('(shows the homeowner the price screen)\n"It\'s $45."');
+    expect(text).not.toContain('Old line.');
   });
 });
 
