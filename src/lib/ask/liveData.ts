@@ -264,6 +264,8 @@ async function boardRankings(db: Db, now: Date): Promise<BoardRow[][]> {
   return ranked;
 }
 
+const BOARD_LIST_MAX = 10;
+
 async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
   const rankings = await boardRankings(db, now);
   const lines = BOARD_PERIODS.map(([period, name], i) => {
@@ -275,8 +277,12 @@ async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
     const ranked = rankings[i];
     const at = ranked.findIndex((row) => row.id === uid);
     if (at === -1) {
-      const last = ranked.at(-1);
-      return `- ${label}: not on the Board yet (no sales)${last ? `; last on the Board is ${rowText(last, ranked.length)}` : ''}.`;
+      // Not on it (an owner, or no sales yet): the whole Board, which every rep can already see,
+      // so "how's the team doing" is never answered from a single row.
+      if (ranked.length === 0) return `- ${label}: nobody on the Board yet.`;
+      const rows = ranked.slice(0, BOARD_LIST_MAX).map((row, n) => rowText(row, n + 1)).join('; ');
+      const more = ranked.length > BOARD_LIST_MAX ? ` (and ${ranked.length - BOARD_LIST_MAX} more)` : '';
+      return `- ${label}: this person is not on it (no sales). Everyone on it (${ranked.length}): ${rows}${more}.`;
     }
     const me = ranked[at];
     const above = at > 0 ? `; just above: ${rowText(ranked[at - 1], at)}` : '; that is first place';

@@ -130,8 +130,16 @@ describe('loadRepSnapshot', () => {
   it('ranks the rep on the Board with the names just above them', async () => {
     const text = await load(createFakeAskDb(seed()).db);
     // Sunday starts a new Board week, so these Thursday/Friday sales are this month's only.
-    expect(text).toContain('- This week (Sun, Sep 27 to Sat, Oct 3): not on the Board yet (no sales).');
+    expect(text).toContain('- This week (Sun, Sep 27 to Sat, Oct 3): nobody on the Board yet.');
     expect(text).toContain('- This month (Tue, Sep 1 to Wed, Sep 30): #2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 5 points).');
+  });
+
+  it('gives someone who is not on the Board (an owner) everyone on it, not just the last row', async () => {
+    const data = seed();
+    data.users.owner1 = { displayName: 'Jeremy', status: 'active', role: 'owner' };
+    const text = await loadRepSnapshot(createFakeAskDb(data).db as unknown as Firestore, 'owner1', NOW);
+    expect(text).toContain('Everyone on it (3): #1 Jordan Price (1 sale, 30 points); #2 ');
+    expect(text).toContain('#3 Sam Lee (1 sale, 5 points)');
   });
 
   it('reads the Board once a minute, however many questions come in', async () => {
