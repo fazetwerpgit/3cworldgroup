@@ -129,7 +129,7 @@ it('searches name, city, email and phone within the chosen status', async () => 
 
 it('exports only the rows currently shown', async () => {
   await search('dallas');
-  const exportButton = [...panel().querySelectorAll('button')].find((button) => button.textContent === 'Export CSV')!;
+  const exportButton = [...panel().querySelectorAll('button')].find((button) => /^Export \d+ shown$/.test(button.textContent ?? ''))!;
   await click(exportButton);
   expect(csv.rows.map((row) => row.id)).toEqual(['a2']);
 });

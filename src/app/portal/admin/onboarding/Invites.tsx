@@ -664,7 +664,7 @@ export function Invites() {
                 }
               >
                 <Download size={16} aria-hidden="true" />
-                Export CSV
+                Export {visibleApplications.length} shown
               </button>
             </div>
             {loading ? (
