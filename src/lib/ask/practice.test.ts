@@ -89,7 +89,6 @@ describe('practiceCustomer', () => {
         const customer = practiceCustomer(persona.id, seed);
         expect(pool).toContain(customer.ttsVoice);
         expect(customer.gender).toBe(VOICE_BOOK[customer.ttsVoice].gender);
-        expect(customer.style).toBe(persona.style[customer.gender]);
         expect(customer.details.length).toBeGreaterThanOrEqual(1);
         expect(customer.details.length).toBeLessThanOrEqual(2);
         expect(new Set(customer.details).size).toBe(customer.details.length);

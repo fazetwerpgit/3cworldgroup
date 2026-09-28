@@ -161,8 +161,8 @@ export interface Persona {
   screen: { plan: string; price: number };
   /** Which of the Gemini voices fit this homeowner (VOICE_BOOK ages); one is drawn per session. */
   voiceAges: readonly VoiceAge[];
-  /** How the TTS voice delivers every line, by the voice's gender. */
-  style: { f: string; m: string };
+  /** How the TTS voice delivers every line: the words of its [tag] ("tired, rushed"). */
+  tone: readonly string[];
   /** One or two are drawn per session: what's going on at this door right now. */
   details: readonly string[];
   /** When set, {provider} in the texts is one of these, drawn per session. */
@@ -190,7 +190,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 4,
     screen: { plan: 'Fiber 500', price: 65 },
     voiceAges: ['adult', 'older'],
-    style: { f: 'Say this like a polite but guarded homeowner who wants to get back inside', m: 'Say this like a polite but guarded homeowner who wants to get back inside' },
+    tone: ['polite', 'guarded', 'wants to get back inside'],
     details: [
       "you were in the middle of watching a game",
       "you have a coffee mug in your hand",
@@ -217,7 +217,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 3,
     screen: { plan: 'Fiber 1 Gig', price: 70 },
     voiceAges: ['young', 'adult'],
-    style: { f: 'Say this like a tired mom answering the door mid-dinner, rushed', m: 'Say this like a tired dad answering the door mid-dinner, rushed' },
+    tone: ['tired', 'rushed', 'distracted'],
     details: [
       "the kids are yelling in the background",
       "a pot is about to boil over on the stove",
@@ -246,7 +246,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 4,
     screen: { plan: 'Fiber 500', price: 55 },
     voiceAges: ['adult', 'older'],
-    style: { f: 'Say this like a suspicious homeowner with her arms crossed, short and wary', m: 'Say this like a suspicious homeowner with his arms crossed, short and wary' },
+    tone: ['suspicious', 'short', 'wary'],
     details: [
       "you just got off a night shift and were trying to sleep",
       "your doorbell camera is recording",
@@ -274,7 +274,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 5,
     screen: { plan: 'Fiber 500', price: 75 },
     voiceAges: ['young', 'adult'],
-    style: { f: 'Say this like a blunt, numbers-focused homeowner, matter-of-fact', m: 'Say this like a blunt, numbers-focused homeowner, matter-of-fact' },
+    tone: ['blunt', 'matter-of-fact'],
     details: [
       "you were paying bills at the kitchen table",
       "you have your laptop open to a budget spreadsheet",
@@ -301,7 +301,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 5,
     screen: { plan: 'Fiber 1 Gig', price: 65 },
     voiceAges: ['young', 'adult'],
-    style: { f: 'Say this like a friendly homeowner who works from home, interested but hesitant', m: 'Say this like a friendly homeowner who works from home, interested but hesitant' },
+    tone: ['friendly', 'interested but hesitant'],
     details: [
       "you're between work calls",
       "a delivery driver just dropped off a package",
@@ -328,7 +328,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 5,
     screen: { plan: 'Fiber 300', price: 50 },
     voiceAges: ['older'],
-    style: { f: 'Say this like a kind, retired older woman, a little slow and careful', m: 'Say this like a kind, retired older man, a little slow and careful' },
+    tone: ['elderly', 'kind', 'slow', 'careful'],
     details: [
       "your little dog is yapping behind you",
       "you were watching your afternoon show",
@@ -356,7 +356,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 5,
     screen: { plan: 'Fiber 300', price: 50 },
     voiceAges: ['young'],
-    style: { f: 'Say this like a relaxed, friendly young renter', m: 'Say this like a relaxed, friendly young renter' },
+    tone: ['relaxed', 'friendly', 'young'],
     details: [
       "music is playing inside",
       "you were gaming and your headset is still around your neck",
@@ -382,7 +382,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 5,
     screen: { plan: 'Fiber 1 Gig', price: 60 },
     voiceAges: ['young', 'adult'],
-    style: { f: 'Say this like a curious, open homeowner', m: 'Say this like a curious, open homeowner' },
+    tone: ['curious', 'open'],
     details: [
       "you were cooking",
       "the kids are playing in the yard",
@@ -408,7 +408,7 @@ export const PERSONAS: readonly Persona[] = [
     patience: 3,
     screen: { plan: 'Fiber 1 Gig', price: 85 },
     voiceAges: ['young', 'adult', 'older'],
-    style: { f: 'Say this like a friendly but firm homeowner who already has what she needs', m: 'Say this like a friendly but firm homeowner who already has what he needs' },
+    tone: ['friendly', 'firm'],
     details: [
       "you were working from home",
       "you just got back from the gym",
@@ -430,8 +430,7 @@ export interface PracticeCustomer {
   gender: Gender;
   /** The Gemini prebuilt voice that speaks this homeowner. */
   ttsVoice: GeminiVoice;
-  /** How that voice delivers every line. */
-  style: string;
+
   /** The homeowner's provider now ('' where the persona fixes it in its text). */
   provider: string;
   bill: number;
@@ -527,7 +526,7 @@ export function practiceCustomer(personaId: PersonaId, seed: number): PracticeCu
   const first = Math.floor(random() * persona.details.length);
   const details = [persona.details[first]];
   if (random() < 0.5) details.push(persona.details[(first + 1 + Math.floor(random() * (persona.details.length - 1))) % persona.details.length]);
-  return { persona, name, gender, ttsVoice, style: persona.style[gender], provider, bill, details };
+  return { persona, name, gender, ttsVoice, provider, bill, details };
 }
 
 function fill(text: string, customer: PracticeCustomer): string {

@@ -66,7 +66,7 @@ afterEach(() => {
 });
 
 describe('POST /api/portal/ask/practice/voice', () => {
-  it("speaks the session's latest homeowner line in its voice and style, as a WAV", async () => {
+  it("speaks the session's latest homeowner line in its voice, as a WAV, sent as `[tags] line` only", async () => {
     geminiSpeaks();
     const res = await POST(req({ sessionId: 's1', text: LINE }));
     expect(res.status).toBe(200);
@@ -75,11 +75,51 @@ describe('POST /api/portal/ask/practice/voice', () => {
 
     const customer = practiceCustomer('busy-parent', 42);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain('gemini-2.5-flash-preview-tts:generateContent');
+    expect(url).toContain('/models/gemini-3.8-flash-tts:generateContent');
     expect(init.headers['x-goog-api-key']).toBe('gem-key');
     const body = JSON.parse(init.body);
-    expect(body.contents[0].parts[0].text).toBe(`${customer.style}: ${LINE}`);
+    // The 3.8 models read prose aloud and refuse a system instruction: only the tag and the line.
+    expect(body.systemInstruction).toBeUndefined();
+    expect(body.contents).toEqual([{ parts: [{ text: `[tired, rushed, distracted] ${LINE}` }] }]);
     expect(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(customer.ttsVoice);
+  });
+
+  it('passes a finished WAV (the lite model\'s answer) through without a second header', async () => {
+    const wav = pcmToWav(PCM, 24_000);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: wav.toString('base64') } }] } }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    const res = await POST(req({ sessionId: 's1', text: LINE }));
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(wav);
+  });
+
+  it('adds "losing patience" to the tag when the homeowner is nearly out', async () => {
+    fake.docs('practiceSessions').set('r1', { ...SAVED, patience: 1 });
+    geminiSpeaks();
+    await POST(req({ sessionId: 's1', text: LINE }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text).toBe(
+      `[tired, rushed, distracted, losing patience] ${LINE}`
+    );
+  });
+
+  it('falls back to the lite model on a rate limit or server error, not on a bad request', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('quota', { status: 429 }));
+    geminiSpeaks();
+    expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(200);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      expect.stringContaining('/models/gemini-3.8-flash-tts:'),
+      expect.stringContaining('/models/gemini-3.8-flash-lite-tts:'),
+    ]);
+    // The lite model gets the same tag format.
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).contents[0].parts[0].text).toBe(`[tired, rushed, distracted] ${LINE}`);
+
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(new Response('bad', { status: 400 }));
+    expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('refuses any text but the latest homeowner line, so it is no free TTS', async () => {
@@ -111,6 +151,8 @@ describe('POST /api/portal/ask/practice/voice', () => {
   });
 
   it('fails with a status (the page falls back to the phone voice) when Gemini fails or is not set up', async () => {
+    // Both models out: the page's phone voice takes over.
+    fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(502);
     fetchMock.mockRejectedValueOnce(new DOMException('The operation timed out.', 'TimeoutError'));

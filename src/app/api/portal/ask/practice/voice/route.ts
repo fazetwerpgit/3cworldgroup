@@ -8,7 +8,7 @@ import { spokenText } from '@/lib/ask/practiceVoice';
 import { PRACTICE_SESSIONS, takeDailyPracticeVoice } from '@/lib/ask/store';
 
 // POST /api/portal/ask/practice/voice { sessionId, text } — the homeowner's
-// latest line spoken in the session's Gemini voice, as audio/wav. Only that
+// latest line spoken in the session's Gemini voice (practiceTts), as audio/wav. Only that
 // line of the caller's own current practice: never arbitrary text, so this is
 // not a free TTS service. Same gate as the practice route; its own daily
 // count. Any failure is an error status and the page reads the line with the
@@ -54,14 +54,14 @@ export async function POST(request: NextRequest) {
   const customer = practiceCustomer(saved.persona, saved.seed);
   const patience = typeof saved.patience === 'number' ? saved.patience : customer.persona.patience;
   // A homeowner near the end of their rope sounds it.
-  const style = patience <= 1 ? `${customer.style}, and clearly losing patience now` : customer.style;
+  const tone = patience <= 1 ? [...customer.persona.tone, 'losing patience'] : customer.persona.tone;
   const started = Date.now();
-  const result = await speakLine({ apiKey, voiceName: customer.ttsVoice, style, text: spoken });
+  const result = await speakLine({ apiKey, voiceName: customer.ttsVoice, tone, text: spoken });
   if (!result.ok) {
     log({ outcome: result.reason, ms: Date.now() - started });
     return fail('The voice didn’t come through.', result.reason === 'timeout' ? 504 : 502);
   }
-  log({ outcome: 'ok', voice: customer.ttsVoice, chars: spoken.length, ms: Date.now() - started });
+  log({ outcome: 'ok', model: result.model, voice: customer.ttsVoice, chars: spoken.length, ms: Date.now() - started });
   return new NextResponse(new Uint8Array(result.wav), {
     status: 200,
     headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' },
