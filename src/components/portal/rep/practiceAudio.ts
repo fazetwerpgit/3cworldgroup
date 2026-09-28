@@ -17,6 +17,8 @@ const START_LEAD_S = 0.25;
 const RESUME_LEAD_S = 0.05;
 /** Porch sounds against the voice (1): clear but under it. */
 const EFFECT_GAIN = 0.55;
+/** How fast the homeowner's voice fades when the rep talks over them. */
+const BARGE_FADE_S = 0.15;
 /** The background bed: well under the voice. */
 const AMBIENT_GAIN = 0.16;
 const AMBIENT_FADE_S = 1.2;
@@ -50,6 +52,12 @@ export interface VoicePlayer {
   setRing(on: boolean): void;
   /** Everything quiet: voices, porch sounds and background. */
   quiet(): void;
+  /** Hands-free: the rep talked over the homeowner, whose voice fades out fast. */
+  fadeOut(): void;
+  /** Seconds of the voice still to play (0 when it's done). */
+  voiceLeft(): number;
+  /** The context the voices play on; the hands-free mic runs on it too. */
+  context: AudioContext;
 }
 
 /**
@@ -287,6 +295,19 @@ export function unlockVoicePlayer(): VoicePlayer | null {
     bed = null;
   };
 
+  const fadeVoice = () => {
+    const now = context.currentTime;
+    voiceBus.gain.cancelScheduledValues(now);
+    voiceBus.gain.setValueAtTime(voiceBus.gain.value, now);
+    voiceBus.gain.linearRampToValueAtTime(0, now + BARGE_FADE_S);
+    const mine = playing;
+    window.setTimeout(() => {
+      if (playing === mine) stop();
+      voiceBus.gain.cancelScheduledValues(context.currentTime);
+      voiceBus.gain.setValueAtTime(1, context.currentTime);
+    }, BARGE_FADE_S * 1000 + 20);
+  };
+
   const quiet = () => {
     stop();
     halt(effects);
@@ -307,5 +328,8 @@ export function unlockVoicePlayer(): VoicePlayer | null {
       ring = on;
     },
     quiet,
+    fadeOut: fadeVoice,
+    voiceLeft: () => Math.max(0, voiceEnd - context.currentTime),
+    context,
   };
 }

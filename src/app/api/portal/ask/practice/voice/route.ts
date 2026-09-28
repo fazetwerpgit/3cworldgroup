@@ -12,7 +12,7 @@ import { PRACTICE_SESSIONS, takeDailyPracticeVoice } from '@/lib/ask/store';
 // homeowner side's latest lines spoken in its speaker's Gemini voice (the
 // homeowner, the spouse who walked up, the kid who answered; practiceTts),
 // streamed as raw PCM (audio/L16;rate=N;channels=1) from the first chunk on.
-// Only those lines of the caller's own current practice: never arbitrary text, so this is
+// Only those lines (or the hands-free cut-in written ahead) of the caller's own current practice: never arbitrary text, so this is
 // not a free TTS service. Same gate as the practice route; its own daily
 // count. Any failure is an error status and the page reads the line with the
 // phone's own voice instead.
@@ -46,7 +46,12 @@ export async function POST(request: NextRequest) {
   if (saved.sessionId !== sessionId || !isPersonaId(saved.persona) || !isPracticeSeed(saved.seed)) {
     return fail('That practice is over.', 409);
   }
-  const latest = Array.isArray(saved.lastLines) ? (saved.lastLines as { speaker?: unknown; text?: unknown }[]) : [];
+  // The latest lines, and a hands-free cut-in written ahead (fetched before it plays).
+  const cutIn = (saved.pendingCut as { lines?: unknown } | null | undefined)?.lines;
+  const latest = [
+    ...(Array.isArray(saved.lastLines) ? saved.lastLines : []),
+    ...(Array.isArray(cutIn) ? cutIn : []),
+  ] as { speaker?: unknown; text?: unknown }[];
   const line = latest.find((candidate) => candidate?.text === text);
   if (!line) return fail('Only the homeowner’s latest line', 403);
   const speaker: Speaker = line.speaker === 'spouse' || line.speaker === 'kid' ? line.speaker : 'homeowner';

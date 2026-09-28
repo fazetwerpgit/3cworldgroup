@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { DoorClosed, DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Undo2, Volume2, VolumeX } from 'lucide-react';
+import { AudioLines, DoorClosed, DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Undo2, Volume2, VolumeX } from 'lucide-react';
 import { BorderBeam } from 'border-beam';
 import { ThinkingOrb } from 'thinking-orbs';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -15,6 +15,7 @@ import {
   isPersonaChoice,
   type PersonaChoice,
   type PracticeEndedBy,
+  type PracticeCutInReply,
   type PracticeFeedbackReply,
   type PracticeKnockReply,
   type PracticePriceReply,
@@ -32,6 +33,8 @@ import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
 import { PracticeMine } from './PracticeMine';
 import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type VoicePlayer } from './practiceAudio';
+import { askForMic, canHandsFree } from './handsFreeMic';
+import { useHandsFree } from './useHandsFree';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -44,6 +47,10 @@ import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type
 // Knock tap unlocks, so iOS lets it play after an await), falling back to the
 // phone's speechSynthesis, and takes the rep's lines by voice
 // (SpeechRecognition) on the phone; typing always works.
+// Hands-free (off unless turned on, on this phone): the mic stays open for the
+// practice and streams to live transcription (handsFreeMic); a pause sends the
+// line, talking over the homeowner stops them, and a rep who talks past the
+// homeowner's budget gets cut off by a line written ahead (useHandsFree).
 // The session lives in sessionStorage under its own key, tagged with the uid,
 // with the same idle reset as Ask.
 // Over time: the feedback carries four skill scores and, with Talk on, plain
@@ -211,6 +218,25 @@ const noSubscribe = () => () => {};
 
 /** Talk on/off is this phone's preference, kept across visits (not rep data, so sign-out leaves it). */
 const TALK_PREF_KEY = 'ask3c-practice-talk';
+/** Hands-free is off unless the rep turned it on, on this phone. */
+const HANDS_FREE_PREF_KEY = 'ask3c-practice-hands-free';
+
+function readHandsFree(): boolean {
+  try {
+    return window.localStorage.getItem(HANDS_FREE_PREF_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+/** A hands-free interruption, written and its voice fetched ahead of the moment it plays. */
+interface PreparedCut {
+  sessionId: string;
+  /** The conversation it was written for. */
+  turns: PracticeTurn[];
+  lines: PracticeLine[];
+  voice: OpenVoice | null;
+}
 
 function readTalkOff(): boolean {
   try {
@@ -243,6 +269,7 @@ export function RepPractice({
   const [talkOff, setTalkOff] = useState(() => typeof window !== 'undefined' && readTalkOff());
   const [listening, setListening] = useState(false);
   const [micBroken, setMicBroken] = useState(false);
+  const [handsFreeOn, setHandsFreeOn] = useState(() => typeof window !== 'undefined' && readHandsFree());
   const reducedMotion = usePrefersReducedMotion();
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<Recognition | null>(null);
@@ -265,6 +292,32 @@ export function RepPractice({
   const canSpeak = useSyncExternalStore(noSubscribe, () => 'speechSynthesis' in window, () => false);
   const canListen = useSyncExternalStore(noSubscribe, () => recognitionClass() !== undefined, () => false);
   const talk = canSpeak && !talkOff;
+  const canHandsFreeHere = useSyncExternalStore(noSubscribe, canHandsFree, () => false);
+  const handsFree = talk && canHandsFreeHere && handsFreeOn;
+  const hands = useHandsFree<PreparedCut>({
+    onLine: (text, ms) => {
+      spokenRef.current = { text, ms: Math.max(MIN_LINE_MS, ms) };
+      sendRef.current(text);
+    },
+    prepareCut: async (partial) => {
+      const sessionId = session?.sessionId;
+      if (!session || !sessionId || session.ended || busy) return null;
+      const turns = session.turns;
+      const result = await post<PracticeCutInReply>({ action: 'cutin', sessionId, history: turns, partial: partial.slice(0, MAX_REP_CHARS) });
+      const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
+      if (!lines.length) return null;
+      const voice = playerRef.current ? await openVoice(sessionId, lines[0].text) : null;
+      return { sessionId, turns, lines, voice };
+    },
+    cut: (prepared, partial, ms) => void cutIn(prepared, partial, ms),
+    bargeIn: () => {
+      speechRef.current += 1;
+      playerRef.current?.fadeOut();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    },
+    onLost: () => setNotice('Hands-free stopped. Tap to talk still works.'),
+  });
+  const pauseHands = hands.pause;
 
   const scrollDown = useCallback((behavior: ScrollBehavior) => {
     window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end', behavior }));
@@ -313,7 +366,8 @@ export function RepPractice({
     stopSpeaking();
     playerRef.current?.quiet();
     stopListening(false);
-  }, [active, stopListening, stopSpeaking]);
+    pauseHands();
+  }, [active, stopListening, stopSpeaking, pauseHands]);
 
   useEffect(() => {
     // Some browsers load their voices late; asking once starts that.
@@ -333,13 +387,15 @@ export function RepPractice({
         stopSpeaking();
         playerRef.current?.quiet();
         stopListening(false);
+        // The phone may take the mic back in the background: hands-free waits for a tap to resume.
+        pauseHands();
         return;
       }
       setSession((current) => (current && !readStoredPractice(uid) ? null : current));
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [uid, stopListening, stopSpeaking]);
+  }, [uid, stopListening, stopSpeaking, pauseHands]);
 
   const save = (next: Session | null) => {
     setSession(next);
@@ -349,13 +405,18 @@ export function RepPractice({
   /** The phone's own voice, when the session's voice didn't come through. Generic on purpose: it says nothing about who this is. */
   const speakFallback = (line: string) => {
     const text = spokenText(line);
-    if (!text || !('speechSynthesis' in window)) return;
+    if (!text || !('speechSynthesis' in window)) {
+      hands.listen();
+      return;
+    }
     const synth = window.speechSynthesis;
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     const voice = pickVoice(synth.getVoices(), null, 0);
     if (voice) utterance.voice = voice;
+    hands.speaking(text);
+    utterance.onend = () => hands.listen();
     synth.speak(utterance);
   };
 
@@ -364,12 +425,15 @@ export function RepPractice({
     setFailed(null);
     scrollDown('smooth');
     const delivery = current.delivery ?? (deliveryRef.current?.lines ? deliveryRef.current : null);
+    hands.stop();
+    const replyMs = hands.takeReplyMs();
     const result = await post<PracticeFeedbackReply>({
       action: 'feedback',
       sessionId: current.sessionId,
       history: current.turns,
       endedBy: current.endedBy ?? 'rep',
       ...(delivery ? { delivery } : {}),
+      ...(replyMs.length ? { replyMs } : {}),
     });
     setBusy(null);
     if (result.ok && result.data.feedback) {
@@ -404,6 +468,7 @@ export function RepPractice({
     const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
     if (result.ok && lines.length && (!knocked || result.data.sessionId)) {
       const { ended, close, beat } = result.data;
+      hands.setBudget(result.data.budgetMs);
       const next: Session = {
         ...current,
         ...(knocked
@@ -432,12 +497,14 @@ export function RepPractice({
         else speakFallback(lines.map((line) => line.text).join(' '));
       } else {
         void first?.reader.cancel().catch(() => {});
+        hands.listen();
       }
       scrollDown('smooth');
       if (ended) await requestFeedback(next);
       return;
     }
     setBusy(null);
+    hands.listen();
     const error = result.ok ? 'The homeowner went quiet. Try again.' : result.error;
     const retryable = result.ok || result.status !== 429;
     if (knocked) {
@@ -471,6 +538,14 @@ export function RepPractice({
   ) => {
     const quiet = speechRef.current;
     const delay = current.turns.length === lines.length && !current.ring ? DOOR_OPEN_S : 0;
+    // Hands-free: the rep may talk over the homeowner from here, and it's their turn once the voice is done.
+    const listenAfter = () => {
+      if (speechRef.current !== quiet || close) return;
+      window.setTimeout(() => {
+        if (speechRef.current === quiet) hands.listen();
+      }, player.voiceLeft() * 1000);
+    };
+    hands.speaking(lines.map((line) => line.text).join(' '));
     // The rep's delivery counts the homeowner's voice as time spent listening, as long as it played.
     const tally = deliveryRef.current;
     const started = performance.now() + delay * 1000;
@@ -480,10 +555,14 @@ export function RepPractice({
     await player.play(first, { delay });
     for (const line of lines.slice(1)) {
       const voice = speechRef.current === quiet && current.sessionId ? await openVoice(current.sessionId, line.text) : null;
-      if (!voice || speechRef.current !== quiet) return heard();
+      if (!voice || speechRef.current !== quiet) {
+        listenAfter();
+        return heard();
+      }
       await player.queue(voice);
     }
     heard();
+    listenAfter();
     if (close && speechRef.current === quiet) player.closeDoor(current.ring ? null : close === 'slam' ? 'door-slam' : 'door-close');
   };
 
@@ -510,7 +589,71 @@ export function RepPractice({
     }
     const next: Session = { ...session, turns: [...session.turns, { role: 'rep', text }] };
     save(next);
+    hands.thinking();
     void requestTurn(next);
+  };
+
+  /**
+   * Hands-free: the rep talked past the homeowner's budget. The interruption
+   * written ahead plays over them at once; the turn that makes it count (the
+   * judge on their cut-off line) runs meanwhile.
+   */
+  const cutIn = async (prepared: PreparedCut, partial: string, ms: number) => {
+    if (!session || session.ended || busy || session.sessionId !== prepared.sessionId || session.turns.length !== prepared.turns.length) {
+      void prepared.voice?.reader.cancel().catch(() => {});
+      hands.listen();
+      return;
+    }
+    const said = partial.slice(0, MAX_REP_CHARS - 1);
+    const rep: PracticeTurn = { role: 'rep', text: `${said}…` };
+    const tally = deliveryRef.current;
+    if (tally && said) {
+      tally.talkMs += Math.max(MIN_LINE_MS, ms);
+      tally.words += said.split(/\s+/).filter(Boolean).length;
+      tally.lines += 1;
+      for (const [word, n] of Object.entries(fillerCount(said))) tally.fillers[word] = (tally.fillers[word] ?? 0) + n;
+    }
+    const withRep: Session = { ...session, turns: [...prepared.turns, rep] };
+    const shown: Session = { ...withRep, turns: [...withRep.turns, ...prepared.lines.map(customerTurn)] };
+    setDraft('');
+    save(shown);
+    scrollDown('smooth');
+    const player = playerRef.current;
+    if (prepared.voice && player) void speakLines(player, prepared.voice, prepared.lines, shown, null);
+    else speakFallback(prepared.lines.map((line) => line.text).join(' '));
+    setBusy('turn');
+    const result = await post<PracticeTurnReply>({ action: 'turn', sessionId: prepared.sessionId, history: withRep.turns, cut: true });
+    setBusy(null);
+    const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
+    if (!result.ok || !lines.length) {
+      stopSpeaking();
+      save({ ...withRep, turns: prepared.turns });
+      setDraft(rep.text);
+      setFailed({ message: result.ok ? 'The homeowner went quiet. Try again.' : result.error, retry: !result.ok && result.status === 429 ? null : 'send' });
+      hands.listen();
+      return;
+    }
+    hands.setBudget(result.data.budgetMs);
+    const next: Session = {
+      ...withRep,
+      turns: [...withRep.turns, ...lines.map(customerTurn)],
+      ended: result.data.ended,
+      endedBy: result.data.ended ? 'homeowner' : undefined,
+    };
+    save(next);
+    if (result.data.ended) {
+      if (talk) player?.closeDoor(next.ring ? null : result.data.close === 'slam' ? 'door-slam' : 'door-close');
+      await requestFeedback(next);
+    }
+  };
+
+  /** Inside a tap: the mic for hands-free, opened once for this practice. */
+  const startHandsFree = (first: 'listening' | 'thinking') => {
+    const player = playerRef.current;
+    if (!player) return;
+    const mic = askForMic();
+    mic.catch(() => {});
+    void hands.start(player.context, mic, first);
   };
   useEffect(() => {
     // The mic's end handler outlives the render that started it; it sends through here.
@@ -527,6 +670,8 @@ export function RepPractice({
       const unlock = new SpeechSynthesisUtterance(' ');
       unlock.volume = 0;
       window.speechSynthesis.speak(unlock);
+      // Opened while the door is answered, so the first words aren't lost to the connection starting.
+      if (handsFree) startHandsFree('thinking');
     }
     setNotice('');
     deliveryRef.current = noDelivery();
@@ -545,6 +690,7 @@ export function RepPractice({
     if (!session || busy) return;
     stopSpeaking();
     stopListening(false);
+    hands.stop();
     if (!session.turns.some((turn) => turn.role === 'rep')) {
       reset();
       return;
@@ -587,11 +733,13 @@ export function RepPractice({
     stopSpeaking();
     playerRef.current?.quiet();
     if (talk) unlockAudio();
+    if (handsFree) startHandsFree('thinking');
     setBusy('redo');
     setFailed(null);
     const result = await post<PracticeRedoReply>({ action: 'redo', logId });
     setBusy(null);
     if (!result.ok || !result.data.sessionId || !Array.isArray(result.data.history) || !result.data.history.length) {
+      hands.stop();
       setFailed({ message: result.ok ? "That didn't go through. Try again." : result.error, retry: null });
       return;
     }
@@ -612,7 +760,10 @@ export function RepPractice({
     save(next);
     scrollDown('smooth');
     const player = playerRef.current;
-    if (!talk || !player) return;
+    if (!talk || !player) {
+      hands.listen();
+      return;
+    }
     let from = history.length;
     while (from > 0 && history[from - 1].role === 'customer') from -= 1;
     const lines: PracticeLine[] = history.slice(from).map((turn) => ({
@@ -624,13 +775,17 @@ export function RepPractice({
     if (!next.ring) player.ambient(next.ambient ?? null);
     const first = lines.length ? await openVoice(sessionId, lines[0].text) : null;
     if (first && speechRef.current === quiet) void speakLines(player, first, lines, next, null);
-    else void first?.reader.cancel().catch(() => {});
+    else {
+      void first?.reader.cancel().catch(() => {});
+      hands.listen();
+    }
   };
 
   const reset = () => {
     stopSpeaking();
     playerRef.current?.quiet();
     stopListening(false);
+    hands.stop();
     deliveryRef.current = null;
     save(null);
     setChoice('surprise');
@@ -723,6 +878,7 @@ export function RepPractice({
           if (talk) {
             stopSpeaking();
             stopListening(false);
+            hands.stop();
           }
           setTalkOff(talk);
           try {
@@ -736,6 +892,36 @@ export function RepPractice({
         {talk ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
         {talk ? 'Talk on' : 'Talk off'}
       </button>
+      {talk && canHandsFreeHere ? (
+        <button
+          type="button"
+          className={`${s.btnSecondary} ${pr.talk}`}
+          aria-pressed={handsFree}
+          onClick={() => {
+            const on = !handsFree;
+            setHandsFreeOn(on);
+            try {
+              if (on) window.localStorage.setItem(HANDS_FREE_PREF_KEY, 'on');
+              else window.localStorage.removeItem(HANDS_FREE_PREF_KEY);
+            } catch {
+              // Storage blocked: the choice holds for this visit only.
+            }
+            if (!on) {
+              hands.stop();
+              return;
+            }
+            // Turned on mid-practice: the mic opens now, in this tap.
+            if (session?.sessionId && !session.ended) {
+              stopListening(false);
+              unlockAudio();
+              startHandsFree(busy ? 'thinking' : 'listening');
+            }
+          }}
+        >
+          <AudioLines size={18} aria-hidden="true" />
+          Hands-free
+        </button>
+      ) : null}
     </div>
   ) : null;
 
@@ -801,7 +987,8 @@ export function RepPractice({
   const repSpoke = session.turns.some((turn) => turn.role === 'rep');
   const pricePulled = session.turns.some((turn) => turn.role === 'screen');
   const atCap = session.turns.length >= MAX_PRACTICE_TURNS - 1;
-  const micShown = talk && canListen && !micBroken && !session.ended && !atCap;
+  const handsOn = hands.status !== 'off' && !session.ended && !atCap;
+  const micShown = talk && canListen && !micBroken && !session.ended && !atCap && !handsOn;
 
   return (
     <>
@@ -908,6 +1095,33 @@ export function RepPractice({
                 </button>
               ) : null}
             </div>
+          ) : null}
+          {handsOn ? (
+            hands.status === 'paused' ? (
+              <button type="button" className={pr.mic} onClick={() => startHandsFree(busy ? 'thinking' : 'listening')}>
+                <Mic size={26} aria-hidden="true" />
+                Hands-free paused. Tap to go on
+              </button>
+            ) : (
+              <div className={pr.handsFree} role="status" aria-live="polite">
+                {hands.status === 'listening' ? (
+                  <ThinkingOrb state="listening" size={20} theme="dark" aria-hidden="true" />
+                ) : hands.status === 'thinking' || hands.status === 'starting' ? (
+                  <ThinkingOrb state="composing" size={20} theme="dark" aria-hidden="true" />
+                ) : (
+                  <AudioLines size={20} aria-hidden="true" />
+                )}
+                <span>
+                  {hands.status === 'starting'
+                    ? 'Starting the mic…'
+                    : hands.status === 'listening'
+                      ? hands.heard || 'Listening. Just talk.'
+                      : hands.status === 'speaking'
+                        ? 'Homeowner talking. Talk over them to cut in.'
+                        : '…'}
+                </span>
+              </div>
+            )
           ) : null}
           {micShown ? (
             <button

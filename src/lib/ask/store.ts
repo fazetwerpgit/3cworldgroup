@@ -16,6 +16,7 @@ import { isPersonaId } from './practice';
 //   askUsage/{uid}_{day}       questions a rep asked on a Chicago day
 //   askUsage/{uid}_{day}_practice   Practice model calls that day (its own count: homeowner, line judge, coach)
 //   askUsage/{uid}_{day}_practice_voice   Practice lines spoken by the TTS voice that day
+//   askUsage/{uid}_{day}_practice_listen  hands-free listen tokens minted that day
 //   practiceLog/{id}           one doc per finished Practice (with its feedback)
 //   practiceSessions/{uid}     the rep's current Practice: who is behind the door (hidden from the rep)
 //   practiceAssignments/{id}   the owner's "N sessions by <day>" asks, for one rep or everyone
@@ -36,6 +37,8 @@ export const PRACTICE_CORRECTIONS = 'practiceCorrections';
 export const PRACTICE_DAILY_LIMIT = 300;
 /** Homeowner lines read aloud by the TTS voice: at most one per homeowner line, plus a few replays. */
 export const PRACTICE_VOICE_DAILY_LIMIT = 150;
+/** Hands-free listen tokens: one per practice, and one more when the phone drops the connection. */
+export const PRACTICE_LISTEN_DAILY_LIMIT = 60;
 
 export type AskRating = 'up' | 'down';
 
@@ -90,6 +93,11 @@ export function takeDailyPractice(
 /** Practice's spoken lines, on a counter of their own so talk mode never eats into practice replies. */
 export function takeDailyPracticeVoice(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
   return takeDaily(db, uid, now, '_practice_voice', PRACTICE_VOICE_DAILY_LIMIT);
+}
+
+/** A hands-free listen token, on a counter of its own. */
+export function takeDailyPracticeListen(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
+  return takeDaily(db, uid, now, '_practice_listen', PRACTICE_LISTEN_DAILY_LIMIT);
 }
 
 async function takeDaily(

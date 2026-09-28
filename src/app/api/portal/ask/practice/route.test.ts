@@ -63,6 +63,7 @@ const says = (text: string, close?: 'slam' | 'shut') => ({
   lines: [{ speaker: 'homeowner', text }],
   ended: close !== undefined,
   ...(close ? { close } : {}),
+  budgetMs: expect.any(Number),
 });
 
 /** A coach answer in the exact shape (no format retry). */
@@ -293,6 +294,7 @@ describe('POST /api/portal/ask/practice', () => {
         { speaker: 'spouse', text: "We don't sign anything at the door." },
       ],
       ended: false,
+      budgetMs: expect.any(Number),
     });
     const body = sentBody();
     expect(body.messages.at(-1).content).toMatch(/walks up behind you and joins in.*SPOUSE:/);
@@ -323,7 +325,7 @@ describe('POST /api/portal/ask/practice', () => {
     fake.docs('practiceSessions').set('r1', { ...SAVED, door });
     modelAnswers("My mom's not home.");
     const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ lines: [{ speaker: 'kid', text: "My mom's not home." }], ended: false });
+    expect(await res.json()).toEqual({ lines: [{ speaker: 'kid', text: "My mom's not home." }], ended: false, budgetMs: expect.any(Number) });
     expect(sentBody().messages[0].content).toMatch(/^You are a kid, about ten years old/);
     expect(JSON.parse(fetchMock.mock.calls.find(isJudge)![1].body).messages[1].content).toMatch(/^A child, about ten, answered the door/);
 
@@ -353,7 +355,7 @@ describe('POST /api/portal/ask/practice', () => {
       const res = await POST(req({ action: 'turn', history: [], persona: 'renter' }));
       const reply = await res.json();
       // Nothing that tells the persona: no voice settings, no price card; only what's heard and seen at the door.
-      expect(Object.keys(reply).sort()).toEqual(['ambient', 'ended', 'lines', 'ring', 'sessionId']);
+      expect(Object.keys(reply).sort()).toEqual(['ambient', 'budgetMs', 'ended', 'lines', 'ring', 'sessionId']);
       const saved = fake.docs('practiceSessions').get('r1')!;
       expect(saved.sessionId).toBe(reply.sessionId);
       expect(saved.patience).toBe(PERSONAS.find((p) => p.id === saved.persona)!.patience);
@@ -526,6 +528,44 @@ describe('POST /api/portal/ask/practice', () => {
     modelAnswers('Hello?');
     await POST(req({ action: 'turn', history: [] }));
     expect(fake.docs('practiceSessions').get('r1')?.persona).not.toBe('elderly');
+  });
+
+  it('hands-free: writes the cut-in ahead, then plays it on the cut turn with only the judge, once', async () => {
+    const before = [PITCH[0]];
+    // Only after the homeowner's line, with words to cut into.
+    expect((await POST(req({ action: 'cutin', ...SESSION, history: PITCH, partial: 'and so' }))).status).toBe(400);
+    expect((await POST(req({ action: 'cutin', ...SESSION, history: before, partial: '' }))).status).toBe(400);
+
+    modelAnswers('Whoa, hang on. What is this about?');
+    const res = await POST(req({ action: 'cutin', ...SESSION, history: before, partial: 'So we have fiber and it is really fast and also' }));
+    expect(await res.json()).toEqual({ lines: [{ speaker: 'homeowner', text: 'Whoa, hang on. What is this about?' }] });
+    expect(sentBody().messages.at(-1).content).toMatch(/^So we have fiber and it is really fast and also\n\(The rep is still talking/);
+    expect(fake.docs('practiceSessions').get('r1')?.pendingCut).toMatchObject({ at: 2 });
+
+    // The rep kept going past the budget: the written line plays; the judge alone runs, one call on the day.
+    verdicts = ['WEAK'];
+    const cutLine = { role: 'rep', text: 'So we have fiber and it is really fast and also the price…' };
+    const played = await POST(req({ action: 'turn', ...SESSION, history: [...before, cutLine], cut: true }));
+    expect(await played.json()).toEqual(says('Whoa, hang on. What is this about?'));
+    expect(fetchMock.mock.calls.filter((c) => !isJudge(c))).toHaveLength(1);
+    expect(judgeCalls()).toHaveLength(1);
+    expect(fake.docs('practiceSessions').get('r1')).toMatchObject({ pendingCut: null, patience: 4 });
+    expect(fake.docs('askUsage').get(`r1_${chicagoDayKey(new Date())}_practice`)?.count).toBe(2);
+  });
+
+  it('hands-free: a normal turn drops a written cut-in, and a cut with none written asks the homeowner fresh', async () => {
+    modelAnswers('Hold on, hold on.');
+    await POST(req({ action: 'cutin', ...SESSION, history: [PITCH[0]], partial: 'Hi, I am' }));
+    // The rep stopped in time: their line gets a real answer and the cut-in is gone.
+    modelAnswers('Oh, okay. Who?');
+    const turn = await POST(req({ action: 'turn', ...SESSION, history: [PITCH[0], { role: 'rep', text: 'Hi, I am with 3C.' }] }));
+    expect((await turn.json()).lines[0].text).toBe('Oh, okay. Who?');
+    expect(fake.docs('practiceSessions').get('r1')?.pendingCut).toBeNull();
+
+    modelAnswers('Sure, go on.');
+    const later = [PITCH[0], { role: 'rep', text: 'Hi, I am with 3C.' }, { role: 'customer', text: 'Oh, okay. Who?' }, { role: 'rep', text: 'T-Mobile Fiber…' }];
+    const fresh = await POST(req({ action: 'turn', ...SESSION, history: later, cut: true }));
+    expect((await fresh.json()).lines[0].text).toBe('Sure, go on.');
   });
 
   it('never lets a sellable homeowner end as "walked away the right way"', async () => {

@@ -49,6 +49,13 @@ export interface PracticeTurnReply {
   close?: 'slam' | 'shut';
   /** An interruption on this line (the phone rings...), for the sound. */
   beat?: BeatKind;
+  /** Hands-free: how long the rep may talk next before the homeowner cuts in. */
+  budgetMs?: number;
+}
+
+/** POST /api/portal/ask/practice {action:'cutin'} answers 200 with this: the interruption, not yet played. */
+export interface PracticeCutInReply {
+  lines: PracticeLine[];
 }
 
 /**
@@ -943,6 +950,8 @@ Only what happened: quote the rep's exact words, and only mention pain points, o
 Honesty: flag anything the rep said that is untrue or risky: a promo, speed or policy that isn't in the playbook (a price "locked in", "you can just cancel"), a made-up claim about neighbors, T-Mobile or the competitor, or a promise they can't keep. Prices come only from the order screen: the transcript shows a "Screen:" line when the rep pulled it up. A price the rep states that matches the Screen line, after it appears, is fine, and so is honest math with it: the difference between the screen's price and what the homeowner said they pay, per month or per year ("$65 against your $99, so about $34 less"). Any price the rep states before the Screen line exists, or that doesn't match it, is an honesty problem. An honesty problem is always the "Fix next time".
 
 Conduct: cursing at the homeowner, insults, slurs, or anything creepy, flirty or sexual is 1/10, No sale, and the Fix next time names it plainly for what it is (for a creepy or sexual line: inappropriate and harassment, never acceptable at a door). Friendly slang is fine.
+
+A rep line that ends in "…" was cut off: the homeowner talked over the rep because they'd been talking too long in one go. Keeping it short and asking questions is the fix; say so if it happened.
 
 This is practice: there is no order screen, no phone, no order to run and no real customer. Judge only the conversation. Offering to pull up the order screen for the price, pulling it up, saying the screen shows every fee, or offering to start the order is the right move; never call it dodging. The standard opener that T-Mobile Fiber is on their street or just became available is true in the field: never dock it. Never dock them for steps that can't happen in practice (finishing the order, the QR code, the confirmation).
 

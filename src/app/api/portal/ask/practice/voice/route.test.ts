@@ -122,6 +122,14 @@ describe('POST /api/portal/ask/practice/voice', () => {
     ]);
   });
 
+  it('speaks a hands-free cut-in written ahead, before it is played', async () => {
+    const cut = 'Whoa, hang on. What is this about?';
+    fake.docs('practiceSessions').set('r1', { ...SAVED, pendingCut: { at: 2, raw: cut, lines: [{ speaker: 'homeowner', text: cut }] } });
+    fetchMock.mockResolvedValueOnce(streamed(PCM_A));
+    expect((await POST(req({ sessionId: 's1', text: cut }))).status).toBe(200);
+    expect((await POST(req({ sessionId: 's1', text: 'Something else entirely.' }))).status).toBe(403);
+  });
+
   it("speaks the spouse's line in the spouse's own voice and tone, and the kid's in the kid's", async () => {
     const spouseLine = "We don't sign anything at the door.";
     fake.docs('practiceSessions').set('r1', {

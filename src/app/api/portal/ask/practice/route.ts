@@ -6,6 +6,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { askAudience } from '@/lib/ask/flag';
 import {
   MAX_PRACTICE_TURNS,
+  MAX_REP_CHARS,
   LINE_JUDGE_PROMPT,
   buildCustomerPrompt,
   buildFeedbackPrompt,
@@ -34,6 +35,8 @@ import {
   type PracticeFeedbackReply,
   type PracticeKnockReply,
   type PracticePriceReply,
+  type PracticeCutInReply,
+  type PracticeCustomer,
   type PracticeRedoReply,
   type PracticeTurn,
   type PracticeTurnReply,
@@ -56,7 +59,9 @@ import {
   spouseHere,
   surpriseNote,
   type PracticeDoor,
+  type PracticeLine,
 } from '@/lib/ask/practiceDoor';
+import { talkBudgetMs } from '@/lib/ask/practiceHandsFree';
 import { AskProviderError, askProviderConfig, callAskModel, type AskMessage, type AskUsage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
 import {
@@ -88,6 +93,10 @@ import {
 //   { action: 'feedback', sessionId, history, endedBy: 'homeowner'|'rep', delivery? }
 //                                                      the coach's grade; logs the session once
 //                                                      (delivery: talk mode's timing and words)
+//   { action: 'cutin', sessionId, history, partial }   hands-free: the homeowner's interruption of a
+//                                                      rep still talking (partial: their words so far),
+//                                                      written ahead; { action: 'turn', ..., cut: true }
+//                                                      then plays it (history ends with the cut-off line)
 //   { action: 'redo', logId }                          "Redo that moment": a new session at the
 //                                                      same door, up to its weakest line
 // Ask 3C Practice: the rep pitches, the model plays a homeowner, then grades
@@ -160,7 +169,9 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const action = body?.action;
-  if (action !== 'turn' && action !== 'feedback' && action !== 'price' && action !== 'redo') return fail('Unknown practice action', 400);
+  if (action !== 'turn' && action !== 'feedback' && action !== 'price' && action !== 'redo' && action !== 'cutin') {
+    return fail('Unknown practice action', 400);
+  }
 
   const sessionRef = db.collection(PRACTICE_SESSIONS).doc(gate.uid);
   const saved = (await sessionRef.get()).data() ?? {};
@@ -185,7 +196,15 @@ export async function POST(request: NextRequest) {
   const history = parsePracticeHistory(body?.history);
   if (!history) return fail('Bad practice conversation', 400);
   const knock = action === 'turn' && history.length === 0;
-  if (action === 'turn') {
+  // Hands-free: the interruption for a rep who's still talking ('cutin', from what they've said so far),
+  // and the turn that plays it (cut: the homeowner's line is the one written then, only the judge runs).
+  const partial = action === 'cutin' && typeof body?.partial === 'string' ? body.partial.trim() : '';
+  const pendingCut = parsePendingCut(saved.pendingCut);
+  const cut = action === 'turn' && body?.cut === true && pendingCut?.at === history.length ? pendingCut : null;
+  if (action === 'cutin') {
+    if (!partial || partial.length > MAX_REP_CHARS) return fail('Bad cut-in', 400);
+    if (history.at(-1)?.role !== 'customer' || history.length >= MAX_PRACTICE_TURNS - 1) return fail('Bad cut-in', 400);
+  } else if (action === 'turn') {
     // The homeowner answers the knock (no lines yet), the rep's last line, or the price card the rep just
     // pulled up, and never runs past the cap.
     if (history.length >= MAX_PRACTICE_TURNS) return fail("That's as long as a practice runs. Get your feedback.", 400);
@@ -264,7 +283,7 @@ export async function POST(request: NextRequest) {
   const now = new Date();
   // Model calls this request makes: the knock and the coach 1, a rep line 2 (homeowner and line judge). A knock
   // also needs room left for a practice worth having: two rep lines and the feedback.
-  const calls = action === 'turn' && !knock ? 2 : 1;
+  const calls = action === 'turn' && !knock && !cut ? 2 : 1;
   const headroom = knock ? KNOCK_HEADROOM : 0;
   if (!(await takeDailyPractice(db, gate.uid, now, calls, headroom))) {
     await release();
@@ -278,6 +297,26 @@ export async function POST(request: NextRequest) {
   const turns = cleanTurns(history, card);
   const started = Date.now();
 
+  if (action === 'cutin') {
+    let reply: string;
+    if (stub) reply = 'Sorry, hang on. What is this about?';
+    else {
+      const heard = [...turns, { role: 'rep' as const, text: redactContact(partial) }];
+      const messages = homeownerMessages(customer, door, heard, patienceBefore, [CUT_IN_NOTE]);
+      try {
+        ({ answer: reply } = await callAskModel(config, messages, CUSTOMER_CALL));
+      } catch (error) {
+        return providerFailure(error, action, started);
+      }
+    }
+    const { text } = readCustomerReply(reply, patienceBefore, null, seed, door.kind === 'kid');
+    const lines = splitSpeakers(text, door, spouseHere(door, turns));
+    // Kept until the turn that plays it (or any other turn, which drops it); the voice route may speak it now.
+    await sessionRef.update({ pendingCut: { at: turns.length + 1, raw: reply, lines }, updatedAt: now });
+    log({ outcome: 'ok', action, stub, turns: turns.length, ms: Date.now() - started });
+    return NextResponse.json<PracticeCutInReply>({ lines });
+  }
+
   if (action === 'turn') {
     let reply: string;
     let event: PracticeEvent | null = null;
@@ -288,35 +327,11 @@ export async function POST(request: NextRequest) {
     // The spouse walking up or an interruption, on the rep line it's due.
     const surprise = knock ? null : surpriseNote(door, turns, customer);
     if (stub) {
-      reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
+      reply = cut ? cut.raw : turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
       event = knock ? null : note ? 'lie' : 'ok';
     } else {
-      const system = kid
-        ? buildKidPrompt(customer, door)
-        : buildCustomerPrompt(customer, patienceBefore, doorPromptBlock(door, customer, turns));
-      const messages: AskMessage[] = [{ role: 'system', content: system }];
-      // The homeowner's side: the knock, the rep's lines and the screen they were shown, one user message
-      // per stretch between the homeowner's own lines (the spouse's lines tagged as the model wrote them).
-      let heard = knockLine(door);
-      let said: PracticeTurn[] = [];
-      for (const turn of turns) {
-        if (turn.role === 'customer') {
-          said.push(turn);
-          continue;
-        }
-        if (said.length) {
-          messages.push({ role: 'user', content: heard }, { role: 'assistant', content: asModelLine(said) });
-          heard = '';
-          said = [];
-        }
-        const line = turn.role === 'screen' ? `(The rep holds up their phone and you read the screen yourself: ${turn.text})` : turn.text;
-        heard = heard ? `${heard}\n${line}` : line;
-      }
-      if (said.length) {
-        messages.push({ role: 'user', content: heard }, { role: 'assistant', content: asModelLine(said) });
-        heard = '';
-      }
-      messages.push({ role: 'user', content: [heard, note, surprise].filter(Boolean).join('\n') });
+      // A cut-in plays the line written for it; only the judge runs.
+      const messages = cut ? null : homeownerMessages(customer, door, turns, patienceBefore, [note, surprise]);
       // The judge runs beside the homeowner, so it costs no time. If it fails, the line counts as fair:
       // a network blip isn't the rep's fault.
       const judged = knock
@@ -332,7 +347,10 @@ export async function POST(request: NextRequest) {
             .then(({ answer }) => judgedEvent(answer))
             .catch(() => 'ok' as const);
       try {
-        const [homeowner, verdict] = await Promise.all([callAskModel(config, messages, CUSTOMER_CALL), judged]);
+        const [homeowner, verdict] = await Promise.all([
+          messages ? callAskModel(config, messages, CUSTOMER_CALL) : Promise.resolve({ answer: cut!.raw, usage }),
+          judged,
+        ]);
         ({ answer: reply, usage } = homeowner);
         event = verdict && note && verdict !== 'abuse' ? 'lie' : verdict;
       } catch (error) {
@@ -347,14 +365,15 @@ export async function POST(request: NextRequest) {
       ended,
       ...(ended ? { close: event === 'abuse' || patience === 0 ? ('slam' as const) : ('shut' as const) } : {}),
       ...(beat ? { beat } : {}),
+      budgetMs: talkBudgetMs(customer.persona.patience, patience),
     };
-    log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', door: door.kind, ms: Date.now() - started, ...usage });
+    log({ outcome: 'ok', action, stub, cut: cut !== null, turns: turns.length, ended, patience, event: event ?? 'knock', door: door.kind, ms: Date.now() - started, ...usage });
     if (!knock) {
       // lastLines: the lines POST .../practice/voice will speak. The step (how this line landed) replaces
       // one from a retried request for the same line.
       const step: PracticeStep = { at: turns.length, event: event ?? 'ok', patience: patienceBefore };
       const steps = [...parseSteps(saved.steps).filter((kept) => kept.at < turns.length), step];
-      await sessionRef.update({ patience, lastLines: lines, steps, updatedAt: now });
+      await sessionRef.update({ patience, lastLines: lines, steps, pendingCut: null, updatedAt: now });
       return NextResponse.json<PracticeTurnReply>(outcome);
     }
     // The session exists once the door has opened; a knock that got no answer leaves the last one as it
@@ -452,6 +471,10 @@ export async function POST(request: NextRequest) {
   const skills = parseSkills(feedback);
   const steps = parseSteps(saved.steps);
   const delivery = parseDelivery(body?.delivery);
+  // Hands-free: how long each answer took to start after the rep stopped talking (the page measures it).
+  const replyMs = Array.isArray(body?.replyMs)
+    ? body.replyMs.filter((ms): ms is number => Number.isInteger(ms) && ms >= 0 && ms <= 60_000).slice(0, MAX_PRACTICE_TURNS)
+    : [];
   const result = /^\s*result\s*:\s*(.+)$/im.exec(feedback)?.[1].trim() ?? null;
   const ref = await db.collection(PRACTICE_LOG).add({
     uid: gate.uid,
@@ -469,6 +492,7 @@ export async function POST(request: NextRequest) {
     skills,
     steps,
     delivery,
+    ...(replyMs.length ? { replyMs } : {}),
     ...(redoOf ? { redoOf, redoFrom: saved.redoFrom } : {}),
     feedback,
     model: stub ? STUB_MODEL : config.model,
@@ -476,7 +500,8 @@ export async function POST(request: NextRequest) {
   });
   const reply: PracticeFeedbackReply = { id: ref.id, feedback, score, skills, canRedo: redoPoint(steps) !== null };
   await sessionRef.update({ feedback: reply, gradingAt: 0, updatedAt: now });
-  log({ outcome: 'ok', action, stub, turns: turns.length, score: score ?? -1, ms: Date.now() - started, ...usage });
+  const medianReply = replyMs.length ? replyMs.toSorted((a, b) => a - b)[Math.floor(replyMs.length / 2)] : -1;
+  log({ outcome: 'ok', action, stub, turns: turns.length, score: score ?? -1, ms: Date.now() - started, medianReplyMs: medianReply, ...usage });
   return NextResponse.json<PracticeFeedbackReply>(reply);
 }
 
@@ -575,4 +600,62 @@ async function startRedo(
     ring: door.kind === 'ring',
     ambient: ambientFor(customer, door),
   });
+}
+
+/** The hidden note that makes the homeowner cut in on a rep who won't stop talking. */
+const CUT_IN_NOTE =
+  "(The rep is still talking and hasn't let you get a word in. Cut in now, over them: one short line, in character, the way a real person at the door interrupts someone who rambles. Don't answer everything they said.)";
+
+interface PendingCut {
+  /** The conversation's length once the rep's cut-off line is in: the turn that plays it. */
+  at: number;
+  /** The homeowner model's line as written. */
+  raw: string;
+  lines: PracticeLine[];
+}
+
+function parsePendingCut(value: unknown): PendingCut | null {
+  const cut = value as Partial<PendingCut> | null | undefined;
+  return cut && Number.isInteger(cut.at) && typeof cut.raw === 'string' && Array.isArray(cut.lines)
+    ? { at: cut.at as number, raw: cut.raw, lines: cut.lines }
+    : null;
+}
+
+/**
+ * The homeowner model's conversation: its prompt (the kid's at a kid door),
+ * then the knock, the rep's lines and the screen they were shown, one user
+ * message per stretch between the homeowner's own lines (the spouse's lines
+ * tagged as the model wrote them), and hidden notes on the last one.
+ */
+function homeownerMessages(
+  customer: PracticeCustomer,
+  door: PracticeDoor,
+  turns: PracticeTurn[],
+  patience: number,
+  notes: (string | null)[]
+): AskMessage[] {
+  const system =
+    door.kind === 'kid' ? buildKidPrompt(customer, door) : buildCustomerPrompt(customer, patience, doorPromptBlock(door, customer, turns));
+  const messages: AskMessage[] = [{ role: 'system', content: system }];
+  let heard = knockLine(door);
+  let said: PracticeTurn[] = [];
+  for (const turn of turns) {
+    if (turn.role === 'customer') {
+      said.push(turn);
+      continue;
+    }
+    if (said.length) {
+      messages.push({ role: 'user', content: heard }, { role: 'assistant', content: asModelLine(said) });
+      heard = '';
+      said = [];
+    }
+    const line = turn.role === 'screen' ? `(The rep holds up their phone and you read the screen yourself: ${turn.text})` : turn.text;
+    heard = heard ? `${heard}\n${line}` : line;
+  }
+  if (said.length) {
+    messages.push({ role: 'user', content: heard }, { role: 'assistant', content: asModelLine(said) });
+    heard = '';
+  }
+  messages.push({ role: 'user', content: [heard, ...notes].filter(Boolean).join('\n') });
+  return messages;
 }
