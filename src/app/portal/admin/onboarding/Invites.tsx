@@ -712,7 +712,6 @@ export function Invites() {
                     <li className={u.tHead} aria-hidden="true">
                       <span>Applicant</span>
                       <span>Contact</span>
-                      <span>Submitted</span>
                       <span>Status</span>
                       <span />
                     </li>
@@ -723,7 +722,12 @@ export function Invites() {
                             <span className={u.personName}>
                               <span>{application.name}</span>
                             </span>
-                            <span className={u.personSub}>{application.city}</span>
+                            <span className={u.personSub}>
+                              {application.city ? `${application.city} · ` : ''}
+                              <span className={u.num}>
+                                {formatDate(application.createdAt ? application.createdAt.toString() : null)}
+                              </span>
+                            </span>
                             {application.referredBy ? (
                               <span className={u.personSub}>Referred by {application.referredBy}</span>
                             ) : null}
@@ -755,11 +759,6 @@ export function Invites() {
                             >
                               {application.email}
                             </a>
-                          </span>
-                        </span>
-                        <span className={u.cell} data-label="Submitted">
-                          <span className={u.num}>
-                            {formatDate(application.createdAt ? application.createdAt.toString() : null)}
                           </span>
                         </span>
                         {application.status === 'applied' ? (

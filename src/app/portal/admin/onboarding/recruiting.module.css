@@ -192,7 +192,7 @@
 }
 
 .appCols {
-  --cols: minmax(0, 0.9fr) minmax(0, 1.3fr) 108px 104px 96px;
+  --cols: minmax(0, 1fr) minmax(0, 1fr) 96px 96px;
 }
 
 .appAction {
@@ -210,6 +210,7 @@
 
   .app > .appStatus {
     order: 9;
+    justify-content: flex-start;
   }
 
   .app > .appAction {
