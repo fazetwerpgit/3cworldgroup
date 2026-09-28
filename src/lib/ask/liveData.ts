@@ -266,7 +266,12 @@ async function boardRankings(db: Db, now: Date): Promise<BoardRow[][]> {
 
 async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
   const rankings = await boardRankings(db, now);
-  const lines = BOARD_PERIODS.map(([, label], i) => {
+  const lines = BOARD_PERIODS.map(([period, name], i) => {
+    // The period's own dates (Central, like the Board), so "when does the week reset" is never a guess.
+    const bounds = periodBounds(period, now);
+    const label = bounds
+      ? `${name} (${dayLabel(bounds.start, LIVE_DEFAULT_ZONE)} to ${dayLabel(new Date(bounds.end.getTime() - 1), LIVE_DEFAULT_ZONE)})`
+      : name;
     const ranked = rankings[i];
     const at = ranked.findIndex((row) => row.id === uid);
     if (at === -1) {
