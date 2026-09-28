@@ -62,10 +62,10 @@ describe('form options', () => {
 
     it('has the exact Leads reasons', () => {
       expect(LEADS_REASONS).toEqual([
-        'New rep neads logins and leads assigned',
-        'Terrtory has been worked and knocked multiple times with 2-3 knock dispositions',
-        'Hostile situation happened a the territory, requesting switch',
-        'another rep was caught knocking in our reps territory',
+        'New rep needs logins and leads assigned',
+        'Territory has been worked and knocked multiple times with 2-3 knock dispositions',
+        'Hostile situation happened at the territory, requesting switch',
+        "Another rep was caught knocking in our rep's territory",
       ]);
     });
   });

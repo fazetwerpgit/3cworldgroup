@@ -15,7 +15,7 @@ export const PORTAL_GUIDE = `Portal guide (the 3C portal at 3cworldgroup.com/por
   Payroll dispute: an install missing from your pay or paid wrong. Contractor name and email, campaign, type of order, date of install, and a screenshot or proof.
   Expedite order: customer name, phone, order number, the dates you want, and a reason: Install too far out; Tech missed install need install asap; Customer no showed need it rescheduled asap.
   Fiber report: log a lead pack's door knocking and fiber sales (date knocked, pack number, doors, contacts, sales).
-  Leads request: ask for a lead pack or flag a territory problem (campaign, manager, location; Jacob approves). Reasons: New rep neads logins and leads assigned; Terrtory has been worked and knocked multiple times with 2-3 knock dispositions; Hostile situation happened a the territory, requesting switch; another rep was caught knocking in our reps territory.
+  Leads request: ask for a lead pack or flag a territory problem (campaign, manager, location; Jacob approves). Reasons: New rep needs logins and leads assigned; Territory has been worked and knocked multiple times with 2-3 knock dispositions; Hostile situation happened at the territory, requesting switch; Another rep was caught knocking in our rep's territory.
   Manager interview: managers only.
 - Learn: Pay & links (your training progress, field tools like the TFiber Service Check, short videos, pay structure) and Training (modules and short videos).
 - Ask 3C: this chat. Add a photo of an order screen or error. 60 questions a day. New chat starts over.
