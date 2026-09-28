@@ -27,6 +27,7 @@ import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
 import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
+import { openVoice, unlockVoicePlayer, type VoicePlayer } from './practiceAudio';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -65,11 +66,6 @@ type Busy = 'turn' | 'feedback' | null;
 type Retry = 'turn' | 'send' | 'feedback' | null;
 
 const REQUEST_TIMEOUT_MS = 60_000;
-/** The server gives the voice 10 s; past this the phone's own voice reads the line. */
-const VOICE_TIMEOUT_MS = 12_000;
-/** A tiny silent WAV: played inside the Knock tap so iOS lets the same element play later lines. */
-const SILENT_WAV =
-  'data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 /** Talk mode: this long without new words ends the rep's line and sends it. */
 const SILENCE_MS = 1600;
 /** And this long with no words at all gives up listening. */
@@ -139,23 +135,6 @@ async function post<T>(
   }
 }
 
-/** The homeowner's latest line in the session's voice, or null (the phone's own voice reads it then). */
-async function fetchVoice(sessionId: string, text: string): Promise<Blob | null> {
-  try {
-    const token = await getIdToken();
-    const res = await fetch('/api/portal/ask/practice/voice', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token ?? ''}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, text }),
-      signal: AbortSignal.timeout(VOICE_TIMEOUT_MS),
-    });
-    const blob = res.ok ? await res.blob() : null;
-    return blob && blob.size > 44 ? blob : null;
-  } catch {
-    return null;
-  }
-}
-
 // ---- the browser's speech APIs (not in every TypeScript DOM lib, so typed here) ----
 
 interface RecognitionResultEvent {
@@ -222,9 +201,8 @@ export function RepPractice({
   const skipSendRef = useRef(false);
   const silenceRef = useRef<number | null>(null);
   const sendRef = useRef<(text: string) => void>(() => {});
-  /** The one audio element every spoken line plays through (unlocked by a tap, reused). */
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
+  /** Plays the homeowner's streamed voice (Web Audio, unlocked by a tap, reused). */
+  const playerRef = useRef<VoicePlayer | null>(null);
   /** Bumped whenever speech should stop: a voice that arrives after that stays quiet. */
   const speechRef = useRef(0);
 
@@ -244,20 +222,13 @@ export function RepPractice({
   /** Quiet: stop the homeowner's voice (and one still on its way) and the phone's voice. */
   const stopSpeaking = useCallback(() => {
     speechRef.current += 1;
-    audioRef.current?.pause();
+    playerRef.current?.stop();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   }, []);
 
-  /**
-   * Inside a tap: play a silent clip on the audio element so iOS lets it play
-   * the homeowner's voice later, after an await. Once is enough.
-   */
+  /** Inside a tap: the voice player, so iOS lets it play later lines after an await. Once is enough. */
   const unlockAudio = () => {
-    if (audioRef.current || typeof Audio === 'undefined') return;
-    const audio = new Audio();
-    audioRef.current = audio;
-    audio.src = SILENT_WAV;
-    void audio.play()?.catch(() => {});
+    if (!playerRef.current) playerRef.current = unlockVoicePlayer();
   };
 
   /** Stop listening: send what was heard, or throw it away. */
@@ -293,7 +264,6 @@ export function RepPractice({
     return () => {
       stopSpeaking();
       recognitionRef.current?.abort();
-      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     };
   }, [stopSpeaking]);
 
@@ -328,17 +298,6 @@ export function RepPractice({
     const voice = pickVoice(synth.getVoices(), null, 0);
     if (voice) utterance.voice = voice;
     synth.speak(utterance);
-  };
-
-  /** Plays the homeowner's voice through the unlocked element; the phone's voice if it won't play. */
-  const play = (voice: Blob, line: string) => {
-    const audio = audioRef.current ?? new Audio();
-    audioRef.current = audio;
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    audioUrlRef.current = URL.createObjectURL(voice);
-    audio.setAttribute('src', audioUrlRef.current);
-    const started = audio.play();
-    if (started) started.catch(() => speakFallback(line));
   };
 
   const requestFeedback = async (current: Session) => {
@@ -389,13 +348,17 @@ export function RepPractice({
         ended,
         endedBy: ended ? 'homeowner' : undefined,
       };
-      const voice = talk && next.sessionId ? await fetchVoice(next.sessionId, reply) : null;
+      // With Talk on the bubble waits (orb showing) for the voice's first audio, then shows as it starts.
+      const player = playerRef.current;
+      const voice = talk && player && next.sessionId ? await openVoice(next.sessionId, reply) : null;
       setBusy(null);
       save(next);
       // The rep started talking or typing meanwhile: the line shows, unspoken.
       if (talk && speechRef.current === quiet) {
-        if (voice) play(voice, reply);
+        if (voice && player) void player.play(voice);
         else speakFallback(reply);
+      } else {
+        void voice?.reader.cancel().catch(() => {});
       }
       scrollDown('smooth');
       if (ended) await requestFeedback(next);

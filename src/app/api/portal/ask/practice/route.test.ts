@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
-import { LINE_JUDGE_PROMPT, PERSONAS, practiceCustomer } from '@/lib/ask/practice';
+import { ABUSE_CLOSES, LINE_JUDGE_PROMPT, PERSONAS, practiceCustomer } from '@/lib/ask/practice';
 
 // POST /api/portal/ask/practice: the Ask 3C gate, its own daily count, the
 // homeowner call (fast settings, [END] stripped) and the graded, logged
@@ -187,9 +187,16 @@ describe('POST /api/portal/ask/practice', () => {
     await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(3);
 
-    // A caught lie halves what is left and takes one more: 3 -> 0, and the server shuts the door.
+    // A caught lie halves what is left (rounded up) and takes one more: 3 -> 1, the door stays open.
     verdicts.push('LIE');
     modelAnswers('Free? Nothing is free.');
+    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({ reply: 'Free? Nothing is free.', ended: false });
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(1);
+
+    // One more weak line: 0, and the server shuts the door.
+    verdicts.push('WEAK');
+    modelAnswers('Uh huh.');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
@@ -215,9 +222,10 @@ describe('POST /api/portal/ask/practice', () => {
 
   it('shuts the door on abuse at once, and on a goodbye without [END]', async () => {
     verdicts.push('ABUSE');
-    modelAnswers('Excuse me? No.');
+    modelAnswers("Excuse me? We're done here. [END]");
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toMatchObject({ ended: true });
+    // The server's close, picked by the session seed, whatever the model wrote.
+    expect(await res.json()).toEqual({ reply: ABUSE_CLOSES[42 % ABUSE_CLOSES.length], ended: true });
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
     fake.docs('practiceSessions').set('r1', SAVED);
@@ -234,8 +242,8 @@ describe('POST /api/portal/ask/practice', () => {
     expect(sentBody().messages.at(-1).content).toContain(
       '[Note only you know: the rep just said $45, but the screen they showed you said $75.]'
     );
-    // The judge said OK (the default), but a wrong price is a lie in code: 5 -> 1.
-    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(1);
+    // The judge said OK (the default), but a wrong price is a lie in code: 5 -> 2.
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(2);
 
     fake.docs('practiceSessions').set('r1', SAVED);
     modelAnswers('Where is that from?');
@@ -412,19 +420,28 @@ describe('POST /api/portal/ask/practice', () => {
     const day = chicagoDayKey(new Date());
     const used = () => fake.docs('askUsage').get(`r1_${day}_practice`)?.count;
     fake.docs('askUsage').set(`r1_${day}`, { uid: 'r1', count: 60 });
-    fake.docs('askUsage').set(`r1_${day}_practice`, { uid: 'r1', count: 296 });
-    // Ask's 60 are used up; practice still runs.
-    modelAnswers('Uh huh.');
-    expect((await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).status).toBe(200);
-    expect(used()).toBe(298);
-    expect(fake.docs('askUsage').get(`r1_${day}`)?.count).toBe(60);
+    fake.docs('askUsage').set(`r1_${day}_practice`, { uid: 'r1', count: 291 });
+    // Ask's 60 are used up; practice still runs. A knock needs room for itself, two rep lines and feedback: 6.
     modelAnswers('Yeah?');
     expect((await POST(req({ action: 'turn', history: [] }))).status).toBe(200);
-    expect(used()).toBe(299);
+    expect(used()).toBe(292);
+    expect(fake.docs('askUsage').get(`r1_${day}`)?.count).toBe(60);
+    const sessionId = fake.docs('practiceSessions').get('r1')!.sessionId;
+    for (const expected of [294, 296, 298]) {
+      modelAnswers('Uh huh.');
+      expect((await POST(req({ action: 'turn', sessionId, history: PITCH }))).status).toBe(200);
+      expect(used()).toBe(expected);
+    }
+    // Two left: no room for a new practice.
+    expect((await POST(req({ action: 'turn', history: [] }))).status).toBe(429);
+    modelAnswers('Uh huh.');
+    expect((await POST(req({ action: 'turn', sessionId, history: PITCH }))).status).toBe(200);
+    expect(used()).toBe(300);
+    fake.docs('askUsage').set(`r1_${day}_practice`, { uid: 'r1', count: 299 });
 
     // One call left: a rep line needs two, so it's refused and nothing is counted or called.
     fetchMock.mockClear();
-    const res = await POST(req({ action: 'turn', sessionId: fake.docs('practiceSessions').get('r1')!.sessionId, history: PITCH }));
+    const res = await POST(req({ action: 'turn', sessionId, history: PITCH }));
     expect(res.status).toBe(429);
     expect((await res.json()).error).toBe("That's today's practice limit. Back at it tomorrow.");
     expect(used()).toBe(299);

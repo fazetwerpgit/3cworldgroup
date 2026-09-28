@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { practiceCustomer } from '@/lib/ask/practice';
-import { pcmToWav } from '@/lib/ask/practiceTts';
+import { pcmFromWav } from '@/lib/ask/practiceTts';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 
 // POST /api/portal/ask/practice/voice: only the caller's own session, only its
-// latest homeowner line, in the session's voice; a WAV around Gemini's PCM.
+// latest homeowner line, in the session's voice, streamed on as raw PCM.
 // fetch is stubbed; nothing leaves the process.
 
 const state = vi.hoisted(() => ({ db: null as unknown }));
@@ -26,7 +26,9 @@ let fake: ReturnType<typeof createFakeAskDb>;
 
 const LINE = "Xfinity. Why, what's this about?";
 const SAVED = { uid: 'r1', sessionId: 's1', persona: 'busy-parent', seed: 42, patience: 3, lastLine: LINE };
-const PCM = Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]);
+const PCM_A = Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]);
+const PCM_B = Buffer.from([5, 0, 6, 0]);
+const PCM_TYPE = 'audio/l16; rate=24000; channels=1';
 
 function req(body: unknown) {
   return new NextRequest('http://localhost/api/portal/ask/practice/voice', {
@@ -36,16 +38,40 @@ function req(body: unknown) {
   });
 }
 
-function geminiSpeaks() {
-  fetchMock.mockResolvedValueOnce(
-    new Response(
-      JSON.stringify({
-        candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: PCM.toString('base64') } }] } }],
-      }),
-      { status: 200, headers: { 'content-type': 'application/json' } }
-    )
-  );
+const answer = (data: Buffer, mimeType = PCM_TYPE) => ({
+  candidates: [{ content: { parts: [{ inlineData: { mimeType, data: data.toString('base64') } }] } }],
+});
+
+/** Gemini's streamed answer: one server-sent event per audio chunk, as its API sends them. */
+const streamed = (...chunks: Buffer[]) =>
+  new Response(chunks.map((chunk) => `data: ${JSON.stringify(answer(chunk))}\r\n\r\n`).join(''), {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  });
+
+/** A small WAV file, with a chunk before the data like real ones can have. */
+function wavOf(pcm: Buffer, rate: number): Buffer {
+  const fmt = Buffer.alloc(24);
+  fmt.write('fmt ', 0, 'ascii');
+  fmt.writeUInt32LE(16, 4);
+  fmt.writeUInt16LE(1, 8);
+  fmt.writeUInt16LE(1, 10);
+  fmt.writeUInt32LE(rate, 12);
+  fmt.writeUInt32LE(rate * 2, 16);
+  fmt.writeUInt16LE(2, 20);
+  fmt.writeUInt16LE(16, 22);
+  const list = Buffer.concat([Buffer.from('LIST', 'ascii'), Buffer.from([3, 0, 0, 0]), Buffer.from('abc\0', 'ascii')]);
+  const data = Buffer.concat([Buffer.from('data', 'ascii'), Buffer.alloc(4), pcm]);
+  data.writeUInt32LE(pcm.length, 4);
+  const body = Buffer.concat([Buffer.from('WAVE', 'ascii'), fmt, list, data]);
+  const riff = Buffer.alloc(8);
+  riff.write('RIFF', 0, 'ascii');
+  riff.writeUInt32LE(body.length, 4);
+  return Buffer.concat([riff, body]);
 }
+
+const urls = () => fetchMock.mock.calls.map((call) => call[0] as string);
+const prompt = (call = 0) => JSON.parse(fetchMock.mock.calls[call][1].body).contents[0].parts[0].text;
 
 beforeEach(() => {
   vi.stubEnv('ASK_3C_ENABLED', 'true');
@@ -66,16 +92,16 @@ afterEach(() => {
 });
 
 describe('POST /api/portal/ask/practice/voice', () => {
-  it("speaks the session's latest homeowner line in its voice, as a WAV, sent as `[tags] line` only", async () => {
-    geminiSpeaks();
+  it("streams the session's latest homeowner line in its voice as raw PCM, sent as `[tags] line` only", async () => {
+    fetchMock.mockResolvedValueOnce(streamed(PCM_A, PCM_B));
     const res = await POST(req({ sessionId: 's1', text: LINE }));
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toBe('audio/wav');
-    expect(Buffer.from(await res.arrayBuffer())).toEqual(pcmToWav(PCM, 24_000));
+    expect(res.headers.get('content-type')).toBe('audio/L16;rate=24000;channels=1');
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(Buffer.concat([PCM_A, PCM_B]));
 
     const customer = practiceCustomer('busy-parent', 42);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain('/models/gemini-3.8-flash-tts:generateContent');
+    expect(url).toContain('/models/gemini-3.8-flash-tts:streamGenerateContent?alt=sse');
     expect(init.headers['x-goog-api-key']).toBe('gem-key');
     const body = JSON.parse(init.body);
     // The 3.8 models read prose aloud and refuse a system instruction: only the tag and the line.
@@ -84,42 +110,42 @@ describe('POST /api/portal/ask/practice/voice', () => {
     expect(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(customer.ttsVoice);
   });
 
-  it('passes a finished WAV (the lite model\'s answer) through without a second header', async () => {
-    const wav = pcmToWav(PCM, 24_000);
-    fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: wav.toString('base64') } }] } }] }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      )
-    );
+  it('falls back to the whole line from the same model when it won\'t stream, unwrapping a WAV answer', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('streaming not supported', { status: 400 }));
+    fetchMock.mockResolvedValueOnce(Response.json(answer(wavOf(PCM_A, 16_000), 'audio/wav')));
     const res = await POST(req({ sessionId: 's1', text: LINE }));
-    expect(Buffer.from(await res.arrayBuffer())).toEqual(wav);
+    expect(res.headers.get('content-type')).toBe('audio/L16;rate=16000;channels=1');
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(PCM_A);
+    expect(urls()).toEqual([
+      expect.stringContaining('/models/gemini-3.8-flash-tts:streamGenerateContent'),
+      expect.stringContaining('/models/gemini-3.8-flash-tts:generateContent'),
+    ]);
   });
 
   it('adds "losing patience" to the tag when the homeowner is nearly out', async () => {
     fake.docs('practiceSessions').set('r1', { ...SAVED, patience: 1 });
-    geminiSpeaks();
+    fetchMock.mockResolvedValueOnce(streamed(PCM_A));
     await POST(req({ sessionId: 's1', text: LINE }));
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text).toBe(
-      `[tired, rushed, distracted, losing patience] ${LINE}`
-    );
+    expect(prompt()).toBe(`[tired, rushed, distracted, losing patience] ${LINE}`);
   });
 
   it('falls back to the lite model on a rate limit or server error, not on a bad request', async () => {
     fetchMock.mockResolvedValueOnce(new Response('quota', { status: 429 }));
-    geminiSpeaks();
+    fetchMock.mockResolvedValueOnce(streamed(PCM_A));
     expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(200);
-    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
-      expect.stringContaining('/models/gemini-3.8-flash-tts:'),
-      expect.stringContaining('/models/gemini-3.8-flash-lite-tts:'),
+    expect(urls()).toEqual([
+      expect.stringContaining('/models/gemini-3.8-flash-tts:streamGenerateContent'),
+      expect.stringContaining('/models/gemini-3.8-flash-lite-tts:streamGenerateContent'),
     ]);
     // The lite model gets the same tag format.
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body).contents[0].parts[0].text).toBe(`[tired, rushed, distracted] ${LINE}`);
+    expect(prompt(1)).toBe(`[tired, rushed, distracted] ${LINE}`);
 
     fetchMock.mockReset();
     fetchMock.mockResolvedValueOnce(new Response('bad', { status: 400 }));
+    fetchMock.mockResolvedValueOnce(new Response('bad', { status: 400 }));
     expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(502);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Streamed, then whole, from the first model only.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('refuses any text but the latest homeowner line, so it is no free TTS', async () => {
@@ -155,27 +181,35 @@ describe('POST /api/portal/ask/practice/voice', () => {
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(502);
-    fetchMock.mockRejectedValueOnce(new DOMException('The operation timed out.', 'TimeoutError'));
-    expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(504);
+    // A stream that ends without any audio.
+    fetchMock.mockResolvedValueOnce(streamed());
+    expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(502);
     vi.stubEnv('GEMINI_API_KEY', '');
     expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(503);
   });
+
+  it('gives up with a 504 when no audio arrives in 10 s', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(
+        (_url: string, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) =>
+            init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+          )
+      );
+      const res = POST(req({ sessionId: 's1', text: LINE }));
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect((await res).status).toBe(504);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
-describe('pcmToWav', () => {
-  it('writes a 44-byte PCM header with the right sizes and rates', () => {
-    const wav = pcmToWav(Buffer.alloc(4800), 24_000);
-    expect(wav.length).toBe(44 + 4800);
-    expect(wav.toString('ascii', 0, 4)).toBe('RIFF');
-    expect(wav.readUInt32LE(4)).toBe(36 + 4800);
-    expect(wav.toString('ascii', 8, 16)).toBe('WAVEfmt ');
-    expect(wav.readUInt16LE(20)).toBe(1);
-    expect(wav.readUInt16LE(22)).toBe(1);
-    expect(wav.readUInt32LE(24)).toBe(24_000);
-    expect(wav.readUInt32LE(28)).toBe(48_000);
-    expect(wav.readUInt16LE(32)).toBe(2);
-    expect(wav.readUInt16LE(34)).toBe(16);
-    expect(wav.toString('ascii', 36, 40)).toBe('data');
-    expect(wav.readUInt32LE(40)).toBe(4800);
+describe('pcmFromWav', () => {
+  it('finds the samples and rate past other chunks, and refuses what isn\'t a WAV', () => {
+    expect(pcmFromWav(wavOf(PCM_A, 24_000))).toEqual({ pcm: PCM_A, sampleRate: 24_000 });
+    expect(pcmFromWav(PCM_A)).toBeNull();
   });
 });

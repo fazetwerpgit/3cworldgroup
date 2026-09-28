@@ -63,10 +63,16 @@ export function takeDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: 
 /**
  * Counts `calls` Practice model calls against the rep's day, on its own
  * counter (practicing never uses up Ask questions); false, and nothing
- * counted, when they don't all fit under PRACTICE_DAILY_LIMIT.
+ * counted, when they and `headroom` more don't fit under PRACTICE_DAILY_LIMIT.
  */
-export function takeDailyPractice(db: FirebaseFirestore.Firestore, uid: string, now: Date, calls: number): Promise<boolean> {
-  return takeDaily(db, uid, now, '_practice', PRACTICE_DAILY_LIMIT, calls);
+export function takeDailyPractice(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  now: Date,
+  calls: number,
+  headroom = 0
+): Promise<boolean> {
+  return takeDaily(db, uid, now, '_practice', PRACTICE_DAILY_LIMIT, calls, headroom);
 }
 
 /** Practice's spoken lines, on a counter of their own so talk mode never eats into practice replies. */
@@ -80,14 +86,15 @@ async function takeDaily(
   now: Date,
   suffix: string,
   limit: number,
-  count = 1
+  count = 1,
+  headroom = 0
 ): Promise<boolean> {
   const day = chicagoDayKey(now);
   const ref = db.collection(ASK_USAGE).doc(`${uid}_${day}${suffix}`);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const used = snap.exists ? Number(snap.get('count')) || 0 : 0;
-    if (used + count > limit) return false;
+    if (used + count + headroom > limit) return false;
     tx.set(ref, { uid, day, count: used + count, updatedAt: now });
     return true;
   });

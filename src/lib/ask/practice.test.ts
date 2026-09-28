@@ -22,6 +22,7 @@ import {
   VOICE_BOOK,
   OUT_OF_PATIENCE,
   soundsLikeGoodbye,
+  ABUSE_CLOSES,
 } from './practice';
 
 // Practice's pure pieces: one seed is one homeowner (page and server agree),
@@ -117,11 +118,15 @@ describe('buildCustomerPrompt', () => {
 });
 
 describe('readCustomerReply', () => {
-  it('moves patience by the judged event: OK keeps, WEAK takes 1, LIE halves then takes 1, ABUSE empties', () => {
+  it('moves patience by the judged event: OK keeps, WEAK takes 1, LIE halves (rounded up) then takes 1, ABUSE empties', () => {
     expect(readCustomerReply('Sure, go on.', 5, 'ok').patience).toBe(5);
     expect(readCustomerReply('I said no.', 5, 'weak').patience).toBe(4);
-    expect(readCustomerReply('Free? Come on.', 5, 'lie').patience).toBe(1);
-    expect(nextPatience(3, 'lie')).toBe(0);
+    expect(readCustomerReply('Free? Come on.', 5, 'lie').patience).toBe(2);
+    // A three-patience door survives one caught lie, barely.
+    expect(nextPatience(3, 'lie')).toBe(1);
+    expect(nextPatience(4, 'lie')).toBe(1);
+    expect(nextPatience(1, 'lie')).toBe(0);
+    expect(nextPatience(5, 'abuse')).toBe(0);
     expect(nextPatience(1, 'weak')).toBe(0);
     expect(nextPatience(0, 'weak')).toBe(0);
   });
@@ -130,13 +135,13 @@ describe('readCustomerReply', () => {
     expect(readCustomerReply('Hi, can I help you?', 3, null)).toEqual({ text: 'Hi, can I help you?', ended: false, patience: 3 });
   });
 
-  it('closes the door on abuse, keeping what the homeowner said and adding a closing that varies', () => {
-    const closes = ['Excuse me?', 'Wow.', 'No.', 'Seriously?'].map((line) => readCustomerReply(line, 4, 'abuse'));
-    for (const close of closes) expect(close).toMatchObject({ ended: true, patience: 0 });
-    expect(closes[0].text.startsWith('Excuse me? ')).toBe(true);
-    expect(new Set(closes.map((close) => close.text.split(' ').slice(-2).join(' '))).size).toBeGreaterThan(1);
-    // A homeowner who already said goodbye keeps their own words.
-    expect(readCustomerReply('Wow. Get off my porch.', 4, 'abuse').text).toBe('Wow. Get off my porch.');
+  it('on abuse, replaces whatever the model wrote with one of the closes, differing by session', () => {
+    const closes = [0, 1, 2, 3, 4].map((seed) => readCustomerReply('Excuse me? We\'re done here. [END]', 4, 'abuse', seed));
+    for (const close of closes) {
+      expect(close).toMatchObject({ ended: true, patience: 0 });
+      expect(ABUSE_CLOSES).toContain(close.text);
+    }
+    expect(new Set(closes.map((close) => close.text)).size).toBe(ABUSE_CLOSES.length);
   });
 
   it('ends on a plain goodbye even without [END]', () => {
@@ -148,6 +153,13 @@ describe('readCustomerReply', () => {
     expect(readCustomerReply('I think I\'m okay, thanks. You have a good afternoon now.', 3, 'ok').ended).toBe(true);
     expect(readCustomerReply('Who are you with?', 3, 'ok').ended).toBe(false);
     expect(readCustomerReply("Alright, Saturday works. Let's do it. [END]", 3, 'ok').ended).toBe(true);
+  });
+
+  it('ends on a longer last sentence that opens with a closing', () => {
+    expect(soundsLikeGoodbye('Have a good one, and good luck out there with the rest of the street today.')).toBe(true);
+    expect(soundsLikeGoodbye('Thanks, appreciate it. Okay, take care, and good luck with the rest of your day.')).toBe(true);
+    expect(soundsLikeGoodbye("I'm not interested, but my wife might be.")).toBe(false);
+    expect(soundsLikeGoodbye('Have a good one, but first, what does the install look like?')).toBe(false);
   });
 
   it('never ends on a goodbye word inside a longer line or a question', () => {
@@ -229,6 +241,18 @@ describe('priceNote', () => {
     );
   });
 
+  it('is quiet for honest savings math against what the homeowner said, monthly or yearly', () => {
+    const paid = { role: 'customer' as const, text: 'About $99 a month, and it keeps going up.' };
+    const spectrum = practiceCustomer('happy-spectrum', 7);
+    const shown = (line: string) => priceNote([paid, card, { role: 'rep', text: line }], spectrum);
+    expect(shown('$65 with AutoPay against your $99, so about $34 less.')).toBeNull();
+    expect(shown('That works out to around $400 a year.')).toBeNull();
+    expect(shown('You\'d save about $35 a month.')).toBeNull();
+    // Still caught: a made-up price, and savings talk before any screen.
+    expect(shown('Really it\'s just $45 a month.')).toMatch(/said \$45/);
+    expect(priceNote([paid, { role: 'rep', text: 'You\'d save $30 a month.' }], spectrum)).toMatch(/quoted \$30/);
+  });
+
   it('is quiet for the card price, the homeowner\'s own bill, plan names, and older lines', () => {
     expect(priceNote([hi, card, { role: 'rep', text: 'Fiber 1 Gig, $60 with AutoPay.' }], customer)).toBeNull();
     expect(priceNote([hi, { role: 'rep', text: `So you pay $${customer.bill} now?` }], customer)).toBeNull();
@@ -242,6 +266,11 @@ describe('feedbackProblem', () => {
 
   it('passes the exact shape', () => {
     expect(feedbackProblem(good)).toBeNull();
+  });
+
+  it('catches a time promise in the Try line', () => {
+    expect(feedbackProblem(good.replace('What bugs you most about it?', 'Two minutes, tops. Want to see?'))).toMatch(/time promise/);
+    expect(feedbackProblem(good.replace('What bugs you most about it?', 'It takes 5 mins to set up.'))).toMatch(/time promise/);
   });
 
   it('catches an extra section, a missing one, a bad Result, a price in the Try line', () => {

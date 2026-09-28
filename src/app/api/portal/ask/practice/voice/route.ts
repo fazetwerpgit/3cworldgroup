@@ -3,19 +3,21 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { askAudience } from '@/lib/ask/flag';
 import { isPersonaId, isPracticeSeed, practiceCustomer } from '@/lib/ask/practice';
-import { speakLine } from '@/lib/ask/practiceTts';
+import { streamLine } from '@/lib/ask/practiceTts';
 import { spokenText } from '@/lib/ask/practiceVoice';
 import { PRACTICE_SESSIONS, takeDailyPracticeVoice } from '@/lib/ask/store';
 
 // POST /api/portal/ask/practice/voice { sessionId, text } — the homeowner's
-// latest line spoken in the session's Gemini voice (practiceTts), as audio/wav. Only that
+// latest line spoken in the session's Gemini voice (practiceTts), streamed as
+// raw PCM (audio/L16;rate=N;channels=1) from the first chunk on. Only that
 // line of the caller's own current practice: never arbitrary text, so this is
 // not a free TTS service. Same gate as the practice route; its own daily
 // count. Any failure is an error status and the page reads the line with the
 // phone's own voice instead.
 
 export const runtime = 'nodejs';
-export const maxDuration = 20;
+// Up to 10 s for the first audio, then the rest of the line streams.
+export const maxDuration = 45;
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
 
@@ -56,14 +58,14 @@ export async function POST(request: NextRequest) {
   // A homeowner near the end of their rope sounds it.
   const tone = patience <= 1 ? [...customer.persona.tone, 'losing patience'] : customer.persona.tone;
   const started = Date.now();
-  const result = await speakLine({ apiKey, voiceName: customer.ttsVoice, tone, text: spoken });
+  const result = await streamLine({ apiKey, voiceName: customer.ttsVoice, tone, text: spoken });
   if (!result.ok) {
     log({ outcome: result.reason, ms: Date.now() - started });
     return fail('The voice didn’t come through.', result.reason === 'timeout' ? 504 : 502);
   }
-  log({ outcome: 'ok', model: result.model, voice: customer.ttsVoice, chars: spoken.length, ms: Date.now() - started });
-  return new NextResponse(new Uint8Array(result.wav), {
+  log({ outcome: 'ok', model: result.model, voice: customer.ttsVoice, chars: spoken.length, firstAudioMs: result.firstAudioMs });
+  return new NextResponse(result.pcm, {
     status: 200,
-    headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': `audio/L16;rate=${result.sampleRate};channels=1`, 'Cache-Control': 'no-store' },
   });
 }

@@ -85,6 +85,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete (window as unknown as Record<string, unknown>).speechSynthesis;
   delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+  delete (window as unknown as Record<string, unknown>).AudioContext;
 });
 
 describe('RepPractice', () => {
@@ -177,16 +178,51 @@ describe('RepPractice', () => {
     expect(text()).not.toContain('Do you pay for internet yourself?Homeowner');
   });
 
-  it("with Talk on: unlocks audio on the knock, plays the session's voice through it, and sends a dictated line", async () => {
-    const played: { element: HTMLMediaElement; src: string }[] = [];
-    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
-      played.push({ element: this, src: this.src });
-      return Promise.resolve();
-    });
-    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
-    let blobs = 0;
-    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => `blob:voice-${++blobs}`, revokeObjectURL: () => {} }));
-    const wav = () => new Response(new Uint8Array(200), { status: 200, headers: { 'content-type': 'audio/wav' } });
+  it("with Talk on: unlocks Web Audio on the knock, streams the session's voice through it, and sends a dictated line", async () => {
+    // A Web Audio stand-in that records what was scheduled, when.
+    const contexts: { started: { at: number; samples: number[] }[] }[] = [];
+    class FakeAudioContext {
+      sampleRate = 48_000;
+      currentTime = 0;
+      state = 'running';
+      destination = {};
+      started: { at: number; samples: number[] }[] = [];
+      constructor() {
+        contexts.push(this);
+      }
+      resume() {
+        return Promise.resolve();
+      }
+      createBuffer(_channels: number, length: number, rate: number) {
+        const data = new Float32Array(length);
+        return { duration: length / rate, getChannelData: () => data };
+      }
+      createBufferSource() {
+        const started = this.started;
+        return {
+          buffer: null as { getChannelData: () => Float32Array } | null,
+          onended: null,
+          connect() {},
+          stop() {},
+          start(at = 0) {
+            started.push({ at, samples: [...(this.buffer?.getChannelData() ?? [])] });
+          },
+        };
+      }
+    }
+    Object.assign(window, { AudioContext: FakeAudioContext });
+    // Two network chunks that split a 16-bit sample: 0x4000 (+0.5), then 0xC000 (-0.5).
+    const pcm = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(stream) {
+            stream.enqueue(new Uint8Array([0x00, 0x40, 0x00]));
+            stream.enqueue(new Uint8Array([0xc0]));
+            stream.close();
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'audio/L16;rate=24000;channels=1' } }
+      );
     const spoken: { text: string; volume: number }[] = [];
     vi.stubGlobal(
       'SpeechSynthesisUtterance',
@@ -239,16 +275,22 @@ describe('RepPractice', () => {
     voiceAnswers.push(voice);
     replies(door('Hello, dear?'));
     await click('Knock');
-    // Unlocked inside the tap, before anything was awaited.
-    expect(played[0].src).toMatch(/^data:audio\/wav;base64,/);
+    // Unlocked inside the tap, before anything was awaited: a one-sample silent buffer.
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].started).toEqual([{ at: 0, samples: [0] }]);
     expect(spoken[0]).toEqual({ text: ' ', volume: 0 });
     expect(container.querySelector('[aria-label="The homeowner is answering"]')).not.toBeNull();
     expect(text()).not.toContain('Hello, dear?');
-    await act(async () => voiceArrives(wav()));
+    await act(async () => voiceArrives(pcm()));
     expect(voiceCalls()).toEqual([{ sessionId: 's1', text: 'Hello, dear?' }]);
+    // The line shows as its voice starts: the chunks play back to back on the same context, a short lead in.
     expect(text()).toContain('Hello, dear?');
-    // The same unlocked element plays the voice; the phone's own voice stays quiet.
-    expect(played[1]).toEqual({ element: played[0].element, src: 'blob:voice-1' });
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].started.slice(1)).toEqual([
+      { at: 0.25, samples: [0.5] },
+      { at: 0.25 + 1 / 24_000, samples: [-0.5] },
+    ]);
+    // The phone's own voice stays quiet.
     expect(spoken).toHaveLength(1);
 
     await click('Tap to talk');

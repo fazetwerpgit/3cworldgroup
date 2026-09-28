@@ -67,6 +67,8 @@ const TRY_AGAIN = 'Try again in a minute.';
 const CUSTOMER_CALL = { think: false, temperature: 0.8, maxTokens: 400 } as const;
 /** The line judge: one word, the same answer every time. */
 const JUDGE_CALL = { think: false, temperature: 0, maxTokens: 5 } as const;
+/** Model calls a knock must leave room for: two rep lines (2 each) and the feedback (1). */
+const KNOCK_HEADROOM = 5;
 /** The coach gets one retry when its answer breaks the format; both fit in maxDuration. */
 const COACH_TIMEOUT_MS = 25_000;
 const COACH_RETRY_MIN_MS = 8_000;
@@ -188,9 +190,11 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
-  // Model calls this request makes: the knock and the coach 1, a rep line 2 (homeowner and line judge).
+  // Model calls this request makes: the knock and the coach 1, a rep line 2 (homeowner and line judge). A knock
+  // also needs room left for a practice worth having: two rep lines and the feedback.
   const calls = action === 'turn' && !knock ? 2 : 1;
-  if (!(await takeDailyPractice(db, gate.uid, now, calls))) {
+  const headroom = knock ? KNOCK_HEADROOM : 0;
+  if (!(await takeDailyPractice(db, gate.uid, now, calls, headroom))) {
     await release();
     return fail("That's today's practice limit. Back at it tomorrow.", 429);
   }
@@ -254,7 +258,7 @@ export async function POST(request: NextRequest) {
         return providerFailure(error, action, started);
       }
     }
-    const { text, ended, patience } = readCustomerReply(reply, patienceBefore, event);
+    const { text, ended, patience } = readCustomerReply(reply, patienceBefore, event, seed);
     log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', ms: Date.now() - started, ...usage });
     if (!knock) {
       // lastLine: the one line POST .../practice/voice will speak.
