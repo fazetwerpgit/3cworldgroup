@@ -89,8 +89,12 @@ const SPOUSE_OBJECTIONS = [
   "We don't have a free day for an installer anytime soon.",
 ];
 
-/** High, light voices for a kid of about ten (Gemini has no child voice; these plus the tone come closest). */
-const KID_VOICES: readonly GeminiVoice[] = ['Achernar', 'Erinome', 'Leda', 'Zephyr', 'Puck'];
+/**
+ * High, light voices for a kid of about ten (Gemini has no child voice; these plus the tone come closest).
+ * With the child tone on 3.8 TTS an audio model heard Zephyr as 10-20 and Leda as 12-20; Puck, the one
+ * male voice tried, heard as a 17-22 year old man, so it's out.
+ */
+const KID_VOICES: readonly GeminiVoice[] = ['Achernar', 'Erinome', 'Leda', 'Zephyr'];
 
 const BEAT_NOTES: Record<BeatKind, string> = {
   phone: 'your phone starts ringing in your pocket',
