@@ -51,6 +51,8 @@ const WHEN = new Intl.DateTimeFormat('en-US', {
 });
 
 const when = (iso: string | null) => (iso ? WHEN.format(new Date(iso)) : '');
+/** A practice score's color: 7 and up lime, 4 to 6 amber, 3 and under red. */
+const scoreTone = (score: number) => (score >= 7 ? u.toneLime : score >= 4 ? u.toneAmber : u.toneRed);
 const plural = (count: number, word: string) => `${count.toLocaleString('en-US')} ${word}${count === 1 ? '' : 's'}`;
 
 async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
@@ -557,8 +559,9 @@ function PracticeSessions() {
                   onClick={() => setOpen(expanded ? null : row.id)}
                 >
                   <b>{row.repName || 'Unknown rep'}</b>
+                  {row.redo ? <span className={u.tag}>Redo</span> : null}
                   <span>{row.persona || 'Homeowner'}</span>
-                  {row.score !== null ? <span className={u.toneLime}>{row.score}/10</span> : null}
+                  {row.score !== null ? <span className={scoreTone(row.score)}>{row.score}/10</span> : null}
                   {row.result ? <span>{row.result}</span> : null}
                   <span>{when(row.createdAt)}</span>
                   <ChevronDown size={16} aria-hidden="true" className={k.chev} />
@@ -858,7 +861,7 @@ function CoachWasWrong({ row, onChange }: { row: PracticeLogView; onChange: () =
               Cancel
             </button>
           </div>
-          <p className={u.hint}>The coach reads your last 20 corrections before it grades.</p>
+          <p className={u.hint}>The coach reads your last 20 corrections before it grades any rep&apos;s practice, not just this rep&apos;s.</p>
         </div>
       ) : (
         <div className={u.btnRow}>

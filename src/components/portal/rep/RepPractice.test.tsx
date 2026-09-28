@@ -398,6 +398,53 @@ describe('RepPractice', () => {
     expect(items.indexOf('Your redo starts here')).toBe(3);
   });
 
+  it('sends a practice replaced on another screen back to Knock, once, with no retry loop', async () => {
+    await render();
+    replies(door('Hi?'));
+    await click('Knock');
+    practiceAnswers.push(json({ error: 'That practice is over. Knock again to start a new one.' }, 409));
+    await type('Hi, I am with 3C.');
+    await click('Send');
+    expect(text()).toContain('This practice was replaced on another screen.');
+    expect(button('Knock')).toBeDefined();
+    expect(button('Try again')).toBeUndefined();
+    expect(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)).toBeNull();
+  });
+
+  it('counts down near the limit and never cuts a long line silently', async () => {
+    await render();
+    replies(door('Hi?'));
+    await click('Knock');
+    await type('x'.repeat(900));
+    expect(text()).toContain('100 characters left');
+    await type('x'.repeat(1200));
+    expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toHaveLength(1200);
+    expect(text()).toContain('1,200 of 1,000 characters. Cut it down to send it.');
+    expect(button('Send')?.disabled).toBe(true);
+  });
+
+  it("picks up the server's copy after a reload: a reply that landed while away, or the line back in the box", async () => {
+    const stored = (turns: unknown[]) =>
+      window.sessionStorage.setItem(
+        PRACTICE_SESSION_KEY,
+        JSON.stringify({ uid: 'r1', sessionId: 's1', pick: 'surprise', turns, ended: false, feedback: null, lastAt: Date.now() })
+      );
+    const line = { role: 'rep', text: 'Who do you have for internet?' };
+    stored([{ role: 'customer', text: 'Hi?' }, line]);
+    replies({ turns: [{ role: 'customer', text: 'Hi?' }, line, { role: 'customer', text: 'Spectrum.' }], ended: false });
+    await render();
+    expect(sent(0)).toEqual({ action: 'sync', sessionId: 's1' });
+    expect(text()).toContain('Spectrum.');
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    stored([{ role: 'customer', text: 'Hi?' }, line]);
+    replies({ turns: [{ role: 'customer', text: 'Hi?' }], ended: false });
+    await render();
+    expect(container.querySelector('ol')?.textContent).not.toContain('Who do you have for internet?');
+    expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Who do you have for internet?');
+  });
+
   it('tells the coach the rep ended it when they tap End', async () => {
     await render();
     replies(door('Hi?'));

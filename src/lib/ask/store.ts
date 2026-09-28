@@ -1,6 +1,7 @@
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 import {
+  ASSIGNMENT_MIN_LINES,
   CORRECTIONS_IN_PROMPT,
   CORRECTION_PARTS,
   type CoachCorrection,
@@ -173,9 +174,18 @@ export async function loadCountedSessions(
   return snap.docs.flatMap((doc) => {
     const data = doc.data();
     const createdAt = isoTime(data.createdAt);
-    return createdAt && typeof data.uid === 'string'
-      ? [{ uid: data.uid, persona: typeof data.persona === 'string' ? data.persona : '', createdAt, redo: typeof data.redoOf === 'string' }]
-      : [];
+    if (!createdAt || typeof data.uid !== 'string') return [];
+    const repLines = Array.isArray(data.turns) ? data.turns.filter((turn: { role?: unknown }) => turn?.role === 'rep').length : 0;
+    const abuse = Array.isArray(data.steps) && data.steps.some((step: { event?: unknown }) => step?.event === 'abuse');
+    return [
+      {
+        uid: data.uid,
+        persona: typeof data.persona === 'string' ? data.persona : '',
+        createdAt,
+        redo: typeof data.redoOf === 'string',
+        real: repLines >= ASSIGNMENT_MIN_LINES && !abuse,
+      },
+    ];
   });
 }
 

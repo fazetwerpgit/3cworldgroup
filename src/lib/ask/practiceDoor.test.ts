@@ -140,7 +140,13 @@ describe('the door and the result', () => {
   });
 
   it('knows dinnertime and the Sunday game from the real clock (Chicago)', () => {
-    expect(doorClock(new Date('2026-09-29T23:15:00Z'))).toMatch(/^Tuesday, 6:15 pm\. It's dinnertime/);
+    expect(doorClock(new Date('2026-09-29T23:15:00Z'), 1)).toMatch(/^Tuesday, 6:15 pm\. /);
+    // Early evening: dinner about 1 door in 3, something else the rest of the time.
+    const evenings = seeds.slice(0, 900).map((seed) => doorClock(new Date('2026-09-29T23:15:00Z'), seed));
+    const dinner = evenings.filter((clock) => clock.includes('dinnertime')).length / evenings.length;
+    expect(dinner).toBeGreaterThan(0.25);
+    expect(dinner).toBeLessThan(0.42);
+    expect(new Set(evenings).size).toBeGreaterThanOrEqual(5);
     expect(doorClock(new Date('2026-09-27T19:05:00Z'))).toMatch(/^Sunday, 2:05 pm\. The football game is on/);
     expect(doorClock(new Date('2026-06-14T19:05:00Z'))).toBe('Sunday, 2:05 pm.');
     expect(doorClock(new Date('2026-09-30T02:30:00Z'))).toMatch(/getting late/);

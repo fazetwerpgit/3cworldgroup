@@ -47,6 +47,8 @@ export interface PracticeDelivery {
   fillers: Record<string, number>;
   /** Spoken rep lines. */
   lines: number;
+  /** Some of the homeowner's lines played in a voice that couldn't be timed: no talk share. */
+  untimed?: boolean;
 }
 
 // "like" is a filler, except as a verb or after words it belongs to: "you like", "don't like", "I'd like",
@@ -84,13 +86,14 @@ export function parseDelivery(raw: unknown): PracticeDelivery | null {
   for (const [word, n] of Object.entries(d?.fillers ?? {})) {
     if (['um', 'uh', 'like', 'you know'].includes(word) && count(n) !== null) fillers[word] = n as number;
   }
-  return { talkMs, listenMs, words, fillers, lines };
+  return { talkMs, listenMs, words, fillers, lines, ...(d?.untimed === true ? { untimed: true } : {}) };
 }
 
 /**
  * Delivery as one plain line for the page, never a score: "You talked 40% of
  * the time · 150 words a minute · 2 fillers a minute (um 3, like 1)". The talk
- * share needs the homeowner's voice (no share when it didn't play).
+ * share needs the homeowner's voice timed (none when it didn't play, or a
+ * line of it couldn't be timed).
  */
 export function deliveryLine(delivery: PracticeDelivery): string {
   const talkMinutes = delivery.talkMs / 60_000;
@@ -98,7 +101,7 @@ export function deliveryLine(delivery: PracticeDelivery): string {
   const total = fillers.reduce((sum, [, n]) => sum + n, 0);
   const perMinute = Math.round((total / talkMinutes) * 10) / 10;
   const parts = [
-    delivery.listenMs > 0 ? `You talked ${Math.round((delivery.talkMs / (delivery.talkMs + delivery.listenMs)) * 100)}% of the time` : null,
+    delivery.listenMs > 0 && !delivery.untimed ? `You talked ${Math.round((delivery.talkMs / (delivery.talkMs + delivery.listenMs)) * 100)}% of the time` : null,
     `${Math.round(delivery.words / talkMinutes)} words a minute`,
     total
       ? `${perMinute} filler${perMinute === 1 ? '' : 's'} a minute (${fillers
@@ -230,7 +233,12 @@ export interface CountedSession {
   createdAt: string;
   /** A "Redo that moment" session: practice, but not a new door. */
   redo: boolean;
+  /** A real practice: at least ASSIGNMENT_MIN_LINES rep lines and nothing abusive. */
+  real: boolean;
 }
+
+/** Rep lines a practice needs to count toward an assignment (one line and End isn't practice). */
+export const ASSIGNMENT_MIN_LINES = 3;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -252,8 +260,8 @@ export function parseAssignment(
 }
 
 /**
- * How many sessions each rep has done toward an assignment: finished
- * practices (not redos) by that rep, from when it was set through its due
+ * How many sessions each rep has done toward an assignment: finished real
+ * practices (not redos; ASSIGNMENT_MIN_LINES rep lines, nothing abusive) by that rep, from when it was set through its due
  * day, with the homeowner type it asks for.
  */
 export function assignmentDone(assignment: PracticeAssignment, sessions: readonly CountedSession[], uid: string): number {
@@ -261,6 +269,7 @@ export function assignmentDone(assignment: PracticeAssignment, sessions: readonl
     (session) =>
       session.uid === uid &&
       !session.redo &&
+      session.real &&
       session.createdAt >= assignment.createdAt &&
       chicagoDayKey(new Date(session.createdAt)) <= assignment.due &&
       (assignment.persona === 'any' || session.persona === assignment.persona)
@@ -354,7 +363,7 @@ export function correctionsBlock(corrections: readonly CoachCorrection[]): strin
   if (corrections.length === 0) return '';
   const lines = corrections.slice(0, CORRECTIONS_IN_PROMPT).map((c) => {
     const said = c.original ? `the coach said "${clip(c.original, 160)}"; ` : '';
-    return `- ${CORRECTION_LABELS[c.part]}, ${c.personaLabel} door: ${said}the owner says: "${clip(c.take, 240)}"`;
+    return `- ${CORRECTION_LABELS[c.part]}, ${c.personaLabel} door: ${said}the owner says: "${clip(c.take, MAX_CORRECTION_CHARS)}"`;
   });
   return `=== Calibration: where the owner said the coach was wrong (newest first) ===
 Learn from these: grade the same way the owner would. They are examples, not facts about this rep.

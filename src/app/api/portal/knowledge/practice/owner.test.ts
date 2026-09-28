@@ -30,6 +30,11 @@ const req = (url: string, method = 'GET', body?: unknown) =>
   });
 
 const rep = (displayName: string) => ({ status: 'active', role: 'rep', fieldRole: 'entry_rep', displayName });
+/** A real practice: three rep lines. */
+const THREE_LINES = [1, 2, 3].flatMap((n) => [
+  { role: 'customer', text: `Answer ${n}.` },
+  { role: 'rep', text: `Line ${n}.` },
+]);
 const FEEDBACK = 'This was: Skeptic\nScore: 8/10\nResult: No sale\nSkills: Opener 7/10, Discovery 4/10, Objections 5/10, Close 3/10\nWhat worked:\n- "Hi"';
 
 beforeEach(() => {
@@ -58,10 +63,13 @@ describe('practice assignments', () => {
     const res = await assignments.POST(req(path, 'POST', { repUid: 'all', persona: 'skeptic', count: 2, due }));
     expect(res.status).toBe(200);
 
-    // After it was set: two for Ana (one a redo, which doesn't count), none for Ben.
+    // After it was set: two for Ana (one a redo, which doesn't count), none that count for Ben.
     const later = new Date(Date.now() + 1000);
-    fake.docs('practiceLog').set('l2', { uid: 'r1', persona: 'skeptic', createdAt: later });
-    fake.docs('practiceLog').set('l3', { uid: 'r1', persona: 'skeptic', createdAt: later, redoOf: 'l2' });
+    fake.docs('practiceLog').set('l2', { uid: 'r1', persona: 'skeptic', createdAt: later, turns: THREE_LINES });
+    fake.docs('practiceLog').set('l3', { uid: 'r1', persona: 'skeptic', createdAt: later, turns: THREE_LINES, redoOf: 'l2' });
+    // Ben: one line and End doesn't count, nor does a door he cursed at.
+    fake.docs('practiceLog').set('l4', { uid: 'r2', persona: 'skeptic', createdAt: later, turns: THREE_LINES.slice(0, 2) });
+    fake.docs('practiceLog').set('l5', { uid: 'r2', persona: 'skeptic', createdAt: later, turns: THREE_LINES, steps: [{ at: 2, event: 'abuse', patience: 4 }] });
     const { assignments: views, reps } = await (await assignments.GET(req(path))).json();
     expect(reps.map((r: { name: string }) => r.name)).toEqual(['Ana', 'Ben']);
     expect(views).toHaveLength(1);

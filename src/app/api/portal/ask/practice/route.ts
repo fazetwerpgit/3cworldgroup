@@ -12,7 +12,15 @@ import {
   buildFeedbackPrompt,
   drawPersona,
   enforceResult,
+  enforceScore,
   feedbackProblem,
+  isSelfHarm,
+  lieQuotes,
+  screenForHomeowner,
+  strayCoachSentences,
+  transcriptProblem,
+  SELF_HARM_FEEDBACK,
+  SELF_HARM_REPLY,
   homeownerPicks,
   isPersonaChoice,
   isPersonaId,
@@ -38,6 +46,7 @@ import {
   type PracticeCutInReply,
   type PracticeCustomer,
   type PracticeRedoReply,
+  type PracticeSyncReply,
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
@@ -97,6 +106,7 @@ import {
 //                                                      rep still talking (partial: their words so far),
 //                                                      written ahead; { action: 'turn', ..., cut: true }
 //                                                      then plays it (history ends with the cut-off line)
+//   { action: 'sync', sessionId }                      the conversation as the server has it (resume)
 //   { action: 'redo', logId }                          "Redo that moment": a new session at the
 //                                                      same door, up to its weakest line
 // Ask 3C Practice: the rep pitches, the model plays a homeowner, then grades
@@ -110,7 +120,12 @@ import {
 // weakest can be redone). An open assignment of the owner's that names a homeowner type decides a rep's
 // knock until it's done. Same gate as Ask 3C, its own daily
 // count and its own log (practiceLog). Typed emails and phone numbers are
-// redacted before the model or the log sees them.
+// redacted before the model or the log sees them. The conversation is the
+// server's (practiceSessions.turns, appended as each reply is written): the
+// page only adds the rep's new line or the price card, and the coach grades
+// the stored copy. Writes to the session check it's still the same session
+// (another screen may have knocked since). The score is counted in code from
+// the coach's skill scores and capped by what the line judge caught.
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -157,6 +172,29 @@ function cleanTurns(history: PracticeTurn[], card: string): PracticeTurn[] {
   );
 }
 
+/** A reply line as a turn of the conversation: the homeowner's own lines carry no speaker. */
+const asTurn = (line: PracticeLine): PracticeTurn =>
+  line.speaker === 'spouse' || line.speaker === 'kid' ? { role: 'customer', text: line.text, speaker: line.speaker } : { role: 'customer', text: line.text };
+
+/**
+ * Writes to the rep's session only while it is still `sessionId`: another tab
+ * or phone may have knocked (a new session) while this request was working.
+ * False when it was replaced.
+ */
+function updateIfCurrent(
+  db: FirebaseFirestore.Firestore,
+  sessionRef: FirebaseFirestore.DocumentReference,
+  sessionId: string,
+  data: Record<string, unknown>
+): Promise<boolean> {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(sessionRef);
+    if (snap.get('sessionId') !== sessionId) return false;
+    tx.update(sessionRef, data);
+    return true;
+  });
+}
+
 export async function POST(request: NextRequest) {
   const audience = askAudience();
   if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
@@ -169,7 +207,7 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const action = body?.action;
-  if (action !== 'turn' && action !== 'feedback' && action !== 'price' && action !== 'redo' && action !== 'cutin') {
+  if (action !== 'turn' && action !== 'feedback' && action !== 'price' && action !== 'redo' && action !== 'cutin' && action !== 'sync') {
     return fail('Unknown practice action', 400);
   }
 
@@ -183,6 +221,10 @@ export async function POST(request: NextRequest) {
       ? { sessionId: body.sessionId, personaId: saved.persona, seed: saved.seed }
       : null;
   const over = () => fail('That practice is over. Knock again to start a new one.', 409);
+  // The conversation as the server wrote it: the homeowner's lines are only ever the server's own. The
+  // page's copy adds nothing but the rep's new line (or the price card) at the end. Null for a session
+  // started before it was kept.
+  const stored = current ? parsePracticeHistory(saved.turns) : null;
 
   if (action === 'price') {
     if (!current) return over();
@@ -193,8 +235,26 @@ export async function POST(request: NextRequest) {
 
   if (action === 'redo') return startRedo(db, gate.uid, body?.logId, saved, sessionRef);
 
-  const history = parsePracticeHistory(body?.history);
-  if (!history) return fail('Bad practice conversation', 400);
+  if (action === 'sync') {
+    // A reload or Back mid-practice: the conversation as the server has it (a reply that landed while the
+    // page was away included), and whether the door has closed.
+    if (!current) return over();
+    return NextResponse.json<PracticeSyncReply>({ turns: stored ?? [], ended: saved.ended === true });
+  }
+
+  const sent = parsePracticeHistory(body?.history);
+  if (!sent) return fail('Bad practice conversation', 400);
+  let history = sent;
+  if (stored) {
+    if (action === 'feedback') history = stored;
+    else {
+      // What the page adds after the homeowner's last line (the rep's line, the price card) goes on the
+      // server's own conversation up to that point; the page's homeowner lines are never used.
+      const tail = sent.findLastIndex((turn) => turn.role === 'customer') + 1;
+      if (stored.length < tail || (tail > 0 && stored[tail - 1].role !== 'customer')) return over();
+      history = [...stored.slice(0, tail), ...sent.slice(tail)];
+    }
+  }
   const knock = action === 'turn' && history.length === 0;
   // Hands-free: the interruption for a rep who's still talking ('cutin', from what they've said so far),
   // and the turn that plays it (cut: the homeowner's line is the one written then, only the judge runs).
@@ -278,7 +338,7 @@ export async function POST(request: NextRequest) {
 
   const config = askProviderConfig();
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
-  const release = () => (action === 'feedback' ? sessionRef.update({ gradingAt: 0 }) : Promise.resolve());
+  const release = () => (action === 'feedback' ? updateIfCurrent(db, sessionRef, sessionId, { gradingAt: 0 }) : Promise.resolve(true));
   if (!config.apiKey && !stub) {
     await release();
     return fail('Practice is not set up yet. Call Jeremy or Jacob.', 503);
@@ -291,7 +351,10 @@ export async function POST(request: NextRequest) {
   const headroom = knock ? KNOCK_HEADROOM : 0;
   if (!(await takeDailyPractice(db, gate.uid, now, calls, headroom))) {
     await release();
-    return fail("That's today's practice limit. Back at it tomorrow.", 429);
+    if (knock || action === 'feedback') return fail("That's today's practice limit. Back at it tomorrow.", 429);
+    // Mid-practice: the coach is told the limit stopped them, and End still gets the feedback.
+    await updateIfCurrent(db, sessionRef, sessionId, { capped: true });
+    return fail("That's today's practice limit. Tap End to get your feedback.", 429);
   }
 
   const customer = practiceCustomer(personaId, seed);
@@ -316,7 +379,9 @@ export async function POST(request: NextRequest) {
     const { text } = readCustomerReply(reply, patienceBefore, null, seed, door.kind === 'kid');
     const lines = splitSpeakers(text, door, spouseHere(door, turns));
     // Kept until the turn that plays it (or any other turn, which drops it); the voice route may speak it now.
-    await sessionRef.update({ pendingCut: { at: turns.length + 1, raw: reply, lines }, updatedAt: now });
+    if (!(await updateIfCurrent(db, sessionRef, sessionId, { pendingCut: { at: turns.length + 1, raw: reply, lines }, updatedAt: now }))) {
+      return over();
+    }
     log({ outcome: 'ok', action, stub, turns: turns.length, ms: Date.now() - started });
     return NextResponse.json<PracticeCutInReply>({ lines });
   }
@@ -330,7 +395,15 @@ export async function POST(request: NextRequest) {
     const note = knock ? null : priceNote(turns, customer);
     // The spouse walking up or an interruption, on the rep line it's due.
     const surprise = knock ? null : surpriseNote(door, turns, customer);
-    if (stub) {
+    // The rep only pulled up the price screen: there are no words of theirs to judge, and an earlier lie
+    // already counted when it was said.
+    const screenOnly = !knock && turns.slice(turns.findLastIndex((turn) => turn.role === 'customer') + 1).every((turn) => turn.role === 'screen');
+    // A rep who says they want to hurt themselves: no role-play, no judge. The homeowner is kind and it ends.
+    const hurting = !knock && turns.slice(turns.findLastIndex((turn) => turn.role === 'customer') + 1).some((turn) => turn.role === 'rep' && isSelfHarm(turn.text));
+    if (hurting) {
+      reply = `${SELF_HARM_REPLY} [END]`;
+      event = 'ok';
+    } else if (stub) {
       reply = cut ? cut.raw : turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
       event = knock ? null : note ? 'lie' : 'ok';
     } else {
@@ -340,6 +413,8 @@ export async function POST(request: NextRequest) {
       // a network blip isn't the rep's fault.
       const judged = knock
         ? Promise.resolve(null)
+        : screenOnly
+          ? Promise.resolve('ok' as const)
         : callAskModel(
             config,
             [
@@ -356,7 +431,7 @@ export async function POST(request: NextRequest) {
           judged,
         ]);
         ({ answer: reply, usage } = homeowner);
-        event = verdict && note && verdict !== 'abuse' ? 'lie' : verdict;
+        event = verdict && note && verdict !== 'abuse' && !screenOnly ? 'lie' : verdict;
       } catch (error) {
         return providerFailure(error, action, started);
       }
@@ -377,7 +452,17 @@ export async function POST(request: NextRequest) {
       // one from a retried request for the same line.
       const step: PracticeStep = { at: turns.length, event: event ?? 'ok', patience: patienceBefore };
       const steps = [...parseSteps(saved.steps).filter((kept) => kept.at < turns.length), step];
-      await sessionRef.update({ patience, lastLines: lines, steps, pendingCut: null, updatedAt: now });
+      const written = await updateIfCurrent(db, sessionRef, sessionId, {
+        patience,
+        lastLines: lines,
+        steps,
+        turns: [...turns, ...lines.map(asTurn)],
+        ended,
+        pendingCut: null,
+        ...(hurting ? { selfHarm: true } : {}),
+        updatedAt: now,
+      });
+      if (!written) return over();
       return NextResponse.json<PracticeTurnReply>(outcome);
     }
     // The session exists once the door has opened; a knock that got no answer leaves the last one as it
@@ -391,6 +476,8 @@ export async function POST(request: NextRequest) {
       bag,
       lastLines: lines,
       steps: [],
+      turns: lines.map(asTurn),
+      ended,
       homeowner: homeownerPicks(customer),
       door,
       startedAt: now,
@@ -407,7 +494,11 @@ export async function POST(request: NextRequest) {
   let feedback: string;
   let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
   const redoOf = typeof saved.redoOf === 'string' ? saved.redoOf : null;
-  if (stub) {
+  const steps = parseSteps(saved.steps);
+  const hurting = saved.selfHarm === true || turns.some((turn) => turn.role === 'rep' && isSelfHarm(turn.text));
+  if (hurting) {
+    feedback = SELF_HARM_FEEDBACK;
+  } else if (stub) {
     feedback = 'Score: 7/10\nResult: No sale\nSkills: Opener 7/10, Discovery 6/10, Objections 6/10, Close 5/10\nWhat worked:\n- "Sandbox: no model was called."\nFix next time: Nothing yet.\nTry this line: "Hi, I\'m with 3C."';
   } else {
     const [notes, corrections] = await Promise.all([loadNotes(db), loadCorrections(db)]);
@@ -419,6 +510,10 @@ export async function POST(request: NextRequest) {
     const redoNote = redoFrom
       ? '\n\nThis is a redo: the rep went back to the line that went worst and tried it again. The lines above the marker are the earlier try, replayed as it happened. Grade what the rep says after the marker; quote only those lines. The Skills line still scores the whole door as it stands.'
       : '';
+    const cappedNote =
+      saved.capped === true
+        ? "\n\nThe rep hit the day's practice limit mid-conversation and couldn't say any more: never dock them for stopping early or for what they didn't get to."
+        : '';
     const messages: AskMessage[] = [
       {
         role: 'system',
@@ -426,21 +521,29 @@ export async function POST(request: NextRequest) {
           notes,
           customer,
           endedBy,
-          { block: doorCoachBlock(door, customer), ...resultRules(customer, door) },
-          correctionsBlock(corrections)
+          { block: doorCoachBlock(door, customer, turns), ...resultRules(customer, door) },
+          correctionsBlock(corrections),
+          gate.name.trim().split(/\s+/)[0] ?? ''
         ),
       },
-      { role: 'user', content: `Grade this practice.${redoNote}\n\nTranscript:\n${transcript}` },
+      { role: 'user', content: `Grade this practice.${redoNote}${cappedNote}\n\nTranscript:\n${transcript}` },
     ];
     try {
-      ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS, effort: 'low' }));
+      // Low temperature where the provider honors it (DeepSeek ignores it while thinking, but not on the
+      // no-thinking fallback); the score is held to the skills in code either way (enforceScore).
+      ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS, effort: 'low', temperature: 0.2 }));
+      // The rep lines the judge caught lying: What worked never quotes them.
+      const lieLines = steps.filter((step) => step.event === 'lie').map((step) => turns[step.at - 1]?.text ?? '');
+      const stray = (answer: string) => [...unbackedClaims(answer, turns), ...strayCoachSentences(answer, turns)];
       // One retry when the shape is off (an extra section, a missing one, a price in the Try line), or when it
       // puts words in someone's mouth (a pain point the homeowner never said).
-      const invented = unbackedClaims(feedback, turns);
+      const invented = stray(feedback);
+      const formatProblem = feedbackProblem(feedback);
       const problem =
-        feedbackProblem(feedback) ??
+        formatProblem ??
+        transcriptProblem(feedback, turns, lieLines) ??
         (invented.length
-          ? `it says someone said something they didn't: "${invented[0]}". Only say the rep or the homeowner said what the transcript shows they said`
+          ? `this sentence isn't backed by the transcript: "${invented[0]}". Only say the rep or the homeowner said what the transcript shows they said, never use a fact or amount nobody said at the door, and never write about the grading itself`
           : null);
       const left = maxDuration * 1000 - 5_000 - (Date.now() - started);
       // The retry is one more model call on the day's count; at the limit the first answer stands.
@@ -453,33 +556,40 @@ export async function POST(request: NextRequest) {
             { role: 'assistant', content: feedback },
             { role: 'user', content: `That broke the format (${problem}). Write it again in exactly the required shape, nothing else.` },
           ],
-          { timeoutMs: Math.min(COACH_TIMEOUT_MS, left), effort: 'low' }
+          { timeoutMs: Math.min(COACH_TIMEOUT_MS, left), effort: 'low', temperature: 0.2 }
         ).catch(() => null);
-        if (retry) feedback = retry.answer;
+        // The retry is held to the same format: it only replaces a first answer whose format was fine if
+        // its own is too (a retry for a made-up claim once slipped a price into the Try line).
+        if (retry && (feedbackProblem(retry.answer) === null || formatProblem !== null)) feedback = retry.answer;
       }
-      // Still putting words in someone's mouth: those sentences go.
-      const still = unbackedClaims(feedback, turns);
+      // Still putting words in someone's mouth, or quoting a lie as what worked: those go.
+      const still = [...stray(feedback), ...lieQuotes(feedback, lieLines)];
       if (still.length) {
         log({ outcome: 'coach_claims_stripped', count: still.length });
         feedback = stripSentences(feedback, still);
       }
       feedback = enforceResult(feedback, resultRules(customer, door));
+      // The number is counted in code: the skills' average, capped by what the judge caught line by line.
+      feedback = enforceScore(feedback, {
+        lies: steps.filter((step) => step.event === 'lie').length,
+        abuse: steps.some((step) => step.event === 'abuse'),
+        pitchedNoSaleDoor: (door.kind === 'kid' || door.kind === 'landlord') && steps.some((step) => step.event === 'weak' || step.event === 'lie'),
+      });
     } catch (error) {
       await release();
       return providerFailure(error, action, started);
     }
   }
-  const summary = doorSummary(door, customer);
-  feedback = revealFeedback(feedback, customer.persona, summary);
-  const score = parseScore(feedback);
-  const skills = parseSkills(feedback);
-  const steps = parseSteps(saved.steps);
+  const summary = doorSummary(door, customer, turns);
+  if (!hurting) feedback = revealFeedback(feedback, customer.persona, summary);
+  const score = hurting ? null : parseScore(feedback);
+  const skills = hurting ? null : parseSkills(feedback);
   const delivery = parseDelivery(body?.delivery);
   // Hands-free: how long each answer took to start after the rep stopped talking (the page measures it).
   const replyMs = Array.isArray(body?.replyMs)
     ? body.replyMs.filter((ms): ms is number => Number.isInteger(ms) && ms >= 0 && ms <= 60_000).slice(0, MAX_PRACTICE_TURNS)
     : [];
-  const result = /^\s*result\s*:\s*(.+)$/im.exec(feedback)?.[1].trim() ?? null;
+  const result = hurting ? 'Not graded' : (/^\s*result\s*:\s*(.+)$/im.exec(feedback)?.[1].trim() ?? null);
   const ref = await db.collection(PRACTICE_LOG).add({
     uid: gate.uid,
     repName: gate.name,
@@ -502,8 +612,10 @@ export async function POST(request: NextRequest) {
     model: stub ? STUB_MODEL : config.model,
     createdAt: now,
   });
-  const reply: PracticeFeedbackReply = { id: ref.id, feedback, score, skills, canRedo: redoPoint(steps) !== null };
-  await sessionRef.update({ feedback: reply, gradingAt: 0, updatedAt: now });
+  const reply: PracticeFeedbackReply = { id: ref.id, feedback, score, skills, canRedo: !hurting && redoPoint(steps) !== null };
+  // Kept on the session only while it's still this one: another screen may have knocked meanwhile, and
+  // that practice must never get this one's feedback. The log above is this session's either way.
+  await updateIfCurrent(db, sessionRef, sessionId, { feedback: reply, gradingAt: 0, updatedAt: now });
   const medianReply = replyMs.length ? replyMs.toSorted((a, b) => a - b)[Math.floor(replyMs.length / 2)] : -1;
   log({ outcome: 'ok', action, stub, turns: turns.length, score: score ?? -1, ms: Date.now() - started, medianReplyMs: medianReply, ...usage });
   return NextResponse.json<PracticeFeedbackReply>(reply);
@@ -590,6 +702,7 @@ async function startRedo(
     bag: Array.isArray(saved.bag) ? saved.bag.filter(isPersonaId) : [],
     lastLines,
     steps: [],
+    turns: kept,
     homeowner: homeownerPicks(customer),
     door,
     redoOf: logId,
@@ -653,7 +766,7 @@ function homeownerMessages(
       heard = '';
       said = [];
     }
-    const line = turn.role === 'screen' ? `(The rep holds up their phone and you read the screen yourself: ${turn.text})` : turn.text;
+    const line = turn.role === 'screen' ? screenForHomeowner(turn.text, customer) : turn.text;
     heard = heard ? `${heard}\n${line}` : line;
   }
   if (said.length) {

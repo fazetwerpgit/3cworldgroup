@@ -20,6 +20,10 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 const mockUser = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const req = () => new NextRequest('http://localhost/api/portal/ask/practice/mine', { headers: { authorization: 'Bearer t' } });
 const DAY = 86_400_000;
+const turns = [1, 2, 3].flatMap((n) => [
+  { role: 'customer', text: `Answer ${n}.` },
+  { role: 'rep', text: `Line ${n}.` },
+]);
 const feedback = (opener: number) =>
   `Score: 6/10\nResult: No sale\nSkills: Opener ${opener}/10, Discovery 4/10, Objections 5/10, Close 3/10\nWhat worked:\n- "Hi"`;
 
@@ -30,7 +34,7 @@ beforeEach(() => {
   const now = Date.now();
   state.db = createFakeAskDb({
     practiceLog: {
-      a: { uid: 'r1', persona: 'skeptic', personaLabel: 'Skeptic', feedback: feedback(4), score: 6, createdAt: new Date(now - 2 * DAY) },
+      a: { uid: 'r1', persona: 'skeptic', personaLabel: 'Skeptic', feedback: feedback(4), score: 6, turns, createdAt: new Date(now - 2 * DAY) },
       b: { uid: 'r1', persona: 'renter', personaLabel: 'Renter', feedback: feedback(8), score: 6, createdAt: new Date(now - DAY), redoOf: 'a' },
       old: { uid: 'r1', persona: 'renter', personaLabel: 'Renter', feedback: feedback(1), createdAt: new Date(now - 40 * DAY) },
       theirs: { uid: 'r2', persona: 'skeptic', personaLabel: 'Skeptic', feedback: feedback(9), createdAt: new Date(now - DAY) },

@@ -15,6 +15,7 @@ const mic = vi.hoisted(() => ({
   finish: vi.fn(),
   close: vi.fn(),
   asked: 0,
+  fail: false,
 }));
 vi.mock('./handsFreeMic', () => ({
   canHandsFree: () => true,
@@ -23,6 +24,7 @@ vi.mock('./handsFreeMic', () => ({
     return Promise.resolve({});
   },
   openHandsFreeMic: async (_context: unknown, _stream: unknown, events: HandsFreeEvents) => {
+    if (mic.fail) return null;
     mic.events = events;
     return { finish: mic.finish, close: mic.close };
   },
@@ -91,6 +93,7 @@ beforeEach(() => {
   practiceAnswers = [];
   mic.events = null;
   mic.asked = 0;
+  mic.fail = false;
   mic.finish.mockReset();
   mic.close.mockReset();
   fetchMock.mockImplementation(async (url: string) => {
@@ -208,5 +211,16 @@ describe('RepPractice hands-free', () => {
     expect(practiceBodies()[2].history.at(-1)).toEqual({ role: 'rep', text: 'So what do you pay for Spectrum right now each month?' });
     await until(() => text().includes("Spectrum's about ninety a month. Why?"));
     expect(text()).not.toContain('Pay for what?');
+  });
+
+  it('turns the switch back off when the mic or connection fails, and says tap to talk still works', async () => {
+    window.localStorage.setItem('ask3c-practice-hands-free', 'on');
+    mic.fail = true;
+    await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
+    practiceAnswers.push(json({ ...says('Hi?'), sessionId: 's1', ring: false, ambient: null }));
+    await act(async () => button('Knock')!.click());
+    await until(() => text().includes('Hands-free stopped. Tap to talk still works.'));
+    expect(button('Hands-free')?.getAttribute('aria-pressed')).toBe('false');
+    expect(window.localStorage.getItem('ask3c-practice-hands-free')).toBeNull();
   });
 });

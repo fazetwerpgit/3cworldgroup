@@ -20,6 +20,7 @@ import {
   type PracticeKnockReply,
   type PracticePriceReply,
   type PracticeRedoReply,
+  type PracticeSyncReply,
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
@@ -109,6 +110,10 @@ const customerTurn = (line: PracticeLine): PracticeTurn =>
   line.speaker === 'spouse' || line.speaker === 'kid'
     ? { role: 'customer', text: line.text, speaker: line.speaker }
     : { role: 'customer', text: line.text };
+const REPLACED = 'This practice was replaced on another screen. Knock to start a new one.';
+/** From here on, the composer shows how many characters are left. */
+const COUNTER_FROM = MAX_REP_CHARS - 150;
+
 const noDelivery = (): PracticeDelivery => ({ talkMs: 0, listenMs: 0, words: 0, fillers: {}, lines: 0 });
 /** A spoken line's length when the mic heard only a word or two (its first and last words came together). */
 const MIN_LINE_MS = 600;
@@ -348,7 +353,16 @@ export function RepPractice({
       playerRef.current?.fadeOut();
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     },
-    onLost: () => setNotice('Hands-free stopped. Tap to talk still works.'),
+    onLost: () => {
+      // It stopped (no mic, no connection): the switch goes back off, so the next knock doesn't try again.
+      setHandsFreeOn(false);
+      try {
+        window.localStorage.removeItem(HANDS_FREE_PREF_KEY);
+      } catch {
+        // Storage blocked: off for this visit.
+      }
+      setNotice('Hands-free stopped. Tap to talk still works.');
+    },
   });
   const pauseHands = hands.pause;
 
@@ -387,10 +401,40 @@ export function RepPractice({
     const restored = readStoredPractice(uid);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only after mount
     setSession(restored);
-    if (restored) {
-      onResume();
+    if (!restored) return;
+    onResume();
+    scrollDown('instant');
+    if (!restored.sessionId || restored.feedback) return;
+    // A reload or Back mid-practice: catch up with the server's copy (a reply that landed meanwhile), or put
+    // a line that never got its answer back in the box.
+    let live = true;
+    void post<PracticeSyncReply>({ action: 'sync', sessionId: restored.sessionId }).then((result) => {
+      if (!live) return;
+      if (!result.ok) {
+        if (result.status === 409) {
+          storeSession(uid, null);
+          setSession(null);
+          setNotice(REPLACED);
+        }
+        return;
+      }
+      const server = Array.isArray(result.data.turns) ? result.data.turns : [];
+      if (!server.length) return;
+      const pending = restored.turns.length > server.length ? restored.turns.at(-1) : undefined;
+      const next: Session = {
+        ...restored,
+        turns: server,
+        ended: restored.ended || result.data.ended === true,
+        endedBy: restored.endedBy ?? (result.data.ended ? 'homeowner' : undefined),
+      };
+      storeSession(uid, next);
+      setSession(next);
+      if (pending?.role === 'rep') setDraft(pending.text);
       scrollDown('instant');
-    }
+    });
+    return () => {
+      live = false;
+    };
   }, [uid, scrollDown, onResume]);
 
   useEffect(() => {
@@ -449,8 +493,36 @@ export function RepPractice({
     const voice = pickVoice(synth.getVoices(), null, 0);
     if (voice) utterance.voice = voice;
     hands.speaking(text);
-    utterance.onend = () => hands.listen();
+    // The phone's voice counts as listening too; when it can't be timed, the talk share isn't shown.
+    const tally = deliveryRef.current;
+    let startedAt = 0;
+    utterance.onstart = () => {
+      startedAt = performance.now();
+    };
+    const done = () => {
+      if (tally && tally === deliveryRef.current) {
+        if (startedAt) tally.listenMs += Math.round(performance.now() - startedAt);
+        else tally.untimed = true;
+      }
+      hands.listen();
+    };
+    utterance.onend = done;
+    utterance.onerror = done;
     synth.speak(utterance);
+  };
+
+  /** The session was replaced by a knock on another screen: back to Knock, said once. */
+  const replaced = () => {
+    stopSpeaking();
+    playerRef.current?.quiet();
+    stopListening(false);
+    hands.stop();
+    specRef.current = null;
+    save(null);
+    setBusy(null);
+    setFailed(null);
+    setDraft('');
+    setNotice(REPLACED);
   };
 
   const requestFeedback = async (current: Session) => {
@@ -469,6 +541,10 @@ export function RepPractice({
       ...(replyMs.length ? { replyMs } : {}),
     });
     setBusy(null);
+    if (!result.ok && result.status === 409) {
+      replaced();
+      return;
+    }
     if (result.ok && result.data.feedback) {
       const { feedback: text, score, id, canRedo } = result.data;
       save({ ...current, ended: true, delivery, feedback: { text, score, id, canRedo: canRedo === true } });
@@ -541,6 +617,10 @@ export function RepPractice({
       return;
     }
     setBusy(null);
+    if (!knocked && !result.ok && result.status === 409) {
+      replaced();
+      return;
+    }
     hands.listen();
     const error = result.ok ? 'The homeowner went quiet. Try again.' : result.error;
     const retryable = result.ok || result.status !== 429;
@@ -672,6 +752,10 @@ export function RepPractice({
     const result = await post<PracticeTurnReply>({ action: 'turn', sessionId: prepared.sessionId, history: withRep.turns, cut: true });
     setBusy(null);
     const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
+    if (!result.ok && result.status === 409) {
+      replaced();
+      return;
+    }
     if (!result.ok || !lines.length) {
       stopSpeaking();
       save({ ...withRep, turns: prepared.turns });
@@ -759,6 +843,10 @@ export function RepPractice({
     if (talk) unlockAudio();
     setBusy('turn');
     const result = await post<PracticePriceReply>({ action: 'price', sessionId: session.sessionId });
+    if (!result.ok && result.status === 409) {
+      replaced();
+      return;
+    }
     if (!result.ok || !result.data.card) {
       setBusy(null);
       setNotice(result.ok ? "The price didn't come up. Try again." : result.error);
@@ -1199,7 +1287,6 @@ export function RepPractice({
                 className={`${p.input} ${p.textarea} ${pr.input}`}
                 placeholder={micShown ? 'Or type what you say' : 'What do you say?'}
                 value={draft}
-                maxLength={MAX_REP_CHARS}
                 rows={2}
                 enterKeyHint="send"
                 readOnly={listening}
@@ -1211,6 +1298,13 @@ export function RepPractice({
                   if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) sendLine(draft);
                 }}
               />
+              {draft.length > COUNTER_FROM ? (
+                <p className={`${p.hint} ${draft.length > MAX_REP_CHARS ? p.hintError : ''}`} aria-live="polite">
+                  {draft.length > MAX_REP_CHARS
+                    ? `${draft.length.toLocaleString('en-US')} of ${MAX_REP_CHARS.toLocaleString('en-US')} characters. Cut it down to send it.`
+                    : `${(MAX_REP_CHARS - draft.length).toLocaleString('en-US')} characters left`}
+                </p>
+              ) : null}
             </>
           )}
           {notice ? (
@@ -1252,7 +1346,7 @@ export function RepPractice({
               <button
                 type="submit"
                 className={`${s.btnPrimary} ${a.sendBtn}`}
-                disabled={busy !== null || listening || !draft.trim()}
+                disabled={busy !== null || listening || !draft.trim() || draft.length > MAX_REP_CHARS}
               >
                 <SendHorizontal size={20} aria-hidden="true" />
                 Send

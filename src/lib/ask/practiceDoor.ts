@@ -3,6 +3,7 @@ import {
   GEMINI_VOICES,
   NAMES,
   VOICE_BOOK,
+  screenBeatsBill,
   seededRandom,
   voiceFits,
   type GeminiVoice,
@@ -158,8 +159,25 @@ const CLOCK = new Intl.DateTimeFormat('en-US', {
   hour12: true,
 });
 
-/** The real day and time at the door (Chicago), and what it means for the homeowner's mood. */
-export function doorClock(now: Date): string {
+/**
+ * Early evening at the door: dinner is one of these, not the rule (a demo had
+ * 6 of 9 homeowners at the table). The door's seed picks one.
+ */
+const EVENING_MOODS = [
+  "It's dinnertime: food is on or you're about to eat, so you want this quick.",
+  "You just got home from work and haven't even put your bag down.",
+  "You were folding laundry in the living room.",
+  "You were helping a kid with homework at the kitchen table.",
+  "You were out in the garage working on something.",
+  "You were on the couch, finally sitting down after a long day.",
+] as const;
+
+/**
+ * The real day and time at the door (Chicago), and what it means for the
+ * homeowner's mood. In the early evening the seed picks what they were doing,
+ * dinner about 1 time in 3.
+ */
+export function doorClock(now: Date, seed = 0): string {
   const parts = Object.fromEntries(CLOCK.formatToParts(now).map((part) => [part.type, part.value]));
   const hour24 = (Number(parts.hour) % 12) + (parts.dayPeriod?.toUpperCase() === 'PM' ? 12 : 0);
   const minutes = hour24 * 60 + Number(parts.minute);
@@ -173,7 +191,9 @@ export function doorClock(now: Date): string {
   } else if (day === 'Saturday' && footballSeason && minutes >= 11 * 60 && minutes < 20 * 60) {
     mood = 'College football is on inside.';
   } else if (minutes >= 17 * 60 && minutes < 19 * 60 + 30) {
-    mood = "It's dinnertime: food is on or you're about to eat, so you want this quick.";
+    const pick = doorRandom(seed, 0x2545f491)();
+    // Dinner a third of the time; otherwise one of the rest.
+    mood = pick < 1 / 3 ? EVENING_MOODS[0] : EVENING_MOODS[1 + Math.floor(((pick - 1 / 3) / (2 / 3)) * (EVENING_MOODS.length - 1))];
   } else if (minutes >= 19 * 60 + 30) {
     mood = "It's getting late and you're winding down for the night.";
   } else if (minutes < 12 * 60) {
@@ -189,7 +209,7 @@ export function drawDoor(seed: number, customer: PracticeCustomer, kind: DoorKin
   return {
     kind,
     surprise: drawSurprise(seed, customer, kind),
-    clock: doorClock(now),
+    clock: doorClock(now, seed),
     kidVoice: kind === 'kid' ? KID_VOICES[Math.floor(doorRandom(seed, 0x1b873593)() * KID_VOICES.length)] : null,
   };
 }
@@ -254,7 +274,13 @@ export function surpriseNote(door: PracticeDoor, turns: PracticeTurn[], customer
 /** The part of the homeowner's system prompt this door adds. */
 export function doorPromptBlock(door: PracticeDoor, customer: PracticeCustomer, turns: PracticeTurn[]): string {
   const lines: string[] = [];
-  if (door.clock) lines.push(`- It's ${door.clock}`);
+  if (door.clock) {
+    lines.push(`- It's ${door.clock}`);
+    const food = /\b(?:eat|cook\w*|dinner|stove|food)\b/i;
+    if (!food.test(door.clock) && !food.test(customer.persona.situation) && !customer.details.some((detail) => food.test(detail))) {
+      lines.push("- You aren't eating or cooking right now: don't bring up dinner or food.");
+    }
+  }
   if (door.kind === 'ring') {
     lines.push(
       "- You aren't opening the door: you're talking through your Ring doorbell camera speaker and can see the rep on your phone. Keep it short and a bit guarded. A good rep might get you to come to the door or ask when to come back."
@@ -339,10 +365,16 @@ export function asModelLine(turns: PracticeTurn[]): string {
 }
 
 /** "a kid answered" / "the husband walked up" / "the phone rang": how the reveal names the surprise. */
-export function doorSummary(door: PracticeDoor, customer: PracticeCustomer): string | null {
+/** Whether the door's surprise happened in this conversation (it's due on a rep line the rep may never reach). */
+export function surpriseFired(door: PracticeDoor, turns: PracticeTurn[]): boolean {
+  return door.surprise !== null && repLines(turns) >= door.surprise.atLine;
+}
+
+export function doorSummary(door: PracticeDoor, customer: PracticeCustomer, turns: PracticeTurn[]): string | null {
   if (door.kind === 'kid') return 'a kid answered the door';
   if (door.kind === 'ring') return 'talked only through the Ring doorbell';
   if (door.kind === 'landlord') return 'the landlord has to approve';
+  if (!surpriseFired(door, turns)) return null;
   if (door.surprise?.kind === 'spouse') return `the ${customer.gender === 'f' ? 'husband' : 'wife'} walked up mid-pitch`;
   if (door.surprise?.kind === 'beat') {
     return { phone: 'the phone rang mid-pitch', kid: 'a kid interrupted', pot: 'the stove boiled over' }[door.surprise.beat];
@@ -351,12 +383,13 @@ export function doorSummary(door: PracticeDoor, customer: PracticeCustomer): str
 }
 
 /** What the coach needs to know about this door to judge it fairly. */
-export function doorCoachBlock(door: PracticeDoor, customer: PracticeCustomer): string {
+export function doorCoachBlock(door: PracticeDoor, customer: PracticeCustomer, turns: PracticeTurn[]): string {
+  const fired = surpriseFired(door, turns);
   const lines: string[] = [];
   if (door.clock) lines.push(`When: ${door.clock} Judge whether the rep read the moment (kept it short at dinnertime, didn't drag it out).`);
   if (door.kind === 'kid') {
     lines.push(
-      'A kid (about ten) answered; the parent was not home. The only right move is not to pitch the child, not to ask them for anything except when a parent will be home, and to leave politely (maybe saying you\'ll come back). Doing that quickly is a good door: score it 8-10 and Result "Walked away the right way". Pitching the kid or asking them for information scores low. There is no Sale at this door.'
+      'A kid (about ten) answered; the parent was not home. The only right move is not to pitch the child, not to ask them for anything except when a parent will be home, and to leave politely (maybe saying you\'ll come back). Doing that quickly is a good door: score it 8-10 and Result "Walked away the right way". Pitching the kid or asking them anything about the family, the bill or the internet is 3/10 at most, and the Fix next time says the right move was to ask when a parent is home and leave politely. There is no Sale at this door.'
     );
   }
   if (door.kind === 'ring') {
@@ -369,13 +402,13 @@ export function doorCoachBlock(door: PracticeDoor, customer: PracticeCustomer): 
       'This renter\'s landlord has to approve any install, so there was no sale today. The right move was to find that out, not push, and leave info or set a time to come back after they ask: doing that is "Walked away the right way". There is no Sale at this door.'
     );
   }
-  if (door.surprise?.kind === 'spouse') {
+  if (fired && door.surprise?.kind === 'spouse') {
     const who = customer.gender === 'f' ? 'husband' : 'wife';
     lines.push(
       `Partway through, the ${who} walked up and joined in with their own worry ("${door.surprise.objection}"). Judge whether the rep brought them in, answered that worry, and didn't just keep pitching the first person.`
     );
   }
-  if (door.surprise?.kind === 'beat') {
+  if (fired && door.surprise?.kind === 'beat') {
     lines.push(
       `Partway through, the homeowner was interrupted (${BEAT_NOTES[door.surprise.beat]}). Judge whether the rep paused, acknowledged it and kept it short instead of talking over it.`
     );
@@ -386,7 +419,8 @@ export function doorCoachBlock(door: PracticeDoor, customer: PracticeCustomer): 
 /** Which Results this door allows: a walk-away where leaving is right, a Sale where one can happen. */
 export function resultRules(customer: PracticeCustomer, door: PracticeDoor): { walkAway: boolean; sale: boolean } {
   if (door.kind === 'kid' || door.kind === 'landlord') return { walkAway: true, sale: false };
-  return { walkAway: !customer.persona.shouldBuy, sale: true };
+  // A door whose price doesn't beat the bill: leaving the right way is a good outcome too.
+  return { walkAway: !customer.persona.shouldBuy || !screenBeatsBill(customer), sale: true };
 }
 
 /** The voice and delivery for one speaker at this door. */

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireOwner } from '@/lib/announcements/requireOwner';
-import { parsePracticeHistory, type PracticeLogView } from '@/lib/ask/practice';
+import { aboutThem, parsePracticeHistory, type PracticeLogView } from '@/lib/ask/practice';
 import { CORRECTION_PARTS, parseDelivery, parseSkills, type CorrectionView } from '@/lib/ask/practiceCoaching';
 import { PRACTICE_CORRECTIONS, PRACTICE_LOG, isoTime } from '@/lib/ask/store';
 
@@ -23,7 +23,12 @@ function homeownerLabel(value: unknown): string | null {
   const who = typeof picks.voice === 'string' && picks.voice ? `${picks.name}, voice ${picks.voice}` : picks.name;
   const provider = typeof picks.provider === 'string' ? picks.provider : '';
   const bill = typeof picks.bill === 'number' ? `$${picks.bill}/mo` : '';
-  const details = Array.isArray(picks.details) ? picks.details.filter((d): d is string => typeof d === 'string').join('; ') : '';
+  const details = Array.isArray(picks.details)
+    ? picks.details
+        .filter((d): d is string => typeof d === 'string')
+        .map(aboutThem)
+        .join('; ')
+    : '';
   return [who, [provider, bill].filter(Boolean).join(' '), details].filter(Boolean).join(' · ');
 }
 

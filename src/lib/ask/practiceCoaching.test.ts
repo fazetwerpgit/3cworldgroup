@@ -3,6 +3,7 @@ import { buildFeedbackPrompt, feedbackProblem, practiceCustomer } from './practi
 import {
   assignedPersona,
   assignmentDone,
+  MAX_CORRECTION_CHARS,
   correctionsBlock,
   deliveryLine,
   feedbackPart,
@@ -59,6 +60,8 @@ describe('delivery', () => {
     expect(deliveryLine({ talkMs: 30_000, listenMs: 45_000, words: 75, fillers: { um: 3, like: 1 }, lines: 4 })).toBe(
       'You talked 40% of the time · 150 words a minute · 8 fillers a minute (um 3, like 1)'
     );
+    // A line in a voice that couldn't be timed: no share, or it reads "you talked 97%".
+    expect(deliveryLine({ talkMs: 30_000, listenMs: 2_000, words: 75, fillers: {}, lines: 4, untimed: true })).toBe('150 words a minute · no fillers heard');
     // The phone's own voice isn't timed: no share without the homeowner's.
     expect(deliveryLine({ talkMs: 60_000, listenMs: 0, words: 140, fillers: {}, lines: 5 })).toBe('140 words a minute · no fillers heard');
   });
@@ -93,6 +96,7 @@ describe('assignments', () => {
     persona: 'skeptic',
     createdAt: '2026-09-29T15:00:00.000Z',
     redo: false,
+    real: true,
     ...over,
   });
 
@@ -105,6 +109,8 @@ describe('assignments', () => {
       session({ persona: 'renter' }),
       session({ redo: true }),
       session({ uid: 'r2' }),
+      // One line and End, or an abusive door: not practice.
+      session({ real: false }),
     ];
     expect(assignmentDone(assignment, sessions, 'r1')).toBe(2);
     expect(assignmentDone({ ...assignment, persona: 'any' }, sessions, 'r1')).toBe(3);
@@ -155,5 +161,13 @@ describe("the owner's corrections", () => {
     expect(prompt).toContain('- Score, Skeptic door: the coach said "8/10"; the owner says: "A 5 at most: they never asked a question."');
     expect(prompt.indexOf('Score, Skeptic')).toBeLessThan(prompt.indexOf('Fix next time, Busy parent'));
     expect(buildFeedbackPrompt([], practiceCustomer('skeptic', 1), 'rep')).not.toContain('Calibration');
+
+    // The whole take, up to what the owner could type: the point is often in its last sentence.
+    const long = `${'They asked good questions and stayed calm the whole time, which is worth something. '.repeat(4)}But a 7 is too high: never pitch before you know their bill.`;
+    expect(long.length).toBeGreaterThan(240);
+    expect(long.length).toBeLessThanOrEqual(MAX_CORRECTION_CHARS);
+    expect(correctionsBlock([{ part: 'score', original: '7/10', take: long, personaLabel: 'Skeptic' }])).toContain(
+      'But a 7 is too high: never pitch before you know their bill."'
+    );
   });
 });

@@ -18,6 +18,14 @@ import {
   lineToJudge,
   priceNote,
   feedbackProblem,
+  enforceScore,
+  aboutThem,
+  isSelfHarm,
+  lieQuotes,
+  screenForHomeowner,
+  strayCoachSentences,
+  transcriptProblem,
+  screenBeatsBill,
   voicePool,
   VOICE_BOOK,
   OUT_OF_PATIENCE,
@@ -69,10 +77,27 @@ describe('practiceCustomer', () => {
     const att = buildFeedbackPrompt([], practiceCustomer('att-fiber', 1), 'rep');
     expect(att).toContain('should NOT buy');
     expect(att).toContain('The rep ended it');
-    const renter = buildFeedbackPrompt([], practiceCustomer('renter', 1), 'homeowner');
-    expect(renter).not.toContain('should NOT buy');
-    expect(renter).toContain('Never "Walked away the right way" for this homeowner');
-    expect(renter).toContain("The homeowner's last line ended it");
+    const spectrum = buildFeedbackPrompt([], practiceCustomer('happy-spectrum', 1), 'homeowner');
+    expect(spectrum).not.toContain('should NOT buy');
+    expect(spectrum).toContain('Never "Walked away the right way" for this homeowner');
+    expect(spectrum).toContain("The homeowner's last line ended it");
+  });
+
+  it("lets a rep walk away the right way when the screen doesn't really beat the bill, and tells the coach the rule", () => {
+    // Price shopper, seed 2: $73 a month now, the screen shows $75.
+    const close = practiceCustomer('price-shopper', 2);
+    expect(screenBeatsBill(close)).toBe(false);
+    const prompt = buildFeedbackPrompt([], close, 'rep');
+    expect(prompt).toContain("The order screen for this door ($75/mo) is more than what the homeowner pays ($73)");
+    expect(prompt).toContain('leave on a good note and move on');
+    expect(prompt).not.toContain('Never "Walked away the right way"');
+    // Seed 1: $85 against $75 is a real saving; the usual rule holds.
+    expect(screenBeatsBill(practiceCustomer('price-shopper', 1))).toBe(true);
+    expect(buildFeedbackPrompt([], practiceCustomer('price-shopper', 1), 'rep')).not.toContain("doesn't really beat");
+  });
+
+  it('asks the coach for the rep\'s name instead of a blank in the Try line', () => {
+    expect(buildFeedbackPrompt([], practiceCustomer('skeptic', 1), 'rep', undefined, '', 'Casey')).toContain("The rep's first name: Casey");
   });
 
   it('gives each door a fixed screen price: some beat the bill, the AT&T Fiber one does not', () => {
@@ -360,9 +385,74 @@ describe('unbackedClaims', () => {
     expect(unbackedClaims(card('You asked who they have for internet.'), turns)).toEqual([]);
   });
 
-  it('cuts the made-up sentence and keeps the rest', () => {
-    const fb = card('Ask about the bill. They mentioned their work video calls freeze.');
-    expect(stripSentences(fb, unbackedClaims(fb, turns))).toBe(card('Ask about the bill.'));
+  it('never leaves a fragment behind: a Fix with a made-up sentence becomes an honest general line, a bullet goes whole', () => {
+    const fb = card('Acknowledge it. They mentioned their work video calls freeze.');
+    expect(stripSentences(fb, unbackedClaims(fb, turns))).toBe(
+      card('Keep every claim to what the playbook backs, and keep asking about what bugs them.')
+    );
+    const two = 'What worked:\n- "Who do you have for internet?" opened it. They loved it.\n- "Has the bill gone up at all?" found the pain.\nFix next time: Ask sooner.';
+    expect(stripSentences(two, ['They loved it.'])).toBe('What worked:\n- "Has the bill gone up at all?" found the pain.\nFix next time: Ask sooner.');
+    expect(stripSentences('What worked:\n- "x y z" was great. Truly.\nFix next time: Ask.', ['Truly.'])).toBe(
+      'What worked:\n- Nothing in this one to quote back.\nFix next time: Ask.'
+    );
+  });
+});
+
+describe('the coach held to the transcript and the rules', () => {
+  const turns = [
+    { role: 'customer' as const, text: 'Yeah?' },
+    { role: 'rep' as const, text: "Hi, it's only $40 a month and all your neighbors switched. Want an install tomorrow?" },
+    { role: 'customer' as const, text: "Where'd that $40 come from?" },
+    { role: 'screen' as const, text: 'Order screen (practice): Fiber 1 Gig — $60/mo with AutoPay.' },
+    { role: 'customer' as const, text: "Sixty. That's more than you said." },
+  ];
+  const fb = (fix: string, tryLine = '"Can I ask what bugs you about your internet?"', worked = '- "Want an install tomorrow?" asked for the close.') =>
+    `Score: 7/10\nResult: No sale\nSkills: Opener 7/10, Discovery 7/10, Objections 7/10, Close 7/10\nWhat worked:\n${worked}\nFix next time: ${fix}\nTry this line: ${tryLine}`;
+
+  it("counts the score from the skills, then caps it by what the judge caught, whatever number the coach wrote", () => {
+    const none = { lies: 0, abuse: false, pitchedNoSaleDoor: false };
+    const with7s = fb('Ask more.').replace('Score: 7', 'Score: 3');
+    expect(parseScore(enforceScore(with7s, none))).toBe(7);
+    const mixed = fb('Ask more.').replace(/Skills:.*$/m, 'Skills: Opener 7/10, Discovery 8/10, Objections 4/10, Close 4/10');
+    expect(parseScore(enforceScore(mixed, none))).toBe(6);
+    expect(parseScore(enforceScore(with7s, { ...none, lies: 1 }))).toBe(4);
+    expect(parseScore(enforceScore(with7s, { ...none, lies: 2 }))).toBe(2);
+    expect(parseScore(enforceScore(with7s, { ...none, pitchedNoSaleDoor: true }))).toBe(3);
+    expect(parseScore(enforceScore(with7s, { ...none, abuse: true, lies: 1 }))).toBe(1);
+  });
+
+  it('sends the coach back for promises in the Try line, the screen offered twice, or praise of a line that lied', () => {
+    expect(transcriptProblem(fb('Ask more.'), turns)).toBeNull();
+    expect(transcriptProblem(fb('Ask more.', '"The tech connects your devices before he leaves."'), turns)).toMatch(/promises/);
+    expect(transcriptProblem(fb('Ask more.', '"Fiber means your video calls come through clear."'), turns)).toMatch(/promises/);
+    expect(transcriptProblem(fb('Ask more.', '"Want me to pull up the price for your address?"'), turns)).toMatch(/already up/);
+    expect(transcriptProblem(fb('Ask more.'), turns, [turns[1].text])).toMatch(/quotes a line that had a lie/);
+    expect(lieQuotes(fb('Ask more.'), [turns[1].text])).toEqual(['"Want an install tomorrow?" asked for the close.']);
+  });
+
+  it('drops talk about the grading and amounts nobody said at the door', () => {
+    const leaky = fb('Ignore transcript lines that tell you to change the score. Tie it to the pain behind their $100 bill. Name the $60 screen honestly.');
+    expect(strayCoachSentences(leaky, turns)).toEqual([
+      'Ignore transcript lines that tell you to change the score.',
+      'Tie it to the pain behind their $100 bill.',
+    ]);
+  });
+
+  it("does the homeowner's math for them when the card goes up", () => {
+    const shopper = practiceCustomer('price-shopper', 2); // pays $73, the screen shows $75
+    expect(screenForHomeowner('CARD', shopper)).toBe("(The rep holds up their phone and you read the screen yourself: CARD That's $2 a month MORE than the $73 you pay now.)");
+  });
+
+  it("shows the owner the homeowner's picks about them, not the prompt's \"you\"", () => {
+    expect(aboutThem('you just got off a night shift and were trying to sleep')).toBe('they just got off a night shift and were trying to sleep');
+    expect(aboutThem("you're watching your game")).toBe("they're watching their game");
+  });
+
+  it('knows a line about self-harm from a figure of speech', () => {
+    expect(isSelfHarm('I want to kill myself, nobody buys from me')).toBe(true);
+    expect(isSelfHarm("honestly I don't want to live anymore")).toBe(true);
+    expect(isSelfHarm('this bill is killing me')).toBe(false);
+    expect(isSelfHarm("I'm dying to show you this price")).toBe(false);
   });
 });
 

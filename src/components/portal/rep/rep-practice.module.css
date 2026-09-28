@@ -325,28 +325,36 @@
   overflow-wrap: anywhere;
 }
 
-/* The coach's four skill scores (out of 10), four across. */
+/* The coach's four skill scores (out of 10): two by two on a phone, four across on a wide screen.
+   Labels never break mid-word ("Objections" fits a half-width tile at 360px). */
 .skills {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s2);
   margin: 0;
 }
+@media (min-width: 640px) {
+  .skills {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
 .skill {
-  display: grid;
-  gap: 2px;
-  padding: var(--s2);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
   border: 1px solid var(--c-line);
   border-radius: var(--r-control);
-  text-align: center;
 }
 .skill dt {
+  min-width: 0;
   color: var(--c-text-3);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .skill dd {
   margin: 0;
