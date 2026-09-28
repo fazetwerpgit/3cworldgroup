@@ -135,7 +135,7 @@ describe('loadRepSnapshot', () => {
   });
 
   it('gives someone who is not on the Board (an owner) everyone on it, not just the last row', async () => {
-    const data = seed();
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
     data.users.owner1 = { displayName: 'Jeremy', status: 'active', role: 'owner' };
     const text = await loadRepSnapshot(createFakeAskDb(data).db as unknown as Firestore, 'owner1', NOW);
     expect(text).toContain('Everyone on it (3): #1 Jordan Price (1 sale, 30 points); #2 ');

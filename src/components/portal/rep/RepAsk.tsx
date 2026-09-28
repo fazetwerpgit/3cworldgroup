@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { askOpenTo } from '@/lib/ask/flag';
+import { isOwner } from '@/types';
 import {
   ASK_CONVERSATION_KEY,
   ASK_HISTORY_TURNS,
@@ -391,7 +392,7 @@ export function RepAsk() {
         </ol>
       )}
 
-      {answered ? <p className={a.stuck}>Still stuck? Call Jeremy or Jacob.</p> : null}
+      {answered && !isOwner(user?.role) ? <p className={a.stuck}>Still stuck? Call Jeremy or Jacob.</p> : null}
 
       <BorderBeam size="line" active={sending && !reducedMotion} theme="dark" strength={0.7} className={a.composerBeam}>
         <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>

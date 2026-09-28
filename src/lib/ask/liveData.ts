@@ -289,7 +289,7 @@ async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
     const below = at < ranked.length - 1 ? `; just below: ${rowText(ranked[at + 1], at + 2)}` : '';
     return `- ${label}: #${at + 1} of ${ranked.length} with ${plural(me.sales, 'sale')}, ${plural(me.points, 'point')}${above}${below}.`;
   });
-  return `Board (ranked by points like the Board's default view; cancelled sales don't count; Year and All time are on the Board):\n${lines.join('\n')}`;
+  return `Board (ranked by points like the Board's default view; cancelled sales don't count; Year and All time are on the Board; every name here is a teammate, another rep, never this rep's customer):\n${lines.join('\n')}`;
 }
 
 // ---------- Calls ----------
