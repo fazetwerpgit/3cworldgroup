@@ -547,7 +547,12 @@
 }
 
 /* ---------- proof card ---------- */
-/* Details step: the attached proof is an L1 card, thumbnails in a well. */
+/* Details step: the attached proof is an L1 card, thumbnails in a well. The
+   border beam wrapper around it clips, so the card's lift lives on it. */
+.proofBeam {
+  box-shadow: var(--c-lift);
+}
+
 .proofCard {
   display: grid;
   gap: var(--s3);
@@ -555,7 +560,6 @@
   border: 1px solid var(--c-line);
   border-radius: 12px;
   background: var(--c-panel);
-  box-shadow: var(--c-lift);
 }
 
 .proofMeta {
@@ -789,6 +793,10 @@ span.thumbView {
 .scanReading svg {
   flex: none;
   color: var(--c-text-3);
+}
+
+.scanReading canvas {
+  flex: none;
 }
 
 .scanSkip {
@@ -1231,7 +1239,7 @@ span.thumbView {
     gap: var(--s5) var(--s7);
   }
 
-  .proofCard {
+  .proofBeam {
     position: sticky;
     top: calc(var(--topbar-h) + var(--s5));
     grid-area: proof;
