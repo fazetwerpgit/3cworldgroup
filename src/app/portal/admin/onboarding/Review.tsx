@@ -160,6 +160,25 @@ export function Review() {
   // In-app viewer, not a new tab: a tab opened after an await is blocked or
   // opens blank in Safari and strands an iPhone home-screen app.
   const viewer = useAttachmentViewer();
+  // Files of a reviewed item, fetched on demand (each sensitive opening is audited).
+  const [openedFiles, setOpenedFiles] = useState<Record<string, ChecklistItem['files']>>({});
+  const [filesLoadingId, setFilesLoadingId] = useState<string | null>(null);
+
+  const openFiles = async (item: ChecklistItem) => {
+    setFilesLoadingId(item.id);
+    setError('');
+    try {
+      const params = new URLSearchParams({ userId: item.userId, itemId: item.itemId });
+      const response = await fetch(`/api/portal/onboarding/files?${params}`, { headers: await authHeaders() });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || "Couldn't open the files");
+      setOpenedFiles((prev) => ({ ...prev, [item.id]: Array.isArray(json.files) ? json.files : [] }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't open the files");
+    } finally {
+      setFilesLoadingId(null);
+    }
+  };
 
   // `background` refreshes after an action keep the current list on failure,
   // so a confirmation the admin just got is not swapped for a load error.
@@ -314,7 +333,7 @@ export function Review() {
         </div>
         {detail ? <p className={o.itemDetail}>{detail}</p> : null}
 
-        {underReview ? (
+        {underReview || item.id in openedFiles ? (
           <div className={o.reference}>
             {item.referenceKind === 'storage' && item.adminOnly ? (
               <p className={o.locked}>
@@ -322,10 +341,10 @@ export function Review() {
                 Admin only. Sensitive files are visible to admins.
               </p>
             ) : item.referenceKind === 'storage' ? (
-              item.files.length > 0 ? (
+              (openedFiles[item.id] ?? item.files).length > 0 ? (
                 <>
                   <div className={o.files}>
-                    {item.files.map((file) =>
+                    {(openedFiles[item.id] ?? item.files).map((file) =>
                       // Photos open in the page. A PDF (or a HEIC, which only
                       // Apple's browsers draw) stays a link: a real tap opens it.
                       /^image\/(jpeg|png|webp)$/.test(file.contentType) ? (
@@ -360,6 +379,18 @@ export function Review() {
             ) : (
               <p className={o.quote}>{item.reference ?? 'No reference on file.'}</p>
             )}
+          </div>
+        ) : item.referenceKind === 'storage' && item.reference && !item.adminOnly && !esign ? (
+          <div className={u.btnRow}>
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm}`}
+              disabled={filesLoadingId === item.id}
+              onClick={() => void openFiles(item)}
+            >
+              <FileText size={16} aria-hidden="true" />
+              {filesLoadingId === item.id ? 'Opening…' : 'View files'}
+            </button>
           </div>
         ) : null}
 
