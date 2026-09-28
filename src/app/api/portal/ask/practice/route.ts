@@ -37,7 +37,7 @@ import {
 } from '@/lib/ask/practice';
 import { AskProviderError, askProviderConfig, callAskModel, type AskMessage, type AskUsage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
-import { PRACTICE_DAILY_LIMIT, PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeDailyPractice } from '@/lib/ask/store';
+import { PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeDailyPractice } from '@/lib/ask/store';
 
 // POST /api/portal/ask/practice
 //   { action: 'turn', history: [], persona? }          the knock: the server picks who is
@@ -188,9 +188,11 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
-  if (!(await takeDailyPractice(db, gate.uid, now))) {
+  // Model calls this request makes: the knock and the coach 1, a rep line 2 (homeowner and line judge).
+  const calls = action === 'turn' && !knock ? 2 : 1;
+  if (!(await takeDailyPractice(db, gate.uid, now, calls))) {
     await release();
-    return fail(`That's ${PRACTICE_DAILY_LIMIT} practice replies today, the daily limit. Back at it tomorrow.`, 429);
+    return fail("That's today's practice limit. Back at it tomorrow.", 429);
   }
 
   const customer = practiceCustomer(personaId, seed);
@@ -291,7 +293,8 @@ export async function POST(request: NextRequest) {
       // One retry when the shape is off (an extra section, a missing one, a price in the Try line).
       const problem = feedbackProblem(feedback);
       const left = maxDuration * 1000 - 5_000 - (Date.now() - started);
-      if (problem && left >= COACH_RETRY_MIN_MS) {
+      // The retry is one more model call on the day's count; at the limit the first answer stands.
+      if (problem && left >= COACH_RETRY_MIN_MS && (await takeDailyPractice(db, gate.uid, now, 1))) {
         log({ outcome: 'coach_format_retry', problem });
         const retry = await callAskModel(
           config,

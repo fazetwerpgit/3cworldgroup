@@ -217,7 +217,7 @@ describe('POST /api/portal/ask/practice', () => {
     verdicts.push('ABUSE');
     modelAnswers('Excuse me? No.');
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ reply: "Excuse me? No. We're done here.", ended: true });
+    expect(await res.json()).toMatchObject({ ended: true });
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
     fake.docs('practiceSessions').set('r1', SAVED);
@@ -240,7 +240,9 @@ describe('POST /api/portal/ask/practice', () => {
     fake.docs('practiceSessions').set('r1', SAVED);
     modelAnswers('Where is that from?');
     await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, { role: 'rep', text: "It's 45 dollars." }] }));
-    expect(sentBody(1).messages.at(-1).content).toContain('the rep just quoted $45 without showing you any screen');
+    expect(sentBody(1).messages.at(-1).content).toContain(
+      "the rep quoted $45 but hasn't shown you anything. You have no idea where that number comes from: ask them where it comes from"
+    );
 
     fake.docs('practiceSessions').set('r1', SAVED);
     modelAnswers('Okay.');
@@ -406,18 +408,34 @@ describe('POST /api/portal/ask/practice', () => {
     expect(practiceLogs()).toHaveLength(1);
   });
 
-  it('allows 150 practice calls a day on a counter of its own, then 429s', async () => {
+  it('counts model calls on a daily counter of its own (a rep line is 2: homeowner and judge), then 429s', async () => {
     const day = chicagoDayKey(new Date());
+    const used = () => fake.docs('askUsage').get(`r1_${day}_practice`)?.count;
     fake.docs('askUsage').set(`r1_${day}`, { uid: 'r1', count: 60 });
-    fake.docs('askUsage').set(`r1_${day}_practice`, { uid: 'r1', count: 149 });
-    modelAnswers('Yeah?');
+    fake.docs('askUsage').set(`r1_${day}_practice`, { uid: 'r1', count: 296 });
     // Ask's 60 are used up; practice still runs.
-    expect((await POST(req({ action: 'turn', ...SESSION, history: [] }))).status).toBe(200);
-    expect(fake.docs('askUsage').get(`r1_${day}_practice`)?.count).toBe(150);
+    modelAnswers('Uh huh.');
+    expect((await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).status).toBe(200);
+    expect(used()).toBe(298);
     expect(fake.docs('askUsage').get(`r1_${day}`)?.count).toBe(60);
+    modelAnswers('Yeah?');
+    expect((await POST(req({ action: 'turn', history: [] }))).status).toBe(200);
+    expect(used()).toBe(299);
 
-    const res = await POST(req({ action: 'turn', ...SESSION, history: [] }));
+    // One call left: a rep line needs two, so it's refused and nothing is counted or called.
+    fetchMock.mockClear();
+    const res = await POST(req({ action: 'turn', sessionId: fake.docs('practiceSessions').get('r1')!.sessionId, history: PITCH }));
     expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe("That's today's practice limit. Back at it tomorrow.");
+    expect(used()).toBe(299);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the coach\'s format retry when the day has no calls left for it', async () => {
+    fake.docs('askUsage').set(`r1_${chicagoDayKey(new Date())}_practice`, { uid: 'r1', count: 299 });
+    modelAnswers(`${coach(3)}\nHonesty flags: extra.`);
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
+    expect(res.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

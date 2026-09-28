@@ -12,11 +12,18 @@ export const dynamic = 'force-dynamic';
 
 const LIMIT = 100;
 
-/** "Maria Garcia, voice Kore" from a session's picks; null for sessions logged before picks were kept. */
+/**
+ * "Maria Garcia, voice Kore · Spectrum $91 · kids yelling; cooking" from a
+ * session's picks; null for sessions logged before picks were kept.
+ */
 function homeownerLabel(value: unknown): string | null {
-  const picks = value as { name?: unknown; voice?: unknown } | null | undefined;
+  const picks = value as { name?: unknown; voice?: unknown; provider?: unknown; bill?: unknown; details?: unknown } | null | undefined;
   if (!picks || typeof picks.name !== 'string' || !picks.name) return null;
-  return typeof picks.voice === 'string' && picks.voice ? `${picks.name}, voice ${picks.voice}` : picks.name;
+  const who = typeof picks.voice === 'string' && picks.voice ? `${picks.name}, voice ${picks.voice}` : picks.name;
+  const provider = typeof picks.provider === 'string' ? picks.provider : '';
+  const bill = typeof picks.bill === 'number' ? `$${picks.bill}/mo` : '';
+  const details = Array.isArray(picks.details) ? picks.details.filter((d): d is string => typeof d === 'string').join('; ') : '';
+  return [who, [provider, bill].filter(Boolean).join(' '), details].filter(Boolean).join(' · ');
 }
 
 /** The Result line of the coach's feedback, for sessions logged before it was kept on its own. */

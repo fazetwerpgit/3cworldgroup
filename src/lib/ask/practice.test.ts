@@ -21,6 +21,7 @@ import {
   voicePool,
   VOICE_BOOK,
   OUT_OF_PATIENCE,
+  soundsLikeGoodbye,
 } from './practice';
 
 // Practice's pure pieces: one seed is one homeowner (page and server agree),
@@ -130,8 +131,13 @@ describe('readCustomerReply', () => {
     expect(readCustomerReply('Hi, can I help you?', 3, null)).toEqual({ text: 'Hi, can I help you?', ended: false, patience: 3 });
   });
 
-  it('closes the door on abuse, keeping what the homeowner said', () => {
-    expect(readCustomerReply('Excuse me? No.', 4, 'abuse')).toEqual({ text: "Excuse me? No. We're done here.", ended: true, patience: 0 });
+  it('closes the door on abuse, keeping what the homeowner said and adding a closing that varies', () => {
+    const closes = ['Excuse me?', 'Wow.', 'No.', 'Seriously?'].map((line) => readCustomerReply(line, 4, 'abuse'));
+    for (const close of closes) expect(close).toMatchObject({ ended: true, patience: 0 });
+    expect(closes[0].text.startsWith('Excuse me? ')).toBe(true);
+    expect(new Set(closes.map((close) => close.text.split(' ').slice(-2).join(' '))).size).toBeGreaterThan(1);
+    // A homeowner who already said goodbye keeps their own words.
+    expect(readCustomerReply('Wow. Get off my porch.', 4, 'abuse').text).toBe('Wow. Get off my porch.');
   });
 
   it('ends on a plain goodbye even without [END]', () => {
@@ -139,8 +145,24 @@ describe('readCustomerReply', () => {
     expect(readCustomerReply("I'm gonna shut the door now.", 3, 'weak').ended).toBe(true);
     expect(readCustomerReply('Goodnight.', 3, 'ok').ended).toBe(true);
     expect(readCustomerReply('Bye.', 3, 'ok').ended).toBe(true);
+    expect(readCustomerReply("Look, I'm not interested.", 3, 'weak').ended).toBe(true);
+    expect(readCustomerReply('I think I\'m okay, thanks. You have a good afternoon now.', 3, 'ok').ended).toBe(true);
     expect(readCustomerReply('Who are you with?', 3, 'ok').ended).toBe(false);
     expect(readCustomerReply("Alright, Saturday works. Let's do it. [END]", 3, 'ok').ended).toBe(true);
+  });
+
+  it('never ends on a goodbye word inside a longer line or a question', () => {
+    for (const line of [
+      "I'm not closing the door on it, I just need to ask my wife.",
+      'Honestly I\'d love to say bye to Xfinity. What\'s the next step?',
+      "Good night and day difference if it's real.",
+      'Would you guys take care of returning the Spectrum box?',
+      'Bye-bye data caps, huh?',
+      "Okay, but who's gonna take care of the setup?",
+    ]) {
+      expect(soundsLikeGoodbye(line)).toBe(false);
+      expect(readCustomerReply(line, 4, 'ok').ended).toBe(false);
+    }
   });
 
   it('at 0 keeps a goodbye but turns anything else, even a yes, into the out-of-patience line', () => {
@@ -175,10 +197,22 @@ describe('the line judge', () => {
       ],
       customer
     );
+    expect(text).toContain('Earlier:\nHomeowner: Hi.\nRep: Old line.');
     expect(text).toContain('The homeowner just said: "What does it cost?"');
     expect(text).toContain('The price screen shown to the homeowner says $75 a month.');
     expect(text).toContain('(shows the homeowner the price screen)\n"It\'s $45."');
-    expect(text).not.toContain('Old line.');
+    expect(text.slice(text.indexOf('The rep now:'))).not.toContain('Old line.');
+  });
+
+  it('tells the judge when the door just opened, so an opener reads as one', () => {
+    const text = lineToJudge(
+      [
+        { role: 'customer', text: "I'm kind of in the middle of something." },
+        { role: 'rep', text: "Hi, I'm Jordan with 3C. T-Mobile Fiber just came to your street." },
+      ],
+      practiceCustomer('happy-spectrum', 1)
+    );
+    expect(text.startsWith('The homeowner just opened the door.')).toBe(true);
   });
 });
 
@@ -192,7 +226,7 @@ describe('priceNote', () => {
       '[Note only you know: the rep just said $45, but the screen they showed you said $60.]'
     );
     expect(priceNote([hi, { role: 'rep', text: "It's 45 dollars." }], customer)).toBe(
-      '[Note only you know: the rep just quoted $45 without showing you any screen.]'
+      "[Note only you know: the rep quoted $45 but hasn't shown you anything. You have no idea where that number comes from: ask them where it comes from before you react to it.]"
     );
   });
 
@@ -216,6 +250,17 @@ describe('feedbackProblem', () => {
     expect(feedbackProblem(good.replace(/Fix next time: .*\n/, ''))).toMatch(/missing|out of order/);
     expect(feedbackProblem(good.replace('No sale', 'Maybe'))).toMatch(/Result/);
     expect(feedbackProblem(good.replace('What bugs you most about it?', 'It\'s $60 a month'))).toMatch(/dollar/);
+    expect(feedbackProblem(good.replace('- "Who\'s your internet with?"', '- The standard opener landed fine.'))).toMatch(/quote/);
+    expect(feedbackProblem(good.replace('- "Who\'s your internet with?"', '- Nothing worked here.'))).toBeNull();
+  });
+
+  it('asks for a retry past 130 words', () => {
+    const padded = (words: number) => good.replace('Ask about the bill.', `Ask ${'more '.repeat(words)}about the bill.`);
+    const count = (text: string) => text.split(/\s+/).filter(Boolean).length;
+    const at130 = padded(130 - count(good));
+    expect(count(at130)).toBe(130);
+    expect(feedbackProblem(at130)).toBeNull();
+    expect(feedbackProblem(padded(131 - count(good)))).toBe('over 130 words');
   });
 });
 

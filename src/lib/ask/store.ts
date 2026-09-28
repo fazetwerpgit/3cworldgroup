@@ -6,7 +6,7 @@ import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 //   knowledgeNotes/{id}        the owner's notes
 //   askLog/{id}                one doc per exchange (never the photo)
 //   askUsage/{uid}_{day}       questions a rep asked on a Chicago day
-//   askUsage/{uid}_{day}_practice   Practice model calls that day (its own count)
+//   askUsage/{uid}_{day}_practice   Practice model calls that day (its own count: homeowner, line judge, coach)
 //   askUsage/{uid}_{day}_practice_voice   Practice lines spoken by the TTS voice that day
 //   practiceLog/{id}           one doc per finished Practice (with its feedback)
 //   practiceSessions/{uid}     the rep's current Practice: who is behind the door (hidden from the rep)
@@ -16,8 +16,12 @@ export const ASK_USAGE = 'askUsage';
 export const ASK_DAILY_LIMIT = 60;
 export const PRACTICE_LOG = 'practiceLog';
 export const PRACTICE_SESSIONS = 'practiceSessions';
-/** Homeowner replies and feedback both count: each is a model call. */
-export const PRACTICE_DAILY_LIMIT = 150;
+/**
+ * Practice model calls a rep may make in a day: a knock is 1, each rep line 2
+ * (the homeowner and the line judge), feedback 1 (2 with a format retry).
+ * About 150 lines of pitching.
+ */
+export const PRACTICE_DAILY_LIMIT = 300;
 /** Homeowner lines read aloud by the TTS voice: at most one per homeowner line, plus a few replays. */
 export const PRACTICE_VOICE_DAILY_LIMIT = 150;
 
@@ -56,9 +60,13 @@ export function takeDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: 
   return takeDaily(db, uid, now, '', ASK_DAILY_LIMIT);
 }
 
-/** Same for Practice, on its own counter: practicing never uses up Ask questions. */
-export function takeDailyPractice(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
-  return takeDaily(db, uid, now, '_practice', PRACTICE_DAILY_LIMIT);
+/**
+ * Counts `calls` Practice model calls against the rep's day, on its own
+ * counter (practicing never uses up Ask questions); false, and nothing
+ * counted, when they don't all fit under PRACTICE_DAILY_LIMIT.
+ */
+export function takeDailyPractice(db: FirebaseFirestore.Firestore, uid: string, now: Date, calls: number): Promise<boolean> {
+  return takeDaily(db, uid, now, '_practice', PRACTICE_DAILY_LIMIT, calls);
 }
 
 /** Practice's spoken lines, on a counter of their own so talk mode never eats into practice replies. */
@@ -71,15 +79,16 @@ async function takeDaily(
   uid: string,
   now: Date,
   suffix: string,
-  limit: number
+  limit: number,
+  count = 1
 ): Promise<boolean> {
   const day = chicagoDayKey(now);
   const ref = db.collection(ASK_USAGE).doc(`${uid}_${day}${suffix}`);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const used = snap.exists ? Number(snap.get('count')) || 0 : 0;
-    if (used >= limit) return false;
-    tx.set(ref, { uid, day, count: used + 1, updatedAt: now });
+    if (used + count > limit) return false;
+    tx.set(ref, { uid, day, count: used + count, updatedAt: now });
     return true;
   });
 }

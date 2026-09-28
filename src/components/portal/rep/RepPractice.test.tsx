@@ -149,19 +149,19 @@ describe('RepPractice', () => {
 
   it('at the daily limit: back to Knock with the reason, and no Try again', async () => {
     await render();
-    practiceAnswers.push(json({ error: "That's 150 practice replies today, the daily limit." }, 429));
+    practiceAnswers.push(json({ error: "That's today's practice limit. Back at it tomorrow." }, 429));
     await click('Knock');
-    expect(text()).toContain("That's 150 practice replies today");
+    expect(text()).toContain("That's today's practice limit");
     expect(button('Knock')).toBeDefined();
     expect(button('Try again')).toBeUndefined();
     expect(container.querySelector('textarea')).toBeNull();
 
     replies(door('Hi?'));
     await click('Knock');
-    practiceAnswers.push(json({ error: "That's 150 practice replies today, the daily limit." }, 429));
+    practiceAnswers.push(json({ error: "That's today's practice limit. Back at it tomorrow." }, 429));
     await type('Hello there.');
     await click('Send');
-    expect(text()).toContain("That's 150 practice replies today");
+    expect(text()).toContain("That's today's practice limit");
     expect(button('Try again')).toBeUndefined();
   });
 
