@@ -22,6 +22,8 @@ import {
   VOICE_BOOK,
   OUT_OF_PATIENCE,
   soundsLikeGoodbye,
+  unbackedClaims,
+  stripSentences,
   ABUSE_CLOSES,
 } from './practice';
 
@@ -97,6 +99,14 @@ describe('practiceCustomer', () => {
         if (persona.providers) expect(persona.providers).toContain(customer.provider);
       }
     }
+  });
+
+  it('keeps a voice out of a tone where it read as the other gender', () => {
+    const persona = (id: string) => PERSONAS.find((p) => p.id === id)!;
+    expect(voicePool(persona('elderly'))).toContain('Pulcherrima');
+    expect(voicePool(persona('happy-spectrum'))).not.toContain('Pulcherrima');
+    expect(voicePool(persona('skeptic'))).not.toContain('Kore');
+    expect(voicePool(persona('elderly'))).not.toContain('Vindemiatrix');
   });
 
   it('gives the older homeowner only older voices, and busy parents both moms and dads', () => {
@@ -319,16 +329,46 @@ describe('feedbackSections', () => {
   });
 });
 
+describe('unbackedClaims', () => {
+  const turns = [
+    { role: 'customer' as const, text: 'Hi, can I help you?' },
+    { role: 'rep' as const, text: "Hi, I'm Toby with 3C. Who do you have for internet?" },
+    { role: 'customer' as const, text: "Spectrum. We're happy with it, thanks." },
+    { role: 'rep' as const, text: 'Totally fair. Has the bill gone up at all?' },
+    { role: 'customer' as const, text: 'It has, twice this year.' },
+  ];
+  const card = (fix: string) =>
+    `Score: 6/10\nResult: No sale\nWhat worked:\n- "Who do you have for internet?" opened it.\nFix next time: ${fix}\nTry this line: "What would fix that for you?"`;
+
+  it('catches pain the homeowner never said, and quotes nobody said', () => {
+    expect(unbackedClaims(card('They mentioned their work video calls freeze.'), turns)).toEqual(['They mentioned their work video calls freeze.']);
+    expect(unbackedClaims(card('You said the bill crept up.'), turns)).toEqual(['You said the bill crept up.']);
+    expect(unbackedClaims(card('She said "my calls drop all the time."'), turns)).toHaveLength(1);
+    expect(unbackedClaims(card('Tie it to that.').replace('"Who do you have for internet?"', '"Fiber is way faster"'), turns)).toHaveLength(1);
+  });
+
+  it('lets through what was said, an answer to the rep\'s question, and the coach\'s own Try line', () => {
+    expect(unbackedClaims(card('The homeowner mentioned the bill went up twice.'), turns)).toEqual([]);
+    expect(unbackedClaims(card('When the homeowner said "It has, twice this year," tie fiber to that.'), turns)).toEqual([]);
+    expect(unbackedClaims(card('You asked who they have for internet.'), turns)).toEqual([]);
+  });
+
+  it('cuts the made-up sentence and keeps the rest', () => {
+    const fb = card('Ask about the bill. They mentioned their work video calls freeze.');
+    expect(stripSentences(fb, unbackedClaims(fb, turns))).toBe(card('Ask about the bill.'));
+  });
+});
+
 describe('enforceResult', () => {
   const feedback = 'Score: 3/10\nResult: Walked away the right way\nWhat worked:\n- "Hi"';
 
   it('turns "walked away" into No sale for a homeowner who could be sold', () => {
-    expect(enforceResult(feedback, true)).toBe('Score: 3/10\nResult: No sale\nWhat worked:\n- "Hi"');
-    expect(enforceResult('Score: 8/10\nResult: Sale', true)).toBe('Score: 8/10\nResult: Sale');
+    expect(enforceResult(feedback, { walkAway: false, sale: true })).toBe('Score: 3/10\nResult: No sale\nWhat worked:\n- "Hi"');
+    expect(enforceResult('Score: 8/10\nResult: Sale', { walkAway: false, sale: true })).toBe('Score: 8/10\nResult: Sale');
   });
 
   it('keeps it for the homeowner who should not buy', () => {
-    expect(enforceResult(feedback, false)).toBe(feedback);
+    expect(enforceResult(feedback, { walkAway: true, sale: true })).toBe(feedback);
   });
 });
 

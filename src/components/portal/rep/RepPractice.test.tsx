@@ -30,7 +30,9 @@ function replies(...bodies: unknown[]) {
 }
 
 const isVoice = (call: unknown[]) => String(call[0]).endsWith('/voice');
-const practiceCalls = () => fetchMock.mock.calls.filter((call) => !isVoice(call));
+const isSound = (call: unknown[]) => String(call[0]).startsWith('/sounds/');
+const practiceCalls = () => fetchMock.mock.calls.filter((call) => !isVoice(call) && !isSound(call));
+const soundCalls = () => fetchMock.mock.calls.filter(isSound).map((call) => String(call[0]));
 const voiceCalls = () => fetchMock.mock.calls.filter(isVoice).map((call) => JSON.parse(call[1].body as string));
 const sent = (call: number) => JSON.parse(practiceCalls()[call][1].body as string);
 const button = (label: string) =>
@@ -58,7 +60,9 @@ async function render(canPick = false) {
 
 const CARD = 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.';
 /** The knock's answer: the door opens and the session starts; the page learns nothing else. */
-const door = (reply: string) => ({ reply, ended: false, sessionId: 's1' });
+/** The homeowner's reply, and whether it ended the door. */
+const says = (text: string, ended = false) => ({ lines: [{ speaker: 'homeowner', text }], ended });
+const door = (text: string) => ({ ...says(text), sessionId: 's1', ring: false, ambient: null });
 
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
@@ -66,6 +70,7 @@ beforeEach(() => {
   practiceAnswers = [];
   voiceAnswers = [];
   fetchMock.mockImplementation(async (url: string) => {
+    if (url.startsWith('/sounds/')) return new Response('', { status: 404 });
     const next = (url.endsWith('/voice') ? voiceAnswers : practiceAnswers).shift();
     return next ?? new Response('', { status: 503 });
   });
@@ -103,7 +108,7 @@ describe('RepPractice', () => {
     expect(container.querySelector('textarea')).not.toBeNull();
 
     replies(
-      { reply: 'Deal, Thursday works.', ended: true },
+      says('Deal, Thursday works.', true),
       { id: 'p1', feedback: 'This was: Price shopper\nScore: 8/10\nResult: Sale\nWhat worked:\n- "Hi, I am with 3C."', score: 8 }
     );
     await type('Hi, I am with 3C.');
@@ -138,7 +143,7 @@ describe('RepPractice', () => {
     replies(door('Yeah?'));
     await click('Knock');
     expect(text()).not.toContain('Order screen');
-    replies({ card: CARD }, { reply: 'Seventy-five, huh. Okay.', ended: false });
+    replies({ card: CARD }, says('Seventy-five, huh. Okay.'));
     await click('Price');
     expect(sent(1)).toEqual({ action: 'price', sessionId: 's1' });
     expect(sent(2)).toMatchObject({ action: 'turn', sessionId: 's1' });
@@ -197,12 +202,25 @@ describe('RepPractice', () => {
         const data = new Float32Array(length);
         return { duration: length / rate, getChannelData: () => data };
       }
+      createGain() {
+        const param = { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} };
+        return { gain: param, connect: (node: unknown) => node };
+      }
+      createBiquadFilter() {
+        return { type: '', frequency: { value: 0 }, Q: { value: 0 }, connect: (node: unknown) => node };
+      }
+      createWaveShaper() {
+        return { curve: null, connect: (node: unknown) => node };
+      }
+      decodeAudioData() {
+        return Promise.reject(new Error('no sounds in tests'));
+      }
       createBufferSource() {
         const started = this.started;
         return {
           buffer: null as { getChannelData: () => Float32Array } | null,
           onended: null,
-          connect() {},
+          connect: (node: unknown) => node,
           stop() {},
           start(at = 0) {
             started.push({ at, samples: [...(this.buffer?.getChannelData() ?? [])] });
@@ -286,9 +304,12 @@ describe('RepPractice', () => {
     // The line shows as its voice starts: the chunks play back to back on the same context, a short lead in.
     expect(text()).toContain('Hello, dear?');
     expect(contexts).toHaveLength(1);
+    // At a door that opened: the knock (or bell) in the tap, the door opening, and the voice after it.
+    expect(soundCalls()[0]).toMatch(/^\/sounds\/practice\/(?:knock|doorbell)\.mp3$/);
+    expect(soundCalls()).toContain('/sounds/practice/door-open.mp3');
     expect(contexts[0].started.slice(1)).toEqual([
-      { at: 0.25, samples: [0.5] },
-      { at: 0.25 + 1 / 24_000, samples: [-0.5] },
+      { at: 0.85, samples: [0.5] },
+      { at: 0.85 + 1 / 24_000, samples: [-0.5] },
     ]);
     // The phone's own voice stays quiet.
     expect(spoken).toHaveLength(1);
@@ -300,7 +321,7 @@ describe('RepPractice', () => {
     );
     expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Hi, I am with 3C.');
     // The voice fails this time (no answer queued: 503): the phone's own voice reads the line.
-    replies({ reply: 'Oh?', ended: false });
+    replies(says('Oh?'));
     await click('Listening');
     expect(sent(1).history.at(-1)).toEqual({ role: 'rep', text: 'Hi, I am with 3C.' });
     expect(spoken.at(-1)?.text).toBe('Oh?');
@@ -314,7 +335,7 @@ describe('RepPractice', () => {
     // Talk off: no voice is fetched at all.
     await click('Talk on');
     const voices = voiceCalls().length;
-    replies({ reply: 'Hm.', ended: false });
+    replies(says('Hm.'));
     await type('Quick question.');
     await click('Send');
     expect(text()).toContain('Hm.');
@@ -331,7 +352,7 @@ describe('RepPractice', () => {
     await render();
     replies(door('Hi?'));
     await click('Knock');
-    replies({ reply: 'Okay.', ended: false }, { id: 'p2', feedback: 'This was: Renter\nScore: 4/10\nResult: No sale', score: 4 });
+    replies(says('Okay.'), { id: 'p2', feedback: 'This was: Renter\nScore: 4/10\nResult: No sale', score: 4 });
     await type('Hi there.');
     await click('Send');
     await click('End');

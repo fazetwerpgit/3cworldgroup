@@ -1,4 +1,5 @@
 import type { NoteDraft } from './notes';
+import type { Ambient, BeatKind, PracticeLine } from './practiceDoor';
 
 // Ask 3C Practice: the rep pitches, the model plays a homeowner at the door,
 // then a coach grades the pitch against the owner's playbook notes. Shared by
@@ -26,22 +27,34 @@ export type PracticeEndedBy = 'homeowner' | 'rep';
 export interface PracticeTurn {
   role: PracticeRole;
   text: string;
+  /** Who on the homeowner's side said it, when not the homeowner: the spouse who walked up, or the kid who answered. */
+  speaker?: 'spouse' | 'kid';
 }
 
 /** POST /api/portal/ask/practice {action:'turn'} answers 200 with this. */
 export interface PracticeTurnReply {
-  reply: string;
+  /** The homeowner's reply, by who said it (the spouse can join in). */
+  lines: PracticeLine[];
   /** The homeowner closed the door or agreed to sign up. */
   ended: boolean;
+  /** How the door shut, for the sound: slammed on abuse or when patience ran out. */
+  close?: 'slam' | 'shut';
+  /** An interruption on this line (the phone rings...), for the sound. */
+  beat?: BeatKind;
 }
 
 /**
  * The knock (a turn with no lines yet) also starts the session. The page gets
- * only its id: nothing it holds before the feedback tells which persona it is
- * (the voice is spoken server side; the price card comes on Pull up price).
+ * its id and only what a rep at the door would notice (a Ring camera instead
+ * of an open door, what they hear inside), nothing that tells which persona it
+ * is: the voice is spoken server side; the price card comes on Pull up price.
  */
 export interface PracticeKnockReply extends PracticeTurnReply {
   sessionId: string;
+  /** They only talk through a Ring doorbell camera. */
+  ring: boolean;
+  /** The sound from inside (Talk on). */
+  ambient: Ambient | null;
 }
 
 /** POST /api/portal/ask/practice {action:'price'} answers 200 with this: the door's order screen card. */
@@ -63,6 +76,8 @@ export interface PracticeLogView {
   persona: string;
   /** "Maria Garcia, voice Kore · Spectrum $91/mo · kids yelling" when the session recorded its picks. */
   homeowner: string | null;
+  /** "a kid answered the door", "the phone rang mid-pitch"; null for a plain door. */
+  door: string | null;
   result: string | null;
   score: number | null;
   feedback: string;
@@ -85,7 +100,7 @@ export const PERSONA_IDS = [
 export type PersonaId = (typeof PERSONA_IDS)[number];
 export type PersonaChoice = PersonaId | 'surprise';
 
-type Gender = 'f' | 'm';
+export type Gender = 'f' | 'm';
 export type VoiceAge = 'young' | 'adult' | 'older';
 
 export const GEMINI_VOICES = [
@@ -98,12 +113,38 @@ export type GeminiVoice = (typeof GEMINI_VOICES)[number];
 /**
  * Every Gemini prebuilt voice, classified by listening checks rather than by
  * name (9/28): one neutral line per voice, its median pitch measured, and three
- * independent reads of gender and age by an audio model. Two voices differ
- * from what their names suggest (Fenrir reads male, Pulcherrima female). No
+ * independent reads of gender and age by an audio model, on 2.5 flash TTS.
+ * The 3.8 model we speak with shifts some of them with the tone tags: see
+ * WRONG_GENDER_ON, which the pools also go by. No
  * voice sounds over ~47 on a neutral line; directed "a kind, retired older
  * woman/man", the most mature ones below all read 68-75, so the older
  * homeowner is those voices plus that direction.
  */
+export type ToneKind = 'elderly' | 'rushed' | 'wary' | 'polite' | 'child';
+
+/**
+ * Where a voice read as the other gender once the 3.8 TTS model spoke it with
+ * the tone tags we send (9/28: four gender reads per line by an audio model,
+ * lines in each tone below; the same line can come out differently run to
+ * run, so one bad run of 2+ wrong reads out of 4 is enough to leave it out).
+ * Pulcherrima only reads as a woman with the elderly tags; Vindemiatrix, which
+ * read female on 2.5, read male on two of three tones.
+ */
+export const WRONG_GENDER_ON: Partial<Record<GeminiVoice, readonly ToneKind[]>> = {
+  Pulcherrima: ['rushed', 'wary', 'polite'],
+  Vindemiatrix: ['elderly', 'rushed', 'wary', 'polite'],
+  Kore: ['wary', 'polite'],
+  Aoede: ['wary'],
+  Autonoe: ['wary'],
+  Fenrir: ['elderly', 'rushed', 'polite'],
+  Puck: ['elderly'],
+};
+
+/** Whether a voice reads as its own gender in this tone. */
+export function voiceFits(voice: GeminiVoice, tone: ToneKind): boolean {
+  return !WRONG_GENDER_ON[voice]?.includes(tone);
+}
+
 export const VOICE_BOOK: Record<GeminiVoice, { gender: Gender; age: VoiceAge }> = {
   Zephyr: { gender: 'f', age: 'young' }, // f0 209 Hz, heard ~31
   Puck: { gender: 'm', age: 'young' }, // f0 154 Hz, heard ~33
@@ -163,6 +204,8 @@ export interface Persona {
   voiceAges: readonly VoiceAge[];
   /** How the TTS voice delivers every line: the words of its [tag] ("tired, rushed"). */
   tone: readonly string[];
+  /** Which checked tone that is closest to, for picking voices that read right in it. */
+  toneKind: ToneKind;
   /** One or two are drawn per session: what's going on at this door right now. */
   details: readonly string[];
   /** When set, {provider} in the texts is one of these, drawn per session. */
@@ -191,6 +234,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 500', price: 65 },
     voiceAges: ['adult', 'older'],
     tone: ['polite', 'guarded', 'wants to get back inside'],
+    toneKind: 'polite',
     details: [
       "you were in the middle of watching a game",
       "you have a coffee mug in your hand",
@@ -218,6 +262,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 1 Gig', price: 70 },
     voiceAges: ['young', 'adult'],
     tone: ['tired', 'rushed', 'distracted'],
+    toneKind: 'rushed',
     details: [
       "the kids are yelling in the background",
       "a pot is about to boil over on the stove",
@@ -247,6 +292,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 500', price: 55 },
     voiceAges: ['adult', 'older'],
     tone: ['suspicious', 'short', 'wary'],
+    toneKind: 'wary',
     details: [
       "you just got off a night shift and were trying to sleep",
       "your doorbell camera is recording",
@@ -275,6 +321,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 500', price: 75 },
     voiceAges: ['young', 'adult'],
     tone: ['blunt', 'matter-of-fact'],
+    toneKind: 'polite',
     details: [
       "you were paying bills at the kitchen table",
       "you have your laptop open to a budget spreadsheet",
@@ -302,6 +349,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 1 Gig', price: 65 },
     voiceAges: ['young', 'adult'],
     tone: ['friendly', 'interested but hesitant'],
+    toneKind: 'polite',
     details: [
       "you're between work calls",
       "a delivery driver just dropped off a package",
@@ -329,6 +377,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 300', price: 50 },
     voiceAges: ['older'],
     tone: ['elderly', 'kind', 'slow', 'careful'],
+    toneKind: 'elderly',
     details: [
       "your little dog is yapping behind you",
       "you were watching your afternoon show",
@@ -357,6 +406,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 300', price: 50 },
     voiceAges: ['young'],
     tone: ['relaxed', 'friendly', 'young'],
+    toneKind: 'polite',
     details: [
       "music is playing inside",
       "you were gaming and your headset is still around your neck",
@@ -383,6 +433,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 1 Gig', price: 60 },
     voiceAges: ['young', 'adult'],
     tone: ['curious', 'open'],
+    toneKind: 'polite',
     details: [
       "you were cooking",
       "the kids are playing in the yard",
@@ -409,6 +460,7 @@ export const PERSONAS: readonly Persona[] = [
     screen: { plan: 'Fiber 1 Gig', price: 85 },
     voiceAges: ['young', 'adult', 'older'],
     tone: ['friendly', 'firm'],
+    toneKind: 'polite',
     details: [
       "you were working from home",
       "you just got back from the gym",
@@ -417,7 +469,7 @@ export const PERSONAS: readonly Persona[] = [
   },
 ];
 
-const NAMES = {
+export const NAMES = {
   f: ['Maria', 'Jennifer', 'Ashley', 'Keisha', 'Lauren', 'Priya', 'Megan', 'Rosa', 'Tanya', 'Nicole'],
   m: ['Mike', 'Chris', 'Marcus', 'Dave', 'Luis', 'Kevin', 'Brian', 'Andre', 'Tom', 'Raj'],
 };
@@ -461,7 +513,7 @@ export function isPracticeSeed(value: unknown): value is number {
 }
 
 /** mulberry32: a small seeded PRNG, so one seed is one customer on the page and the server alike. */
-function seededRandom(seed: number): () => number {
+export function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -503,9 +555,9 @@ export function isPersonaId(value: unknown): value is PersonaId {
   return PERSONA_IDS.includes(value as PersonaId);
 }
 
-/** The Gemini voices that fit a persona: its ages, both genders. */
+/** The Gemini voices that fit a persona: its ages, both genders, the ones that read right in its tone. */
 export function voicePool(persona: Persona): GeminiVoice[] {
-  return GEMINI_VOICES.filter((voice) => persona.voiceAges.includes(VOICE_BOOK[voice].age));
+  return GEMINI_VOICES.filter((voice) => persona.voiceAges.includes(VOICE_BOOK[voice].age) && voiceFits(voice, persona.toneKind));
 }
 
 /**
@@ -550,11 +602,11 @@ What would get you to yes: ${fill(persona.yes, customer)}`;
 }
 
 /** The homeowner's system prompt. No playbook notes: the homeowner knows only their own life. */
-export function buildCustomerPrompt(customer: PracticeCustomer, patienceLeft: number): string {
+export function buildCustomerPrompt(customer: PracticeCustomer, patienceLeft: number, doorBlock = ''): string {
   return `You are a homeowner in the US. A door-to-door sales rep selling T-Mobile Fiber home internet just knocked on your door. Play the homeowner below, straight and realistic, so the rep can practice.
 
 ${customerFacts(customer)}
-
+${doorBlock}
 How to play it:
 - Stay in character the whole time. Talk like a real person at the door: 1-3 short spoken sentences, casual, with contractions. Only the words you say out loud: no stage directions, no actions or descriptions in parentheses or asterisks, no lists, no narration.
 - Never help or coach the rep. Don't hint at what they should ask or say, don't point out what they missed or did wrong (never "you didn't even ask me...", "you should have..."), don't sum up their offer for them, don't set up easy openings. A real homeowner doesn't teach a salesperson how to sell; when the pitch is bad you just get shorter and more impatient.
@@ -623,6 +675,11 @@ export const ABUSE_CLOSES = [
   "Seriously? No. Leave, please.",
 ] as const;
 
+/** The same, when a kid answered the door. */
+export const KID_CLOSES = ["I'm not supposed to talk to strangers. Bye.", "I'm gonna shut the door now. Bye.", 'My mom says not to talk to people I don\'t know. Bye.'] as const;
+/** When a kid's door runs out of patience. */
+const KID_OUT_OF_PATIENCE = 'I have to go now. Bye.';
+
 /** [END], and any tag the model adds anyway ([OK], [P=3]...): never shown. */
 const TAG = /\[\s*(OK|WEAK|LIE|ABUSE|END|P\s*=\s*\d+)\s*\]/gi;
 
@@ -639,7 +696,8 @@ export function readCustomerReply(
   raw: string,
   patienceBefore: number,
   event: PracticeEvent | null,
-  seed = 0
+  seed = 0,
+  kid = false
 ): { text: string; ended: boolean; patience: number } {
   const marked = /\[\s*END\s*\]/i.test(raw);
   const patience = event ? nextPatience(patienceBefore, event) : patienceBefore;
@@ -649,11 +707,12 @@ export function readCustomerReply(
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/ +([.,!?])/g, '$1')
     .trim();
-  if (event === 'abuse') return { text: ABUSE_CLOSES[seed % ABUSE_CLOSES.length], ended: true, patience };
+  const closes = kid ? KID_CLOSES : ABUSE_CLOSES;
+  if (event === 'abuse') return { text: closes[seed % closes.length], ended: true, patience };
   const goodbye = soundsLikeGoodbye(text);
   if (patience === 0) {
     if (goodbye) return { text, ended: true, patience };
-    return { text: OUT_OF_PATIENCE, ended: true, patience };
+    return { text: kid ? KID_OUT_OF_PATIENCE : OUT_OF_PATIENCE, ended: true, patience };
   }
   return {
     text: text || (marked ? 'No thanks. Have a good one.' : 'Sorry, what was that?'),
@@ -749,16 +808,25 @@ const JUDGE_CONTEXT_LINES = 3;
  * after the door opens reads as one), the homeowner's last words, the price
  * screen so far, and the rep's latest line(s).
  */
-export function lineToJudge(turns: PracticeTurn[], customer: PracticeCustomer): string {
+export function lineToJudge(turns: PracticeTurn[], customer: PracticeCustomer, kid = false): string {
   const lastHomeowner = turns.findLastIndex((turn) => turn.role === 'customer');
+  let firstOfReply = lastHomeowner;
+  while (firstOfReply > 0 && turns[firstOfReply - 1].role === 'customer') firstOfReply -= 1;
   const shown = turns.some((turn) => turn.role === 'screen');
   const latest = turns.slice(lastHomeowner + 1);
-  const before = turns.slice(Math.max(0, lastHomeowner - JUDGE_CONTEXT_LINES), Math.max(0, lastHomeowner));
+  const before = turns.slice(Math.max(0, firstOfReply - JUDGE_CONTEXT_LINES), Math.max(0, firstOfReply));
+  const said = turns
+    .slice(firstOfReply, lastHomeowner + 1)
+    .map((turn) => (turn.speaker === 'spouse' ? `(their spouse) ${turn.text}` : turn.text))
+    .join(' ');
   return [
-    before.length
-      ? `Earlier:\n${before.map((turn) => `${turn.role === 'rep' ? 'Rep' : turn.role === 'screen' ? 'Screen' : 'Homeowner'}: ${turn.text}`).join('\n')}`
-      : 'The homeowner just opened the door.',
-    `The homeowner just said: "${turns[lastHomeowner]?.text ?? ''}"`,
+    ...(kid
+      ? [
+          'A child, about ten, answered the door; their parent is not home. Pitching to the child, or asking them for anything except when a parent will be home, is WEAK; anything creepy toward a child is ABUSE. Politely saying you will come back is OK.',
+        ]
+      : []),
+    before.length ? `Earlier:\n${transcriptText(before)}` : 'The homeowner just opened the door.',
+    `The homeowner just said: "${said}"`,
     shown ? `The price screen shown to the homeowner says $${customer.persona.screen.price} a month.` : 'No price screen has been shown yet.',
     `The homeowner pays $${customer.bill} a month now.`,
     'The rep now:',
@@ -796,8 +864,8 @@ const FEEDBACK_HEADINGS: Record<string, string> = {
 };
 
 /** The feedback as the rep gets it: who the homeowner was comes first (the rep didn't know until now). */
-export function revealFeedback(feedback: string, persona: Persona): string {
-  return `This was: ${persona.label}\n${feedback}`;
+export function revealFeedback(feedback: string, persona: Persona, doorSummary: string | null = null): string {
+  return `This was: ${persona.label}${doorSummary ? ` (${doorSummary})` : ''}\n${feedback}`;
 }
 
 /**
@@ -834,7 +902,8 @@ export function practiceScreenCard(persona: Persona): string {
 
 export function transcriptText(turns: PracticeTurn[]): string {
   const who = { rep: 'Rep', customer: 'Homeowner', screen: 'Screen' } as const;
-  return turns.map((turn) => `${who[turn.role]}: ${turn.text}`).join('\n');
+  const speaker = { spouse: 'Spouse', kid: 'Kid' } as const;
+  return turns.map((turn) => `${turn.speaker ? speaker[turn.speaker] : who[turn.role]}: ${turn.text}`).join('\n');
 }
 
 const COACH_RULES = `You are the sales coach for 3C World Group. 3C reps sell T-Mobile Fiber (T-Fiber) home internet door to door, and nothing else. Never suggest selling, offering or mentioning any other product or service.
@@ -908,12 +977,97 @@ export function feedbackProblem(feedback: string): string | null {
   return null;
 }
 
+const normalize = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[^a-z0-9$' ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+const STOP = new Set(
+  'the a an and or but so to of in on at for with that this it its is was are were be been you your yours i me my we our they them their he she his her about just really like get got have has had do does did not no yes what when how than then there here from'.split(' ')
+);
+const IRREGULAR: Record<string, string> = { went: 'go', gone: 'go', goes: 'go', said: 'say', paid: 'pay', pays: 'pay', froze: 'freez', frozen: 'freez' };
+/** A rough stem, enough to match "went up" to "gone up" and "freezes" to "freezing". */
+const stem = (word: string) => IRREGULAR[word] ?? word.replace(/(?:ing|ed|es|s)$/, '').replace(/e$/, '');
+const contentWords = (text: string) => normalize(text).split(' ').filter((word) => word.length > 2 && !STOP.has(word));
+
+// "you said", "the homeowner mentioned", "she told you", "they complained that"
+const ATTRIBUTION =
+  /\b(you|the homeowner|homeowner|the customer|she|he|they|the spouse|the wife|the husband)\s+(?:had\s+|already\s+|even\s+)?(said|say|mentioned|told you|told them|brought up|complained|admitted|explained|asked)\b(?:\s+(?:that|how))?\s*,?\s*(.*)$/i;
+const QUOTE = /["“]([^"”]{3,})["”]/g;
+
+/** Whether `claim` is something `said` backs: a quote word for word (ellipses allowed), a paraphrase by most of its words. */
+function backedBy(claim: string, said: string, quoted: boolean): boolean {
+  const all = normalize(said);
+  if (quoted) return claim.split(/\.\.\.|…/).every((part) => !normalize(part) || all.includes(normalize(part)));
+  const words = contentWords(claim);
+  if (words.length === 0) return true;
+  const have = new Set(all.split(' ').map(stem));
+  return words.filter((word) => have.has(stem(word))).length / words.length >= 0.6;
+}
+
+/**
+ * The sentences of the coach's feedback that put words in someone's mouth:
+ * a quote or a "you said" / "the homeowner mentioned" that the rep's or the
+ * homeowner's actual lines don't back. The Try this line is the coach's own
+ * words and isn't checked.
+ */
+export function unbackedClaims(feedback: string, turns: PracticeTurn[]): string[] {
+  const rep = turns.filter((turn) => turn.role === 'rep').map((turn) => turn.text).join(' \n ');
+  // A homeowner's "It has, twice" answers the rep's question before it: the question is part of what they said.
+  const homeowner = turns
+    .map((turn, index) => (turn.role === 'customer' ? `${turns[index - 1]?.role === 'rep' ? `${turns[index - 1].text} ` : ''}${turn.text}` : ''))
+    .filter(Boolean)
+    .join(' \n ');
+  const found: string[] = [];
+  for (const rawLine of feedback.split('\n')) {
+    const line = rawLine.trim();
+    const heading = /^([a-z ]+?)\s*:/i.exec(line)?.[1].toLowerCase() ?? '';
+    if (!line || ['score', 'result', 'try this line', 'this was'].includes(heading)) continue;
+    const inWhatWorked = /^[-•*]\s+/.test(line);
+    for (const sentence of line.replace(/^[a-z ]+:\s*/i, '').split(/(?<=[.!?])\s+(?=[A-Z"“])/)) {
+      const attribution = ATTRIBUTION.exec(sentence);
+      const byRep = attribution ? attribution[1].toLowerCase() === 'you' : inWhatWorked;
+      const said = byRep ? rep : homeowner;
+      const quotes = [...sentence.matchAll(QUOTE)].map((match) => match[1]);
+      // A quote without "the homeowner said" is the rep's words (the coach quotes the rep).
+      const quotesOk = quotes.every((quote) => backedBy(quote, attribution ? said : rep, true) || (!attribution && backedBy(quote, homeowner, true)));
+      const clauseOk = !attribution || quotes.length > 0 || backedBy(attribution[3], said, false);
+      if (!quotesOk || !clauseOk) found.push(sentence.trim());
+    }
+  }
+  return found;
+}
+
+/** The feedback without those sentences (a What worked bullet that loses its quote becomes "nothing to quote"). */
+export function stripSentences(feedback: string, sentences: string[]): string {
+  return feedback
+    .split('\n')
+    .map((line) => {
+      let kept = line;
+      for (const sentence of sentences) kept = kept.replace(sentence, '').replace(/\s{2,}/g, ' ');
+      if (/^\s*[-•*]\s*$/.test(kept)) return '- Nothing in this one to quote back.';
+      return kept.replace(/\s+$/, '');
+    })
+    .join('\n');
+}
+
 /** The coach's system prompt: rules, the playbook notes, then who the homeowner really was and how it ended. */
-export function buildFeedbackPrompt(notes: NoteDraft[], customer: PracticeCustomer, endedBy: PracticeEndedBy): string {
+export function buildFeedbackPrompt(
+  notes: NoteDraft[],
+  customer: PracticeCustomer,
+  endedBy: PracticeEndedBy,
+  door: { block: string; walkAway: boolean; sale: boolean } = { block: '', walkAway: !customer.persona.shouldBuy, sale: true }
+): string {
   const notesBlock = notes.length
     ? notes.map((note) => `=== ${note.title} ===\n${note.body}`).join('\n\n')
     : '(The playbook is not loaded yet. Coach from solid door-to-door sales sense, and never state T-Mobile facts.)';
-  const verdict = customer.persona.shouldBuy
+  const verdict = !door.sale
+    ? 'There was no sale to be had at this door. Result rule: "Walked away the right way" if the rep read the situation and left politely without pushing, otherwise "No sale". Never "Sale".'
+    : door.walkAway && customer.persona.shouldBuy
+      ? 'Result rule: "Sale" only if the homeowner agreed to an install date; "Walked away the right way" if the rep handled the situation below well and left politely; otherwise "No sale".'
+      : customer.persona.shouldBuy
     ? 'This homeowner could be sold with a good pitch. Result rule: "Sale" only if the homeowner agreed to an install date, otherwise "No sale". Never "Walked away the right way" for this homeowner, even if the rep left politely: a homeowner who closed the door on a weak pitch is "No sale".'
     : 'This homeowner should NOT buy. The right move was to qualify fast, thank them and leave politely: doing that quickly scores high, pushing on scores low. Result rule: "Walked away the right way" only if the rep found out they already have fiber and then left politely without pushing; if the rep kept pushing or the homeowner shut the door on them, "No sale".';
   const ending =
@@ -929,18 +1083,21 @@ ${notesBlock}
 === The homeowner the rep faced (the rep couldn't see this) ===
 Type: ${customer.persona.label}
 ${customerFacts(customer, false)}
-${verdict}
+${door.block ? `${door.block}\n` : ''}${verdict}
 How it ended: ${ending}`;
 }
 
 /**
- * The coach's feedback with its Result line held to the rule in code: a
- * homeowner who could be sold never earns "Walked away the right way" (a door
- * closed on a weak pitch is a No sale).
+ * The coach's feedback with its Result line held to the door's rules in code:
+ * a homeowner who could be sold never earns "Walked away the right way" (a
+ * door closed on a weak pitch is a No sale), and a door with no sale to be had
+ * (a kid answered, the landlord decides) never records a Sale.
  */
-export function enforceResult(feedback: string, shouldBuy: boolean): string {
-  if (!shouldBuy) return feedback;
-  return feedback.replace(/^(\s*result\s*:).*walked away.*$/im, '$1 No sale');
+export function enforceResult(feedback: string, rules: { walkAway: boolean; sale: boolean }): string {
+  let held = feedback;
+  if (!rules.walkAway) held = held.replace(/^(\s*result\s*:).*walked away.*$/im, '$1 No sale');
+  if (!rules.sale) held = held.replace(/^(\s*result\s*:)\s*sale\b.*$/im, '$1 No sale');
+  return held;
 }
 
 /**
@@ -954,10 +1111,12 @@ export function parsePracticeHistory(raw: unknown): PracticeTurn[] | null {
   for (const item of raw) {
     const role = (item as { role?: unknown } | null)?.role;
     const text = (item as { text?: unknown } | null)?.text;
+    const speaker = (item as { speaker?: unknown } | null)?.speaker;
     if ((role !== 'rep' && role !== 'customer' && role !== 'screen') || typeof text !== 'string') return null;
+    if (speaker !== undefined && (role !== 'customer' || (speaker !== 'spouse' && speaker !== 'kid'))) return null;
     const trimmed = text.trim();
     if (!trimmed || trimmed.length > (role === 'rep' ? MAX_REP_CHARS : MAX_CUSTOMER_CHARS)) return null;
-    turns.push({ role, text: trimmed });
+    turns.push(speaker ? { role, text: trimmed, speaker } : { role, text: trimmed });
   }
   return turns;
 }

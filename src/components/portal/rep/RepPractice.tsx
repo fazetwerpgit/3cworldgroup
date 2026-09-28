@@ -21,13 +21,14 @@ import {
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
+import type { Ambient, BeatKind, PracticeLine } from '@/lib/ask/practiceDoor';
 import { pickVoice, spokenText } from '@/lib/ask/practiceVoice';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
 import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
-import { openVoice, unlockVoicePlayer, type VoicePlayer } from './practiceAudio';
+import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type VoicePlayer } from './practiceAudio';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -54,6 +55,10 @@ interface Session {
   /** Who ended it; the coach grades the Result by it. */
   endedBy?: PracticeEndedBy;
   feedback: { text: string; score: number | null } | null;
+  /** The homeowner only talks through a Ring doorbell camera (from the knock). */
+  ring?: boolean;
+  /** The sound from inside the house (from the knock). */
+  ambient?: Ambient | null;
 }
 
 interface StoredSession extends Session {
@@ -66,6 +71,19 @@ type Busy = 'turn' | 'feedback' | null;
 type Retry = 'turn' | 'send' | 'feedback' | null;
 
 const REQUEST_TIMEOUT_MS = 60_000;
+/** The door-open sound plays out before the first line at the door. */
+const DOOR_OPEN_S = 0.6;
+const BEAT_SOUNDS: Record<BeatKind, PracticeEffect> = { phone: 'phone-buzz', kid: 'kid-whine', pot: 'pot-boil' };
+
+/** Who's talking, above a homeowner-side bubble. */
+const speakerLabel = (turn: PracticeTurn, ring: boolean) =>
+  turn.speaker === 'spouse' ? 'Spouse' : turn.speaker === 'kid' ? 'Kid' : ring ? 'Homeowner · Ring camera' : 'Homeowner';
+
+/** A reply line as a turn of the conversation: the homeowner's own lines carry no speaker. */
+const customerTurn = (line: PracticeLine): PracticeTurn =>
+  line.speaker === 'spouse' || line.speaker === 'kid'
+    ? { role: 'customer', text: line.text, speaker: line.speaker }
+    : { role: 'customer', text: line.text };
 /** Talk mode: this long without new words ends the rep's line and sends it. */
 const SILENCE_MS = 1600;
 /** And this long with no words at all gives up listening. */
@@ -89,13 +107,21 @@ export function readStoredPractice(uid: string): Session | null {
     return {
       sessionId: raw.sessionId,
       pick: isPersonaChoice(raw.pick) ? raw.pick : 'surprise',
-      turns: raw.turns.filter(
-        (turn) =>
-          turn && (turn.role === 'rep' || turn.role === 'customer' || turn.role === 'screen') && typeof turn.text === 'string'
-      ),
+      turns: raw.turns
+        .filter(
+          (turn) =>
+            turn && (turn.role === 'rep' || turn.role === 'customer' || turn.role === 'screen') && typeof turn.text === 'string'
+        )
+        .map((turn) =>
+          turn.role === 'customer' && (turn.speaker === 'spouse' || turn.speaker === 'kid')
+            ? { role: turn.role, text: turn.text, speaker: turn.speaker }
+            : { role: turn.role, text: turn.text }
+        ),
       ended: raw.ended === true,
       endedBy: raw.endedBy === 'homeowner' || raw.endedBy === 'rep' ? raw.endedBy : undefined,
       feedback: raw.feedback && typeof raw.feedback.text === 'string' ? raw.feedback : null,
+      ring: raw.ring === true,
+      ambient: raw.ambient === 'dog' || raw.ambient === 'kids' || raw.ambient === 'tv' || raw.ambient === 'kitchen' ? raw.ambient : null,
     };
   } catch {
     return null;
@@ -255,6 +281,7 @@ export function RepPractice({
     // Leaving Practice (the Ask tab, another page) silences the homeowner and the mic.
     if (active) return;
     stopSpeaking();
+    playerRef.current?.quiet();
     stopListening(false);
   }, [active, stopListening, stopSpeaking]);
 
@@ -263,6 +290,7 @@ export function RepPractice({
     if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
     return () => {
       stopSpeaking();
+      playerRef.current?.quiet();
       recognitionRef.current?.abort();
     };
   }, [stopSpeaking]);
@@ -273,6 +301,7 @@ export function RepPractice({
     const onVisible = () => {
       if (document.visibilityState !== 'visible') {
         stopSpeaking();
+        playerRef.current?.quiet();
         stopListening(false);
         return;
       }
@@ -339,26 +368,37 @@ export function RepPractice({
         ? { action: 'turn', history: [], ...(canPick ? { persona: current.pick } : {}) }
         : { action: 'turn', sessionId: current.sessionId, history: current.turns }
     );
-    if (result.ok && result.data.reply && (!knocked || result.data.sessionId)) {
-      const { reply, ended } = result.data;
+    const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
+    if (result.ok && lines.length && (!knocked || result.data.sessionId)) {
+      const { ended, close, beat } = result.data;
       const next: Session = {
         ...current,
-        ...(knocked ? { sessionId: result.data.sessionId ?? null } : {}),
-        turns: [...current.turns, { role: 'customer', text: reply }],
+        ...(knocked
+          ? { sessionId: result.data.sessionId ?? null, ring: result.data.ring === true, ambient: result.data.ambient ?? null }
+          : {}),
+        turns: [...current.turns, ...lines.map(customerTurn)],
         ended,
         endedBy: ended ? 'homeowner' : undefined,
       };
-      // With Talk on the bubble waits (orb showing) for the voice's first audio, then shows as it starts.
+      // With Talk on the bubbles wait (orb showing) for the first voice's first audio, then show as it starts.
       const player = playerRef.current;
-      const voice = talk && player && next.sessionId ? await openVoice(next.sessionId, reply) : null;
+      const first = talk && player && next.sessionId ? await openVoice(next.sessionId, lines[0].text) : null;
       setBusy(null);
       save(next);
-      // The rep started talking or typing meanwhile: the line shows, unspoken.
+      // The rep started talking or typing meanwhile: the lines show, unspoken.
       if (talk && speechRef.current === quiet) {
-        if (voice && player) void player.play(voice);
-        else speakFallback(reply);
+        if (player) {
+          player.setRing(next.ring === true);
+          if (knocked && !next.ring) {
+            player.effect('door-open');
+            player.ambient(next.ambient ?? null);
+          }
+          if (beat) player.effect(BEAT_SOUNDS[beat]);
+        }
+        if (first && player) void speakLines(player, first, lines, next, ended ? close ?? 'shut' : null);
+        else speakFallback(lines.map((line) => line.text).join(' '));
       } else {
-        void voice?.reader.cancel().catch(() => {});
+        void first?.reader.cancel().catch(() => {});
       }
       scrollDown('smooth');
       if (ended) await requestFeedback(next);
@@ -383,6 +423,28 @@ export function RepPractice({
       setFailed({ message: error, retry: retryable ? 'turn' : null });
     }
     scrollDown('smooth');
+  };
+
+  /**
+   * Plays a reply's voices one after another (the spouse chiming in after the
+   * homeowner), then shuts the door when the reply ended it.
+   */
+  const speakLines = async (
+    player: VoicePlayer,
+    first: OpenVoice,
+    lines: PracticeLine[],
+    current: Session,
+    close: 'slam' | 'shut' | null
+  ) => {
+    const quiet = speechRef.current;
+    await player.play(first, { delay: current.turns.length === lines.length && !current.ring ? DOOR_OPEN_S : 0 });
+    for (const line of lines.slice(1)) {
+      if (speechRef.current !== quiet || !current.sessionId) return;
+      const voice = await openVoice(current.sessionId, line.text);
+      if (!voice || speechRef.current !== quiet) return;
+      await player.queue(voice);
+    }
+    if (close && speechRef.current === quiet) player.closeDoor(current.ring ? null : close === 'slam' ? 'door-slam' : 'door-close');
   };
 
   const sendLine = (typed: string) => {
@@ -410,6 +472,8 @@ export function RepPractice({
     // iOS only plays sound a tap started: the audio element and the phone's voice are both unlocked here.
     if (talk) {
       unlockAudio();
+      // Knock or ring, at random: it says nothing about who answers.
+      playerRef.current?.effect(Math.random() < 0.5 ? 'knock' : 'doorbell');
       const unlock = new SpeechSynthesisUtterance(' ');
       unlock.volume = 0;
       window.speechSynthesis.speak(unlock);
@@ -435,6 +499,8 @@ export function RepPractice({
       return;
     }
     const next: Session = { ...session, ended: true, endedBy: 'rep' };
+    // The rep walks off: the door shuts behind them.
+    if (talk) playerRef.current?.closeDoor(session.ring ? null : 'door-close');
     save(next);
     void requestFeedback(next);
   };
@@ -461,6 +527,7 @@ export function RepPractice({
 
   const reset = () => {
     stopSpeaking();
+    playerRef.current?.quiet();
     stopListening(false);
     save(null);
     setChoice('surprise');
@@ -639,7 +706,7 @@ export function RepPractice({
             </li>
           ) : (
             <li key={index} className={pr.customer}>
-              <span className={pr.speaker}>Homeowner</span>
+              <span className={pr.speaker}>{speakerLabel(turn, session.ring === true)}</span>
               <p className={`${a.answer} ${a.answerText} ${pr.line}`}>{turn.text}</p>
             </li>
           )

@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       repName: typeof data.repName === 'string' ? data.repName : '',
       persona: typeof data.personaLabel === 'string' ? data.personaLabel : '',
       homeowner: homeownerLabel(data.homeowner),
+      door: typeof data.doorSummary === 'string' && data.doorSummary ? data.doorSummary : null,
       result: typeof data.result === 'string' && data.result ? data.result : resultOf(data.feedback),
       score: typeof data.score === 'number' ? data.score : null,
       feedback: typeof data.feedback === 'string' ? data.feedback : '',

@@ -549,6 +549,7 @@ function PracticeSessions() {
                 {expanded ? (
                   <div className={k.sessionBody}>
                     {row.homeowner ? <p className={k.qMeta}>Homeowner: {row.homeowner}</p> : null}
+                    {row.door ? <p className={k.qMeta}>At the door: {row.door}</p> : null}
                     <div className={k.aText}>
                       <PracticeFeedback text={row.feedback} />
                     </div>

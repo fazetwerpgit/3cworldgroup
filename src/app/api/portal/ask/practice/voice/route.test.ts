@@ -25,7 +25,7 @@ const fetchMock = vi.fn();
 let fake: ReturnType<typeof createFakeAskDb>;
 
 const LINE = "Xfinity. Why, what's this about?";
-const SAVED = { uid: 'r1', sessionId: 's1', persona: 'busy-parent', seed: 42, patience: 3, lastLine: LINE };
+const SAVED = { uid: 'r1', sessionId: 's1', persona: 'busy-parent', seed: 42, patience: 3, lastLines: [{ speaker: 'homeowner', text: LINE }] };
 const PCM_A = Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]);
 const PCM_B = Buffer.from([5, 0, 6, 0]);
 const PCM_TYPE = 'audio/l16; rate=24000; channels=1';
@@ -120,6 +120,29 @@ describe('POST /api/portal/ask/practice/voice', () => {
       expect.stringContaining('/models/gemini-3.8-flash-tts:streamGenerateContent'),
       expect.stringContaining('/models/gemini-3.8-flash-tts:generateContent'),
     ]);
+  });
+
+  it("speaks the spouse's line in the spouse's own voice and tone, and the kid's in the kid's", async () => {
+    const spouseLine = "We don't sign anything at the door.";
+    fake.docs('practiceSessions').set('r1', {
+      ...SAVED,
+      lastLines: [{ speaker: 'homeowner', text: LINE }, { speaker: 'spouse', text: spouseLine }],
+      door: { kind: 'standard', clock: '', kidVoice: null, surprise: { kind: 'spouse', atLine: 1, voice: 'Charon', name: 'Mike', objection: 'x' } },
+    });
+    fetchMock.mockResolvedValueOnce(streamed(PCM_A));
+    expect((await POST(req({ sessionId: 's1', text: spouseLine }))).status).toBe(200);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Charon');
+    expect(prompt()).toBe(`[direct, wary, protective] ${spouseLine}`);
+
+    fake.docs('practiceSessions').set('r1', {
+      ...SAVED,
+      lastLines: [{ speaker: 'kid', text: "My mom's not home." }],
+      door: { kind: 'kid', clock: '', kidVoice: 'Leda', surprise: null },
+    });
+    fetchMock.mockResolvedValueOnce(streamed(PCM_A));
+    await POST(req({ sessionId: 's1', text: "My mom's not home." }));
+    expect(prompt(1)).toBe("[child, about ten years old, shy, soft] My mom's not home.");
   });
 
   it('adds "losing patience" to the tag when the homeowner is nearly out', async () => {

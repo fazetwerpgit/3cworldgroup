@@ -58,6 +58,13 @@ const isJudge = (call: unknown[]) =>
   JSON.parse((call[1] as { body: string }).body).messages[0].content === LINE_JUDGE_PROMPT;
 const judgeCalls = () => fetchMock.mock.calls.filter(isJudge);
 
+/** A reply by the homeowner alone. */
+const says = (text: string, close?: 'slam' | 'shut') => ({
+  lines: [{ speaker: 'homeowner', text }],
+  ended: close !== undefined,
+  ...(close ? { close } : {}),
+});
+
 /** A coach answer in the exact shape (no format retry). */
 const coach = (score: number, result = 'No sale') =>
   `Score: ${score}/10\nResult: ${result}\nWhat worked:\n- "Hi, I'm with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"`;
@@ -125,7 +132,7 @@ describe('POST /api/portal/ask/practice', () => {
     modelAnswers("Fine, Thursday works. I'm in. [END]");
     const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reply: "Fine, Thursday works. I'm in.", ended: true });
+    expect(await res.json()).toEqual(says("Fine, Thursday works. I'm in.", 'shut'));
 
     const body = sentBody();
     expect(body.thinking).toEqual({ type: 'disabled' });
@@ -178,7 +185,7 @@ describe('POST /api/portal/ask/practice', () => {
     verdicts.push('WEAK');
     modelAnswers('Hmm.');
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ reply: 'Hmm.', ended: false });
+    expect(await res.json()).toEqual(says('Hmm.'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(4);
 
     // An answer that isn't one of the four words counts as weak.
@@ -191,20 +198,20 @@ describe('POST /api/portal/ask/practice', () => {
     verdicts.push('LIE');
     modelAnswers('Free? Nothing is free.');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ reply: 'Free? Nothing is free.', ended: false });
+    expect(await res.json()).toEqual(says('Free? Nothing is free.'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(1);
 
     // One more weak line: 0, and the server shuts the door.
     verdicts.push('WEAK');
     modelAnswers('Uh huh.');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
+    expect(await res.json()).toEqual(says("Look, I'm not interested. I've got to go.", 'slam'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
     // At 0 the door is shut whatever the homeowner says next.
     modelAnswers('Yeah, probably.');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
+    expect(await res.json()).toEqual(says("Look, I'm not interested. I've got to go.", 'slam'));
   });
 
   it('counts a line as fair when the judge itself fails', async () => {
@@ -213,10 +220,7 @@ describe('POST /api/portal/ask/practice', () => {
         ? new Response('down', { status: 503 })
         : modelResponse('Okay, go on.')
     );
-    expect(await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json()).toEqual({
-      reply: 'Okay, go on.',
-      ended: false,
-    });
+    expect(await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json()).toEqual(says('Okay, go on.'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(5);
   });
 
@@ -225,14 +229,14 @@ describe('POST /api/portal/ask/practice', () => {
     modelAnswers("Excuse me? We're done here. [END]");
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     // The server's close, picked by the session seed, whatever the model wrote.
-    expect(await res.json()).toEqual({ reply: ABUSE_CLOSES[42 % ABUSE_CLOSES.length], ended: true });
+    expect(await res.json()).toEqual(says(ABUSE_CLOSES[42 % ABUSE_CLOSES.length], 'slam'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
     fake.docs('practiceSessions').set('r1', SAVED);
     verdicts.push('WEAK');
     modelAnswers("I'm good, thanks. Have a nice day.");
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(await res.json()).toEqual({ reply: "I'm good, thanks. Have a nice day.", ended: true });
+    expect(await res.json()).toEqual(says("I'm good, thanks. Have a nice day.", 'shut'));
   });
 
   it('tells the homeowner, hidden, when the rep quotes a price the screen did not show, and counts it a lie', async () => {
@@ -273,15 +277,83 @@ describe('POST /api/portal/ask/practice', () => {
     expect(sentBody().messages.at(-1).content).toContain('(The rep holds up their phone and you read the screen yourself: Order screen (practice)');
   });
 
+  it('brings the spouse in on their line: a hidden note, their own lines, and "SPOUSE:" in the history after', async () => {
+    const door = {
+      kind: 'standard',
+      clock: 'Tuesday, 6:15 pm. It\'s dinnertime.',
+      kidVoice: null,
+      surprise: { kind: 'spouse', atLine: 1, voice: 'Charon', name: 'Mike', objection: "We don't sign anything at the door." },
+    };
+    fake.docs('practiceSessions').set('r1', { ...SAVED, door });
+    modelAnswers("Uh, hang on, this is my husband.\nSPOUSE: We don't sign anything at the door.");
+    const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({
+      lines: [
+        { speaker: 'homeowner', text: 'Uh, hang on, this is my husband.' },
+        { speaker: 'spouse', text: "We don't sign anything at the door." },
+      ],
+      ended: false,
+    });
+    const body = sentBody();
+    expect(body.messages.at(-1).content).toMatch(/walks up behind you and joins in.*SPOUSE:/);
+    expect(body.messages[0].content).toContain("It's Tuesday, 6:15 pm. It's dinnertime.");
+    expect(body.messages[0].content).toContain('is on the porch with you now');
+    expect(fake.docs('practiceSessions').get('r1')?.lastLines).toHaveLength(2);
+
+    // Next line: the spouse's words go back to the model as it wrote them.
+    const history = [...PITCH, { role: 'customer', text: 'Uh, hang on, this is my husband.' }, { role: 'customer', speaker: 'spouse', text: "We don't sign anything at the door." }, { role: 'rep', text: 'Totally fair, nothing gets signed today.' }];
+    modelAnswers('Okay.');
+    await POST(req({ action: 'turn', ...SESSION, history }));
+    expect(sentBody(1).messages.at(-2)).toEqual({
+      role: 'assistant',
+      content: "Uh, hang on, this is my husband.\nSPOUSE: We don't sign anything at the door.",
+    });
+  });
+
+  it('interrupts on its line and says so, for the sound', async () => {
+    fake.docs('practiceSessions').set('r1', { ...SAVED, door: { kind: 'standard', clock: '', kidVoice: null, surprise: { kind: 'beat', beat: 'phone', atLine: 1 } } });
+    modelAnswers('Hang on, my phone. Yeah, what?');
+    const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({ ...says('Hang on, my phone. Yeah, what?'), beat: 'phone' });
+    expect(sentBody().messages.at(-1).content).toContain('your phone starts ringing');
+  });
+
+  it('plays a kid at a kid door, and never records a Sale there', async () => {
+    const door = { kind: 'kid', clock: '', kidVoice: 'Leda', surprise: null };
+    fake.docs('practiceSessions').set('r1', { ...SAVED, door });
+    modelAnswers("My mom's not home.");
+    const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({ lines: [{ speaker: 'kid', text: "My mom's not home." }], ended: false });
+    expect(sentBody().messages[0].content).toMatch(/^You are a kid, about ten years old/);
+    expect(JSON.parse(fetchMock.mock.calls.find(isJudge)![1].body).messages[1].content).toMatch(/^A child, about ten, answered the door/);
+
+    modelAnswers(coach(9, 'Sale'));
+    const graded = await (await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }))).json();
+    expect(graded.feedback).toMatch(/^This was: Price shopper \(a kid answered the door\)\nScore: 9\/10\nResult: No sale\n/);
+    expect(sentBody(1).messages[0].content).toContain('A kid (about ten) answered');
+  });
+
+  it('asks the coach again when it puts words in the homeowner\'s mouth, then cuts what\'s still made up', async () => {
+    const invented = coach(5).replace('Fix next time: Ask about their bill.', 'Fix next time: Ask about their bill. The homeowner said their work video calls freeze.');
+    modelAnswers(invented);
+    modelAnswers(invented);
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
+    const { feedback } = await res.json();
+    expect(sentBody(1).messages.at(-1).content).toMatch(/says someone said something they didn't: "The homeowner said their work video calls freeze\."/);
+    expect(feedback).not.toContain('video calls');
+    expect(feedback).toContain('Fix next time: Ask about their bill.');
+    expect(practiceLogs()[0].feedback).toBe(feedback);
+  });
+
   it("draws a rep's homeowner server side from a shuffle bag: all nine before a repeat, never twice in a row", async () => {
     const drawn: string[] = [];
-    for (let i = 0; i < 27; i += 1) {
+    for (let i = 0; drawn.length < 27; i += 1) {
       modelAnswers('Yeah?');
       // A rep asking for a persona is ignored.
       const res = await POST(req({ action: 'turn', history: [], persona: 'renter' }));
       const reply = await res.json();
-      // Nothing that tells the persona: no voice settings, no price card.
-      expect(Object.keys(reply).sort()).toEqual(['ended', 'reply', 'sessionId']);
+      // Nothing that tells the persona: no voice settings, no price card; only what's heard and seen at the door.
+      expect(Object.keys(reply).sort()).toEqual(['ambient', 'ended', 'lines', 'ring', 'sessionId']);
       const saved = fake.docs('practiceSessions').get('r1')!;
       expect(saved.sessionId).toBe(reply.sessionId);
       expect(saved.patience).toBe(PERSONAS.find((p) => p.id === saved.persona)!.patience);
@@ -294,7 +366,8 @@ describe('POST /api/portal/ask/practice', () => {
         bill: customer.bill,
         details: customer.details,
       });
-      drawn.push(saved.persona as string);
+      // A landlord door is a renter drawn outside the bag.
+      if ((saved.door as { kind: string }).kind !== 'landlord') drawn.push(saved.persona as string);
     }
     for (let round = 0; round < 3; round += 1) {
       expect(new Set(drawn.slice(round * 9, round * 9 + 9)).size).toBe(9);

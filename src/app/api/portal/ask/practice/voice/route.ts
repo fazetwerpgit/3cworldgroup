@@ -3,14 +3,16 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { askAudience } from '@/lib/ask/flag';
 import { isPersonaId, isPracticeSeed, practiceCustomer } from '@/lib/ask/practice';
+import { STANDARD_DOOR, parseDoor, voiceFor, type Speaker } from '@/lib/ask/practiceDoor';
 import { streamLine } from '@/lib/ask/practiceTts';
 import { spokenText } from '@/lib/ask/practiceVoice';
 import { PRACTICE_SESSIONS, takeDailyPracticeVoice } from '@/lib/ask/store';
 
-// POST /api/portal/ask/practice/voice { sessionId, text } — the homeowner's
-// latest line spoken in the session's Gemini voice (practiceTts), streamed as
-// raw PCM (audio/L16;rate=N;channels=1) from the first chunk on. Only that
-// line of the caller's own current practice: never arbitrary text, so this is
+// POST /api/portal/ask/practice/voice { sessionId, text } — one of the
+// homeowner side's latest lines spoken in its speaker's Gemini voice (the
+// homeowner, the spouse who walked up, the kid who answered; practiceTts),
+// streamed as raw PCM (audio/L16;rate=N;channels=1) from the first chunk on.
+// Only those lines of the caller's own current practice: never arbitrary text, so this is
 // not a free TTS service. Same gate as the practice route; its own daily
 // count. Any failure is an error status and the page reads the line with the
 // phone's own voice instead.
@@ -44,7 +46,10 @@ export async function POST(request: NextRequest) {
   if (saved.sessionId !== sessionId || !isPersonaId(saved.persona) || !isPracticeSeed(saved.seed)) {
     return fail('That practice is over.', 409);
   }
-  if (typeof saved.lastLine !== 'string' || saved.lastLine !== text) return fail('Only the homeowner’s latest line', 403);
+  const latest = Array.isArray(saved.lastLines) ? (saved.lastLines as { speaker?: unknown; text?: unknown }[]) : [];
+  const line = latest.find((candidate) => candidate?.text === text);
+  if (!line) return fail('Only the homeowner’s latest line', 403);
+  const speaker: Speaker = line.speaker === 'spouse' || line.speaker === 'kid' ? line.speaker : 'homeowner';
   const spoken = spokenText(text);
   if (!spoken) return fail('Nothing to say', 400);
 
@@ -55,15 +60,15 @@ export async function POST(request: NextRequest) {
 
   const customer = practiceCustomer(saved.persona, saved.seed);
   const patience = typeof saved.patience === 'number' ? saved.patience : customer.persona.patience;
-  // A homeowner near the end of their rope sounds it.
-  const tone = patience <= 1 ? [...customer.persona.tone, 'losing patience'] : customer.persona.tone;
+  // Each speaker has their own voice; a homeowner near the end of their rope sounds it.
+  const { voice, tone } = voiceFor(speaker, customer, saved.door ? parseDoor(saved.door) : STANDARD_DOOR, patience);
   const started = Date.now();
-  const result = await streamLine({ apiKey, voiceName: customer.ttsVoice, tone, text: spoken });
+  const result = await streamLine({ apiKey, voiceName: voice, tone, text: spoken });
   if (!result.ok) {
     log({ outcome: result.reason, ms: Date.now() - started });
     return fail('The voice didn’t come through.', result.reason === 'timeout' ? 504 : 502);
   }
-  log({ outcome: 'ok', model: result.model, voice: customer.ttsVoice, chars: spoken.length, firstAudioMs: result.firstAudioMs });
+  log({ outcome: 'ok', model: result.model, voice, speaker, chars: spoken.length, firstAudioMs: result.firstAudioMs });
   return new NextResponse(result.pcm, {
     status: 200,
     headers: { 'Content-Type': `audio/L16;rate=${result.sampleRate};channels=1`, 'Cache-Control': 'no-store' },

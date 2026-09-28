@@ -4,7 +4,6 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { askAudience } from '@/lib/ask/flag';
 import {
-  KNOCK,
   MAX_PRACTICE_TURNS,
   LINE_JUDGE_PROMPT,
   buildCustomerPrompt,
@@ -25,7 +24,9 @@ import {
   priceNote,
   readCustomerReply,
   revealFeedback,
+  stripSentences,
   transcriptText,
+  unbackedClaims,
   type PersonaId,
   type PracticeEndedBy,
   type PracticeEvent,
@@ -35,6 +36,25 @@ import {
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
+import {
+  STANDARD_DOOR,
+  ambientFor,
+  asModelLine,
+  beatNow,
+  buildKidPrompt,
+  doorCoachBlock,
+  doorPromptBlock,
+  doorSummary,
+  drawDoor,
+  drawDoorKind,
+  knockLine,
+  parseDoor,
+  resultRules,
+  splitSpeakers,
+  spouseHere,
+  surpriseNote,
+  type PracticeDoor,
+} from '@/lib/ask/practiceDoor';
 import { AskProviderError, askProviderConfig, callAskModel, type AskMessage, type AskUsage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
 import { PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeDailyPractice } from '@/lib/ask/store';
@@ -148,17 +168,29 @@ export async function POST(request: NextRequest) {
   let seed: number;
   let patienceBefore: number;
   let bag: PersonaId[] = [];
+  let door: PracticeDoor;
   if (knock) {
-    // Only an owner picks; a rep's knock is always a surprise.
+    // Only an owner picks; a rep's knock is always a surprise, and so is the kind of door. A landlord door
+    // is a renter, drawn outside the shuffle bag (it isn't a turn of the bag).
     const choice = gate.isOwner && isPersonaChoice(body?.persona) ? body.persona : 'surprise';
     const previous = typeof saved.persona === 'string' ? saved.persona : null;
     sessionId = randomUUID();
-    ({ persona: personaId, bag } = drawPersona(choice, saved.bag, previous, () => randomInt(0, 2 ** 31) / 2 ** 31));
     seed = randomInt(0, 2 ** 32 - 1);
-    patienceBefore = practiceCustomer(personaId, seed).persona.patience;
+    const doorKind = choice === 'surprise' ? drawDoorKind(seed, previous) : 'standard';
+    if (doorKind === 'landlord') {
+      personaId = 'renter';
+      bag = Array.isArray(saved.bag) ? saved.bag.filter(isPersonaId) : [];
+    } else {
+      ({ persona: personaId, bag } = drawPersona(choice, saved.bag, previous, () => randomInt(0, 2 ** 31) / 2 ** 31));
+    }
+    const drawn = practiceCustomer(personaId, seed);
+    // An owner's picked homeowner is a plain door (to demo that homeowner); the clock still counts.
+    door = choice === 'surprise' ? drawDoor(seed, drawn, doorKind, new Date()) : { ...drawDoor(seed, drawn, 'standard', new Date()), surprise: null };
+    patienceBefore = drawn.persona.patience;
   } else {
     if (!current) return over();
     ({ sessionId, personaId, seed } = current);
+    door = saved.door ? parseDoor(saved.door) : STANDARD_DOOR;
     const start = practiceCustomer(personaId, seed).persona.patience;
     patienceBefore = Number.isInteger(saved.patience) ? Math.min(start, Math.max(0, saved.patience as number)) : start;
   }
@@ -216,26 +248,41 @@ export async function POST(request: NextRequest) {
     let reply: string;
     let event: PracticeEvent | null = null;
     let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
+    const kid = door.kind === 'kid';
     // A price that isn't on the screen the homeowner saw: the homeowner hears about it, and it's a lie.
     const note = knock ? null : priceNote(turns, customer);
+    // The spouse walking up or an interruption, on the rep line it's due.
+    const surprise = knock ? null : surpriseNote(door, turns, customer);
     if (stub) {
       reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
       event = knock ? null : note ? 'lie' : 'ok';
     } else {
-      const messages: AskMessage[] = [{ role: 'system', content: buildCustomerPrompt(customer, patienceBefore) }];
+      const system = kid
+        ? buildKidPrompt(customer, door)
+        : buildCustomerPrompt(customer, patienceBefore, doorPromptBlock(door, customer, turns));
+      const messages: AskMessage[] = [{ role: 'system', content: system }];
       // The homeowner's side: the knock, the rep's lines and the screen they were shown, one user message
-      // per stretch between the homeowner's own lines.
-      let heard = KNOCK;
+      // per stretch between the homeowner's own lines (the spouse's lines tagged as the model wrote them).
+      let heard = knockLine(door);
+      let said: PracticeTurn[] = [];
       for (const turn of turns) {
         if (turn.role === 'customer') {
-          messages.push({ role: 'user', content: heard }, { role: 'assistant', content: turn.text });
-          heard = '';
+          said.push(turn);
           continue;
+        }
+        if (said.length) {
+          messages.push({ role: 'user', content: heard }, { role: 'assistant', content: asModelLine(said) });
+          heard = '';
+          said = [];
         }
         const line = turn.role === 'screen' ? `(The rep holds up their phone and you read the screen yourself: ${turn.text})` : turn.text;
         heard = heard ? `${heard}\n${line}` : line;
       }
-      messages.push({ role: 'user', content: note ? `${heard}\n${note}` : heard });
+      if (said.length) {
+        messages.push({ role: 'user', content: heard }, { role: 'assistant', content: asModelLine(said) });
+        heard = '';
+      }
+      messages.push({ role: 'user', content: [heard, note, surprise].filter(Boolean).join('\n') });
       // The judge runs beside the homeowner, so it costs no time. If it fails, the line counts as fair:
       // a network blip isn't the rep's fault.
       const judged = knock
@@ -244,7 +291,7 @@ export async function POST(request: NextRequest) {
             config,
             [
               { role: 'system', content: LINE_JUDGE_PROMPT },
-              { role: 'user', content: lineToJudge(turns, customer) },
+              { role: 'user', content: lineToJudge(turns, customer, kid) },
             ],
             JUDGE_CALL
           )
@@ -258,12 +305,20 @@ export async function POST(request: NextRequest) {
         return providerFailure(error, action, started);
       }
     }
-    const { text, ended, patience } = readCustomerReply(reply, patienceBefore, event, seed);
-    log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', ms: Date.now() - started, ...usage });
+    const { text, ended, patience } = readCustomerReply(reply, patienceBefore, event, seed, kid);
+    const lines = splitSpeakers(text, door, spouseHere(door, turns));
+    const beat = knock ? null : beatNow(door, turns);
+    const outcome: PracticeTurnReply = {
+      lines,
+      ended,
+      ...(ended ? { close: event === 'abuse' || patience === 0 ? ('slam' as const) : ('shut' as const) } : {}),
+      ...(beat ? { beat } : {}),
+    };
+    log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', door: door.kind, ms: Date.now() - started, ...usage });
     if (!knock) {
-      // lastLine: the one line POST .../practice/voice will speak.
-      await sessionRef.update({ patience, lastLine: text, updatedAt: now });
-      return NextResponse.json<PracticeTurnReply>({ reply: text, ended });
+      // lastLines: the lines POST .../practice/voice will speak.
+      await sessionRef.update({ patience, lastLines: lines, updatedAt: now });
+      return NextResponse.json<PracticeTurnReply>(outcome);
     }
     // The session exists once the door has opened; a knock that got no answer leaves the last one as it
     // was. The seed fixes every pick; the picks are written out too so they read without the code.
@@ -274,12 +329,18 @@ export async function POST(request: NextRequest) {
       seed,
       patience,
       bag,
-      lastLine: text,
+      lastLines: lines,
       homeowner: homeownerPicks(customer),
+      door,
       startedAt: now,
       updatedAt: now,
     });
-    return NextResponse.json<PracticeKnockReply>({ reply: text, ended, sessionId });
+    return NextResponse.json<PracticeKnockReply>({
+      ...outcome,
+      sessionId,
+      ring: door.kind === 'ring',
+      ambient: ambientFor(customer, door),
+    });
   }
 
   let feedback: string;
@@ -289,13 +350,19 @@ export async function POST(request: NextRequest) {
   } else {
     const notes = await loadNotes(db);
     const messages: AskMessage[] = [
-      { role: 'system', content: buildFeedbackPrompt(notes, customer, endedBy) },
+      { role: 'system', content: buildFeedbackPrompt(notes, customer, endedBy, { block: doorCoachBlock(door, customer), ...resultRules(customer, door) }) },
       { role: 'user', content: `Grade this practice.\n\nTranscript:\n${transcriptText(turns)}` },
     ];
     try {
       ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS }));
-      // One retry when the shape is off (an extra section, a missing one, a price in the Try line).
-      const problem = feedbackProblem(feedback);
+      // One retry when the shape is off (an extra section, a missing one, a price in the Try line), or when it
+      // puts words in someone's mouth (a pain point the homeowner never said).
+      const invented = unbackedClaims(feedback, turns);
+      const problem =
+        feedbackProblem(feedback) ??
+        (invented.length
+          ? `it says someone said something they didn't: "${invented[0]}". Only say the rep or the homeowner said what the transcript shows they said`
+          : null);
       const left = maxDuration * 1000 - 5_000 - (Date.now() - started);
       // The retry is one more model call on the day's count; at the limit the first answer stands.
       if (problem && left >= COACH_RETRY_MIN_MS && (await takeDailyPractice(db, gate.uid, now, 1))) {
@@ -311,13 +378,20 @@ export async function POST(request: NextRequest) {
         ).catch(() => null);
         if (retry) feedback = retry.answer;
       }
-      feedback = enforceResult(feedback, customer.persona.shouldBuy);
+      // Still putting words in someone's mouth: those sentences go.
+      const still = unbackedClaims(feedback, turns);
+      if (still.length) {
+        log({ outcome: 'coach_claims_stripped', count: still.length });
+        feedback = stripSentences(feedback, still);
+      }
+      feedback = enforceResult(feedback, resultRules(customer, door));
     } catch (error) {
       await release();
       return providerFailure(error, action, started);
     }
   }
-  feedback = revealFeedback(feedback, customer.persona);
+  const summary = doorSummary(door, customer);
+  feedback = revealFeedback(feedback, customer.persona, summary);
   const score = parseScore(feedback);
   const result = /^\s*result\s*:\s*(.+)$/im.exec(feedback)?.[1].trim() ?? null;
   const ref = await db.collection(PRACTICE_LOG).add({
@@ -327,6 +401,8 @@ export async function POST(request: NextRequest) {
     personaLabel: customer.persona.label,
     seed,
     homeowner: homeownerPicks(customer),
+    door,
+    doorSummary: summary,
     turns,
     endedBy,
     score,
