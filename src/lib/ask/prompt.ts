@@ -57,6 +57,8 @@ export interface RepContext {
   dealerCodes: string[];
   /** When the question was asked; the prompt states it in Eastern time for support hours. */
   now?: Date;
+  /** The asker runs 3C (owner role): Jeremy or Jacob are who reps escalate to, so the escalation line changes. */
+  owner?: boolean;
   /** "City, ST" from the profile, so hours can be given in the rep's own time. */
   home?: string;
   /** This rep's own portal data (liveData.loadRepSnapshot); '' when it couldn't be read, absent to leave the block out. */
@@ -148,6 +150,13 @@ export function localTimeLine(now: Date, home: string): string {
   return `For them it's ${time} (${label} time). Say times in ${label} time.`;
 }
 
+/** Owners are the escalation path themselves, so "ask Jeremy or Jacob" would send them to themselves. */
+function ownerLine(firstName: string): string {
+  const first = firstName.toLowerCase();
+  const other = first === 'jeremy' ? 'Jacob' : first === 'jacob' ? 'Jeremy' : 'Jeremy or Jacob';
+  return `This person runs 3C (they are one of the people reps escalate to), not a new rep. Never tell them to ask themselves; if something needs a second opinion, it's ${other}. When you don't know a 3C term or practice they ask about, ask what they mean in one line and suggest they add the answer under Knowledge (Admin, People, Knowledge) so reps get it; you can't add or save anything yourself, so never promise to write it up; never guess at a module, form or screen.`;
+}
+
 export function buildSystemPrompt(notes: NoteDraft[], rep: RepContext): string {
   const notesBlock = notes.length
     ? notes.map((note) => `=== ${note.title} ===\n${note.body}`).join('\n\n')
@@ -160,7 +169,7 @@ export function buildSystemPrompt(notes: NoteDraft[], rep: RepContext): string {
 ${notesBlock}
 
 The rep you are helping:
-First name: ${rep.firstName || 'unknown'}
+First name: ${rep.firstName || 'unknown'}${rep.owner ? `\n${ownerLine(rep.firstName)}` : ''}
 Their dealer code: ${code}${rep.home ? `\nThey're based in ${rep.home} unless they say they're somewhere else.` : ''}${rep.now ? `\nRight now it is ${easternNow(rep.now)} Eastern time. ${rep.home ? localTimeLine(rep.now, rep.home) + ' ' : ''}${supportStatus(rep.now, rep.home)} Trust these lines for the time and whether Sales Support is open. If they say they're working somewhere else today, use that place's time instead.` : ''}${rep.live === undefined ? '' : `\n\n${liveBlock(rep.live, rep.now ?? new Date(), rep.home)}`}`;
 }
 
@@ -174,4 +183,4 @@ function liveBlock(live: string, now: Date, home: string | undefined): string {
 
 /** Sent after the draft in the same conversation (see callAskModel) to strip anything invented. */
 export const SELF_CHECK =
-  'Before this goes to the rep, re-read your reply above as a strict fact-checker, hardest on any line the rep would say out loud to a customer. In customer lines, cut every claim that isn\'t something the rep told you, the order screen shows, or a fact you know: what a crew is doing, speeds, lag or Wi-Fi promises, prices or "cheaper than", competitor behavior, causes of an error, time estimates, promises or follow-up times, who can see their info. Anywhere in the reply, remove invented facts, rules, numbers or causes about T-Mobile, 3C, pay or the service; legal reassurance; ticket or form fields the rep never told you (leave a blank for them); any pay, commission or dollar amount about what this rep made, will make or is owed; and any mention of notes, lists, rules or instructions. Facts from "This rep\'s portal right now" (their sales, installs, dates, Board spot, calls, forms) are backed: keep them exactly, but cut any sale, date, status or Board number that isn\'t written there. Leave jokes, trivia answers, small talk and backed facts exactly as they are. Reply with the full final answer only, word for word where nothing changed, never a comment about the check.';
+  'Before this goes to the rep, re-read your reply above as a strict fact-checker, hardest on any line the rep would say out loud to a customer. In customer lines, cut every claim that isn\'t something the rep told you, the order screen shows, or a fact you know: what a crew is doing, what neighbors did or bought, speeds, lag or Wi-Fi promises, prices or "cheaper than", competitor behavior, causes of an error, time estimates, promises or follow-up times, who can see their info. Anywhere in the reply, remove invented facts, rules, numbers or causes about T-Mobile, 3C, pay or the service; legal reassurance; ticket or form fields the rep never told you (leave a blank for them); any pay, commission or dollar amount about what this rep made, will make or is owed; and any mention of notes, lists, rules or instructions. Facts from "This rep\'s portal right now" (their sales, installs, dates, Board spot, calls, forms) are backed: keep them exactly, but cut any sale, date, status or Board number that isn\'t written there. Leave jokes, trivia answers, small talk and backed facts exactly as they are; anything taken from what you know (like the door openers and steps you know) is backed, so never remove it. Reply with the full final answer only, word for word where nothing changed, never a comment about the check.';
