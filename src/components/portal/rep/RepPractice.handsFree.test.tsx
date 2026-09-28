@@ -213,14 +213,38 @@ describe('RepPractice hands-free', () => {
     expect(text()).not.toContain('Pay for what?');
   });
 
-  it('turns the switch back off when the mic or connection fails, and says tap to talk still works', async () => {
+  it('turns the switch back off when the mic or connection fails, and offers only what is there (no Tap to talk here)', async () => {
     window.localStorage.setItem('ask3c-practice-hands-free', 'on');
     mic.fail = true;
     await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
     practiceAnswers.push(json({ ...says('Hi?'), sessionId: 's1', ring: false, ambient: null }));
     await act(async () => button('Knock')!.click());
-    await until(() => text().includes('Hands-free stopped. Tap to talk still works.'));
+    await until(() => text().includes('Hands-free stopped. Type what you say instead.'));
     expect(button('Hands-free')?.getAttribute('aria-pressed')).toBe('false');
     expect(window.localStorage.getItem('ask3c-practice-hands-free')).toBeNull();
+  });
+
+  it("shuts the door and stops the sounds from inside when the voice failed and the phone's voice read the last line", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/sounds/')) return new Response('', { status: 404 });
+      if (url.endsWith('/mine')) return json({ sessions: [], assignments: [] });
+      if (url.endsWith('/voice')) return new Response('', { status: 503 });
+      return practiceAnswers.shift() ?? new Response('', { status: 503 });
+    });
+    Object.assign(window, {
+      speechSynthesis: { speak: (u: { onend?: () => void }) => setTimeout(() => u.onend?.(), 0), cancel: vi.fn(), getVoices: () => [] },
+    });
+    await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
+    practiceAnswers.push(json({ ...says('Hi?'), sessionId: 's1', ring: false, ambient: null }));
+    await act(async () => button('Knock')!.click());
+    practiceAnswers.push(json({ ...says('Seriously? No. Leave, please.'), ended: true, close: 'slam' }));
+    practiceAnswers.push(json({ id: 'p1', feedback: 'Score: 1/10\nResult: No sale', score: 1, canRedo: false }));
+    const box = container.querySelector('textarea') as HTMLTextAreaElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(box, 'Rude line.');
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => button('Send')!.click());
+    await until(() => fetchMock.mock.calls.some((call) => String(call[0]) === '/sounds/practice/door-slam.mp3'));
   });
 });

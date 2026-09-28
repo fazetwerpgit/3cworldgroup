@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseSkills } from './practiceCoaching';
 import {
   MAX_PRACTICE_TURNS,
   MAX_REP_CHARS,
@@ -21,6 +22,10 @@ import {
   enforceScore,
   aboutThem,
   isSelfHarm,
+  NAMES,
+  OLDER_NAMES,
+  calendarNote,
+  freshSeed,
   lieQuotes,
   screenForHomeowner,
   strayCoachSentences,
@@ -84,16 +89,16 @@ describe('practiceCustomer', () => {
   });
 
   it("lets a rep walk away the right way when the screen doesn't really beat the bill, and tells the coach the rule", () => {
-    // Price shopper, seed 2: $73 a month now, the screen shows $75.
-    const close = practiceCustomer('price-shopper', 2);
+    // Price shopper, seed 1: $73 a month now, the screen shows $75.
+    const close = practiceCustomer('price-shopper', 1);
     expect(screenBeatsBill(close)).toBe(false);
     const prompt = buildFeedbackPrompt([], close, 'rep');
     expect(prompt).toContain("The order screen for this door ($75/mo) is more than what the homeowner pays ($73)");
     expect(prompt).toContain('leave on a good note and move on');
     expect(prompt).not.toContain('Never "Walked away the right way"');
-    // Seed 1: $85 against $75 is a real saving; the usual rule holds.
-    expect(screenBeatsBill(practiceCustomer('price-shopper', 1))).toBe(true);
-    expect(buildFeedbackPrompt([], practiceCustomer('price-shopper', 1), 'rep')).not.toContain("doesn't really beat");
+    // Seed 7: $85 against $75 is a real saving; the usual rule holds.
+    expect(screenBeatsBill(practiceCustomer('price-shopper', 7))).toBe(true);
+    expect(buildFeedbackPrompt([], practiceCustomer('price-shopper', 7), 'rep')).not.toContain("doesn't really beat");
   });
 
   it('asks the coach for the rep\'s name instead of a blank in the Try line', () => {
@@ -439,13 +444,45 @@ describe('the coach held to the transcript and the rules', () => {
   });
 
   it("does the homeowner's math for them when the card goes up", () => {
-    const shopper = practiceCustomer('price-shopper', 2); // pays $73, the screen shows $75
+    const shopper = practiceCustomer('price-shopper', 1); // pays $73, the screen shows $75
     expect(screenForHomeowner('CARD', shopper)).toBe("(The rep holds up their phone and you read the screen yourself: CARD That's $2 a month MORE than the $73 you pay now.)");
   });
 
   it("shows the owner the homeowner's picks about them, not the prompt's \"you\"", () => {
     expect(aboutThem('you just got off a night shift and were trying to sleep')).toBe('they just got off a night shift and were trying to sleep');
     expect(aboutThem("you're watching your game")).toBe("they're watching their game");
+  });
+
+  it("draws whole names from the persona's pool, and a new one when the rep met that name lately", () => {
+    for (let seed = 1; seed < 60; seed += 1) {
+      const elderly = practiceCustomer('elderly', seed);
+      expect(OLDER_NAMES[elderly.gender]).toContain(elderly.name);
+      const renter = practiceCustomer('renter', seed);
+      expect(NAMES[renter.gender]).toContain(renter.name);
+    }
+    const first = practiceCustomer('skeptic', 5).name;
+    let n = 100;
+    const fresh = freshSeed('skeptic', 5, [first], () => (n += 1));
+    expect(practiceCustomer('skeptic', fresh).name).not.toBe(first);
+    expect(freshSeed('skeptic', 5, [], () => 1)).toBe(5);
+  });
+
+  it('only ever names real dates, with their weekdays', () => {
+    const note = calendarNote(new Date('2026-10-05T17:00:00Z'));
+    expect(note).toMatch(/^Today is Monday, October 5\./);
+    expect(note).toContain('Tuesday, October 13');
+    expect(note).toContain('Monday, October 19');
+    expect(note).not.toContain('October 20');
+  });
+
+  it("caps a kid door's skills: no objection or close above the opener, and 3 at most when the kid got pitched", () => {
+    const kid = 'Score: 8/10\nResult: Walked away the right way\nSkills: Opener 7/10, Discovery 8/10, Objections 8/10, Close 9/10\nWhat worked:\n- "Is your mom home?"';
+    const polite = enforceScore(kid, { lies: 0, abuse: false, pitchedNoSaleDoor: false, kidDoor: true });
+    expect(parseSkills(polite)).toEqual({ opener: 7, discovery: 8, objections: 7, close: 9 });
+    expect(parseScore(polite)).toBe(8);
+    const pitched = enforceScore(kid, { lies: 0, abuse: false, pitchedNoSaleDoor: true, kidDoor: true });
+    expect(parseSkills(pitched)).toEqual({ opener: 3, discovery: 3, objections: 3, close: 3 });
+    expect(parseScore(pitched)).toBe(3);
   });
 
   it('knows a line about self-harm from a figure of speech', () => {

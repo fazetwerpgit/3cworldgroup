@@ -14,6 +14,10 @@ import {
   enforceResult,
   enforceScore,
   feedbackProblem,
+  calendarNote,
+  freshSeed,
+  openerHint,
+  OUT_OF_PATIENCE,
   isSelfHarm,
   lieQuotes,
   screenForHomeowner,
@@ -64,8 +68,10 @@ import {
   knockLine,
   parseDoor,
   resultRules,
+  fixSpouseLines,
   splitSpeakers,
   spouseHere,
+  spouseLinesProblem,
   surpriseNote,
   type PracticeDoor,
   type PracticeLine,
@@ -138,6 +144,8 @@ const CUSTOMER_CALL = { think: false, temperature: 0.8, maxTokens: 400 } as cons
 const JUDGE_CALL = { think: false, temperature: 0, maxTokens: 5 } as const;
 /** Model calls a knock must leave room for: two rep lines (2 each) and the feedback (1). */
 const KNOCK_HEADROOM = 5;
+/** A rep doesn't meet the same full name twice within this many doors. */
+const RECENT_NAMES = 20;
 /** The coach gets one retry when its answer breaks the format; both fit in maxDuration. */
 const COACH_TIMEOUT_MS = 25_000;
 const COACH_RETRY_MIN_MS = 8_000;
@@ -281,6 +289,7 @@ export async function POST(request: NextRequest) {
   let seed: number;
   let patienceBefore: number;
   let bag: PersonaId[] = [];
+  let recentNames: string[] = [];
   let door: PracticeDoor;
   if (knock) {
     // Only an owner picks; a rep's knock is always a surprise, and so is the kind of door. A landlord door
@@ -302,6 +311,11 @@ export async function POST(request: NextRequest) {
     } else {
       ({ persona: personaId, bag } = drawPersona(choice, saved.bag, previous, () => randomInt(0, 2 ** 31) / 2 ** 31));
     }
+    // A full name this rep hasn't met in their last RECENT_NAMES doors: the seed is drawn again until one
+    // is new (it fixes the name).
+    const recent = Array.isArray(saved.recentNames) ? saved.recentNames.filter((name): name is string => typeof name === 'string') : [];
+    seed = freshSeed(personaId, seed, recent, () => randomInt(0, 2 ** 32 - 1));
+    recentNames = [practiceCustomer(personaId, seed).name, ...recent].slice(0, RECENT_NAMES);
     const drawn = practiceCustomer(personaId, seed);
     // An owner's picked homeowner is a plain door (to demo that homeowner); the clock still counts.
     door = choice === 'surprise' ? drawDoor(seed, drawn, doorKind, new Date()) : { ...drawDoor(seed, drawn, 'standard', new Date()), surprise: null };
@@ -408,7 +422,9 @@ export async function POST(request: NextRequest) {
       event = knock ? null : note ? 'lie' : 'ok';
     } else {
       // A cut-in plays the line written for it; only the judge runs.
-      const messages = cut ? null : homeownerMessages(customer, door, turns, patienceBefore, [note, surprise]);
+      const messages = cut
+        ? null
+        : homeownerMessages(customer, door, turns, patienceBefore, knock ? [openerHint(customer, seed)] : [note, surprise]);
       // The judge runs beside the homeowner, so it costs no time. If it fails, the line counts as fair:
       // a network blip isn't the rep's fault.
       const judged = knock
@@ -436,8 +452,36 @@ export async function POST(request: NextRequest) {
         return providerFailure(error, action, started);
       }
     }
-    const { text, ended, patience } = readCustomerReply(reply, patienceBefore, event, seed, kid);
-    const lines = splitSpeakers(text, door, spouseHere(door, turns));
+    const first = readCustomerReply(reply, patienceBefore, event, seed, kid);
+    const { patience } = first;
+    let { text, ended } = first;
+    // Patience ran out on this line but the homeowner's reply didn't close the door: rather than a fixed
+    // line after whatever they'd just said (even "that's way better"), they end it in their own words.
+    if (!stub && !hurting && !knock && !cut && patience === 0 && event !== 'abuse' && (text === OUT_OF_PATIENCE || kid)) {
+      const last = await callAskModel(
+        config,
+        homeownerMessages(customer, door, turns, 0, [note, surprise, LAST_STRAW_NOTE]),
+        CUSTOMER_CALL
+      ).catch(() => null);
+      const closing = last ? readCustomerReply(last.answer, 1, null, seed, kid) : null;
+      if (closing?.text) ({ text } = closing);
+      ended = true;
+    }
+    let lines = splitSpeakers(text, door, spouseHere(door, turns));
+    // The spouse speaks only their own worry, after the homeowner's own lead-in when they walk up; a reply
+    // that gave them the homeowner's words is written once more, then put right in code.
+    const joining = door.surprise?.kind === 'spouse' && surpriseNote(door, turns, customer) !== null;
+    const spouseOff = !stub && !cut && !hurting && spouseLinesProblem(lines, door, customer, joining);
+    if (spouseOff) {
+      const again = await callAskModel(
+        config,
+        homeownerMessages(customer, door, turns, patienceBefore, [note, surprise, SPOUSE_FORMAT_NOTE]),
+        CUSTOMER_CALL
+      ).catch(() => null);
+      const retried = again ? splitSpeakers(readCustomerReply(again.answer, patienceBefore, event, seed, kid).text, door, spouseHere(door, turns)) : null;
+      lines = retried && !spouseLinesProblem(retried, door, customer, joining) ? retried : fixSpouseLines(lines, door, customer, joining);
+      log({ outcome: 'spouse_line_retry', fixed: retried !== null && !spouseLinesProblem(retried, door, customer, joining) });
+    }
     const beat = knock ? null : beatNow(door, turns);
     const outcome: PracticeTurnReply = {
       lines,
@@ -478,6 +522,7 @@ export async function POST(request: NextRequest) {
       steps: [],
       turns: lines.map(asTurn),
       ended,
+      recentNames,
       homeowner: homeownerPicks(customer),
       door,
       startedAt: now,
@@ -526,7 +571,7 @@ export async function POST(request: NextRequest) {
           gate.name.trim().split(/\s+/)[0] ?? ''
         ),
       },
-      { role: 'user', content: `Grade this practice.${redoNote}${cappedNote}\n\nTranscript:\n${transcript}` },
+      { role: 'user', content: `Grade this practice.${redoNote}${cappedNote}\n\n${calendarNote(now)}\n\nTranscript:\n${transcript}` },
     ];
     try {
       // Low temperature where the provider honors it (DeepSeek ignores it while thinking, but not on the
@@ -574,6 +619,7 @@ export async function POST(request: NextRequest) {
         lies: steps.filter((step) => step.event === 'lie').length,
         abuse: steps.some((step) => step.event === 'abuse'),
         pitchedNoSaleDoor: (door.kind === 'kid' || door.kind === 'landlord') && steps.some((step) => step.event === 'weak' || step.event === 'lie'),
+        kidDoor: door.kind === 'kid',
       });
     } catch (error) {
       await release();
@@ -718,6 +764,14 @@ async function startRedo(
     ambient: ambientFor(customer, door),
   });
 }
+
+/** When patience runs out on a line the homeowner answered without closing: they close it themselves. */
+const LAST_STRAW_NOTE =
+  "(You've had enough of this rep. This is your last line: end it now in your own words, firmly but without being rude, and close the door. Don't praise their offer in this line.)";
+
+/** A spouse reply that mixed the two people up: how to write it. */
+const SPOUSE_FORMAT_NOTE =
+  '(Write each person on their own line. Your own words first, as the homeowner. Then your spouse on a line of their own starting "SPOUSE:", saying only their own worry, never your words or your situation.)';
 
 /** The hidden note that makes the homeowner cut in on a rep who won't stop talking. */
 const CUT_IN_NOTE =

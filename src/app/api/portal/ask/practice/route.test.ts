@@ -173,8 +173,8 @@ describe('POST /api/portal/ask/practice', () => {
     await POST(req({ action: 'turn', ...SESSION, history }));
     expect(sentBody().messages.at(-1)).toEqual({
       role: 'user',
-      // The math done for the homeowner: $75 against the $77 this homeowner pays.
-      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep holds up their phone and you read the screen yourself: ${card} That's $2 a month less than the $77 you pay now.)\nIt says $75 with AutoPay.`,
+      // The math done for the homeowner: $75 against the $82 this homeowner pays.
+      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep holds up their phone and you read the screen yourself: ${card} That's $7 a month less than the $82 you pay now.)\nIt says $75 with AutoPay.`,
     });
 
     modelAnswers(coach(7));
@@ -691,9 +691,41 @@ describe('POST /api/portal/ask/practice', () => {
     expect(sentBody().messages[1].content).toContain("hit the day's practice limit");
   });
 
+  it("closes the door in the homeowner's own words when patience runs out, never a fixed line after praise", async () => {
+    fake.docs('practiceSessions').set('r1', { ...SAVED, patience: 1 });
+    verdicts = ['WEAK'];
+    modelAnswers("Sixty? That's way better than what I pay.");
+    modelAnswers("Yeah, I think I'm done here. Have a good one.");
+    const res = await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json();
+    expect(res).toMatchObject({ ended: true, close: 'slam', lines: [{ speaker: 'homeowner', text: "Yeah, I think I'm done here. Have a good one." }] });
+    expect(sentBody(1).messages.at(-1).content).toContain('This is your last line');
+  });
+
+  it("writes a spouse reply again when it mixes the two up, and puts it right if it's still mixed", async () => {
+    const door = { kind: 'standard', clock: '', kidVoice: null, surprise: { kind: 'spouse', atLine: 1, voice: 'Charon', name: 'Mike', objection: 'We read every word before we sign anything.' } };
+    fake.docs('practiceSessions').set('r1', { ...SAVED, door });
+    // No lead-in from the homeowner: written again, and the second one is right.
+    modelAnswers('SPOUSE: We read every word before we sign anything.');
+    modelAnswers('Oh, this is my husband.\nSPOUSE: We read every word before we sign anything.');
+    const res = await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json();
+    expect(res.lines).toEqual([
+      { speaker: 'homeowner', text: 'Oh, this is my husband.' },
+      { speaker: 'spouse', text: 'We read every word before we sign anything.' },
+    ]);
+    expect(sentBody(1).messages.at(-1).content).toContain('Write each person on their own line');
+
+    // Wrong twice: fixed in code, with the homeowner's lead-in.
+    fake.docs('practiceSessions').set('r1', { ...SAVED, door });
+    modelAnswers('SPOUSE: We read every word before we sign anything.');
+    modelAnswers('SPOUSE: We read every word before we sign anything.');
+    const fixed = await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json();
+    expect(fixed.lines[0].speaker).toBe('homeowner');
+    expect(fixed.lines.at(-1)).toEqual({ speaker: 'spouse', text: 'We read every word before we sign anything.' });
+  });
+
   it('never lets a sellable homeowner end as "walked away the right way"', async () => {
-    // Seed 1: the screen ($75) beats this homeowner's $85 bill, so leaving isn't the right move.
-    fake.docs('practiceSessions').set('r1', { ...SAVED, seed: 1 });
+    // Seed 7: the screen ($75) beats this homeowner's $85 bill, so leaving isn't the right move.
+    fake.docs('practiceSessions').set('r1', { ...SAVED, seed: 7 });
     modelAnswers(coach(2, 'Walked away the right way'));
     const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'homeowner' }));
     const { feedback } = await res.json();

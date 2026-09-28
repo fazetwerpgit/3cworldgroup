@@ -37,6 +37,8 @@ import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type
 import { SPECULATION_SLACK, wordsApart } from '@/lib/ask/practiceHandsFree';
 import { askForMic, canHandsFree } from './handsFreeMic';
 import { useHandsFree } from './useHandsFree';
+import { useSoftKeyboardOpen } from './RepForm';
+import { useHideRepTabBar } from './RepShell';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -313,6 +315,9 @@ export function RepPractice({
   const canListen = useSyncExternalStore(noSubscribe, () => recognitionClass() !== undefined, () => false);
   const talk = canSpeak && !talkOff;
   const canHandsFreeHere = useSyncExternalStore(noSubscribe, canHandsFree, () => false);
+  // Typing a line: the tab bar steps aside for the keyboard, as it does on forms.
+  const keyboardOpen = useSoftKeyboardOpen();
+  useHideRepTabBar(active && keyboardOpen);
   const handsFree = talk && canHandsFreeHere && handsFreeOn;
   const hands = useHandsFree<PreparedCut>({
     onLine: (text, ms) => {
@@ -361,7 +366,7 @@ export function RepPractice({
       } catch {
         // Storage blocked: off for this visit.
       }
-      setNotice('Hands-free stopped. Tap to talk still works.');
+      setNotice(canListen && !micBroken ? 'Hands-free stopped. Tap to talk still works.' : 'Hands-free stopped. Type what you say instead.');
     },
   });
   const pauseHands = hands.pause;
@@ -480,9 +485,10 @@ export function RepPractice({
   };
 
   /** The phone's own voice, when the session's voice didn't come through. Generic on purpose: it says nothing about who this is. */
-  const speakFallback = (line: string) => {
+  const speakFallback = (line: string, after?: () => void) => {
     const text = spokenText(line);
     if (!text || !('speechSynthesis' in window)) {
+      after?.();
       hands.listen();
       return;
     }
@@ -504,11 +510,17 @@ export function RepPractice({
         if (startedAt) tally.listenMs += Math.round(performance.now() - startedAt);
         else tally.untimed = true;
       }
+      after?.();
       hands.listen();
     };
     utterance.onend = done;
     utterance.onerror = done;
     synth.speak(utterance);
+  };
+
+  /** The door shuts (or slams) and the sounds from inside go with it: every way a door ends. */
+  const shutDoor = (current: Session, how: 'slam' | 'shut') => {
+    playerRef.current?.closeDoor(current.ring ? null : how === 'slam' ? 'door-slam' : 'door-close');
   };
 
   /** The session was replaced by a knock on another screen: back to Knock, said once. */
@@ -606,10 +618,13 @@ export function RepPractice({
           }
           if (beat) player.effect(BEAT_SOUNDS[beat]);
         }
-        if (first && player) void speakLines(player, first, lines, next, ended ? close ?? 'shut' : null);
-        else speakFallback(lines.map((line) => line.text).join(' '));
+        const door = ended ? (close ?? 'shut') : null;
+        if (first && player) void speakLines(player, first, lines, next, door);
+        // The phone's voice reads it; the door still shuts behind it and the background goes.
+        else speakFallback(lines.map((line) => line.text).join(' '), door ? () => shutDoor(next, door) : undefined);
       } else {
         void first?.reader.cancel().catch(() => {});
+        if (ended && talk) shutDoor(next, close ?? 'shut');
         hands.listen();
       }
       scrollDown('smooth');
@@ -773,7 +788,7 @@ export function RepPractice({
     };
     save(next);
     if (result.data.ended) {
-      if (talk) player?.closeDoor(next.ring ? null : result.data.close === 'slam' ? 'door-slam' : 'door-close');
+      if (talk) shutDoor(next, result.data.close === 'slam' ? 'slam' : 'shut');
       await requestFeedback(next);
     }
   };
@@ -828,7 +843,7 @@ export function RepPractice({
     }
     const next: Session = { ...session, ended: true, endedBy: 'rep' };
     // The rep walks off: the door shuts behind them.
-    if (talk) playerRef.current?.closeDoor(session.ring ? null : 'door-close');
+    if (talk) shutDoor(session, 'shut');
     save(next);
     void requestFeedback(next);
   };

@@ -1,7 +1,7 @@
 import {
   END_MARKER,
   GEMINI_VOICES,
-  NAMES,
+  namesFor,
   VOICE_BOOK,
   screenBeatsBill,
   seededRandom,
@@ -137,7 +137,7 @@ export function drawSurprise(seed: number, customer: PracticeCustomer, kind: Doo
   const id = customer.persona.id;
   if (SPOUSE_PERSONAS.includes(id) && random() < SPOUSE_SHARE) {
     const voice = spouseVoice(customer, random);
-    const names = (customer.persona.names ?? NAMES)[VOICE_BOOK[voice].gender];
+    const names = namesFor(customer.persona)[VOICE_BOOK[voice].gender].map((full) => full.split(' ')[0]);
     return {
       kind: 'spouse',
       atLine: 2 + Math.floor(random() * 2),
@@ -365,6 +365,77 @@ export function asModelLine(turns: PracticeTurn[]): string {
 }
 
 /** "a kid answered" / "the husband walked up" / "the phone rang": how the reveal names the surprise. */
+const words = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[^a-z0-9' ]+/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 3);
+
+/** How much of `line` is made of `source`'s longer words (0..1). */
+const overlap = (line: string, source: string) => {
+  const own = words(line);
+  const theirs = new Set(words(source));
+  return own.length ? own.filter((word) => theirs.has(word)).length / own.length : 0;
+};
+
+/**
+ * Whether a reply's spouse lines are wrong: the spouse just walked up with no
+ * homeowner lead-in, or a spouse sentence is really the homeowner's (their
+ * details, objections or situation) rather than the spouse's own worry.
+ */
+export function spouseLinesProblem(lines: PracticeLine[], door: PracticeDoor, customer: PracticeCustomer, joining: boolean): boolean {
+  if (door.surprise?.kind !== 'spouse') return false;
+  const spouse = lines.filter((line) => line.speaker === 'spouse');
+  if (joining && (lines[0]?.speaker !== 'homeowner' || spouse.length === 0)) return true;
+  return spouse.some((line) => spouseSentences(line.text, door, customer).theirs.length > 0);
+}
+
+/** A spouse line's sentences: the spouse's own, and the homeowner's that slipped in. */
+function spouseSentences(text: string, door: PracticeDoor, customer: PracticeCustomer): { own: string[]; theirs: string[] } {
+  const objection = door.surprise?.kind === 'spouse' ? door.surprise.objection : '';
+  const homeowner = [...customer.details, ...customer.persona.objections, customer.persona.situation, customer.persona.pain].join(' ');
+  const own: string[] = [];
+  const theirs: string[] = [];
+  for (const sentence of text.split(/(?<=[.!?])\s+/).filter(Boolean)) {
+    const mine = overlap(sentence, objection);
+    const homeowners = overlap(sentence, homeowner);
+    (homeowners >= 0.4 && homeowners > mine ? theirs : own).push(sentence);
+  }
+  return { own, theirs };
+}
+
+/**
+ * The reply put right in code when the model mixed the two up again: the
+ * homeowner's sentences go back to the homeowner, and a spouse who just walked
+ * up gets the homeowner's lead-in first.
+ */
+export function fixSpouseLines(lines: PracticeLine[], door: PracticeDoor, customer: PracticeCustomer, joining: boolean): PracticeLine[] {
+  if (door.surprise?.kind !== 'spouse') return lines;
+  const fixed: PracticeLine[] = [];
+  for (const line of lines) {
+    if (line.speaker !== 'spouse') {
+      fixed.push(line);
+      continue;
+    }
+    const { own, theirs } = spouseSentences(line.text, door, customer);
+    if (theirs.length) fixed.push({ speaker: 'homeowner', text: theirs.join(' ') });
+    fixed.push({ speaker: 'spouse', text: own.length ? own.join(' ') : door.surprise.objection });
+  }
+  if (joining && !fixed.some((line) => line.speaker === 'spouse')) fixed.push({ speaker: 'spouse', text: door.surprise.objection });
+  if (joining && fixed[0]?.speaker !== 'homeowner') {
+    fixed.unshift({ speaker: 'homeowner', text: `Oh, hang on. This is my ${customer.gender === 'f' ? 'husband' : 'wife'}, ${door.surprise.name}.` });
+  }
+  // Two homeowner lines in a row read as one.
+  return fixed.reduce<PracticeLine[]>((out, line) => {
+    const last = out.at(-1);
+    if (last && last.speaker === line.speaker) last.text = `${last.text} ${line.text}`;
+    else out.push({ ...line });
+    return out;
+  }, []);
+}
+
 /** Whether the door's surprise happened in this conversation (it's due on a rep line the rep may never reach). */
 export function surpriseFired(door: PracticeDoor, turns: PracticeTurn[]): boolean {
   return door.surprise !== null && repLines(turns) >= door.surprise.atLine;
@@ -389,7 +460,7 @@ export function doorCoachBlock(door: PracticeDoor, customer: PracticeCustomer, t
   if (door.clock) lines.push(`When: ${door.clock} Judge whether the rep read the moment (kept it short at dinnertime, didn't drag it out).`);
   if (door.kind === 'kid') {
     lines.push(
-      'A kid (about ten) answered; the parent was not home. The only right move is not to pitch the child, not to ask them for anything except when a parent will be home, and to leave politely (maybe saying you\'ll come back). Doing that quickly is a good door: score it 8-10 and Result "Walked away the right way". Pitching the kid or asking them anything about the family, the bill or the internet is 3/10 at most, and the Fix next time says the right move was to ask when a parent is home and leave politely. There is no Sale at this door.'
+      'A kid (about ten) answered; the parent was not home. The only right move is not to pitch the child, not to ask them for anything except when a parent will be home, and to leave politely (maybe saying you\'ll come back). Doing that quickly is a good door: score it 8-10 and Result "Walked away the right way". There is no objection to handle and no close to make here: score Objections by how well they kept from pitching, and Close by how well they left. Pitching the kid or asking them anything about the family, the bill or the internet is 3/10 at most, and the Fix next time says the right move was to ask when a parent is home and leave politely. There is no Sale at this door.'
     );
   }
   if (door.kind === 'ring') {

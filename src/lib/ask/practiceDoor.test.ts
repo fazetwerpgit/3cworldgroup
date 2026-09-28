@@ -8,10 +8,12 @@ import {
   drawDoor,
   drawDoorKind,
   drawSurprise,
+  fixSpouseLines,
   parseDoor,
   resultRules,
   splitSpeakers,
   spouseHere,
+  spouseLinesProblem,
   surpriseNote,
   type PracticeDoor,
 } from './practiceDoor';
@@ -117,6 +119,35 @@ describe('the surprise on the porch', () => {
     expect(splitSpeakers("My mom's not home.", { ...STANDARD_DOOR, kind: 'kid', kidVoice: 'Leda' }, false)).toEqual([
       { speaker: 'kid', text: "My mom's not home." },
     ]);
+  });
+});
+
+describe("the spouse's own lines", () => {
+  const customer = practiceCustomer('busy-parent', 4);
+  const spouse: PracticeDoor = {
+    ...STANDARD_DOOR,
+    surprise: { kind: 'spouse', atLine: 2, voice: 'Charon', name: 'Mike', objection: 'The last time we switched, the install guy never showed up and we lost a day.' },
+  };
+  const homeownersLine = customer.persona.objections[0];
+
+  it("catches a spouse line carrying the homeowner's words, or a spouse walking up with no lead-in", () => {
+    const mixed = [{ speaker: 'spouse' as const, text: `The last time we switched, the install guy never showed up. ${homeownersLine}` }];
+    expect(spouseLinesProblem(mixed, spouse, customer, true)).toBe(true);
+    expect(spouseLinesProblem([{ speaker: 'spouse', text: 'The install guy never showed up last time.' }], spouse, customer, true)).toBe(true);
+    const good = [
+      { speaker: 'homeowner' as const, text: 'Oh, hang on, this is my wife.' },
+      { speaker: 'spouse' as const, text: 'Last time we switched the install guy never showed up.' },
+    ];
+    expect(spouseLinesProblem(good, spouse, customer, true)).toBe(false);
+  });
+
+  it("puts it right: the homeowner's words back with the homeowner, a lead-in first", () => {
+    const mixed = [{ speaker: 'spouse' as const, text: `The last time we switched, the install guy never showed up. ${homeownersLine}` }];
+    const fixed = fixSpouseLines(mixed, spouse, customer, true);
+    expect(fixed[0].speaker).toBe('homeowner');
+    expect(fixed[0].text).toContain(homeownersLine);
+    expect(fixed.at(-1)).toEqual({ speaker: 'spouse', text: 'The last time we switched, the install guy never showed up.' });
+    expect(spouseLinesProblem(fixed, spouse, customer, true)).toBe(false);
   });
 });
 

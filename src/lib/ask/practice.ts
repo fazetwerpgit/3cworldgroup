@@ -252,7 +252,6 @@ export interface Persona {
   details: readonly string[];
   /** When set, {provider} in the texts is one of these, drawn per session. */
   providers?: readonly string[];
-  names?: { f: string[]; m: string[] };
 }
 
 export const PERSONAS: readonly Persona[] = [
@@ -426,7 +425,6 @@ export const PERSONAS: readonly Persona[] = [
       "it took you a moment to get to the door",
     ],
     providers: ['AT&T DSL', 'CenturyLink DSL', 'Frontier DSL'],
-    names: { f: ['Dorothy', 'Barbara', 'Joyce', 'Marlene', 'Shirley'], m: ['Harold', 'Walter', 'Eugene', 'Frank', 'Gerald'] },
   },
   {
     id: 'renter',
@@ -511,11 +509,105 @@ export const PERSONAS: readonly Persona[] = [
   },
 ];
 
+/**
+ * Whole names, first and last together (drawing them apart gave pairs like
+ * "Raj Walsh" and "Eugene Nguyen"), by gender and by age: the older
+ * homeowner gets the older names.
+ */
 export const NAMES = {
-  f: ['Maria', 'Jennifer', 'Ashley', 'Keisha', 'Lauren', 'Priya', 'Megan', 'Rosa', 'Tanya', 'Nicole'],
-  m: ['Mike', 'Chris', 'Marcus', 'Dave', 'Luis', 'Kevin', 'Brian', 'Andre', 'Tom', 'Raj'],
+  f: [
+    'Jennifer Olson', 'Ashley Nguyen', 'Keisha Robinson', 'Lauren Schmidt', 'Priya Shah', 'Megan Hansen',
+    'Rosa Hernandez', 'Tanya Brooks', 'Nicole Peterson', 'Amanda Larson', 'Maria Gonzalez', 'Jessica Kim',
+    'Brittany Meyer', 'Sarah Johnson', 'Danielle Carter', 'Emily Nelson',
+  ],
+  m: [
+    'Mike Schultz', 'Chris Anderson', 'Marcus Williams', 'Dave Jorgensen', 'Luis Ramirez', 'Kevin Tran',
+    'Brian Miller', 'Andre Jackson', 'Tom Becker', 'Raj Mehta', 'Jason Christensen', 'Tyler Wagner',
+    'Carlos Mendoza', 'Eric Thompson', 'Derek Coleman', 'Matt Hoffman',
+  ],
+} as const;
+export const OLDER_NAMES = {
+  f: [
+    'Dorothy Hansen', 'Barbara Schroeder', 'Joyce Miller', 'Marlene Olson', 'Shirley Peterson', 'Carol Jensen',
+    'Patricia Davis', 'Linda Kowalski', 'Judy Nelson', 'Gloria Martinez',
+  ],
+  m: [
+    'Harold Schmidt', 'Walter Johnson', 'Eugene Larson', 'Frank Novak', 'Gerald Anderson', 'Richard Meyer',
+    'Donald Brooks', 'Roger Wilson', 'Jim Kowalski', 'Ray Hernandez',
+  ],
+} as const;
+
+/** The name pool a persona draws from. */
+export const namesFor = (persona: Persona) => (persona.voiceAges.every((age) => age === 'older') ? OLDER_NAMES : NAMES);
+
+/**
+ * How the homeowner opens the door, a few ways per persona (one per session,
+ * from the seed): a busy parent said "sorry, now's really not a good time"
+ * five doors in a row.
+ */
+const OPENERS: Record<PersonaId, readonly string[]> = {
+  'happy-spectrum': [
+    "Hi, can I help you?",
+    "Yeah? What can I do for you?",
+    "Hey there. What's up?",
+    "Afternoon. Help you with something?",
+  ],
+  'busy-parent': [
+    "Hi, yeah? Make it quick, I've got a lot going on.",
+    "Hey. Sorry, it's a little crazy in here. What is it?",
+    "Yes? Kids, hang on! Okay. What can I do for you?",
+    "Hi. I've got like two minutes. What's up?",
+  ],
+  skeptic: [
+    "Can I help you?",
+    "Yeah? Who are you with?",
+    "What's this about?",
+    "Hi. What are you selling?",
+  ],
+  'price-shopper': [
+    "Hey, what's up?",
+    "Hi. What've you got?",
+    "Yeah? Selling something?",
+    "Hello. What can I do for you?",
+  ],
+  'spouse-decides': [
+    "Oh, hi. Can I help you?",
+    "Hi there. What can I do for you?",
+    "Yes? Hi.",
+    "Hey. What's going on?",
+  ],
+  elderly: [
+    "Oh, hello there. Can I help you?",
+    "Hello? Who is it?",
+    "Well, hi. What can I do for you?",
+    "Oh! You startled me. Hello.",
+  ],
+  renter: [
+    "Hey. What's up?",
+    "Hi? Can I help you?",
+    "Yeah? What's this about?",
+    "Oh, hey. Are you looking for my landlord?",
+  ],
+  'tmobile-customer': [
+    "Hi! What can I do for you?",
+    "Hey there. What's up?",
+    "Hello. Can I help you?",
+    "Hi. Oh, T-Mobile? What's this about?",
+  ],
+  'att-fiber': [
+    "Hi, can I help you?",
+    "Hey. What's up?",
+    "Yes? What can I do for you?",
+    "Hello there. What've you got?",
+  ],
 };
-const LAST_NAMES = ['Johnson', 'Garcia', 'Miller', 'Nguyen', 'Brooks', 'Patel', 'Carter', 'Ramirez', 'Walsh', 'Coleman', 'Foster', 'Bennett'];
+
+/** The hidden hint for the homeowner's first line: an opener in this spirit, in their own words. */
+export function openerHint(customer: PracticeCustomer, seed: number): string {
+  const openers = OPENERS[customer.persona.id];
+  const opener = openers[(seed >>> 3) % openers.length];
+  return `[Open the door with something in the spirit of "${opener}", in your own words, fitting what's going on right now. Don't start with "sorry" or "now's not a good time" unless it really fits.]`;
+}
 
 /** Who is behind the door this session: a persona plus the details drawn from the seed. */
 export interface PracticeCustomer {
@@ -621,13 +713,23 @@ export function voicePool(persona: Persona): GeminiVoice[] {
  * from the persona's pool (and the gender with it), a first name to match,
  * the provider and bill, and one or two details of the moment.
  */
+/**
+ * A seed whose homeowner name isn't one of `recent` (the rep's last doors),
+ * trying new seeds from `next`; after 30 tries the last one stands.
+ */
+export function freshSeed(personaId: PersonaId, seed: number, recent: readonly string[], next: () => number): number {
+  let fresh = seed;
+  for (let tries = 0; tries < 30 && recent.includes(practiceCustomer(personaId, fresh).name); tries += 1) fresh = next();
+  return fresh;
+}
+
 export function practiceCustomer(personaId: PersonaId, seed: number): PracticeCustomer {
   const random = seededRandom(seed);
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)];
   const persona = PERSONAS.find((p) => p.id === personaId)!;
   const ttsVoice = pick(voicePool(persona));
   const gender = VOICE_BOOK[ttsVoice].gender;
-  const name = `${pick((persona.names ?? NAMES)[gender])} ${pick(LAST_NAMES)}`;
+  const name = pick(namesFor(persona)[gender]);
   const [low, high] = persona.bill;
   const bill = low + Math.floor(random() * (high - low + 1));
   const provider = persona.providers ? pick(persona.providers) : '';
@@ -671,6 +773,8 @@ How to play it:
 - React like a real person. Warm up a little when the rep is likable, asks good questions about your situation, finds what's bugging you, or ties the offer to it. Get shorter, colder and more annoyed when they're pushy, ramble, ignore what you said, or say something that sounds too good to be true or untrue.
 - Raise your objections one at a time, naturally. A good answer moves you along; a weak or pushy one makes you dig in.
 - Once the rep has answered a worry well enough for you (you accepted it, or they gave you a way to check it), drop it: don't bring the same question back later. Move on to your next concern, or to deciding.
+- Your bill is exactly $${customer.bill} a month: if it comes up, it's always that same number (never a different amount, never "extra" on top of it).
+- Once the rep has said who they are and who they're with (a name, 3C, T-Mobile Fiber, a badge), you know it: don't ask who they're with again. A skeptic can still ask to see ID or how to check.
 - Only refer back to what was actually said in this conversation, by you or the rep. Never claim you said something you didn't ("like I said...", "I told you I don't give out my info") unless you really said it above.
 - Pressure, pushing or repeating the pitch never makes you agree to anything, not even a "yeah, probably". Only good questions and straight answers move you.
 - Your patience is ${patienceLeft === customer.persona.patience ? 'full' : patienceLeft <= 1 ? 'almost gone: one more weak line and you close the door' : 'wearing thin'}. Let it show.
@@ -1298,6 +1402,16 @@ export function transcriptProblem(feedback: string, turns: PracticeTurn[], lieLi
 }
 
 /** What the judge caught over the practice, which caps the score in code. */
+/**
+ * Today and the next 14 days with their weekdays (Chicago), so the coach's
+ * lines only name real dates ("Tuesday the 14th" when no Tuesday was).
+ */
+export function calendarNote(now: Date): string {
+  const format = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric' });
+  const days = Array.from({ length: 15 }, (_, i) => format.format(new Date(now.getTime() + i * 86_400_000)));
+  return `Today is ${days[0]}. The next two weeks: ${days.slice(1).join('; ')}. If a line names a date, it must be one of these, with its right weekday; a weekday alone ("Saturday") is fine.`;
+}
+
 export interface ScoreFacts {
   /** Rep lines judged a lie. */
   lies: number;
@@ -1305,6 +1419,8 @@ export interface ScoreFacts {
   abuse: boolean;
   /** At a kid's or landlord's door, the rep pitched anyway (a weak or lying line there). */
   pitchedNoSaleDoor: boolean;
+  /** A kid answered: there were no objections to handle and no close to make. */
+  kidDoor?: boolean;
 }
 
 /**
@@ -1314,9 +1430,30 @@ export interface ScoreFacts {
  * door 3, one lie 4. The model narrates; it doesn't set the number.
  */
 export function enforceScore(feedback: string, facts: ScoreFacts): string {
+  let held = feedback;
+  let skills = parseSkills(held);
+  // At a kid's door the skills can't run above the door itself: a pitched kid door caps them all at 3,
+  // and there's no objection or close to score above what the opener earned.
+  if (skills && facts.kidDoor) {
+    const cap = facts.pitchedNoSaleDoor ? 3 : 10;
+    const capped = {
+      opener: Math.min(skills.opener, cap),
+      discovery: Math.min(skills.discovery, cap),
+      objections: Math.min(skills.objections, skills.opener, cap),
+      close: Math.min(skills.close, cap),
+    };
+    held = held.replace(
+      /^(\s*skills\s*:).*$/im,
+      `$1 Opener ${capped.opener}/10, Discovery ${capped.discovery}/10, Objections ${capped.objections}/10, Close ${capped.close}/10`
+    );
+    skills = capped;
+  }
+  return enforceTotal(held, skills, facts);
+}
+
+function enforceTotal(feedback: string, skills: SkillScores | null, facts: ScoreFacts): string {
   const score = parseScore(feedback);
   if (score === null) return feedback;
-  const skills = parseSkills(feedback);
   let held = skills ? Math.max(1, Math.round((skills.opener + skills.discovery + skills.objections + skills.close) / 4)) : score;
   if (facts.abuse) held = Math.min(held, 1);
   if (facts.lies >= 2) held = Math.min(held, 2);

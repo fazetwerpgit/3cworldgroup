@@ -41,9 +41,13 @@ describe('skill scores', () => {
 });
 
 describe('delivery', () => {
-  it('counts um, uh and you know, and "like" only as a filler', () => {
-    expect(fillerCount('Um, so, uh, you know, it is like way faster. Umm.')).toEqual({ um: 2, uh: 1, 'you know': 1, like: 1 });
+  it('counts um and uh, and "you know" and "like" only standing alone', () => {
+    expect(fillerCount('Um, so, uh, you know, it is, like, way faster. Umm.')).toEqual({ um: 2, uh: 1, 'you know': 1, like: 1 });
     expect(fillerCount("I'd like to show you. Looks like you have Spectrum. Would you like that?")).toEqual({});
+    // Real phrases, not fillers.
+    expect(fillerCount("you know it's not a promo that jumps")).toEqual({});
+    expect(fillerCount("it doesn't slow down at night like cable")).toEqual({});
+    expect(fillerCount("It's fast, you know? Like, really fast.")).toEqual({ 'you know': 1, like: 1 });
   });
 
   it('takes only a sane delivery from the page, and shows it as plain facts', () => {

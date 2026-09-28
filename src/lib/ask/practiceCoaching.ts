@@ -51,24 +51,25 @@ export interface PracticeDelivery {
   untimed?: boolean;
 }
 
-// "like" is a filler, except as a verb or after words it belongs to: "you like", "don't like", "I'd like",
-// "looks like", "feel like", "more like".
-const LIKE_KEEPS =
-  /(?:\b(?:i|you|we|they|he|she|people|folks|would|look|looks|looked|feel|feels|felt|sound|sounds|seem|seems|more|much|something|anything|nothing|just|kind of|sort of)|'d|n't)\s+$/i;
-
-/** The filler words in a spoken line, by word. */
+/**
+ * The filler words in a spoken line, by word. "um" and "uh" always count;
+ * "you know" and "like" only standing alone, set off by a pause (a comma, the
+ * end of a sentence): "it's, like, fast" and "it's fast, you know?" count,
+ * "you know it's not a promo" and "fast like cable" don't.
+ */
 export function fillerCount(line: string): Record<string, number> {
   const counts: Record<string, number> = {};
   const add = (word: string) => {
     counts[word] = (counts[word] ?? 0) + 1;
   };
-  for (const match of line.matchAll(/\b(u+m+|u+h+|e+r+m+|you know)\b/gi)) {
-    const word = match[1].toLowerCase();
-    add(word === 'you know' ? 'you know' : /^u+h+$/.test(word) ? 'uh' : 'um');
-  }
-  for (const match of line.matchAll(/\blike\b/gi)) {
-    if (!LIKE_KEEPS.test(line.slice(0, match.index ?? 0))) add('like');
-  }
+  for (const match of line.matchAll(/\b(u+m+|u+h+|e+r+m+)\b/gi)) add(/^u+h+$/i.test(match[1]) ? 'uh' : 'um');
+  // "you know" with a pause after it: "..., you know?", "you know, it's...".
+  const times = (pattern: RegExp, word: string) => {
+    for (let n = [...line.matchAll(pattern)].length; n > 0; n -= 1) add(word);
+  };
+  times(/\byou know\s*(?:[,.?!…]|$)/gi, 'you know');
+  // "like" with a pause on either side: "Like, ...", "it's, like, ...", "..., like."
+  times(/(?:^|[,.?!…]\s*)like\b|\blike\s*(?:[,.?!…]|$)/gi, 'like');
   return counts;
 }
 
