@@ -1,5 +1,5 @@
 // TEST-ONLY in-memory stand-in for the slice of Firestore Ask 3C touches
-// (collection get/add, doc get/set/update, runTransaction with get/set).
+// (collection get/add, doc get/set/update, runTransaction with get/set/update).
 // Imported by tests only; nothing in the app imports it.
 
 type DocData = Record<string, unknown>;
@@ -50,6 +50,9 @@ export function createFakeAskDb(seed: Record<string, Record<string, DocData>> = 
         get: (ref: { get: () => Promise<unknown> }) => ref.get(),
         set: (ref: { set: (data: DocData) => Promise<void> }, data: DocData) => {
           pending.push(() => ref.set(data));
+        },
+        update: (ref: { update: (data: DocData) => Promise<void> }, data: DocData) => {
+          pending.push(() => ref.update(data));
         },
       });
       for (const write of pending) await write();

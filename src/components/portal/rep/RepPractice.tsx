@@ -17,9 +17,9 @@ import {
   type PracticeEndedBy,
   type PracticeFeedbackReply,
   type PracticeKnockReply,
+  type PracticePriceReply,
   type PracticeTurn,
   type PracticeTurnReply,
-  type PracticeVoice,
 } from '@/lib/ask/practice';
 import { pickVoice, spokenText } from '@/lib/ask/practiceVoice';
 import s from './rep.module.css';
@@ -34,8 +34,11 @@ import { PracticeFeedback } from './PracticeFeedback';
 // door is drawn by the server and stays there: the page holds only the session
 // id, and the rep learns who it was from the feedback. Owners can pick one to
 // demo it ("Surprise me" by default).
-// Talk mode reads the homeowner aloud (speechSynthesis) and takes the rep's
-// lines by voice (SpeechRecognition), all on the phone; typing always works.
+// Talk mode speaks the homeowner in the session's own voice (Gemini TTS via
+// POST /api/portal/ask/practice/voice, played through one audio element the
+// Knock tap unlocks, so iOS lets it play after an await), falling back to the
+// phone's speechSynthesis, and takes the rep's lines by voice
+// (SpeechRecognition) on the phone; typing always works.
 // The session lives in sessionStorage under its own key, tagged with the uid,
 // with the same idle reset as Ask.
 
@@ -44,9 +47,6 @@ interface Session {
   sessionId: string | null;
   /** An owner's pick for the knock; reps always get a surprise. */
   pick: PersonaChoice;
-  voice: PracticeVoice | null;
-  /** This door's practice order screen card, for Pull up price. */
-  card: string | null;
   turns: PracticeTurn[];
   /** The homeowner closed the door or signed up, or the rep ended it. */
   ended: boolean;
@@ -61,9 +61,15 @@ interface StoredSession extends Session {
 }
 
 type Busy = 'turn' | 'feedback' | null;
-type Retry = 'turn' | 'send' | 'feedback';
+/** null: nothing to retry today (the daily limit). */
+type Retry = 'turn' | 'send' | 'feedback' | null;
 
-const REQUEST_TIMEOUT_MS = 45_000;
+const REQUEST_TIMEOUT_MS = 60_000;
+/** The server gives the voice 10 s; past this the phone's own voice reads the line. */
+const VOICE_TIMEOUT_MS = 12_000;
+/** A tiny silent WAV: played inside the Knock tap so iOS lets the same element play later lines. */
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 /** Talk mode: this long without new words ends the rep's line and sends it. */
 const SILENCE_MS = 1600;
 /** And this long with no words at all gives up listening. */
@@ -87,8 +93,6 @@ export function readStoredPractice(uid: string): Session | null {
     return {
       sessionId: raw.sessionId,
       pick: isPersonaChoice(raw.pick) ? raw.pick : 'surprise',
-      voice: raw.voice && (raw.voice.gender === 'f' || raw.voice.gender === 'm') ? raw.voice : null,
-      card: typeof raw.card === 'string' ? raw.card : null,
       turns: raw.turns.filter(
         (turn) =>
           turn && (turn.role === 'rep' || turn.role === 'customer' || turn.role === 'screen') && typeof turn.text === 'string'
@@ -116,7 +120,9 @@ function storeSession(uid: string, session: Session | null) {
   }
 }
 
-async function post<T>(body: Record<string, unknown>): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+async function post<T>(
+  body: Record<string, unknown>
+): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
   try {
     const token = await getIdToken();
     const res = await fetch('/api/portal/ask/practice', {
@@ -127,9 +133,26 @@ async function post<T>(body: Record<string, unknown>): Promise<{ ok: true; data:
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (res.ok) return { ok: true, data: json };
-    return { ok: false, error: json.error || "That didn't go through. Try again." };
+    return { ok: false, error: json.error || "That didn't go through. Try again.", status: res.status };
   } catch {
-    return { ok: false, error: 'Nothing came back. Check your signal and try again.' };
+    return { ok: false, error: 'Nothing came back. Check your signal and try again.', status: 0 };
+  }
+}
+
+/** The homeowner's latest line in the session's voice, or null (the phone's own voice reads it then). */
+async function fetchVoice(sessionId: string, text: string): Promise<Blob | null> {
+  try {
+    const token = await getIdToken();
+    const res = await fetch('/api/portal/ask/practice/voice', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token ?? ''}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, text }),
+      signal: AbortSignal.timeout(VOICE_TIMEOUT_MS),
+    });
+    const blob = res.ok ? await res.blob() : null;
+    return blob && blob.size > 44 ? blob : null;
+  } catch {
+    return null;
   }
 }
 
@@ -169,9 +192,6 @@ function readTalkOff(): boolean {
   }
 }
 
-function stopSpeaking() {
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-}
 
 export function RepPractice({
   uid,
@@ -202,6 +222,11 @@ export function RepPractice({
   const skipSendRef = useRef(false);
   const silenceRef = useRef<number | null>(null);
   const sendRef = useRef<(text: string) => void>(() => {});
+  /** The one audio element every spoken line plays through (unlocked by a tap, reused). */
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  /** Bumped whenever speech should stop: a voice that arrives after that stays quiet. */
+  const speechRef = useRef(0);
 
   const canSpeak = useSyncExternalStore(noSubscribe, () => 'speechSynthesis' in window, () => false);
   const canListen = useSyncExternalStore(noSubscribe, () => recognitionClass() !== undefined, () => false);
@@ -214,6 +239,25 @@ export function RepPractice({
   const clearSilence = () => {
     if (silenceRef.current !== null) window.clearTimeout(silenceRef.current);
     silenceRef.current = null;
+  };
+
+  /** Quiet: stop the homeowner's voice (and one still on its way) and the phone's voice. */
+  const stopSpeaking = useCallback(() => {
+    speechRef.current += 1;
+    audioRef.current?.pause();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }, []);
+
+  /**
+   * Inside a tap: play a silent clip on the audio element so iOS lets it play
+   * the homeowner's voice later, after an await. Once is enough.
+   */
+  const unlockAudio = () => {
+    if (audioRef.current || typeof Audio === 'undefined') return;
+    const audio = new Audio();
+    audioRef.current = audio;
+    audio.src = SILENT_WAV;
+    void audio.play()?.catch(() => {});
   };
 
   /** Stop listening: send what was heard, or throw it away. */
@@ -241,7 +285,7 @@ export function RepPractice({
     if (active) return;
     stopSpeaking();
     stopListening(false);
-  }, [active, stopListening]);
+  }, [active, stopListening, stopSpeaking]);
 
   useEffect(() => {
     // Some browsers load their voices late; asking once starts that.
@@ -249,8 +293,9 @@ export function RepPractice({
     return () => {
       stopSpeaking();
       recognitionRef.current?.abort();
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     };
-  }, []);
+  }, [stopSpeaking]);
 
   useEffect(() => {
     // Back from the background: quiet, and after the idle window a fresh start.
@@ -265,27 +310,35 @@ export function RepPractice({
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [uid, stopListening]);
+  }, [uid, stopListening, stopSpeaking]);
 
   const save = (next: Session | null) => {
     setSession(next);
     storeSession(uid, next);
   };
 
-  /** Reads a homeowner line aloud in this session's voice (Talk on only). */
-  const speak = (line: string, current: Session) => {
+  /** The phone's own voice, when the session's voice didn't come through. Generic on purpose: it says nothing about who this is. */
+  const speakFallback = (line: string) => {
     const text = spokenText(line);
-    const speaker = current.voice;
-    if (!talk || !text || !speaker) return;
+    if (!text || !('speechSynthesis' in window)) return;
     const synth = window.speechSynthesis;
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
-    const voice = pickVoice(synth.getVoices(), speaker.gender, speaker.variant);
+    const voice = pickVoice(synth.getVoices(), null, 0);
     if (voice) utterance.voice = voice;
-    utterance.pitch = speaker.pitch;
-    utterance.rate = speaker.rate;
     synth.speak(utterance);
+  };
+
+  /** Plays the homeowner's voice through the unlocked element; the phone's voice if it won't play. */
+  const play = (voice: Blob, line: string) => {
+    const audio = audioRef.current ?? new Audio();
+    audioRef.current = audio;
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = URL.createObjectURL(voice);
+    audio.setAttribute('src', audioUrlRef.current);
+    const started = audio.play();
+    if (started) started.catch(() => speakFallback(line));
   };
 
   const requestFeedback = async (current: Session) => {
@@ -302,49 +355,69 @@ export function RepPractice({
     if (result.ok && result.data.feedback) {
       save({ ...current, ended: true, feedback: { text: result.data.feedback, score: result.data.score } });
     } else {
-      setFailed({ message: result.ok ? 'No feedback came back. Try again.' : result.error, retry: 'feedback' });
+      setFailed({
+        message: result.ok ? 'No feedback came back. Try again.' : result.error,
+        retry: !result.ok && result.status === 429 ? null : 'feedback',
+      });
     }
     scrollDown('smooth');
   };
 
-  /** The homeowner's next line: the door opening (no turns yet) or the answer to the rep's last line. */
+  /**
+   * The homeowner's next line: the door opening (no turns yet), the answer to
+   * the rep's last line, or a reaction to the price card just pulled up. With
+   * Talk on, the line waits (orb showing) for its voice, then shows and plays.
+   */
   const requestTurn = async (current: Session) => {
     setBusy('turn');
     setFailed(null);
+    setNotice('');
     scrollDown('smooth');
+    const quiet = speechRef.current;
     const knocked = current.turns.length === 0;
     const result = await post<PracticeTurnReply & Partial<PracticeKnockReply>>(
       knocked
         ? { action: 'turn', history: [], ...(canPick ? { persona: current.pick } : {}) }
         : { action: 'turn', sessionId: current.sessionId, history: current.turns }
     );
-    setBusy(null);
     if (result.ok && result.data.reply && (!knocked || result.data.sessionId)) {
       const { reply, ended } = result.data;
       const next: Session = {
         ...current,
-        ...(knocked
-          ? { sessionId: result.data.sessionId ?? null, voice: result.data.voice ?? null, card: result.data.card ?? null }
-          : {}),
+        ...(knocked ? { sessionId: result.data.sessionId ?? null } : {}),
         turns: [...current.turns, { role: 'customer', text: reply }],
         ended,
         endedBy: ended ? 'homeowner' : undefined,
       };
+      const voice = talk && next.sessionId ? await fetchVoice(next.sessionId, reply) : null;
+      setBusy(null);
       save(next);
-      speak(reply, next);
+      // The rep started talking or typing meanwhile: the line shows, unspoken.
+      if (talk && speechRef.current === quiet) {
+        if (voice) play(voice, reply);
+        else speakFallback(reply);
+      }
       scrollDown('smooth');
       if (ended) await requestFeedback(next);
       return;
     }
+    setBusy(null);
     const error = result.ok ? 'The homeowner went quiet. Try again.' : result.error;
+    const retryable = result.ok || result.status !== 429;
+    if (knocked) {
+      // No door opened: back to Knock, with why.
+      save(null);
+      setNotice(error);
+      return;
+    }
     const last = current.turns.at(-1);
     if (last?.role === 'rep') {
       // Nothing to show for it: the line goes back in the composer, ready for Try again.
       save({ ...current, turns: current.turns.slice(0, -1) });
       setDraft(last.text);
-      setFailed({ message: error, retry: 'send' });
+      setFailed({ message: error, retry: retryable ? 'send' : null });
     } else {
-      setFailed({ message: error, retry: 'turn' });
+      setFailed({ message: error, retry: retryable ? 'turn' : null });
     }
     scrollDown('smooth');
   };
@@ -357,6 +430,7 @@ export function RepPractice({
       return;
     }
     stopSpeaking();
+    if (talk) unlockAudio();
     setDraft('');
     setNotice('');
     const next: Session = { ...session, turns: [...session.turns, { role: 'rep', text }] };
@@ -370,17 +444,17 @@ export function RepPractice({
 
   const knock = () => {
     if (busy) return;
-    // iOS only lets a page speak after a tap has spoken once: this silent line is that.
+    // iOS only plays sound a tap started: the audio element and the phone's voice are both unlocked here.
     if (talk) {
+      unlockAudio();
       const unlock = new SpeechSynthesisUtterance(' ');
       unlock.volume = 0;
       window.speechSynthesis.speak(unlock);
     }
+    setNotice('');
     const next: Session = {
       sessionId: null,
       pick: canPick ? choice : 'surprise',
-      voice: null,
-      card: null,
       turns: [],
       ended: false,
       feedback: null,
@@ -402,11 +476,24 @@ export function RepPractice({
     void requestFeedback(next);
   };
 
-  /** The practice order screen: this door's price card goes into the conversation for the homeowner and the coach. */
-  const pullUpPrice = () => {
-    if (!session?.card || session.ended || busy) return;
-    save({ ...session, turns: [...session.turns, { role: 'screen', text: session.card }] });
-    scrollDown('smooth');
+  /**
+   * The practice order screen: the server hands over this door's card only
+   * now, it goes into the conversation, and the homeowner reacts to it.
+   */
+  const pullUpPrice = async () => {
+    if (!session?.sessionId || session.ended || busy) return;
+    stopSpeaking();
+    if (talk) unlockAudio();
+    setBusy('turn');
+    const result = await post<PracticePriceReply>({ action: 'price', sessionId: session.sessionId });
+    if (!result.ok || !result.data.card) {
+      setBusy(null);
+      setNotice(result.ok ? "The price didn't come up. Try again." : result.error);
+      return;
+    }
+    const next: Session = { ...session, turns: [...session.turns, { role: 'screen', text: result.data.card }] };
+    save(next);
+    await requestTurn(next);
   };
 
   const reset = () => {
@@ -420,7 +507,8 @@ export function RepPractice({
   };
 
   const retry = () => {
-    if (!session || !failed) return;
+    if (!session || !failed?.retry) return;
+    if (talk) unlockAudio();
     if (failed.retry === 'feedback') void requestFeedback(session);
     else if (failed.retry === 'turn') void requestTurn(session);
     else sendLine(draft);
@@ -553,6 +641,11 @@ export function RepPractice({
             <DoorOpen size={22} aria-hidden="true" />
             Knock
           </button>
+          {notice ? (
+            <p className={`${p.hint} ${p.hintError} ${pr.center}`} role="alert">
+              {notice}
+            </p>
+          ) : null}
           <p className={`${p.hint} ${pr.center}`}>
             Someone different answers each time. Pitch it like a real door; you find out who it was in your feedback.
           </p>
@@ -633,10 +726,12 @@ export function RepPractice({
           {failed ? (
             <div className={a.failed} role="alert">
               <p>{failed.message}</p>
-              <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={retry}>
-                <RotateCw size={18} aria-hidden="true" />
-                Try again
-              </button>
+              {failed.retry ? (
+                <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={retry}>
+                  <RotateCw size={18} aria-hidden="true" />
+                  Try again
+                </button>
+              ) : null}
             </div>
           ) : null}
           {session.feedback || failed ? (
@@ -651,10 +746,12 @@ export function RepPractice({
           {failed ? (
             <div className={a.failed} role="alert">
               <p>{failed.message}</p>
-              <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={retry} disabled={busy !== null}>
-                <RotateCw size={18} aria-hidden="true" />
-                Try again
-              </button>
+              {failed.retry ? (
+                <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={retry} disabled={busy !== null}>
+                  <RotateCw size={18} aria-hidden="true" />
+                  Try again
+                </button>
+              ) : null}
             </div>
           ) : null}
           {micShown ? (
@@ -726,8 +823,8 @@ export function RepPractice({
                   type="button"
                   className={`${s.btnSecondary} ${pr.sideBtn}`}
                   aria-label={pricePulled ? 'Price is up' : 'Pull up price'}
-                  onClick={pullUpPrice}
-                  disabled={busy !== null || pricePulled || !session.card}
+                  onClick={() => void pullUpPrice()}
+                  disabled={busy !== null || pricePulled || !session.sessionId}
                 >
                   <MonitorSmartphone size={20} aria-hidden="true" />
                   Price

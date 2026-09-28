@@ -17,11 +17,11 @@ const NATURAL = /natural|neural|premium|enhanced|online/i;
 
 /**
  * The voice for a homeowner: US English over other English, natural-sounding
- * over robotic, the homeowner's gender when the name tells, then the seed picks
+ * over robotic, the homeowner's gender when given and the name tells, then the seed picks
  * among equals so the same session always sounds the same. Undefined when the
  * phone has no English voice (the browser default then reads it).
  */
-export function pickVoice<V extends VoiceLike>(voices: readonly V[], gender: 'f' | 'm', seed: number): V | undefined {
+export function pickVoice<V extends VoiceLike>(voices: readonly V[], gender: 'f' | 'm' | null, seed: number): V | undefined {
   const ranked: { voice: V; score: number }[] = [];
   for (const voice of voices) {
     const lang = voice.lang.replace('_', '-').toLowerCase();
@@ -32,7 +32,7 @@ export function pickVoice<V extends VoiceLike>(voices: readonly V[], gender: 'f'
     if (NATURAL.test(voice.name)) score += 3;
     else if (/google/i.test(voice.name)) score += 2;
     if ((gender === 'f' && female) || (gender === 'm' && male)) score += 4;
-    else if (female || male) score -= 4;
+    else if (gender && (female || male)) score -= 4;
     ranked.push({ voice, score });
   }
   if (ranked.length === 0) return undefined;

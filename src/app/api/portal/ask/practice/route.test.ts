@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
-import { PERSONAS } from '@/lib/ask/practice';
+import { PERSONAS, TAG_REMINDER, practiceCustomer } from '@/lib/ask/practice';
 
 // POST /api/portal/ask/practice: the Ask 3C gate, its own daily count, the
 // homeowner call (fast settings, [END] stripped) and the graded, logged
@@ -47,6 +47,10 @@ function modelAnswers(content: string) {
     })
   );
 }
+
+/** A coach answer in the exact shape (no format retry). */
+const coach = (score: number, result = 'No sale') =>
+  `Score: ${score}/10\nResult: ${result}\nWhat worked:\n- "Hi, I'm with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"`;
 
 const sentBody = (call = 0) => JSON.parse(fetchMock.mock.calls[call][1].body as string);
 const practiceLogs = () => [...fake.docs('practiceLog').values()];
@@ -101,7 +105,7 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it('plays the homeowner fast and loose, redacts the rep, and strips [END]', async () => {
-    modelAnswers("Fine, Thursday works. I'm in. [END]");
+    modelAnswers("Fine, Thursday works. I'm in. [OK] [END]");
     const res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reply: "Fine, Thursday works. I'm in.", ended: true });
@@ -115,7 +119,8 @@ describe('POST /api/portal/ask/practice', () => {
     expect(body.messages[0].content).not.toContain('Open with the three things.');
     expect(body.messages.slice(2)).toEqual([
       { role: 'assistant', content: '(opens the door) Yeah?' },
-      { role: 'user', content: "Hi, I'm with 3C. Text me at [phone] or [email]." },
+      // The tag reminder rides on the rep's words, so the model never drops it.
+      { role: 'user', content: `Hi, I'm with 3C. Text me at [phone] or [email].\n${TAG_REMINDER}` },
     ]);
     // A turn is not a finished session.
     expect(practiceLogs()).toHaveLength(0);
@@ -124,48 +129,106 @@ describe('POST /api/portal/ask/practice', () => {
   it('shows the homeowner this door\'s own screen card, whatever the page sent, and the coach sees it too', async () => {
     const card = 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.';
     const history = [...PITCH, { role: 'screen', text: 'Order screen: $1/mo' }, { role: 'rep', text: 'It says $75 with AutoPay.' }];
-    modelAnswers('Hm, that is more than I pay now. [P=5]');
+    modelAnswers('Hm, that is more than I pay now. [OK]');
     await POST(req({ action: 'turn', ...SESSION, history }));
     expect(sentBody().messages.at(-1)).toEqual({
       role: 'user',
-      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep shows you their phone. ${card})\nIt says $75 with AutoPay.`,
+      content: `Hi, I'm with 3C. Text me at [phone] or [email].\n(The rep shows you their phone. ${card})\nIt says $75 with AutoPay.\n${TAG_REMINDER}`,
     });
 
-    modelAnswers('Score: 7/10\nResult: No sale');
+    modelAnswers(coach(7));
     const res = await POST(req({ action: 'feedback', ...SESSION, history, endedBy: 'rep' }));
     expect(sentBody(1).messages[1].content).toContain(`Screen: ${card}\nRep: It says $75 with AutoPay.`);
     expect(fake.docs('practiceLog').get((await res.json()).id)?.turns).toContainEqual({ role: 'screen', text: card });
   });
 
-  it('keeps patience server side, going down only, and closes the door itself at 0', async () => {
-    fake.docs('practiceSessions').set('r1', { ...SAVED, patience: 2 });
-    modelAnswers('Hmm, maybe. [P=4]');
+  it('owns patience: the model reports events, the server counts, and closes the door at 0', async () => {
+    modelAnswers('Hmm. [WEAK]');
     let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    // A higher tag than the saved patience is ignored.
-    expect(await res.json()).toEqual({ reply: 'Hmm, maybe.', ended: false });
-    expect(sentBody().messages[0].content).toContain('you started at 5 and have 2 left');
-    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(2);
+    expect(await res.json()).toEqual({ reply: 'Hmm.', ended: false });
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(4);
 
-    modelAnswers('Fine. [P=1]');
+    // No tag counts as weak.
+    modelAnswers('Uh huh.');
     await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
-    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(1);
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(3);
 
-    modelAnswers('(nods) Yeah, probably. [P=0]');
+    // A caught lie halves what is left and takes one more: 3 -> 0, and the server shuts the door.
+    modelAnswers('Free? Nothing is free. [LIE]');
     res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
     expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
+
+    // At 0 the door is shut whatever the model says next.
+    modelAnswers('Yeah, probably. [OK]');
+    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({ reply: "Look, I'm not interested. I've got to go.", ended: true });
+  });
+
+  it('shuts the door on abuse at once, and on a goodbye without [END]', async () => {
+    modelAnswers('Excuse me? No. [ABUSE]');
+    let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({ reply: "Excuse me? No. We're done here.", ended: true });
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
+
+    fake.docs('practiceSessions').set('r1', SAVED);
+    modelAnswers("I'm good, thanks. Have a nice day. [WEAK]");
+    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    expect(await res.json()).toEqual({ reply: "I'm good, thanks. Have a nice day.", ended: true });
+  });
+
+  it('tells the homeowner, hidden, when the rep quotes a price the screen did not show', async () => {
+    const card = { role: 'screen', text: 'card' };
+    modelAnswers('Wait, the screen said 75. [LIE]');
+    await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, card, { role: 'rep', text: 'So $45 a month with AutoPay.' }] }));
+    expect(sentBody().messages.at(-1).content).toContain(
+      '[Note only you know: the rep just said $45, but the screen they showed you said $75.]'
+    );
+
+    modelAnswers('Where is that from? [LIE]');
+    await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, { role: 'rep', text: "It's 45 dollars." }] }));
+    expect(sentBody(1).messages.at(-1).content).toContain('the rep just quoted $45 without showing you any screen');
+
+    modelAnswers('Okay. [OK]');
+    await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, card, { role: 'rep', text: '$75 with AutoPay.' }] }));
+    expect(sentBody(2).messages.at(-1).content).not.toContain('Note only you know');
+  });
+
+  it('hands over the price card only on Pull up price, and the homeowner then answers the card', async () => {
+    const res = await POST(req({ action: 'price', ...SESSION }));
+    expect(await res.json()).toEqual({
+      card: 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.',
+    });
+    expect((await POST(req({ action: 'price', sessionId: 'old' }))).status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    modelAnswers('Seventy-five, huh. [OK]');
+    const turn = await POST(req({ action: 'turn', ...SESSION, history: [...PITCH, { role: 'screen', text: 'card' }] }));
+    expect(turn.status).toBe(200);
+    expect(sentBody().messages.at(-1).content).toContain('(The rep shows you their phone. Order screen (practice)');
   });
 
   it("draws a rep's homeowner server side from a shuffle bag: all nine before a repeat, never twice in a row", async () => {
     const drawn: string[] = [];
     for (let i = 0; i < 27; i += 1) {
-      modelAnswers('Yeah? [P=5]');
+      modelAnswers('Yeah?');
       // A rep asking for a persona is ignored.
       const res = await POST(req({ action: 'turn', history: [], persona: 'renter' }));
       const reply = await res.json();
-      expect(Object.keys(reply).sort()).toEqual(['card', 'ended', 'reply', 'sessionId', 'voice']);
+      // Nothing that tells the persona: no voice settings, no price card.
+      expect(Object.keys(reply).sort()).toEqual(['ended', 'reply', 'sessionId']);
       const saved = fake.docs('practiceSessions').get('r1')!;
       expect(saved.sessionId).toBe(reply.sessionId);
       expect(saved.patience).toBe(PERSONAS.find((p) => p.id === saved.persona)!.patience);
+      // The picks are kept with the session, and are what the seed draws.
+      const customer = practiceCustomer(saved.persona as never, saved.seed as number);
+      expect(saved.homeowner).toEqual({
+        name: customer.name,
+        voice: customer.ttsVoice,
+        provider: customer.provider,
+        bill: customer.bill,
+        details: customer.details,
+      });
       drawn.push(saved.persona as string);
     }
     for (let round = 0; round < 3; round += 1) {
@@ -178,14 +241,13 @@ describe('POST /api/portal/ask/practice', () => {
 
   it('lets an owner pick the homeowner to demo, and tells the coach who it was first', async () => {
     mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true });
-    modelAnswers('Hello? [P=3]');
+    modelAnswers('Hello?');
     const knock = await (await POST(req({ action: 'turn', history: [], persona: 'att-fiber' }))).json();
     expect(fake.docs('practiceSessions').get('o1')).toMatchObject({ persona: 'att-fiber', sessionId: knock.sessionId });
-    expect(knock.card).toContain('$85/mo');
 
-    modelAnswers('Score: 9/10\nResult: Walked away the right way');
+    modelAnswers(coach(9, 'Walked away the right way'));
     const res = await POST(req({ action: 'feedback', sessionId: knock.sessionId, history: PITCH, endedBy: 'rep' }));
-    expect((await res.json()).feedback).toBe('This was: Already has AT&T Fiber\nScore: 9/10\nResult: Walked away the right way');
+    expect((await res.json()).feedback).toMatch(/^This was: Already has AT&T Fiber\nScore: 9\/10\nResult: Walked away the right way\n/);
   });
 
   it('refuses a turn that is not an answer to the rep, a bad transcript, or a stale session', async () => {
@@ -203,7 +265,7 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it('grades against the notes and logs the session with its parsed score', async () => {
-    modelAnswers('Score: 6/10\nResult: no sale\nWhat worked:\n- "Hi, I\'m with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"');
+    modelAnswers(coach(6));
     const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     expect(res.status).toBe(200);
     const { id, score, feedback } = await res.json();
@@ -212,8 +274,11 @@ describe('POST /api/portal/ask/practice', () => {
     expect(feedback).toMatch(/^This was: Price shopper\nScore: 6\/10/);
 
     const body = sentBody();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(body.thinking).toEqual({ type: 'enabled' });
     expect(body.messages[0].content).toContain('Open with the three things.');
+    // The coach never learns the homeowner's name, so it can't slip into the feedback.
+    expect(body.messages[0].content).not.toContain(practiceCustomer('price-shopper', 42).name);
     expect(body.messages[0].content).toContain('Type: Price shopper');
     expect(body.messages[0].content).toContain('The rep ended it');
     expect(body.messages[1].content).toContain('Rep: Hi, I\'m with 3C. Text me at [phone] or [email].');
@@ -224,6 +289,7 @@ describe('POST /api/portal/ask/practice', () => {
       persona: 'price-shopper',
       personaLabel: 'Price shopper',
       score: 6,
+      result: 'No sale',
       endedBy: 'rep',
       feedback,
       turns: [PITCH[0], { role: 'rep', text: "Hi, I'm with 3C. Text me at [phone] or [email]." }],
@@ -232,19 +298,57 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it('never lets a sellable homeowner end as "walked away the right way"', async () => {
-    modelAnswers('Score: 2/10\nResult: Walked away the right way\nFix next time: Ask questions.');
+    modelAnswers(coach(2, 'Walked away the right way'));
     const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'homeowner' }));
     const { feedback } = await res.json();
-    expect(feedback).toBe('This was: Price shopper\nScore: 2/10\nResult: No sale\nFix next time: Ask questions.');
+    expect(feedback).toBe(`This was: Price shopper\n${coach(2, 'No sale')}`);
     expect(sentBody().messages[0].content).toContain("The homeowner's last line ended it");
     expect(practiceLogs()[0]).toMatchObject({ feedback, endedBy: 'homeowner' });
   });
 
-  it('logs a null score when the coach skips the Score line', async () => {
+  it('asks the coach once more when it breaks the format, and uses the fixed answer', async () => {
+    modelAnswers(`${coach(3)}\nHonesty flags: never promise that.`);
+    modelAnswers(coach(3));
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
+    expect((await res.json()).feedback).toBe(`This was: Price shopper\n${coach(3)}`);
+    expect(sentBody(1).messages.at(-1).content).toMatch(/^That broke the format \(an extra line or section/);
+    expect(practiceLogs()).toHaveLength(1);
+  });
+
+  it('logs a null score when the coach skips the Score line, even after the retry', async () => {
     modelAnswers('Good energy. Ask more questions.');
+    modelAnswers('Still no score.');
     const res = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
     expect((await res.json()).score).toBeNull();
     expect(practiceLogs()[0].score).toBeNull();
+  });
+
+  it('grades a session once: a second request gets the stored result, no model call, no second log', async () => {
+    modelAnswers(coach(5));
+    const first = await (await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }))).json();
+    const second = await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'homeowner' }));
+    expect(second.status).toBe(200);
+    expect(await second.json()).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(practiceLogs()).toHaveLength(1);
+  });
+
+  it('a feedback request while another is grading waits for that result instead of grading again', async () => {
+    const { promise: answer, resolve } = Promise.withResolvers<Response>();
+    fetchMock.mockReturnValueOnce(answer);
+    const first = POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const second = POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }));
+    resolve(
+      new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: coach(4) } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    const [a, b] = await Promise.all([(await first).json(), (await second).json()]);
+    expect(b).toEqual(a);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(practiceLogs()).toHaveLength(1);
   });
 
   it('allows 150 practice calls a day on a counter of its own, then 429s', async () => {
@@ -268,5 +372,8 @@ describe('POST /api/portal/ask/practice', () => {
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("The coach couldn't answer right now. Try again in a minute.");
     expect(practiceLogs()).toHaveLength(0);
+    // The failed grading doesn't block a retry.
+    modelAnswers(coach(4));
+    expect((await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep' }))).status).toBe(200);
   });
 });

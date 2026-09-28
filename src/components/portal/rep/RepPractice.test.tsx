@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 //
-// Ask 3C Practice on the rep page: pick, knock, pitch, the door closes, the
-// feedback shows, practice again. With no speech APIs it is plain typing; with
-// them the homeowner is read aloud and a dictated line sends itself.
+// Ask 3C Practice on the rep page: knock, pitch, the door closes, the feedback
+// shows, practice again. With no speech APIs it is plain typing; with them the
+// homeowner speaks in the session's voice (the phone's own when that fails)
+// and a dictated line sends itself.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,16 +18,21 @@ import { RepPractice } from './RepPractice';
 let container: HTMLDivElement;
 let root: Root;
 const fetchMock = vi.fn();
+/** Answers for POST /api/portal/ask/practice and .../practice/voice, in order. */
+let practiceAnswers: Array<Response | Promise<Response>> = [];
+let voiceAnswers: Array<Response | Promise<Response>> = [];
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 function replies(...bodies: unknown[]) {
-  for (const body of bodies) {
-    fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
-    );
-  }
+  for (const body of bodies) practiceAnswers.push(json(body));
 }
 
-const sent = (call: number) => JSON.parse(fetchMock.mock.calls[call][1].body as string);
+const isVoice = (call: unknown[]) => String(call[0]).endsWith('/voice');
+const practiceCalls = () => fetchMock.mock.calls.filter((call) => !isVoice(call));
+const voiceCalls = () => fetchMock.mock.calls.filter(isVoice).map((call) => JSON.parse(call[1].body as string));
+const sent = (call: number) => JSON.parse(practiceCalls()[call][1].body as string);
 const button = (label: string) =>
   [...container.querySelectorAll('button')].find((b) => b.textContent?.includes(label)) as HTMLButtonElement | undefined;
 const text = () => container.textContent ?? '';
@@ -51,18 +57,18 @@ async function render(canPick = false) {
 }
 
 const CARD = 'Order screen (practice): Fiber 500 — $75/mo with AutoPay. Real prices come from your order screen.';
-/** The knock's answer: the door opens and the session starts; the page never learns the persona. */
-const door = (reply: string) => ({
-  reply,
-  ended: false,
-  sessionId: 's1',
-  voice: { gender: 'f', pitch: 0.85, rate: 0.88, variant: 0 },
-  card: CARD,
-});
+/** The knock's answer: the door opens and the session starts; the page learns nothing else. */
+const door = (reply: string) => ({ reply, ended: false, sessionId: 's1' });
 
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
+  practiceAnswers = [];
+  voiceAnswers = [];
+  fetchMock.mockImplementation(async (url: string) => {
+    const next = (url.endsWith('/voice') ? voiceAnswers : practiceAnswers).shift();
+    return next ?? new Response('', { status: 503 });
+  });
   Element.prototype.scrollIntoView = () => {};
   window.matchMedia ??= ((query: string) =>
     ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
@@ -125,25 +131,45 @@ describe('RepPractice', () => {
     expect(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)).toBeNull();
   });
 
-  it('pulls up the practice price card once, and sends it with the next line', async () => {
+  it('gets the price card only on Pull up price, shows it, then the homeowner answers it', async () => {
     await render();
     expect(button('Price')).toBeUndefined();
     replies(door('Yeah?'));
     await click('Knock');
+    expect(text()).not.toContain('Order screen');
+    replies({ card: CARD }, { reply: 'Seventy-five, huh. Okay.', ended: false });
     await click('Price');
-    expect(text()).toContain(CARD);
+    expect(sent(1)).toEqual({ action: 'price', sessionId: 's1' });
+    expect(sent(2)).toMatchObject({ action: 'turn', sessionId: 's1' });
+    expect(sent(2).history.map((turn: { role: string }) => turn.role)).toEqual(['customer', 'screen']);
+    // The card comes first in the thread, then the homeowner's reaction to it.
+    expect(text().indexOf(CARD)).toBeLessThan(text().indexOf('Seventy-five, huh.'));
     expect(button('Price')?.disabled).toBe(true);
-    replies({ reply: 'Huh.', ended: false });
-    await type('It says 75 with AutoPay.');
+  });
+
+  it('at the daily limit: back to Knock with the reason, and no Try again', async () => {
+    await render();
+    practiceAnswers.push(json({ error: "That's 150 practice replies today, the daily limit." }, 429));
+    await click('Knock');
+    expect(text()).toContain("That's 150 practice replies today");
+    expect(button('Knock')).toBeDefined();
+    expect(button('Try again')).toBeUndefined();
+    expect(container.querySelector('textarea')).toBeNull();
+
+    replies(door('Hi?'));
+    await click('Knock');
+    practiceAnswers.push(json({ error: "That's 150 practice replies today, the daily limit." }, 429));
+    await type('Hello there.');
     await click('Send');
-    expect(sent(1).history.map((turn: { role: string }) => turn.role)).toEqual(['customer', 'screen', 'rep']);
+    expect(text()).toContain("That's 150 practice replies today");
+    expect(button('Try again')).toBeUndefined();
   });
 
   it('puts a line that got no answer back in the composer', async () => {
     await render();
     replies(door('Hi?'));
     await click('Knock');
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'The homeowner took too long.' }), { status: 504 }));
+    practiceAnswers.push(json({ error: 'The homeowner took too long.' }, 504));
     await type('Do you pay for internet yourself?');
     await click('Send');
     expect(text()).toContain('The homeowner took too long.');
@@ -151,7 +177,16 @@ describe('RepPractice', () => {
     expect(text()).not.toContain('Do you pay for internet yourself?Homeowner');
   });
 
-  it('with Talk on: unlocks speech on the knock, reads the homeowner aloud, and sends a dictated line', async () => {
+  it("with Talk on: unlocks audio on the knock, plays the session's voice through it, and sends a dictated line", async () => {
+    const played: { element: HTMLMediaElement; src: string }[] = [];
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
+      played.push({ element: this, src: this.src });
+      return Promise.resolve();
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    let blobs = 0;
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => `blob:voice-${++blobs}`, revokeObjectURL: () => {} }));
+    const wav = () => new Response(new Uint8Array(200), { status: 200, headers: { 'content-type': 'audio/wav' } });
     const spoken: { text: string; volume: number }[] = [];
     vi.stubGlobal(
       'SpeechSynthesisUtterance',
@@ -199,10 +234,22 @@ describe('RepPractice', () => {
 
     await render();
     expect(button('Talk on')?.getAttribute('aria-pressed')).toBe('true');
+    // The voice is still on its way: the orb holds the homeowner's place and the line waits for it.
+    const { promise: voice, resolve: voiceArrives } = Promise.withResolvers<Response>();
+    voiceAnswers.push(voice);
     replies(door('Hello, dear?'));
     await click('Knock');
+    // Unlocked inside the tap, before anything was awaited.
+    expect(played[0].src).toMatch(/^data:audio\/wav;base64,/);
     expect(spoken[0]).toEqual({ text: ' ', volume: 0 });
-    expect(spoken[1]).toEqual({ text: 'Hello, dear?', volume: 1 });
+    expect(container.querySelector('[aria-label="The homeowner is answering"]')).not.toBeNull();
+    expect(text()).not.toContain('Hello, dear?');
+    await act(async () => voiceArrives(wav()));
+    expect(voiceCalls()).toEqual([{ sessionId: 's1', text: 'Hello, dear?' }]);
+    expect(text()).toContain('Hello, dear?');
+    // The same unlocked element plays the voice; the phone's own voice stays quiet.
+    expect(played[1]).toEqual({ element: played[0].element, src: 'blob:voice-1' });
+    expect(spoken).toHaveLength(1);
 
     await click('Tap to talk');
     expect(recognition!.lang).toBe('en-US');
@@ -210,6 +257,7 @@ describe('RepPractice', () => {
       recognition!.onresult({ results: [[{ transcript: 'Hi, I am with' }], [{ transcript: ' 3C.' }]] })
     );
     expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Hi, I am with 3C.');
+    // The voice fails this time (no answer queued: 503): the phone's own voice reads the line.
     replies({ reply: 'Oh?', ended: false });
     await click('Listening');
     expect(sent(1).history.at(-1)).toEqual({ role: 'rep', text: 'Hi, I am with 3C.' });
@@ -218,11 +266,19 @@ describe('RepPractice', () => {
     // Nothing heard: nothing sent, and a note to try again.
     await click('Tap to talk');
     await click('Listening');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(practiceCalls()).toHaveLength(2);
     expect(text()).toContain("Didn't catch that — tap to try again.");
 
-    // Talk off sticks on this phone across visits.
+    // Talk off: no voice is fetched at all.
     await click('Talk on');
+    const voices = voiceCalls().length;
+    replies({ reply: 'Hm.', ended: false });
+    await type('Quick question.');
+    await click('Send');
+    expect(text()).toContain('Hm.');
+    expect(voiceCalls()).toHaveLength(voices);
+
+    // Talk off sticks on this phone across visits.
     act(() => root.unmount());
     root = createRoot(container);
     await render();
@@ -233,7 +289,7 @@ describe('RepPractice', () => {
     await render();
     replies(door('Hi?'));
     await click('Knock');
-    replies({ reply: 'Okay.', ended: false }, { id: 'p2', feedback: 'Score: 4/10\nResult: No sale', score: 4 });
+    replies({ reply: 'Okay.', ended: false }, { id: 'p2', feedback: 'This was: Renter\nScore: 4/10\nResult: No sale', score: 4 });
     await type('Hi there.');
     await click('Send');
     await click('End');

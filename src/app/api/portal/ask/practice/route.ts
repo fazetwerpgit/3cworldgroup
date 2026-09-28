@@ -6,10 +6,13 @@ import { askAudience } from '@/lib/ask/flag';
 import {
   KNOCK,
   MAX_PRACTICE_TURNS,
+  TAG_REMINDER,
   buildCustomerPrompt,
   buildFeedbackPrompt,
   drawPersona,
   enforceResult,
+  feedbackProblem,
+  homeownerPicks,
   isPersonaChoice,
   isPersonaId,
   isPracticeSeed,
@@ -17,6 +20,7 @@ import {
   parseScore,
   practiceCustomer,
   practiceScreenCard,
+  priceNote,
   readCustomerReply,
   revealFeedback,
   transcriptText,
@@ -24,6 +28,7 @@ import {
   type PracticeEndedBy,
   type PracticeFeedbackReply,
   type PracticeKnockReply,
+  type PracticePriceReply,
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
@@ -34,30 +39,54 @@ import { PRACTICE_DAILY_LIMIT, PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeD
 // POST /api/portal/ask/practice
 //   { action: 'turn', history: [], persona? }          the knock: the server picks who is
 //                                                      behind the door and starts the session
-//   { action: 'turn', sessionId, history }             the homeowner's next line
+//   { action: 'turn', sessionId, history }             the homeowner's next line (history ends
+//                                                      with the rep's line or the price card)
+//   { action: 'price', sessionId }                     the door's order screen card (Pull up price)
 //   { action: 'feedback', sessionId, history, endedBy: 'homeowner'|'rep' }
-//                                                      the coach's grade; logs the session
+//                                                      the coach's grade; logs the session once
 // Ask 3C Practice: the rep pitches, the model plays a homeowner, then grades
 // the pitch against the owner's notes. Reps never choose or see the persona:
 // the knock draws it from the rep's shuffle bag (all nine before any repeat)
-// and keeps it server side in practiceSessions/{uid} with its seed, the
-// homeowner's patience and the bag; the page only holds the session id. Owners may pick a persona
-// (persona, default 'surprise') to demo one. Same gate as Ask 3C, its own daily
+// and keeps it server side in practiceSessions/{uid} with its seed, the picks
+// drawn from it, the homeowner's patience and the bag. The page holds only the
+// session id until the feedback reveals who it was. Owners may pick a persona
+// (persona, default 'surprise') to demo one. The server owns patience: the
+// model only tags how each rep line landed. Same gate as Ask 3C, its own daily
 // count and its own log (practiceLog). Typed emails and phone numbers are
 // redacted before the model or the log sees them.
 
 export const runtime = 'nodejs';
-export const maxDuration = 45;
+export const maxDuration = 60;
 
 const STUB_MODEL = 'sandbox-stub';
 const TRY_AGAIN = 'Try again in a minute.';
 /** Homeowner lines: quick, and different each time. */
 const CUSTOMER_CALL = { think: false, temperature: 0.8, maxTokens: 400 } as const;
+/** The coach gets one retry when its answer breaks the format; both fit in maxDuration. */
+const COACH_TIMEOUT_MS = 25_000;
+const COACH_RETRY_MIN_MS = 8_000;
+/** A second feedback request while the first is grading waits for that result instead of grading again. */
+const GRADING_STALE_MS = 60_000;
+const GRADING_WAIT_MS = 40_000;
+const GRADING_POLL_MS = 500;
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
 
 function log(event: Record<string, string | number | boolean>) {
   console.info('[ask-3c-practice]', JSON.stringify(event));
+}
+
+interface StoredFeedback {
+  id: string;
+  feedback: string;
+  score: number | null;
+}
+
+function storedFeedback(value: unknown): StoredFeedback | null {
+  const stored = value as Partial<StoredFeedback> | null | undefined;
+  return stored && typeof stored.id === 'string' && typeof stored.feedback === 'string'
+    ? { id: stored.id, feedback: stored.feedback, score: typeof stored.score === 'number' ? stored.score : null }
+    : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -72,14 +101,34 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const action = body?.action;
-  if (action !== 'turn' && action !== 'feedback') return fail('Unknown practice action', 400);
+  if (action !== 'turn' && action !== 'feedback' && action !== 'price') return fail('Unknown practice action', 400);
+
+  const sessionRef = db.collection(PRACTICE_SESSIONS).doc(gate.uid);
+  const saved = (await sessionRef.get()).data() ?? {};
+  const current =
+    typeof body?.sessionId === 'string' &&
+    saved.sessionId === body.sessionId &&
+    isPersonaId(saved.persona) &&
+    isPracticeSeed(saved.seed)
+      ? { sessionId: body.sessionId, personaId: saved.persona, seed: saved.seed }
+      : null;
+  const over = () => fail('That practice is over. Knock again to start a new one.', 409);
+
+  if (action === 'price') {
+    if (!current) return over();
+    return NextResponse.json<PracticePriceReply>({
+      card: practiceScreenCard(practiceCustomer(current.personaId, current.seed).persona),
+    });
+  }
+
   const history = parsePracticeHistory(body?.history);
   if (!history) return fail('Bad practice conversation', 400);
   const knock = action === 'turn' && history.length === 0;
   if (action === 'turn') {
-    // The homeowner answers the knock (no lines yet) or the rep's last line, and never runs past the cap.
+    // The homeowner answers the knock (no lines yet), the rep's last line, or the price card the rep just
+    // pulled up, and never runs past the cap.
     if (history.length >= MAX_PRACTICE_TURNS) return fail("That's as long as a practice runs. Get your feedback.", 400);
-    if (!knock && history.at(-1)?.role !== 'rep') return fail('Say something first', 400);
+    if (!knock && history.at(-1)?.role === 'customer') return fail('Say something first', 400);
   } else if (!history.some((turn) => turn.role === 'rep')) {
     return fail('Say something to the homeowner first', 400);
   }
@@ -87,8 +136,6 @@ export async function POST(request: NextRequest) {
   if (action === 'feedback' && body?.endedBy !== endedBy) return fail('Bad practice ending', 400);
 
   // Who is behind the door: drawn on the knock, read back from the rep's session after that.
-  const sessionRef = db.collection(PRACTICE_SESSIONS).doc(gate.uid);
-  const saved = (await sessionRef.get()).data() ?? {};
   let sessionId: string;
   let personaId: PersonaId;
   let seed: number;
@@ -103,27 +150,41 @@ export async function POST(request: NextRequest) {
     seed = randomInt(0, 2 ** 32 - 1);
     patienceBefore = practiceCustomer(personaId, seed).persona.patience;
   } else {
-    if (
-      typeof body?.sessionId !== 'string' ||
-      saved.sessionId !== body.sessionId ||
-      !isPersonaId(saved.persona) ||
-      !isPracticeSeed(saved.seed)
-    ) {
-      return fail('That practice is over. Knock again to start a new one.', 409);
-    }
-    sessionId = body.sessionId;
-    personaId = saved.persona;
-    seed = saved.seed;
+    if (!current) return over();
+    ({ sessionId, personaId, seed } = current);
     const start = practiceCustomer(personaId, seed).persona.patience;
     patienceBefore = Number.isInteger(saved.patience) ? Math.min(start, Math.max(0, saved.patience as number)) : start;
   }
 
+  if (action === 'feedback') {
+    // Graded once: a second request (a reload during Thinking…) gets the stored result, or waits for the
+    // grading already under way, and never grades or logs again.
+    const done = storedFeedback(saved.feedback);
+    if (done) return NextResponse.json<PracticeFeedbackReply>(done);
+    const claimed = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(sessionRef);
+      if (snap.get('sessionId') !== sessionId) return 'over' as const;
+      if (storedFeedback(snap.get('feedback'))) return 'done' as const;
+      const gradingAt = Number(snap.get('gradingAt')) || 0;
+      if (Date.now() - gradingAt < GRADING_STALE_MS) return 'busy' as const;
+      tx.update(sessionRef, { gradingAt: Date.now() });
+      return 'mine' as const;
+    });
+    if (claimed === 'over') return over();
+    if (claimed !== 'mine') return waitForFeedback(sessionRef, sessionId);
+  }
+
   const config = askProviderConfig();
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
-  if (!config.apiKey && !stub) return fail('Practice is not set up yet. Call Jeremy or Jacob.', 503);
+  const release = () => (action === 'feedback' ? sessionRef.update({ gradingAt: 0 }) : Promise.resolve());
+  if (!config.apiKey && !stub) {
+    await release();
+    return fail('Practice is not set up yet. Call Jeremy or Jacob.', 503);
+  }
 
   const now = new Date();
   if (!(await takeDailyPractice(db, gate.uid, now))) {
+    await release();
     return fail(`That's ${PRACTICE_DAILY_LIMIT} practice replies today, the daily limit. Back at it tomorrow.`, 429);
   }
 
@@ -144,7 +205,7 @@ export async function POST(request: NextRequest) {
     let reply: string;
     let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
     if (stub) {
-      reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called.';
+      reply = turns.length === 0 ? 'Hi, can I help you?' : 'Sandbox homeowner here. No model was called. [OK]';
     } else {
       const messages: AskMessage[] = [{ role: 'system', content: buildCustomerPrompt(customer, patienceBefore) }];
       // The homeowner's side: the knock, the rep's lines and the screen they were shown, one user message
@@ -159,34 +220,43 @@ export async function POST(request: NextRequest) {
         const line = turn.role === 'screen' ? `(The rep shows you their phone. ${turn.text})` : turn.text;
         heard = heard ? `${heard}\n${line}` : line;
       }
-      messages.push({ role: 'user', content: heard });
+      // Hidden from the rep: a price that doesn't match the screen, and the tag the reply must carry.
+      const note = knock ? null : priceNote(turns, customer);
+      messages.push({ role: 'user', content: [heard, note, knock ? null : TAG_REMINDER].filter(Boolean).join('\n') });
       try {
         ({ answer: reply, usage } = await callAskModel(config, messages, CUSTOMER_CALL));
       } catch (error) {
         return providerFailure(error, action, started);
       }
     }
-    const { text, ended, patience } = readCustomerReply(reply, patienceBefore);
-    log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, ms: Date.now() - started, ...usage });
+    const { text, ended, patience, event } = readCustomerReply(reply, patienceBefore, !knock);
+    log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', ms: Date.now() - started, ...usage });
     if (!knock) {
-      await sessionRef.update({ patience, updatedAt: now });
+      // lastLine: the one line POST .../practice/voice will speak.
+      await sessionRef.update({ patience, lastLine: text, updatedAt: now });
       return NextResponse.json<PracticeTurnReply>({ reply: text, ended });
     }
-    // The session exists once the door has opened; a knock that got no answer leaves the last one as it was.
-    await sessionRef.set({ uid: gate.uid, sessionId, persona: personaId, seed, patience, bag, startedAt: now, updatedAt: now });
-    return NextResponse.json<PracticeKnockReply>({
-      reply: text,
-      ended,
+    // The session exists once the door has opened; a knock that got no answer leaves the last one as it
+    // was. The seed fixes every pick; the picks are written out too so they read without the code.
+    await sessionRef.set({
+      uid: gate.uid,
       sessionId,
-      voice: { gender: customer.gender, pitch: customer.voice.pitch, rate: customer.voice.rate, variant: seed },
-      card,
+      persona: personaId,
+      seed,
+      patience,
+      bag,
+      lastLine: text,
+      homeowner: homeownerPicks(customer),
+      startedAt: now,
+      updatedAt: now,
     });
+    return NextResponse.json<PracticeKnockReply>({ reply: text, ended, sessionId });
   }
 
   let feedback: string;
   let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
   if (stub) {
-    feedback = 'Score: 7/10\nResult: sandbox, no model was called.\nWhat worked:\n- You showed up.\nFix next time: Nothing yet.\nTry this line: "Hi, I\'m with 3C."';
+    feedback = 'Score: 7/10\nResult: No sale\nWhat worked:\n- "Sandbox: no model was called."\nFix next time: Nothing yet.\nTry this line: "Hi, I\'m with 3C."';
   } else {
     const notes = await loadNotes(db);
     const messages: AskMessage[] = [
@@ -194,29 +264,67 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: `Grade this practice.\n\nTranscript:\n${transcriptText(turns)}` },
     ];
     try {
-      ({ answer: feedback, usage } = await callAskModel(config, messages));
+      ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS }));
+      // One retry when the shape is off (an extra section, a missing one, a price in the Try line).
+      const problem = feedbackProblem(feedback);
+      const left = maxDuration * 1000 - 5_000 - (Date.now() - started);
+      if (problem && left >= COACH_RETRY_MIN_MS) {
+        log({ outcome: 'coach_format_retry', problem });
+        const retry = await callAskModel(
+          config,
+          [
+            ...messages,
+            { role: 'assistant', content: feedback },
+            { role: 'user', content: `That broke the format (${problem}). Write it again in exactly the required shape, nothing else.` },
+          ],
+          { timeoutMs: Math.min(COACH_TIMEOUT_MS, left) }
+        ).catch(() => null);
+        if (retry) feedback = retry.answer;
+      }
       feedback = enforceResult(feedback, customer.persona.shouldBuy);
     } catch (error) {
+      await release();
       return providerFailure(error, action, started);
     }
   }
   feedback = revealFeedback(feedback, customer.persona);
   const score = parseScore(feedback);
+  const result = /^\s*result\s*:\s*(.+)$/im.exec(feedback)?.[1].trim() ?? null;
   const ref = await db.collection(PRACTICE_LOG).add({
     uid: gate.uid,
     repName: gate.name,
     persona: customer.persona.id,
     personaLabel: customer.persona.label,
     seed,
+    homeowner: homeownerPicks(customer),
     turns,
     endedBy,
     score,
+    result,
     feedback,
     model: stub ? STUB_MODEL : config.model,
     createdAt: now,
   });
+  const reply: PracticeFeedbackReply = { id: ref.id, feedback, score };
+  await sessionRef.update({ feedback: reply, gradingAt: 0, updatedAt: now });
   log({ outcome: 'ok', action, stub, turns: turns.length, score: score ?? -1, ms: Date.now() - started, ...usage });
-  return NextResponse.json<PracticeFeedbackReply>({ id: ref.id, feedback, score });
+  return NextResponse.json<PracticeFeedbackReply>(reply);
+}
+
+/** Another request is grading this session: its result, once stored. */
+async function waitForFeedback(sessionRef: FirebaseFirestore.DocumentReference, sessionId: string) {
+  const until = Date.now() + GRADING_WAIT_MS;
+  while (Date.now() < until) {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, GRADING_POLL_MS);
+    await promise;
+    const snap = (await sessionRef.get()).data() ?? {};
+    if (snap.sessionId !== sessionId) break;
+    const done = storedFeedback(snap.feedback);
+    if (done) return NextResponse.json<PracticeFeedbackReply>(done);
+    if (!snap.gradingAt) return fail(`The coach couldn't answer right now. ${TRY_AGAIN}`, 502);
+  }
+  return fail(`The coach is still working on it. ${TRY_AGAIN}`, 504);
 }
 
 function providerFailure(error: unknown, action: string, started: number) {

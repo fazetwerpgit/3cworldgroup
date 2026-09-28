@@ -137,3 +137,60 @@
   color: var(--c-text);
   font-weight: 600;
 }
+
+/* One line per practice session; tap to open it. */
+.session + .session {
+  border-top: 1px solid var(--c-line);
+}
+
+.sessionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s3) var(--s4);
+  border: 0;
+  background: transparent;
+  color: var(--c-text-3);
+  font: 500 var(--t-sm) / 1.35 var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sessionRow b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.sessionRow:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .sessionRow:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+.chev {
+  margin-left: auto;
+  transition: transform 140ms ease;
+}
+
+.sessionRow[aria-expanded='true'] .chev {
+  transform: rotate(180deg);
+}
+
+.sessionBody {
+  display: grid;
+  gap: var(--s2);
+  padding: 0 var(--s4) var(--s4);
+}
+
+.repFilter {
+  min-width: 0;
+  max-width: 220px;
+}

@@ -7,6 +7,7 @@ import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 //   askLog/{id}                one doc per exchange (never the photo)
 //   askUsage/{uid}_{day}       questions a rep asked on a Chicago day
 //   askUsage/{uid}_{day}_practice   Practice model calls that day (its own count)
+//   askUsage/{uid}_{day}_practice_voice   Practice lines spoken by the TTS voice that day
 //   practiceLog/{id}           one doc per finished Practice (with its feedback)
 //   practiceSessions/{uid}     the rep's current Practice: who is behind the door (hidden from the rep)
 
@@ -17,6 +18,8 @@ export const PRACTICE_LOG = 'practiceLog';
 export const PRACTICE_SESSIONS = 'practiceSessions';
 /** Homeowner replies and feedback both count: each is a model call. */
 export const PRACTICE_DAILY_LIMIT = 150;
+/** Homeowner lines read aloud by the TTS voice: at most one per homeowner line, plus a few replays. */
+export const PRACTICE_VOICE_DAILY_LIMIT = 150;
 
 export type AskRating = 'up' | 'down';
 
@@ -56,6 +59,11 @@ export function takeDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: 
 /** Same for Practice, on its own counter: practicing never uses up Ask questions. */
 export function takeDailyPractice(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
   return takeDaily(db, uid, now, '_practice', PRACTICE_DAILY_LIMIT);
+}
+
+/** Practice's spoken lines, on a counter of their own so talk mode never eats into practice replies. */
+export function takeDailyPracticeVoice(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<boolean> {
+  return takeDaily(db, uid, now, '_practice_voice', PRACTICE_VOICE_DAILY_LIMIT);
 }
 
 async function takeDaily(

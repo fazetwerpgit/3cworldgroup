@@ -13,6 +13,12 @@ import {
   practiceCustomer,
   practiceScreenCard,
   readCustomerReply,
+  nextPatience,
+  priceNote,
+  feedbackProblem,
+  voicePool,
+  VOICE_BOOK,
+  OUT_OF_PATIENCE,
 } from './practice';
 
 // Practice's pure pieces: one seed is one homeowner (page and server agree),
@@ -72,44 +78,122 @@ describe('practiceCustomer', () => {
     );
   });
 
-  it('tells the homeowner their starting and current patience', () => {
-    expect(buildCustomerPrompt(practiceCustomer('busy-parent', 1), 2)).toContain('you started at 3 and have 2 left');
-    expect(buildCustomerPrompt(practiceCustomer('elderly', 1), 5)).toContain('you started at 5 and have 5 left');
+  it('draws a voice from the persona\'s pool, a name to match its gender, and one or two of its details', () => {
+    for (const persona of PERSONAS) {
+      const pool = voicePool(persona);
+      expect(pool.length).toBeGreaterThan(1);
+      for (let seed = 1; seed < 200; seed += 7) {
+        const customer = practiceCustomer(persona.id, seed);
+        expect(pool).toContain(customer.ttsVoice);
+        expect(customer.gender).toBe(VOICE_BOOK[customer.ttsVoice].gender);
+        expect(customer.style).toBe(persona.style[customer.gender]);
+        expect(customer.details.length).toBeGreaterThanOrEqual(1);
+        expect(customer.details.length).toBeLessThanOrEqual(2);
+        expect(new Set(customer.details).size).toBe(customer.details.length);
+        for (const detail of customer.details) expect(persona.details).toContain(detail);
+        if (persona.providers) expect(persona.providers).toContain(customer.provider);
+      }
+    }
+  });
+
+  it('gives the older homeowner only older voices, and busy parents both moms and dads', () => {
+    const elderly = PERSONAS.find((p) => p.id === 'elderly')!;
+    for (const voice of voicePool(elderly)) expect(VOICE_BOOK[voice].age).toBe('older');
+    const parents = new Set(Array.from({ length: 60 }, (_, seed) => practiceCustomer('busy-parent', seed).gender));
+    expect(parents).toEqual(new Set(['f', 'm']));
+  });
+});
+
+describe('buildCustomerPrompt', () => {
+  it('tells the homeowner how thin the server-kept patience is, never a number to maintain', () => {
+    const customer = practiceCustomer('busy-parent', 1);
+    expect(buildCustomerPrompt(customer, 3)).toContain('Your patience is full');
+    expect(buildCustomerPrompt(customer, 2)).toContain('Your patience is wearing thin');
+    expect(buildCustomerPrompt(customer, 1)).toContain('almost gone');
+    expect(buildCustomerPrompt(customer, 3)).not.toMatch(/\[P=/);
   });
 });
 
 describe('readCustomerReply', () => {
-  it('strips the patience tag, the end marker and stage directions', () => {
-    expect(readCustomerReply("(wipes hands) Fine, let's do Thursday. [END] [P=2]", 3)).toEqual({
-      text: "Fine, let's do Thursday.",
-      ended: true,
-      patience: 2,
-    });
-    expect(readCustomerReply('*sighs* Who are you with? (kids yelling behind you)[P=4]', 4)).toEqual({
-      text: 'Who are you with?',
-      ended: false,
-      patience: 4,
-    });
+  it('moves patience by the reported event: OK keeps, WEAK takes 1, LIE halves then takes 1, ABUSE empties', () => {
+    expect(readCustomerReply('Sure, go on. [OK]', 5).patience).toBe(5);
+    expect(readCustomerReply('I said no. [WEAK]', 5).patience).toBe(4);
+    expect(readCustomerReply('Free? Come on. [LIE]', 5).patience).toBe(1);
+    expect(readCustomerReply('Free? Come on. [LIE]', 3).patience).toBe(0);
+    expect(nextPatience(1, 'weak')).toBe(0);
+    expect(nextPatience(0, 'weak')).toBe(0);
   });
 
-  it('only lets patience go down: a missing or higher tag keeps it', () => {
-    expect(readCustomerReply('Okay.', 3).patience).toBe(3);
-    expect(readCustomerReply('Okay. [P=5]', 3).patience).toBe(3);
-    expect(readCustomerReply('Okay. [P=1]', 3).patience).toBe(1);
+  it('counts a missing or unknown tag as weak, and never scores the knock', () => {
+    expect(readCustomerReply('Okay.', 3)).toMatchObject({ patience: 2, event: 'weak' });
+    expect(readCustomerReply('Okay. [MAYBE]', 3).patience).toBe(2);
+    expect(readCustomerReply('Old tag. [P=5]', 3).patience).toBe(2);
+    expect(readCustomerReply('Hi, can I help you?', 3, false)).toMatchObject({ patience: 3, event: null, ended: false });
   });
 
-  it('closes the door at 0 even when the model kept talking', () => {
-    expect(readCustomerReply('Yeah, probably. [P=0]', 1)).toEqual({
-      text: "Look, I'm not interested. I've got to go.",
+  it('closes the door on abuse, keeping what the homeowner said', () => {
+    expect(readCustomerReply('Excuse me? No. [ABUSE]', 4)).toEqual({
+      text: "Excuse me? No. We're done here.",
       ended: true,
       patience: 0,
+      event: 'abuse',
     });
-    // The model's own goodbye stands.
-    expect(readCustomerReply('Not today, thanks. [END] [P=0]', 1).text).toBe('Not today, thanks.');
   });
 
-  it('never shows an empty line', () => {
-    expect(readCustomerReply('(closes the door) [END]', 2).text).toBe('No thanks. Have a good one.');
+  it('ends on a plain goodbye even without [END]', () => {
+    expect(readCustomerReply("I'm good, thanks. Have a nice day. [WEAK]", 3)).toMatchObject({ ended: true, patience: 2 });
+    expect(readCustomerReply("I'm gonna shut the door now. [WEAK]", 3).ended).toBe(true);
+    expect(readCustomerReply('Goodnight.', 3).ended).toBe(true);
+    expect(readCustomerReply('Who are you with? [OK]', 3).ended).toBe(false);
+    expect(readCustomerReply('Alright, Saturday works. Let\'s do it. [OK] [END]', 3).ended).toBe(true);
+  });
+
+  it('at 0 keeps a goodbye but turns anything else, even a yes, into the out-of-patience line', () => {
+    expect(readCustomerReply('Yeah, probably. [WEAK]', 1)).toMatchObject({ text: OUT_OF_PATIENCE, ended: true, patience: 0 });
+    expect(readCustomerReply('Sure, sign me up. [WEAK] [END]', 1).text).toBe(OUT_OF_PATIENCE);
+    expect(readCustomerReply('Not today. Have a good one. [WEAK]', 1).text).toBe('Not today. Have a good one.');
+  });
+
+  it('strips tags and stage directions, and never shows an empty line', () => {
+    expect(readCustomerReply('(wipes hands) Who are you with? *sighs* [OK]', 3).text).toBe('Who are you with?');
+    expect(readCustomerReply('(closes the door) [END] [OK]', 2).text).toBe('No thanks. Have a good one.');
+  });
+});
+
+describe('priceNote', () => {
+  const customer = practiceCustomer('tmobile-customer', 7);
+  const card = { role: 'screen' as const, text: 'card' };
+  const hi = { role: 'customer' as const, text: 'Hi.' };
+
+  it('flags a price that is not the card, or any price before the card', () => {
+    expect(priceNote([hi, card, { role: 'rep', text: 'It says $45 a month with AutoPay.' }], customer)).toBe(
+      '[Note only you know: the rep just said $45, but the screen they showed you said $60.]'
+    );
+    expect(priceNote([hi, { role: 'rep', text: "It's 45 dollars." }], customer)).toBe(
+      '[Note only you know: the rep just quoted $45 without showing you any screen.]'
+    );
+  });
+
+  it('is quiet for the card price, the homeowner\'s own bill, plan names, and older lines', () => {
+    expect(priceNote([hi, card, { role: 'rep', text: 'Fiber 1 Gig, $60 with AutoPay.' }], customer)).toBeNull();
+    expect(priceNote([hi, { role: 'rep', text: `So you pay $${customer.bill} now?` }], customer)).toBeNull();
+    expect(priceNote([hi, { role: 'rep', text: 'Fiber 500 or 1 Gig, 300 Mbps.' }], customer)).toBeNull();
+    expect(priceNote([{ role: 'rep', text: '$45!' }, hi, { role: 'rep', text: 'Anyway.' }], customer)).toBeNull();
+  });
+});
+
+describe('feedbackProblem', () => {
+  const good = 'Score: 6/10\nResult: No sale\nWhat worked:\n- "Who\'s your internet with?"\nFix next time: Ask about the bill.\nTry this line: "What bugs you most about it?"';
+
+  it('passes the exact shape', () => {
+    expect(feedbackProblem(good)).toBeNull();
+  });
+
+  it('catches an extra section, a missing one, a bad Result, a price in the Try line', () => {
+    expect(feedbackProblem(`${good}\nHonesty flags: never promise that.`)).toMatch(/extra/);
+    expect(feedbackProblem(good.replace(/Fix next time: .*\n/, ''))).toMatch(/missing|out of order/);
+    expect(feedbackProblem(good.replace('No sale', 'Maybe'))).toMatch(/Result/);
+    expect(feedbackProblem(good.replace('What bugs you most about it?', 'It\'s $60 a month'))).toMatch(/dollar/);
   });
 });
 
