@@ -71,3 +71,18 @@ describe('callAskModel self-check drift', () => {
     expect(out.draft).toBeUndefined();
   });
 });
+
+describe('callAskModel self-check growth', () => {
+  it('keeps the draft when the check pastes an earlier reply in front of it', async () => {
+    const earlier = 'No, Tim Schuitema is Monday, Oct 12. Tomorrow (Sep 28) is Jordan Stahr at 2221 Swensberg.';
+    const draft = 'Text: "Hey Tim, quick heads up, your install is Monday, Oct 12, not the 28th. My bad."';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(`${earlier}\n\n${draft}`)));
+    const out = await callAskModel(
+      config,
+      [{ role: 'user', content: 'tim is tmrw?' }, { role: 'assistant', content: earlier }, { role: 'user', content: 'write me the text to tim' }],
+      undefined,
+      'check it'
+    );
+    expect(out.answer).toBe(draft);
+  });
+});

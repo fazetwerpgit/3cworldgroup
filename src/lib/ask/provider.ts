@@ -82,12 +82,14 @@ export async function callAskModel(
       Math.min(left, 12_000),
       false
     );
-    // A cut-off, a comment about the check, a gutted reply, or a different reply (in live use the check
-    // sometimes answered with an earlier turn's reply instead of the draft) keeps the draft.
+    // The check only cuts or softens. A cut-off, a comment about the check, a gutted reply, a reply
+    // that grew (in live use it sometimes pasted an earlier turn's reply in front of the draft), or a
+    // different reply (it sometimes answered with an earlier turn's reply outright) keeps the draft.
     if (
       checked.truncated ||
       /^(looks|no changes|the reply|this reply|checked|all good)/i.test(checked.answer) ||
       checked.answer.length < draft.answer.length * 0.4 ||
+      checked.answer.length > draft.answer.length * 1.15 + 20 ||
       !revisesDraft(checked.answer, draft.answer)
     ) {
       return draft;
