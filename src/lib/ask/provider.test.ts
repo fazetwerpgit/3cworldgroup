@@ -23,11 +23,12 @@ describe('callAskModel with a cut-off answer', () => {
 
 describe('callAskModel self-check', () => {
   it('returns the checked copy, and keeps the draft when the check fails', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(reply('Draft with a made-up claim.')).mockResolvedValueOnce(reply('Clean answer.'));
+    const draft = 'Tell her to try another card, and fiber fixes her lag for sure.';
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply('Tell her to try another card.'));
     vi.stubGlobal('fetch', fetchMock);
-    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it')).answer).toBe('Clean answer.');
+    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it')).answer).toBe('Tell her to try another card.');
     const sent = JSON.parse(fetchMock.mock.calls[1][1].body).messages;
-    expect(sent.slice(-2)).toEqual([{ role: 'assistant', content: 'Draft with a made-up claim.' }, { role: 'user', content: 'check it' }]);
+    expect(sent.slice(-2)).toEqual([{ role: 'assistant', content: draft }, { role: 'user', content: 'check it' }]);
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply('Draft.')).mockResolvedValueOnce(new Response('', { status: 500 })));
     expect((await callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it')).answer).toBe('Draft.');
@@ -53,5 +54,20 @@ describe('callAskModel self-check guards', () => {
     expect(await ask()).toMatchObject({ answer: trimmed, draft });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(draft)));
     expect((await ask()).draft).toBeUndefined();
+  });
+});
+
+describe('callAskModel self-check drift', () => {
+  it("keeps the draft when the check answers with an earlier turn's reply", async () => {
+    const earlier = 'Not sure on that one. Run the second address as its own order in a fresh private window and let the screen tell you.';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply('Anytime. Go get one on the board.')).mockResolvedValueOnce(reply(earlier)));
+    const out = await callAskModel(
+      config,
+      [{ role: 'user', content: 'two houses?' }, { role: 'assistant', content: earlier }, { role: 'user', content: 'Thanks dude' }],
+      undefined,
+      'check it'
+    );
+    expect(out.answer).toBe('Anytime. Go get one on the board.');
+    expect(out.draft).toBeUndefined();
   });
 });

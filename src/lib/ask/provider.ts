@@ -82,8 +82,14 @@ export async function callAskModel(
       Math.min(left, 12_000),
       false
     );
-    // A cut-off, a comment about the check, or a gutted reply keeps the draft.
-    if (checked.truncated || /^(looks|no changes|the reply|this reply|checked|all good)/i.test(checked.answer) || checked.answer.length < draft.answer.length * 0.4) {
+    // A cut-off, a comment about the check, a gutted reply, or a different reply (in live use the check
+    // sometimes answered with an earlier turn's reply instead of the draft) keeps the draft.
+    if (
+      checked.truncated ||
+      /^(looks|no changes|the reply|this reply|checked|all good)/i.test(checked.answer) ||
+      checked.answer.length < draft.answer.length * 0.4 ||
+      !revisesDraft(checked.answer, draft.answer)
+    ) {
       return draft;
     }
     const u = draft.usage;
@@ -100,6 +106,14 @@ export async function callAskModel(
   } catch {
     return draft;
   }
+}
+
+/** Whether `checked` is an edit of `draft`: most of its words come from the draft. */
+function revisesDraft(checked: string, draft: string): boolean {
+  const inDraft = new Set(draft.toLowerCase().match(/[a-z0-9']+/g) ?? []);
+  const out = checked.toLowerCase().match(/[a-z0-9']+/g) ?? [];
+  if (out.length === 0) return false;
+  return out.filter((word) => inDraft.has(word)).length / out.length >= 0.7;
 }
 
 /**
