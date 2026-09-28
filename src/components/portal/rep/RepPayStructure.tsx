@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Check, Clock3, Edit3 } from 'lucide-react';
+import { AlertCircle, Check, CircleHelp, Clock3, Edit3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ratesArePending, CommissionConfig, FieldRole, IBO_FIELD_ROLES, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
+import { PayHelpSheet } from './PayHelpSheet';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import l from './rep-learn.module.css';
@@ -50,6 +51,8 @@ export function RepPayStructure() {
   const [draft, setDraft] = useState<CommissionConfig[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
 
   const isAdmin = isRole('admin');
 
@@ -140,7 +143,7 @@ export function RepPayStructure() {
         <LoadFailed what="pay structure" onRetry={() => void fetchStructure()} />
       ) : (
         <>
-          {(error || success || ratesPending) && (
+          {(error || success || (ratesPending && data.scope === 'all')) && (
             <div className={l.payNotices}>
               {error && (
                 <div className={`${p.notice} ${p.noticeRed}`} role="alert">
@@ -154,7 +157,7 @@ export function RepPayStructure() {
                   <span>{success}</span>
                 </div>
               )}
-              {ratesPending && (
+              {ratesPending && data.scope === 'all' && (
                 <div className={`${p.notice} ${p.noticeAmber}`} role="status">
                   <Clock3 size={16} aria-hidden="true" />
                   <span>Leadership is confirming the final rates. These numbers are placeholders for now.</span>
@@ -165,19 +168,30 @@ export function RepPayStructure() {
 
           {data.scope === 'own' ? (
             <div className={l.rate}>
-              <p className={s.kicker}>Your rate</p>
-              {ownRoleLabel !== null ? <p className={l.rateRole}>{ownRoleLabel}</p> : null}
-              <dl className={l.rateFigures}>
-                <div>
-                  <dt>Base</dt>
-                  <dd>{ownTier?.baseRate ?? 0}%</dd>
-                </div>
-                <div>
-                  <dt>Override</dt>
-                  <dd>{ownTier?.overrideRate == null ? '—' : `${ownTier.overrideRate}%`}</dd>
-                </div>
-              </dl>
-              <p className={l.rateNote}>{ownTier?.notes || TIER_NOTES[ownTier?.fieldRole ?? 'entry_rep']}</p>
+              {ratesPending ? null : (
+                <>
+                  <p className={s.kicker}>Your rate</p>
+                  {ownRoleLabel !== null ? <p className={l.rateRole}>{ownRoleLabel}</p> : null}
+                  <dl className={l.rateFigures}>
+                    <div>
+                      <dt>Base</dt>
+                      <dd>{ownTier?.baseRate ?? 0}%</dd>
+                    </div>
+                    <div>
+                      <dt>Override</dt>
+                      <dd>{ownTier?.overrideRate == null ? '—' : `${ownTier.overrideRate}%`}</dd>
+                    </div>
+                  </dl>
+                  <p className={l.rateNote}>{ownTier?.notes || TIER_NOTES[ownTier?.fieldRole ?? 'entry_rep']}</p>
+                </>
+              )}
+              {/* Reps look here for "when do I get paid": the dated pay schedule lives in How pay works. */}
+              <p className={l.rateNote}>When you get paid for each install week, missed installs and chargebacks.</p>
+              <button type="button" className={s.btnSecondary} onClick={() => setHelpOpen(true)}>
+                <CircleHelp size={16} aria-hidden="true" />
+                How pay works
+              </button>
+              {helpOpen ? <PayHelpSheet onClose={closeHelp} /> : null}
             </div>
           ) : (
             <div>

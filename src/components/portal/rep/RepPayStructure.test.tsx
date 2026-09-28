@@ -69,3 +69,19 @@ describe('RepPayStructure (all tiers)', () => {
     expect(JSON.parse((put![1] as RequestInit).body as string).tiers).toEqual(TIERS);
   });
 });
+
+describe('RepPayStructure (a rep, own tier)', () => {
+  it('shows no placeholder rate while rates are pending, and opens How pay works', async () => {
+    fetchMock.mockImplementation(async () =>
+      new Response(JSON.stringify({ tiers: [{ fieldRole: 'internal_rep', baseRate: 0 }], scope: 'own', updatedAt: null, updatedByName: null }), { status: 200 }),
+    );
+    await act(async () => root.render(<RepPayStructure />));
+    await flush();
+    expect(container.textContent).not.toContain('0%');
+    expect(container.textContent).not.toMatch(/placeholder/i);
+
+    act(() => button('How pay works').click());
+    expect(document.body.textContent).toContain('How T-Fiber pay works');
+    expect(document.body.textContent).toContain('14th–18th');
+  });
+});
