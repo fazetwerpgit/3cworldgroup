@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { DoorClosed, DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Volume2, VolumeX } from 'lucide-react';
+import { BorderBeam } from 'border-beam';
+import { ThinkingOrb } from 'thinking-orbs';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ASK_IDLE_RESET_MS } from '@/lib/ask/chat';
 import {
@@ -192,6 +195,7 @@ export function RepPractice({
   const [talkOff, setTalkOff] = useState(() => typeof window !== 'undefined' && readTalkOff());
   const [listening, setListening] = useState(false);
   const [micBroken, setMicBroken] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<Recognition | null>(null);
   const heardRef = useRef('');
@@ -588,7 +592,7 @@ export function RepPractice({
           <li className={pr.customer}>
             <span className={pr.speaker}>Homeowner</span>
             <p className={`${a.answer} ${a.pending}`} role="status" aria-label="The homeowner is answering">
-              …
+              <ThinkingOrb state="composing" size={20} theme="dark" aria-hidden="true" />
             </p>
           </li>
         ) : null}
@@ -597,23 +601,30 @@ export function RepPractice({
       {session.ended ? (
         <div className={pr.after}>
           <p className={pr.over}>Session over</p>
-          {session.feedback ? (
-            <section className={`${s.panel} ${pr.feedback}`} aria-labelledby="practice-feedback-h">
-              <div className={pr.feedbackHead}>
-                <h2 id="practice-feedback-h" className={s.kicker}>
-                  Feedback
-                </h2>
-                {session.feedback.score !== null ? (
-                  <span className={pr.score}>{session.feedback.score}/10</span>
-                ) : null}
-              </div>
-              <PracticeFeedback text={session.feedback.text} />
+          {session.feedback || busy === 'feedback' ? (
+            <BorderBeam size="md" active={busy === 'feedback' && !reducedMotion} theme="dark" className={pr.feedbackBeam}>
+              {session.feedback ? (
+                <section className={`${s.panel} ${pr.feedback}`} aria-labelledby="practice-feedback-h">
+                  <div className={pr.feedbackHead}>
+                    <h2 id="practice-feedback-h" className={s.kicker}>
+                      Feedback
+                    </h2>
+                    {session.feedback.score !== null ? (
+                      <span className={pr.score}>{session.feedback.score}/10</span>
+                    ) : null}
+                  </div>
+                  <PracticeFeedback text={session.feedback.text} />
 
-            </section>
-          ) : busy === 'feedback' ? (
-            <p className={`${a.answer} ${a.pending}`} role="status">
-              Thinking…
-            </p>
+                </section>
+              ) : (
+                <section className={`${s.panel} ${pr.feedback}`} aria-busy="true">
+                  <p className={pr.thinking} role="status">
+                    <ThinkingOrb state="composing" size={20} theme="dark" aria-hidden="true" />
+                    Thinking…
+                  </p>
+                </section>
+              )}
+            </BorderBeam>
           ) : failed ? null : (
             <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void requestFeedback(session)}>
               Get feedback
@@ -654,7 +665,11 @@ export function RepPractice({
               disabled={busy !== null && !listening}
               onClick={() => (listening ? stopListening(true) : listen())}
             >
-              <Mic size={26} aria-hidden="true" />
+              {listening ? (
+                <ThinkingOrb state="listening" size={20} theme="light" aria-hidden="true" />
+              ) : (
+                <Mic size={26} aria-hidden="true" />
+              )}
               {listening ? 'Listening… tap to send' : 'Tap to talk'}
             </button>
           ) : null}

@@ -143,10 +143,10 @@
   transition: transform 120ms ease-out;
 }
 
+/* Listening: a listening orb takes the mic icon's place, so no pulse here. */
 .mic[aria-pressed='true'] {
   background: var(--c-lime);
   color: var(--c-ground);
-  animation: listening 1.4s ease-in-out infinite;
 }
 
 .mic:active {
@@ -161,18 +161,6 @@
 .mic:focus-visible {
   outline: 2px solid var(--c-lime-hi);
   outline-offset: 2px;
-}
-
-@keyframes listening {
-  50% {
-    box-shadow: 0 0 0 6px var(--c-lime-wash);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mic[aria-pressed='true'] {
-    animation: none;
-  }
 }
 
 .input {
@@ -237,12 +225,31 @@
   letter-spacing: 0.08em;
 }
 
+/* The border beam wrapper clips its child, so the panel's lift lives on it. */
+.feedbackBeam {
+  box-shadow: var(--c-lift);
+}
+
+.feedbackBeam > .feedback {
+  box-shadow: none;
+}
+
 .feedback {
   display: grid;
   gap: var(--s3);
   padding: var(--s4);
   color: var(--c-text);
   font-size: var(--t-body);
+}
+
+/* Waiting on the coach: the orb beside Thinking… inside the feedback card. */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
 }
 
 .feedbackHead {

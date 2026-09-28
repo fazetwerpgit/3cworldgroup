@@ -64,6 +64,8 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
   Element.prototype.scrollIntoView = () => {};
+  window.matchMedia ??= ((query: string) =>
+    ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
   window.sessionStorage.clear();
   window.localStorage.clear();
   container = document.createElement('div');
