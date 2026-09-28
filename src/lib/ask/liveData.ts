@@ -302,7 +302,7 @@ async function callsSection(db: Db, user: Data, now: Date, zone: Zone): Promise<
     const started = call.at.getTime() <= now.getTime();
     return `- ${call.title}: ${dayLabel(call.at, zone)} ${timeLabel(call.at, zone)}${started ? ' (started, still on)' : ''}`;
   });
-  return `Next team calls (${zone[1]} time; join from Calls):\n${lines.join('\n')}`;
+  return `Next team calls (${zone[1]} time; Join is on the Calls page, in the Menu):\n${lines.join('\n')}`;
 }
 
 // ---------- Forms ----------
